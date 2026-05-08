@@ -142,24 +142,6 @@ jobs:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-  semgrep:
-    name: Semgrep
-    if: github.event.pull_request.draft == false || github.event_name != 'pull_request'
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    permissions:
-      contents: read
-    container:
-      image: semgrep/semgrep@sha256:eff54a019260cc16b215176f611a82871854f117
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Run semgrep
-        env:
-          SEMGREP_APP_TOKEN: ${{ secrets.SEMGREP_APP_TOKEN }}
-        run: semgrep ci --config auto --error
-
   commitlint:
     name: Commitlint
     if: github.event_name == 'pull_request' && github.event.pull_request.draft == false

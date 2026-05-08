@@ -48,7 +48,9 @@ android {
     }
 
     kotlin {
-        jvmToolchain(17)
+        // Toolchain (JDK the compiler runs on) tracks latest LTS; java source/target compat stays
+        // at 17 because that's the highest the Android docs guarantee for API 34+ desugaring.
+        jvmToolchain(25)
     }
 
     buildFeatures {

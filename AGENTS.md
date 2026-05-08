@@ -149,4 +149,4 @@ Source of truth: `gradle/libs.versions.toml`. Sync this section when bumping.
 - Compose BOM: `2026.04.01`
 - ObjectBox: `5.4.2`
 - LiteRT-LM: `com.google.ai.edge.litertlm:litertlm-android:0.11.0` (bundles `libLiteRt.so` — do NOT also add `:litert` directly)
-- minSdk 31 / targetSdk 35 / compileSdk 35. JVM toolchain 17.
+- minSdk 31 / targetSdk 35 / compileSdk 35. JVM toolchain 25 (latest LTS); Java source/target compat 17 (Android max).

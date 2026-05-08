@@ -14,13 +14,13 @@ Scaffold. Phase 0 validation pending. The full README pass lands later.
 - Gradle KTS + version catalog (`gradle/libs.versions.toml`)
 - Gemma 4 E4B via LiteRT-LM, on-device only
 - ObjectBox `5.4.2` (structured tags) + markdown (entry source-of-truth)
-- Android: minSdk 31 / targetSdk 35 / compileSdk 35, JVM toolchain 17
+- Android: minSdk 31 / targetSdk 35 / compileSdk 35, JVM toolchain 25 (Java source/target compat 17)
 
 ## Prerequisites
 
 | Tool | Required for | Install |
 |---|---|---|
-| JDK 17+ (Temurin) | Gradle runtime | `brew install --cask temurin` |
+| JDK 25 LTS (Temurin) | Gradle runtime + Kotlin toolchain | `brew install --cask temurin` |
 | Android SDK + `adb` | build + install on device | Android Studio, or `brew install --cask android-commandlinetools` |
 | System Gradle | one-time wrapper bootstrap | `brew install gradle` |
 | `lefthook` | git hooks | `brew install lefthook` |

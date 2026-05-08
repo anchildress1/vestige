@@ -1,0 +1,9 @@
+{
+  "name": "vestige-tooling",
+  "private": true,
+  "description": "Tooling-only package for commitlint. The Android app does not depend on this.",
+  "devDependencies": {
+    "@commitlint/cli": "^19.6.1",
+    "@commitlint/config-conventional": "^19.6.0"
+  }
+}

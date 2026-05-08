@@ -1,0 +1,25 @@
+pre-commit:
+  parallel: false
+  commands:
+    ktlint-format:
+      glob: '*.{kt,kts}'
+      run: make ktlint-format FILES="{staged_files}"
+      stage_fixed: true
+    secret-scan:
+      run: make secret-scan
+    actionlint:
+      glob: '.github/workflows/*.yml'
+      run: actionlint {staged_files}
+
+commit-msg:
+  commands:
+    commitlint:
+      run: make commitlint COMMIT_MSG_FILE={1}
+
+pre-push:
+  parallel: true
+  commands:
+    build:
+      run: make build
+    test:
+      run: make test

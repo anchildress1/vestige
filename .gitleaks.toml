@@ -1,0 +1,10 @@
+title = "vestige gitleaks config"
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Files allowed to contain false-positive secret-like strings."
+paths = [
+  "gradle/wrapper/gradle-wrapper.properties",
+]

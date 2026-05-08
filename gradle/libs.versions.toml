@@ -1,0 +1,92 @@
+[versions]
+# Build tooling
+agp = "9.0.0"
+kotlin = "2.3.21"
+ksp = "2.3.7"
+gradle = "9.1.0"
+
+# AndroidX core
+androidx-core-ktx = "1.15.0"
+androidx-activity-compose = "1.10.1"
+androidx-lifecycle = "2.9.0"
+
+# Compose
+compose-bom = "2026.04.01"
+
+# Persistence
+objectbox = "5.4.2"
+
+# Inference — litertlm-android wraps Gemma 4 .litertlm execution and bundles libLiteRt.so.
+# Pre-1.0 and moves fast; pin precisely and bump deliberately. Ships via Google Maven
+# (https://dl.google.com/dl/android/maven2). The lower-level com.google.ai.edge.litert:litert
+# coord exists at 2.1.4 but is intentionally NOT a direct dependency — adding it would collide
+# on libLiteRt.so at :app:mergeDebugNativeLibs.
+litert-lm = "0.11.0"
+
+# Quality
+# detekt deferred to v1.5: 1.23.x calls a Gradle 10-deprecated API in plugin apply, and
+# 2.0 is still alpha at scaffold time. ktlint covers the load-bearing rules until detekt
+# 2.0 ships stable. See v1.5-backlog.md.
+kover = "0.9.1"
+ktlint-cli = "1.5.0"
+
+# Testing
+junit = "4.13.2"
+junit-jupiter = "5.11.4"
+junit-platform = "1.11.4"
+mockk = "1.13.13"
+turbine = "1.2.1"
+androidx-test-ext-junit = "1.2.1"
+androidx-test-espresso = "3.6.1"
+robolectric = "4.14.1"
+kotlinx-coroutines-test = "1.10.1"
+
+[libraries]
+androidx-core-ktx = { module = "androidx.core:core-ktx", version.ref = "androidx-core-ktx" }
+androidx-activity-compose = { module = "androidx.activity:activity-compose", version.ref = "androidx-activity-compose" }
+androidx-lifecycle-runtime-ktx = { module = "androidx.lifecycle:lifecycle-runtime-ktx", version.ref = "androidx-lifecycle" }
+androidx-lifecycle-viewmodel-compose = { module = "androidx.lifecycle:lifecycle-viewmodel-compose", version.ref = "androidx-lifecycle" }
+
+# Compose
+compose-bom = { module = "androidx.compose:compose-bom", version.ref = "compose-bom" }
+compose-ui = { module = "androidx.compose.ui:ui" }
+compose-ui-graphics = { module = "androidx.compose.ui:ui-graphics" }
+compose-ui-tooling = { module = "androidx.compose.ui:ui-tooling" }
+compose-ui-tooling-preview = { module = "androidx.compose.ui:ui-tooling-preview" }
+compose-ui-test-junit4 = { module = "androidx.compose.ui:ui-test-junit4" }
+compose-ui-test-manifest = { module = "androidx.compose.ui:ui-test-manifest" }
+compose-material3 = { module = "androidx.compose.material3:material3" }
+
+# ObjectBox
+objectbox-android = { module = "io.objectbox:objectbox-android", version.ref = "objectbox" }
+objectbox-kotlin = { module = "io.objectbox:objectbox-kotlin", version.ref = "objectbox" }
+
+# Inference (Gemma 4 via LiteRT-LM)
+litert-lm = { module = "com.google.ai.edge.litertlm:litertlm-android", version.ref = "litert-lm" }
+
+# Testing — JVM
+junit = { module = "junit:junit", version.ref = "junit" }
+junit-jupiter-api = { module = "org.junit.jupiter:junit-jupiter-api", version.ref = "junit-jupiter" }
+junit-jupiter-engine = { module = "org.junit.jupiter:junit-jupiter-engine", version.ref = "junit-jupiter" }
+junit-platform-launcher = { module = "org.junit.platform:junit-platform-launcher", version.ref = "junit-platform" }
+mockk = { module = "io.mockk:mockk", version.ref = "mockk" }
+turbine = { module = "app.cash.turbine:turbine", version.ref = "turbine" }
+kotlinx-coroutines-test = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-test", version.ref = "kotlinx-coroutines-test" }
+robolectric = { module = "org.robolectric:robolectric", version.ref = "robolectric" }
+
+# Testing — instrumented
+androidx-test-ext-junit = { module = "androidx.test.ext:junit", version.ref = "androidx-test-ext-junit" }
+androidx-test-espresso-core = { module = "androidx.test.espresso:espresso-core", version.ref = "androidx-test-espresso" }
+
+[plugins]
+android-application = { id = "com.android.application", version.ref = "agp" }
+# AGP 9.0+ ships kotlin-android built in — no separate plugin needed.
+kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
+ksp = { id = "com.google.devtools.ksp", version.ref = "ksp" }
+objectbox = { id = "io.objectbox", version.ref = "objectbox" }
+kover = { id = "org.jetbrains.kotlinx.kover", version.ref = "kover" }
+
+[bundles]
+compose-ui = ["compose-ui", "compose-ui-graphics", "compose-ui-tooling-preview", "compose-material3"]
+compose-debug = ["compose-ui-tooling", "compose-ui-test-manifest"]
+test-jvm = ["junit-jupiter-api", "mockk", "turbine", "kotlinx-coroutines-test"]

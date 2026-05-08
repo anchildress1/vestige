@@ -2,7 +2,7 @@ pre-commit:
   parallel: false
   commands:
     ktlint-format:
-      glob: '*.{kt,kts}'
+      glob: '**/*.{kt,kts}'
       run: make ktlint-format FILES="{staged_files}"
       stage_fixed: true
     secret-scan:

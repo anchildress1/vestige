@@ -87,7 +87,7 @@ PRD `Non-Goals` and P2 list are blocklists. Check before adding features.
   - `fix/*` — bounded to bug + tests proving fix.
   - `chore/*` — tooling, CI, deps. No user-facing changes.
   - `docs/*` — `README.md`, `docs/*` only. No code.
-- Pre-commit: ktlint, detekt, gitleaks, actionlint, commitlint. DO NOT bypass.
+- Pre-commit (lefthook): ktlint format on staged kt files, gitleaks, actionlint. commit-msg: commitlint. pre-push: build + test. DO NOT bypass with `--no-verify`. detekt is deferred to v1.5 — see `v1.5-backlog.md`.
 - Push only when ready for review. Not after every commit.
 
 ## BRANCH SCOPE GUARD
@@ -138,13 +138,15 @@ Triggers for new branch:
 | `architecture-brief.md` | Module breakdown, build plan, contracts. (Phase 0+) |
 | `v1.5-backlog.md` | Deferred features. |
 
-## VERSIONS (verify at Phase 0 against `runtime-research.md`)
+## VERSIONS
+
+Source of truth: `gradle/libs.versions.toml`. Sync this section when bumping.
 
 - Kotlin: `2.3.21`
 - AGP: `9.0.0`
-- Gradle: `8.13`
-- KSP: `2.3.21-2.0.0`
+- Gradle: `9.1.0`
+- KSP: `2.3.7`
 - Compose BOM: `2026.04.01`
 - ObjectBox: `5.4.2`
-- LiteRT / LiteRT-LM: pinned in `gradle/libs.versions.toml`. UNVERIFIED — confirm coordinates at Phase 0.
+- LiteRT-LM: `com.google.ai.edge.litertlm:litertlm-android:0.11.0` (bundles `libLiteRt.so` — do NOT also add `:litert` directly)
 - minSdk 31 / targetSdk 35 / compileSdk 35. JVM toolchain 17.

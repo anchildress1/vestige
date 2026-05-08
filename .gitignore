@@ -1,0 +1,53 @@
+# Gradle
+.gradle/
+build/
+!gradle/wrapper/gradle-wrapper.jar
+!**/src/**/build/
+!**/src/**/build/
+
+# Android
+*.apk
+*.aab
+*.ap_
+*.dex
+*.class
+bin/
+gen/
+out/
+release/
+local.properties
+*.iml
+captures/
+.cxx/
+.externalNativeBuild/
+
+# Kotlin / KSP
+.kotlin/
+
+# IntelliJ / Android Studio
+.idea/*
+!.idea/codeStyles/
+!.idea/inspectionProfiles/
+!.idea/runConfigurations/
+
+# Coverage / reports
+**/build/reports/
+**/build/test-results/
+**/build/jacoco/
+**/build/kover/
+
+# OS / editor
+.DS_Store
+*.swp
+*.log
+logs/
+
+# Env / secrets
+.env
+.env.*
+!.env.example
+.secrets.baseline.tmp
+
+# Models — Gemma 4 .litertlm download lives in app-internal storage at runtime
+*.litertlm
+*.tflite

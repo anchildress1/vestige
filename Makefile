@@ -1,4 +1,4 @@
-.PHONY: install bootstrap-wrapper build assemble test lint format ktlint-format ktlint-check detekt secret-scan commitlint ci clean
+.PHONY: install bootstrap-wrapper doctor build assemble test lint format ktlint-format ktlint-check detekt secret-scan commitlint ci clean
 
 GRADLE := ./gradlew
 KTLINT := $(or $(shell command -v ktlint 2>/dev/null), $(HOME)/.local/bin/ktlint)
@@ -8,6 +8,9 @@ install:
 	@if [ ! -f gradle/wrapper/gradle-wrapper.jar ]; then $(MAKE) bootstrap-wrapper; fi
 	@command -v lefthook >/dev/null 2>&1 || { echo "❌ lefthook not found. Install: https://github.com/evilmartians/lefthook"; exit 1; }
 	lefthook install
+
+doctor:
+	./scripts/doctor.sh
 
 # Generate the gradle-wrapper.jar via a system Gradle install. One-shot bootstrap.
 bootstrap-wrapper:

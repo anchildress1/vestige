@@ -36,6 +36,7 @@ Scaffold. Phase 0 validation pending. The full README pass lands later.
 
 ```bash
 make install          # bootstrap gradle wrapper, install lefthook hooks
+make doctor           # verify local toolchain and environment variables
 make build            # assemble debug APK
 make test             # unit tests + Kover XML coverage + 80% verification
 make lint             # ktlint + detekt

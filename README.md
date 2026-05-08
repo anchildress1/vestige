@@ -31,6 +31,7 @@ Scaffold. Phase 0 validation pending. The full README pass lands later.
 | `gh` | repo ops | `brew install gh` |
 
 `ANDROID_HOME` must be set and `$ANDROID_HOME/platform-tools` must be on `PATH` so `adb` resolves.
+Gradle dependency verification is pinned in `gradle/verification-metadata.xml`; refresh it only when changing dependencies.
 
 ## Build
 

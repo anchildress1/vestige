@@ -40,6 +40,7 @@ make doctor           # verify local toolchain and environment variables
 make build            # assemble debug APK
 make test             # unit tests + Kover XML coverage + 80% verification
 make lint             # ktlint + detekt + Android lint
+make verify           # lint + test + build + staged secret scan
 make ci               # full local check (lint + test + build)
 make clean
 ```

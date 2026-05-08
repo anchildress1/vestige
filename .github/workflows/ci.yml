@@ -78,8 +78,8 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@50e97c2cd7a37755bbfafc9c5b7cafaece252f6e # v6.1.0
 
-      - name: Run unit tests + Kover XML report
-        run: ./gradlew :app:testDebugUnitTest :app:koverXmlReport
+      - name: Run unit tests + Kover verification
+        run: ./gradlew :app:testDebugUnitTest :app:koverXmlReport :app:koverVerify
 
       - name: Upload test report
         uses: actions/upload-artifact@v4

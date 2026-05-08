@@ -35,9 +35,9 @@ Scaffold. Phase 0 validation pending. The full README pass lands later.
 ## Build
 
 ```bash
-make install          # bootstrap gradle wrapper, install npm deps, install lefthook hooks
+make install          # bootstrap gradle wrapper, install lefthook hooks
 make build            # assemble debug APK
-make test             # unit tests + Kover XML coverage
+make test             # unit tests + Kover XML coverage + 80% verification
 make lint             # ktlint + detekt
 make ci               # full local check (lint + test + build)
 make clean

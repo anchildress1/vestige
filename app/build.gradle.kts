@@ -1,3 +1,5 @@
+import kotlinx.kover.gradle.plugin.dsl.CoverageUnit
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
@@ -112,6 +114,24 @@ tasks.withType<Test>().configureEach {
     useJUnitPlatform()
 }
 
-// Kover verify rule deferred until real production code lands. Re-enable with
-// minBound(80) (per AGENTS.md) once :app has anything beyond Compose / theme stubs.
-// See v1.5-backlog.md.
+kover {
+    reports {
+        filters {
+            excludes {
+                classes(
+                    "dev.anchildress1.vestige.MainActivity",
+                    "dev.anchildress1.vestige.VestigeApplication",
+                    "dev.anchildress1.vestige.ui.theme.*",
+                )
+            }
+        }
+        verify {
+            rule {
+                minBound(80, CoverageUnit.LINE)
+            }
+            rule {
+                minBound(80, CoverageUnit.BRANCH)
+            }
+        }
+    }
+}

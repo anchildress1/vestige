@@ -12,7 +12,7 @@ concurrency:
 
 jobs:
   lint:
-    name: Lint (ktlint + actionlint)
+    name: Lint (ktlint + detekt + actionlint)
     if: github.event.pull_request.draft == false || github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -37,8 +37,17 @@ jobs:
           chmod +x ktlint
           sudo mv ktlint /usr/local/bin/
 
+      - name: Install detekt
+        run: |
+          curl -sSL "https://github.com/detekt/detekt/releases/download/v1.23.8/detekt-cli-1.23.8.zip" -o detekt.zip
+          unzip -q detekt.zip
+          sudo install -m 755 detekt-cli-1.23.8/bin/detekt-cli /usr/local/bin/detekt
+
       - name: Run ktlint
         run: ktlint
+
+      - name: Run detekt
+        run: make detekt
 
       - name: Run actionlint
         uses: rhysd/actionlint@03d0035246f3e81f36aed592ffb4bebf33a03106 # v1.7.7

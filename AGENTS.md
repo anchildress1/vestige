@@ -87,7 +87,7 @@ PRD `Non-Goals` and P2 list are blocklists. Check before adding features.
   - `fix/*` — bounded to bug + tests proving fix.
   - `chore/*` — tooling, CI, deps. No user-facing changes.
   - `docs/*` — `README.md`, `docs/*` only. No code.
-- Pre-commit (lefthook): ktlint format on staged kt files, gitleaks, actionlint. commit-msg: commitlint. pre-push: build + test. DO NOT bypass with `--no-verify`. detekt is deferred to v1.5 — see `v1.5-backlog.md`.
+- Pre-commit (lefthook): ktlint format on staged kt files, detekt over `app/src`, gitleaks, actionlint. commit-msg: commitlint (bash regex, no node toolchain). pre-push: build + test. DO NOT bypass with `--no-verify`.
 - Push only when ready for review. Not after every commit.
 
 ## BRANCH SCOPE GUARD

@@ -1,7 +1,8 @@
-.PHONY: install bootstrap-wrapper build assemble test lint format ktlint-format ktlint-check secret-scan commitlint ci clean
+.PHONY: install bootstrap-wrapper build assemble test lint format ktlint-format ktlint-check detekt secret-scan commitlint ci clean
 
 GRADLE := ./gradlew
 KTLINT := $(or $(shell command -v ktlint 2>/dev/null), $(HOME)/.local/bin/ktlint)
+DETEKT := $(or $(shell command -v detekt 2>/dev/null), $(HOME)/.local/bin/detekt)
 
 install:
 	@if [ ! -f gradle/wrapper/gradle-wrapper.jar ]; then $(MAKE) bootstrap-wrapper; fi
@@ -22,7 +23,7 @@ assemble:
 test:
 	$(GRADLE) :app:testDebugUnitTest :app:koverXmlReport
 
-lint: ktlint-check
+lint: ktlint-check detekt
 
 format: ktlint-format
 
@@ -34,6 +35,10 @@ ktlint-format:
 ktlint-check:
 	@command -v $(KTLINT) >/dev/null 2>&1 || { echo "❌ ktlint not found. Install: brew install ktlint"; exit 1; }
 	$(KTLINT)
+
+detekt:
+	@command -v $(DETEKT) >/dev/null 2>&1 || { echo "❌ detekt not found. Install: brew install detekt"; exit 1; }
+	$(DETEKT) --build-upon-default-config --config detekt.yml --input app/src
 
 secret-scan:
 	@if command -v gitleaks >/dev/null 2>&1; then \

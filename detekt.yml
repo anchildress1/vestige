@@ -1,0 +1,44 @@
+# Detekt config — minimal overrides on top of detekt-default. Everything else inherits.
+#
+# Run with: detekt --build-upon-default-config --config detekt.yml --input app/src
+#
+# Override surface: only Compose-convention exceptions and the magic-number
+# rule (constants in property/local declarations ARE the prescribed fix for
+# magic numbers, not a violation). Everything else uses detekt defaults.
+
+build:
+  maxIssues: 0
+  excludeCorrectable: false
+
+config:
+  validation: true
+  warningsAsErrors: true
+
+processors:
+  active: true
+
+console-reports:
+  active: true
+
+naming:
+  FunctionNaming:
+    # Compose @Composable functions intentionally use PascalCase per the official Compose naming convention.
+    ignoreAnnotated: ['Composable']
+
+style:
+  UnusedPrivateMember:
+    # @Preview entry points are referenced only by Android Studio's preview tooling at design time.
+    ignoreAnnotated: ['Preview']
+  MagicNumber:
+    # Magic numbers are about embedded literals IN expressions. Named constants in property
+    # or local-variable declarations are the prescribed fix, not a violation.
+    ignorePropertyDeclaration: true
+    ignoreLocalVariableDeclaration: true
+  ForbiddenComment:
+    comments:
+      - reason: 'Resolve before merging.'
+        value: 'FIXME:'
+      - reason: 'Open work — link to a v1.5-backlog entry or an issue, then drop the marker.'
+        value: 'XXX:'
+      - reason: 'Hack markers must not survive review.'
+        value: 'HACK:'

@@ -27,6 +27,7 @@ Scaffold. Phase 0 validation pending. The full README pass lands later.
 | `gitleaks` | secret scan | `brew install gitleaks` |
 | `actionlint` | workflow lint | `brew install actionlint` |
 | `ktlint` | format + lint Kotlin | `brew install ktlint` |
+| `detekt` | static analysis Kotlin | `brew install detekt` |
 | `gh` | repo ops | `brew install gh` |
 
 `ANDROID_HOME` must be set and `$ANDROID_HOME/platform-tools` must be on `PATH` so `adb` resolves.
@@ -37,7 +38,7 @@ Scaffold. Phase 0 validation pending. The full README pass lands later.
 make install          # bootstrap gradle wrapper, install npm deps, install lefthook hooks
 make build            # assemble debug APK
 make test             # unit tests + Kover XML coverage
-make lint             # ktlint + actionlint
+make lint             # ktlint + detekt
 make ci               # full local check (lint + test + build)
 make clean
 ```

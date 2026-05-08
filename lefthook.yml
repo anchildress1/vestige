@@ -5,6 +5,9 @@ pre-commit:
       glob: '**/*.{kt,kts}'
       run: make ktlint-format FILES="{staged_files}"
       stage_fixed: true
+    detekt:
+      glob: '**/*.{kt,kts}'
+      run: make detekt
     secret-scan:
       run: make secret-scan
     actionlint:

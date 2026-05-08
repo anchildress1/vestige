@@ -2,7 +2,6 @@
 # Build tooling
 agp = "9.0.0"
 kotlin = "2.3.21"
-ksp = "2.3.7"
 gradle = "9.1.0"
 
 # AndroidX core
@@ -24,9 +23,6 @@ objectbox = "5.4.2"
 litert-lm = "0.11.0"
 
 # Quality
-# detekt deferred to v1.5: 1.23.x calls a Gradle 10-deprecated API in plugin apply, and
-# 2.0 is still alpha at scaffold time. ktlint covers the load-bearing rules until detekt
-# 2.0 ships stable. See v1.5-backlog.md.
 kover = "0.9.1"
 ktlint-cli = "1.5.0"
 
@@ -82,7 +78,7 @@ androidx-test-espresso-core = { module = "androidx.test.espresso:espresso-core",
 android-application = { id = "com.android.application", version.ref = "agp" }
 # AGP 9.0+ ships kotlin-android built in — no separate plugin needed.
 kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
-ksp = { id = "com.google.devtools.ksp", version.ref = "ksp" }
+kotlin-kapt = { id = "com.android.legacy-kapt", version.ref = "agp" }
 objectbox = { id = "io.objectbox", version.ref = "objectbox" }
 kover = { id = "org.jetbrains.kotlinx.kover", version.ref = "kover" }
 

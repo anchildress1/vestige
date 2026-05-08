@@ -145,7 +145,7 @@ Source of truth: `gradle/libs.versions.toml`. Sync this section when bumping.
 - Kotlin: `2.3.21`
 - AGP: `9.0.0`
 - Gradle: `9.1.0`
-- KSP: `2.3.7`
+- ObjectBox annotation processing: `com.android.legacy-kapt` via AGP `9.0.0`
 - Compose BOM: `2026.04.01`
 - ObjectBox: `5.4.2`
 - LiteRT-LM: `com.google.ai.edge.litertlm:litertlm-android:0.11.0` (bundles `libLiteRt.so` — do NOT also add `:litert` directly)

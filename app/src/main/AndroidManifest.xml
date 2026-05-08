@@ -26,6 +26,16 @@
         android:theme="@style/Theme.Vestige"
         tools:targetApi="35">
 
+        <!--
+            Launcher activities are REQUIRED by Android to set android:exported="true" — the
+            system can't locate or start an activity registered for the LAUNCHER intent filter
+            otherwise. Semgrep's exported_activity rule treats this as a finding regardless of
+            context, so we suppress it here. The activity body must remain a thin Compose entry
+            point with no privileged surface (no deeplinks accepting untrusted input, no
+            authentication state in extras, no IPC handlers). If that changes, drop the nosem
+            and re-evaluate.
+        -->
+        <!-- nosemgrep: exported_activity -->
         <activity
             android:name=".MainActivity"
             android:exported="true"

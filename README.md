@@ -23,7 +23,6 @@ Scaffold. Phase 0 validation pending. The full README pass lands later.
 | JDK 17+ (Temurin) | Gradle runtime | `brew install --cask temurin` |
 | Android SDK + `adb` | build + install on device | Android Studio, or `brew install --cask android-commandlinetools` |
 | System Gradle | one-time wrapper bootstrap | `brew install gradle` |
-| Node.js LTS | commitlint | `brew install node` |
 | `lefthook` | git hooks | `brew install lefthook` |
 | `gitleaks` | secret scan | `brew install gitleaks` |
 | `actionlint` | workflow lint | `brew install actionlint` |

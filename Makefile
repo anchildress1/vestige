@@ -6,8 +6,6 @@ KTLINT := $(or $(shell command -v ktlint 2>/dev/null), $(HOME)/.local/bin/ktlint
 install:
 	@if [ ! -f gradle/wrapper/gradle-wrapper.jar ]; then $(MAKE) bootstrap-wrapper; fi
 	@command -v lefthook >/dev/null 2>&1 || { echo "❌ lefthook not found. Install: https://github.com/evilmartians/lefthook"; exit 1; }
-	@command -v npm >/dev/null 2>&1 || { echo "❌ npm not found. Install Node.js LTS (commitlint runs via npm)."; exit 1; }
-	npm install
 	lefthook install
 
 # Generate the gradle-wrapper.jar via a system Gradle install. One-shot bootstrap.
@@ -46,8 +44,7 @@ secret-scan:
 	fi
 
 commitlint:
-	@command -v npx >/dev/null 2>&1 || { echo "❌ npx not found. Install Node.js LTS"; exit 1; }
-	npx commitlint --edit $(COMMIT_MSG_FILE)
+	./scripts/check-commit-msg.sh $(COMMIT_MSG_FILE)
 
 ci: lint test build
 

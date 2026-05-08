@@ -48,6 +48,11 @@ logs/
 !.env.example
 .secrets.baseline.tmp
 
+# Node — this repo intentionally has no node toolchain. If anything drops these in, ignore.
+node_modules/
+package-lock.json
+bun.lockb
+
 # Models — Gemma 4 .litertlm download lives in app-internal storage at runtime
 *.litertlm
 *.tflite

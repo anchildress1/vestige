@@ -185,41 +185,20 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Download Kover XML report
-        uses: actions/download-artifact@v4
+      - name: Set up JDK 25
+        uses: actions/setup-java@v5
         with:
-          name: kover-report
-          path: app/build/reports/kover/
+          distribution: temurin
+          java-version: '25'
 
-      - name: Download app JUnit test results
-        uses: actions/download-artifact@v4
-        with:
-          name: app-junit-results
-          path: app/build/test-results/testDebugUnitTest/
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@50e97c2cd7a37755bbfafc9c5b7cafaece252f6e # v6.1.0
 
-      - name: Download core-inference JUnit test results
-        uses: actions/download-artifact@v4
-        with:
-          name: core-inference-junit-results
-          path: core-inference/build/test-results/testDebugUnitTest/
-
-      - name: Download core-model JUnit test results
-        uses: actions/download-artifact@v4
-        with:
-          name: core-model-junit-results
-          path: core-model/build/test-results/test/
-
-      - name: Download core-storage JUnit test results
-        uses: actions/download-artifact@v4
-        with:
-          name: core-storage-junit-results
-          path: core-storage/build/test-results/testDebugUnitTest/
-
-      - name: SonarCloud scan
-        uses: SonarSource/sonarqube-scan-action@fd88b7d7ccbaefd23d8f36f73b59db7a3d246602 # v6.0.0
+      - name: Run SonarCloud analysis via Gradle
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: ./gradlew :core-model:test :core-inference:testDebugUnitTest :core-storage:testDebugUnitTest :app:testDebugUnitTest :app:koverXmlReport sonar -Dsonar.token="$SONAR_TOKEN"
 
   commitlint:
     name: Commit message lint

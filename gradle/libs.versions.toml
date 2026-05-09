@@ -26,6 +26,7 @@ litert-lm = "0.11.0"
 # Quality
 kover = "0.9.1"
 ktlint-cli = "1.5.0"
+sonar = "7.2.3.7755"
 
 # Coroutines
 kotlinx-coroutines = "1.10.1"
@@ -93,6 +94,7 @@ kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "ko
 kotlin-kapt = { id = "com.android.legacy-kapt", version.ref = "agp" }
 objectbox = { id = "io.objectbox", version.ref = "objectbox" }
 kover = { id = "org.jetbrains.kotlinx.kover", version.ref = "kover" }
+sonar = { id = "org.sonarqube", version.ref = "sonar" }
 
 [bundles]
 compose-ui = ["compose-ui", "compose-ui-graphics", "compose-ui-tooling-preview", "compose-material3"]

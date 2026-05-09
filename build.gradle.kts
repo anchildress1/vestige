@@ -6,6 +6,43 @@ plugins {
     alias(libs.plugins.kotlin.kapt) apply false
     alias(libs.plugins.objectbox) apply false
     alias(libs.plugins.kover)
+    alias(libs.plugins.sonar)
+}
+
+sonar {
+    properties {
+        property("sonar.projectKey", "anchildress1_vestige")
+        property("sonar.organization", "anchildress1")
+        property("sonar.host.url", "https://sonarcloud.io")
+        property("sonar.kotlin.coveragePlugin", "jacoco")
+        property("sonar.coverage.jacoco.xmlReportPaths", "app/build/reports/kover/report.xml")
+        property(
+            "sonar.junit.reportPaths",
+            listOf(
+                "app/build/test-results/testDebugUnitTest",
+                "core-inference/build/test-results/testDebugUnitTest",
+                "core-model/build/test-results/test",
+                "core-storage/build/test-results/testDebugUnitTest",
+            ).joinToString(","),
+        )
+        property(
+            "sonar.exclusions",
+            listOf(
+                "**/build/**",
+                "**/generated/**",
+                "**/*.gradle.kts",
+                "**/objectbox-models/**",
+            ).joinToString(","),
+        )
+        property(
+            "sonar.coverage.exclusions",
+            listOf(
+                "**/ui/theme/**",
+                "**/VestigeApplication.kt",
+                "**/MainActivity.kt",
+            ).joinToString(","),
+        )
+    }
 }
 
 tasks.register<Delete>("clean") {

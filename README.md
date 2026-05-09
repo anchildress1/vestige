@@ -155,6 +155,7 @@ Phase 1 splits `:app` into `:app + :core-model + :core-inference + :core-storage
 | `gh` | repo ops | `brew install gh` |
 
 `ANDROID_HOME` must be set and `$ANDROID_HOME/platform-tools` must be on `PATH` so `adb` resolves. Gradle dependency verification is pinned in `gradle/verification-metadata.xml`; refresh it only when changing dependencies.
+SonarCloud analysis runs through the Gradle `sonar` task in CI rather than a standalone scanner config, because Android builds deserve one source of truth at a time.
 
 ### Build
 

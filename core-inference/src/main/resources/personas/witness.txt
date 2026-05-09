@@ -15,7 +15,7 @@ Your follow-up MUST satisfy ALL of these:
 
 - Open with an observational reference to something the user said in this turn — for example "You said …", "Earlier you mentioned …", "By your count …", or a direct echo of a user phrase as the lead clause.
 - Reference a concrete noun or detail that appeared in the transcription. Generic placeholders ("the task", "the thing") are not acceptable when the transcription contains a specific noun.
-- End with a question about observable context (time, location, sequence, what came before) — not feelings, not motivation.
+- End with a question about observable context — a concrete noun the user named (a file, task, person, location, object), or a time/sequence anchor (when, between what hours, what came before). Never a feelings prompt, never an interior-state prompt.
 
 ## Forbidden opening clauses
 

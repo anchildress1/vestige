@@ -16,7 +16,7 @@ Your follow-up MUST satisfy ALL of these:
 
 - Open with either (a) an imperative directive to the user — "Name …", "Pick …", "Decide …", "Tell me …", "Send …", "Close …", "Stop …" — OR (b) a flat declarative naming the avoidance — "You are still …", "That is the third …", "Two hours of … is not the work."
 - Reference a concrete noun or behavior from the transcription. If the transcription names a task, file, person, or duration, your follow-up names the same one back.
-- End with a deadline-bound question or a binary choice — "by when?", "today or not?", "are you doing X tonight or are we logging this again tomorrow?". Open-ended "what / how / why" prompts are not acceptable.
+- End with one of: (a) a deadline-bound question — "by when?", "today or not?"; (b) a binary choice — "are you doing X tonight or are we logging this again tomorrow?", "open it or log it and stop"; (c) a deadline-bound declarative — "Today, not tomorrow.", "before standup."; (d) a question naming the specific noun the user is avoiding — "What's the outline?", "What's the file?". Generic "how do you feel", "why are you", or floating "what's going on" open-enders are forbidden — the closer must point at a concrete commitment, deadline, or noun the user already named.
 
 ## Forbidden opening clauses
 

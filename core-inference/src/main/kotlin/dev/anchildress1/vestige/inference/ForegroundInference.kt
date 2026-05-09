@@ -18,7 +18,10 @@ import java.util.concurrent.ConcurrentHashMap
  *  - the active [Persona]'s system prompt (via [PersonaPromptComposer]) — Story 1.8;
  *  - the last [historyTurnLimit] turns of the transcript as recent context, oldest-first
  *    (ADR-002 §Q5 — default last 4);
- *  - a markdown-with-headers output schema reminder (ADR-002 §"Structured-output reliability");
+ *  - an XML-tag output schema reminder asking for `<transcription>`/`<follow_up>` blocks
+ *    (ADR-002 §"Structured-output reliability"; the markdown-with-headers approach was
+ *    rejected after codex review round 2 because verbatim transcriptions can legitimately
+ *    contain `## TRANSCRIPTION` / `## FOLLOW_UP` lines and would be silently sliced);
  *  - the audio buffer handed off as `Content.AudioFile` against a temp PCM_S16LE WAV (the only
  *    handoff that works on LiteRT-LM 0.11.0 per ADR-001 §Q4 STT-A record).
  *

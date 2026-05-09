@@ -75,10 +75,10 @@ internal object ForegroundResponseParser {
 
     private fun extract(raw: String): Extracted = when {
         raw.isBlank() -> Extracted.Bad(ForegroundResult.ParseReason.EMPTY_RESPONSE)
-        else -> splitOnHeaders(raw)
+        else -> splitOnTags(raw)
     }
 
-    private fun splitOnHeaders(raw: String): Extracted {
+    private fun splitOnTags(raw: String): Extracted {
         val transcriptionMatches = TRANSCRIPTION_TAG.findAll(raw).toList()
         val followUpMatches = FOLLOW_UP_TAG.findAll(raw).toList()
         if (transcriptionMatches.size > 1 || followUpMatches.size > 1) {

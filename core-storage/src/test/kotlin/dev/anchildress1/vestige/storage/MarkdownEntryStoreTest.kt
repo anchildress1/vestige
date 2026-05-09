@@ -8,6 +8,7 @@ import io.objectbox.kotlin.boxFor
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -68,6 +69,9 @@ class MarkdownEntryStoreTest {
         assertEquals(entry.statedCommitmentJson, readBack.statedCommitmentJson)
         assertEquals(entry.confidenceJson, readBack.confidenceJson)
         assertEquals(entry.entryObservationsJson, readBack.entryObservationsJson)
+        assertEquals(ExtractionStatus.COMPLETED, readBack.extractionStatus)
+        assertEquals(0, readBack.attemptCount)
+        assertNull(readBack.lastError)
     }
 
     @Test
@@ -146,6 +150,69 @@ class MarkdownEntryStoreTest {
         assertTrue(
             "Expected IllegalArgumentException, got ${raised.exceptionOrNull()?.javaClass?.name}",
             raised.exceptionOrNull() is IllegalArgumentException,
+        )
+    }
+
+    @Test
+    fun `read rejects file with unsupported schema_version`() {
+        markdownDir.mkdirs()
+        val entriesDir = File(markdownDir, MarkdownEntryStore.ENTRIES_SUBDIR).apply { mkdirs() }
+        val bad = File(entriesDir, "bad.md").apply {
+            writeText(
+                """
+                ---
+                schema_version: 99
+                timestamp: 2026-05-09T14:32:15Z
+                template_label: null
+                energy_descriptor: null
+                recurrence_link: null
+                stated_commitment: null
+                tags:
+                confidence: {}
+                entry_observations: []
+                ---
+                
+                body
+                """.trimIndent(),
+            )
+        }
+
+        val raised = runCatching { store.read(bad) }
+        assertTrue("Unsupported schema_version must fail fast", raised.isFailure)
+        assertTrue(
+            "Expected IllegalArgumentException, got ${raised.exceptionOrNull()?.javaClass?.name}",
+            raised.exceptionOrNull() is IllegalArgumentException,
+        )
+    }
+
+    @Test
+    fun `read rejects file with missing schema_version`() {
+        markdownDir.mkdirs()
+        val entriesDir = File(markdownDir, MarkdownEntryStore.ENTRIES_SUBDIR).apply { mkdirs() }
+        val bad = File(entriesDir, "bad.md").apply {
+            writeText(
+                """
+                ---
+                timestamp: 2026-05-09T14:32:15Z
+                template_label: null
+                energy_descriptor: null
+                recurrence_link: null
+                stated_commitment: null
+                tags:
+                confidence: {}
+                entry_observations: []
+                ---
+                
+                body
+                """.trimIndent(),
+            )
+        }
+
+        val raised = runCatching { store.read(bad) }
+        assertTrue("Missing schema_version must fail fast", raised.isFailure)
+        assertTrue(
+            "Expected IllegalStateException, got ${raised.exceptionOrNull()?.javaClass?.name}",
+            raised.exceptionOrNull() is IllegalStateException,
         )
     }
 

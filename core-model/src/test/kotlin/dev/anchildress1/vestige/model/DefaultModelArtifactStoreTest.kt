@@ -1,5 +1,7 @@
 package dev.anchildress1.vestige.model
 
+import com.sun.net.httpserver.HttpExchange
+import com.sun.net.httpserver.HttpServer
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
@@ -12,6 +14,7 @@ import org.junit.jupiter.api.io.TempDir
 import java.io.ByteArrayInputStream
 import java.io.File
 import java.io.IOException
+import java.net.InetSocketAddress
 import java.security.MessageDigest
 
 class DefaultModelArtifactStoreTest {
@@ -183,6 +186,55 @@ class DefaultModelArtifactStoreTest {
     }
 
     @Test
+    fun `DefaultHttpClient rejects lookalike hostnames that only share a suffix`() {
+        val client = DefaultHttpClient(allowedHosts = listOf("huggingface.co"))
+        assertThrows(IllegalArgumentException::class.java) {
+            client.open("https://evilhuggingface.co/model.bin", resumeFromByte = 0)
+        }
+    }
+
+    @Test
+    fun `DefaultHttpClient follows redirects only when each hop stays on the allowlist`() {
+        val server = HttpServer.create(InetSocketAddress("127.0.0.1", 0), 0)
+        server.createContext("/start") { exchange ->
+            exchange.redirectTo("http://127.0.0.1:${server.address.port}/final")
+        }
+        server.createContext("/final") { exchange ->
+            exchange.sendResponseHeaders(200, SHORT_BYTES.size.toLong())
+            exchange.responseBody.use { it.write(SHORT_BYTES) }
+        }
+        server.start()
+
+        try {
+            val client = DefaultHttpClient(allowedHosts = listOf("127.0.0.1"))
+            client.open("http://127.0.0.1:${server.address.port}/start", resumeFromByte = 0).use { response ->
+                assertEquals(200, response.statusCode)
+                assertEquals(SHORT_BYTES.toList(), response.inputStream.readBytes().toList())
+            }
+        } finally {
+            server.stop(0)
+        }
+    }
+
+    @Test
+    fun `DefaultHttpClient rejects redirects that leave the allowlist`() {
+        val server = HttpServer.create(InetSocketAddress("127.0.0.1", 0), 0)
+        server.createContext("/start") { exchange ->
+            exchange.redirectTo("http://localhost:${server.address.port}/final")
+        }
+        server.start()
+
+        try {
+            val client = DefaultHttpClient(allowedHosts = listOf("127.0.0.1"))
+            assertThrows(IllegalArgumentException::class.java) {
+                client.open("http://127.0.0.1:${server.address.port}/start", resumeFromByte = 0)
+            }
+        } finally {
+            server.stop(0)
+        }
+    }
+
+    @Test
     fun `ExponentialBackoff caps delay at the configured ceiling`() {
         val backoff = ExponentialBackoff(baseDelayMs = 1_000L, maxDelayMs = 4_000L)
         assertEquals(1_000L, backoff.delayMs(1))
@@ -234,6 +286,12 @@ class DefaultModelArtifactStoreTest {
     private class InMemoryResponse(override val statusCode: Int, override val inputStream: java.io.InputStream) :
         HttpResponse {
         override fun close() = inputStream.close()
+    }
+
+    private fun HttpExchange.redirectTo(location: String) {
+        responseHeaders.add("Location", location)
+        sendResponseHeaders(302, -1)
+        close()
     }
 
     private companion object {

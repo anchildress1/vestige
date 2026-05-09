@@ -1,5 +1,6 @@
 package dev.anchildress1.vestige.storage
 
+import dev.anchildress1.vestige.model.ExtractionStatus
 import dev.anchildress1.vestige.model.TemplateLabel
 import java.io.File
 import java.time.Instant
@@ -89,6 +90,7 @@ class MarkdownEntryStore(private val baseDir: File) {
         val raw = file.readText(Charsets.UTF_8)
         val (front, body) = splitFrontmatter(raw)
         val parsed = parseFrontmatter(front)
+        validateSchemaVersion(parsed)
 
         val timestamp = parsed[KEY_TIMESTAMP]?.let { parseIso(it) } ?: 0L
         val templateLabel = parsed[KEY_TEMPLATE_LABEL]?.takeUnless { it == NULL }
@@ -109,6 +111,9 @@ class MarkdownEntryStore(private val baseDir: File) {
             statedCommitmentJson = commitment,
             entryObservationsJson = observations,
             confidenceJson = confidence,
+            extractionStatus = ExtractionStatus.COMPLETED,
+            attemptCount = 0,
+            lastError = null,
         )
     }
 
@@ -182,6 +187,14 @@ class MarkdownEntryStore(private val baseDir: File) {
         return result
     }
 
+    private fun validateSchemaVersion(parsed: Map<String, String>) {
+        val schemaVersion = parsed[KEY_SCHEMA_VERSION]?.toIntOrNull()
+            ?: error("Markdown entry missing or invalid schema_version.")
+        require(schemaVersion == SCHEMA_VERSION) {
+            "Unsupported markdown schema_version: $schemaVersion (expected $SCHEMA_VERSION)."
+        }
+    }
+
     private fun parseTagNames(front: String): List<String> {
         val tags = mutableListOf<String>()
         var inTagsBlock = false
@@ -205,6 +218,7 @@ class MarkdownEntryStore(private val baseDir: File) {
         private const val NULL = "null"
         private const val TEMP_SUFFIX = ".tmp"
         private const val YAML_LIST_ITEM_PREFIX = "  - "
+        private const val KEY_SCHEMA_VERSION = "schema_version"
         private const val KEY_TIMESTAMP = "timestamp"
         private const val KEY_TEMPLATE_LABEL = "template_label"
         private const val KEY_ENERGY_DESCRIPTOR = "energy_descriptor"

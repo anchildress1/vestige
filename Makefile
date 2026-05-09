@@ -27,7 +27,7 @@ assemble:
 	$(GRADLE) :app:assembleRelease
 
 test:
-	$(GRADLE) :app:testDebugUnitTest :app:koverXmlReport :app:koverVerify
+	$(GRADLE) :core-model:test :core-inference:testDebugUnitTest :core-storage:testDebugUnitTest :app:testDebugUnitTest :app:koverXmlReport :app:koverVerify
 
 lint: ktlint-check detekt android-lint
 

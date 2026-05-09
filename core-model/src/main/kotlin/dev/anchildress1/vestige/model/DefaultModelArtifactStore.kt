@@ -196,26 +196,67 @@ class DefaultHttpClient(
     private val networkGate: NetworkGate = DefaultNetworkGate.ALWAYS_OPEN_FOR_TESTS,
 ) : HttpClient {
     override fun open(url: String, resumeFromByte: Long): HttpResponse {
-        networkGate.assertOpen()
-        val parsed: URL = URI.create(url).toURL()
-        val host = parsed.host.orEmpty()
-        require(allowedHosts.any { host.endsWith(it, ignoreCase = true) }) {
+        var currentUrl = URI.create(url).toURL()
+        repeat(MAX_REDIRECTS + 1) { redirectCount ->
+            networkGate.assertOpen()
+            validateHost(currentUrl)
+            val connection = (currentUrl.openConnection() as HttpURLConnection).apply {
+                instanceFollowRedirects = false
+                requestMethod = "GET"
+                connectTimeout = CONNECT_TIMEOUT_MS
+                readTimeout = READ_TIMEOUT_MS
+                if (resumeFromByte > 0) {
+                    setRequestProperty("Range", "bytes=$resumeFromByte-")
+                }
+            }
+            val statusCode = connection.responseCode
+            if (!statusCode.isRedirect()) {
+                return UrlHttpResponse(connection)
+            }
+
+            val location = connection.getHeaderField("Location")
+            connection.disconnect()
+            require(!location.isNullOrBlank()) {
+                "Redirect from $currentUrl returned HTTP $statusCode without a Location header."
+            }
+            require(redirectCount < MAX_REDIRECTS) {
+                "Too many redirects while fetching $url"
+            }
+            currentUrl = currentUrl.toURI().resolve(location).toURL()
+        }
+        error("Unreachable: redirect loop should have returned or thrown.")
+    }
+
+    private fun validateHost(url: URL) {
+        val host = url.host.orEmpty()
+        require(allowedHosts.any { allowedHost -> host.matchesAllowedHost(allowedHost) }) {
             "Refusing to open a connection to '$host' — not in manifest allowed_hosts $allowedHosts"
         }
-        val connection = (parsed.openConnection() as HttpURLConnection).apply {
-            requestMethod = "GET"
-            connectTimeout = CONNECT_TIMEOUT_MS
-            readTimeout = READ_TIMEOUT_MS
-            if (resumeFromByte > 0) {
-                setRequestProperty("Range", "bytes=$resumeFromByte-")
-            }
-        }
-        return UrlHttpResponse(connection)
+    }
+
+    private fun String.matchesAllowedHost(allowedHost: String): Boolean {
+        val candidate = lowercase()
+        val allowed = allowedHost.lowercase()
+        return candidate == allowed || candidate.endsWith(".$allowed")
+    }
+
+    private fun Int.isRedirect(): Boolean = when (this) {
+        HttpURLConnection.HTTP_MOVED_PERM,
+        HttpURLConnection.HTTP_MOVED_TEMP,
+        HttpURLConnection.HTTP_SEE_OTHER,
+        HTTP_TEMP_REDIRECT,
+        HTTP_PERM_REDIRECT,
+        -> true
+
+        else -> false
     }
 
     private companion object {
         const val CONNECT_TIMEOUT_MS = 15_000
         const val READ_TIMEOUT_MS = 30_000
+        const val MAX_REDIRECTS = 5
+        const val HTTP_TEMP_REDIRECT = 307
+        const val HTTP_PERM_REDIRECT = 308
     }
 }
 

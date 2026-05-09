@@ -70,9 +70,7 @@ If STT-A fails after the time-box: stop. Write a superseding ADR. Do not proceed
 **Done when:**
 - [x] LiteRT-LM Android dependency pinned in `gradle/libs.versions.toml`.
 - [x] `:core-inference` exposes a function that loads the E4B model from a known on-disk path and runs a text prompt-completion call.
-- [ ] A smoke test on the reference S24 Ultra produces a non-empty response from a simple text prompt (e.g., "respond with the word OK"). _(Manual — instrumented test scaffolded at `:app/src/androidTest/.../LiteRtLmTextSmokeTest.kt`. User adb-pushes the model then runs `./gradlew :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.modelPath=...`. Box stays unchecked until the user reports green.)_
-
-  > **TODO — manual validation pending (Phase 1, Story 1.3):** instructions in chat. After it passes, agent fills in latency + backend selected from logcat and ticks the box.
+- [x] A smoke test on the reference S24 Ultra produces a non-empty response from a simple text prompt ("respond with the word OK"). _(Passed 2026-05-09. Backend: CPU. Model load: 11,305 ms. Inference: 3,261 ms. Model at `/data/local/tmp/gemma-4-E4B-it.litertlm`; run via `./gradlew :app:connectedDebugAndroidTest -PmodelPath=<path>`.)_
 - [x] Inference logs CPU/GPU backend selection and rough latency to logcat in dev builds.
 - [x] No MediaPipe LLM Inference dependency in the project (per `AGENTS.md` guardrail 13).
 

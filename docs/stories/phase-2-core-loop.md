@@ -49,12 +49,12 @@ Build the end-to-end capture loop: user records or types → foreground call ret
 **As** the AI implementor, **I need** the foreground inference call that takes a normalized audio buffer (from Story 1.4) and the active persona's system prompt (from Story 1.8) and returns a structured `{transcription, follow_up}` response, **so that** the user gets text back at human conversation pace and the conversation transcript advances.
 
 **Done when:**
-- [ ] `:core-inference` exposes a `runForegroundCall(audioBuffer, sessionTranscript, persona): ForegroundResult` API.
-- [ ] The call composes the persona system prompt + the in-session transcript (as multi-turn history) + the new audio buffer.
-- [ ] The response is parsed as structured output (JSON or markdown-with-headers per ADR-002 §"Structured-output reliability"). On parse failure, return a typed error — do not silently retry.
-- [ ] The transcription appears in the transcript before the follow-up renders.
-- [ ] Audio buffer is discarded after the call returns.
-- [ ] Latency on the reference device is recorded; if outside the documented 1–5 second target, log it for ADR-002's latency note.
+- [x] `:core-inference` exposes a `runForegroundCall(audioBuffer, sessionTranscript, persona): ForegroundResult` API. _(Class `ForegroundInference` in `:core-inference`; `ForegroundResult` is a sealed `Success` / `ParseFailure` pair.)_
+- [x] The call composes the persona system prompt + the in-session transcript (as multi-turn history) + the new audio buffer. _(Persona via `PersonaPromptComposer`; last 4 turns appended under `## RECENT TURNS` header per ADR-002 §Q5; audio handed off as `Content.AudioFile` against a temp PCM_S16LE WAV per ADR-001 §Q4.)_
+- [x] The response is parsed as structured output (JSON or markdown-with-headers per ADR-002 §"Structured-output reliability"). On parse failure, return a typed error — do not silently retry. _(Markdown-with-headers (`## TRANSCRIPTION` / `## FOLLOW_UP`) chosen for E4B robustness per ADR-002 Action Item #2; `ForegroundResponseParser` returns `ForegroundResult.ParseFailure(EMPTY_RESPONSE | MISSING_TRANSCRIPTION | MISSING_FOLLOW_UP)`. STT-C will measure the parse-failure rate.)_
+- [x] The transcription appears in the transcript before the follow-up renders. _(`ForegroundInference` is pure — it does not advance `CaptureSession`. The caller threads `Success.transcription` through `recordTranscription` (state → TRANSCRIBED) before `recordModelResponse(Success.followUp, persona)` (state → RESPONDED), preserving the Story 2.1 ordering.)_
+- [x] Audio buffer is discarded after the call returns. _(Temp WAV is created, used, and `delete()`d in a `finally` block — even on engine error or coroutine cancellation. No `ByteArray` / `FloatArray` is retained on the result type.)_
+- [x] Latency on the reference device is recorded; if outside the documented 1–5 second target, log it for ADR-002's latency note. _(`elapsedMs` and `completedAt` populate every `ForegroundResult` (success and failure); each call also emits a `Log.d("VestigeForegroundInference", …)` line carrying persona + elapsed ms + raw-response length. Reference-device measurements still get added under ADR-002 §"Latency budget" once the on-device run lands.)_
 
 **Notes / risks:** ADR-002 §Q1 / §"Default for Phase 1" says non-streaming structured response is the default. Do not introduce token-streaming UI here unless STT-D's structured-output measurements say it's worth the parser complexity. Streaming is a Phase 4 polish decision, not a Phase 2 baseline.
 

@@ -1,0 +1,40 @@
+# Dependabot — keep dependencies current without burying the review queue.
+# Two ecosystems, one grouped PR per ecosystem, schedules staggered so the
+# two PRs rarely sit open at the same time (open-pull-requests-limit is
+# per-ecosystem; staggering is what holds the realistic count near 1).
+# https://docs.github.com/en/code-security/dependabot/dependabot-version-updates/configuration-options-for-the-dependabot.yml-file
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 1
+    labels:
+      - dependencies
+      - github-actions
+    commit-message:
+      prefix: "chore(deps)"
+      include: scope
+    groups:
+      gha:
+        patterns:
+          - "*"
+
+  - package-ecosystem: gradle
+    directory: /
+    schedule:
+      interval: weekly
+      day: thursday
+    open-pull-requests-limit: 1
+    labels:
+      - dependencies
+      - gradle
+    commit-message:
+      prefix: "chore(deps)"
+      include: scope
+    groups:
+      pkg:
+        patterns:
+          - "*"

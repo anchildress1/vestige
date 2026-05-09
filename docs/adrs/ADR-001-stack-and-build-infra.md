@@ -70,6 +70,8 @@ If the bug recurs, leave the flag off but add `org.gradle.configuration-cache.pr
 
 **Action:** time-boxed verification task in Phase 1. Outcome recorded inline in this file.
 
+**Verification result (2026-05-09, ObjectBox plugin 5.4.2, Gradle 9.1.0):** the bug recurs. `:core-storage:objectboxPrepareBuild` (type `io.objectbox.gradle.PrepareTask`) still serializes a `Project` instance, which the configuration cache rejects. Build completes only because Gradle stores the entry "with problems" rather than failing — turning it on as-is would mask real cache misses behind those two known violations. Flag stays `org.gradle.configuration-cache=false` with `org.gradle.configuration-cache.problems=warn` in `gradle.properties` so other regressions remain visible. Re-evaluate on the next ObjectBox plugin bump.
+
 ### 4. ObjectBox annotation processing — Kapt, not KSP
 
 Earlier drafts considered a Phase-1 KSP2 smoke test against the ObjectBox processor. Do not spend the build window there. ObjectBox runs on Kapt for v1.

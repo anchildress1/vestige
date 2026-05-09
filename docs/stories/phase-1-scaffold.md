@@ -54,10 +54,10 @@ If STT-A fails after the time-box: stop. Write a superseding ADR. Do not proceed
 **As** the AI implementor, **I need** the JVM and AGP flags configured per ADR-001's "Refactored `gradle.properties`" section, **so that** daemon stability and Compose/KSP/ObjectBox compile performance are predictable across cold and warm builds.
 
 **Done when:**
-- [ ] `gradle.properties` matches the proposed file in ADR-001 §"Refactored `gradle.properties`" verbatim except where commented otherwise in the ADR.
-- [ ] `kotlin { jvmToolchain(25) }` configured with foojay-resolver-convention plugin so a fresh clone doesn't depend on the developer's `JAVA_HOME`.
-- [ ] AGP version, Kotlin version, ObjectBox plugin version, and LiteRT-LM dependency are pinned in `gradle/libs.versions.toml`.
-- [ ] Configuration cache time-boxed verification recorded inline in ADR-001 §3 (with the ObjectBox plugin version actually pinned).
+- [x] `gradle.properties` matches the proposed file in ADR-001 §"Refactored `gradle.properties`" verbatim except where commented otherwise in the ADR.
+- [x] `kotlin { jvmToolchain(25) }` configured with foojay-resolver-convention plugin so a fresh clone doesn't depend on the developer's `JAVA_HOME`.
+- [x] AGP version, Kotlin version, ObjectBox plugin version, and LiteRT-LM dependency are pinned in `gradle/libs.versions.toml`.
+- [x] Configuration cache time-boxed verification recorded inline in ADR-001 §3 (with the ObjectBox plugin version actually pinned).
 
 **Notes / risks:** Time-box the configuration-cache check to ≤1 hour. If still incompatible with the pinned ObjectBox plugin, leave `org.gradle.configuration-cache=false` per ADR-001 and record version+date.
 

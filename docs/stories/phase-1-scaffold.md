@@ -68,11 +68,11 @@ If STT-A fails after the time-box: stop. Write a superseding ADR. Do not proceed
 **As** the AI implementor, **I need** a working LiteRT-LM integration that can load the Gemma 4 E4B model and run a text-only inference call, **so that** every later inference story (audio, multi-lens, re-eval) has a known-good runtime baseline.
 
 **Done when:**
-- [ ] LiteRT-LM Android dependency pinned in `gradle/libs.versions.toml`.
-- [ ] `:core-inference` exposes a function that loads the E4B model from a known on-disk path and runs a text prompt-completion call.
-- [ ] A smoke test on the reference S24 Ultra produces a non-empty response from a simple text prompt (e.g., "respond with the word OK").
-- [ ] Inference logs CPU/GPU backend selection and rough latency to logcat in dev builds.
-- [ ] No MediaPipe LLM Inference dependency in the project (per `AGENTS.md` guardrail 13).
+- [x] LiteRT-LM Android dependency pinned in `gradle/libs.versions.toml`.
+- [x] `:core-inference` exposes a function that loads the E4B model from a known on-disk path and runs a text prompt-completion call.
+- [ ] A smoke test on the reference S24 Ultra produces a non-empty response from a simple text prompt (e.g., "respond with the word OK"). _(Manual — instrumented test scaffolded at `:app/src/androidTest/.../LiteRtLmTextSmokeTest.kt`. User adb-pushes the model then runs `./gradlew :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.modelPath=...`. Box stays unchecked until the user reports green.)_
+- [x] Inference logs CPU/GPU backend selection and rough latency to logcat in dev builds.
+- [x] No MediaPipe LLM Inference dependency in the project (per `AGENTS.md` guardrail 13).
 
 **Notes / risks:** Model artifact should be loaded from a known dev location for this story (e.g., adb push). The first-launch download UX is Phase 4 work, gated by the `ModelArtifactStore` contract from Story 1.9 — do not build progress UI here.
 

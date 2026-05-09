@@ -26,6 +26,9 @@ litert-lm = "0.11.0"
 kover = "0.9.1"
 ktlint-cli = "1.5.0"
 
+# Coroutines
+kotlinx-coroutines = "1.10.1"
+
 # Testing
 junit = "4.13.2"
 junit-jupiter = "5.11.4"
@@ -35,7 +38,6 @@ turbine = "1.2.1"
 androidx-test-ext-junit = "1.2.1"
 androidx-test-espresso = "3.6.1"
 robolectric = "4.14.1"
-kotlinx-coroutines-test = "1.10.1"
 
 [libraries]
 androidx-core-ktx = { module = "androidx.core:core-ktx", version.ref = "androidx-core-ktx" }
@@ -67,7 +69,8 @@ junit-jupiter-engine = { module = "org.junit.jupiter:junit-jupiter-engine", vers
 junit-platform-launcher = { module = "org.junit.platform:junit-platform-launcher", version.ref = "junit-platform" }
 mockk = { module = "io.mockk:mockk", version.ref = "mockk" }
 turbine = { module = "app.cash.turbine:turbine", version.ref = "turbine" }
-kotlinx-coroutines-test = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-test", version.ref = "kotlinx-coroutines-test" }
+kotlinx-coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "kotlinx-coroutines" }
+kotlinx-coroutines-test = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-test", version.ref = "kotlinx-coroutines" }
 robolectric = { module = "org.robolectric:robolectric", version.ref = "robolectric" }
 
 # Testing — instrumented

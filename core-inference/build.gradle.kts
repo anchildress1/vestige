@@ -32,6 +32,8 @@ android {
 dependencies {
     api(project(":core-model"))
 
+    implementation(libs.kotlinx.coroutines.core)
+
     // Inference — litertlm-android is the high-level entry point for Gemma 4 .litertlm models.
     // It bundles the underlying LiteRT runtime (libLiteRt.so), so do not also depend on
     // com.google.ai.edge.litert:litert directly — both ship the same native lib path and

@@ -18,12 +18,13 @@ import java.nio.ByteOrder
 /**
  * Story 1.5 — STT-A existential audio plumbing test.
  *
- * Probes both `Content.AudioBytes` (raw float32-LE) and `Content.AudioFile` (PCM_FLOAT WAV)
- * handoffs against Gemma 4 E4B on the reference device. The human running this test fills in
- * ADR-001 §Q4 with which path actually produces a coherent transcription and the round-trip
- * latency for one 30-second clip.
+ * Probes both `Content.AudioBytes` (raw float32-LE) and `Content.AudioFile` (mono PCM_S16LE
+ * WAV — LiteRT-LM 0.11.0's miniaudio decoder rejects IEEE_FLOAT, per ADR-001 §Q4) handoffs
+ * against Gemma 4 E4B on the reference device. The human running this test fills in ADR-001
+ * §Q4 with which path actually produces a coherent transcription and the round-trip latency
+ * for one 30-second clip.
  *
- * Prerequisites — adb-push the model and a sample WAV (16 kHz mono PCM_FLOAT, ≤ 30 s) to the
+ * Prerequisites — adb-push the model and a sample WAV (16 kHz mono PCM_S16LE, ≤ 30 s) to the
  * device's `Android/data/.../files` directory:
  *
  *   adb push gemma-4-E4B-it.litertlm <BASE>/models/

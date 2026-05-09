@@ -50,8 +50,10 @@ class SttAProbe(private val engine: LiteRtLmEngine) {
     }
 
     /**
-     * Convenience: write [samples] as a temp PCM_FLOAT WAV in [cacheDir], hand it to Gemma, and
-     * delete the temp file inside this call regardless of outcome.
+     * Convenience: write [samples] as a temp mono PCM_S16LE WAV in [cacheDir] (per
+     * [WavWriter.writeMonoFloatWav] — LiteRT-LM 0.11.0's miniaudio decoder rejects IEEE_FLOAT,
+     * see ADR-001 §Q4), hand it to Gemma, and delete the temp file inside this call regardless
+     * of outcome.
      */
     suspend fun transcribeViaTempWav(
         samples: FloatArray,

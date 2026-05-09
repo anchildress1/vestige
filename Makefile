@@ -14,9 +14,14 @@ doctor:
 	./scripts/doctor.sh
 
 # Generate the gradle-wrapper.jar via a system Gradle install. One-shot bootstrap.
+# Wrapper version is sourced from gradle/wrapper/gradle-wrapper.properties so the regenerated
+# jar matches whatever distribution that file pins — drift is impossible by construction.
 bootstrap-wrapper:
 	@command -v gradle >/dev/null 2>&1 || { echo "❌ system gradle not found. Install: brew install gradle"; exit 1; }
-	gradle wrapper --gradle-version 9.1.0 --distribution-type bin
+	@version=$$(grep -E '^distributionUrl=' gradle/wrapper/gradle-wrapper.properties | sed -E 's|.*gradle-([0-9.]+)-bin\.zip|\1|') ; \
+		test -n "$$version" || { echo "❌ could not parse Gradle version from gradle/wrapper/gradle-wrapper.properties"; exit 1; } ; \
+		echo "Generating wrapper for Gradle $$version" ; \
+		gradle wrapper --gradle-version "$$version" --distribution-type bin
 
 build:
 	$(GRADLE) :app:assembleDebug

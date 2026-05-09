@@ -146,7 +146,7 @@ Phase 1 splits `:app` into `:app + :core-model + :core-inference + :core-storage
 |---|---|---|
 | JDK 25 LTS (Temurin) | Gradle runtime + Kotlin toolchain | `brew install --cask temurin` |
 | Android SDK + `adb` | build + install on device | Android Studio, or `brew install --cask android-commandlinetools` |
-| System Gradle | one-time wrapper bootstrap | `brew install gradle` |
+| System Gradle (optional) | regenerating the wrapper jar (`make bootstrap-wrapper`); not needed for routine builds, since `gradle/wrapper/gradle-wrapper.jar` is committed | `brew install gradle` |
 | `lefthook` | git hooks | `brew install lefthook` |
 | `gitleaks` | secret scan | `brew install gitleaks` |
 | `actionlint` | workflow lint | `brew install actionlint` |

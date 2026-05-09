@@ -9,6 +9,7 @@ import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -360,6 +361,30 @@ class MarkdownEntryStoreTest {
         // Only the two `  - …` items count; `confidence:` terminates the tags block and is not
         // mistakenly captured as a tag.
         assertEquals(listOf("work", "launch"), store.readTagNames(file))
+    }
+
+    @Test
+    fun `read fails fast when the closing frontmatter fence is missing`() {
+        // Without the explicit guard, `substringBefore`/`substringAfter` silently treat the whole
+        // file as both frontmatter and body — a malformed file would round-trip as garbage.
+        markdownDir.mkdirs()
+        val entriesDir = File(markdownDir, MarkdownEntryStore.ENTRIES_SUBDIR).apply { mkdirs() }
+        val file = File(entriesDir, "missing-closing-fence.md").apply {
+            writeText(
+                """
+                ---
+                schema_version: 1
+                timestamp: 2026-05-09T14:32:15Z
+
+                body without a closing fence
+                """.trimIndent(),
+            )
+        }
+        val ex = assertThrows(IllegalArgumentException::class.java) { store.read(file) }
+        assertTrue(
+            "Error must mention the missing closing fence: ${ex.message}",
+            ex.message?.contains("closing frontmatter fence") == true,
+        )
     }
 
     @Test

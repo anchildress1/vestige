@@ -10,6 +10,7 @@ import java.net.HttpURLConnection
 import java.net.URI
 import java.net.URL
 import java.security.MessageDigest
+import java.util.HexFormat
 
 /**
  * Default file-on-disk + HTTP implementation of [ModelArtifactStore]. Uses `HttpURLConnection`
@@ -167,7 +168,10 @@ class DefaultModelArtifactStore(
                 digest.update(buffer, 0, read)
             }
         }
-        return digest.digest().joinToString("") { byte -> "%02x".format(byte) }
+        // HexFormat lowercase keeps each byte at exactly two hex chars. The naive
+        // `"%02x".format(byte)` path sign-extends negative bytes to 8 hex chars and produces
+        // an invalid SHA-256 string — every digest with a high-bit byte breaks otherwise.
+        return HexFormat.of().formatHex(digest.digest())
     }
 
     private companion object {

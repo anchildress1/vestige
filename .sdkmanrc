@@ -3,5 +3,5 @@
 # JAVA_HOME drives keytool, the Kotlin daemon, and adb-launched processes).
 #
 # CI parity target per docs/adrs/ADR-001-stack-and-build-infra.md and scripts/doctor.sh:
-# JDK 25, Android SDK platform 35, Gradle wrapper 9.1.0.
+# JDK 25, Android SDK platform 35, Gradle wrapper 9.5.0.
 java=25.0.1-tem

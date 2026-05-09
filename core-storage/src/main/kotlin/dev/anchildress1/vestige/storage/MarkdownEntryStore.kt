@@ -163,8 +163,15 @@ class MarkdownEntryStore(private val baseDir: File) {
             "Markdown entry missing leading frontmatter fence ($FRONTMATTER_FENCE)."
         }
         val afterFirst = withoutLeading.substringAfter(FRONTMATTER_FENCE).trimStart('\n')
-        val frontmatter = afterFirst.substringBefore("\n$FRONTMATTER_FENCE")
-        val body = afterFirst.substringAfter("\n$FRONTMATTER_FENCE").trimStart('\n')
+        // `substringBefore`/`substringAfter` silently return the whole string when the closing
+        // fence is missing — that turns a malformed entry into a "valid" one with the body
+        // mis-parsed as frontmatter. Fail loudly instead.
+        val closingFence = "\n$FRONTMATTER_FENCE"
+        require(afterFirst.contains(closingFence)) {
+            "Markdown entry missing closing frontmatter fence ($FRONTMATTER_FENCE)."
+        }
+        val frontmatter = afterFirst.substringBefore(closingFence)
+        val body = afterFirst.substringAfter(closingFence).trimStart('\n')
         return frontmatter to body
     }
 

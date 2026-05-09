@@ -16,6 +16,7 @@ import java.io.File
 import java.io.IOException
 import java.net.InetSocketAddress
 import java.security.MessageDigest
+import java.util.HexFormat
 
 class DefaultModelArtifactStoreTest {
 
@@ -437,6 +438,27 @@ class DefaultModelArtifactStoreTest {
     }
 
     @Test
+    fun `sha256 hex is exactly 64 lowercase chars for digests with high-bit bytes`() = runTest {
+        // Pins the byte-format regression: a naive `"%02x".format(byte)` sign-extends negative
+        // bytes to 8 hex chars and breaks every digest with a high-bit byte. Pre-loading the
+        // payload with all 256 byte values guarantees the resulting SHA-256 contains at least
+        // one byte ≥ 0x80, so the production sha256() and the HexFormat reference must agree.
+        val payload = ByteArray(256) { it.toByte() }
+        val expected = HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(payload))
+        assertEquals(64, expected.length)
+
+        File(baseDir, MANIFEST_FILENAME).writeBytes(payload)
+        val store = DefaultModelArtifactStore(
+            manifest = manifest(payload.size.toLong(), expected),
+            baseDir = baseDir,
+            httpClient = ByteArrayHttpClient(payload),
+            backoff = ZeroBackoff,
+        )
+        assertEquals(ModelArtifactState.Complete, store.currentState())
+        assertTrue(store.verifyChecksum())
+    }
+
+    @Test
     fun `download deletes the prior artifact before promoting a fresh part file`() = runTest {
         // Pre-seed an existing artifact file. promotePartToArtifact must delete it before rename;
         // the test pins the branch where artifactFile.exists() returns true.
@@ -463,10 +485,8 @@ class DefaultModelArtifactStoreTest {
         allowedHosts = listOf("huggingface.co"),
     )
 
-    private fun sha256Of(bytes: ByteArray): String {
-        val digest = MessageDigest.getInstance("SHA-256").digest(bytes)
-        return digest.joinToString("") { "%02x".format(it) }
-    }
+    private fun sha256Of(bytes: ByteArray): String =
+        HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(bytes))
 
     private object ZeroBackoff : BackoffPolicy {
         override fun delayMs(attempt: Int): Long = 0L

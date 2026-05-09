@@ -71,9 +71,9 @@ check_command "gh" "brew install gh"
 
 if [[ "$failures" -gt 0 ]]; then
   printf '\n%d issue(s) found. Fix those before trusting local build results.\n' "$failures"
-  printf 'CI parity target: JDK 25, Android SDK platform 35, Gradle wrapper 9.1.0.\n'
+  printf 'CI parity target: JDK 25, Android SDK platform 35, Gradle wrapper 9.5.0.\n'
   exit 1
 fi
 
 printf '\nAll required local tools are visible.\n'
-printf 'CI parity target: JDK 25, Android SDK platform 35, Gradle wrapper 9.1.0.\n'
+printf 'CI parity target: JDK 25, Android SDK platform 35, Gradle wrapper 9.5.0.\n'

@@ -250,3 +250,4 @@ Phase 2 starts when all the following are true:
 - [x] No new entries logged to `backlog.md` from Phase 1 work that change the v1 contract. _(`mic-perm-resume-recheck` added 2026-05-09 — Phase 1 shell UI polish, does not affect v1 contract.)_
 
 If STT-A failed and a superseding ADR was written, Phase 2's scope changes per that ADR. Otherwise, Phase 2 picks up at `PRD.md` §Phase 2 Story 1 (capture loop end-to-end) with the foundation Phase 1 produced.
+

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Enforce Conventional Commits with lowercase type and subject.
+# Enforce Conventional Commits with lowercase type and a non-empty subject.
 # Replaces commitlint so the repo doesn't drag in a node toolchain.
 #
 # Usage:
@@ -8,19 +8,19 @@
 
 set -euo pipefail
 
-# Conventional Commits subject: type(scope)?!?: subject (subject starts lowercase)
+# Conventional Commits subject: type(scope)?!?: subject (any case, must start with a letter)
 readonly TYPES='feat|fix|chore|docs|style|refactor|test|ci|perf|build|revert'
-readonly PATTERN="^(${TYPES})(\\([a-z0-9._/-]+\\))?!?: [a-z].+$"
+readonly PATTERN="^(${TYPES})(\\([a-z0-9._/-]+\\))?!?: [A-Za-z].+$"
 
 reject() {
   local subject="$1"
   cat >&2 <<EOF
-✗ Commit subject does not match Conventional Commits with lowercase type+subject.
+✗ Commit subject does not match Conventional Commits with lowercase type and a letter-led subject.
 
   Got:      ${subject}
   Expected: <type>(<scope>)?: <subject>
   Types:    feat, fix, chore, docs, style, refactor, test, ci, perf, build, revert
-  Subject:  must start with a lowercase letter
+  Subject:  must start with a letter (proper nouns and acronyms are allowed to be capitalized)
 
 Examples:
   feat: capture loop with detective persona

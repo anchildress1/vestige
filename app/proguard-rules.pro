@@ -1,9 +1,5 @@
-# ObjectBox model — keep generated MyObjectBox + entity classes from being stripped.
--keep class io.objectbox.** { *; }
--keep @io.objectbox.annotation.Entity class * { *; }
--keepclassmembers class * extends io.objectbox.converter.PropertyConverter { *; }
-
-# LiteRT / LiteRT-LM native bindings — verify exact rules at Phase 0.
-# litertlm-android bundles the underlying litert runtime so we keep both packages.
--keep class com.google.ai.edge.litert.** { *; }
--keep class com.google.ai.edge.litertlm.** { *; }
+# App-only ProGuard rules go here.
+#
+# ObjectBox and LiteRT-LM keep rules ship as consumer-rules.pro on their owning modules
+# (:core.storage and :core.inference) and are merged into the app's R8 input automatically.
+# Do not duplicate them here.

@@ -3,8 +3,6 @@ import kotlinx.kover.gradle.plugin.dsl.CoverageUnit
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
-    alias(libs.plugins.kotlin.kapt)
-    alias(libs.plugins.objectbox)
     alias(libs.plugins.kover)
 }
 
@@ -78,6 +76,10 @@ android {
 }
 
 dependencies {
+    implementation(project(":core-model"))
+    implementation(project(":core-storage"))
+    implementation(project(":core-inference"))
+
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.lifecycle.runtime.ktx)
@@ -86,15 +88,6 @@ dependencies {
     implementation(platform(libs.compose.bom))
     implementation(libs.bundles.compose.ui)
     debugImplementation(libs.bundles.compose.debug)
-
-    implementation(libs.objectbox.android)
-    implementation(libs.objectbox.kotlin)
-
-    // Inference — litertlm-android is the high-level entry point for Gemma 4 .litertlm models.
-    // It bundles the underlying LiteRT runtime (libLiteRt.so), so do not also depend on
-    // com.google.ai.edge.litert:litert directly — both ship the same native lib path and
-    // collide at :app:mergeDebugNativeLibs.
-    implementation(libs.litert.lm)
 
     testImplementation(libs.junit.jupiter.api)
     testRuntimeOnly(libs.junit.jupiter.engine)

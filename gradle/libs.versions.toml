@@ -76,7 +76,10 @@ androidx-test-espresso-core = { module = "androidx.test.espresso:espresso-core",
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
-# AGP 9.0+ ships kotlin-android built in — no separate plugin needed.
+android-library = { id = "com.android.library", version.ref = "agp" }
+# AGP 9.0+ ships kotlin-android built in — no separate plugin needed for android modules.
+# kotlin-jvm is required for pure-JVM modules (:core-model) that don't apply an Android plugin.
+kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
 kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
 kotlin-kapt = { id = "com.android.legacy-kapt", version.ref = "agp" }
 objectbox = { id = "io.objectbox", version.ref = "objectbox" }

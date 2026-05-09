@@ -39,11 +39,11 @@ If STT-A fails after the time-box: stop. Write a superseding ADR. Do not proceed
 **As** the AI implementor of v1, **I need** a working multi-module Android project with the locked four-module split, **so that** every subsequent story has a stable place to put code without mid-build refactors.
 
 **Done when:**
-- [ ] Top-level Gradle build configures successfully with modules `:app`, `:core-model`, `:core-inference`, `:core-storage` per ADR-001 Q1.
-- [ ] `:app` depends on the three `:core-*` modules; `:core-*` modules do not depend on each other except as ADR-001 specifies (no cycles).
-- [ ] Each module has a placeholder Kotlin file establishing its package namespace.
-- [ ] `AGENTS.md` is committed at the repo root and visible to any agent loading context.
-- [ ] `README.md` linking to `docs/` is present at repo root.
+- [x] Top-level Gradle build configures successfully with modules `:app`, `:core-model`, `:core-inference`, `:core-storage` per ADR-001 Q1.
+- [x] `:app` depends on the three `:core-*` modules; `:core-*` modules do not depend on each other except as ADR-001 specifies (no cycles).
+- [x] Each module has a placeholder Kotlin file establishing its package namespace.
+- [x] `AGENTS.md` is committed at the repo root and visible to any agent loading context.
+- [x] `README.md` linking to `docs/` is present at repo root.
 
 **Notes / risks:** ADR-001 Q2 (`AppContainer` ownership) lands in Phase 2 — this story only sets up the modules. Don't pre-build container plumbing here.
 

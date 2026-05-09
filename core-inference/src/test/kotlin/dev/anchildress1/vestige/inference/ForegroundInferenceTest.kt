@@ -96,8 +96,21 @@ class ForegroundInferenceTest {
             { assertTrue(systemPrompt.contains("Persona: Editor"), "Missing persona tag in prompt") },
             { assertTrue(systemPrompt.contains("cognition tracker"), "Missing shared sentinel in prompt") },
             { assertTrue(systemPrompt.contains(ForegroundInference.RECENT_TURNS_HEADER)) },
-            { assertTrue(systemPrompt.contains("<transcription>")) },
-            { assertTrue(systemPrompt.contains("<follow_up>")) },
+            // The schema reminder describes the format prose-only — no literal example tags so
+            // the model can't echo placeholder content the parser would mistake for a response.
+            {
+                assertTrue(systemPrompt.contains("transcription tags"), "Output schema must mention transcription tags")
+            },
+            { assertTrue(systemPrompt.contains("follow_up tags"), "Output schema must mention follow_up tags") },
+            {
+                assertFalse(
+                    systemPrompt.contains("<transcription>"),
+                    "Schema example must not contain literal opening tag",
+                )
+            },
+            {
+                assertFalse(systemPrompt.contains("<follow_up>"), "Schema example must not contain literal opening tag")
+            },
         )
     }
 
@@ -276,6 +289,41 @@ class ForegroundInferenceTest {
                 )
             }
         }
+    }
+
+    @Test
+    fun `crash-leftover temp WAVs are swept before the next call`(@TempDir cacheDir: File) = runTest {
+        // Simulate a prior call that died mid-inference: a vestige-fg-*.wav still on disk.
+        val leftover =
+            File(cacheDir, "${ForegroundInference.TEMP_PREFIX}previous-crash${ForegroundInference.TEMP_SUFFIX}")
+        leftover.writeBytes(byteArrayOf(0x52, 0x49, 0x46, 0x46))
+        assertTrue(leftover.exists())
+
+        val engine = mockk<LiteRtLmEngine>()
+        coEvery { engine.sendMessageContents(any()) } returns rawSuccess("a", "b")
+        ForegroundInference(engine, cacheDir, clock = fixedClock).runForegroundCall(
+            audio = audioChunk(),
+            transcript = Transcript(),
+            persona = Persona.WITNESS,
+        )
+
+        assertFalse(leftover.exists(), "Pre-call sweep must delete crash-leftover foreground WAVs")
+        assertEquals(0, cacheDir.listFiles().orEmpty().size)
+    }
+
+    @Test
+    fun `sweep ignores unrelated files in cacheDir`(@TempDir cacheDir: File) = runTest {
+        val unrelated = File(cacheDir, "model-artifact.litertlm")
+        unrelated.writeBytes(byteArrayOf(0x00))
+        val engine = mockk<LiteRtLmEngine>()
+        coEvery { engine.sendMessageContents(any()) } returns rawSuccess("a", "b")
+        ForegroundInference(engine, cacheDir, clock = fixedClock).runForegroundCall(
+            audio = audioChunk(),
+            transcript = Transcript(),
+            persona = Persona.WITNESS,
+        )
+
+        assertTrue(unrelated.exists(), "Sweep must not touch non-foreground-temp files")
     }
 
     @Test

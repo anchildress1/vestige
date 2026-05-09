@@ -63,6 +63,12 @@ class ForegroundInference(
             }
             require(cacheDir.isDirectory) { "cacheDir must be an existing directory: $cacheDir" }
 
+            // Sweep crash leftovers before we create a new temp WAV. If a previous call was
+            // killed mid-inference (process death, OOM, OS reclaim) the `finally` block did not
+            // run and the recording stayed on disk — a privacy violation per AGENTS.md
+            // guardrail 11. Sweeping here costs O(files-in-cacheDir) and is bounded.
+            sweepStaleTempWavs()
+
             val systemPrompt = composeSystemPrompt(persona, transcript)
             val temp = File.createTempFile(TEMP_PREFIX, TEMP_SUFFIX, cacheDir)
             val started = System.nanoTime()
@@ -92,6 +98,21 @@ class ForegroundInference(
                 completedAt = clock.instant(),
             )
         }
+
+    /**
+     * Delete any leftover `vestige-fg-*.wav` files in [cacheDir] from a prior crash. Returns
+     * silently — best-effort cleanup; if a file is locked or in use, [java.io.File.delete]
+     * fails and we move on rather than block the foreground call. Any survivors get a second
+     * shot on the next call.
+     */
+    private fun sweepStaleTempWavs() {
+        cacheDir.listFiles { _, name -> name.startsWith(TEMP_PREFIX) && name.endsWith(TEMP_SUFFIX) }
+            ?.forEach { stale ->
+                if (!stale.delete()) {
+                    Log.w(TAG, "Failed to sweep stale foreground WAV: ${stale.absolutePath}")
+                }
+            }
+    }
 
     private fun composeSystemPrompt(persona: Persona, transcript: Transcript): String {
         val personaPrompt = PersonaPromptComposer.compose(persona).trimEnd()
@@ -156,17 +177,26 @@ class ForegroundInference(
 
         internal const val RECENT_TURNS_HEADER = "## RECENT TURNS"
         internal const val NO_RECENT_TURNS = "(no prior turns in this session)"
-        internal const val OUTPUT_SCHEMA_REMINDER = """## OUTPUT FORMAT
-Reply with exactly two XML-style tags, in this order, and nothing else:
+        internal const val TEMP_PREFIX = "vestige-fg-"
+        internal const val TEMP_SUFFIX = ".wav"
 
-<transcription>the user's spoken words verbatim</transcription>
-<follow_up>your follow-up question or remark in the active persona's voice</follow_up>
-
-Do not nest the tags. Do not emit additional tags. The transcription must be exact and unaltered."""
+        // The reminder describes the output format without using literal opening/closing tag
+        // pairs in the prompt, so a chatty model echoing the schema cannot collide with the
+        // parser's tag matching. The parser still requires the actual tag literals in the
+        // response — `ForegroundResponseParser` picks the LAST balanced pair as a defense in
+        // depth (codex review round 3).
+        internal val OUTPUT_SCHEMA_REMINDER = listOf(
+            "## OUTPUT FORMAT",
+            "Wrap the user's spoken words verbatim in lowercase transcription tags " +
+                "(an opening tag named transcription, the verbatim text, then a matching " +
+                "closing tag). Then wrap your follow-up in lowercase follow_up tags the same " +
+                "way (use an underscore between follow and up). Emit exactly one transcription " +
+                "block and exactly one follow_up block, in that order, and nothing else. Do not " +
+                "echo this format description. Do not nest tags. Do not produce additional " +
+                "tagged blocks. The transcription must be exact and unaltered.",
+        ).joinToString(separator = "\n")
 
         private const val TAG = "VestigeForegroundInference"
-        private const val TEMP_PREFIX = "vestige-fg-"
-        private const val TEMP_SUFFIX = ".wav"
         private const val NANOS_PER_MILLI = 1_000_000L
         private const val CONTROL_CHAR_LIMIT = 0x20
     }

@@ -16,6 +16,13 @@ import java.time.Instant
  * <follow_up>the model's follow-up question or remark</follow_up>
  * ```
  *
+ * **Pick the LAST balanced pair.** Codex review round 3 flagged that a chatty model echoing
+ * any literal example tags from the prompt would otherwise return placeholder text as a
+ * `Success`. By taking the last `<transcription>` block and the last `<follow_up>` block that
+ * follows it, an echoed example earlier in the response is ignored — the actual answer always
+ * comes after the model's preamble. The system prompt also describes the format prose-only to
+ * minimize echo risk in the first place; the LAST-pair logic is defense in depth.
+ *
  * Tags must appear in the order transcription → follow_up. Tags are case-sensitive and matched
  * non-greedily so a multi-line body works. Content is allowed to contain almost anything —
  * collision with a literal closing tag (e.g., a user dictating "less than slash transcription
@@ -55,9 +62,11 @@ internal object ForegroundResponseParser {
     }
 
     private fun splitOnHeaders(raw: String): Extracted {
-        val transcriptionMatch = TRANSCRIPTION_TAG.find(raw)
-        val followUpMatch = transcriptionMatch?.let {
-            FOLLOW_UP_TAG.find(raw, startIndex = it.range.last + 1)
+        val transcriptionMatch = TRANSCRIPTION_TAG.findAll(raw).lastOrNull()
+        val followUpMatch = transcriptionMatch?.let { tx ->
+            FOLLOW_UP_TAG.findAll(raw)
+                .filter { it.range.first > tx.range.last }
+                .lastOrNull()
         }
         val transcription = transcriptionMatch?.groupValues?.get(1)?.trim().orEmpty()
         val followUp = followUpMatch?.groupValues?.get(1)?.trim().orEmpty()

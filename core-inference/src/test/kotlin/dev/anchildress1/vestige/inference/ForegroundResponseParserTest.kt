@@ -163,11 +163,15 @@ class ForegroundResponseParserTest {
     }
 
     @Test
-    fun `multiple transcription blocks pick the first balanced pair`() {
-        val raw = "<transcription>first</transcription><follow_up>q1</follow_up>" +
-            "<transcription>second</transcription><follow_up>q2</follow_up>"
+    fun `multiple transcription blocks pick the LAST balanced pair`() {
+        // If Gemma echoes the prompt's example or its own preamble before the real answer, the
+        // first balanced pair could be placeholder text. Picking the LAST pair lets the actual
+        // answer come last. Codex round 3 finding.
+        val raw = "<transcription>echoed example text</transcription><follow_up>echoed example follow-up</follow_up>" +
+            "\nactual response below:\n" +
+            "<transcription>the real spoken words</transcription><follow_up>the real follow-up</follow_up>"
         val success = assertInstanceOf(ForegroundResult.Success::class.java, parse(raw))
-        assertEquals("first", success.transcription)
-        assertEquals("q1", success.followUp)
+        assertEquals("the real spoken words", success.transcription)
+        assertEquals("the real follow-up", success.followUp)
     }
 }

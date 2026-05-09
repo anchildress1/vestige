@@ -1,5 +1,6 @@
 package dev.anchildress1.vestige.inference
 
+import dev.anchildress1.vestige.model.Persona
 import java.time.Clock
 
 /**
@@ -12,7 +13,10 @@ import java.time.Clock
  *   IDLE ──startRecording──▶ RECORDING ──submitForInference──▶ INFERRING
  *    ▲                                                              │
  *    │                                                              ▼
- *    └──acknowledgeResponse──── RESPONDED ◀──recordResponse────────┘
+ *    └──acknowledgeResponse──── RESPONDED ◀──recordModelResponse── TRANSCRIBED
+ *                                                                  ▲
+ *                                                                  │
+ *                                                    recordTranscription
  *
  *   any ──fail──▶ ERROR ──clearError──▶ IDLE
  * ```
@@ -23,7 +27,7 @@ import java.time.Clock
  */
 class CaptureSession(private val clock: Clock = Clock.systemUTC()) {
 
-    enum class State { IDLE, RECORDING, INFERRING, RESPONDED, ERROR }
+    enum class State { IDLE, RECORDING, INFERRING, TRANSCRIBED, RESPONDED, ERROR }
 
     val transcript: Transcript = Transcript()
 
@@ -45,16 +49,20 @@ class CaptureSession(private val clock: Clock = Clock.systemUTC()) {
         state = State.INFERRING
     }
 
+    /** INFERRING → TRANSCRIBED. Appends the user's transcription before the follow-up renders. */
+    fun recordTranscription(userText: String) {
+        requireState("recordTranscription", State.INFERRING)
+        transcript.append(Turn(Speaker.USER, userText, clock.instant()))
+        state = State.TRANSCRIBED
+    }
+
     /**
-     * INFERRING → RESPONDED. Appends the user's transcription then the model's follow-up to
-     * [transcript], in that order, so the saved `entry_text` reads chronologically per
-     * `design-guidelines.md` §"Conversation transcript".
+     * TRANSCRIBED → RESPONDED. Appends the model's follow-up after the user's transcription is
+     * already visible in the transcript.
      */
-    fun recordResponse(userText: String, modelText: String) {
-        requireState("recordResponse", State.INFERRING)
-        val now = clock.instant()
-        transcript.append(Turn(Speaker.USER, userText, now))
-        transcript.append(Turn(Speaker.MODEL, modelText, now))
+    fun recordModelResponse(modelText: String, persona: Persona) {
+        requireState("recordModelResponse", State.TRANSCRIBED)
+        transcript.append(Turn(Speaker.MODEL, modelText, clock.instant(), persona))
         state = State.RESPONDED
     }
 

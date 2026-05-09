@@ -1,5 +1,6 @@
 package dev.anchildress1.vestige.inference
 
+import dev.anchildress1.vestige.model.Persona
 import java.time.Instant
 
 /**
@@ -16,11 +17,23 @@ enum class Speaker { USER, MODEL }
  * [timestamp] is when the turn entered the transcript (post-transcription for `USER`, post-response
  * for `MODEL`), not when audio capture began.
  */
-data class Turn(val speaker: Speaker, val text: String, val timestamp: Instant)
+data class Turn(
+    val speaker: Speaker,
+    val text: String,
+    val timestamp: Instant,
+    val persona: Persona? = null,
+) {
+    init {
+        when (speaker) {
+            Speaker.USER -> require(persona == null) { "USER turns cannot carry a persona" }
+            Speaker.MODEL -> require(persona != null) { "MODEL turns must record their persona" }
+        }
+    }
+}
 
 /**
  * Append-only ordered log of [Turn]s for a single capture session. One [CaptureSession] owns one
- * `Transcript`; the joined text becomes the entry's `entry_text` at save time (Story 2.12).
+ * `Transcript`; `entry_text` is derived from the ordered USER turns only, never from model output.
  *
  * Read access returns a snapshot — callers cannot mutate the underlying list. Writes go through
  * `CaptureSession`'s state-machine methods so transcript advances stay synchronized with state.
@@ -33,6 +46,12 @@ class Transcript {
     val size: Int get() = mutableTurns.size
 
     fun isEmpty(): Boolean = mutableTurns.isEmpty()
+
+    fun entryText(): String = mutableTurns
+        .asSequence()
+        .filter { it.speaker == Speaker.USER }
+        .map(Turn::text)
+        .joinToString(separator = "\n\n")
 
     internal fun append(turn: Turn) {
         mutableTurns += turn

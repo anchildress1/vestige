@@ -27,6 +27,11 @@ If no, defer it to `backlog.md` and say: "this doesn't help us win, deferring to
 13. Use one inference runtime in v1: LiteRT-LM. Any llama.cpp / MediaPipe / AICore switch requires a superseding ADR.
 14. If LiteRT-LM or Gemma 4 audio fails an existential stop-and-test (notably STT-A audio plumbing in Phase 1), stop and replan. Do not build a pretty wrapper around a broken premise. We have standards, allegedly.
 15. Tick checklist items off the active phase story file in `docs/stories/phase-{N}-*.md` as work completes. Stories are the canonical work queue; an unchecked item with shipped code is an unfinished story, not a victory lap. If a story can't ship as written, edit the story (or push it to `backlog.md`) before moving on — don't ghost the checklist.
+16. **No backwards compatibility.** Vestige is a v1 challenge submission, not a long-running product. Do not add migration shims, deprecated-but-kept APIs, feature flags for "old behavior," or compatibility wrappers. If a design changes, the old design dies — supersede the ADR and rewrite the code.
+17. **Technical excellence at all times.** This is a public submission judged against other submissions. Code quality is part of the deliverable. No quick fixes, no temp solutions, no `// TODO fix later` for things that ship. If it's not right, do not commit it.
+18. **All scans must pass at all times.** Sonar, Semgrep, and Snyk findings are blockers, not warnings. Lint, detekt, and ktlint findings are blockers, not warnings. A failing scan is a failing build. Fix at root, not at the report level.
+19. **Codex and Copilot will review every PR.** Assume an adversarial automated reviewer is reading the diff. Match documented patterns; cite the ADR/spec when deviating; do not leave unexplained idiom drift.
+20. **Stick to the plan.** Do not overbuild or over-deliver. The story file is the contract. If a story can ship as N lines, it ships as N lines — not N + a refactor + a new abstraction layer "while we're here." Scope creep is rejected at review.
 
 ## Build Order
 

@@ -18,13 +18,39 @@ dependencies {
 
 kover {
     reports {
-        filters {
-            excludes {
-                classes(
-                    "dev.anchildress1.vestige.MainActivity",
-                    "dev.anchildress1.vestige.VestigeApplication",
-                    "dev.anchildress1.vestige.ui.theme.*",
-                )
+        total {
+            filters {
+                excludes {
+                    // Kover's `*` glob requires ≥1 trailing character — `MainActivity*` matches
+                    // `MainActivityKt` but NOT bare `MainActivity`. Enumerate both forms so
+                    // top-level classes AND their Compose / coroutine / FileKt synthetics are
+                    // excluded together. Leading `*` on `*MainActivityKt*` catches Compose's
+                    // `ComposableSingletons$MainActivityKt` lambda holder, which lives in the
+                    // root package alongside MainActivity.
+                    classes(
+                        "dev.anchildress1.vestige.MainActivity",
+                        "dev.anchildress1.vestige.MainActivity*",
+                        "dev.anchildress1.vestige.MainActivityKt",
+                        "dev.anchildress1.vestige.MainActivityKt*",
+                        "dev.anchildress1.vestige.*MainActivityKt*",
+                        "dev.anchildress1.vestige.VestigeApplication",
+                        "dev.anchildress1.vestige.VestigeApplication*",
+                        "dev.anchildress1.vestige.ui.theme.*",
+                        // Model loading and audio recording require on-device hardware/model;
+                        // exercised by androidTest, not JVM unit tests.
+                        "dev.anchildress1.vestige.inference.LiteRtLmEngine",
+                        "dev.anchildress1.vestige.inference.LiteRtLmEngine*",
+                        "dev.anchildress1.vestige.inference.AudioCapture",
+                        "dev.anchildress1.vestige.inference.AudioCapture*",
+                    )
+                }
+            }
+            verify {
+                rule {
+                    bound {
+                        minValue = 85
+                    }
+                }
             }
         }
     }
@@ -61,6 +87,8 @@ sonar {
                 "**/ui/theme/**",
                 "**/VestigeApplication.kt",
                 "**/MainActivity.kt",
+                "**/LiteRtLmEngine.kt",
+                "**/AudioCapture.kt",
             ).joinToString(","),
         )
         property("sonar.qualitygate.wait", "true")

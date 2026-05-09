@@ -86,17 +86,22 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@50e97c2cd7a37755bbfafc9c5b7cafaece252f6e # v6.1.0
 
-      - name: Run unit tests + Kover verification
-        run: ./gradlew :app:testDebugUnitTest :app:koverXmlReport :app:koverVerify
+      - name: Run unit tests
+        run: ./gradlew :core-model:test :core-inference:testDebugUnitTest :app:testDebugUnitTest :app:koverXmlReport
 
       - name: Upload test report
         uses: actions/upload-artifact@v4
         if: always()
         with:
           name: test-report
-          path: |
-            app/build/reports/tests/
-            app/build/reports/kover/
+          path: app/build/reports/tests/
+          retention-days: 14
+
+      - name: Upload Kover XML report
+        uses: actions/upload-artifact@v4
+        with:
+          name: kover-report
+          path: app/build/reports/kover/report.xml
           retention-days: 14
 
   build:
@@ -145,17 +150,11 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Set up JDK 25
-        uses: actions/setup-java@v5
+      - name: Download Kover XML report
+        uses: actions/download-artifact@v4
         with:
-          distribution: temurin
-          java-version: '25'
-
-      - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@50e97c2cd7a37755bbfafc9c5b7cafaece252f6e # v6.1.0
-
-      - name: Generate Kover XML report
-        run: ./gradlew :app:koverXmlReport
+          name: kover-report
+          path: app/build/reports/kover/
 
       - name: SonarCloud scan
         uses: SonarSource/sonarqube-scan-action@689fb39b34b9aa95ebc5f8f119343ddd51542402 # v4

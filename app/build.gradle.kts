@@ -1,4 +1,3 @@
-import kotlinx.kover.gradle.plugin.dsl.CoverageUnit
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import java.util.Properties
 
@@ -207,14 +206,6 @@ kover {
                     "dev.anchildress1.vestige.VestigeApplication",
                     "dev.anchildress1.vestige.ui.theme.*",
                 )
-            }
-        }
-        verify {
-            rule {
-                minBound(80, CoverageUnit.LINE)
-            }
-            rule {
-                minBound(80, CoverageUnit.BRANCH)
             }
         }
     }

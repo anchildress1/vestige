@@ -35,7 +35,10 @@ EOF
 is_passthrough() {
   local subject="$1"
   case "$subject" in
-    "Merge "*|"Revert "*|"chore: release main"|"chore(release): "*) return 0 ;;
+    # Default git-generated subjects for merges, squash-merges, and reverts.
+    "Merge "*|"Squashed commit "*|"Revert "*) return 0 ;;
+    # release-please managed subjects.
+    "chore: release main"|"chore(release): "*) return 0 ;;
     *) return 1 ;;
   esac
 }

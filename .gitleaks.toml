@@ -5,14 +5,21 @@ useDefault = true
 
 [allowlist]
 description = "Files allowed to contain false-positive secret-like strings."
+# SonarCloud projectKey is a public identifier (visible at sonarcloud.io/dashboard?id=...),
+# not a secret. It appears in three places:
+#   1. gradle/wrapper/gradle-wrapper.properties — wrapper distribution URL noise
+#      (whole-file allowance: this is generated infrastructure, not a place secrets land)
+#   2. build.gradle.kts — Gradle DSL form for the org.sonarqube plugin
+#      (regex-only allowance below; the rest of the file is still scanned)
+#   3. sonar-project.properties — Java-properties form for SonarLint IDE connected
+#      mode and the SonarQube MCP resolver, both of which require the verbatim line
+#      (regex-only allowance below; per Copilot review, a whole-file allowance would
+#      mask any future secret accidentally added to the same file)
 paths = [
   "gradle/wrapper/gradle-wrapper.properties",
 ]
-# SonarCloud projectKey is a public identifier (visible at sonarcloud.io/dashboard?id=...),
-# not a secret. The org.sonarqube Gradle plugin migration moved this value out of
-# sonar-project.properties into a sonar { } block in build.gradle.kts, so the prior
-# whole-file allowlist no longer applies.
 regexTarget = "match"
 regexes = [
   '''sonar\.projectKey", "anchildress1_vestige"''',
+  '''sonar\.projectKey=anchildress1_vestige''',
 ]

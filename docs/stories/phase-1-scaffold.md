@@ -1,7 +1,7 @@
 # Phase 1 — Architecture and Scaffold
 
-**Status:** Not started
-**Dates:** TBD — kicks off after the executive-decision restructure lands
+**Status:** Complete
+**Dates:** 2026-05-08 – 2026-05-09
 **References:** `PRD.md` §Phase 1, `AGENTS.md`, `architecture-brief.md`, `runtime-research.md`, `adrs/ADR-001-stack-and-build-infra.md`, `adrs/ADR-002-multi-lens-extraction-pattern.md` Q4
 
 ---
@@ -16,17 +16,17 @@ Stand up the four-module Android scaffold, prove LiteRT-LM can run Gemma 4 E4B o
 
 ## Phase-level acceptance criteria
 
-- [ ] Repo committed with the four-module split per ADR-001 Q1.
-- [ ] `gradle.properties` matches the proposed config in ADR-001 §"Refactored `gradle.properties`."
-- [ ] LiteRT-LM SDK loaded; text-only inference smoke test passes on the reference device.
-- [ ] **STT-A passes:** audio bytes from `AudioRecord` round-trip through Gemma 4 and produce a coherent transcription on the reference device. Time-boxed; if not passing inside one focused day, stop and replan.
-- [ ] ObjectBox schema migrates cleanly with `extraction_status` / `attempt_count` / `last_error` operational fields wired.
-- [ ] Markdown source-of-truth read/write contract working with the same data the ObjectBox row carries.
-- [ ] `ModelArtifactStore` interface implemented with SHA-256 verification and retry policy.
-- [ ] `NetworkGate` shipped with `OPEN`/`SEALED` states; StrictMode network detection in dev; telemetry-library grep clean.
-- [ ] Signed dummy release APK installed on the reference S24 Ultra.
-- [ ] Convergence resolver unit-test suite scaffolded (no implementation; ready for Phase 2).
-- [ ] Persona prompt scaffold compiles with Witness / Hardass / Editor as tone-only variants. No tone validation yet.
+- [x] Repo committed with the four-module split per ADR-001 Q1.
+- [x] `gradle.properties` matches the proposed config in ADR-001 §"Refactored `gradle.properties`."
+- [x] LiteRT-LM SDK loaded; text-only inference smoke test passes on the reference device.
+- [x] **STT-A passes:** audio bytes from `AudioRecord` round-trip through Gemma 4 and produce a coherent transcription on the reference device. Time-boxed; if not passing inside one focused day, stop and replan.
+- [x] ObjectBox schema migrates cleanly with `extraction_status` / `attempt_count` / `last_error` operational fields wired.
+- [x] Markdown source-of-truth read/write contract working with the same data the ObjectBox row carries.
+- [x] `ModelArtifactStore` interface implemented with SHA-256 verification and retry policy.
+- [x] `NetworkGate` shipped with `OPEN`/`SEALED` states; StrictMode network detection in dev; telemetry-library grep clean.
+- [x] Signed dummy release APK installed on the reference S24 Ultra.
+- [x] Convergence resolver unit-test suite scaffolded (no implementation; ready for Phase 2).
+- [x] Persona prompt scaffold compiles with Witness / Hardass / Editor as tone-only variants. No tone validation yet.
 
 If STT-A fails after the time-box: stop. Write a superseding ADR. Do not proceed to Phase 2.
 
@@ -101,12 +101,10 @@ If STT-A fails after the time-box: stop. Write a superseding ADR. Do not proceed
 
 **Done when:**
 - [x] A test harness in `:core-inference` accepts a normalized audio buffer from `AudioCapture` (Story 1.4) and produces a transcription via Gemma 4 E4B. _(Harness shipped as `SttAProbe` + `WavWriter` in `:core-inference`; instrumented runner at `:app/src/androidTest/.../SttAAudioPlumbingTest.kt`.)_
-- [x] At least 5 sample utterances round-trip through the harness on the reference S24 Ultra and produce coherent transcriptions. _(2026-05-09: 4 clips tested — ~24 s spoken content, ~9.5 s simple test sentence, ~11 s conceptual explanation, ~25 s nuanced speech. All transcriptions coherent ≥90% by visual inspection. User signed off.)_
+- [x] At least 5 sample utterances round-trip through the harness on the reference S24 Ultra and produce coherent transcriptions. _(2026-05-09: 4 clips tested — ~24 s spoken content, ~9.5 s simple test sentence, ~11 s conceptual explanation, ~25 s nuanced speech. All transcriptions coherent ≥90% by visual inspection. User signed off. Requirement calls for 5; user accepted 4 as sufficient for Phase 1 sign-off given variability in clip length and content coverage.)_
 - [x] The exact LiteRT-LM Android handoff is documented inline in ADR-001 Q4. _(2026-05-09: `Content.AudioFile` with PCM_S16LE WAV is the working path. `Content.AudioBytes` (float32-LE) and `Content.AudioFile` with IEEE_FLOAT WAV both fail with `MA_INVALID_DATA` from miniaudio. `WavWriter` updated to emit PCM_S16LE. Recorded in ADR-001 §Q4.)_
 - [x] If `AudioFile` is the working path, temp-file lifecycle is correct: created → handed to model → deleted within the same call. No persisted audio. _(`SttAProbe.transcribeViaTempWav` deletes inside `finally`; falls back to `deleteOnExit` only if the in-call delete fails.)_
 - [x] Latency of one clip end-to-end recorded to ADR-001 §Q4. _(2026-05-09: ~19,400–20,800 ms for a 24-second clip on CPU backend. Recorded in ADR-001 §Q4 device-test table.)_
-
-  > **TODO — manual validation pending (Phase 1, Story 1.5):** `Content.AudioFile` path works and produces coherent transcriptions. Still need the user to record/push **5 total utterances** (varied length and content per `sample-data-scenarios.md`) and visually confirm ≥90% accuracy. One clip verified so far (2026-05-09). Push more clips to `/data/local/tmp/` and run `./gradlew :app:connectedDebugAndroidTest -PmodelPath=/data/local/tmp/gemma-4-E4B-it.litertlm -PaudioPath=/data/local/tmp/<clip>.wav`.
 
 **Time-box:** one focused day of debugging. If transcription is not coherent or the byte-packing path remains unknown after that day, stop. Write a superseding ADR documenting the failure mode and the replan options:
 1. Wait for LiteRT-LM doc updates and pivot the demo to text-only as primary input.
@@ -244,11 +242,11 @@ If a Phase 1 story starts pulling in Phase 2+ scope, stop and check `backlog.md`
 
 Phase 2 starts when all the following are true:
 
-- [ ] All twelve stories above are Done.
-- [ ] **STT-A passed.** Audio plumbing is proven on the reference device.
-- [ ] Signed dummy APK is installed and running.
-- [ ] Privacy rails (NetworkGate, StrictMode, dependency grep) are clean.
-- [ ] Convergence resolver test scaffolding compiles.
-- [ ] No new entries logged to `backlog.md` from Phase 1 work that change the v1 contract.
+- [x] All twelve stories above are Done.
+- [x] **STT-A passed.** Audio plumbing is proven on the reference device.
+- [x] Signed dummy APK is installed and running.
+- [x] Privacy rails (NetworkGate, StrictMode, dependency grep) are clean.
+- [x] Convergence resolver test scaffolding compiles.
+- [x] No new entries logged to `backlog.md` from Phase 1 work that change the v1 contract. _(`mic-perm-resume-recheck` added 2026-05-09 — Phase 1 shell UI polish, does not affect v1 contract.)_
 
 If STT-A failed and a superseding ADR was written, Phase 2's scope changes per that ADR. Otherwise, Phase 2 picks up at `PRD.md` §Phase 2 Story 1 (capture loop end-to-end) with the foundation Phase 1 produced.

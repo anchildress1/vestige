@@ -7,6 +7,7 @@ import com.google.ai.edge.litertlm.Contents
 import com.google.ai.edge.litertlm.Engine
 import com.google.ai.edge.litertlm.EngineConfig
 import com.google.ai.edge.litertlm.LogSeverity
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -40,11 +41,12 @@ class LiteRtLmEngine(
     private val audioBackend: BackendChoice? = null,
     private val visionBackend: BackendChoice? = null,
     private val cacheDir: String? = null,
+    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) : AutoCloseable {
 
     private var engine: Engine? = null
 
-    suspend fun initialize() = withContext(Dispatchers.IO) {
+    suspend fun initialize() = withContext(ioDispatcher) {
         check(engine == null) { "LiteRtLmEngine already initialized; close() before re-init." }
         Log.d(
             TAG,
@@ -66,7 +68,7 @@ class LiteRtLmEngine(
         Log.d(TAG, "Engine initialized in ${elapsedMs}ms")
     }
 
-    suspend fun generateText(prompt: String): String = withContext(Dispatchers.IO) {
+    suspend fun generateText(prompt: String): String = withContext(ioDispatcher) {
         val active = checkNotNull(engine) {
             "LiteRtLmEngine.generateText called before initialize()."
         }
@@ -87,7 +89,7 @@ class LiteRtLmEngine(
      * `Content.AudioFile` alongside a transcription prompt. Single-turn — opens and closes a
      * conversation per call.
      */
-    suspend fun sendMessageContents(parts: List<Content>): String = withContext(Dispatchers.IO) {
+    suspend fun sendMessageContents(parts: List<Content>): String = withContext(ioDispatcher) {
         val active = checkNotNull(engine) {
             "LiteRtLmEngine.sendMessageContents called before initialize()."
         }

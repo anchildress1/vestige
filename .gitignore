@@ -66,3 +66,6 @@ bun.lockb
 libobjectbox-jni-*.dylib
 libobjectbox-jni-*.so
 libobjectbox-jni-*.dll
+
+# Claude Code session state — session locks, transcripts, scheduled-task metadata
+.claude/

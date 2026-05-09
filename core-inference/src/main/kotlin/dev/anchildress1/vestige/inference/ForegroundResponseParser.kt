@@ -16,18 +16,19 @@ import java.time.Instant
  * <follow_up>the model's follow-up question or remark</follow_up>
  * ```
  *
- * **Pick the LAST balanced pair.** Codex review round 3 flagged that a chatty model echoing
- * any literal example tags from the prompt would otherwise return placeholder text as a
- * `Success`. By taking the last `<transcription>` block and the last `<follow_up>` block that
- * follows it, an echoed example earlier in the response is ignored — the actual answer always
- * comes after the model's preamble. The system prompt also describes the format prose-only to
- * minimize echo risk in the first place; the LAST-pair logic is defense in depth.
+ * **Exactly one of each tag.** Codex review rounds 3 and 4 walked us through the failure modes
+ * of guessing which block is "the answer" when the model emits more than one of either tag —
+ * first-pair picks an echoed example, last-pair picks a trailing reminder, and either heuristic
+ * silently corrupts saved entries. The honest contract: the system prompt asks the model for
+ * exactly one transcription block and exactly one follow_up block; if it returns more, that
+ * is `AMBIGUOUS_BLOCKS` and the caller decides what to do (re-prompt, mark as parse-error,
+ * surface the failure to STT-C instrumentation).
  *
  * Tags must appear in the order transcription → follow_up. Tags are case-sensitive and matched
- * non-greedily so a multi-line body works. Content is allowed to contain almost anything —
- * collision with a literal closing tag (e.g., a user dictating "less than slash transcription
- * greater than") is the only remaining ambiguity, and that is vanishingly unlikely in spoken
- * cognition-tracker dumps. STT-C measures parse-success rate on a real E4B transcript set.
+ * non-greedily so a multi-line body works. Content is preserved verbatim — no trimming — to
+ * honor the `personas/shared.txt` "exact and unaltered" transcription rule (codex round 4 P2).
+ * Empty / whitespace-only bodies still register as MISSING_*, but otherwise the captured text
+ * passes through byte-for-byte. STT-C measures parse-success rate on a real E4B transcript set.
  */
 internal object ForegroundResponseParser {
 
@@ -62,19 +63,26 @@ internal object ForegroundResponseParser {
     }
 
     private fun splitOnHeaders(raw: String): Extracted {
-        val transcriptionMatch = TRANSCRIPTION_TAG.findAll(raw).lastOrNull()
-        val followUpMatch = transcriptionMatch?.let { tx ->
-            FOLLOW_UP_TAG.findAll(raw)
-                .filter { it.range.first > tx.range.last }
-                .lastOrNull()
+        val transcriptionMatches = TRANSCRIPTION_TAG.findAll(raw).toList()
+        val followUpMatches = FOLLOW_UP_TAG.findAll(raw).toList()
+        if (transcriptionMatches.size > 1 || followUpMatches.size > 1) {
+            return Extracted.Bad(ForegroundResult.ParseReason.AMBIGUOUS_BLOCKS)
         }
-        val transcription = transcriptionMatch?.groupValues?.get(1)?.trim().orEmpty()
-        val followUp = followUpMatch?.groupValues?.get(1)?.trim().orEmpty()
+        val transcriptionMatch = transcriptionMatches.singleOrNull()
+        val followUpMatch = followUpMatches.singleOrNull()
+        val orderedFollowUp = followUpMatch?.takeIf {
+            transcriptionMatch == null ||
+                it.range.first > transcriptionMatch.range.last
+        }
+        // Verbatim — no `.trim()`. The transcription contract from `personas/shared.txt` says
+        // "exact and unaltered"; collapsing wrapping whitespace would mutate user content.
+        val transcription = transcriptionMatch?.groupValues?.get(1).orEmpty()
+        val followUp = orderedFollowUp?.groupValues?.get(1).orEmpty()
         return when {
             transcriptionMatch == null -> Extracted.Bad(ForegroundResult.ParseReason.MISSING_TRANSCRIPTION)
-            followUpMatch == null -> Extracted.Bad(ForegroundResult.ParseReason.MISSING_FOLLOW_UP)
-            transcription.isEmpty() -> Extracted.Bad(ForegroundResult.ParseReason.MISSING_TRANSCRIPTION)
-            followUp.isEmpty() -> Extracted.Bad(ForegroundResult.ParseReason.MISSING_FOLLOW_UP)
+            orderedFollowUp == null -> Extracted.Bad(ForegroundResult.ParseReason.MISSING_FOLLOW_UP)
+            transcription.isBlank() -> Extracted.Bad(ForegroundResult.ParseReason.MISSING_TRANSCRIPTION)
+            followUp.isBlank() -> Extracted.Bad(ForegroundResult.ParseReason.MISSING_FOLLOW_UP)
             else -> Extracted.Ok(transcription, followUp)
         }
     }

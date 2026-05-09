@@ -46,5 +46,13 @@ sealed interface ForegroundResult {
         EMPTY_RESPONSE,
         MISSING_TRANSCRIPTION,
         MISSING_FOLLOW_UP,
+
+        /**
+         * Multiple `<transcription>` and/or `<follow_up>` blocks in the response. Per ADR-002
+         * §"Structured-output reliability" the foreground prompt requires exactly one of each;
+         * if Gemma echoes the schema, drifts into a reminder, or appends a second answer, we
+         * surface a typed failure rather than guessing which block is the real one.
+         */
+        AMBIGUOUS_BLOCKS,
     }
 }

@@ -48,11 +48,14 @@ class ForegroundResponseParserTest {
     }
 
     @Test
-    fun `tolerates whitespace and newlines between tags`() {
+    fun `wrapping whitespace inside tag bodies is preserved verbatim`() {
+        // The transcription contract is "exact and unaltered" — even the model's wrapping
+        // newlines/spaces survive untouched. Callers that want to display normalized text can
+        // trim themselves; the parser does not mutate. (Codex round 4 P2.)
         val raw = "<transcription>\n\nfoo\n\n</transcription>\n\n\n<follow_up>\n\nbar\n\n</follow_up>\n\n"
         val success = assertInstanceOf(ForegroundResult.Success::class.java, parse(raw))
-        assertEquals("foo", success.transcription)
-        assertEquals("bar", success.followUp)
+        assertEquals("\n\nfoo\n\n", success.transcription)
+        assertEquals("\n\nbar\n\n", success.followUp)
     }
 
     @Test
@@ -99,6 +102,13 @@ class ForegroundResponseParserTest {
     }
 
     @Test
+    fun `transcription tag with whitespace-only body returns MISSING_TRANSCRIPTION`() {
+        val raw = "<transcription>   \n\t\n</transcription>\n<follow_up>nothing was said?</follow_up>"
+        val failure = assertInstanceOf(ForegroundResult.ParseFailure::class.java, parse(raw))
+        assertEquals(ForegroundResult.ParseReason.MISSING_TRANSCRIPTION, failure.reason)
+    }
+
+    @Test
     fun `follow-up tag present but body empty returns MISSING_FOLLOW_UP`() {
         val raw = "<transcription>something the user said.</transcription>\n<follow_up></follow_up>"
         val failure = assertInstanceOf(ForegroundResult.ParseFailure::class.java, parse(raw))
@@ -131,16 +141,14 @@ class ForegroundResponseParserTest {
         // A user dictating "## FOLLOW_UP" inline (or even on its own line) must not split the
         // transcription — the verbatim contract from `personas/shared.txt` says "exact and
         // unaltered." XML tags bound the section, so markdown markers are just content.
-        val raw = "<transcription>i was reading the doc and the next section is called\n" +
+        val transcriptionContent = "i was reading the doc and the next section is called\n" +
             "## FOLLOW_UP\n" +
-            "all in caps.</transcription>\n" +
+            "all in caps."
+        val raw = "<transcription>$transcriptionContent</transcription>\n" +
             "<follow_up>What were you reading right before that?</follow_up>"
 
         val success = assertInstanceOf(ForegroundResult.Success::class.java, parse(raw))
-        assertEquals(
-            "i was reading the doc and the next section is called\n## FOLLOW_UP\nall in caps.",
-            success.transcription,
-        )
+        assertEquals(transcriptionContent, success.transcription)
         assertEquals("What were you reading right before that?", success.followUp)
     }
 
@@ -163,15 +171,31 @@ class ForegroundResponseParserTest {
     }
 
     @Test
-    fun `multiple transcription blocks pick the LAST balanced pair`() {
-        // If Gemma echoes the prompt's example or its own preamble before the real answer, the
-        // first balanced pair could be placeholder text. Picking the LAST pair lets the actual
-        // answer come last. Codex round 3 finding.
-        val raw = "<transcription>echoed example text</transcription><follow_up>echoed example follow-up</follow_up>" +
-            "\nactual response below:\n" +
-            "<transcription>the real spoken words</transcription><follow_up>the real follow-up</follow_up>"
-        val success = assertInstanceOf(ForegroundResult.Success::class.java, parse(raw))
-        assertEquals("the real spoken words", success.transcription)
-        assertEquals("the real follow-up", success.followUp)
+    fun `multiple transcription blocks return AMBIGUOUS_BLOCKS — never guess`() {
+        // Codex review rounds 3 and 4: first-pair picks an echoed example; last-pair picks a
+        // trailing reminder. Either heuristic silently corrupts the saved entry. The contract
+        // is "exactly one of each" — anything else is a typed parse failure surfaced for STT-C
+        // instrumentation and caller-side recovery (re-prompt, error UI, etc.).
+        val raw = "<transcription>first</transcription><follow_up>q1</follow_up>\n" +
+            "<transcription>second</transcription><follow_up>q2</follow_up>"
+        val failure = assertInstanceOf(ForegroundResult.ParseFailure::class.java, parse(raw))
+        assertEquals(ForegroundResult.ParseReason.AMBIGUOUS_BLOCKS, failure.reason)
+    }
+
+    @Test
+    fun `duplicate transcription tag alone returns AMBIGUOUS_BLOCKS`() {
+        val raw = "<transcription>one</transcription>\n" +
+            "<transcription>two</transcription>\n<follow_up>q</follow_up>"
+        val failure = assertInstanceOf(ForegroundResult.ParseFailure::class.java, parse(raw))
+        assertEquals(ForegroundResult.ParseReason.AMBIGUOUS_BLOCKS, failure.reason)
+    }
+
+    @Test
+    fun `duplicate follow-up tag alone returns AMBIGUOUS_BLOCKS`() {
+        val raw = "<transcription>just one transcription.</transcription>\n" +
+            "<follow_up>first follow-up.</follow_up>\n" +
+            "<follow_up>second follow-up.</follow_up>"
+        val failure = assertInstanceOf(ForegroundResult.ParseFailure::class.java, parse(raw))
+        assertEquals(ForegroundResult.ParseReason.AMBIGUOUS_BLOCKS, failure.reason)
     }
 }

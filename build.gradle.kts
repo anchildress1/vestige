@@ -9,13 +9,34 @@ plugins {
     alias(libs.plugins.sonar)
 }
 
+dependencies {
+    kover(project(":app"))
+    kover(project(":core-model"))
+    kover(project(":core-inference"))
+    kover(project(":core-storage"))
+}
+
+kover {
+    reports {
+        filters {
+            excludes {
+                classes(
+                    "dev.anchildress1.vestige.MainActivity",
+                    "dev.anchildress1.vestige.VestigeApplication",
+                    "dev.anchildress1.vestige.ui.theme.*",
+                )
+            }
+        }
+    }
+}
+
 sonar {
     properties {
         property("sonar.projectKey", "anchildress1_vestige")
         property("sonar.organization", "anchildress1")
         property("sonar.host.url", "https://sonarcloud.io")
         property("sonar.kotlin.coveragePlugin", "jacoco")
-        property("sonar.coverage.jacoco.xmlReportPaths", "app/build/reports/kover/report.xml")
+        property("sonar.coverage.jacoco.xmlReportPaths", "build/reports/kover/report.xml")
         property(
             "sonar.junit.reportPaths",
             listOf(

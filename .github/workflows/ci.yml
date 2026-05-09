@@ -87,7 +87,7 @@ jobs:
         uses: gradle/actions/setup-gradle@50e97c2cd7a37755bbfafc9c5b7cafaece252f6e # v6.1.0
 
       - name: Run unit tests
-        run: ./gradlew :core-model:test :core-inference:testDebugUnitTest :core-storage:testDebugUnitTest :app:testDebugUnitTest :app:koverXmlReport
+        run: ./gradlew :core-model:test :core-inference:testDebugUnitTest :core-storage:testDebugUnitTest :app:testDebugUnitTest koverXmlReport
 
       - name: Upload app HTML test report
         uses: actions/upload-artifact@v4
@@ -133,7 +133,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: kover-report
-          path: app/build/reports/kover/report.xml
+          path: build/reports/kover/report.xml
           retention-days: 14
 
   build:
@@ -198,7 +198,7 @@ jobs:
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: ./gradlew :core-model:test :core-inference:testDebugUnitTest :core-storage:testDebugUnitTest :app:testDebugUnitTest :app:koverXmlReport sonar -Dsonar.token="$SONAR_TOKEN"
+        run: ./gradlew :core-model:test :core-inference:testDebugUnitTest :core-storage:testDebugUnitTest :app:testDebugUnitTest koverXmlReport sonar -Dsonar.token="$SONAR_TOKEN"
 
   commitlint:
     name: Commit message lint

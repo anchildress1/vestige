@@ -4,6 +4,7 @@ plugins {
     alias(libs.plugins.android.library)
     alias(libs.plugins.kotlin.kapt)
     alias(libs.plugins.objectbox)
+    alias(libs.plugins.kover)
 }
 
 android {

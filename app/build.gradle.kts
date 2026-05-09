@@ -196,17 +196,3 @@ tasks.register("verifyNoTelemetry") {
         }
     }
 }
-
-kover {
-    reports {
-        filters {
-            excludes {
-                classes(
-                    "dev.anchildress1.vestige.MainActivity",
-                    "dev.anchildress1.vestige.VestigeApplication",
-                    "dev.anchildress1.vestige.ui.theme.*",
-                )
-            }
-        }
-    }
-}

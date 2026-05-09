@@ -94,7 +94,12 @@ jobs:
         if: always()
         with:
           name: test-report
-          path: app/build/reports/tests/
+          path: |
+            app/build/reports/tests/
+            app/build/test-results/testDebugUnitTest/
+            core-inference/build/test-results/testDebugUnitTest/
+            core-model/build/test-results/test/
+            core-storage/build/test-results/testDebugUnitTest/
           retention-days: 14
 
       - name: Upload Kover XML report
@@ -156,8 +161,14 @@ jobs:
           name: kover-report
           path: app/build/reports/kover/
 
+      - name: Download JUnit test results
+        uses: actions/download-artifact@v4
+        with:
+          name: test-report
+          path: .
+
       - name: SonarCloud scan
-        uses: SonarSource/sonarqube-scan-action@689fb39b34b9aa95ebc5f8f119343ddd51542402 # v4
+        uses: SonarSource/sonarqube-scan-action@fd88b7d7ccbaefd23d8f36f73b59db7a3d246602 # v6.0.0
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

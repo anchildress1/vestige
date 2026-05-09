@@ -103,6 +103,25 @@ class ForegroundResponseParserTest {
     }
 
     @Test
+    fun `empty transcription beats missing follow_up in failure precedence`() {
+        // `<transcription></transcription>` with no follow_up tag is fundamentally a
+        // missing-transcription failure — that's the user's words not landing, the more
+        // important signal for STT-C telemetry and caller recovery. Before codex round 6
+        // the parser reported MISSING_FOLLOW_UP first because the missing-tag check ran
+        // before the empty-content check.
+        val raw = "<transcription></transcription>"
+        val failure = assertInstanceOf(ForegroundResult.ParseFailure::class.java, parse(raw))
+        assertEquals(ForegroundResult.ParseReason.MISSING_TRANSCRIPTION, failure.reason)
+    }
+
+    @Test
+    fun `whitespace-only transcription with missing follow_up returns MISSING_TRANSCRIPTION`() {
+        val raw = "<transcription>   \n\t\n</transcription>"
+        val failure = assertInstanceOf(ForegroundResult.ParseFailure::class.java, parse(raw))
+        assertEquals(ForegroundResult.ParseReason.MISSING_TRANSCRIPTION, failure.reason)
+    }
+
+    @Test
     fun `transcription tag with whitespace-only body returns MISSING_TRANSCRIPTION`() {
         // Auto-normalization trims wrapping whitespace, so a body of pure whitespace becomes
         // empty after trim — same MISSING_TRANSCRIPTION outcome as a literally empty body.

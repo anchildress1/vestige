@@ -64,16 +64,20 @@ class ForegroundInference(
             }
             require(cacheDir.isDirectory) { "cacheDir must be an existing directory: $cacheDir" }
 
-            // Sweep crash leftovers before we create a new temp WAV. If a previous process died
-            // mid-inference (process death, OOM, OS reclaim) the `finally` block did not run and
-            // the recording stayed on disk — a privacy violation per AGENTS.md guardrail 11.
-            // Active temp files from overlapping in-process calls are tracked separately and
-            // skipped here so one call cannot delete another call's live audio handoff.
-            sweepStaleTempWavs()
-
+            // Sweep crash leftovers, create the new temp WAV, and register it as active in a
+            // single critical section. Without the lock, two overlapping `runForegroundCall`
+            // invocations race: call A creates its temp file; before A registers it in
+            // `activeTempWavs`, call B sweeps and deletes A's just-created file (codex review
+            // round 6 P1). Holding `tempWavLock` makes sweep + create + register atomic
+            // against the same lock taken by other in-flight calls. The expensive engine call
+            // happens OUTSIDE the lock so concurrent inference is still allowed.
             val systemPrompt = composeSystemPrompt(persona, transcript)
-            val temp = File.createTempFile(TEMP_PREFIX, TEMP_SUFFIX, cacheDir)
-            activeTempWavs += temp.absolutePath
+            val temp = synchronized(tempWavLock) {
+                sweepStaleTempWavs()
+                File.createTempFile(TEMP_PREFIX, TEMP_SUFFIX, cacheDir).also {
+                    activeTempWavs += it.absolutePath
+                }
+            }
             val started = System.nanoTime()
             val rawResponse = try {
                 WavWriter.writeMonoFloatWav(temp, audio.samples, audio.sampleRateHz)
@@ -84,8 +88,8 @@ class ForegroundInference(
                     ),
                 )
             } finally {
-                activeTempWavs -= temp.absolutePath
                 discardTempWav(temp)
+                activeTempWavs -= temp.absolutePath
             }
             val elapsedMs = (System.nanoTime() - started) / NANOS_PER_MILLI
             Log.d(
@@ -222,5 +226,13 @@ class ForegroundInference(
         private const val NANOS_PER_MILLI = 1_000_000L
         private const val CONTROL_CHAR_LIMIT = 0x20
         private val activeTempWavs: MutableSet<String> = ConcurrentHashMap.newKeySet()
+
+        /**
+         * Guards the sweep + create + register sequence so a concurrent call's sweep cannot
+         * delete this call's just-created temp WAV before it lands in [activeTempWavs] (codex
+         * review round 6 P1). Held only for the short critical section; the slow engine call
+         * runs outside the lock so concurrent inference is still allowed.
+         */
+        private val tempWavLock: Any = Any()
     }
 }

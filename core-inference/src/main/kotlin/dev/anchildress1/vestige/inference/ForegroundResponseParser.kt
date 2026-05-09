@@ -104,15 +104,19 @@ internal object ForegroundResponseParser {
         // downstream `entry_text` doesn't carry stray newlines into the markdown store.
         val transcription = transcriptionMatch?.groupValues?.get(1)?.trim().orEmpty()
         val followUp = orderedFollowUp?.groupValues?.get(1)?.trim().orEmpty()
+        // Empty-transcription wins regardless of follow_up state. If the user's words are
+        // missing, that is the more fundamental failure to surface for STT-C telemetry and
+        // caller recovery (codex review round 6 P2). MISSING_FOLLOW_UP only fires when the
+        // transcription itself parsed cleanly.
         return when {
             transcriptionMatch == null -> Extracted.Bad(ForegroundResult.ParseReason.MISSING_TRANSCRIPTION)
 
+            transcription.isEmpty() -> Extracted.Bad(ForegroundResult.ParseReason.MISSING_TRANSCRIPTION)
+
             orderedFollowUp == null -> Extracted.Bad(
                 reason = ForegroundResult.ParseReason.MISSING_FOLLOW_UP,
-                recoveredTranscription = transcription.takeUnless(String::isEmpty),
+                recoveredTranscription = transcription,
             )
-
-            transcription.isEmpty() -> Extracted.Bad(ForegroundResult.ParseReason.MISSING_TRANSCRIPTION)
 
             followUp.isEmpty() -> Extracted.Bad(
                 reason = ForegroundResult.ParseReason.MISSING_FOLLOW_UP,

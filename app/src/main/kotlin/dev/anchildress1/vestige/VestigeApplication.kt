@@ -17,15 +17,19 @@ class VestigeApplication : Application() {
     }
 
     private fun installStrictModeOnDebugBuilds() {
-        val isDebuggable = applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE != 0
+        val isDebuggable = (applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE) != 0
         if (!isDebuggable) return
 
+        // Network violations throw per ADR-001 §Q7 ("a violation throws and fails the build's
+        // instrumented tests"). Disk violations only log — Compose + ObjectBox unavoidably touch
+        // disk during init, and those reads aren't a privacy concern.
         StrictMode.setThreadPolicy(
             StrictMode.ThreadPolicy.Builder()
                 .detectNetwork()
                 .detectDiskReads()
                 .detectDiskWrites()
                 .penaltyLog()
+                .penaltyDeathOnNetwork()
                 .build(),
         )
         StrictMode.setVmPolicy(

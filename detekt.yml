@@ -1,6 +1,6 @@
 # Detekt config — minimal overrides on top of detekt-default. Everything else inherits.
 #
-# Run with: detekt --build-upon-default-config --config detekt.yml --input app/src
+# Run with: detekt --build-upon-default-config --config detekt.yml --input app/src,core-model/src,core-inference/src,core-storage/src
 #
 # Override surface: only Compose-convention exceptions and the magic-number
 # rule (constants in property/local declarations ARE the prescribed fix for

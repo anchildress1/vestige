@@ -3,6 +3,7 @@
 GRADLE := ./gradlew
 KTLINT := $(or $(shell command -v ktlint 2>/dev/null), $(HOME)/.local/bin/ktlint)
 DETEKT := $(or $(shell command -v detekt 2>/dev/null), $(HOME)/.local/bin/detekt)
+DETEKT_INPUTS := app/src,core-model/src,core-inference/src,core-storage/src
 
 install:
 	@if [ ! -f gradle/wrapper/gradle-wrapper.jar ]; then $(MAKE) bootstrap-wrapper; fi
@@ -27,7 +28,7 @@ assemble:
 	$(GRADLE) :app:assembleRelease
 
 test:
-	$(GRADLE) :core-model:test :core-inference:testDebugUnitTest :core-storage:testDebugUnitTest :app:testDebugUnitTest :app:koverXmlReport :app:koverVerify
+	$(GRADLE) :core-model:test :core-inference:testDebugUnitTest :core-storage:testDebugUnitTest :app:testDebugUnitTest koverXmlReport koverVerify
 
 lint: ktlint-check detekt android-lint
 
@@ -44,7 +45,7 @@ ktlint-check:
 
 detekt:
 	@command -v $(DETEKT) >/dev/null 2>&1 || { echo "❌ detekt not found. Install: brew install detekt"; exit 1; }
-	$(DETEKT) --build-upon-default-config --config detekt.yml --input app/src
+	$(DETEKT) --build-upon-default-config --config detekt.yml --input $(DETEKT_INPUTS)
 
 android-lint:
 	$(GRADLE) :app:lintDebug

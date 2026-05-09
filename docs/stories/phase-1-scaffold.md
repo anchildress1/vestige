@@ -164,11 +164,11 @@ If STT-A fails after the time-box: stop. Write a superseding ADR. Do not proceed
 **As** the AI implementor, **I need** a `ModelArtifactStore` interface that owns model file location, SHA-256 verification on load, corruption surfacing, and retry-with-backoff for downloads (per ADR-001 Q6), **so that** Phase 4's onboarding model-download UX has a stable contract to drive and the model file's integrity is verifiable on every cold start.
 
 **Done when:**
-- [ ] `ModelArtifactStore` interface defined in `:core-model` with operations to: report current state (absent / partial / complete / corrupt), trigger download, verify SHA-256, load into LiteRT-LM.
-- [ ] Manifest file checked in: artifact repo, filename, expected byte size, SHA-256, allowed HTTPS hosts (placeholder until STT-A's download probe records the real Hugging Face redirect chain).
-- [ ] Retry policy per ADR-001 Q6: exponential backoff on transient errors, capped at 3 attempts, surfaces the appropriate error state. HTTP `Range` resume support if supported by the artifact host; otherwise restart from byte 0.
-- [ ] SHA-256 mismatch on load surfaces a corrupt-file state and triggers re-download (not a silent retry).
-- [ ] No onboarding UI work. Phase 4 owns the user-facing download progress, retry buttons, and Wi-Fi gate.
+- [x] `ModelArtifactStore` interface defined in `:core-model` with operations to: report current state (absent / partial / complete / corrupt), trigger download, verify SHA-256, load into LiteRT-LM.
+- [x] Manifest file checked in: artifact repo, filename, expected byte size, SHA-256, allowed HTTPS hosts (placeholder until STT-A's download probe records the real Hugging Face redirect chain). _SHA-256 is `PENDING_STT_A_DOWNLOAD_PROBE` until the human runs STT-A and pins the canonical hash._
+- [x] Retry policy per ADR-001 Q6: exponential backoff on transient errors, capped at 3 attempts, surfaces the appropriate error state. HTTP `Range` resume support if supported by the artifact host; otherwise restart from byte 0.
+- [x] SHA-256 mismatch on load surfaces a corrupt-file state and triggers re-download (not a silent retry).
+- [x] No onboarding UI work. Phase 4 owns the user-facing download progress, retry buttons, and Wi-Fi gate.
 
 **Notes / risks:** ADR-001 §Sources of truth notes Hugging Face downloads may redirect through LFS/Xet artifact hosts. The exact redirect chain must be recorded during STT-A's download probe before Phase 1 locks the `network_security_config.xml` allowlist (Story 1.10).
 

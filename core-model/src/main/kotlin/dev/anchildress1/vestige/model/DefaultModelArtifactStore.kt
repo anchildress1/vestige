@@ -56,7 +56,7 @@ class DefaultModelArtifactStore(
         // Wipe the file when its previous state is Corrupt — never silently rewrite around
         // a known-bad payload.
         if (state is ModelArtifactState.Corrupt) {
-            artifactFile.delete()
+            check(artifactFile.delete()) { "Could not delete corrupt artifact at ${artifactFile.absolutePath}" }
         }
 
         var attempt = 0
@@ -115,7 +115,9 @@ class DefaultModelArtifactStore(
                 "Unexpected HTTP status ${it.statusCode} from ${manifest.downloadUrl}"
             }
             val appendMode = resumeFrom > 0 && it.statusCode == HTTP_PARTIAL_CONTENT
-            if (!appendMode && partFile.exists()) partFile.delete()
+            if (!appendMode && partFile.exists()) {
+                check(partFile.delete()) { "Could not delete stale part file at ${partFile.absolutePath}" }
+            }
             val startBytes = if (appendMode) resumeFrom else 0L
             writeBodyToFile(it.inputStream, partFile, appendMode, startBytes, onProgress)
         }
@@ -143,7 +145,9 @@ class DefaultModelArtifactStore(
     }
 
     private fun promotePartToArtifact(partFile: File) {
-        if (artifactFile.exists()) artifactFile.delete()
+        if (artifactFile.exists()) {
+            check(artifactFile.delete()) { "Could not delete prior artifact at ${artifactFile.absolutePath}" }
+        }
         require(partFile.renameTo(artifactFile)) {
             "Could not rename ${partFile.absolutePath} -> ${artifactFile.absolutePath}"
         }

@@ -65,12 +65,13 @@ class MarkdownEntryStore(private val baseDir: File) {
         val tempFile = File(entriesDir, "$filename$TEMP_SUFFIX")
         tempFile.writeText(payload, Charsets.UTF_8)
         if (target.exists() && !target.delete()) {
-            tempFile.delete()
-            error("Could not replace existing markdown at ${target.absolutePath}")
+            // Best-effort cleanup of the temp before raising — leave the target intact for diagnosis.
+            val cleanedUp = tempFile.delete()
+            error("Could not replace existing markdown at ${target.absolutePath} (temp cleanup=$cleanedUp)")
         }
         if (!tempFile.renameTo(target)) {
-            tempFile.delete()
-            error("Could not rename ${tempFile.absolutePath} → ${target.absolutePath}")
+            val cleanedUp = tempFile.delete()
+            error("Could not rename ${tempFile.absolutePath} → ${target.absolutePath} (temp cleanup=$cleanedUp)")
         }
         return target
     }

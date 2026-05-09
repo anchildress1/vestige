@@ -7,7 +7,7 @@ plugins {
 
 android {
     namespace = "dev.anchildress1.vestige.inference"
-    compileSdk = 35
+    compileSdk = 36
 
     defaultConfig {
         minSdk = 31

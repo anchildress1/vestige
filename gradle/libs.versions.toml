@@ -5,10 +5,10 @@ kotlin = "2.3.21"
 gradle = "9.5.0"
 
 # AndroidX core
-androidx-annotation = "1.9.1"
-androidx-core-ktx = "1.15.0"
-androidx-activity-compose = "1.10.1"
-androidx-lifecycle = "2.9.0"
+androidx-annotation = "1.10.0"
+androidx-core-ktx = "1.18.0"
+androidx-activity-compose = "1.13.0"
+androidx-lifecycle = "2.10.0"
 
 # Compose
 compose-bom = "2026.04.01"
@@ -40,7 +40,7 @@ turbine = "1.2.1"
 androidx-test-core = "1.6.1"
 androidx-test-ext-junit = "1.2.1"
 androidx-test-espresso = "3.6.1"
-robolectric = "4.15.1"
+robolectric = "4.16.1"
 
 [libraries]
 androidx-annotation = { module = "androidx.annotation:annotation", version.ref = "androidx-annotation" }

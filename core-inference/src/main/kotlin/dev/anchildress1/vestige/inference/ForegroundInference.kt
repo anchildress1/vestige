@@ -85,9 +85,7 @@ class ForegroundInference(
                 )
             } finally {
                 activeTempWavs -= temp.absolutePath
-                if (!temp.delete()) {
-                    temp.deleteOnExit()
-                }
+                discardTempWav(temp)
             }
             val elapsedMs = (System.nanoTime() - started) / NANOS_PER_MILLI
             Log.d(
@@ -102,6 +100,23 @@ class ForegroundInference(
                 completedAt = clock.instant(),
             )
         }
+
+    /**
+     * Discard a temp foreground WAV per AGENTS.md guardrail 11. Try delete first; if delete
+     * fails (file locked, transient FS error), truncate the file to zero bytes so the audio
+     * payload is gone even if the inode survives, then retry the delete and finally fall back
+     * to `deleteOnExit` (which is best-effort on Android — process kill skips it). Every step
+     * that fails gets a `Log.w` so a crash-leftover sweep can correlate.
+     */
+    private fun discardTempWav(temp: File) {
+        if (temp.delete()) return
+        Log.w(TAG, "Initial delete failed for ${temp.absolutePath}; truncating audio payload")
+        runCatching { temp.outputStream().use { /* truncate to zero bytes */ } }
+            .onFailure { Log.w(TAG, "Truncate failed for ${temp.absolutePath}: ${it.message}") }
+        if (temp.delete()) return
+        Log.w(TAG, "Retry delete failed for ${temp.absolutePath}; scheduling deleteOnExit")
+        temp.deleteOnExit()
+    }
 
     /**
      * Delete any leftover `vestige-fg-*.wav` files in [cacheDir] from a prior crash. Files that

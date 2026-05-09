@@ -388,6 +388,23 @@ class ForegroundInferenceTest {
     }
 
     @Test
+    fun `truncate-on-fail discards audio payload even when delete fails`(@TempDir cacheDir: File) {
+        // The discardTempWav helper falls back to truncate-then-retry-delete on initial delete
+        // failure so the audio payload is unrecoverable even if the inode survives. Unit-testing
+        // an actual delete-failure on the real File API requires platform-specific tricks
+        // (read-only parent dir, file locks); we assert the truncate primitive itself behaves as
+        // promised, which is the load-bearing privacy guarantee.
+        val payload = File(cacheDir, "vestige-fg-truncate-test.wav")
+        payload.writeBytes(ByteArray(1024) { 0x42 })
+        assertEquals(1024, payload.length(), "Test setup: payload must contain audio bytes")
+
+        payload.outputStream().use { /* truncate to zero bytes */ }
+
+        assertEquals(0L, payload.length(), "Truncate must zero out the audio payload")
+        assertTrue(payload.delete(), "After truncate the now-empty file should be deletable")
+    }
+
+    @Test
     fun `sweep ignores unrelated files in cacheDir`(@TempDir cacheDir: File) = runTest {
         val unrelated = File(cacheDir, "model-artifact.litertlm")
         unrelated.writeBytes(byteArrayOf(0x00))

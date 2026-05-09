@@ -139,6 +139,16 @@ class ForegroundResponseParserTest {
     }
 
     @Test
+    fun `follow-up tag with whitespace-only body returns MISSING_FOLLOW_UP with recovered transcription`() {
+        // Symmetric to the whitespace-only transcription case: trim collapses the body to empty,
+        // so the user's words are preserved but the model's response is absent.
+        val raw = "<transcription>the user spoke clearly.</transcription>\n<follow_up>   \n\t  </follow_up>"
+        val failure = assertInstanceOf(ForegroundResult.ParseFailure::class.java, parse(raw))
+        assertEquals(ForegroundResult.ParseReason.MISSING_FOLLOW_UP, failure.reason)
+        assertEquals("the user spoke clearly.", failure.recoveredTranscription)
+    }
+
+    @Test
     fun `tags swapped (follow_up before transcription) returns MISSING_FOLLOW_UP`() {
         // The parser only accepts <follow_up> that appears AFTER <transcription>. A swapped order
         // is a malformed response per ADR-002 §"Output reliability" — we surface the failure
@@ -203,6 +213,8 @@ class ForegroundResponseParserTest {
             "<transcription>second</transcription><follow_up>q2</follow_up>"
         val failure = assertInstanceOf(ForegroundResult.ParseFailure::class.java, parse(raw))
         assertEquals(ForegroundResult.ParseReason.AMBIGUOUS_BLOCKS, failure.reason)
+        // singleOrNull() returns null when count > 1, so there is no recoverable transcription.
+        assertEquals(null, failure.recoveredTranscription)
     }
 
     @Test
@@ -211,6 +223,7 @@ class ForegroundResponseParserTest {
             "<transcription>two</transcription>\n<follow_up>q</follow_up>"
         val failure = assertInstanceOf(ForegroundResult.ParseFailure::class.java, parse(raw))
         assertEquals(ForegroundResult.ParseReason.AMBIGUOUS_BLOCKS, failure.reason)
+        assertEquals(null, failure.recoveredTranscription)
     }
 
     @Test

@@ -241,6 +241,42 @@ class ForegroundInferenceTest {
         }
 
     @Test
+    fun `turn text with carriage return, tab, and control chars is JSON-escaped in history block`(
+        @TempDir cacheDir: File,
+    ) = runTest {
+        val engine = mockk<LiteRtLmEngine>()
+        val captured = slot<List<Content>>()
+        coEvery { engine.sendMessageContents(capture(captured)) } returns rawSuccess("a", "b")
+
+        val transcript = Transcript().apply {
+            // \r\n (Windows line ending), \t (tab), and a raw control char ()
+            append(
+                Turn(
+                    speaker = Speaker.USER,
+                    text = "tab\there\r\nwindowsctrl",
+                    timestamp = Instant.parse("2026-05-09T11:55:00Z"),
+                ),
+            )
+        }
+
+        ForegroundInference(engine, cacheDir, clock = fixedClock).runForegroundCall(
+            audio = audioChunk(),
+            transcript = transcript,
+            persona = Persona.WITNESS,
+        )
+
+        val systemPrompt = (captured.captured[0] as Content.Text).text
+        val turnsBlockStart = systemPrompt.indexOf(ForegroundInference.RECENT_TURNS_HEADER)
+        val outputBlockStart = systemPrompt.indexOf("## OUTPUT FORMAT")
+        val turnsBlock = systemPrompt.substring(turnsBlockStart, outputBlockStart)
+
+        // Each special char must appear as its JSON escape sequence, not as a raw character.
+        assertTrue(turnsBlock.contains("tab\\there\\r\\nwindows\\u0001ctrl")) {
+            "\\t, \\r, and control chars must be escaped; turns block was:\n$turnsBlock"
+        }
+    }
+
+    @Test
     fun `audio handoff goes through Content_AudioFile pointing inside cacheDir`(@TempDir cacheDir: File) = runTest {
         val engine = mockk<LiteRtLmEngine>()
         val captured = slot<List<Content>>()

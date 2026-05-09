@@ -56,3 +56,8 @@ bun.lockb
 # Models — Gemma 4 .litertlm download lives in app-internal storage at runtime
 *.litertlm
 *.tflite
+
+# Native libs — extracted at test runtime by Robolectric / ObjectBox; never check these in
+libobjectbox-jni-*.dylib
+libobjectbox-jni-*.so
+libobjectbox-jni-*.dll

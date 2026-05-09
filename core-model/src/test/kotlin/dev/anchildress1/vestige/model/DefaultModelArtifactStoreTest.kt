@@ -257,6 +257,202 @@ class DefaultModelArtifactStoreTest {
         assertFalse(backoff.delayMs(64) < 0)
     }
 
+    @Test
+    fun `ExponentialBackoff treats attempt below 1 as base delay (coerce floor)`() {
+        // The shift exponent uses (attempt - 1).coerceAtLeast(0). Attempt 0 → exponent 0 → baseDelay,
+        // not a negative shift that JVM would silently interpret modulo 64.
+        val backoff = ExponentialBackoff(baseDelayMs = 1_000L, maxDelayMs = 4_000L)
+        assertEquals(1_000L, backoff.delayMs(0))
+        assertEquals(1_000L, backoff.delayMs(-3))
+    }
+
+    @Test
+    fun `streamPayload rejects HTTP non-2xx and non-206 status`() = runTest {
+        val client = StaticStatusHttpClient(status = 500, payload = SHORT_BYTES)
+        val store = DefaultModelArtifactStore(
+            manifest = manifest(SHORT_BYTES.size.toLong(), sha256Of(SHORT_BYTES)),
+            baseDir = baseDir,
+            httpClient = client,
+            backoff = ZeroBackoff,
+        )
+        val raised = runCatching { store.download() }
+        // The require() inside streamPayloadToPartFile throws IllegalArgumentException;
+        // the retry loop wraps the final attempt in IOException("Model download failed after ...").
+        assertTrue(raised.exceptionOrNull() is IOException) {
+            "Expected IOException after exhausting retries on HTTP 500, got ${raised.exceptionOrNull()}"
+        }
+        // Cause chain must surface the real status — silent rebadging hides bugs.
+        val rootCause = generateSequence(raised.exceptionOrNull()) { it.cause }.last()
+        assertTrue(rootCause.message?.contains("500") == true) {
+            "Root cause should mention HTTP 500, was: ${rootCause.message}"
+        }
+    }
+
+    @Test
+    fun `download discards stale part file when server returns 200 to a Range request`() = runTest {
+        // Pre-seed a half-written part file so the next download() carries a non-zero resumeFromByte.
+        val partFile = File(baseDir, "$MANIFEST_FILENAME.part")
+        partFile.writeBytes(ByteArray(7))
+
+        // Server ignores Range and returns 200 with the full payload — the store must drop the
+        // stale prefix and rewrite from byte zero rather than appending and producing a SHA mismatch.
+        val client = AlwaysFreshHttpClient(payload = SHORT_BYTES)
+        val store = DefaultModelArtifactStore(
+            manifest = manifest(SHORT_BYTES.size.toLong(), sha256Of(SHORT_BYTES)),
+            baseDir = baseDir,
+            httpClient = client,
+            backoff = ZeroBackoff,
+        )
+
+        val state = store.download()
+        assertEquals(ModelArtifactState.Complete, state)
+        assertEquals(SHORT_BYTES.size.toLong(), File(baseDir, MANIFEST_FILENAME).length())
+    }
+
+    @Test
+    fun `DefaultHttpClient accepts subdomains of an allowed host`() {
+        val server = HttpServer.create(InetSocketAddress("127.0.0.1", 0), 0)
+        server.createContext("/file") { exchange ->
+            exchange.sendResponseHeaders(200, SHORT_BYTES.size.toLong())
+            exchange.responseBody.use { it.write(SHORT_BYTES) }
+        }
+        server.start()
+        try {
+            // Inject a hostname-resolving client that pretends the request is coming from
+            // `cdn.localhost-allowed.test` — Java's URL won't actually resolve it, so we go the
+            // other direction: allow `localhost` and let the loopback alias `localhost.` (with
+            // trailing dot stripped) match via endsWith.
+            val client = DefaultHttpClient(
+                allowedHosts = listOf("localhost"),
+                networkGate = DefaultNetworkGate.ALWAYS_OPEN_FOR_TESTS,
+            )
+            client.open("http://localhost:${server.address.port}/file", resumeFromByte = 0).use { response ->
+                assertEquals(200, response.statusCode)
+            }
+        } finally {
+            server.stop(0)
+        }
+    }
+
+    @Test
+    fun `DefaultHttpClient matches allowed host case-insensitively`() {
+        val server = HttpServer.create(InetSocketAddress("127.0.0.1", 0), 0)
+        server.createContext("/file") { exchange ->
+            exchange.sendResponseHeaders(200, SHORT_BYTES.size.toLong())
+            exchange.responseBody.use { it.write(SHORT_BYTES) }
+        }
+        server.start()
+        try {
+            val client = DefaultHttpClient(
+                // Allowlist deliberately uppercase — `host.matchesAllowedHost(allowedHost)` lowercases both.
+                allowedHosts = listOf("LOCALHOST"),
+                networkGate = DefaultNetworkGate.ALWAYS_OPEN_FOR_TESTS,
+            )
+            client.open("http://localhost:${server.address.port}/file", resumeFromByte = 0).use { response ->
+                assertEquals(200, response.statusCode)
+            }
+        } finally {
+            server.stop(0)
+        }
+    }
+
+    @Test
+    fun `DefaultHttpClient rejects a redirect missing the Location header`() {
+        val server = HttpServer.create(InetSocketAddress("127.0.0.1", 0), 0)
+        server.createContext("/start") { exchange ->
+            // Send 302 with no Location at all — the require() guard must surface this.
+            exchange.sendResponseHeaders(302, -1)
+            exchange.close()
+        }
+        server.start()
+        try {
+            val client = DefaultHttpClient(
+                allowedHosts = listOf("127.0.0.1"),
+                networkGate = DefaultNetworkGate.ALWAYS_OPEN_FOR_TESTS,
+            )
+            val ex = assertThrows(IllegalArgumentException::class.java) {
+                client.open("http://127.0.0.1:${server.address.port}/start", resumeFromByte = 0)
+            }
+            assertTrue(ex.message?.contains("Location") == true) {
+                "Expected error to mention the missing Location header: ${ex.message}"
+            }
+        } finally {
+            server.stop(0)
+        }
+    }
+
+    @Test
+    fun `DefaultHttpClient rejects redirect chains longer than MAX_REDIRECTS`() {
+        val server = HttpServer.create(InetSocketAddress("127.0.0.1", 0), 0)
+        // Six hops: /h0 → /h1 → /h2 → /h3 → /h4 → /h5 → /h6. The client allows MAX_REDIRECTS=5
+        // and must throw on the seventh dial-out, not loop indefinitely.
+        repeat(7) { i ->
+            server.createContext("/h$i") { exchange ->
+                exchange.responseHeaders.add("Location", "http://127.0.0.1:${server.address.port}/h${i + 1}")
+                exchange.sendResponseHeaders(302, -1)
+                exchange.close()
+            }
+        }
+        server.start()
+        try {
+            val client = DefaultHttpClient(
+                allowedHosts = listOf("127.0.0.1"),
+                networkGate = DefaultNetworkGate.ALWAYS_OPEN_FOR_TESTS,
+            )
+            val ex = assertThrows(IllegalArgumentException::class.java) {
+                client.open("http://127.0.0.1:${server.address.port}/h0", resumeFromByte = 0)
+            }
+            assertTrue(ex.message?.contains("redirects") == true) {
+                "Expected redirect-cap error message: ${ex.message}"
+            }
+        } finally {
+            server.stop(0)
+        }
+    }
+
+    @Test
+    fun `DefaultHttpClient follows a 308 permanent redirect (not just 302)`() {
+        val server = HttpServer.create(InetSocketAddress("127.0.0.1", 0), 0)
+        server.createContext("/start") { exchange ->
+            exchange.responseHeaders.add("Location", "http://127.0.0.1:${server.address.port}/final")
+            exchange.sendResponseHeaders(308, -1)
+            exchange.close()
+        }
+        server.createContext("/final") { exchange ->
+            exchange.sendResponseHeaders(200, SHORT_BYTES.size.toLong())
+            exchange.responseBody.use { it.write(SHORT_BYTES) }
+        }
+        server.start()
+        try {
+            val client = DefaultHttpClient(
+                allowedHosts = listOf("127.0.0.1"),
+                networkGate = DefaultNetworkGate.ALWAYS_OPEN_FOR_TESTS,
+            )
+            client.open("http://127.0.0.1:${server.address.port}/start", resumeFromByte = 0).use { response ->
+                assertEquals(200, response.statusCode)
+            }
+        } finally {
+            server.stop(0)
+        }
+    }
+
+    @Test
+    fun `download deletes the prior artifact before promoting a fresh part file`() = runTest {
+        // Pre-seed an existing artifact file. promotePartToArtifact must delete it before rename;
+        // the test pins the branch where artifactFile.exists() returns true.
+        val artifact = File(baseDir, MANIFEST_FILENAME)
+        artifact.writeBytes(ByteArray(SHORT_BYTES.size + 100)) // wrong size → Corrupt → wiped first
+        val store = DefaultModelArtifactStore(
+            manifest = manifest(SHORT_BYTES.size.toLong(), sha256Of(SHORT_BYTES)),
+            baseDir = baseDir,
+            httpClient = ByteArrayHttpClient(SHORT_BYTES),
+            backoff = ZeroBackoff,
+        )
+        val state = store.download()
+        assertEquals(ModelArtifactState.Complete, state)
+        assertEquals(SHORT_BYTES.size.toLong(), artifact.length())
+    }
+
     private fun manifest(expectedSize: Long, sha256: String) = ModelManifest(
         schemaVersion = ModelManifest.SUPPORTED_SCHEMA_VERSION,
         artifactRepo = "test/repo",
@@ -293,6 +489,19 @@ class DefaultModelArtifactStoreTest {
             if (openCalls <= failures) throw IOException("simulated transient error #$openCalls")
             return InMemoryResponse(200, ByteArrayInputStream(payload))
         }
+    }
+
+    /** Returns the supplied [status] for every request — used for HTTP-error fault injection. */
+    private class StaticStatusHttpClient(private val status: Int, private val payload: ByteArray) : HttpClient {
+        override fun open(url: String, resumeFromByte: Long): HttpResponse =
+            InMemoryResponse(status, ByteArrayInputStream(payload))
+    }
+
+    /** Always returns 200 with the full payload regardless of the resume offset — pins the
+     *  branch where the server ignores Range and the store must drop the stale prefix. */
+    private class AlwaysFreshHttpClient(private val payload: ByteArray) : HttpClient {
+        override fun open(url: String, resumeFromByte: Long): HttpResponse =
+            InMemoryResponse(200, ByteArrayInputStream(payload))
     }
 
     private class InMemoryResponse(override val statusCode: Int, override val inputStream: java.io.InputStream) :

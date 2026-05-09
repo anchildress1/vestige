@@ -17,14 +17,19 @@ import java.time.Instant
  * the model's follow-up question or remark
  * ```
  *
- * Anything before `## TRANSCRIPTION` is ignored (Gemma tends to preface structured output with a
- * short courtesy line). Anything after `## FOLLOW_UP` is treated as part of the follow-up body.
- * STT-C will measure parse-success rate on a real E4B transcript set.
+ * Headers are matched only when they appear as a **whole line** (optionally surrounded by
+ * whitespace). A user dictating the literal text "## FOLLOW_UP" mid-sentence must not split the
+ * transcription — the verbatim-transcription contract from `personas/shared.txt` requires that
+ * inline occurrences are preserved as content, not re-interpreted as section markers.
+ *
+ * Anything before the `## TRANSCRIPTION` line is ignored (Gemma tends to preface structured
+ * output with a short courtesy line). Anything after the `## FOLLOW_UP` line is treated as the
+ * follow-up body. STT-C will measure parse-success rate on a real E4B transcript set.
  */
 internal object ForegroundResponseParser {
 
-    private const val TRANSCRIPTION_HEADER = "## TRANSCRIPTION"
-    private const val FOLLOW_UP_HEADER = "## FOLLOW_UP"
+    private val TRANSCRIPTION_HEADER_LINE = Regex("(?m)^[ \\t]*##[ \\t]+TRANSCRIPTION[ \\t]*\$")
+    private val FOLLOW_UP_HEADER_LINE = Regex("(?m)^[ \\t]*##[ \\t]+FOLLOW_UP[ \\t]*\$")
 
     fun parse(raw: String, persona: Persona, elapsedMs: Long, completedAt: Instant): ForegroundResult {
         val outcome = extract(raw)
@@ -54,25 +59,23 @@ internal object ForegroundResponseParser {
     }
 
     private fun splitOnHeaders(raw: String): Extracted {
-        val transcriptionStart = raw.indexOf(TRANSCRIPTION_HEADER)
-        val followUpStart = if (transcriptionStart >= 0) {
-            raw.indexOf(FOLLOW_UP_HEADER, startIndex = transcriptionStart + TRANSCRIPTION_HEADER.length)
-        } else {
-            -1
+        val transcriptionMatch = TRANSCRIPTION_HEADER_LINE.find(raw)
+        val followUpMatch = transcriptionMatch?.let {
+            FOLLOW_UP_HEADER_LINE.find(raw, startIndex = it.range.last + 1)
         }
-        val transcription = if (transcriptionStart >= 0 && followUpStart >= 0) {
-            raw.substring(transcriptionStart + TRANSCRIPTION_HEADER.length, followUpStart).trim()
+        val transcription = if (transcriptionMatch != null && followUpMatch != null) {
+            raw.substring(transcriptionMatch.range.last + 1, followUpMatch.range.first).trim()
         } else {
             ""
         }
-        val followUp = if (followUpStart >= 0) {
-            raw.substring(followUpStart + FOLLOW_UP_HEADER.length).trim()
+        val followUp = if (followUpMatch != null) {
+            raw.substring(followUpMatch.range.last + 1).trim()
         } else {
             ""
         }
         return when {
-            transcriptionStart < 0 -> Extracted.Bad(ForegroundResult.ParseReason.MISSING_TRANSCRIPTION)
-            followUpStart < 0 -> Extracted.Bad(ForegroundResult.ParseReason.MISSING_FOLLOW_UP)
+            transcriptionMatch == null -> Extracted.Bad(ForegroundResult.ParseReason.MISSING_TRANSCRIPTION)
+            followUpMatch == null -> Extracted.Bad(ForegroundResult.ParseReason.MISSING_FOLLOW_UP)
             transcription.isEmpty() -> Extracted.Bad(ForegroundResult.ParseReason.MISSING_TRANSCRIPTION)
             followUp.isEmpty() -> Extracted.Bad(ForegroundResult.ParseReason.MISSING_FOLLOW_UP)
             else -> Extracted.Ok(transcription, followUp)

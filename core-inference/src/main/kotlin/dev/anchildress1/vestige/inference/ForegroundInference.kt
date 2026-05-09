@@ -12,14 +12,20 @@ import java.time.Clock
 /**
  * Foreground capture inference (Phase 2 Story 2.2).
  *
- * Takes a normalized [AudioChunk] from `AudioCapture` (Story 1.4) plus the in-session
- * [Transcript] and runs one Gemma 4 E4B call composed of:
+ * Takes a normalized **final-chunk** [AudioChunk] from `AudioCapture` (Story 1.4) plus the
+ * in-session [Transcript] and runs one Gemma 4 E4B call composed of:
  *  - the active [Persona]'s system prompt (via [PersonaPromptComposer]) — Story 1.8;
  *  - the last [historyTurnLimit] turns of the transcript as recent context, oldest-first
  *    (ADR-002 §Q5 — default last 4);
  *  - a markdown-with-headers output schema reminder (ADR-002 §"Structured-output reliability");
  *  - the audio buffer handed off as `Content.AudioFile` against a temp PCM_S16LE WAV (the only
  *    handoff that works on LiteRT-LM 0.11.0 per ADR-001 §Q4 STT-A record).
+ *
+ * **Final-chunk only.** Per ADR-002 §"For >30s captures" intermediate chunks (`isFinal == false`)
+ * must run a stripped-down transcription-only call — no persona, no session context, no follow-up.
+ * This API rejects non-final chunks at the precondition; multi-chunk orchestration (concatenating
+ * transcript-so-far before the final foreground call) is a separate story. A non-final chunk
+ * arriving here is a caller bug, not a fallback to handle silently.
  *
  * Per AGENTS.md guardrail 11 the temp WAV is created, used, and deleted inside this call — even
  * on engine error or coroutine cancellation. No audio bytes survive past the response.
@@ -51,6 +57,10 @@ class ForegroundInference(
     suspend fun runForegroundCall(audio: AudioChunk, transcript: Transcript, persona: Persona): ForegroundResult =
         withContext(ioDispatcher) {
             require(audio.samples.isNotEmpty()) { "ForegroundInference requires non-empty audio samples." }
+            require(audio.isFinal) {
+                "runForegroundCall is final-chunk only (ADR-002 §\"For >30s captures\"); " +
+                    "intermediate chunks need a transcription-only call."
+            }
             require(cacheDir.isDirectory) { "cacheDir must be an existing directory: $cacheDir" }
 
             val systemPrompt = composeSystemPrompt(persona, transcript)

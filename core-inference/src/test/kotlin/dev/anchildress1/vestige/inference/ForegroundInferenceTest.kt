@@ -228,6 +228,20 @@ class ForegroundInferenceTest {
     }
 
     @Test
+    fun `non-final audio chunk is rejected — final-chunk-only contract`(@TempDir cacheDir: File) {
+        val engine = mockk<LiteRtLmEngine>()
+        val inference = ForegroundInference(engine, cacheDir, clock = fixedClock)
+        val intermediate = AudioChunk(samples(), AudioCapture.SAMPLE_RATE_HZ, isFinal = false)
+        val ex = assertThrows(IllegalArgumentException::class.java) {
+            runTest { inference.runForegroundCall(intermediate, Transcript(), Persona.WITNESS) }
+        }
+        assertTrue(
+            ex.message!!.contains("final-chunk only"),
+            "Error must explain the final-chunk contract; was: ${ex.message}",
+        )
+    }
+
+    @Test
     fun `missing cacheDir is rejected before the engine is called`(@TempDir cacheDir: File) {
         val engine = mockk<LiteRtLmEngine>()
         val nonExistent = File(cacheDir, "nope")

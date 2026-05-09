@@ -161,4 +161,59 @@ class ForegroundResponseParserTest {
         assertEquals(9_999L, failure.elapsedMs)
         assertEquals(completedAt, failure.completedAt)
     }
+
+    @Test
+    fun `transcription text quoting the FOLLOW_UP marker is preserved verbatim`() {
+        // A user dictating literal markdown ("the section called ## FOLLOW_UP, capitalized") must
+        // not be sliced mid-quote — the transcription contract from `personas/shared.txt` says
+        // "exact and unaltered."
+        val raw = """
+            ## TRANSCRIPTION
+            i was reading the doc and the next section is called ## FOLLOW_UP, all caps.
+
+            ## FOLLOW_UP
+            What were you reading right before that?
+        """.trimIndent()
+
+        val success = assertInstanceOf(ForegroundResult.Success::class.java, parse(raw))
+        assertEquals(
+            "i was reading the doc and the next section is called ## FOLLOW_UP, all caps.",
+            success.transcription,
+        )
+        assertEquals("What were you reading right before that?", success.followUp)
+    }
+
+    @Test
+    fun `inline TRANSCRIPTION marker inside follow-up body does not break parsing`() {
+        val raw = """
+            ## TRANSCRIPTION
+            something the user said.
+
+            ## FOLLOW_UP
+            you mentioned ## TRANSCRIPTION mid-sentence — what file were you reading?
+        """.trimIndent()
+        val success = assertInstanceOf(ForegroundResult.Success::class.java, parse(raw))
+        assertEquals("something the user said.", success.transcription)
+        assertEquals(
+            "you mentioned ## TRANSCRIPTION mid-sentence — what file were you reading?",
+            success.followUp,
+        )
+    }
+
+    @Test
+    fun `header with trailing whitespace on the line still matches`() {
+        val raw = "## TRANSCRIPTION   \nfoo\n## FOLLOW_UP \t\nbar"
+        val success = assertInstanceOf(ForegroundResult.Success::class.java, parse(raw))
+        assertEquals("foo", success.transcription)
+        assertEquals("bar", success.followUp)
+    }
+
+    @Test
+    fun `inline header with content after on the same line does not match`() {
+        // "## FOLLOW_UP and then more text" is not a header line — it's prose containing the
+        // marker. Without a TRANSCRIPTION line, this is MISSING_TRANSCRIPTION.
+        val raw = "## FOLLOW_UP and then more text on the same line\nnope"
+        val failure = assertInstanceOf(ForegroundResult.ParseFailure::class.java, parse(raw))
+        assertEquals(ForegroundResult.ParseReason.MISSING_TRANSCRIPTION, failure.reason)
+    }
 }

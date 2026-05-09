@@ -14,7 +14,7 @@ pluginManagement {
 
 plugins {
     // Resolves the JDK 25 toolchain on a fresh clone so build no longer depends on JAVA_HOME.
-    id("org.gradle.toolchains.foojay-resolver-convention") version "0.10.0"
+    id("org.gradle.toolchains.foojay-resolver-convention") version "1.0.0"
 }
 
 dependencyResolutionManagement {

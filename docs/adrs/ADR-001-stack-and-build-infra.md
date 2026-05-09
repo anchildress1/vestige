@@ -238,14 +238,17 @@ STT-A says this must work. The 30s constraint is a runtime cap — `AudioRecord`
 
 | Field | Value |
 |---|---|
-| Device | _S24 Ultra (12 GB / SD8 Gen 3)_ |
-| LiteRT-LM version | _0.11.0_ |
-| Date run | _TBD — fill in on test_ |
-| AudioBytes float32-LE result | _TBD: coherent / garbage / failed_ |
-| AudioFile WAV result | _TBD: coherent / garbage / failed_ |
-| Working path chosen | _TBD: AudioBytes / AudioFile_ |
-| End-to-end latency, 30 s clip (capture stop → transcript) | _TBD ms_ |
-| Backend selected | _TBD: CPU / GPU / NPU_ |
+| Device | S24 Ultra (12 GB / SD8 Gen 3), SM-S928U, Android 16 |
+| LiteRT-LM version | 0.11.0 |
+| Date run | 2026-05-09 |
+| AudioBytes float32-LE result | **FAILED** — `MA_INVALID_DATA (-10)` from miniaudio; raw float32-LE bytes are not a supported audio container |
+| AudioFile WAV (IEEE_FLOAT) result | **FAILED** — same `MA_INVALID_DATA`; LiteRT-LM 0.11.0 miniaudio rejects `WAVE_FORMAT_IEEE_FLOAT` (format code 3) |
+| AudioFile WAV (PCM_S16LE) result | **COHERENT** — produced a coherent transcription visually matching the spoken content |
+| Working path chosen | `Content.AudioFile(path)` with a PCM_S16LE (format code 1) WAV at 16 kHz mono |
+| End-to-end latency, 24 s clip (sendMessageContents) | ~19,400–20,800 ms on CPU backend |
+| Backend selected | CPU |
+
+**Consequence:** `WavWriter` updated to emit PCM_S16LE (format 1, 16-bit int, 16 kHz) instead of IEEE_FLOAT. Float32 samples from `AudioCapture` are scaled to `[-32767, 32767]` on write. `Content.AudioBytes` is dead for this SDK version — the only live path is `Content.AudioFile` via a temp PCM_S16LE WAV.
 
 ### Q5. Distribution & signing
 

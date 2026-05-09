@@ -1,6 +1,5 @@
 package dev.anchildress1.vestige.inference
 
-import org.junit.jupiter.api.Assertions.assertArrayEquals
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertThrows
 import org.junit.jupiter.api.Test
@@ -9,10 +8,11 @@ import java.io.File
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 
+// STT-A (Story 1.5) established PCM_S16LE as the required format for LiteRT-LM's miniaudio.
 class WavWriterTest {
 
     @Test
-    fun `writes RIFF WAVE header with IEEE_FLOAT format and mono channel`(@TempDir dir: File) {
+    fun `writes RIFF WAVE header with PCM_S16LE format and mono channel`(@TempDir dir: File) {
         val target = File(dir, "out.wav")
         val samples = floatArrayOf(0.0f, 0.5f, -0.5f, 1.0f, -1.0f)
         WavWriter.writeMonoFloatWav(target, samples, sampleRateHz = 16_000)
@@ -24,36 +24,48 @@ class WavWriterTest {
         assertEquals("data", header.copyOfRange(36, 40).toString(Charsets.US_ASCII))
 
         val buf = ByteBuffer.wrap(header).order(ByteOrder.LITTLE_ENDIAN)
-        // riffSize (offset 4) = total file size - 8
-        assertEquals(target.length().toInt() - 8, buf.getInt(4))
-        // fmt chunk size = 16
-        assertEquals(16, buf.getInt(16))
-        // audioFormat = 3 (IEEE_FLOAT)
-        assertEquals(3.toShort(), buf.getShort(20))
-        // numChannels = 1 (mono)
-        assertEquals(1.toShort(), buf.getShort(22))
-        // sampleRate = 16000
-        assertEquals(16_000, buf.getInt(24))
-        // byteRate = sampleRate * 4
-        assertEquals(64_000, buf.getInt(28))
-        // blockAlign = 4
-        assertEquals(4.toShort(), buf.getShort(32))
-        // bitsPerSample = 32
-        assertEquals(32.toShort(), buf.getShort(34))
-        // dataSize = samples * 4
-        assertEquals(samples.size * 4, buf.getInt(40))
+        assertEquals(target.length().toInt() - 8, buf.getInt(4))  // riffSize
+        assertEquals(16, buf.getInt(16))                           // fmt chunk size
+        assertEquals(1.toShort(), buf.getShort(20))                // audioFormat = 1 (PCM)
+        assertEquals(1.toShort(), buf.getShort(22))                // numChannels = 1
+        assertEquals(16_000, buf.getInt(24))                       // sampleRate
+        assertEquals(32_000, buf.getInt(28))                       // byteRate = 16000 * 2
+        assertEquals(2.toShort(), buf.getShort(32))                // blockAlign = 2
+        assertEquals(16.toShort(), buf.getShort(34))               // bitsPerSample = 16
+        assertEquals(samples.size * 2, buf.getInt(40))             // dataSize = samples * 2
     }
 
     @Test
-    fun `samples round-trip as little-endian float32 in payload`(@TempDir dir: File) {
+    fun `float samples are scaled and clipped to int16 range`(@TempDir dir: File) {
         val target = File(dir, "rt.wav")
-        val original = floatArrayOf(0.1f, -0.2f, 0.999f, -0.999f)
-        WavWriter.writeMonoFloatWav(target, original, sampleRateHz = 16_000)
+        val samples = floatArrayOf(0.0f, 0.5f, -0.5f, 1.0f, -1.0f)
+        WavWriter.writeMonoFloatWav(target, samples, sampleRateHz = 16_000)
 
         val payload = target.readBytes().copyOfRange(44, target.length().toInt())
-        val readback = FloatArray(original.size)
-        ByteBuffer.wrap(payload).order(ByteOrder.LITTLE_ENDIAN).asFloatBuffer().get(readback)
-        assertArrayEquals(original, readback)
+        val buf = ByteBuffer.wrap(payload).order(ByteOrder.LITTLE_ENDIAN)
+        val readback = ShortArray(samples.size) { buf.short }
+
+        assertEquals(0, readback[0])
+        // 0.5 * 32767 ≈ 16383
+        assertEquals((0.5f * 32767f).toInt().toShort(), readback[1])
+        // -0.5 * 32767 ≈ -16383
+        assertEquals((-0.5f * 32767f).toInt().toShort(), readback[2])
+        // 1.0 clips to 32767
+        assertEquals(32767.toShort(), readback[3])
+        // -1.0 clips to -32767
+        assertEquals((-32767).toShort(), readback[4])
+    }
+
+    @Test
+    fun `samples outside -1 to 1 range are clipped before scaling`(@TempDir dir: File) {
+        val target = File(dir, "clip.wav")
+        WavWriter.writeMonoFloatWav(target, floatArrayOf(2.0f, -2.0f), sampleRateHz = 16_000)
+
+        val payload = target.readBytes().copyOfRange(44, target.length().toInt())
+        val buf = ByteBuffer.wrap(payload).order(ByteOrder.LITTLE_ENDIAN)
+        // Both should be clamped to ±32767, not overflow
+        assertEquals(32767.toShort(), buf.short)
+        assertEquals((-32767).toShort(), buf.short)
     }
 
     @Test
@@ -78,7 +90,7 @@ class WavWriterTest {
         val target = File(dir, "ow.wav")
         target.writeBytes(ByteArray(1024) { 0xFF.toByte() })
         WavWriter.writeMonoFloatWav(target, floatArrayOf(0.5f), 16_000)
-        // 44-byte header + 4-byte sample
-        assertEquals(48L, target.length())
+        // 44-byte header + 2-byte int16 sample
+        assertEquals(46L, target.length())
     }
 }

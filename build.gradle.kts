@@ -63,6 +63,8 @@ sonar {
                 "**/MainActivity.kt",
             ).joinToString(","),
         )
+        property("sonar.qualitygate.wait", "true")
+        property("sonar.qualitygate.timeout", "300")
     }
 }
 

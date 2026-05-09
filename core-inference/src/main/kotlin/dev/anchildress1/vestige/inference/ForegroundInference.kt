@@ -128,9 +128,9 @@ class ForegroundInference(
     /**
      * Delete any leftover `vestige-fg-*.wav` files in [cacheDir] from a prior crash. Files that
      * are currently in use by another in-process foreground call are skipped via [activeTempWavs].
-     * Returns silently — best-effort cleanup; if a file is locked or in use, [java.io.File.delete]
-     * fails and we move on rather than block the foreground call. Any survivors get a second shot
-     * on the next call.
+     * Reuses [discardTempWav] so a delete-failure on a crash leftover still gets the truncate
+     * fallback — the audio bytes are zeroed even if the inode survives, matching the privacy
+     * guarantee the active-call cleanup gives.
      */
     private fun sweepStaleTempWavs() {
         cacheDir.listFiles { _, name -> name.startsWith(TEMP_PREFIX) && name.endsWith(TEMP_SUFFIX) }
@@ -138,9 +138,7 @@ class ForegroundInference(
                 if (stale.absolutePath in activeTempWavs) {
                     return@forEach
                 }
-                if (!stale.delete()) {
-                    Log.w(TAG, "Failed to sweep stale foreground WAV: ${stale.absolutePath}")
-                }
+                discardTempWav(stale)
             }
     }
 

@@ -3,6 +3,14 @@
    <configuration>
       <verify-metadata>true</verify-metadata>
       <verify-signatures>false</verify-signatures>
+      <trusted-artifacts>
+         <!-- aapt2 ships platform-specific JARs (osx/linux/windows); only the host
+              platform variant is downloaded per machine, so we cannot pin all three
+              from a single OS.  Trust the whole aapt2 group — it is a Google build
+              tool, not a runtime dependency that ships in the APK. -->
+         <trust group="com.android.tools.build" name="aapt2" regex="true"
+                artifact="aapt2-.*\.(jar|pom|module)"/>
+      </trusted-artifacts>
    </configuration>
    <components>
       <component group="androidx.activity" name="activity" version="1.10.1">

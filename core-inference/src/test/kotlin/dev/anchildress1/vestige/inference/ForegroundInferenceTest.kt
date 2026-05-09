@@ -26,7 +26,7 @@ class ForegroundInferenceTest {
     private val fixedClock: Clock = Clock.fixed(completedAt, ZoneOffset.UTC)
 
     private fun rawSuccess(transcription: String, followUp: String): String =
-        "## TRANSCRIPTION\n$transcription\n\n## FOLLOW_UP\n$followUp\n"
+        "<transcription>$transcription</transcription>\n<follow_up>$followUp</follow_up>\n"
 
     private fun samples(): FloatArray = floatArrayOf(0.1f, -0.1f, 0.0f, 0.5f, -0.5f)
 
@@ -96,8 +96,8 @@ class ForegroundInferenceTest {
             { assertTrue(systemPrompt.contains("Persona: Editor"), "Missing persona tag in prompt") },
             { assertTrue(systemPrompt.contains("cognition tracker"), "Missing shared sentinel in prompt") },
             { assertTrue(systemPrompt.contains(ForegroundInference.RECENT_TURNS_HEADER)) },
-            { assertTrue(systemPrompt.contains("## TRANSCRIPTION")) },
-            { assertTrue(systemPrompt.contains("## FOLLOW_UP")) },
+            { assertTrue(systemPrompt.contains("<transcription>")) },
+            { assertTrue(systemPrompt.contains("<follow_up>")) },
         )
     }
 
@@ -147,14 +147,65 @@ class ForegroundInferenceTest {
         assertAll(
             { assertFalse(turnsBlock.contains("u-old"), "Oldest USER turn should be dropped") },
             { assertFalse(turnsBlock.contains("m-old"), "Oldest MODEL turn should be dropped") },
-            { assertTrue(turnsBlock.contains("- USER: u-1")) },
-            { assertTrue(turnsBlock.contains("- MODEL: m-1")) },
-            { assertTrue(turnsBlock.contains("- USER: u-2")) },
-            { assertTrue(turnsBlock.contains("- MODEL: m-2")) },
+            { assertTrue(turnsBlock.contains("\"speaker\":\"USER\",\"text\":\"u-1\"")) },
+            { assertTrue(turnsBlock.contains("\"speaker\":\"MODEL\",\"text\":\"m-1\"")) },
+            { assertTrue(turnsBlock.contains("\"speaker\":\"USER\",\"text\":\"u-2\"")) },
+            { assertTrue(turnsBlock.contains("\"speaker\":\"MODEL\",\"text\":\"m-2\"")) },
         )
         // Order check — u-1 must precede m-2.
-        assertTrue(turnsBlock.indexOf("- USER: u-1") < turnsBlock.indexOf("- MODEL: m-2"))
+        assertTrue(turnsBlock.indexOf("\"text\":\"u-1\"") < turnsBlock.indexOf("\"text\":\"m-2\""))
     }
+
+    @Test
+    fun `multi-line turn text is JSON-escaped so it cannot escape the history envelope`(@TempDir cacheDir: File) =
+        runTest {
+            val engine = mockk<LiteRtLmEngine>()
+            val captured = slot<List<Content>>()
+            coEvery { engine.sendMessageContents(capture(captured)) } returns rawSuccess("a", "b")
+
+            val transcript = Transcript().apply {
+                append(Turn(Speaker.USER, "first line\nsecond line", Instant.parse("2026-05-09T11:55:00Z")))
+                append(
+                    Turn(
+                        speaker = Speaker.MODEL,
+                        text = "model line one.\nmodel line two with a \" quote and a \\ backslash.",
+                        timestamp = Instant.parse("2026-05-09T11:55:01Z"),
+                        persona = Persona.WITNESS,
+                    ),
+                )
+            }
+
+            ForegroundInference(engine, cacheDir, clock = fixedClock).runForegroundCall(
+                audio = audioChunk(),
+                transcript = transcript,
+                persona = Persona.WITNESS,
+            )
+
+            val systemPrompt = (captured.captured[0] as Content.Text).text
+            val turnsBlockStart = systemPrompt.indexOf(ForegroundInference.RECENT_TURNS_HEADER)
+            val outputBlockStart = systemPrompt.indexOf("## OUTPUT FORMAT")
+            val turnsBlock = systemPrompt.substring(turnsBlockStart, outputBlockStart)
+
+            assertAll(
+                // Newlines escape to \n inside the JSON string so each turn renders on a single line.
+                { assertTrue(turnsBlock.contains("\"first line\\nsecond line\"")) },
+                {
+                    val expected = "\"model line one.\\nmodel line two " +
+                        "with a \\\" quote and a \\\\ backslash.\""
+                    assertTrue(turnsBlock.contains(expected))
+                },
+                // No raw newline inside any turn's text portion — every line in the block starts with
+                // either the header, the JSON object opener, or the trailing blank.
+                {
+                    turnsBlock.lines().forEach { line ->
+                        val ok = line.isEmpty() ||
+                            line == ForegroundInference.RECENT_TURNS_HEADER ||
+                            line.startsWith("{\"speaker\":")
+                        assertTrue(ok, "Stray content escaped the history envelope: '$line'")
+                    }
+                },
+            )
+        }
 
     @Test
     fun `audio handoff goes through Content_AudioFile pointing inside cacheDir`(@TempDir cacheDir: File) = runTest {

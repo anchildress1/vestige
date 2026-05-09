@@ -5,31 +5,27 @@ import java.time.Instant
 
 /**
  * Parses Gemma 4's foreground response text into a [ForegroundResult]. Format is
- * markdown-with-headers per ADR-002 §"Structured-output reliability" — JSON parse-rate on E4B
- * is the documented risk that pushed us off JSON in Action Item #2.
+ * XML-style tags per ADR-002 §"Structured-output reliability" — JSON parse-rate on E4B is the
+ * documented risk that pushed us off JSON in Action Item #2, and `## TRANSCRIPTION` / `## FOLLOW_UP`
+ * markdown headers were rejected (codex review round 2) because a verbatim transcription can
+ * legitimately contain those marker lines and would be silently sliced.
  *
- * Expected shape (whitespace tolerant; the model sometimes wraps headers in extra blank lines):
+ * Expected shape:
  * ```
- * ## TRANSCRIPTION
- * the user's spoken words verbatim
- *
- * ## FOLLOW_UP
- * the model's follow-up question or remark
+ * <transcription>the user's spoken words verbatim</transcription>
+ * <follow_up>the model's follow-up question or remark</follow_up>
  * ```
  *
- * Headers are matched only when they appear as a **whole line** (optionally surrounded by
- * whitespace). A user dictating the literal text "## FOLLOW_UP" mid-sentence must not split the
- * transcription — the verbatim-transcription contract from `personas/shared.txt` requires that
- * inline occurrences are preserved as content, not re-interpreted as section markers.
- *
- * Anything before the `## TRANSCRIPTION` line is ignored (Gemma tends to preface structured
- * output with a short courtesy line). Anything after the `## FOLLOW_UP` line is treated as the
- * follow-up body. STT-C will measure parse-success rate on a real E4B transcript set.
+ * Tags must appear in the order transcription → follow_up. Tags are case-sensitive and matched
+ * non-greedily so a multi-line body works. Content is allowed to contain almost anything —
+ * collision with a literal closing tag (e.g., a user dictating "less than slash transcription
+ * greater than") is the only remaining ambiguity, and that is vanishingly unlikely in spoken
+ * cognition-tracker dumps. STT-C measures parse-success rate on a real E4B transcript set.
  */
 internal object ForegroundResponseParser {
 
-    private val TRANSCRIPTION_HEADER_LINE = Regex("(?m)^[ \\t]*##[ \\t]+TRANSCRIPTION[ \\t]*\$")
-    private val FOLLOW_UP_HEADER_LINE = Regex("(?m)^[ \\t]*##[ \\t]+FOLLOW_UP[ \\t]*\$")
+    private val TRANSCRIPTION_TAG = Regex("(?s)<transcription>(.*?)</transcription>")
+    private val FOLLOW_UP_TAG = Regex("(?s)<follow_up>(.*?)</follow_up>")
 
     fun parse(raw: String, persona: Persona, elapsedMs: Long, completedAt: Instant): ForegroundResult {
         val outcome = extract(raw)
@@ -59,20 +55,12 @@ internal object ForegroundResponseParser {
     }
 
     private fun splitOnHeaders(raw: String): Extracted {
-        val transcriptionMatch = TRANSCRIPTION_HEADER_LINE.find(raw)
+        val transcriptionMatch = TRANSCRIPTION_TAG.find(raw)
         val followUpMatch = transcriptionMatch?.let {
-            FOLLOW_UP_HEADER_LINE.find(raw, startIndex = it.range.last + 1)
+            FOLLOW_UP_TAG.find(raw, startIndex = it.range.last + 1)
         }
-        val transcription = if (transcriptionMatch != null && followUpMatch != null) {
-            raw.substring(transcriptionMatch.range.last + 1, followUpMatch.range.first).trim()
-        } else {
-            ""
-        }
-        val followUp = if (followUpMatch != null) {
-            raw.substring(followUpMatch.range.last + 1).trim()
-        } else {
-            ""
-        }
+        val transcription = transcriptionMatch?.groupValues?.get(1)?.trim().orEmpty()
+        val followUp = followUpMatch?.groupValues?.get(1)?.trim().orEmpty()
         return when {
             transcriptionMatch == null -> Extracted.Bad(ForegroundResult.ParseReason.MISSING_TRANSCRIPTION)
             followUpMatch == null -> Extracted.Bad(ForegroundResult.ParseReason.MISSING_FOLLOW_UP)

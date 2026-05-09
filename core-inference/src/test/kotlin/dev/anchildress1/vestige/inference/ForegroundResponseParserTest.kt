@@ -16,13 +16,10 @@ class ForegroundResponseParserTest {
     private fun parse(raw: String) = ForegroundResponseParser.parse(raw, persona, elapsedMs, completedAt)
 
     @Test
-    fun `parses transcription and follow-up from canonical markdown`() {
+    fun `parses transcription and follow-up from canonical XML tags`() {
         val raw = """
-            ## TRANSCRIPTION
-            I sat down and didn't move for an hour.
-
-            ## FOLLOW_UP
-            What were you trying to do before you sat down?
+            <transcription>I sat down and didn't move for an hour.</transcription>
+            <follow_up>What were you trying to do before you sat down?</follow_up>
         """.trimIndent()
 
         val result = parse(raw)
@@ -37,15 +34,12 @@ class ForegroundResponseParserTest {
     }
 
     @Test
-    fun `tolerates preface text before the first header`() {
+    fun `tolerates preface text before the first tag`() {
         val raw = """
             Sure thing — here's the structured response you asked for.
 
-            ## TRANSCRIPTION
-            went to bed at four am again.
-
-            ## FOLLOW_UP
-            What pulled you toward the four-am window tonight?
+            <transcription>went to bed at four am again.</transcription>
+            <follow_up>What pulled you toward the four-am window tonight?</follow_up>
         """.trimIndent()
 
         val success = assertInstanceOf(ForegroundResult.Success::class.java, parse(raw))
@@ -54,24 +48,16 @@ class ForegroundResponseParserTest {
     }
 
     @Test
-    fun `tolerates extra blank lines between headers and content`() {
-        val raw = "## TRANSCRIPTION\n\n\nfoo\n\n\n## FOLLOW_UP\n\n\nbar\n\n"
+    fun `tolerates whitespace and newlines between tags`() {
+        val raw = "<transcription>\n\nfoo\n\n</transcription>\n\n\n<follow_up>\n\nbar\n\n</follow_up>\n\n"
         val success = assertInstanceOf(ForegroundResult.Success::class.java, parse(raw))
         assertEquals("foo", success.transcription)
         assertEquals("bar", success.followUp)
     }
 
     @Test
-    fun `treats trailing content after FOLLOW_UP as part of the follow-up body`() {
-        val raw = """
-            ## TRANSCRIPTION
-            short note.
-
-            ## FOLLOW_UP
-            line one.
-            line two.
-        """.trimIndent()
-
+    fun `multi-line follow-up body is preserved`() {
+        val raw = "<transcription>short note.</transcription>\n<follow_up>line one.\nline two.</follow_up>"
         val success = assertInstanceOf(ForegroundResult.Success::class.java, parse(raw))
         assertEquals("line one.\nline two.", success.followUp)
     }
@@ -91,62 +77,40 @@ class ForegroundResponseParserTest {
     }
 
     @Test
-    fun `missing transcription header returns MISSING_TRANSCRIPTION failure`() {
-        val raw = """
-            ## FOLLOW_UP
-            i have no transcription.
-        """.trimIndent()
+    fun `missing transcription tag returns MISSING_TRANSCRIPTION failure`() {
+        val raw = "<follow_up>i have no transcription.</follow_up>"
         val failure = assertInstanceOf(ForegroundResult.ParseFailure::class.java, parse(raw))
         assertEquals(ForegroundResult.ParseReason.MISSING_TRANSCRIPTION, failure.reason)
         assertEquals(raw, failure.rawResponse)
     }
 
     @Test
-    fun `missing follow-up header returns MISSING_FOLLOW_UP failure`() {
-        val raw = """
-            ## TRANSCRIPTION
-            this is the user's voice.
-        """.trimIndent()
+    fun `missing follow-up tag returns MISSING_FOLLOW_UP failure`() {
+        val raw = "<transcription>this is the user's voice.</transcription>"
         val failure = assertInstanceOf(ForegroundResult.ParseFailure::class.java, parse(raw))
         assertEquals(ForegroundResult.ParseReason.MISSING_FOLLOW_UP, failure.reason)
     }
 
     @Test
-    fun `transcription header present but body empty returns MISSING_TRANSCRIPTION`() {
-        val raw = """
-            ## TRANSCRIPTION
-
-            ## FOLLOW_UP
-            you didn't say anything yet.
-        """.trimIndent()
+    fun `transcription tag present but body empty returns MISSING_TRANSCRIPTION`() {
+        val raw = "<transcription></transcription>\n<follow_up>you didn't say anything yet.</follow_up>"
         val failure = assertInstanceOf(ForegroundResult.ParseFailure::class.java, parse(raw))
         assertEquals(ForegroundResult.ParseReason.MISSING_TRANSCRIPTION, failure.reason)
     }
 
     @Test
-    fun `follow-up header present but body empty returns MISSING_FOLLOW_UP`() {
-        val raw = """
-            ## TRANSCRIPTION
-            something the user said.
-
-            ## FOLLOW_UP
-        """.trimIndent()
+    fun `follow-up tag present but body empty returns MISSING_FOLLOW_UP`() {
+        val raw = "<transcription>something the user said.</transcription>\n<follow_up></follow_up>"
         val failure = assertInstanceOf(ForegroundResult.ParseFailure::class.java, parse(raw))
         assertEquals(ForegroundResult.ParseReason.MISSING_FOLLOW_UP, failure.reason)
     }
 
     @Test
-    fun `headers swapped (FOLLOW_UP before TRANSCRIPTION) returns MISSING_FOLLOW_UP`() {
-        // The parser only accepts FOLLOW_UP that appears AFTER TRANSCRIPTION. A swapped order is
-        // a malformed response per ADR-002 §"Output reliability" — we surface the failure rather
-        // than guessing a recovery.
-        val raw = """
-            ## FOLLOW_UP
-            first.
-
-            ## TRANSCRIPTION
-            second.
-        """.trimIndent()
+    fun `tags swapped (follow_up before transcription) returns MISSING_FOLLOW_UP`() {
+        // The parser only accepts <follow_up> that appears AFTER <transcription>. A swapped order
+        // is a malformed response per ADR-002 §"Output reliability" — we surface the failure
+        // rather than guessing a recovery.
+        val raw = "<follow_up>first.</follow_up>\n<transcription>second.</transcription>"
         val failure = assertInstanceOf(ForegroundResult.ParseFailure::class.java, parse(raw))
         assertEquals(ForegroundResult.ParseReason.MISSING_FOLLOW_UP, failure.reason)
     }
@@ -163,57 +127,47 @@ class ForegroundResponseParserTest {
     }
 
     @Test
-    fun `transcription text quoting the FOLLOW_UP marker is preserved verbatim`() {
-        // A user dictating literal markdown ("the section called ## FOLLOW_UP, capitalized") must
-        // not be sliced mid-quote — the transcription contract from `personas/shared.txt` says
-        // "exact and unaltered."
-        val raw = """
-            ## TRANSCRIPTION
-            i was reading the doc and the next section is called ## FOLLOW_UP, all caps.
-
-            ## FOLLOW_UP
-            What were you reading right before that?
-        """.trimIndent()
+    fun `transcription text mentioning markdown headers is preserved verbatim`() {
+        // A user dictating "## FOLLOW_UP" inline (or even on its own line) must not split the
+        // transcription — the verbatim contract from `personas/shared.txt` says "exact and
+        // unaltered." XML tags bound the section, so markdown markers are just content.
+        val raw = "<transcription>i was reading the doc and the next section is called\n" +
+            "## FOLLOW_UP\n" +
+            "all in caps.</transcription>\n" +
+            "<follow_up>What were you reading right before that?</follow_up>"
 
         val success = assertInstanceOf(ForegroundResult.Success::class.java, parse(raw))
         assertEquals(
-            "i was reading the doc and the next section is called ## FOLLOW_UP, all caps.",
+            "i was reading the doc and the next section is called\n## FOLLOW_UP\nall in caps.",
             success.transcription,
         )
         assertEquals("What were you reading right before that?", success.followUp)
     }
 
     @Test
-    fun `inline TRANSCRIPTION marker inside follow-up body does not break parsing`() {
+    fun `transcription text containing markdown TRANSCRIPTION marker is preserved verbatim`() {
         val raw = """
-            ## TRANSCRIPTION
-            something the user said.
-
-            ## FOLLOW_UP
-            you mentioned ## TRANSCRIPTION mid-sentence — what file were you reading?
+            <transcription>and then a line that says ## TRANSCRIPTION on its own.</transcription>
+            <follow_up>where were you reading?</follow_up>
         """.trimIndent()
         val success = assertInstanceOf(ForegroundResult.Success::class.java, parse(raw))
-        assertEquals("something the user said.", success.transcription)
-        assertEquals(
-            "you mentioned ## TRANSCRIPTION mid-sentence — what file were you reading?",
-            success.followUp,
-        )
+        assertEquals("and then a line that says ## TRANSCRIPTION on its own.", success.transcription)
+        assertEquals("where were you reading?", success.followUp)
     }
 
     @Test
-    fun `header with trailing whitespace on the line still matches`() {
-        val raw = "## TRANSCRIPTION   \nfoo\n## FOLLOW_UP \t\nbar"
-        val success = assertInstanceOf(ForegroundResult.Success::class.java, parse(raw))
-        assertEquals("foo", success.transcription)
-        assertEquals("bar", success.followUp)
-    }
-
-    @Test
-    fun `inline header with content after on the same line does not match`() {
-        // "## FOLLOW_UP and then more text" is not a header line — it's prose containing the
-        // marker. Without a TRANSCRIPTION line, this is MISSING_TRANSCRIPTION.
-        val raw = "## FOLLOW_UP and then more text on the same line\nnope"
+    fun `unbalanced transcription tag (no closing) returns MISSING_TRANSCRIPTION`() {
+        val raw = "<transcription>I started speaking but the close tag is missing.\n<follow_up>nope</follow_up>"
         val failure = assertInstanceOf(ForegroundResult.ParseFailure::class.java, parse(raw))
         assertEquals(ForegroundResult.ParseReason.MISSING_TRANSCRIPTION, failure.reason)
+    }
+
+    @Test
+    fun `multiple transcription blocks pick the first balanced pair`() {
+        val raw = "<transcription>first</transcription><follow_up>q1</follow_up>" +
+            "<transcription>second</transcription><follow_up>q2</follow_up>"
+        val success = assertInstanceOf(ForegroundResult.Success::class.java, parse(raw))
+        assertEquals("first", success.transcription)
+        assertEquals("q1", success.followUp)
     }
 }

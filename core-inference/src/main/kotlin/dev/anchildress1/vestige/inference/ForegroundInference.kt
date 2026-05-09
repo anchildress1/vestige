@@ -106,10 +106,7 @@ class ForegroundInference(
                 append('\n')
             } else {
                 recentTurns.forEach { turn ->
-                    append("- ")
-                    append(turn.speaker.name)
-                    append(": ")
-                    append(turn.text)
+                    append(turn.toJsonLine())
                     append('\n')
                 }
             }
@@ -119,23 +116,58 @@ class ForegroundInference(
         }
     }
 
+    /**
+     * Render one prior turn as a single-line JSON object per ADR-002 §"Session context format"
+     * (`{speaker: USER|MODEL, text: "..."}`). JSON encoding properly escapes embedded newlines and
+     * quotes, so a multi-line model reply (now possible because [ForegroundResponseParser] accepts
+     * multi-line `<follow_up>` bodies) cannot escape the history block and inject stray prompt
+     * lines outside the envelope. Hand-rolled because there's no JSON dep in `:core-inference`.
+     */
+    private fun Turn.toJsonLine(): String = "{\"speaker\":\"${speaker.name}\",\"text\":\"${escapeJsonString(text)}\"}"
+
+    private fun escapeJsonString(input: String): String = buildString(input.length) {
+        input.forEach { ch ->
+            when (ch) {
+                '\\' -> append("\\\\")
+
+                '"' -> append("\\\"")
+
+                '\n' -> append("\\n")
+
+                '\r' -> append("\\r")
+
+                '\t' -> append("\\t")
+
+                '\b' -> append("\\b")
+
+                '\u000c' -> append("\\f")
+
+                else -> if (ch.code < CONTROL_CHAR_LIMIT) {
+                    append("\\u%04x".format(ch.code))
+                } else {
+                    append(ch)
+                }
+            }
+        }
+    }
+
     companion object {
         const val DEFAULT_HISTORY_TURN_LIMIT: Int = 4
 
         internal const val RECENT_TURNS_HEADER = "## RECENT TURNS"
         internal const val NO_RECENT_TURNS = "(no prior turns in this session)"
         internal const val OUTPUT_SCHEMA_REMINDER = """## OUTPUT FORMAT
-Reply with exactly the following two sections, headers included, nothing else before or between them:
+Reply with exactly two XML-style tags, in this order, and nothing else:
 
-## TRANSCRIPTION
-<the user's spoken words verbatim>
+<transcription>the user's spoken words verbatim</transcription>
+<follow_up>your follow-up question or remark in the active persona's voice</follow_up>
 
-## FOLLOW_UP
-<your follow-up question or remark in the active persona's voice>"""
+Do not nest the tags. Do not emit additional tags. The transcription must be exact and unaltered."""
 
         private const val TAG = "VestigeForegroundInference"
         private const val TEMP_PREFIX = "vestige-fg-"
         private const val TEMP_SUFFIX = ".wav"
         private const val NANOS_PER_MILLI = 1_000_000L
+        private const val CONTROL_CHAR_LIMIT = 0x20
     }
 }

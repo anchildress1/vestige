@@ -69,36 +69,96 @@ class SttAAudioPlumbingTest {
             val samples = readMonoFloatWavSamples(audioFile)
             val sampleRateHz = AudioCapture.SAMPLE_RATE_HZ
 
-            val audioFileResponse = probe.transcribeAudioFile(audioFile.absolutePath)
-            assertTrue("AudioFile path returned blank", audioFileResponse.isNotBlank())
+            // Each path is tried independently — the probe's job is to discover which one
+            // produces a coherent transcription. All three are logged; at least one must succeed.
+            val audioFileResult = runCatching {
+                probe.transcribeAudioFile(audioFile.absolutePath)
+            }
+            val audioBytesResult = runCatching {
+                probe.transcribeAudioBytesAsFloat32Le(samples)
+            }
+            val tempWavResult = runCatching {
+                probe.transcribeViaTempWav(samples = samples, sampleRateHz = sampleRateHz, cacheDir = context.cacheDir)
+            }
 
-            val audioBytesResponse = probe.transcribeAudioBytesAsFloat32Le(samples)
-            assertTrue("AudioBytes(float32-LE) path returned blank", audioBytesResponse.isNotBlank())
+            android.util.Log.i(TAG, "AudioFile  : ${audioFileResult.summarize()}")
+            android.util.Log.i(TAG, "AudioBytes : ${audioBytesResult.summarize()}")
+            android.util.Log.i(TAG, "TempWAV    : ${tempWavResult.summarize()}")
 
-            val tempWavResponse = probe.transcribeViaTempWav(
-                samples = samples,
-                sampleRateHz = sampleRateHz,
-                cacheDir = context.cacheDir,
+            val anySuccess = listOf(audioFileResult, audioBytesResult, tempWavResult)
+                .any { result -> result.getOrNull()?.isNotBlank() == true }
+            assertTrue(
+                "All three STT-A paths failed — see logcat tag $TAG for details",
+                anySuccess,
             )
-            assertTrue("Temp-WAV path returned blank", tempWavResponse.isNotBlank())
         }
     }
 
     /**
-     * Read raw PCM_FLOAT samples from a mono WAV file. Stripped down — assumes the canonical
-     * 44-byte RIFF/WAVE/fmt/data layout produced by [dev.anchildress1.vestige.inference.WavWriter].
+     * Read normalized float32 samples from a mono WAV file. Handles both PCM_S16LE (format 1)
+     * and IEEE_FLOAT (format 3). Scans chunk headers rather than assuming a fixed offset — WAV
+     * files from real encoders include `fact`, `LIST`, and other chunks before `data`.
      */
     private fun readMonoFloatWavSamples(file: File): FloatArray {
-        val raw = file.readBytes()
-        check(raw.size > WAV_HEADER_BYTES) { "WAV file too small: ${file.absolutePath}" }
-        val payload = raw.copyOfRange(WAV_HEADER_BYTES, raw.size)
-        val out = FloatArray(payload.size / BYTES_PER_FLOAT)
-        ByteBuffer.wrap(payload).order(ByteOrder.LITTLE_ENDIAN).asFloatBuffer().get(out)
-        return out
+        val buf = ByteBuffer.wrap(file.readBytes()).order(ByteOrder.LITTLE_ENDIAN)
+        buf.position(RIFF_WAVE_PREFIX_BYTES) // skip "RIFF" + file-size + "WAVE"
+
+        var audioFormat = 0
+        var bitsPerSample = 0
+
+        while (buf.remaining() >= CHUNK_HEADER_BYTES) {
+            val id = ByteArray(CHUNK_ID_BYTES).also { buf.get(it) }.toString(Charsets.US_ASCII)
+            val chunkSize = buf.int
+            when (id) {
+                "fmt " -> {
+                    audioFormat = buf.short.toInt() and 0xFFFF
+                    buf.short // channels
+                    buf.int   // sampleRate
+                    buf.int   // byteRate
+                    buf.short // blockAlign
+                    bitsPerSample = buf.short.toInt() and 0xFFFF
+                    // Skip any fmt extension bytes
+                    val consumed = 16
+                    if (chunkSize > consumed) buf.position(buf.position() + chunkSize - consumed)
+                }
+                "data" -> {
+                    return when {
+                        audioFormat == FMT_IEEE_FLOAT && bitsPerSample == 32 -> {
+                            FloatArray(chunkSize / BYTES_PER_FLOAT).also {
+                                buf.asFloatBuffer().get(it)
+                            }
+                        }
+                        audioFormat == FMT_PCM && bitsPerSample == 16 -> {
+                            val sampleCount = chunkSize / BYTES_PER_INT16
+                            FloatArray(sampleCount) {
+                                buf.short / PCM16_SCALE
+                            }
+                        }
+                        else -> error(
+                            "Unsupported WAV format=$audioFormat bits=$bitsPerSample in ${file.name}",
+                        )
+                    }
+                }
+                else -> buf.position(buf.position() + chunkSize + (chunkSize and 1))
+            }
+        }
+        error("No 'data' chunk found in WAV file: ${file.absolutePath}")
     }
 
+    private fun Result<String>.summarize(): String = fold(
+        onSuccess = { if (it.isBlank()) "BLANK response" else "OK — \"${it.take(120)}\"" },
+        onFailure = { "FAILED — ${it.javaClass.simpleName}: ${it.message?.take(120)}" },
+    )
+
     private companion object {
-        const val WAV_HEADER_BYTES = 44
+        const val TAG = "VestigeSttA"
+        const val RIFF_WAVE_PREFIX_BYTES = 12
+        const val CHUNK_HEADER_BYTES = 8
+        const val CHUNK_ID_BYTES = 4
         const val BYTES_PER_FLOAT = 4
+        const val BYTES_PER_INT16 = 2
+        const val FMT_PCM = 1
+        const val FMT_IEEE_FLOAT = 3
+        const val PCM16_SCALE = 32768f
     }
 }

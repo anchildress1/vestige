@@ -25,7 +25,7 @@ litert-lm = "0.11.0"
 
 # Quality
 kover = "0.9.8"
-ktlint-cli = "1.5.0"
+ktlint-cli = "1.8.0"
 sonar = "7.3.0.8198"
 
 # Coroutines

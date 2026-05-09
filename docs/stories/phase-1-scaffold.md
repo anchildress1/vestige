@@ -150,10 +150,10 @@ If STT-A fails after the time-box: stop. Write a superseding ADR. Do not proceed
 **As** the AI implementor, **I need** a prompt scaffold that composes the three persona system prompts as tone-only variants per `concept-locked.md` §Personas, **so that** Phase 2's foreground capture call has a working persona switch without re-architecting prompt assembly mid-phase.
 
 **Done when:**
-- [ ] `:core-inference` exposes a `PersonaPromptComposer` that returns a system prompt for one of `WITNESS` / `HARDASS` / `EDITOR`.
-- [ ] Each persona system prompt is loaded from a checked-in resource file (one file per persona) — not a hardcoded string in Kotlin.
-- [ ] Persona prompts share the same extraction/observation rules and differ only in tone-shaping language (per `concept-locked.md` §Personas: "tone-only variants").
-- [ ] A smoke test runs the same input through all three persona prompts and shows visibly different tone in the responses while preserving the same structured fields. (No automated assertion on tone — visual inspection only at this stage.)
+- [x] `:core-inference` exposes a `PersonaPromptComposer` that returns a system prompt for one of `WITNESS` / `HARDASS` / `EDITOR`.
+- [x] Each persona system prompt is loaded from a checked-in resource file (one file per persona) — not a hardcoded string in Kotlin.
+- [x] Persona prompts share the same extraction/observation rules and differ only in tone-shaping language (per `concept-locked.md` §Personas: "tone-only variants").
+- [ ] A smoke test runs the same input through all three persona prompts and shows visibly different tone in the responses while preserving the same structured fields. (No automated assertion on tone — visual inspection only at this stage.) _(Manual — requires the reference device + Gemma 4 E4B model. JVM tests assert that the three composed prompts diverge and share the rules block; the on-device tone difference is the user's visual inspection step.)_
 
 **Notes / risks:** Personas are output-only per the locked architecture. They do not affect the multi-lens extraction pipeline (Phase 2). If a persona prompt drifts toward affecting tag extraction, that's a regression — persona prompts wrap the response, not the schema.
 

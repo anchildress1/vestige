@@ -83,11 +83,11 @@ If STT-A fails after the time-box: stop. Write a superseding ADR. Do not proceed
 **As** the AI implementor, **I need** an `AudioRecord`-based capture path that produces normalized audio buffers (mono 16 kHz float32 in `[-1, 1]`) and chunks streams >30 seconds per ADR-001 Q4, **so that** Story 1.5 can hand audio to Gemma 4 in the format the model expects.
 
 **Done when:**
-- [ ] `:core-inference` exposes an `AudioCapture` API that records mono audio with `AudioRecord` and emits normalized float32 buffers conforming to Google's Gemma audio spec.
-- [ ] Capture ≤30 seconds emits a single buffer for the full recording.
-- [ ] Capture >30 seconds emits sequential 30-second chunks per ADR-001 Q4 (Case B). Chunk boundaries do not interleave with re-encoding artifacts.
-- [ ] `AudioCapture` does not write audio to disk except as a temp file when Story 1.5 needs `Content.AudioFile`. Any temp file is deleted within the same call.
-- [ ] Microphone permission request flow exists in `:app` for dev runs (full polished onboarding is Phase 4).
+- [x] `:core-inference` exposes an `AudioCapture` API that records mono audio with `AudioRecord` and emits normalized float32 buffers conforming to Google's Gemma audio spec.
+- [x] Capture ≤30 seconds emits a single buffer for the full recording.
+- [x] Capture >30 seconds emits sequential 30-second chunks per ADR-001 Q4 (Case B). Chunk boundaries do not interleave with re-encoding artifacts.
+- [x] `AudioCapture` does not write audio to disk except as a temp file when Story 1.5 needs `Content.AudioFile`. Any temp file is deleted within the same call.
+- [x] Microphone permission request flow exists in `:app` for dev runs (full polished onboarding is Phase 4).
 
 **Notes / risks:** Do not introduce `SpeechRecognizer` or any third-party STT (per `AGENTS.md` guardrail 13 and `concept-locked.md` §Stack). The audio path is captured-by-us → handed-to-Gemma → discarded.
 

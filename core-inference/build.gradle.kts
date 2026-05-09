@@ -32,6 +32,7 @@ android {
 dependencies {
     api(project(":core-model"))
 
+    implementation(libs.androidx.annotation)
     implementation(libs.kotlinx.coroutines.core)
 
     // Inference — litertlm-android is the high-level entry point for Gemma 4 .litertlm models.

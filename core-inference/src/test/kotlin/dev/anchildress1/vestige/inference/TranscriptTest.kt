@@ -47,16 +47,20 @@ class TranscriptTest {
     }
 
     @Test
-    fun `Turn equality uses speaker, text, and timestamp together`() {
+    fun `Turn equality compares every field including persona`() {
         val ts = Instant.parse("2026-05-09T12:00:00Z")
         val a = Turn(Speaker.USER, "same", ts)
         val b = Turn(Speaker.USER, "same", ts)
         val c = Turn(Speaker.MODEL, "same", ts, Persona.WITNESS)
         val d = Turn(Speaker.USER, "different", ts)
+        val e = Turn(Speaker.MODEL, "same", ts, Persona.HARDASS)
         assertEquals(a, b)
         assertEquals(a.hashCode(), b.hashCode())
         assertFalse(a == c)
         assertFalse(a == d)
+        // Persona is part of equality — same speaker / text / timestamp but different persona must diverge.
+        // Hash codes may collide in theory, so only assert on equals.
+        assertFalse(c == e)
     }
 
     @Test

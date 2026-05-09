@@ -13,7 +13,9 @@ enum class Speaker { USER, MODEL }
 
 /**
  * One contribution inside a [Transcript]. Per `AGENTS.md` guardrail 11 the payload is text only
- * — audio bytes are never persisted on a turn (or anywhere else), even transiently.
+ * — audio bytes are not persisted on a `Turn` or anywhere else durably. Audio still flows through
+ * memory (and a short-lived temp WAV when LiteRT-LM needs `Content.AudioFile`) per Story 1.4 /
+ * Story 1.5; that is transient by design and discarded inside the same call.
  *
  * [timestamp] is when the turn entered the transcript (post-transcription for `USER`, post-response
  * for `MODEL`), not when audio capture began.

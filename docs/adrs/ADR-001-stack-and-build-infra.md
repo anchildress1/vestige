@@ -225,6 +225,19 @@ STT-A says this must work. The 30s constraint is a runtime cap — `AudioRecord`
 
 **Validation:** STT-A measures whether mid-sentence chunk boundaries lose meaning. If they do, the fallback is overlapping windows (last 1.5s of chunk N replayed at start of chunk N+1) with deduplication on the transcript.
 
+**STT-A device-test record (Phase 1, on-device, human-run):** the harness in `:core-inference` (`SttAProbe`) and the instrumented test at `:app/src/androidTest/.../SttAAudioPlumbingTest.kt` exercise three handoffs against Gemma 4 E4B on the S24 Ultra: `Content.AudioBytes(float32-LE bytes)`, `Content.AudioFile(<existing WAV>)`, and `transcribeViaTempWav` (PCM_FLOAT WAV written + handed off + deleted in-call). After running, fill in below. If neither byte-pack works and the file path is the only viable handoff, the temp-WAV lifecycle is the canonical path for v1.
+
+| Field | Value |
+|---|---|
+| Device | _S24 Ultra (12 GB / SD8 Gen 3)_ |
+| LiteRT-LM version | _0.11.0_ |
+| Date run | _TBD — fill in on test_ |
+| AudioBytes float32-LE result | _TBD: coherent / garbage / failed_ |
+| AudioFile WAV result | _TBD: coherent / garbage / failed_ |
+| Working path chosen | _TBD: AudioBytes / AudioFile_ |
+| End-to-end latency, 30 s clip (capture stop → transcript) | _TBD ms_ |
+| Backend selected | _TBD: CPU / GPU / NPU_ |
+
 ### Q5. Distribution & signing
 
 GitHub Releases sideload means a single signing key, stored somewhere. **Not** in the repo. **Not** in plain text on the dev machine.

@@ -100,7 +100,7 @@ schema_version: 1
 timestamp: 2026-05-08T14:32:15Z
 template_label: aftermath
 energy_descriptor: crashed
-recurrence_link: null
+recurrence_link: a3f9c2b8d4e7f1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6
 stated_commitment: null
 tags:
   - tuesday-meeting
@@ -110,8 +110,8 @@ confidence:
   template_label: canonical
   tags: canonical
   energy_descriptor: canonical
-  recurrence_link: null
-  stated_commitment: null
+  recurrence_link: canonical
+  stated_commitment: canonical
 entry_observations:
   - text: "you said 'fine' before the meeting and 'flattened' after"
     evidence: vocabulary-contradiction

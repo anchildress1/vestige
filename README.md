@@ -103,27 +103,34 @@ Module boundaries: `:app` (UI), `:core-inference` (LiteRT-LM + lens composition)
 
 ```
 .
-├── app/                       # :app — Compose UI, navigation, AppContainer
+├── app/                       # :app — Compose UI, navigation, AppContainer (lives on chore/scaffold)
 ├── docs/                      # canonical product/architecture/UX spec
+│   ├── README.md              # reading order + file inventory
 │   ├── PRD.md                 # P0/P1/P2 requirements + phase schedule
 │   ├── concept-locked.md      # full product spec
 │   ├── adrs/                  # ADR-001..003 (stack, lenses, patterns)
 │   ├── architecture-brief.md
 │   ├── design-guidelines.md
-│   └── ux-copy.md
-├── gradle/
-│   ├── libs.versions.toml     # version catalog — single source of truth for deps
-│   └── verification-metadata.xml
-├── scripts/                   # doctor, lint, secret scan helpers
+│   ├── ux-copy.md
+│   ├── sample-data-scenarios.md
+│   ├── runtime-research.md
+│   ├── challenge-brief.md
+│   ├── blog-template.md
+│   ├── backlog.md             # deferred features
+│   └── stories/               # phase-1..7 build queue
+├── poc/                       # Compose-port reference (JSX prototypes + screenshots)
+├── gradle/                    # version catalog + verification (lives on chore/scaffold)
+├── scripts/                   # doctor, lint, secret scan helpers (lives on chore/scaffold)
 ├── AGENTS.md                  # AI implementor guardrails (authoritative)
-├── CLAUDE.md                  # Claude Code → AGENTS.md pointer
-├── backlog.md                 # deferred features
-├── lefthook.yml               # pre-commit / commit-msg / pre-push hooks
-├── release-please-config.json
-└── Makefile                   # local CI surface
+├── CLAUDE.md                  # Claude Code → AGENTS.md pointer (lives on chore/scaffold)
+├── lefthook.yml               # pre-commit / commit-msg / pre-push hooks (lives on chore/scaffold)
+├── release-please-config.json # (lives on chore/scaffold)
+├── Makefile                   # local CI surface (lives on chore/scaffold)
+├── LICENSE
+└── README.md
 ```
 
-Phase 1 splits `:app` into `:app + :core-model + :core-inference + :core-storage` per ADR-001. Tree above reflects the current scaffold state.
+Phase 1 splits `:app` into `:app + :core-model + :core-inference + :core-storage` per ADR-001. Tree above reflects the **post-merge** main state — entries marked `(lives on chore/scaffold)` arrive when that branch lands; everything else exists on `docs/foundation`.
 
 ---
 

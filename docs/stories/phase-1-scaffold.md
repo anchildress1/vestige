@@ -71,6 +71,8 @@ If STT-A fails after the time-box: stop. Write a superseding ADR. Do not proceed
 - [x] LiteRT-LM Android dependency pinned in `gradle/libs.versions.toml`.
 - [x] `:core-inference` exposes a function that loads the E4B model from a known on-disk path and runs a text prompt-completion call.
 - [ ] A smoke test on the reference S24 Ultra produces a non-empty response from a simple text prompt (e.g., "respond with the word OK"). _(Manual — instrumented test scaffolded at `:app/src/androidTest/.../LiteRtLmTextSmokeTest.kt`. User adb-pushes the model then runs `./gradlew :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.modelPath=...`. Box stays unchecked until the user reports green.)_
+
+  > **TODO — manual validation pending (Phase 1, Story 1.3):** instructions in chat. After it passes, agent fills in latency + backend selected from logcat and ticks the box.
 - [x] Inference logs CPU/GPU backend selection and rough latency to logcat in dev builds.
 - [x] No MediaPipe LLM Inference dependency in the project (per `AGENTS.md` guardrail 13).
 
@@ -105,6 +107,8 @@ If STT-A fails after the time-box: stop. Write a superseding ADR. Do not proceed
 - [ ] The exact LiteRT-LM Android handoff is documented inline in ADR-001 Q4: which of `Content.AudioBytes(audioBytes)` vs `Content.AudioFile(path)` is the working path, and the exact byte packing or file format used. _(Manual — placeholder table added to ADR-001 §Q4. Filled in once the device run completes.)_
 - [x] If `AudioFile` is the working path, temp-file lifecycle is correct: created → handed to model → deleted within the same call. No persisted audio. _(`SttAProbe.transcribeViaTempWav` deletes inside `finally`; falls back to `deleteOnExit` only if the in-call delete fails.)_
 - [ ] Latency of one 30-second clip end-to-end (capture stop → transcription back) recorded to ADR-001 §Latency notes. _(Manual — emitted to logcat by `LiteRtLmEngine.sendMessageContents`; user copies the value into the placeholder table in ADR-001 §Q4.)_
+
+  > **TODO — manual validation pending (Phase 1, Story 1.5, EXISTENTIAL):** STT-A is the existential gate. Do **not** start any later story until this one passes. Agent will provide instructions when Story 1.3 is green and we hit Story 1.5.
 
 **Time-box:** one focused day of debugging. If transcription is not coherent or the byte-packing path remains unknown after that day, stop. Write a superseding ADR documenting the failure mode and the replan options:
 1. Wait for LiteRT-LM doc updates and pivot the demo to text-only as primary input.
@@ -155,6 +159,8 @@ If STT-A fails after the time-box: stop. Write a superseding ADR. Do not proceed
 - [x] Persona prompts share the same extraction/observation rules and differ only in tone-shaping language (per `concept-locked.md` §Personas: "tone-only variants").
 - [ ] A smoke test runs the same input through all three persona prompts and shows visibly different tone in the responses while preserving the same structured fields. (No automated assertion on tone — visual inspection only at this stage.) _(Manual — requires the reference device + Gemma 4 E4B model. JVM tests assert that the three composed prompts diverge and share the rules block; the on-device tone difference is the user's visual inspection step.)_
 
+  > **TODO — manual validation pending (Phase 1, Story 1.8):** instructions deferred until Story 1.3 + STT-A (Story 1.5) are green — the model has to load before this can run.
+
 **Notes / risks:** Personas are output-only per the locked architecture. They do not affect the multi-lens extraction pipeline (Phase 2). If a persona prompt drifts toward affecting tag extraction, that's a regression — persona prompts wrap the response, not the schema.
 
 ---
@@ -200,6 +206,8 @@ If STT-A fails after the time-box: stop. Write a superseding ADR. Do not proceed
 - [x] A release-build APK with placeholder UI builds successfully via `./gradlew :app:assembleRelease`. _(Verified with debug-fallback signing — once the user pins the real keystore, the same pipeline produces the submission-signed APK.)_
 - [ ] The APK installs and launches on the reference S24 Ultra. _(Manual — user runs `adb install` after `assembleRelease`.)_
 - [x] The APK passes through the same signing + zipalign + R8 pipeline that Phase 6 will use for the submission release.
+
+  > **TODO — manual validation pending (Phase 1, Story 1.11):** keystore generation + on-device install. Instructions deferred until Story 1.3 is green.
 
 **Notes / risks:** Do this before any product code lands per ADR-001 Q5. Discovering signing-config issues on May 23 is exactly how the deadline gets missed.
 

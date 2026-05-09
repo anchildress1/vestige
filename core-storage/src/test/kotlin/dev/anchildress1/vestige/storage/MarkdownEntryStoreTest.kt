@@ -233,6 +233,145 @@ class MarkdownEntryStoreTest {
     }
 
     @Test
+    fun `read populates all optional fields when frontmatter carries them`() {
+        // Hand-write a frontmatter shape with templateLabel + energy + recurrence + commitment
+        // *populated* (not the `null` literal). This pins the takeUnless { it == NULL } branches
+        // for every optional field — the empty-entry round-trip only exercises the null side.
+        markdownDir.mkdirs()
+        val entriesDir = File(markdownDir, MarkdownEntryStore.ENTRIES_SUBDIR).apply { mkdirs() }
+        val file = File(entriesDir, "populated.md").apply {
+            writeText(
+                """
+                ---
+                schema_version: 1
+                timestamp: 2026-05-09T14:32:15Z
+                template_label: aftermath
+                energy_descriptor: flattened
+                recurrence_link: pat-007
+                stated_commitment: {"text":"ship the launch doc","topic_or_person":"work","entry_id":"e1"}
+                tags:
+                  - work
+                confidence: {"templateLabel":"CANONICAL"}
+                entry_observations: [{"text":"stared at doc","evidence":"capture","fields":["focus"]}]
+                ---
+
+                Standup ran long again.
+                """.trimIndent(),
+            )
+        }
+        val readBack = store.read(file)
+        assertEquals(TemplateLabel.AFTERMATH, readBack.templateLabel)
+        assertEquals("flattened", readBack.energyDescriptor)
+        assertEquals("pat-007", readBack.recurrenceLink)
+        assertEquals(
+            """{"text":"ship the launch doc","topic_or_person":"work","entry_id":"e1"}""",
+            readBack.statedCommitmentJson,
+        )
+        assertEquals("""{"templateLabel":"CANONICAL"}""", readBack.confidenceJson)
+        assertEquals(Instant.parse("2026-05-09T14:32:15Z").toEpochMilli(), readBack.timestampEpochMs)
+    }
+
+    @Test
+    fun `read defaults timestamp to zero when timestamp key is absent`() {
+        // Pins the `?: 0L` fallback. Production write() always emits a timestamp; this exists to
+        // guarantee read() doesn't NPE on a hand-edited file that drops it.
+        markdownDir.mkdirs()
+        val entriesDir = File(markdownDir, MarkdownEntryStore.ENTRIES_SUBDIR).apply { mkdirs() }
+        val file = File(entriesDir, "no-ts.md").apply {
+            writeText(
+                """
+                ---
+                schema_version: 1
+                template_label: null
+                energy_descriptor: null
+                recurrence_link: null
+                stated_commitment: null
+                tags:
+                confidence: {}
+                entry_observations: []
+                ---
+
+                body
+                """.trimIndent(),
+            )
+        }
+        assertEquals(0L, store.read(file).timestampEpochMs)
+    }
+
+    @Test
+    fun `parseFrontmatter ignores lines without a colon and indented continuation lines`() {
+        // The `colonIndex <= 0 || line.startsWith("  ")` skip branch is otherwise unhit — happy-
+        // path frontmatter is always well-formed.
+        markdownDir.mkdirs()
+        val entriesDir = File(markdownDir, MarkdownEntryStore.ENTRIES_SUBDIR).apply { mkdirs() }
+        val file = File(entriesDir, "noisy.md").apply {
+            writeText(
+                """
+                ---
+                schema_version: 1
+                # commentary line with no colon should be skipped, not crashed on
+                timestamp: 2026-05-09T14:32:15Z
+                  continuation indented under timestamp — must not be parsed as a key
+                template_label: null
+                energy_descriptor: null
+                recurrence_link: null
+                stated_commitment: null
+                tags:
+                confidence: {}
+                entry_observations: []
+                ---
+
+                body
+                """.trimIndent(),
+            )
+        }
+        val readBack = store.read(file)
+        assertEquals(Instant.parse("2026-05-09T14:32:15Z").toEpochMilli(), readBack.timestampEpochMs)
+        assertNull(readBack.templateLabel) // the `null` literal still resolved correctly
+    }
+
+    @Test
+    fun `readTagNames terminates the tags block at the next non-indented key`() {
+        // Pins the third arm of the tags-block parser: a non-indented, non-blank line ends the
+        // block. Without this branch coverage, mid-frontmatter list parsing relies on file order.
+        markdownDir.mkdirs()
+        val entriesDir = File(markdownDir, MarkdownEntryStore.ENTRIES_SUBDIR).apply { mkdirs() }
+        val file = File(entriesDir, "tags-then-keys.md").apply {
+            writeText(
+                """
+                ---
+                schema_version: 1
+                timestamp: 2026-05-09T14:32:15Z
+                template_label: null
+                energy_descriptor: null
+                recurrence_link: null
+                stated_commitment: null
+                tags:
+                  - work
+                  - launch
+                confidence: {}
+                entry_observations: []
+                ---
+
+                body
+                """.trimIndent(),
+            )
+        }
+        // Only the two `  - …` items count; `confidence:` terminates the tags block and is not
+        // mistakenly captured as a tag.
+        assertEquals(listOf("work", "launch"), store.readTagNames(file))
+    }
+
+    @Test
+    fun `listAll returns empty list when the entries path is a regular file rather than a directory`() {
+        // Pins the `!entriesDir.isDirectory` early return — guards against a caller accidentally
+        // pointing baseDir at a parent that contains a *file* called `entries`.
+        markdownDir.mkdirs()
+        File(markdownDir, MarkdownEntryStore.ENTRIES_SUBDIR).writeText("not a directory")
+        assertEquals(emptyList<File>(), store.listAll())
+    }
+
+    @Test
     fun `listAll returns sorted markdown files only`() {
         val entryBox = boxStore.boxFor<EntryEntity>()
         val a =

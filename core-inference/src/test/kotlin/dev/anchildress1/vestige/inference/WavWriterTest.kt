@@ -24,15 +24,15 @@ class WavWriterTest {
         assertEquals("data", header.copyOfRange(36, 40).toString(Charsets.US_ASCII))
 
         val buf = ByteBuffer.wrap(header).order(ByteOrder.LITTLE_ENDIAN)
-        assertEquals(target.length().toInt() - 8, buf.getInt(4))  // riffSize
-        assertEquals(16, buf.getInt(16))                           // fmt chunk size
-        assertEquals(1.toShort(), buf.getShort(20))                // audioFormat = 1 (PCM)
-        assertEquals(1.toShort(), buf.getShort(22))                // numChannels = 1
-        assertEquals(16_000, buf.getInt(24))                       // sampleRate
-        assertEquals(32_000, buf.getInt(28))                       // byteRate = 16000 * 2
-        assertEquals(2.toShort(), buf.getShort(32))                // blockAlign = 2
-        assertEquals(16.toShort(), buf.getShort(34))               // bitsPerSample = 16
-        assertEquals(samples.size * 2, buf.getInt(40))             // dataSize = samples * 2
+        assertEquals(target.length().toInt() - 8, buf.getInt(4)) // riffSize
+        assertEquals(16, buf.getInt(16)) // fmt chunk size
+        assertEquals(1.toShort(), buf.getShort(20)) // audioFormat = 1 (PCM)
+        assertEquals(1.toShort(), buf.getShort(22)) // numChannels = 1
+        assertEquals(16_000, buf.getInt(24)) // sampleRate
+        assertEquals(32_000, buf.getInt(28)) // byteRate = 16000 * 2
+        assertEquals(2.toShort(), buf.getShort(32)) // blockAlign = 2
+        assertEquals(16.toShort(), buf.getShort(34)) // bitsPerSample = 16
+        assertEquals(samples.size * 2, buf.getInt(40)) // dataSize = samples * 2
     }
 
     @Test

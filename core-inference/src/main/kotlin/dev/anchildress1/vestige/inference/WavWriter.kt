@@ -21,7 +21,7 @@ internal object WavWriter {
     private const val FMT_CHUNK_SIZE = 16
     private const val FORMAT_PCM: Short = 1
     private const val MONO_CHANNEL_COUNT: Short = 1
-    private const val BYTES_PER_SAMPLE = 2   // int16
+    private const val BYTES_PER_SAMPLE = 2 // int16
     private const val BITS_PER_SAMPLE: Short = 16
     private const val PCM16_SCALE = 32767f
 

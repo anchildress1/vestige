@@ -95,7 +95,8 @@ class LensExtractionTest {
     @Test
     fun `ResolvedField all four ConfidenceVerdict values are valid`() {
         ConfidenceVerdict.entries.forEach { verdict ->
-            val field = ResolvedField(value = if (verdict == ConfidenceVerdict.AMBIGUOUS) null else "val", verdict = verdict)
+            val value = if (verdict == ConfidenceVerdict.AMBIGUOUS) null else "val"
+            val field = ResolvedField(value = value, verdict = verdict)
             assertEquals(verdict, field.verdict)
         }
     }

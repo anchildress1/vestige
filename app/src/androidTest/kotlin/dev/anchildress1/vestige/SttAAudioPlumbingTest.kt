@@ -113,14 +113,15 @@ class SttAAudioPlumbingTest {
                 "fmt " -> {
                     audioFormat = buf.short.toInt() and 0xFFFF
                     buf.short // channels
-                    buf.int   // sampleRate
-                    buf.int   // byteRate
+                    buf.int // sampleRate
+                    buf.int // byteRate
                     buf.short // blockAlign
                     bitsPerSample = buf.short.toInt() and 0xFFFF
                     // Skip any fmt extension bytes
                     val consumed = 16
                     if (chunkSize > consumed) buf.position(buf.position() + chunkSize - consumed)
                 }
+
                 "data" -> {
                     return when {
                         audioFormat == FMT_IEEE_FLOAT && bitsPerSample == 32 -> {
@@ -128,17 +129,20 @@ class SttAAudioPlumbingTest {
                                 buf.asFloatBuffer().get(it)
                             }
                         }
+
                         audioFormat == FMT_PCM && bitsPerSample == 16 -> {
                             val sampleCount = chunkSize / BYTES_PER_INT16
                             FloatArray(sampleCount) {
                                 buf.short / PCM16_SCALE
                             }
                         }
+
                         else -> error(
                             "Unsupported WAV format=$audioFormat bits=$bitsPerSample in ${file.name}",
                         )
                     }
                 }
+
                 else -> buf.position(buf.position() + chunkSize + (chunkSize and 1))
             }
         }

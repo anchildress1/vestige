@@ -65,7 +65,12 @@ jobs:
           retention-days: 14
 
       - name: Run actionlint
-        uses: rhysd/actionlint@03d0035246f3e81f36aed592ffb4bebf33a03106 # v1.7.7
+        shell: bash
+        run: |
+          # rhysd/actionlint is a CLI, not a JS/composite Action; install via the
+          # in-repo download script pinned to v1.7.7 (commit 03d0035) per upstream docs.
+          bash <(curl -fsSL https://raw.githubusercontent.com/rhysd/actionlint/03d0035246f3e81f36aed592ffb4bebf33a03106/scripts/download-actionlint.bash) 1.7.7
+          ./actionlint -color
 
   test:
     name: Test + coverage

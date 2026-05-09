@@ -33,6 +33,7 @@ If no, defer it to `backlog.md` and say: "this doesn't help us win, deferring to
 19. **Codex and Copilot will review every PR.** Assume an adversarial automated reviewer is reading the diff. Match documented patterns; cite the ADR/spec when deviating; do not leave unexplained idiom drift.
 20. **Stick to the plan.** Do not overbuild or over-deliver. The story file is the contract. If a story can ship as N lines, it ships as N lines — not N + a refactor + a new abstraction layer "while we're here." Scope creep is rejected at review.
 21. **Stop on manual checks.** If a story, ADR, or PRD calls for a check the agent cannot run itself (on-device install, real-keystore signing, microphone permission flow, STT-A audio round-trip, `tcpdump` privacy clip, etc.), stop and surface the check to the user for validation. Do not check the box on their behalf. Do not fake it with a "looks correct" justification. The user runs the manual step and reports the outcome — then the agent records it.
+22. **Tests and docs ship with the change, every change.** Every code change carries pos/neg/err/edge coverage at unit, integration, performance, and accessibility tiers as applicable to the surface being touched. Same commit must update relevant docs (README, ADRs, story files, architecture-brief, design-guidelines, ux-copy) and any Mermaid/architecture diagrams the change invalidates. A green test run alone is not "done"; missing scenarios or stale docs/diagrams are unfinished work, not follow-up tickets.
 
 ## Build Order
 

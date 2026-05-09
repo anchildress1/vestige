@@ -1,4 +1,4 @@
-.PHONY: install bootstrap-wrapper doctor build assemble test lint format ktlint-format ktlint-check detekt android-lint secret-scan commitlint verify-no-telemetry verify ci clean
+.PHONY: install bootstrap-wrapper doctor build assemble reinstall test lint format ktlint-format ktlint-check detekt android-lint secret-scan commitlint verify-no-telemetry verify ci clean
 
 GRADLE := ./gradlew
 KTLINT := $(or $(shell command -v ktlint 2>/dev/null), $(HOME)/.local/bin/ktlint)
@@ -19,6 +19,9 @@ bootstrap-wrapper:
 
 build:
 	$(GRADLE) :app:assembleDebug
+
+reinstall:
+	adb uninstall dev.anchildress1.vestige; $(GRADLE) :app:installDebug
 
 assemble:
 	$(GRADLE) :app:assembleRelease

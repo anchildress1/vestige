@@ -13,7 +13,7 @@ import dev.anchildress1.vestige.model.Persona
  */
 object PersonaPromptComposer {
 
-    private const val SHARED_RESOURCE = "/personas/_shared.txt"
+    private const val SHARED_RESOURCE = "/personas/shared.txt"
     private const val WITNESS_RESOURCE = "/personas/witness.txt"
     private const val HARDASS_RESOURCE = "/personas/hardass.txt"
     private const val EDITOR_RESOURCE = "/personas/editor.txt"

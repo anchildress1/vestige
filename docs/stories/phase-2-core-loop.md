@@ -1,7 +1,7 @@
 # Phase 2 — Core Capture Loop
 
-**Status:** Not started
-**Dates:** TBD — kicks off after Phase 1 exits and STT-A has passed
+**Status:** In progress
+**Dates:** 2026-05-09 – TBD
 **References:** `PRD.md` §Phase 2, `concept-locked.md` §"Multi-lens extraction architecture", `concept-locked.md` §Schema, `AGENTS.md`, `architecture-brief.md`, `adrs/ADR-001-stack-and-build-infra.md` §Q3 / §Q4, `adrs/ADR-002-multi-lens-extraction-pattern.md` (entire), `sample-data-scenarios.md`
 
 ---
@@ -34,11 +34,11 @@ Build the end-to-end capture loop: user records or types → foreground call ret
 **As** the AI implementor, **I need** a `CaptureSession` model that owns turn-by-turn state across a single session — recording, awaiting-transcription, model-responded, idle — and a transcript model that records every user turn (transcription text) and every model turn (text response), **so that** the foreground call (Story 2.2) and multi-turn handling (Story 2.4) have a stable place to read and write conversation state.
 
 **Done when:**
-- [ ] `:core-inference` exposes `CaptureSession` with explicit states: `IDLE`, `RECORDING`, `INFERRING`, `RESPONDED`, `ERROR`. Transitions are explicit; illegal transitions throw.
-- [ ] `Transcript` model holds an ordered list of `Turn { speaker: USER | MODEL, text: String, timestamp: Instant }`.
-- [ ] User turns store transcription text only; no audio bytes (per `AGENTS.md` guardrail 11).
-- [ ] Model turns store text response only.
-- [ ] A unit test exercises the state machine through one full multi-turn session in memory.
+- [x] `:core-inference` exposes `CaptureSession` with explicit states: `IDLE`, `RECORDING`, `INFERRING`, `RESPONDED`, `ERROR`. Transitions are explicit; illegal transitions throw. _(Transitions go through `requireState` → `check(...)` so the message names the action and the offending state.)_
+- [x] `Transcript` model holds an ordered list of `Turn { speaker: USER | MODEL, text: String, timestamp: Instant }`. _(`Transcript` is append-only; `turns` returns a defensive snapshot, not the live list.)_
+- [x] User turns store transcription text only; no audio bytes (per `AGENTS.md` guardrail 11). _(`Turn.text: String` is the only payload — no `ByteArray`/`FloatArray` field exists on `Turn` or `Transcript`.)_
+- [x] Model turns store text response only.
+- [x] A unit test exercises the state machine through one full multi-turn session in memory. _(`CaptureSessionTest."full multi-turn session walks the happy path and preserves chronological order"` runs 3 user/model turns end-to-end with an injected ticking `Clock`; pos/neg/err/edge coverage in sibling tests.)_
 
 **Notes / risks:** The transcript is what gets persisted as `entry_text` (joined) at session end. Don't conflate per-turn state with per-entry state — one entry corresponds to one full session, multiple turns.
 

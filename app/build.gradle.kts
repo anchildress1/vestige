@@ -1,10 +1,27 @@
 import kotlinx.kover.gradle.plugin.dsl.CoverageUnit
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+import java.util.Properties
 
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.kover)
+}
+
+// Release signing per ADR-001 §Q5. Reads `keystore.properties` from the repo root if present.
+// When the file is absent (agent-loop machines, fresh clones) the release variant falls back to
+// debug signing — a build-time WARNING is emitted so the operator knows the APK isn't a
+// submission-ready artifact. The Phase 6 submission build requires the real keystore.
+val keystorePropsFile = rootProject.file("keystore.properties")
+val keystoreProps: Properties? = if (keystorePropsFile.exists()) {
+    Properties().apply { keystorePropsFile.inputStream().use { load(it) } }
+} else {
+    logger.warn(
+        "[vestige] keystore.properties is missing — release builds will sign with the DEBUG " +
+            "keystore. Copy keystore.properties.example and set the four fields before " +
+            "Phase 6 submission. (ADR-001 §Q5)",
+    )
+    null
 }
 
 // Derived so a single release-please bump on versionName auto-bumps versionCode too.
@@ -29,6 +46,17 @@ android {
         vectorDrawables.useSupportLibrary = true
     }
 
+    signingConfigs {
+        if (keystoreProps != null) {
+            create("release") {
+                storeFile = file(keystoreProps.getProperty("storeFile"))
+                storePassword = keystoreProps.getProperty("storePassword")
+                keyAlias = keystoreProps.getProperty("keyAlias")
+                keyPassword = keystoreProps.getProperty("keyPassword")
+            }
+        }
+    }
+
     buildTypes {
         debug {
             isMinifyEnabled = false
@@ -40,6 +68,11 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro",
             )
+            signingConfig = if (keystoreProps != null) {
+                signingConfigs.getByName("release")
+            } else {
+                signingConfigs.getByName("debug")
+            }
         }
     }
 

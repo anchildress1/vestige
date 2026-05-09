@@ -120,11 +120,11 @@ If STT-A fails after the time-box: stop. Write a superseding ADR. Do not proceed
 **As** the AI implementor, **I need** the canonical ObjectBox entities for entries, tags, and patterns — including the operational fields ADR-001 Q3 specifies for the retry-based background-extraction recovery path — **so that** Phase 2 background extraction has somewhere to write canonical/candidate/ambiguous fields and Phase 3 pattern detection has somewhere to find them.
 
 **Done when:**
-- [ ] `Entry`, `Tag`, `Pattern` entities defined in `:core-storage` per `concept-locked.md` §Schema and ADR-001 Q3.
-- [ ] `Entry` carries the nine content fields from `concept-locked.md` plus the operational triplet `extraction_status` / `attempt_count` / `last_error` from ADR-001 Q3.
-- [ ] `Entry` does **not** carry a vector field in the Phase 1 schema. The vector field (and its index) ships only if STT-E passes in Phase 3 — see Story 1.6's note about no schema migrations.
-- [ ] ObjectBox plugin runs cleanly through Kapt (per ADR-001 §4 — KSP is intentionally out for ObjectBox).
-- [ ] An empty `Entry` can be written and read back from `:core-storage` in a smoke test.
+- [x] `Entry`, `Tag`, `Pattern` entities defined in `:core-storage` per `concept-locked.md` §Schema and ADR-001 Q3.
+- [x] `Entry` carries the nine content fields from `concept-locked.md` plus the operational triplet `extraction_status` / `attempt_count` / `last_error` from ADR-001 Q3.
+- [x] `Entry` does **not** carry a vector field in the Phase 1 schema. The vector field (and its index) ships only if STT-E passes in Phase 3 — see Story 1.6's note about no schema migrations.
+- [x] ObjectBox plugin runs cleanly through Kapt (per ADR-001 §4 — KSP is intentionally out for ObjectBox).
+- [x] An empty `Entry` can be written and read back from `:core-storage` in a smoke test.
 
 **Notes / risks:** Per ADR-001 Q6, the submitted APK has exactly one schema shape — if STT-E fails, vector fields are absent until v1.5. Do not write runtime-conditional schema branches.
 

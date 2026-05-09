@@ -1,4 +1,5 @@
 import kotlinx.kover.gradle.plugin.dsl.CoverageUnit
+import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 plugins {
     alias(libs.plugins.android.application)
@@ -51,6 +52,9 @@ android {
         // Toolchain (JDK the compiler runs on) tracks latest LTS; java source/target compat stays
         // at 17 because that's the highest the Android docs guarantee for API 34+ desugaring.
         jvmToolchain(25)
+        compilerOptions {
+            jvmTarget.set(JvmTarget.JVM_17)
+        }
     }
 
     buildFeatures {

@@ -168,3 +168,16 @@ The granular work queue lives in `stories/phase-1-scaffold.md`. This list is the
 
 STT-A is the only existential gate inside Phase 1. If it fails after a time-boxed debugging window, stop and replan rather than continue building. Stop after any other step if the premise breaks too — momentum is good; sprinting confidently into a wall is just cardio.
 
+## Release Keystore Setup (Story 1.11)
+
+Per ADR-001 §Q5 the keystore lives outside the repo and is referenced via `keystore.properties` at the repo root (gitignored). One-time setup on a fresh machine:
+
+1. Generate the keystore once: `keytool -genkeypair -v -storetype PKCS12 -keystore ~/.vestige/keystore.jks -alias vestige-release -keyalg RSA -keysize 4096 -validity 10000`. Save the passwords in macOS Keychain (or a password manager).
+2. Copy `keystore.properties.example` to `keystore.properties` and fill in the four fields. The file is gitignored.
+3. Build: `./gradlew :app:assembleRelease`. The output APK is at `app/build/outputs/apk/release/app-release.apk` and is signed with the real key.
+4. Install on the reference S24 Ultra: `adb install -r app/build/outputs/apk/release/app-release.apk`.
+
+If `keystore.properties` is absent the release variant falls back to the debug keystore so the build still completes for agent loops — the Gradle warning makes this loud. The Phase 6 submission build must use the real key; the build operator confirms by checking the WARN line is absent.
+
+If the keystore is lost: a sideload upgrade to a differently-signed APK requires the user to uninstall first. Document that limitation in the README before submission.
+

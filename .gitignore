@@ -48,6 +48,24 @@ logs/
 !.env.example
 .secrets.baseline.tmp
 
+# Keystore — never check in. See keystore.properties.example for the contract.
+keystore.properties
+*.jks
+*.keystore
+
+# Node — this repo intentionally has no node toolchain. If anything drops these in, ignore.
+node_modules/
+package-lock.json
+bun.lockb
+
 # Models — Gemma 4 .litertlm download lives in app-internal storage at runtime
 *.litertlm
 *.tflite
+
+# Native libs — extracted at test runtime by Robolectric / ObjectBox; never check these in
+libobjectbox-jni-*.dylib
+libobjectbox-jni-*.so
+libobjectbox-jni-*.dll
+
+# Claude Code session state — session locks, transcripts, scheduled-task metadata
+.claude/

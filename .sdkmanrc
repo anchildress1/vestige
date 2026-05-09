@@ -1,0 +1,7 @@
+# Pinned JDK for SDKMAN! users. Run `sdk env install` once on a fresh clone so the shell
+# matches the Gradle toolchain (foojay resolves the same version inside the build, but
+# JAVA_HOME drives keytool, the Kotlin daemon, and adb-launched processes).
+#
+# CI parity target per docs/adrs/ADR-001-stack-and-build-infra.md and scripts/doctor.sh:
+# JDK 25, Android SDK platform 35, Gradle wrapper 9.5.0.
+java=25.0.1-tem

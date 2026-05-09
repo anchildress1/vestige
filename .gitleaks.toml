@@ -1,0 +1,18 @@
+title = "vestige gitleaks config"
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Files allowed to contain false-positive secret-like strings."
+paths = [
+  "gradle/wrapper/gradle-wrapper.properties",
+]
+# SonarCloud projectKey is a public identifier (visible at sonarcloud.io/dashboard?id=...),
+# not a secret. The org.sonarqube Gradle plugin migration moved this value out of
+# sonar-project.properties into a sonar { } block in build.gradle.kts, so the prior
+# whole-file allowlist no longer applies.
+regexTarget = "match"
+regexes = [
+  '''sonar\.projectKey", "anchildress1_vestige"''',
+]

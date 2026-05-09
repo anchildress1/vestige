@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="https://repository-images.githubusercontent.com/1233196257/725f61a8-e9fc-49a6-b5d5-eb491ad1404b" alt="Vestige social banner" />
+</p>
+
 # Vestige
 
 On-device cognition tracker for ADHD-flavored adults. Anti-sycophant, behavioral, private.
@@ -142,7 +146,7 @@ Phase 1 splits `:app` into `:app + :core-model + :core-inference + :core-storage
 |---|---|---|
 | JDK 25 LTS (Temurin) | Gradle runtime + Kotlin toolchain | `brew install --cask temurin` |
 | Android SDK + `adb` | build + install on device | Android Studio, or `brew install --cask android-commandlinetools` |
-| System Gradle | one-time wrapper bootstrap | `brew install gradle` |
+| System Gradle (optional) | regenerating the wrapper jar (`make bootstrap-wrapper`); not needed for routine builds, since `gradle/wrapper/gradle-wrapper.jar` is committed | `brew install gradle` |
 | `lefthook` | git hooks | `brew install lefthook` |
 | `gitleaks` | secret scan | `brew install gitleaks` |
 | `actionlint` | workflow lint | `brew install actionlint` |
@@ -151,6 +155,7 @@ Phase 1 splits `:app` into `:app + :core-model + :core-inference + :core-storage
 | `gh` | repo ops | `brew install gh` |
 
 `ANDROID_HOME` must be set and `$ANDROID_HOME/platform-tools` must be on `PATH` so `adb` resolves. Gradle dependency verification is pinned in `gradle/verification-metadata.xml`; refresh it only when changing dependencies.
+SonarCloud analysis runs through the Gradle `sonar` task in CI rather than a standalone scanner config, because Android builds deserve one source of truth at a time.
 
 ### Build
 

@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Vestige</string>
+
+    <!-- Phase 1 dev-only mic permission strings. Phase 4 ships polished onboarding copy from ux-copy.md §"Mic permission". -->
+    <string name="mic_permission_request">Allow microphone</string>
+    <string name="mic_permission_granted">Mic permission granted.</string>
+    <string name="mic_permission_denied">Mic permission required to record. Settings → Permissions.</string>
+</resources>

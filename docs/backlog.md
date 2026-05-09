@@ -44,6 +44,7 @@ stt-N : conditional on stop-and-test outcome (see PRD §"Build philosophy: build
 | `calendar-health-correlation` | v2 | data | adds perms + integrations + new analytical surface; breaks v1 simplicity | v2 "data sources" expansion release |
 | `pattern-charts` | v1.5 | patterns | pure polish; needs charting infrastructure; v1 patterns are textual | post-submission v2 polish window |
 | `embeddings-fallback` | stt-E | memory | conditional: tag-only covers ~365-1000 entry scale | STT-E fails OR user data scale where tag-only weakens visibly |
+| `mic-perm-resume-recheck` | v1.5 | permissions | Phase 1 shell checks mic permission once at startup via `rememberSaveable`; revoking in Settings and returning leaves UI showing stale "granted" state. Fix is a `LifecycleEventEffect(ON_RESUME)` re-check, but Phase 4 replaces the shell entirely | Phase 4 onboarding UX ships — wire into the real permission gate there |
 
 ## Detail blocks
 

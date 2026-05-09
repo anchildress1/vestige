@@ -1,0 +1,167 @@
+{
+  "_note1": "KEEP THIS FILE! Check it into a version control system (VCS) like git.",
+  "_note2": "ObjectBox manages crucial IDs for your object model. See docs for details.",
+  "_note3": "If you have VCS merge conflicts, you must resolve them according to ObjectBox docs.",
+  "entities": [
+    {
+      "id": "1:8495295597095795304",
+      "lastPropertyId": "13:3421602807125172125",
+      "name": "EntryEntity",
+      "properties": [
+        {
+          "id": "1:1669407613626112133",
+          "name": "id",
+          "type": 6,
+          "flags": 1
+        },
+        {
+          "id": "2:5549610685975464875",
+          "name": "markdownFilename",
+          "indexId": "1:985184430402227483",
+          "type": 9,
+          "flags": 2048
+        },
+        {
+          "id": "3:5221822808588176591",
+          "name": "entryText",
+          "type": 9
+        },
+        {
+          "id": "4:2517552071371831797",
+          "name": "timestampEpochMs",
+          "type": 6
+        },
+        {
+          "id": "5:1388967748457498499",
+          "name": "templateLabel",
+          "type": 9
+        },
+        {
+          "id": "6:4871547513666557747",
+          "name": "energyDescriptor",
+          "type": 9
+        },
+        {
+          "id": "7:3241086642826468546",
+          "name": "recurrenceLink",
+          "type": 9
+        },
+        {
+          "id": "8:8079727537542977060",
+          "name": "statedCommitmentJson",
+          "type": 9
+        },
+        {
+          "id": "9:4045501342227900177",
+          "name": "entryObservationsJson",
+          "type": 9
+        },
+        {
+          "id": "10:7828743535515341699",
+          "name": "confidenceJson",
+          "type": 9
+        },
+        {
+          "id": "11:6655032420221738462",
+          "name": "extractionStatus",
+          "type": 9
+        },
+        {
+          "id": "12:1976415790413423979",
+          "name": "attemptCount",
+          "type": 5
+        },
+        {
+          "id": "13:3421602807125172125",
+          "name": "lastError",
+          "type": 9
+        }
+      ],
+      "relations": [
+        {
+          "id": "1:1893507337631124940",
+          "name": "tags",
+          "targetId": "3:430272669255310156"
+        }
+      ]
+    },
+    {
+      "id": "2:4677060229249736497",
+      "lastPropertyId": "6:6002941357885825737",
+      "name": "PatternEntity",
+      "properties": [
+        {
+          "id": "1:7432141310755273954",
+          "name": "id",
+          "type": 6,
+          "flags": 1
+        },
+        {
+          "id": "2:8698818706334475088",
+          "name": "stableId",
+          "indexId": "2:3992624674876859483",
+          "type": 9,
+          "flags": 2048
+        },
+        {
+          "id": "3:4604130542972569887",
+          "name": "type",
+          "type": 9
+        },
+        {
+          "id": "4:7626472666879732483",
+          "name": "entryCount",
+          "type": 5
+        },
+        {
+          "id": "5:1012377897072890243",
+          "name": "lifecycleState",
+          "type": 9
+        },
+        {
+          "id": "6:6002941357885825737",
+          "name": "lastObservedEpochMs",
+          "type": 6
+        }
+      ],
+      "relations": []
+    },
+    {
+      "id": "3:430272669255310156",
+      "lastPropertyId": "3:7130668833912445323",
+      "name": "TagEntity",
+      "properties": [
+        {
+          "id": "1:2560675055611519993",
+          "name": "id",
+          "type": 6,
+          "flags": 1
+        },
+        {
+          "id": "2:4204124419292330634",
+          "name": "name",
+          "indexId": "3:8599132434491255052",
+          "type": 9,
+          "flags": 2080
+        },
+        {
+          "id": "3:7130668833912445323",
+          "name": "entryCount",
+          "type": 5
+        }
+      ],
+      "relations": []
+    }
+  ],
+  "lastEntityId": "3:430272669255310156",
+  "lastIndexId": "3:8599132434491255052",
+  "lastRelationId": "1:1893507337631124940",
+  "lastSequenceId": "0:0",
+  "modelVersion": 5,
+  "modelVersionParserMinimum": 5,
+  "retiredEntityUids": [],
+  "retiredIndexUids": [],
+  "retiredPropertyUids": [],
+  "retiredRelationUids": [],
+  "version": 1
+}

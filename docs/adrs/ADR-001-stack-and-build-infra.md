@@ -70,6 +70,8 @@ If the bug recurs, leave the flag off but add `org.gradle.configuration-cache.pr
 
 **Action:** time-boxed verification task in Phase 1. Outcome recorded inline in this file.
 
+**Verification result (2026-05-09, ObjectBox plugin 5.4.2, Gradle 9.1.0):** the bug recurs. `:core-storage:objectboxPrepareBuild` (type `io.objectbox.gradle.PrepareTask`) still serializes a `Project` instance, which the configuration cache rejects. Build completes only because Gradle stores the entry "with problems" rather than failing — turning it on as-is would mask real cache misses behind those two known violations. Flag stays `org.gradle.configuration-cache=false` with `org.gradle.configuration-cache.problems=warn` in `gradle.properties` so other regressions remain visible. Re-evaluate on the next ObjectBox plugin bump.
+
 ### 4. ObjectBox annotation processing — Kapt, not KSP
 
 Earlier drafts considered a Phase-1 KSP2 smoke test against the ObjectBox processor. Do not spend the build window there. ObjectBox runs on Kapt for v1.
@@ -223,6 +225,31 @@ STT-A says this must work. The 30s constraint is a runtime cap — `AudioRecord`
 
 **Validation:** STT-A measures whether mid-sentence chunk boundaries lose meaning. If they do, the fallback is overlapping windows (last 1.5s of chunk N replayed at start of chunk N+1) with deduplication on the transcript.
 
+**Story 1.3 text-only smoke test result (2026-05-09, S24 Ultra):**
+
+| Field | Value |
+|---|---|
+| Backend | CPU |
+| Model load | 11,305 ms |
+| Inference (32-char prompt → 2-char reply) | 3,261 ms |
+| SHA-256 pinned | `0b2a8980ce155fd97673d8e820b4d29d9c7d99b8fa6806f425d969b145bd52e0` |
+
+**STT-A device-test record (Phase 1, on-device, human-run):** the harness in `:core-inference` (`SttAProbe`) and the instrumented test at `:app/src/androidTest/.../SttAAudioPlumbingTest.kt` exercise three handoffs against Gemma 4 E4B on the S24 Ultra: `Content.AudioBytes(float32-LE bytes)`, `Content.AudioFile(<existing WAV>)`, and `transcribeViaTempWav` (PCM_FLOAT WAV written + handed off + deleted in-call). After running, fill in below. If neither byte-pack works and the file path is the only viable handoff, the temp-WAV lifecycle is the canonical path for v1.
+
+| Field | Value |
+|---|---|
+| Device | S24 Ultra (12 GB / SD8 Gen 3), SM-S928U, Android 16 |
+| LiteRT-LM version | 0.11.0 |
+| Date run | 2026-05-09 |
+| AudioBytes float32-LE result | **FAILED** — `MA_INVALID_DATA (-10)` from miniaudio; raw float32-LE bytes are not a supported audio container |
+| AudioFile WAV (IEEE_FLOAT) result | **FAILED** — same `MA_INVALID_DATA`; LiteRT-LM 0.11.0 miniaudio rejects `WAVE_FORMAT_IEEE_FLOAT` (format code 3) |
+| AudioFile WAV (PCM_S16LE) result | **COHERENT** — produced a coherent transcription visually matching the spoken content |
+| Working path chosen | `Content.AudioFile(path)` with a PCM_S16LE (format code 1) WAV at 16 kHz mono |
+| End-to-end latency, 24 s clip (sendMessageContents) | ~19,400–20,800 ms on CPU backend |
+| Backend selected | CPU |
+
+**Consequence:** `WavWriter` updated to emit PCM_S16LE (format 1, 16-bit int, 16 kHz) instead of IEEE_FLOAT. Float32 samples from `AudioCapture` are scaled to `[-32767, 32767]` on write. `Content.AudioBytes` is dead for this SDK version — the only live path is `Content.AudioFile` via a temp PCM_S16LE WAV.
+
 ### Q5. Distribution & signing
 
 GitHub Releases sideload means a single signing key, stored somewhere. **Not** in the repo. **Not** in plain text on the dev machine.
@@ -253,7 +280,7 @@ The 3.66 GB E4B model is the largest single asset in the build. How it ships aff
 
 `PRD.md` §P0 promises zero outbound network calls during normal operation. The model download is the sole network event. Enforcement mechanism beyond a code review:
 
-- **`network_security_config.xml`** with `cleartextTrafficPermitted=false` and a narrow download allowlist. Hugging Face model downloads may redirect through LFS/Xet artifact hosts, so the Phase-1 download spike must record the exact redirect chain for the pinned artifact before the network allowlist is locked. Do not use a single `huggingface.co` allowlist and then discover the real download host in front of a judge. Very cinematic, wrong genre.
+- **`network_security_config.xml`** with `cleartextTrafficPermitted=false` and a narrow download allowlist. Hugging Face model downloads may redirect through LFS/Xet artifact hosts, so the Phase-1 download spike must record the exact redirect chain for the pinned artifact before the network allowlist is locked. **Probe result (2026-05-09):** `huggingface.co` resolver → `cas-bridge.xethub.hf.co`, `Content-Length=3659530240`, SHA-256 `0b2a8980ce155fd97673d8e820b4d29d9c7d99b8fa6806f425d969b145bd52e0`. Do not use a single `huggingface.co` allowlist and then discover the real download host in front of a judge. Very cinematic, wrong genre.
 - **`NetworkGate` abstraction** — a single small interface in `:core-inference` (or its own `:core-net` module if Phase 1 wants the boundary) that owns the OkHttp `Dispatcher` and any other outbound primitives. Two states: `OPEN` (only valid during the model-download flow) and `SEALED` (default, asserts on any outbound call). `SEALED` is set the moment the download completes; the rest of the process runs against the sealed gate. All HTTP clients in the app obtain their executor from `NetworkGate`.
 
   **v1 minimum acceptance** (do not let this become a side quest):

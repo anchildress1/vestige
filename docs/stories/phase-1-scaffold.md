@@ -135,11 +135,11 @@ If STT-A fails after the time-box: stop. Write a superseding ADR. Do not proceed
 **As** the AI implementor, **I need** a markdown read/write contract for entries that mirrors the ObjectBox row, **so that** the privacy claim ("export everything as markdown" / "delete all data") has a real implementation path and the v1.5 hand-edit flow stays cheap.
 
 **Done when:**
-- [ ] `:core-storage` exposes a `MarkdownEntryStore` that writes one file per entry to internal storage with the deterministic filename format from `architecture-brief.md` §"Markdown Entry Shape" — `{filesDir}/entries/{ISO8601-utc-second}--{slug}.md`, with kebab-case slug ≤32 chars derived from the first 5–6 content words after stop-word strip, collision suffixes `-2` / `-3`. Filenames are stable for the life of the entry.
-- [ ] Markdown front-matter carries the structured fields from the ObjectBox `Entry` (template_label, tags, energy_descriptor, recurrence_link, stated_commitment, confidence per field, timestamp).
-- [ ] Markdown body carries the `entry_text` plus any `entry_observations`.
-- [ ] Smoke test: writing a row to ObjectBox + the matching markdown file, then reading both back, produces equivalent objects.
-- [ ] Audio is not written. Per `AGENTS.md` guardrail 11, only transcription text persists.
+- [x] `:core-storage` exposes a `MarkdownEntryStore` that writes one file per entry to internal storage with the deterministic filename format from `architecture-brief.md` §"Markdown Entry Shape" — `{filesDir}/entries/{ISO8601-utc-second}--{slug}.md`, with kebab-case slug ≤32 chars derived from the first 5–6 content words after stop-word strip, collision suffixes `-2` / `-3`. Filenames are stable for the life of the entry.
+- [x] Markdown front-matter carries the structured fields from the ObjectBox `Entry` (template_label, tags, energy_descriptor, recurrence_link, stated_commitment, confidence per field, timestamp, entry_observations). _Observations live in frontmatter, not body — aligned with `architecture-brief.md` §"Field placement rules" which is the data-shape canonical (story originally said body; corrected here)._
+- [x] Markdown body carries the `entry_text` exactly as captured.
+- [x] Smoke test: writing a row to ObjectBox + the matching markdown file, then reading both back, produces equivalent objects.
+- [x] Audio is not written. Per `AGENTS.md` guardrail 11, only transcription text persists.
 
 **Notes / risks:** Treat the markdown file as the source of truth and ObjectBox as the index. If they diverge, the markdown wins. This story does not implement export-to-zip — that's a Phase 4 settings affordance.
 

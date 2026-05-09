@@ -140,6 +140,33 @@ class MarkdownEntryStoreTest {
     }
 
     @Test
+    fun `read rejects a non-existent file`() {
+        val nonExistent = File(markdownDir, "does-not-exist.md")
+        val raised = runCatching { store.read(nonExistent) }
+        assertTrue("read must throw for a non-existent file", raised.isFailure)
+        assertTrue(
+            "Expected IllegalArgumentException, got ${raised.exceptionOrNull()?.javaClass?.name}",
+            raised.exceptionOrNull() is IllegalArgumentException,
+        )
+    }
+
+    @Test
+    fun `readTagNames rejects a non-existent file`() {
+        val nonExistent = File(markdownDir, "does-not-exist.md")
+        val raised = runCatching { store.readTagNames(nonExistent) }
+        assertTrue("readTagNames must throw for a non-existent file", raised.isFailure)
+        assertTrue(
+            "Expected IllegalArgumentException, got ${raised.exceptionOrNull()?.javaClass?.name}",
+            raised.exceptionOrNull() is IllegalArgumentException,
+        )
+    }
+
+    @Test
+    fun `listAll returns empty list when entries directory has not been created yet`() {
+        assertEquals(emptyList<File>(), store.listAll())
+    }
+
+    @Test
     fun `listAll returns sorted markdown files only`() {
         val entryBox = boxStore.boxFor<EntryEntity>()
         val a =

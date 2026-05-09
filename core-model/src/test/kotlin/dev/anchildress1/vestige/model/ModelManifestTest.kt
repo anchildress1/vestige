@@ -20,11 +20,13 @@ class ModelManifestTest {
     }
 
     @Test
-    fun `sha256IsResolved is false until the STT-A probe fills it in`() {
+    fun `sha256IsResolved is true after STT-A download probe resolved the hash`() {
         val manifest = ModelManifest.loadDefault()
-        // Phase 1 ships the placeholder; STT-A's download probe replaces it.
-        assertFalse(manifest.sha256IsResolved)
-        assertEquals(ModelManifest.PENDING_HASH_TOKEN, manifest.sha256)
+        // STT-A completed (Story 1.10) and pinned the canonical SHA-256 into manifest.properties.
+        assertTrue(manifest.sha256IsResolved)
+        // 64 hex chars — SHA-256 output is 32 bytes = 64 lowercase hex digits.
+        assertEquals(64, manifest.sha256.length)
+        assertTrue(manifest.sha256.all { it in '0'..'9' || it in 'a'..'f' })
     }
 
     @Test

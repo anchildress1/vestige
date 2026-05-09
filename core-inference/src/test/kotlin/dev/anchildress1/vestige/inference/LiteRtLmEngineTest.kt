@@ -5,6 +5,7 @@ import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertThrows
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.assertDoesNotThrow
 
 /**
  * Lifecycle-invariant tests for [LiteRtLmEngine]. The pre-state checks fail before any SDK call,
@@ -58,6 +59,23 @@ class LiteRtLmEngineTest {
     fun `Npu backend requires native library dir`() {
         val choice = BackendChoice.Npu(nativeLibraryDir = "/data/app/native")
         assertEquals("/data/app/native", choice.nativeLibraryDir)
+    }
+
+    @Test
+    fun `BackendChoice Gpu can be constructed`() {
+        assertDoesNotThrow { BackendChoice.Gpu }
+    }
+
+    @Test
+    fun `BackendChoice Cpu can be constructed`() {
+        assertDoesNotThrow { BackendChoice.Cpu }
+    }
+
+    @Test
+    fun `BackendChoice sealed subtypes are distinct`() {
+        assertTrue(BackendChoice.Cpu != BackendChoice.Gpu)
+        assertTrue(BackendChoice.Cpu != BackendChoice.Npu(nativeLibraryDir = "/lib"))
+        assertTrue(BackendChoice.Gpu != BackendChoice.Npu(nativeLibraryDir = "/lib"))
     }
 
     private companion object {

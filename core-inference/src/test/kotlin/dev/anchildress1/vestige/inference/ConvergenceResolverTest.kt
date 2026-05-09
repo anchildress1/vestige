@@ -6,6 +6,7 @@ import dev.anchildress1.vestige.model.LensExtraction
 import dev.anchildress1.vestige.model.ResolvedExtraction
 import dev.anchildress1.vestige.model.ResolvedField
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertThrows
 import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 
@@ -104,5 +105,11 @@ class ConvergenceResolverTest {
         //   inferential.fields["template_label"]= "aftermath"
         //   skeptical.fields["template_label"]  = "audit"
         // Expected: ResolvedField(value="aftermath", verdict=CANONICAL, flags=[])
+    }
+
+    @Test
+    fun `Phase2NotImplementedConvergenceResolver throws NotImplementedError on resolve`() {
+        val resolver = Phase2NotImplementedConvergenceResolver()
+        assertThrows(NotImplementedError::class.java) { resolver.resolve(emptyList()) }
     }
 }

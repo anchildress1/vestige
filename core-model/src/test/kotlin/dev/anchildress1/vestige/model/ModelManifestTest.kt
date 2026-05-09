@@ -65,6 +65,49 @@ class ModelManifestTest {
     }
 
     @Test
+    fun `fromProperties rejects whitespace-only required values`() {
+        // requireString uses isNotBlank — `   ` reads as present-but-empty and must surface as
+        // a missing-key error, not a silent default.
+        val props = Properties().apply {
+            setProperty("schema_version", "1")
+            setProperty("artifact_repo", "   ")
+            setProperty("filename", "x.bin")
+            setProperty("download_url", "https://example.com/x.bin")
+            setProperty("expected_byte_size", "1")
+            setProperty("sha256", "abc")
+            setProperty("allowed_hosts", "example.com")
+        }
+        val ex = assertThrows(IllegalStateException::class.java) { ModelManifest.fromProperties(props) }
+        assertTrue(ex.message?.contains("artifact_repo") == true) {
+            "Error must identify the offending key (artifact_repo): ${ex.message}"
+        }
+    }
+
+    @Test
+    fun `fromProperties rejects non-numeric schema version`() {
+        val props = Properties().apply {
+            setProperty("schema_version", "one")
+            setProperty("artifact_repo", "x")
+            setProperty("filename", "x.bin")
+            setProperty("download_url", "https://example.com/x.bin")
+            setProperty("expected_byte_size", "1")
+            setProperty("sha256", "abc")
+            setProperty("allowed_hosts", "example.com")
+        }
+        assertThrows(IllegalStateException::class.java) { ModelManifest.fromProperties(props) }
+    }
+
+    @Test
+    fun `loadFromResource throws when the resource path does not exist`() {
+        val ex = assertThrows(IllegalStateException::class.java) {
+            ModelManifest.loadFromResource("/model/does-not-exist.properties")
+        }
+        assertTrue(ex.message?.contains("does-not-exist") == true) {
+            "Error must echo the missing path: ${ex.message}"
+        }
+    }
+
+    @Test
     fun `allowed_hosts splits and trims comma-separated entries`() {
         val props = Properties().apply {
             setProperty("schema_version", "1")

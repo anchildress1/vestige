@@ -116,7 +116,7 @@ Produce the four deliverables the submission requires: the **APK** (signed relea
 - [ ] **Privacy claim**: "Your voice never leaves the device" + the tcpdump-clip reference.
 - [ ] **Known limitations**: what didn't ship and why. Honest.
 - [ ] **Acknowledgments**: Anthropic Claude for the spec/design pairing (per the dev.to challenge being a hackathon), Google for Gemma 4 and LiteRT-LM, ObjectBox, etc.
-- [ ] **License**: MIT or Apache 2.0 (pick one — Apache 2.0 matches Gemma 4's license and is the safer default for "this app uses Gemma" attribution).
+- [ ] **License**: link to repo `LICENSE` (Polyform Shield 1.0.0 + Supplemental Terms — source-available, non-commercial). Note that Gemma 4 redistribution obligations are separate and apply to the model artifact, not Vestige's host-app license choice.
 - [ ] Screenshots from the polished UX in Phase 4: at minimum the capture screen, a pattern detail, and the local model status surface.
 
 **Notes / risks:** The repo README is the lasting artifact. The dev.to post has a publish date and falls off the front page in days; the GitHub README is what people find six months from now. Make it a real README, not a "submission landing page."

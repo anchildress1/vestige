@@ -55,9 +55,9 @@ Five kinds. Each emits one `Pattern` row when its threshold trips. Each is indep
 | `commitment_recurrence` | `("commitment", topic_or_person)` | ≥3 entries with `stated_commitment.topic_or_person` matching | "You've logged commitments about her in five entries. Last on May 2." |
 | `vocab_frequency` | `("vocab", token)` | A single normalized token appears in ≥N entries with ≥2 distinct contexts (N=4 in v1) | "'Tired' is doing six different jobs this month." |
 
-**Why these five.** They map directly to the demo beats already promised in `concept-locked.md` §Analysis and the `ux-copy.md` Pattern Detail / Roast examples. Anything beyond these is `../../backlog.md` territory.
+**Why these five.** They map directly to the demo beats already promised in `concept-locked.md` §Analysis and the `ux-copy.md` Pattern Detail / Roast examples. Anything beyond these is `../backlog.md` territory.
 
-**Why tag pairs and not tag triples or arbitrary subsets.** Pair enumeration is `O(t²)` per entry where `t` is tag count; triples are `O(t³)` and the resulting patterns rarely earn their visual real estate in a 5-min demo. Triples are a `../../backlog.md` candidate.
+**Why tag pairs and not tag triples or arbitrary subsets.** Pair enumeration is `O(t²)` per entry where `t` is tag count; triples are `O(t³)` and the resulting patterns rarely earn their visual real estate in a 5-min demo. Triples are a `../backlog.md` candidate.
 
 **Why a 90-day rolling window for `template_recurrence` and `tag_pair_co_occurrence` but 30-day for `time_of_day_cluster`.** Behavioral clusters drift. Witness saying "fourth Aftermath" feels honest when it's "fourth in twelve recent entries"; "fourth Aftermath in your entire history of 200 entries" reads as nagging. Goblin-hours specifically is meant to catch *current* sleep patterns, hence the tighter window.
 
@@ -138,7 +138,7 @@ Run on every new entry, not only on detection-trigger entries. Cheap; bounds ext
 - `commitment_recurrence`: one signature per distinct topic_or_person seen. ~10–30.
 - `vocab_frequency`: token frequency table over `entry.tags ∪ entry_text` stems.
 
-All five together run in ~tens of milliseconds at v1 scale on the reference S24 Ultra. No incremental aggregates needed; full recompute every 10 entries is fine. Pre-aggregating is a `../../backlog.md` candidate when entries cross 1000.
+All five together run in ~tens of milliseconds at v1 scale on the reference S24 Ultra. No incremental aggregates needed; full recompute every 10 entries is fine. Pre-aggregating is a `../backlog.md` candidate when entries cross 1000.
 
 ---
 
@@ -187,7 +187,7 @@ dismissed        →  (terminal)        no transition out in v1
 resolved         →  (terminal)        no transition out in v1; new evidence accumulates silently per "UPDATE silently" rule
 ```
 
-**Why `dismissed` and `resolved` are terminal in v1.** Adding "un-dismiss" or "auto-reopen on stronger evidence" doubles the state-machine surface and is invisible in the demo. The user has agency to act on a pattern; if they kill it, they killed it. Reopening is a `../../backlog.md` candidate (similar to `reeval-auto-promote`).
+**Why `dismissed` and `resolved` are terminal in v1.** Adding "un-dismiss" or "auto-reopen on stronger evidence" doubles the state-machine surface and is invisible in the demo. The user has agency to act on a pattern; if they kill it, they killed it. Reopening is a `../backlog.md` candidate (similar to `reeval-auto-promote`).
 
 **Auto-promotion of snoozed → active.** Detection step 6 handles this. A user who snoozed Tuesday Meetings 7 days ago will see it return on the next detection run after the snooze expires *if the pattern still has fresh supporting entries*. If the pattern has decayed (no new supporting entries in the last 30 days), it stays snoozed silently — re-surfacing a stale pattern is more annoying than helpful.
 
@@ -236,7 +236,7 @@ Per ADR-002, Re-eval re-runs the 3-lens pipeline on a stored entry and may chang
 | Team familiarity | Plain Kotlin; no new deps |
 
 **Pros:** Sourced by construction. Idempotent across re-eval and cold-start sweep. Easy to test (`ADR-002` Q4-style fixture suite extends naturally).
-**Cons:** Bounded primitives. Doesn't catch patterns the five primitives can't express. (Mitigation: that's `../../backlog.md`.)
+**Cons:** Bounded primitives. Doesn't catch patterns the five primitives can't express. (Mitigation: that's `../backlog.md`.)
 
 ### Option B: Embedding-cluster-based pattern detection
 
@@ -296,7 +296,7 @@ The other significant trade-off is **mark-resolved sticky vs. auto-reopen**. Sti
 **Revisit when:**
 - Entry counts cross ~1000 and full-recompute every 10 entries starts costing noticeable battery → introduce incremental aggregates.
 - A v1.5 demo scenario actually needs tag triples or learned-cluster patterns → write a successor ADR; don't patch this one.
-- User feedback shows mark-resolved is too sticky → add `auto-reopen-on-fresh-evidence` semantics (already noted in `../../backlog.md`?).
+- User feedback shows mark-resolved is too sticky → add `auto-reopen-on-fresh-evidence` semantics (already noted in `../backlog.md`?).
 
 ---
 

@@ -37,6 +37,8 @@ The positioning is deliberate: cognition tracker, not journal app. Templates (`A
 
 Scaffold. Phase 1 implementation begins after spec sign-off; risk is managed inline via five stop-and-test points (STT-A–E) embedded in phases 1–3. Full README pass lands in Phase 6 alongside the demo video and dev.to post — see [`docs/PRD.md`](docs/PRD.md) §Timeline for phase-by-phase scope.
 
+> **Branch caveat:** Tech Stack version pins, Project Structure tree, Getting Started commands, and Run-on-device steps below describe the **post-merge** main state. Android scaffold infra (Makefile, `gradle/`, `app/`, lefthook config, release-please config) lives on `chore/scaffold` and merges to main separately. Links to those paths resolve only after that branch lands. This branch (`docs/foundation`) ships the canonical docs; the scaffold ships its own infra.
+
 ---
 
 ## Features
@@ -250,7 +252,7 @@ Contributors: do not introduce dependencies that pull in Firebase, Crashlytics, 
 
 PRs are not accepted during the challenge window (until 2026-05-24). Issues are welcome — use the GitHub issue tracker. Post-submission, see [`AGENTS.md`](AGENTS.md) and [`backlog.md`](docs/backlog.md) for the contribution surface.
 
-Branches and commits follow [`AGENTS.md` §COMMITS](AGENTS.md): atomic, signed AI footer, Conventional Commits, never on `main`.
+Branches and commits follow [`AGENTS.md`](AGENTS.md) and the user's repo conventions: atomic, signed AI footer (`generated-by: claude opus 4.7 <noreply@anthropic.com>`), Conventional Commits, never on `main`.
 
 ---
 

@@ -10,7 +10,7 @@ This folder is the canonical source-of-truth for the v1 build. The CLI agent rea
 
 1. **`concept-locked.md`** — full product spec. Read first.
 2. **`PRD.md`** — formal P0/P1/P2 requirements + acceptance criteria + phase schedule + the five stop-and-test points (build philosophy section). Read second.
-3. **`AGENTS.md`** — implementor guardrails and non-negotiables. Read before changing anything.
+3. **[`../AGENTS.md`](../AGENTS.md)** — implementor guardrails and non-negotiables. Lives at repo root. Read before changing anything.
 4. **`adrs/`** — architecture decision records. ADR-001 (stack & build infra), ADR-002 (multi-lens extraction pattern), ADR-003 (pattern detection algorithm & persistence). Read before Phase 1.
 5. **`architecture-brief.md`** — module ownership, data flow, and Phase-1 build sequence.
 6. **`stories/`** — phased build stories. Drives what to work on right now.
@@ -76,11 +76,12 @@ Quick reference:
 
 ---
 
-## What is still being written (not yet present at root)
+## What is still being written
 
 - `pre-mortem.md` — risks and mitigations.
 - `demo-storyboard.md` — exact 90s pitch + 5-min walkthrough beats. Required by Phase 5. Same name used in PRD Open Questions; do not create a duplicate doc.
-- Phase story files — written as each phase begins (`phase-1-scaffold.md`, etc.). Build directly per PRD §"Build philosophy: build first, test at failure zones"; there is no Phase-0 validation phase.
+
+Phase story files (`phase-1-scaffold.md` through `phase-7-buffer.md`) are present in `stories/` — that's the active work queue. There is no Phase-0 validation phase; build directly per PRD §"Build philosophy: build first, test at failure zones".
 
 **Naming/ownership rules to prevent duplicates:**
 - Font/type system decisions land in `design-guidelines.md`, never in a new doc.

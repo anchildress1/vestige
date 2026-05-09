@@ -142,7 +142,7 @@ Each extracted schema field has its own equality predicate. The locked spec didn
 Per field, applied independently:
 
 1. **≥2 of 3 lenses produce equal value (per the predicate above)** → `canonical`, value = the agreed value (for `tags`: the intersection).
-2. **Only one lens populates the field, others null** → `candidate`, with the source lens recorded. Pattern engine ignores candidates until promoted by re-eval or later corroboration (auto-promotion deferred to v1.5 per `../../backlog.md`).
+2. **Only one lens populates the field, others null** → `candidate`, with the source lens recorded. Pattern engine ignores candidates until promoted by re-eval or later corroboration (auto-promotion deferred to v1.5 per `../backlog.md`).
 3. **All three produce values, none agree** → `ambiguous`. Field saved null with a debug note listing the three values.
 4. **Skeptical flags a contradiction even when Literal and Inferential agree** → `canonical_with_conflict`. Saved with the agreed value AND a `conflicts` blob containing Skeptical's flag. UI surfaces the marker on the entry detail's Reading section.
 

@@ -1,6 +1,6 @@
 # Stories
 
-Phased build stories that drive the CLI's per-phase work. Each story references the spec docs at the project root for context.
+Phased build stories that drive the CLI's per-phase work. Each story references the spec docs under `docs/` (and `../../AGENTS.md` at repo root) for context.
 
 These are *build-driving* stories, not user-experience-narrative stories (those live in `PRD.md`). They tell the CLI what to do next, in what order, with clear acceptance criteria.
 
@@ -18,7 +18,7 @@ Active layout (all seven phase files exist):
 - `phase-6-submission.md` — final signed release APK, video edit, dev.to post, README, GitHub release, `tcpdump` privacy proof clip
 - `phase-7-buffer.md` — bug fixes, P1 polish if scope allows, submit
 
-**Note:** there is no `phase-0-validation.md` in the active story set. The previous Phase 0 validation phase was retired in favor of inline stop-and-test points (STT-A through STT-E) embedded in phases 1–3. See `PRD.md` §"Build philosophy: build first, test at failure zones" for the full table. The legacy `phase-0-validation.md` file (if still on disk) is kept for reference only and should not be treated as a phase to execute.
+**Note:** there is no `phase-0-validation.md`. The Phase 0 validation phase was retired in favor of inline stop-and-test points (STT-A through STT-E) embedded in phases 1–3. See `PRD.md` §"Build philosophy: build first, test at failure zones" for the full table.
 
 ## Story format (suggested)
 

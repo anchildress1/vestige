@@ -1,6 +1,18 @@
 # Architecture Brief — Vestige v1
 
-This is the implementation map for Phase 1. Product behavior lives in `concept-locked.md` and `PRD.md`; this doc keeps module ownership and build order from leaking all over the carpet.
+Implementation map for the v1 build, sequenced for Phase 1 entry. Product behavior lives in `concept-locked.md` and `PRD.md`; the per-phase work queues live in `stories/phase-{1..7}-*.md`. This doc keeps module ownership, data flow, and the schema shape from leaking all over the carpet.
+
+**Build philosophy:** there is no Phase 0 validation phase. We build directly. Five stop-and-test points are embedded inline in phases 1–3 — see `PRD.md` §"Build philosophy: build first, test at failure zones" for the canonical table. Brief reference:
+
+| STT | Lives in | What's tested | Failure mode |
+|---|---|---|---|
+| **STT-A** | Phase 1 audio pipeline | Audio bytes round-trip through Gemma 4 via LiteRT-LM | Existential — replan |
+| **STT-B** | Phase 2 capture loop | Multi-turn reliability on E4B | Drop to single-turn |
+| **STT-C** | Phase 2 extraction | Tag stability across equivalent dumps | Tighten prompts; accept noise as last resort |
+| **STT-D** | Phase 2 multi-lens | 3-lens convergence differs sometimes | Drop multi-lens to single-pass |
+| **STT-E** | Phase 3 retrieval | EmbeddingGemma vs tag-only | Drop EmbeddingGemma to v1.5 |
+
+This brief assumes those gates exist and the architecture is built to absorb their failure modes (e.g., the Phase-1 schema does not include a vector field; the vector field lands in Phase 3 only if STT-E passes).
 
 ## Module Split
 
@@ -23,7 +35,7 @@ No extra modules in v1 unless they remove a real compile or ownership problem. D
 | `ModelHandle` | process-scoped, lazy after artifact verified | loaded LiteRT-LM engine and conversation factory |
 | `NetworkGate` | process-scoped | sole HTTP/download path; `OPEN` only during model download, `SEALED` otherwise |
 | `EntryStore` | process-scoped | ObjectBox entry/tag writes plus markdown source-of-truth |
-| `PatternStore` | process-scoped | ObjectBox pattern persistence; lifecycle states (`active` / `dismissed` / `snoozed` / `resolved` / `below_threshold`), `pattern_id` content-hashing, supporting-entry references, global callout cooldown — all per `adrs/ADR-003-pattern-detection-and-persistence.md` |
+| `PatternStore` | process-scoped | ObjectBox pattern persistence, lifecycle state machine, and pattern detection algorithm per `adrs/ADR-003-pattern-detection-and-persistence.md` |
 | `RetrievalRepo` | process-scoped | keyword + tag + recency retrieval; vector only if STT-E passes |
 | `InferenceCoordinator` | process-scoped | foreground call, background extraction scheduling, prompt composition, resolver |
 | `SessionState` | active session | last turns, current persona override, chunk counter |
@@ -140,14 +152,19 @@ Top-level integer. v1 is `schema_version: 1`. Bump on any breaking frontmatter c
 
 ## Phase-1 Build Sequence
 
-1. Create Gradle scaffold and modules.
-2. Add `:core-model` domain types.
-3. Add ObjectBox + markdown storage skeleton.
-4. Add `ModelArtifactStore` and model manifest shape.
-5. Add `NetworkGate` and network security config.
-6. Add LiteRT-LM engine smoke test.
-7. Add audio normalization utility and STT-A API probe harness.
-8. Add convergence resolver tests.
-9. Build and install signed dummy release APK on the S24 Ultra.
+The granular work queue lives in `stories/phase-1-scaffold.md`. This list is the architectural ordering — what gets stood up before what — not the full story breakdown.
 
-Stop after each step if the premise breaks. Momentum is good; sprinting confidently into a wall is just cardio.
+1. Create Gradle scaffold and modules. *(Story 1.1, 1.2)*
+2. Add `:core-model` domain types. *(part of Story 1.1)*
+3. Add ObjectBox + markdown storage skeleton — no vector field. *(Story 1.6, 1.7)*
+4. Add `ModelArtifactStore` and model manifest shape. *(Story 1.9)*
+5. Add `NetworkGate` and network security config. *(Story 1.10)*
+6. Add LiteRT-LM engine smoke test (text-only). *(Story 1.3)*
+7. Add audio normalization utility and STT-A API probe harness. *(Story 1.4)*
+8. **🛑 STT-A — audio plumbing test on the reference device.** *(Story 1.5, existential)*
+9. Add persona prompt scaffold (tone-only, three personas). *(Story 1.8)*
+10. Add convergence resolver tests (scaffold only — Phase 2 implements). *(Story 1.12)*
+11. Build and install signed dummy release APK on the S24 Ultra. *(Story 1.11)*
+
+STT-A is the only existential gate inside Phase 1. If it fails after a time-boxed debugging window, stop and replan rather than continue building. Stop after any other step if the premise breaks too — momentum is good; sprinting confidently into a wall is just cardio.
+

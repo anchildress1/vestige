@@ -8,7 +8,7 @@ These are *build-driving* stories, not user-experience-narrative stories (those 
 
 `phase-{N}-{short-description}.md` — one file per phase, optionally split if a phase is large.
 
-Current/planned layout:
+Active layout (all seven phase files exist):
 
 - `phase-1-scaffold.md` — four-module split per ADR-001 Q1, LiteRT-LM SDK integration, audio pipeline (≤30s + >30s chunking per ADR-001 Q4), **STT-A audio plumbing test (existential)**, ObjectBox schema including `extraction_status` / `attempt_count` / `last_error` (ADR-001 Q3), `ModelArtifactStore` + SHA-256 verification (ADR-001 Q6), `NetworkGate` (ADR-001 Q7), signed dummy release APK (ADR-001 Q5)
 - `phase-2-core-loop.md` — capture loop end-to-end, multi-turn session state, foreground extraction, prompt composer + 3-lens resolver per ADR-002, **STT-B multi-turn reliability test, STT-C tag consistency test, STT-D 3-lens convergence test**
@@ -18,7 +18,7 @@ Current/planned layout:
 - `phase-6-submission.md` — final signed release APK, video edit, dev.to post, README, GitHub release, `tcpdump` privacy proof clip
 - `phase-7-buffer.md` — bug fixes, P1 polish if scope allows, submit
 
-**Note:** there is no `phase-0-validation.md`. The Phase-0 validation phase was retired in favor of inline stop-and-test points (STT-A through STT-E) embedded in phases 1–3. See `PRD.md` §"Build philosophy: build first, test at failure zones" for the full table.
+**Note:** there is no `phase-0-validation.md` in the active story set. The previous Phase 0 validation phase was retired in favor of inline stop-and-test points (STT-A through STT-E) embedded in phases 1–3. See `PRD.md` §"Build philosophy: build first, test at failure zones" for the full table. The legacy `phase-0-validation.md` file (if still on disk) is kept for reference only and should not be treated as a phase to execute.
 
 ## Story format (suggested)
 
@@ -48,4 +48,4 @@ One sentence — what this phase produces.
 **Notes / risks:** ...
 ```
 
-Add stories here as they are written. The CLI uses these as its work queue.
+The CLI uses these as its work queue. Each phase file has its own exit checklist that gates entry into the next phase.

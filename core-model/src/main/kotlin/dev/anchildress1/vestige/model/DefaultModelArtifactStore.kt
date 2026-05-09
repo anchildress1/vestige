@@ -1,5 +1,6 @@
 package dev.anchildress1.vestige.model
 
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
@@ -18,17 +19,20 @@ import java.security.MessageDigest
  * @param httpClient open-and-connect indirection so tests can swap in a fake without standing
  *  up a local HTTP server. The default uses [HttpURLConnection] and respects the manifest's
  *  `allowed_hosts` allowlist before opening the connection.
+ * @param ioDispatcher dispatcher for blocking filesystem and HTTP work. Defaults to [Dispatchers.IO];
+ *  tests inject a deterministic dispatcher (typically `runTest`'s scheduler) for fast, ordered runs.
  */
 class DefaultModelArtifactStore(
     override val manifest: ModelManifest,
     private val baseDir: File,
     private val httpClient: HttpClient,
     private val backoff: BackoffPolicy = ExponentialBackoff(),
+    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) : ModelArtifactStore {
 
     override val artifactFile: File = File(baseDir, manifest.filename)
 
-    override suspend fun currentState(): ModelArtifactState = withContext(Dispatchers.IO) {
+    override suspend fun currentState(): ModelArtifactState = withContext(ioDispatcher) {
         if (!artifactFile.exists()) return@withContext ModelArtifactState.Absent
 
         val length = artifactFile.length()
@@ -49,7 +53,7 @@ class DefaultModelArtifactStore(
         }
     }
 
-    override suspend fun download(onProgress: (Long, Long) -> Unit): ModelArtifactState = withContext(Dispatchers.IO) {
+    override suspend fun download(onProgress: (Long, Long) -> Unit): ModelArtifactState = withContext(ioDispatcher) {
         baseDir.mkdirs()
         val state = currentState()
 
@@ -81,7 +85,7 @@ class DefaultModelArtifactStore(
         )
     }
 
-    override suspend fun verifyChecksum(): Boolean = withContext(Dispatchers.IO) {
+    override suspend fun verifyChecksum(): Boolean = withContext(ioDispatcher) {
         if (!artifactFile.exists()) return@withContext false
         sha256(artifactFile).equals(manifest.sha256, ignoreCase = true)
     }

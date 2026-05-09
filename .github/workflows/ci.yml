@@ -89,17 +89,44 @@ jobs:
       - name: Run unit tests
         run: ./gradlew :core-model:test :core-inference:testDebugUnitTest :core-storage:testDebugUnitTest :app:testDebugUnitTest :app:koverXmlReport
 
-      - name: Upload test report
+      - name: Upload app HTML test report
         uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: test-report
-          path: |
-            app/build/reports/tests/
-            app/build/test-results/testDebugUnitTest/
-            core-inference/build/test-results/testDebugUnitTest/
-            core-model/build/test-results/test/
-            core-storage/build/test-results/testDebugUnitTest/
+          name: app-test-report
+          path: app/build/reports/tests/
+          retention-days: 14
+
+      - name: Upload app JUnit test results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: app-junit-results
+          path: app/build/test-results/testDebugUnitTest/
+          retention-days: 14
+
+      - name: Upload core-inference JUnit test results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: core-inference-junit-results
+          path: core-inference/build/test-results/testDebugUnitTest/
+          retention-days: 14
+
+      - name: Upload core-model JUnit test results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: core-model-junit-results
+          path: core-model/build/test-results/test/
+          retention-days: 14
+
+      - name: Upload core-storage JUnit test results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: core-storage-junit-results
+          path: core-storage/build/test-results/testDebugUnitTest/
           retention-days: 14
 
       - name: Upload Kover XML report
@@ -164,11 +191,29 @@ jobs:
           name: kover-report
           path: app/build/reports/kover/
 
-      - name: Download JUnit test results
+      - name: Download app JUnit test results
         uses: actions/download-artifact@v4
         with:
-          name: test-report
-          path: .
+          name: app-junit-results
+          path: app/build/test-results/testDebugUnitTest/
+
+      - name: Download core-inference JUnit test results
+        uses: actions/download-artifact@v4
+        with:
+          name: core-inference-junit-results
+          path: core-inference/build/test-results/testDebugUnitTest/
+
+      - name: Download core-model JUnit test results
+        uses: actions/download-artifact@v4
+        with:
+          name: core-model-junit-results
+          path: core-model/build/test-results/test/
+
+      - name: Download core-storage JUnit test results
+        uses: actions/download-artifact@v4
+        with:
+          name: core-storage-junit-results
+          path: core-storage/build/test-results/testDebugUnitTest/
 
       - name: SonarCloud scan
         uses: SonarSource/sonarqube-scan-action@fd88b7d7ccbaefd23d8f36f73b59db7a3d246602 # v6.0.0

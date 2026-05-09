@@ -1,6 +1,6 @@
 [versions]
 # Build tooling
-agp = "9.2.0"
+agp = "9.2.1"
 kotlin = "2.3.21"
 gradle = "9.5.0"
 
@@ -11,7 +11,7 @@ androidx-activity-compose = "1.13.0"
 androidx-lifecycle = "2.10.0"
 
 # Compose
-compose-bom = "2026.04.01"
+compose-bom = "2026.05.00"
 
 # Persistence
 objectbox = "5.4.2"
@@ -29,12 +29,12 @@ ktlint-cli = "1.8.0"
 sonar = "7.3.0.8198"
 
 # Coroutines
-kotlinx-coroutines = "1.10.2"
+kotlinx-coroutines = "1.11.0"
 
 # Testing
 junit = "4.13.2"
-junit-jupiter = "5.14.4"
-junit-platform = "1.14.4"
+junit-jupiter = "6.0.3"
+junit-platform = "6.0.3"
 mockk = "1.14.9"
 turbine = "1.2.1"
 androidx-test-core = "1.7.0"

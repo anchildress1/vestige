@@ -25,10 +25,24 @@ import java.time.Instant
  * surface the failure to STT-C instrumentation).
  *
  * Tags must appear in the order transcription → follow_up. Tags are case-sensitive and matched
- * non-greedily so a multi-line body works. Content is preserved verbatim — no trimming — to
- * honor the `personas/shared.txt` "exact and unaltered" transcription rule (codex round 4 P2).
- * Empty / whitespace-only bodies still register as MISSING_*, but otherwise the captured text
- * passes through byte-for-byte. STT-C measures parse-success rate on a real E4B transcript set.
+ * non-greedily so a multi-line body works.
+ *
+ * **Whitespace handling.** Tag bodies are `.trim()`-ed automatically and consistently. The
+ * `personas/shared.txt` "exact and unaltered" rule is about the user's spoken words, not the
+ * model's pretty-print wrapping — `<transcription>\n  hello\n</transcription>` and
+ * `<transcription>hello</transcription>` should produce the same `entry_text` because the leading
+ * and trailing whitespace is the model's formatting choice, not the user's content. Empty /
+ * whitespace-only bodies still register as MISSING_*.
+ *
+ * **Known parse-failure case (STT-C measurement target).** A user dictating verbatim XML/HTML
+ * markup that contains a literal `<transcription>` or `</transcription>` (or the matching
+ * `<follow_up>` markers) inside the spoken content will trip the same delimiter-collision class
+ * that pushed us off `## TRANSCRIPTION` markdown headers. There is no text-delimiter format
+ * that side-steps this entirely without out-of-band escaping (length prefixes, JSON strings,
+ * etc.); switching the format adds parse-rate risk on E4B that ADR-002 §"Structured-output
+ * reliability" already explicitly accepts. Cognition-tracker dumps about behavior and attention
+ * almost never include literal markup, so the trade-off lands here. STT-C measures the actual
+ * rate on real model output and ADR-002 supersedes if it turns out to matter.
  */
 internal object ForegroundResponseParser {
 
@@ -74,15 +88,17 @@ internal object ForegroundResponseParser {
             transcriptionMatch == null ||
                 it.range.first > transcriptionMatch.range.last
         }
-        // Verbatim — no `.trim()`. The transcription contract from `personas/shared.txt` says
-        // "exact and unaltered"; collapsing wrapping whitespace would mutate user content.
-        val transcription = transcriptionMatch?.groupValues?.get(1).orEmpty()
-        val followUp = orderedFollowUp?.groupValues?.get(1).orEmpty()
+        // Auto-normalize wrapping whitespace. The model's pretty-print (`<tag>\n...\n</tag>`)
+        // is formatting, not content — the user's spoken words are what's between the
+        // boundary whitespace, not what surrounds it. Consistent stripping here means
+        // downstream `entry_text` doesn't carry stray newlines into the markdown store.
+        val transcription = transcriptionMatch?.groupValues?.get(1)?.trim().orEmpty()
+        val followUp = orderedFollowUp?.groupValues?.get(1)?.trim().orEmpty()
         return when {
             transcriptionMatch == null -> Extracted.Bad(ForegroundResult.ParseReason.MISSING_TRANSCRIPTION)
             orderedFollowUp == null -> Extracted.Bad(ForegroundResult.ParseReason.MISSING_FOLLOW_UP)
-            transcription.isBlank() -> Extracted.Bad(ForegroundResult.ParseReason.MISSING_TRANSCRIPTION)
-            followUp.isBlank() -> Extracted.Bad(ForegroundResult.ParseReason.MISSING_FOLLOW_UP)
+            transcription.isEmpty() -> Extracted.Bad(ForegroundResult.ParseReason.MISSING_TRANSCRIPTION)
+            followUp.isEmpty() -> Extracted.Bad(ForegroundResult.ParseReason.MISSING_FOLLOW_UP)
             else -> Extracted.Ok(transcription, followUp)
         }
     }

@@ -48,14 +48,14 @@ class ForegroundResponseParserTest {
     }
 
     @Test
-    fun `wrapping whitespace inside tag bodies is preserved verbatim`() {
-        // The transcription contract is "exact and unaltered" — even the model's wrapping
-        // newlines/spaces survive untouched. Callers that want to display normalized text can
-        // trim themselves; the parser does not mutate. (Codex round 4 P2.)
+    fun `wrapping whitespace inside tag bodies is auto-normalized`() {
+        // The model's pretty-print (`<tag>\n...\n</tag>`) is formatting, not content —
+        // auto-normalize so downstream `entry_text` doesn't carry stray newlines into the
+        // markdown store. The user's spoken words are what's between the boundary whitespace.
         val raw = "<transcription>\n\nfoo\n\n</transcription>\n\n\n<follow_up>\n\nbar\n\n</follow_up>\n\n"
         val success = assertInstanceOf(ForegroundResult.Success::class.java, parse(raw))
-        assertEquals("\n\nfoo\n\n", success.transcription)
-        assertEquals("\n\nbar\n\n", success.followUp)
+        assertEquals("foo", success.transcription)
+        assertEquals("bar", success.followUp)
     }
 
     @Test
@@ -103,6 +103,8 @@ class ForegroundResponseParserTest {
 
     @Test
     fun `transcription tag with whitespace-only body returns MISSING_TRANSCRIPTION`() {
+        // Auto-normalization trims wrapping whitespace, so a body of pure whitespace becomes
+        // empty after trim — same MISSING_TRANSCRIPTION outcome as a literally empty body.
         val raw = "<transcription>   \n\t\n</transcription>\n<follow_up>nothing was said?</follow_up>"
         val failure = assertInstanceOf(ForegroundResult.ParseFailure::class.java, parse(raw))
         assertEquals(ForegroundResult.ParseReason.MISSING_TRANSCRIPTION, failure.reason)

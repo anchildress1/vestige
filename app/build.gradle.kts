@@ -111,6 +111,50 @@ tasks.withType<Test>().configureEach {
     useJUnitPlatform()
 }
 
+// Privacy gate per ADR-001 §Q7 + AGENTS.md guardrail 13. Walks the release runtime classpath
+// and fails the build if any artifact coordinate matches a known telemetry SDK fingerprint.
+// The runtime counterpart is `NetworkGate` in :core-model.
+tasks.register("verifyNoTelemetry") {
+    group = "verification"
+    description = "Fail the build if known telemetry/analytics SDKs land in this module's release classpath."
+
+    val patterns = listOf(
+        "firebase-analytics", "firebase-crashlytics", "firebase-perf", "firebase-config",
+        "crashlytics", "mlkit-analytics",
+        "google-analytics", "play-services-analytics", "play-services-measurement",
+        "io.sentry:", "com.sentry:",
+        "segment.analytics", "com.segment",
+        "mixpanel-android", "mixpanel-java",
+        "amplitude-android", "amplitude-analytics",
+        "datadog-android", "ddog",
+        "newrelic-android",
+        "appcenter-analytics",
+        "kochava",
+    )
+
+    val classpath = configurations.named("releaseRuntimeClasspath")
+
+    doLast {
+        // artifactView with lenient = true avoids the AGP 9 variant-ambiguity errors that hit
+        // resolvedConfiguration.resolvedArtifacts on android-application configurations.
+        val artifactView = classpath.get().incoming.artifactView { lenient(true) }
+        val coordinates = artifactView.artifacts.artifacts.mapNotNull { artifact ->
+            val moduleId = artifact.id.componentIdentifier
+                as? org.gradle.api.artifacts.component.ModuleComponentIdentifier
+            moduleId?.let { "${it.group}:${it.module}".lowercase() }
+        }
+        val violations = coordinates.flatMap { coordinate ->
+            patterns.filter { pattern -> pattern in coordinate }.map { pattern -> "$coordinate matches '$pattern'" }
+        }
+        if (violations.isNotEmpty()) {
+            throw GradleException(
+                "Telemetry / analytics dependency detected — AGENTS.md guardrail 13 violation:\n" +
+                    violations.joinToString("\n") + "\n\nRemove the dependency or supersede the guardrail.",
+            )
+        }
+    }
+}
+
 kover {
     reports {
         filters {

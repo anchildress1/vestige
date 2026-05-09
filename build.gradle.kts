@@ -11,3 +11,11 @@ plugins {
 tasks.register<Delete>("clean") {
     delete(rootProject.layout.buildDirectory)
 }
+
+// Aggregator that delegates to :app:verifyNoTelemetry. The actual classpath resolution lives
+// inside :app's build script because Gradle 9 forbids cross-project configuration resolution.
+tasks.register("verifyNoTelemetry") {
+    group = "verification"
+    description = "Fail the build if known telemetry/analytics SDKs land in :app's release classpath."
+    dependsOn(":app:verifyNoTelemetry")
+}

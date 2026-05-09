@@ -179,12 +179,12 @@ If STT-A fails after the time-box: stop. Write a superseding ADR. Do not proceed
 **As** the AI implementor, **I need** a `NetworkGate` abstraction with `OPEN` / `SEALED` states, plus dev-build StrictMode network detection and a transitive-dependency grep for telemetry libraries (per ADR-001 Q7), **so that** the privacy claim ("zero outbound network calls during normal operation") is enforced at the runtime layer and provable at build time.
 
 **Done when:**
-- [ ] `NetworkGate` exposed in `:core-model` with `OPEN` (allowed during model download) and `SEALED` (default; all network blocked) states. Transitions are explicit and logged in dev.
-- [ ] When `SEALED`, any HTTP attempt fails fast and surfaces an error rather than silently succeeding.
-- [ ] `network_security_config.xml` ships with `cleartextTrafficPermitted=false` and a narrow HTTPS allowlist matching the model-download manifest (Story 1.9).
-- [ ] StrictMode in dev builds detects unexpected network operations on the main or background threads.
-- [ ] Build-time check: a Gradle task greps the resolved dependency graph for known telemetry/analytics libraries (Firebase Analytics, Crashlytics, Sentry SaaS, RemoteConfig, etc.) and fails the build if any are found.
-- [ ] None are found. (If they are, remove them. This is a non-negotiable per `AGENTS.md` guardrail 13.)
+- [x] `NetworkGate` exposed in `:core-model` with `OPEN` (allowed during model download) and `SEALED` (default; all network blocked) states. Transitions are explicit and logged in dev.
+- [x] When `SEALED`, any HTTP attempt fails fast and surfaces an error rather than silently succeeding. _(`DefaultHttpClient.open` calls `gate.assertOpen()` which throws `NetworkSealedException` on a sealed gate.)_
+- [x] `network_security_config.xml` ships with `cleartextTrafficPermitted=false` and a narrow HTTPS allowlist matching the model-download manifest (Story 1.9).
+- [x] StrictMode in dev builds detects unexpected network operations on the main or background threads.
+- [x] Build-time check: a Gradle task greps the resolved dependency graph for known telemetry/analytics libraries (Firebase Analytics, Crashlytics, Sentry SaaS, RemoteConfig, etc.) and fails the build if any are found. _(`./gradlew verifyNoTelemetry`, wired into `make verify` and `make ci`.)_
+- [x] None are found. (If they are, remove them. This is a non-negotiable per `AGENTS.md` guardrail 13.)
 
 **Notes / risks:** This is the rails behind the "privacy proof clip" required for the Phase 6 demo. If any of this isn't airtight, the `tcpdump` clip will catch it on stage.
 

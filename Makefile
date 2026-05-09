@@ -1,4 +1,4 @@
-.PHONY: install bootstrap-wrapper doctor build assemble test lint format ktlint-format ktlint-check detekt android-lint secret-scan commitlint verify ci clean
+.PHONY: install bootstrap-wrapper doctor build assemble test lint format ktlint-format ktlint-check detekt android-lint secret-scan commitlint verify-no-telemetry verify ci clean
 
 GRADLE := ./gradlew
 KTLINT := $(or $(shell command -v ktlint 2>/dev/null), $(HOME)/.local/bin/ktlint)
@@ -57,9 +57,12 @@ secret-scan:
 commitlint:
 	./scripts/check-commit-msg.sh $(COMMIT_MSG_FILE)
 
-verify: lint test build secret-scan
+verify-no-telemetry:
+	$(GRADLE) verifyNoTelemetry
 
-ci: lint test build
+verify: lint test build secret-scan verify-no-telemetry
+
+ci: lint test build verify-no-telemetry
 
 clean:
 	$(GRADLE) clean

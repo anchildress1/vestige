@@ -182,9 +182,17 @@ interface HttpResponse : AutoCloseable {
     val inputStream: java.io.InputStream
 }
 
-/** Default `HttpURLConnection`-backed client. Fails fast on hosts not in [allowedHosts]. */
-class DefaultHttpClient(private val allowedHosts: List<String>) : HttpClient {
+/**
+ * Default `HttpURLConnection`-backed client. Fails fast on hosts not in [allowedHosts] and
+ * consults the supplied [networkGate] before each connect — so a sealed gate prevents the
+ * dial-out even if the allowlist would otherwise permit the host.
+ */
+class DefaultHttpClient(
+    private val allowedHosts: List<String>,
+    private val networkGate: NetworkGate = DefaultNetworkGate.ALWAYS_OPEN_FOR_TESTS,
+) : HttpClient {
     override fun open(url: String, resumeFromByte: Long): HttpResponse {
+        networkGate.assertOpen()
         val parsed: URL = URI.create(url).toURL()
         val host = parsed.host.orEmpty()
         require(allowedHosts.any { host.endsWith(it, ignoreCase = true) }) {

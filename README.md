@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="https://repository-images.githubusercontent.com/1233196257/540147b2-671b-467b-b242-ab8b84322fb5" alt="Vestige" />
+  <img src="https://repository-images.githubusercontent.com/1233196257/725f61a8-e9fc-49a6-b5d5-eb491ad1404b" alt="Vestige social banner" />
 </p>
 
 # Vestige

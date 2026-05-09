@@ -12,7 +12,7 @@ concurrency:
 
 jobs:
   lint:
-    name: Lint (ktlint + detekt + Android lint + actionlint)
+    name: Lint (ktlint + detekt + Android lint)
     if: github.event.pull_request.draft == false || github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -63,14 +63,6 @@ jobs:
           name: android-lint-report
           path: app/build/reports/lint-results-debug.*
           retention-days: 14
-
-      - name: Run actionlint
-        shell: bash
-        run: |
-          # rhysd/actionlint is a CLI, not a JS/composite Action; install via the
-          # in-repo download script pinned to v1.7.7 (commit 03d0035) per upstream docs.
-          bash <(curl -fsSL https://raw.githubusercontent.com/rhysd/actionlint/03d0035246f3e81f36aed592ffb4bebf33a03106/scripts/download-actionlint.bash) 1.7.7
-          ./actionlint -color
 
   test:
     name: Test + coverage

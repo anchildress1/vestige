@@ -26,6 +26,7 @@ If no, defer it to `backlog.md` and say: "this doesn't help us win, deferring to
 12. Pattern claims must be sourced with counts, dates, snippets, tags, or field evidence.
 13. Use one inference runtime in v1: LiteRT-LM. Any llama.cpp / MediaPipe / AICore switch requires a superseding ADR.
 14. If LiteRT-LM or Gemma 4 audio fails an existential stop-and-test (notably STT-A audio plumbing in Phase 1), stop and replan. Do not build a pretty wrapper around a broken premise. We have standards, allegedly.
+15. Tick checklist items off the active phase story file in `docs/stories/phase-{N}-*.md` as work completes. Stories are the canonical work queue; an unchecked item with shipped code is an unfinished story, not a victory lap. If a story can't ship as written, edit the story (or push it to `backlog.md`) before moving on — don't ghost the checklist.
 
 ## Build Order
 

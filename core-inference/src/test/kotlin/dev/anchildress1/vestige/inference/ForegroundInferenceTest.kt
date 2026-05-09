@@ -493,6 +493,57 @@ class ForegroundInferenceTest {
     }
 
     @Test
+    fun `session setPersona routes the next foreground call through the new persona prompt`(@TempDir cacheDir: File) =
+        runTest {
+            val engine = mockk<LiteRtLmEngine>()
+            val captured = mutableListOf<List<Content>>()
+            coEvery { engine.sendMessageContents(capture(captured)) } returnsMany listOf(
+                rawSuccess("first user text", "witness follow-up"),
+                rawSuccess("second user text", "editor follow-up"),
+            )
+            val inference = ForegroundInference(engine, cacheDir, clock = fixedClock)
+            val session = CaptureSession(clock = Clock.fixed(completedAt, ZoneOffset.UTC))
+
+            // Turn 1 — default persona (WITNESS).
+            assertEquals(Persona.WITNESS, session.activePersona)
+            session.startRecording()
+            session.submitForInference()
+            val first = assertInstanceOf(
+                ForegroundResult.Success::class.java,
+                inference.runForegroundCall(audioChunk(), session.transcript, session.activePersona),
+            )
+            session.recordTranscription(first.transcription)
+            session.recordModelResponse(first.followUp, first.persona)
+            session.acknowledgeResponse()
+
+            // Switch persona, run turn 2 — the new prompt must reach the engine.
+            session.setPersona(Persona.EDITOR)
+            session.startRecording()
+            session.submitForInference()
+            val second = assertInstanceOf(
+                ForegroundResult.Success::class.java,
+                inference.runForegroundCall(audioChunk(), session.transcript, session.activePersona),
+            )
+            session.recordTranscription(second.transcription)
+            session.recordModelResponse(second.followUp, second.persona)
+
+            assertEquals(2, captured.size)
+            val firstPrompt = (captured[0][0] as Content.Text).text
+            val secondPrompt = (captured[1][0] as Content.Text).text
+            assertAll(
+                { assertTrue(firstPrompt.contains("Persona: Witness"), "Turn 1 must carry Witness prompt") },
+                { assertFalse(firstPrompt.contains("Persona: Editor"), "Turn 1 must not carry Editor prompt") },
+                { assertTrue(secondPrompt.contains("Persona: Editor"), "Turn 2 must carry Editor prompt") },
+                { assertFalse(secondPrompt.contains("Persona: Witness"), "Turn 2 must not carry Witness prompt") },
+                { assertEquals(Persona.WITNESS, first.persona) },
+                { assertEquals(Persona.EDITOR, second.persona) },
+                // History block in turn 2 must include the WITNESS-authored model turn — switching
+                // does not rewrite prior turns (Story 2.3 done-when 2).
+                { assertTrue(secondPrompt.contains("\"text\":\"witness follow-up\"")) },
+            )
+        }
+
+    @Test
     fun `empty engine response surfaces as EMPTY_RESPONSE failure`(@TempDir cacheDir: File) = runTest {
         val engine = mockk<LiteRtLmEngine>()
         coEvery { engine.sendMessageContents(any()) } returns ""

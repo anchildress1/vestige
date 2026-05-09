@@ -288,4 +288,82 @@ class CaptureSessionTest {
         val modelTurn = session.transcript.turns.single { it.speaker == Speaker.MODEL }
         assertEquals(Persona.HARDASS, modelTurn.persona)
     }
+
+    @Test
+    fun `default activePersona is WITNESS per concept-locked Personas`() {
+        val session = CaptureSession()
+        assertEquals(Persona.WITNESS, session.activePersona)
+    }
+
+    @Test
+    fun `defaultPersona constructor argument seeds activePersona`() {
+        val session = CaptureSession(defaultPersona = Persona.EDITOR)
+        assertEquals(Persona.EDITOR, session.activePersona)
+    }
+
+    @Test
+    fun `setPersona updates activePersona for subsequent foreground calls`() {
+        val session = CaptureSession()
+        assertEquals(Persona.WITNESS, session.activePersona)
+
+        session.setPersona(Persona.HARDASS)
+        assertEquals(Persona.HARDASS, session.activePersona)
+
+        session.setPersona(Persona.EDITOR)
+        assertEquals(Persona.EDITOR, session.activePersona)
+    }
+
+    @Test
+    fun `setPersona does not rewrite history — prior model turns keep their authoring persona`() {
+        val session = CaptureSession(clock = fixedClock())
+        session.startRecording()
+        session.submitForInference()
+        session.recordTranscription("first user text")
+        session.recordModelResponse("witness reply", Persona.WITNESS)
+        session.acknowledgeResponse()
+
+        session.setPersona(Persona.HARDASS)
+        session.startRecording()
+        session.submitForInference()
+        session.recordTranscription("second user text")
+        session.recordModelResponse("hardass reply", Persona.HARDASS)
+
+        val modelTurns = session.transcript.turns.filter { it.speaker == Speaker.MODEL }
+        assertEquals(2, modelTurns.size)
+        assertEquals(Persona.WITNESS, modelTurns[0].persona)
+        assertEquals(Persona.HARDASS, modelTurns[1].persona)
+    }
+
+    @Test
+    fun `setPersona is allowed in every state and preserves state and transcript`() {
+        val transcriptionAt = Instant.parse("2026-05-09T08:30:00Z")
+        val responseAt = Instant.parse("2026-05-09T08:30:04Z")
+        val session = CaptureSession(clock = tickingClock(transcriptionAt, responseAt))
+
+        session.setPersona(Persona.HARDASS)
+        assertEquals(CaptureSession.State.IDLE, session.state)
+
+        session.startRecording()
+        session.setPersona(Persona.EDITOR)
+        assertEquals(CaptureSession.State.RECORDING, session.state)
+        assertEquals(Persona.EDITOR, session.activePersona)
+
+        session.submitForInference()
+        session.setPersona(Persona.WITNESS)
+        assertEquals(CaptureSession.State.INFERRING, session.state)
+
+        session.recordTranscription("u")
+        session.setPersona(Persona.HARDASS)
+        assertEquals(CaptureSession.State.TRANSCRIBED, session.state)
+
+        session.recordModelResponse("m", Persona.WITNESS)
+        session.setPersona(Persona.EDITOR)
+        assertEquals(CaptureSession.State.RESPONDED, session.state)
+
+        session.fail(RuntimeException("boom"))
+        session.setPersona(Persona.HARDASS)
+        assertEquals(CaptureSession.State.ERROR, session.state)
+        assertEquals(Persona.HARDASS, session.activePersona)
+        assertEquals(2, session.transcript.size)
+    }
 }

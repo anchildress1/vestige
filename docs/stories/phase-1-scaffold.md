@@ -200,12 +200,12 @@ If STT-A fails after the time-box: stop. Write a superseding ADR. Do not proceed
 
 **Done when:**
 - [x] Release signing configuration exists in `:app/build.gradle.kts` with a real keystore. _(`signingConfigs.release` reads `keystore.properties` if present; falls back to the debug keystore with a loud Gradle WARN if absent so agent loops still build.)_
-- [ ] Keystore is committed to a private location (not the repo) with documented local setup steps in `docs/` (one paragraph in `architecture-brief.md` is fine). _(Setup steps written in `architecture-brief.md` §"Release Keystore Setup". Manual — user runs `keytool` and copies `keystore.properties.example` to `keystore.properties`.)_
+- [x] Keystore is committed to a private location (not the repo) with documented local setup steps in `docs/` (one paragraph in `architecture-brief.md` is fine). _(Setup steps written in `architecture-brief.md` §"Release Keystore Setup". Keystore generated 2026-05-09 at `~/.vestige/keystore.jks`, alias `vestige-release`, 4096-bit RSA, 10 000-day validity.)_
 - [x] A release-build APK with placeholder UI builds successfully via `./gradlew :app:assembleRelease`. _(Verified with debug-fallback signing — once the user pins the real keystore, the same pipeline produces the submission-signed APK.)_
-- [ ] The APK installs and launches on the reference S24 Ultra. _(Manual — user runs `adb install` after `assembleRelease`.)_
+- [x] The APK installs and launches on the reference S24 Ultra. _(Validated 2026-05-09. `adb install -r app-release.apk` → Success. App launched via monkey on SM-S928U.)_
 - [x] The APK passes through the same signing + zipalign + R8 pipeline that Phase 6 will use for the submission release.
 
-  > **TODO — manual validation pending (Phase 1, Story 1.11):** keystore generation + on-device install. Instructions deferred until Story 1.3 is green.
+  > **Validated 2026-05-09 on SM-S928U (Galaxy S24 Ultra).** Keystore generated, `keystore.properties` wired, release APK built (R8 + zipalign + real key), installed and launched successfully.
 
 **Notes / risks:** Do this before any product code lands per ADR-001 Q5. Discovering signing-config issues on May 23 is exactly how the deadline gets missed.
 

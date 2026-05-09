@@ -10,6 +10,17 @@
               tool, not a runtime dependency that ships in the APK. -->
          <trust group="com.android.tools.build" name="aapt2" regex="true"
                 artifact="aapt2-.*\.(jar|pom|module)"/>
+         <!-- ObjectBox ships per-OS native runtime JARs (linux/macos/windows); same
+              host-only download story as aapt2 — pin the whole platform-variant set so
+              CI on Linux can resolve objectbox-linux while macOS dev pins objectbox-macos. -->
+         <trust group="io.objectbox" name="objectbox-linux" regex="true"
+                artifact="objectbox-linux-.*\.(jar|pom|module)"/>
+         <trust group="io.objectbox" name="objectbox-windows" regex="true"
+                artifact="objectbox-windows-.*\.(jar|pom|module)"/>
+         <trust group="io.objectbox" name="objectbox-linux-arm64" regex="true"
+                artifact="objectbox-linux-arm64-.*\.(jar|pom|module)"/>
+         <trust group="io.objectbox" name="objectbox-linux-armv7" regex="true"
+                artifact="objectbox-linux-armv7-.*\.(jar|pom|module)"/>
       </trusted-artifacts>
    </configuration>
    <components>

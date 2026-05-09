@@ -1,5 +1,9 @@
 # Vestige
 
+<p align="center">
+  <img src="https://repository-images.githubusercontent.com/1233196257/540147b2-671b-467b-b242-ab8b84322fb5" alt="Vestige" />
+</p>
+
 On-device cognition tracker for ADHD-flavored adults. Anti-sycophant, behavioral, private.
 
 > Built for the [Gemma 4 Challenge](https://dev.to/devteam/join-the-gemma-4-challenge-3000-prize-pool-for-ten-winners-23in) — submission category: Build with Gemma 4. Canonical product spec lives under [`docs/`](docs); see [`AGENTS.md`](AGENTS.md) for AI agent rules.

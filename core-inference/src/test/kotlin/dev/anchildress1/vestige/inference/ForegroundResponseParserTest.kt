@@ -92,6 +92,7 @@ class ForegroundResponseParserTest {
         val raw = "<transcription>this is the user's voice.</transcription>"
         val failure = assertInstanceOf(ForegroundResult.ParseFailure::class.java, parse(raw))
         assertEquals(ForegroundResult.ParseReason.MISSING_FOLLOW_UP, failure.reason)
+        assertEquals("this is the user's voice.", failure.recoveredTranscription)
     }
 
     @Test
@@ -115,6 +116,7 @@ class ForegroundResponseParserTest {
         val raw = "<transcription>something the user said.</transcription>\n<follow_up></follow_up>"
         val failure = assertInstanceOf(ForegroundResult.ParseFailure::class.java, parse(raw))
         assertEquals(ForegroundResult.ParseReason.MISSING_FOLLOW_UP, failure.reason)
+        assertEquals("something the user said.", failure.recoveredTranscription)
     }
 
     @Test
@@ -199,5 +201,6 @@ class ForegroundResponseParserTest {
             "<follow_up>second follow-up.</follow_up>"
         val failure = assertInstanceOf(ForegroundResult.ParseFailure::class.java, parse(raw))
         assertEquals(ForegroundResult.ParseReason.AMBIGUOUS_BLOCKS, failure.reason)
+        assertEquals("just one transcription.", failure.recoveredTranscription)
     }
 }

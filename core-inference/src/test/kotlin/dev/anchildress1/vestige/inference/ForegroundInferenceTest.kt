@@ -6,6 +6,9 @@ import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.mockk
 import io.mockk.slot
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.async
+import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Assertions.assertAll
 import org.junit.jupiter.api.Assertions.assertEquals
@@ -75,8 +78,25 @@ class ForegroundInferenceTest {
         assertEquals(ForegroundResult.ParseReason.MISSING_TRANSCRIPTION, failure.reason)
         assertEquals(Persona.HARDASS, failure.persona)
         assertEquals("no headers, just prose", failure.rawResponse)
+        assertEquals(null, failure.recoveredTranscription)
         // Only one engine call — no silent retry per ADR-002 §"Structured-output reliability".
         coVerify(exactly = 1) { engine.sendMessageContents(any()) }
+    }
+
+    @Test
+    fun `parse failure preserves transcription when only follow-up parsing fails`(@TempDir cacheDir: File) = runTest {
+        val engine = mockk<LiteRtLmEngine>()
+        coEvery { engine.sendMessageContents(any()) } returns "<transcription>verbatim user text</transcription>"
+
+        val result = ForegroundInference(engine, cacheDir, clock = fixedClock).runForegroundCall(
+            audio = audioChunk(),
+            transcript = Transcript(),
+            persona = Persona.WITNESS,
+        )
+
+        val failure = assertInstanceOf(ForegroundResult.ParseFailure::class.java, result)
+        assertEquals(ForegroundResult.ParseReason.MISSING_FOLLOW_UP, failure.reason)
+        assertEquals("verbatim user text", failure.recoveredTranscription)
     }
 
     @Test
@@ -312,6 +332,62 @@ class ForegroundInferenceTest {
     }
 
     @Test
+    fun `sweep skips another in-flight foreground temp WAV`(@TempDir cacheDir: File) = runTest {
+        val engine = mockk<LiteRtLmEngine>()
+        val firstAudioPath = CompletableDeferred<String>()
+        val secondCallReachedEngine = CompletableDeferred<Unit>()
+        val releaseFirstCall = CompletableDeferred<Unit>()
+        var invocationCount = 0
+        coEvery { engine.sendMessageContents(any()) } coAnswers {
+            invocationCount += 1
+            val parts = firstArg<List<Content>>()
+            val audioPath = (parts[1] as Content.AudioFile).absolutePath
+            when (invocationCount) {
+                1 -> {
+                    firstAudioPath.complete(audioPath)
+                    secondCallReachedEngine.await()
+                    assertTrue(
+                        File(audioPath).exists(),
+                        "An overlapping call must not sweep the first call's live temp WAV",
+                    )
+                    releaseFirstCall.await()
+                    rawSuccess("first transcription", "first follow-up")
+                }
+
+                2 -> {
+                    val activeFirstPath = firstAudioPath.await()
+                    assertTrue(
+                        File(activeFirstPath).exists(),
+                        "The first call's temp WAV should still exist when the second call starts",
+                    )
+                    secondCallReachedEngine.complete(Unit)
+                    releaseFirstCall.complete(Unit)
+                    rawSuccess("second transcription", "second follow-up")
+                }
+
+                else -> error("Unexpected sendMessageContents invocation #$invocationCount")
+            }
+        }
+
+        val dispatcher = StandardTestDispatcher(testScheduler)
+        val firstInference = ForegroundInference(engine, cacheDir, clock = fixedClock, ioDispatcher = dispatcher)
+        val secondInference = ForegroundInference(engine, cacheDir, clock = fixedClock, ioDispatcher = dispatcher)
+
+        val firstCall = async {
+            firstInference.runForegroundCall(audioChunk(), Transcript(), Persona.WITNESS)
+        }
+        val secondCall = async {
+            secondInference.runForegroundCall(audioChunk(), Transcript(), Persona.HARDASS)
+        }
+
+        val firstResult = assertInstanceOf(ForegroundResult.Success::class.java, firstCall.await())
+        val secondResult = assertInstanceOf(ForegroundResult.Success::class.java, secondCall.await())
+        assertEquals("first transcription", firstResult.transcription)
+        assertEquals("second transcription", secondResult.transcription)
+        assertEquals(0, cacheDir.listFiles().orEmpty().size, "Both temp WAVs should be cleaned up after completion")
+    }
+
+    @Test
     fun `sweep ignores unrelated files in cacheDir`(@TempDir cacheDir: File) = runTest {
         val unrelated = File(cacheDir, "model-artifact.litertlm")
         unrelated.writeBytes(byteArrayOf(0x00))
@@ -376,5 +452,6 @@ class ForegroundInferenceTest {
 
         val failure = assertInstanceOf(ForegroundResult.ParseFailure::class.java, result)
         assertEquals(ForegroundResult.ParseReason.EMPTY_RESPONSE, failure.reason)
+        assertEquals(null, failure.recoveredTranscription)
     }
 }

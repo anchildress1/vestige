@@ -22,7 +22,8 @@ import java.time.Instant
  * silently corrupts saved entries. The honest contract: the system prompt asks the model for
  * exactly one transcription block and exactly one follow_up block; if it returns more, that
  * is `AMBIGUOUS_BLOCKS` and the caller decides what to do (re-prompt, mark as parse-error,
- * surface the failure to STT-C instrumentation).
+ * surface the failure to STT-C instrumentation). If the transcription block is still uniquely
+ * parseable while the follow-up is not, the failure preserves that transcription for the caller.
  *
  * Tags must appear in the order transcription → follow_up. Tags are case-sensitive and matched
  * non-greedily so a multi-line body works.
@@ -67,6 +68,7 @@ internal object ForegroundResponseParser {
                 elapsedMs = elapsedMs,
                 completedAt = completedAt,
                 reason = outcome.reason,
+                recoveredTranscription = outcome.recoveredTranscription,
             )
         }
     }
@@ -80,7 +82,15 @@ internal object ForegroundResponseParser {
         val transcriptionMatches = TRANSCRIPTION_TAG.findAll(raw).toList()
         val followUpMatches = FOLLOW_UP_TAG.findAll(raw).toList()
         if (transcriptionMatches.size > 1 || followUpMatches.size > 1) {
-            return Extracted.Bad(ForegroundResult.ParseReason.AMBIGUOUS_BLOCKS)
+            val recoveredTranscription = transcriptionMatches.singleOrNull()
+                ?.groupValues
+                ?.get(1)
+                ?.trim()
+                ?.takeUnless(String::isEmpty)
+            return Extracted.Bad(
+                reason = ForegroundResult.ParseReason.AMBIGUOUS_BLOCKS,
+                recoveredTranscription = recoveredTranscription,
+            )
         }
         val transcriptionMatch = transcriptionMatches.singleOrNull()
         val followUpMatch = followUpMatches.singleOrNull()
@@ -96,15 +106,26 @@ internal object ForegroundResponseParser {
         val followUp = orderedFollowUp?.groupValues?.get(1)?.trim().orEmpty()
         return when {
             transcriptionMatch == null -> Extracted.Bad(ForegroundResult.ParseReason.MISSING_TRANSCRIPTION)
-            orderedFollowUp == null -> Extracted.Bad(ForegroundResult.ParseReason.MISSING_FOLLOW_UP)
+
+            orderedFollowUp == null -> Extracted.Bad(
+                reason = ForegroundResult.ParseReason.MISSING_FOLLOW_UP,
+                recoveredTranscription = transcription.takeUnless(String::isEmpty),
+            )
+
             transcription.isEmpty() -> Extracted.Bad(ForegroundResult.ParseReason.MISSING_TRANSCRIPTION)
-            followUp.isEmpty() -> Extracted.Bad(ForegroundResult.ParseReason.MISSING_FOLLOW_UP)
+
+            followUp.isEmpty() -> Extracted.Bad(
+                reason = ForegroundResult.ParseReason.MISSING_FOLLOW_UP,
+                recoveredTranscription = transcription,
+            )
+
             else -> Extracted.Ok(transcription, followUp)
         }
     }
 
     private sealed interface Extracted {
         data class Ok(val transcription: String, val followUp: String) : Extracted
-        data class Bad(val reason: ForegroundResult.ParseReason) : Extracted
+        data class Bad(val reason: ForegroundResult.ParseReason, val recoveredTranscription: String? = null) :
+            Extracted
     }
 }

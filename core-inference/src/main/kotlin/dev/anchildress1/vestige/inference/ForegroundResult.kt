@@ -32,14 +32,18 @@ sealed interface ForegroundResult {
         val followUp: String,
     ) : ForegroundResult
 
-    /** Structured parse failed. The raw response is preserved for instrumentation. STT-C tracks
-     *  the rate of these per ADR-002 §"Structured-output reliability" / Action Item #2. */
+    /** Structured parse failed. The raw response is preserved for instrumentation. If the model
+     *  produced a usable transcription before mangling the follow-up block, [recoveredTranscription]
+     *  preserves it so the caller can still advance `entry_text` instead of dropping the user's
+     *  words on the floor. STT-C tracks the failure rate per ADR-002 §"Structured-output
+     *  reliability" / Action Item #2. */
     data class ParseFailure(
         override val persona: Persona,
         override val rawResponse: String,
         override val elapsedMs: Long,
         override val completedAt: Instant,
         val reason: ParseReason,
+        val recoveredTranscription: String? = null,
     ) : ForegroundResult
 
     enum class ParseReason {

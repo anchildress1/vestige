@@ -8,6 +8,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.time.Clock
+import java.util.concurrent.ConcurrentHashMap
 
 /**
  * Foreground capture inference (Phase 2 Story 2.2).
@@ -63,14 +64,16 @@ class ForegroundInference(
             }
             require(cacheDir.isDirectory) { "cacheDir must be an existing directory: $cacheDir" }
 
-            // Sweep crash leftovers before we create a new temp WAV. If a previous call was
-            // killed mid-inference (process death, OOM, OS reclaim) the `finally` block did not
-            // run and the recording stayed on disk — a privacy violation per AGENTS.md
-            // guardrail 11. Sweeping here costs O(files-in-cacheDir) and is bounded.
+            // Sweep crash leftovers before we create a new temp WAV. If a previous process died
+            // mid-inference (process death, OOM, OS reclaim) the `finally` block did not run and
+            // the recording stayed on disk — a privacy violation per AGENTS.md guardrail 11.
+            // Active temp files from overlapping in-process calls are tracked separately and
+            // skipped here so one call cannot delete another call's live audio handoff.
             sweepStaleTempWavs()
 
             val systemPrompt = composeSystemPrompt(persona, transcript)
             val temp = File.createTempFile(TEMP_PREFIX, TEMP_SUFFIX, cacheDir)
+            activeTempWavs += temp.absolutePath
             val started = System.nanoTime()
             val rawResponse = try {
                 WavWriter.writeMonoFloatWav(temp, audio.samples, audio.sampleRateHz)
@@ -81,6 +84,7 @@ class ForegroundInference(
                     ),
                 )
             } finally {
+                activeTempWavs -= temp.absolutePath
                 if (!temp.delete()) {
                     temp.deleteOnExit()
                 }
@@ -100,14 +104,18 @@ class ForegroundInference(
         }
 
     /**
-     * Delete any leftover `vestige-fg-*.wav` files in [cacheDir] from a prior crash. Returns
-     * silently — best-effort cleanup; if a file is locked or in use, [java.io.File.delete]
-     * fails and we move on rather than block the foreground call. Any survivors get a second
-     * shot on the next call.
+     * Delete any leftover `vestige-fg-*.wav` files in [cacheDir] from a prior crash. Files that
+     * are currently in use by another in-process foreground call are skipped via [activeTempWavs].
+     * Returns silently — best-effort cleanup; if a file is locked or in use, [java.io.File.delete]
+     * fails and we move on rather than block the foreground call. Any survivors get a second shot
+     * on the next call.
      */
     private fun sweepStaleTempWavs() {
         cacheDir.listFiles { _, name -> name.startsWith(TEMP_PREFIX) && name.endsWith(TEMP_SUFFIX) }
             ?.forEach { stale ->
+                if (stale.absolutePath in activeTempWavs) {
+                    return@forEach
+                }
                 if (!stale.delete()) {
                     Log.w(TAG, "Failed to sweep stale foreground WAV: ${stale.absolutePath}")
                 }
@@ -183,8 +191,7 @@ class ForegroundInference(
         // The reminder describes the output format without using literal opening/closing tag
         // pairs in the prompt, so a chatty model echoing the schema cannot collide with the
         // parser's tag matching. The parser still requires the actual tag literals in the
-        // response — `ForegroundResponseParser` picks the LAST balanced pair as a defense in
-        // depth (codex review round 3).
+        // response and rejects duplicate blocks rather than guessing which one Gemma meant.
         internal val OUTPUT_SCHEMA_REMINDER = listOf(
             "## OUTPUT FORMAT",
             "Wrap the user's spoken words verbatim in lowercase transcription tags " +
@@ -199,5 +206,6 @@ class ForegroundInference(
         private const val TAG = "VestigeForegroundInference"
         private const val NANOS_PER_MILLI = 1_000_000L
         private const val CONTROL_CHAR_LIMIT = 0x20
+        private val activeTempWavs: MutableSet<String> = ConcurrentHashMap.newKeySet()
     }
 }

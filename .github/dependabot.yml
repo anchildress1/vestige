@@ -15,7 +15,7 @@ updates:
       - dependencies
       - github-actions
     commit-message:
-      prefix: "chore(deps)"
+      prefix: chore
       include: scope
     groups:
       gha:
@@ -32,7 +32,7 @@ updates:
       - dependencies
       - gradle
     commit-message:
-      prefix: "chore(deps)"
+      prefix: chore
       include: scope
     groups:
       pkg:

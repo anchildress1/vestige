@@ -179,7 +179,10 @@ class DefaultModelArtifactStoreTest {
 
     @Test
     fun `DefaultHttpClient rejects hosts not in the allowlist`() {
-        val client = DefaultHttpClient(allowedHosts = listOf("huggingface.co"))
+        val client = DefaultHttpClient(
+            allowedHosts = listOf("huggingface.co"),
+            networkGate = DefaultNetworkGate.ALWAYS_OPEN_FOR_TESTS,
+        )
         assertThrows(IllegalArgumentException::class.java) {
             client.open("https://evil.example.com/model.bin", resumeFromByte = 0)
         }
@@ -187,7 +190,10 @@ class DefaultModelArtifactStoreTest {
 
     @Test
     fun `DefaultHttpClient rejects lookalike hostnames that only share a suffix`() {
-        val client = DefaultHttpClient(allowedHosts = listOf("huggingface.co"))
+        val client = DefaultHttpClient(
+            allowedHosts = listOf("huggingface.co"),
+            networkGate = DefaultNetworkGate.ALWAYS_OPEN_FOR_TESTS,
+        )
         assertThrows(IllegalArgumentException::class.java) {
             client.open("https://evilhuggingface.co/model.bin", resumeFromByte = 0)
         }
@@ -206,7 +212,10 @@ class DefaultModelArtifactStoreTest {
         server.start()
 
         try {
-            val client = DefaultHttpClient(allowedHosts = listOf("127.0.0.1"))
+            val client = DefaultHttpClient(
+                allowedHosts = listOf("127.0.0.1"),
+                networkGate = DefaultNetworkGate.ALWAYS_OPEN_FOR_TESTS,
+            )
             client.open("http://127.0.0.1:${server.address.port}/start", resumeFromByte = 0).use { response ->
                 assertEquals(200, response.statusCode)
                 assertEquals(SHORT_BYTES.toList(), response.inputStream.readBytes().toList())
@@ -225,7 +234,10 @@ class DefaultModelArtifactStoreTest {
         server.start()
 
         try {
-            val client = DefaultHttpClient(allowedHosts = listOf("127.0.0.1"))
+            val client = DefaultHttpClient(
+                allowedHosts = listOf("127.0.0.1"),
+                networkGate = DefaultNetworkGate.ALWAYS_OPEN_FOR_TESTS,
+            )
             assertThrows(IllegalArgumentException::class.java) {
                 client.open("http://127.0.0.1:${server.address.port}/start", resumeFromByte = 0)
             }

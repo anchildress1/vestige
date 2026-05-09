@@ -22,7 +22,7 @@ import java.security.MessageDigest
 class DefaultModelArtifactStore(
     override val manifest: ModelManifest,
     private val baseDir: File,
-    private val httpClient: HttpClient = DefaultHttpClient(manifest.allowedHosts),
+    private val httpClient: HttpClient,
     private val backoff: BackoffPolicy = ExponentialBackoff(),
 ) : ModelArtifactStore {
 
@@ -189,12 +189,10 @@ interface HttpResponse : AutoCloseable {
 /**
  * Default `HttpURLConnection`-backed client. Fails fast on hosts not in [allowedHosts] and
  * consults the supplied [networkGate] before each connect — so a sealed gate prevents the
- * dial-out even if the allowlist would otherwise permit the host.
+ * dial-out even if the allowlist would otherwise permit the host. The gate is required: there
+ * is no production scenario where the model-download client should bypass the privacy gate.
  */
-class DefaultHttpClient(
-    private val allowedHosts: List<String>,
-    private val networkGate: NetworkGate = DefaultNetworkGate.ALWAYS_OPEN_FOR_TESTS,
-) : HttpClient {
+class DefaultHttpClient(private val allowedHosts: List<String>, private val networkGate: NetworkGate) : HttpClient {
     override fun open(url: String, resumeFromByte: Long): HttpResponse {
         var currentUrl = URI.create(url).toURL()
         repeat(MAX_REDIRECTS + 1) { redirectCount ->

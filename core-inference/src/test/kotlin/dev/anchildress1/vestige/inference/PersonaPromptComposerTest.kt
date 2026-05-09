@@ -19,7 +19,7 @@ class PersonaPromptComposerTest {
     @Test
     fun `every persona prompt contains the shared cognition-tracker rules`() {
         // The shared rules are the part that must NOT vary across personas — extraction relies
-        // on this. Smoke-test the load by checking a phrase from `_shared.txt` shows up in all.
+        // on this. Smoke-test the load by checking a phrase from `shared.txt` shows up in all.
         val sentinel = "cognition tracker"
         Persona.entries.forEach { persona ->
             val prompt = PersonaPromptComposer.compose(persona)

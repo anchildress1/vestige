@@ -51,6 +51,7 @@ class LiteRtLmEngine(
             "Loading $modelPath backend=${backend.label} " +
                 "audio=${audioBackend?.label ?: "off"} vision=${visionBackend?.label ?: "off"}",
         )
+        Engine.setNativeMinLogSeverity(LogSeverity.WARNING)
         val started = System.nanoTime()
         engine = Engine(
             EngineConfig(
@@ -126,10 +127,5 @@ class LiteRtLmEngine(
     companion object {
         private const val TAG = "VestigeLiteRtLm"
         private const val NANOS_PER_MILLI = 1_000_000L
-
-        /** Quiet the LiteRT-LM native logs. Useful for tests. */
-        fun setNativeLogSeverity(severity: LogSeverity) {
-            Engine.setNativeMinLogSeverity(severity)
-        }
     }
 }

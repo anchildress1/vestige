@@ -2,7 +2,6 @@ package dev.anchildress1.vestige
 
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
-import com.google.ai.edge.litertlm.LogSeverity
 import dev.anchildress1.vestige.inference.BackendChoice
 import dev.anchildress1.vestige.inference.LiteRtLmEngine
 import kotlinx.coroutines.runBlocking
@@ -38,8 +37,6 @@ class LiteRtLmTextSmokeTest {
         assumeTrue("modelPath instrumentation argument not provided", modelPath != null)
         val modelFile = File(modelPath!!)
         assumeTrue("Model file not found at $modelPath", modelFile.exists() && modelFile.canRead())
-
-        LiteRtLmEngine.setNativeLogSeverity(LogSeverity.WARN)
 
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         val engine = LiteRtLmEngine(

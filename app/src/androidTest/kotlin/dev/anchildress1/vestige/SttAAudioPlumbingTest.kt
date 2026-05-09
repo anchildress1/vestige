@@ -2,7 +2,6 @@ package dev.anchildress1.vestige
 
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
-import com.google.ai.edge.litertlm.LogSeverity
 import dev.anchildress1.vestige.inference.AudioCapture
 import dev.anchildress1.vestige.inference.BackendChoice
 import dev.anchildress1.vestige.inference.LiteRtLmEngine
@@ -54,7 +53,6 @@ class SttAAudioPlumbingTest {
         assumeTrue("Model file not found at $modelPath", modelFile.exists() && modelFile.canRead())
         assumeTrue("Audio file not found at $audioPath", audioFile.exists() && audioFile.canRead())
 
-        LiteRtLmEngine.setNativeLogSeverity(LogSeverity.WARN)
         val context = InstrumentationRegistry.getInstrumentation().targetContext
 
         val engine = LiteRtLmEngine(

@@ -14,14 +14,17 @@ class ModelManifestTest {
         assertEquals(ModelManifest.SUPPORTED_SCHEMA_VERSION, manifest.schemaVersion)
         assertEquals("litert-community/gemma-4-E4B-it-litert-lm", manifest.artifactRepo)
         assertEquals("gemma-4-E4B-it.litertlm", manifest.filename)
-        assertTrue(manifest.expectedByteSize > 0)
-        assertTrue(manifest.allowedHosts.contains("huggingface.co"))
+        assertEquals(3_659_530_240L, manifest.expectedByteSize)
+        assertEquals(
+            listOf("huggingface.co", "cas-bridge.xethub.hf.co"),
+            manifest.allowedHosts,
+        )
     }
 
     @Test
     fun `sha256IsResolved is true after STT-A download probe resolved the hash`() {
         val manifest = ModelManifest.loadDefault()
-        // STT-A completed (Story 1.10) and pinned the canonical SHA-256 into manifest.properties.
+        // STT-A's download probe completed and pinned the canonical SHA-256 into manifest.properties.
         assertTrue(manifest.sha256IsResolved)
         // 64 hex chars — SHA-256 output is 32 bytes = 64 lowercase hex digits.
         assertEquals(64, manifest.sha256.length)

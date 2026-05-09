@@ -2,9 +2,9 @@
 <!--
     Network security policy per ADR-001 §Q7. Cleartext is blocked everywhere; HTTPS is
     permitted only to the model-download hosts pinned in :core-model's
-    /model/manifest.properties → allowed_hosts. The actual redirect chain is captured during
-    the Phase-1 download probe (Story 1.9) and may add LFS/Xet hosts to this allowlist —
-    update both files in lockstep when that happens.
+    /model/manifest.properties → allowed_hosts. Phase 1's download probe pinned the live
+    redirect chain as huggingface.co -> cas-bridge.xethub.hf.co on 2026-05-09; keep the two
+    allowlists in lockstep if the host chain changes again.
 -->
 <network-security-config>
     <base-config cleartextTrafficPermitted="false">
@@ -15,7 +15,7 @@
 
     <domain-config cleartextTrafficPermitted="false">
         <domain includeSubdomains="true">huggingface.co</domain>
-        <domain includeSubdomains="true">cdn-lfs.huggingface.co</domain>
+        <domain includeSubdomains="true">cas-bridge.xethub.hf.co</domain>
         <trust-anchors>
             <certificates src="system" />
         </trust-anchors>

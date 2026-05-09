@@ -167,12 +167,12 @@ If STT-A fails after the time-box: stop. Write a superseding ADR. Do not proceed
 
 **Done when:**
 - [x] `ModelArtifactStore` interface defined in `:core-model` with operations to: report current state (absent / partial / complete / corrupt), trigger download, verify SHA-256, load into LiteRT-LM.
-- [x] Manifest file checked in: artifact repo, filename, expected byte size, SHA-256, allowed HTTPS hosts (placeholder until STT-A's download probe records the real Hugging Face redirect chain). _SHA-256 is `PENDING_STT_A_DOWNLOAD_PROBE` until the human runs STT-A and pins the canonical hash._
+- [x] Manifest file checked in: artifact repo, filename, expected byte size, SHA-256, allowed HTTPS hosts. _(Pinned from the 2026-05-09 download probe: `huggingface.co` resolver → `cas-bridge.xethub.hf.co`, `expected_byte_size=3659530240`, SHA-256 `0b2a8980ce155fd97673d8e820b4d29d9c7d99b8fa6806f425d969b145bd52e0`.)_
 - [x] Retry policy per ADR-001 Q6: exponential backoff on transient errors, capped at 3 attempts, surfaces the appropriate error state. HTTP `Range` resume support if supported by the artifact host; otherwise restart from byte 0.
 - [x] SHA-256 mismatch on load surfaces a corrupt-file state and triggers re-download (not a silent retry).
 - [x] No onboarding UI work. Phase 4 owns the user-facing download progress, retry buttons, and Wi-Fi gate.
 
-**Notes / risks:** ADR-001 §Sources of truth notes Hugging Face downloads may redirect through LFS/Xet artifact hosts. The exact redirect chain must be recorded during STT-A's download probe before Phase 1 locks the `network_security_config.xml` allowlist (Story 1.10).
+**Notes / risks:** ADR-001 §Sources of truth notes Hugging Face downloads may redirect through LFS/Xet artifact hosts. The Phase 1 probe pinned the live chain as `huggingface.co` → `cas-bridge.xethub.hf.co`; if Hugging Face rotates that path again, update both `manifest.properties` and `network_security_config.xml` in the same change.
 
 ---
 
@@ -250,4 +250,3 @@ Phase 2 starts when all the following are true:
 - [x] No new entries logged to `backlog.md` from Phase 1 work that change the v1 contract. _(`mic-perm-resume-recheck` added 2026-05-09 — Phase 1 shell UI polish, does not affect v1 contract.)_
 
 If STT-A failed and a superseding ADR was written, Phase 2's scope changes per that ADR. Otherwise, Phase 2 picks up at `PRD.md` §Phase 2 Story 1 (capture loop end-to-end) with the foundation Phase 1 produced.
-

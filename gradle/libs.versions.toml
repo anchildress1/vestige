@@ -33,8 +33,8 @@ kotlinx-coroutines = "1.10.1"
 
 # Testing
 junit = "4.13.2"
-junit-jupiter = "5.11.4"
-junit-platform = "1.11.4"
+junit-jupiter = "5.14.4"
+junit-platform = "1.14.4"
 mockk = "1.13.13"
 turbine = "1.2.1"
 androidx-test-core = "1.7.0"

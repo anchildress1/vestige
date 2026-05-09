@@ -109,16 +109,10 @@ internal object ForegroundResponseParser {
         // caller recovery (codex review round 6 P2). MISSING_FOLLOW_UP only fires when the
         // transcription itself parsed cleanly.
         return when {
-            transcriptionMatch == null -> Extracted.Bad(ForegroundResult.ParseReason.MISSING_TRANSCRIPTION)
+            transcriptionMatch == null || transcription.isEmpty() ->
+                Extracted.Bad(ForegroundResult.ParseReason.MISSING_TRANSCRIPTION)
 
-            transcription.isEmpty() -> Extracted.Bad(ForegroundResult.ParseReason.MISSING_TRANSCRIPTION)
-
-            orderedFollowUp == null -> Extracted.Bad(
-                reason = ForegroundResult.ParseReason.MISSING_FOLLOW_UP,
-                recoveredTranscription = transcription,
-            )
-
-            followUp.isEmpty() -> Extracted.Bad(
+            orderedFollowUp == null || followUp.isEmpty() -> Extracted.Bad(
                 reason = ForegroundResult.ParseReason.MISSING_FOLLOW_UP,
                 recoveredTranscription = transcription,
             )

@@ -5,8 +5,9 @@ import java.time.Instant
 
 /**
  * Who produced the [Turn]. `USER` turns carry Gemma's transcription of the user's spoken audio;
- * `MODEL` turns carry the follow-up response. There is no third party — `concept-locked.md`
- * §Personas keeps tone variants on the model side, not on the speaker enum.
+ * `MODEL` turns carry the follow-up response, with the [Turn.persona] that produced them per
+ * `concept-locked.md` §Personas. There is no third speaker — personas are a property of the
+ * model turn, not a separate participant.
  */
 enum class Speaker { USER, MODEL }
 
@@ -17,12 +18,7 @@ enum class Speaker { USER, MODEL }
  * [timestamp] is when the turn entered the transcript (post-transcription for `USER`, post-response
  * for `MODEL`), not when audio capture began.
  */
-data class Turn(
-    val speaker: Speaker,
-    val text: String,
-    val timestamp: Instant,
-    val persona: Persona? = null,
-) {
+data class Turn(val speaker: Speaker, val text: String, val timestamp: Instant, val persona: Persona? = null) {
     init {
         when (speaker) {
             Speaker.USER -> require(persona == null) { "USER turns cannot carry a persona" }

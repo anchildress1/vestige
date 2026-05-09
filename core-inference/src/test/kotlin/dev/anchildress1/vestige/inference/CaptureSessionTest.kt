@@ -164,6 +164,24 @@ class CaptureSessionTest {
     }
 
     @Test
+    fun `startRecording from TRANSCRIBED throws — model reply is still pending`() {
+        val session = CaptureSession()
+        session.startRecording()
+        session.submitForInference()
+        session.recordTranscription("u")
+        assertThrows(IllegalStateException::class.java) { session.startRecording() }
+    }
+
+    @Test
+    fun `acknowledgeResponse from TRANSCRIBED throws — model reply hasn't landed yet`() {
+        val session = CaptureSession()
+        session.startRecording()
+        session.submitForInference()
+        session.recordTranscription("u")
+        assertThrows(IllegalStateException::class.java) { session.acknowledgeResponse() }
+    }
+
+    @Test
     fun `acknowledgeResponse from IDLE throws`() {
         val session = CaptureSession()
         assertThrows(IllegalStateException::class.java) { session.acknowledgeResponse() }

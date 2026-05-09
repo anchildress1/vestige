@@ -88,4 +88,17 @@ class TranscriptTest {
 
         assertEquals("first user\n\nsecond user", transcript.entryText())
     }
+
+    @Test
+    fun `entryText on an empty transcript returns the empty string`() {
+        assertEquals("", Transcript().entryText())
+    }
+
+    @Test
+    fun `entryText with only MODEL turns returns the empty string`() {
+        val transcript = Transcript()
+        transcript.append(Turn(Speaker.MODEL, "first", Instant.EPOCH, Persona.WITNESS))
+        transcript.append(Turn(Speaker.MODEL, "second", Instant.EPOCH, Persona.HARDASS))
+        assertEquals("", transcript.entryText())
+    }
 }

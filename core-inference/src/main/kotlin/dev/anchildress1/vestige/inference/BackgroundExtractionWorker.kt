@@ -29,12 +29,11 @@ import java.io.IOException
  *
  * **Status surfacing.** [ExtractionStatusListener.onUpdate] fires on every transition the entry
  * persistence layer needs to mirror onto the `EntryEntity` row: one `RUNNING` at start, one
- * `RUNNING` per retry (with the latest `lastError`), and exactly one terminal call. The listener
- * receives the caller-supplied entry retry count for the whole run; lens retries do not mutate
- * that persisted counter. Terminal `lastError` is `null` on [ExtractionStatus.COMPLETED] and
- * populated only on [ExtractionStatus.FAILED]. Exactly one terminal call —
+ * `RUNNING` per lens-level retry (with the latest `lastError`), and exactly one terminal call —
  * [ExtractionStatus.COMPLETED] when the resolver runs (≥1 lens succeeded), or
- * [ExtractionStatus.FAILED] when every lens exhausted its budget.
+ * [ExtractionStatus.FAILED] when every lens exhausted its budget. Every event carries the
+ * caller-supplied entry retry count verbatim; lens retries do not mutate that persisted counter.
+ * Terminal `lastError` is `null` on `COMPLETED` and populated only on `FAILED`.
  *
  * **Storage isolation.** This module does not depend on `:core-storage`. The worker takes the
  * already-persisted entry text as input and emits a result the caller writes to ObjectBox /

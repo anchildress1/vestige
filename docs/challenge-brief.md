@@ -11,7 +11,7 @@
 - **Build with Gemma 4** (5 winners): $500 + DEV++ + badge each
 - **Write About Gemma 4** (5 winners): $100 + DEV++ + badge each
 - All valid submissions get a completion badge
-- Each submission picks ONE category, not both
+- Each individual submission picks ONE category, but a person may submit multiple posts (e.g., one Build + one Write). Confirmed by DEV team (Jess Lee) in the announcement-post comments. Posts must be distinct content, not duplicates across categories.
 
 ## Build prompt
 "Build something useful or creative with any Gemma 4 model. The scope is wide open — IoT integration, multimodal tool, long-context reasoning app. What matters is that Gemma 4 is doing real work at the heart of your project." Compelling entries show *why* the model was chosen and what it unlocked.

@@ -1,8 +1,8 @@
 # ADR-004 — App Backgrounding & Model-Handle Lifecycle
 
-**Status:** Proposed
+**Status:** Accepted
 **Date:** 2026-05-08
-**Deciders:** Ashley (sole owner). AI implementors read this as authoritative once accepted.
+**Deciders:** Ashley (sole owner). AI implementors read this as authoritative.
 **Depends on:** `adrs/ADR-001-stack-and-build-infra.md` §Q3 (retry-based recovery) + §Q7 (network enforcement), `adrs/ADR-002-multi-lens-extraction-pattern.md` §"Two-Tier Processing Contract", `architecture-brief.md` §"AppContainer Ownership"
 
 ---

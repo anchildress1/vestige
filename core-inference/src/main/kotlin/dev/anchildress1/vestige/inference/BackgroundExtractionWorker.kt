@@ -66,17 +66,15 @@ class BackgroundExtractionWorker(
                 for (lens in LENSES) {
                     state.results += runLens(lens, entryText, retrievedHistory, state, listener)
                 }
+                completeRun(state, started, listener)
             }
         } catch (timeout: TimeoutCancellationException) {
-            return@withContext handleTimeout(state, started, timeoutMs ?: 0L, listener, timeout)
+            handleTimeout(state, started, timeoutMs ?: 0L, listener, timeout)
         }
-
-        completeRun(state, started, listener)
     }
 
-    private suspend inline fun withTimeoutOrNoCap(timeoutMs: Long?, crossinline block: suspend () -> Unit) {
+    private suspend inline fun <T> withTimeoutOrNoCap(timeoutMs: Long?, crossinline block: suspend () -> T): T =
         if (timeoutMs == null) block() else withTimeout(timeoutMs) { block() }
-    }
 
     private suspend fun runLens(
         lens: Lens,

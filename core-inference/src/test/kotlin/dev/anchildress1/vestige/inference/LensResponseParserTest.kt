@@ -222,12 +222,21 @@ class LensResponseParserTest {
     @Test
     fun `accepts a brace after an unrelated bracket pair earlier in the prose`() {
         // `[note]` is prose, not an array opener for the payload. The "is the payload wrapped"
-        // check looks at whether nothing-but-whitespace separates the bracket from the brace.
+        // check looks at the immediate predecessor of the first `{`, not the first `[` anywhere
+        // in the response.
         val raw = """[note] {"tags":["a"]}"""
         val extraction = LensResponseParser.parse(Lens.LITERAL, raw)
 
         assertNotNull(extraction)
         assertEquals(listOf("a"), extraction!!.fields["tags"])
+    }
+
+    @Test
+    fun `rejects array-wrapped payload even when bracketed prose appears first`() {
+        // Earlier bracketed prose ("[note]") doesn't change the verdict: the `[` immediately
+        // before the first `{` is still the array opener and the payload is still malformed.
+        val raw = """[note] [{"tags":["a"]}]"""
+        assertNull(LensResponseParser.parse(Lens.LITERAL, raw))
     }
 
     @Test

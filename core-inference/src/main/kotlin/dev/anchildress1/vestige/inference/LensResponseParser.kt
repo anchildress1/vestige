@@ -92,10 +92,16 @@ internal object LensResponseParser {
         return found
     }
 
+    /**
+     * The payload is array-wrapped when the closest non-whitespace character preceding the first
+     * `{` is `[`. Looking at *only* the immediate predecessor (rather than the first `[` in the
+     * whole response) keeps prose like `[note] [{...}]` honest — the inner array still wraps the
+     * brace, but `[note] {...}` does not.
+     */
     private fun isArrayWrapped(raw: String, firstBrace: Int): Boolean {
-        val firstBracket = raw.indexOf('[')
-        return firstBracket in 0 until firstBrace &&
-            (firstBracket + 1 >= firstBrace || raw.substring(firstBracket + 1, firstBrace).all(Char::isWhitespace))
+        var i = firstBrace - 1
+        while (i >= 0 && raw[i].isWhitespace()) i -= 1
+        return i >= 0 && raw[i] == '['
     }
 
     private fun scanBalancedClose(raw: String, openIdx: Int): Int? {

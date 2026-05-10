@@ -156,6 +156,16 @@ After the resolver finishes, generate 1-2 `entry_observations` from the transcri
 
 Each lens call returns JSON conforming to the extracted-field schema. Parsing failure on a lens output = lens error (see edge case above). E4B's structured-output reliability is STT-C territory; if JSON returns are flaky, switch to a markdown-with-headers format and parse with a deterministic Kotlin parser. Do not retry the call inside the resolver — that hides a real signal.
 
+### Addendum (2026-05-10) — conservative tag persistence
+
+Supersedes the earlier `tags` wording that implied plural normalization should rewrite the saved value itself. Surfaced when a naive singularizer in `DefaultConvergenceResolver` corrupted legitimate singular tags (`news` → `new`, `series` → `sery`) because the stem was being persisted, not just counted (Story 2.8, fix landed in commit `2944843`).
+
+- **Agreement counting:** the resolver may normalize case/plurals to decide whether lenses agree on a tag.
+- **Persisted value:** the resolver must save a deterministic surface form that was actually emitted by a lens. It must not persist a generated stem/singular form unless a future ADR adopts a proven morphology layer.
+- **Current v1 behavior:** `meeting` and `meetings` count as agreement-equivalent for convergence, but the saved canonical tag is the first majority-winning surface form in lens order. If no tag reaches majority, the Literal lens's strongest tag is saved as `candidate`.
+- **Reason:** the lightweight singularizer that is good enough for counting is not safe for storage. It corrupts legitimate singular tags such as `news` and `series`, which is worse than tolerated plural drift.
+- **Deferred work:** full canonical morphology stays in backlog land until retrieval/embeddings work justifies a stronger normalization layer.
+
 ---
 
 ## Two-Tier Processing Contract

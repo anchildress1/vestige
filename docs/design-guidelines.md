@@ -250,7 +250,7 @@ Forbidden across all personas: "thank you for sharing," "how does that make you 
 
 1. **Top status row**
    - Left: Local Model Status indicator (`LOCAL · READY`-style chip per `ux-copy.md`). The chip is **clickable**; tap opens the persistent Local Model Status screen. Contributes to the 10-second judge test — a visible "this is on-device" signal lives on the primary surface.
-   - Right: Persona dropdown pill (`WITNESS ▾`-style per `ux-copy.md`). Tap opens the per-session persona override (P1 — see PRD).
+   - Right: Persona dropdown pill (`WITNESS ▾`-style per `ux-copy.md`). Tap opens the per-capture persona selector (P1 — see PRD; the prior "per-session override" framing was retired with the STT-B fallback).
 2. **Patterns peek card** *(below status row, per `ux-copy.md` §"Patterns peek (below status)")*
    - Compact card with `{N} active patterns` title, one-line teaser of pattern names, subtle. No purple left-rule here — that's reserved for the full Patterns list. Empty-state copy comes from `ux-copy.md`.
 3. **Hero title (above MistHero)**
@@ -318,7 +318,7 @@ Three options, segmented control or simple list. No avatars, no carousel, no cha
 **Hardass** — Sharper. Less padding. More action.
 **Editor** — Cuts vague words until they confess.
 
-Default is highlighted. Selection changes the active persona (per-session override allowed). No celebration animation on switch.
+Default is highlighted. Selection changes the active persona for the next capture (per-capture override allowed; STT-B fallback retired the per-session framing). No celebration animation on switch.
 
 ### Pattern List
 
@@ -463,12 +463,13 @@ Use the `error` token (`#B3261E` per `poc/design-review.md` §2.1) on the destru
 
 Compose translation notes for `MistHero` live in `design-review.md` §8 (radial gradients, conic ring, infinite-transition halo).
 
-### Conversation transcript
-- Vertical scroll, chronological within session.
+### Entry transcript
+- **Single-turn-per-capture** per the STT-B fallback (`adrs/ADR-002-multi-lens-extraction-pattern.md` §"Multi-turn behavior"): one entry contains exactly one `YOU` turn (your transcription) and one `WITNESS`/`HARDASS`/`EDITOR` turn (the model's follow-up). No scroll across multiple exchanges, no session thread — the entry IS the exchange.
 - **Avoid messenger-style chat bubbles** — too consumer-coded.
 - Treatment: left-rule indicators in different tones per speaker, monospace label (`WITNESS` / `YOU`) above each turn, body text in regular sans.
 - User's transcribed words shown in **muted/dimmed tone** (visually secondary). Model's response in primary text weight. User can verify; model stays the focal point.
 - No waveform shown for past audio — only the transcription.
+- The history list (Phase 4) is a list of completed entries, not a list of conversation threads. Tapping an entry opens a single-exchange view, not a chat log.
 
 ### Pattern card
 - Short title, category, observation, source count, last seen, actions.

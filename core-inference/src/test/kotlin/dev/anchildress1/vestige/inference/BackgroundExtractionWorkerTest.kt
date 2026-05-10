@@ -20,6 +20,7 @@ import org.junit.jupiter.api.Assertions.assertThrows
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import java.time.Instant
+import java.util.TimeZone
 
 class BackgroundExtractionWorkerTest {
 
@@ -263,21 +264,29 @@ class BackgroundExtractionWorkerTest {
             fields = mapOf("tags" to ResolvedField(listOf("late-night"), ConfidenceVerdict.CANONICAL)),
         )
         val parser: (Lens, String) -> LensExtraction? = { lens, _ -> extraction(lens) }
+        val originalZone = TimeZone.getDefault()
+        try {
+            // Pin the JVM default zone so the worker's default TemplateLabeler is deterministic:
+            // 08:00 UTC is 03:00 in Chicago, which sits inside the goblin window.
+            TimeZone.setDefault(TimeZone.getTimeZone("America/Chicago"))
 
-        val result = BackgroundExtractionWorker(
-            engine = engine,
-            resolver = RecordingResolver(lateNightResolved),
-            parser = parser,
-            composer = fakeComposer(),
-        ).extract(
-            request = BackgroundExtractionRequest(
-                entryText = "user words",
-                capturedAt = Instant.parse("2026-05-09T08:00:00Z"),
-            ),
-        )
+            val result = BackgroundExtractionWorker(
+                engine = engine,
+                resolver = RecordingResolver(lateNightResolved),
+                parser = parser,
+                composer = fakeComposer(),
+            ).extract(
+                request = BackgroundExtractionRequest(
+                    entryText = "user words",
+                    capturedAt = Instant.parse("2026-05-09T08:00:00Z"),
+                ),
+            )
 
-        val success = assertInstanceOf(BackgroundExtractionResult.Success::class.java, result)
-        assertEquals(TemplateLabel.GOBLIN_HOURS, success.templateLabel)
+            val success = assertInstanceOf(BackgroundExtractionResult.Success::class.java, result)
+            assertEquals(TemplateLabel.GOBLIN_HOURS, success.templateLabel)
+        } finally {
+            TimeZone.setDefault(originalZone)
+        }
     }
 
     @Test

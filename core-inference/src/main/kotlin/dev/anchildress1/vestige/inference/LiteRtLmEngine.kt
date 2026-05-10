@@ -28,8 +28,16 @@ sealed interface BackendChoice {
  * the model artifact is verified, then [generateText] (text-only) or [sendMessageContents]
  * (multimodal — STT-A audio probes) for each call. The native engine is released on [close].
  *
- * Multi-turn conversation state is owned by `SessionState` in `:app` (Phase 2). This wrapper
- * opens a fresh conversation per call and closes it immediately.
+ * **Single-turn-per-capture (v1).** Each [sendMessageContents] / [generateText] call opens a
+ * fresh `engine.createConversation()` handle and closes it immediately. Per-capture session
+ * state (active persona + the in-flight `CaptureSession` instance) lives in `:app`. Cross-
+ * capture multi-turn — accumulated transcript, persistent SDK `Conversation`, KV-cache reuse —
+ * does not exist in v1 per the STT-B v1 scope choice (see
+ * `adrs/ADR-005-stt-b-scope-and-v1-single-turn.md`, which amends
+ * `adrs/ADR-002-multi-lens-extraction-pattern.md` §"Multi-turn behavior"). The fresh-handle-
+ * per-call pattern this wrapper exposes is the same pattern STT-B measured; a future revival
+ * of multi-turn would need a different wrapper that holds the `Conversation` open across
+ * multiple `sendMessage` calls (revival pointer in ADR-005 §"Future revival path").
  *
  * The on-device smoke test that exercises the actual Gemma 4 E4B model lives in
  * `:app/src/androidTest/.../LiteRtLmTextSmokeTest.kt` (Story 1.3) and the STT-A audio harness

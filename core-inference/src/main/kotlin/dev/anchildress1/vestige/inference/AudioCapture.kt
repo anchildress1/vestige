@@ -13,25 +13,18 @@ import kotlinx.coroutines.isActive
 import java.util.concurrent.atomic.AtomicBoolean
 
 /**
- * Mono 16 kHz PCM_FLOAT capture from `AudioRecord`, **hard-capped at 30 seconds per recording**
- * per ADR-001 §Q4 + the v1 single-turn scope choice (see
- * `adrs/ADR-005-stt-b-scope-and-v1-single-turn.md`, which amends
- * `adrs/ADR-002-multi-lens-extraction-pattern.md` §"Multi-turn behavior"). Float samples land in
- * `[-1, 1]` directly because `ENCODING_PCM_FLOAT` returns normalized floats — no manual
- * short→float conversion, so the cap boundary cannot interleave with re-encoding artifacts.
+ * Mono 16 kHz PCM_FLOAT capture from `AudioRecord`, hard-capped at 30 s per recording per
+ * ADR-001 §Q4. `ENCODING_PCM_FLOAT` returns normalized `[-1, 1]` floats directly so the cap
+ * boundary cannot interleave with re-encoding artifacts.
  *
- * Lifecycle: caller collects [captureChunks]; calls [requestStop] to flush the chunk early and
- * complete the flow, OR the flow self-terminates when 30 s of audio have been buffered. Either
- * way the flow emits **exactly one** [AudioChunk] with `isFinal = true` and then completes. Hard
- * cancellation (job.cancel) skips the emission entirely.
+ * Lifecycle: caller collects [captureChunks]; either calls [requestStop] OR the flow self-
+ * terminates at the cap. Either path emits exactly one [AudioChunk] (`isFinal = true`) then
+ * completes. Hard cancellation (job.cancel) skips the emission. Audio past 30 s is silently
+ * truncated at this layer; the UI owns the time-remaining indicator. The deferred >30 s
+ * orchestration lives in backlog row `multi-chunk-foreground`.
  *
- * The >30 s multi-chunk orchestration (intermediate transcription-only call + final call with
- * concatenated transcript-so-far) was deferred to backlog row `multi-chunk-foreground` after the
- * STT-B fallback — v1 does not chunk. Audio past 30 s is silently truncated at the audio layer;
- * the UI (Phase 4) is responsible for showing the user the time remaining.
- *
- * This class never persists audio. Story 1.5's harness writes a temp WAV only when LiteRT-LM
- * needs `Content.AudioFile` and deletes it within the same call.
+ * Never persists audio. The temp WAV that LiteRT-LM needs is owned by [ForegroundInference]
+ * and deleted inside its own call.
  */
 class AudioCapture(
     private val sampleRateHz: Int = SAMPLE_RATE_HZ,
@@ -68,12 +61,9 @@ class AudioCapture(
     }
 
     /**
-     * Pump the [record]'s read loop until either the 30 s cap fires (returns the cap chunk) or
-     * the loop exits via [requestStop] / coroutine cancellation (returns `null`; caller drains
-     * the partial buffer). Extracted from [captureChunks] to keep both methods under Sonar's
-     * cognitive-complexity ceiling and detekt's single-jump-per-loop ceiling. `internal` only
-     * so the JVM unit tests in `AudioCaptureTest` can drive it directly with a mocked
-     * [AudioRecord]; not part of the public API.
+     * Returns the cap chunk if the 30 s window completes, or `null` on [requestStop] /
+     * coroutine cancellation (caller drains the partial buffer). `internal` for JVM testability,
+     * not public API.
      */
     internal suspend fun readUntilCapOrStop(
         record: AudioRecord,
@@ -90,19 +80,14 @@ class AudioCapture(
     }
 
     /**
-     * Append [readCount] samples from [readBuffer] into [builder]; return the cap chunk if
-     * `builder.append` produced a complete window, otherwise null. Extracted so the loop in
-     * [readUntilCapOrStop] only contains one jump statement and stays under detekt's
-     * `LoopWithTooManyJumpStatements` ceiling. `internal` only so the JVM unit tests in
-     * `AudioCaptureTest` can pin the empty / single-chunk / multi-chunk-WARN paths without
-     * routing through a real `AudioRecord`; not part of the public API.
+     * Returns the cap chunk if [builder] completes a window from [readCount] samples, otherwise
+     * null. Extras (multi-chunk readouts) are discarded with a WARN — v1 never buffers past the
+     * cap; the deferred orchestration lives in backlog row `multi-chunk-foreground`. `internal`
+     * for JVM testability, not public API.
      */
     internal fun tryBuildCapChunk(builder: ChunkBuilder, readBuffer: FloatArray, readCount: Int): AudioChunk? {
         val complete = builder.append(readBuffer, readCount)
         if (complete.isEmpty()) return null
-        // The 30 s cap fired. v1 emits the first complete chunk and drops any extras —
-        // multi-chunk orchestration is deferred to backlog `multi-chunk-foreground`, so we
-        // never buffer past 30 s.
         if (complete.size > 1) {
             Log.w(TAG, "30s cap fired; ${complete.size - 1} tail chunk(s) discarded.")
         }

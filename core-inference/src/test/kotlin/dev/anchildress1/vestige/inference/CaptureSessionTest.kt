@@ -140,9 +140,6 @@ class CaptureSessionTest {
         session.recordModelResponse("m", Persona.WITNESS)
         assertEquals(CaptureSession.State.RESPONDED, session.state)
 
-        // The STT-B fallback made each session single-use. Looping a second turn from RESPONDED
-        // would silently re-introduce the multi-turn semantics that failed STT-B; the contract
-        // is "construct a fresh CaptureSession for the next recording" instead.
         val ex = assertThrows(IllegalStateException::class.java) { session.startRecording() }
         assertTrue(ex.message!!.contains("startRecording"))
         assertTrue(ex.message!!.contains("RESPONDED"))
@@ -187,7 +184,6 @@ class CaptureSessionTest {
     fun `ERROR is terminal — startRecording is illegal after fail`() {
         val session = CaptureSession()
         session.fail(RuntimeException("boom"))
-        // Recovery from ERROR means constructing a fresh CaptureSession; no in-place clearError.
         val ex = assertThrows(IllegalStateException::class.java) { session.startRecording() }
         assertTrue(ex.message!!.contains("ERROR"))
     }
@@ -261,11 +257,6 @@ class CaptureSessionTest {
         session.recordTranscription("user said this")
         session.recordModelResponse("model replied", Persona.WITNESS)
 
-        // Capture the snapshot AT RESPONDED, then attempt every illegal transition the
-        // single-use lifecycle forbids. Each throws; the snapshot taken before the throws
-        // must be unchanged afterward (Transcript.turns returns a defensive copy + the
-        // illegal transitions cannot mutate state because they throw before the
-        // transcript.append call inside the body).
         val snapshot = session.transcript.turns
 
         assertThrows(IllegalStateException::class.java) { session.startRecording() }
@@ -273,8 +264,8 @@ class CaptureSessionTest {
         assertThrows(IllegalStateException::class.java) { session.recordTranscription("u2") }
         assertThrows(IllegalStateException::class.java) { session.recordModelResponse("m2", Persona.HARDASS) }
 
-        assertEquals(2, snapshot.size, "Snapshot taken before illegal transitions must stay 2-deep")
-        assertEquals(snapshot, session.transcript.turns, "Live transcript must also be unchanged")
+        assertEquals(2, snapshot.size)
+        assertEquals(snapshot, session.transcript.turns)
         assertEquals("user said this", snapshot[0].text)
         assertEquals("model replied", snapshot[1].text)
     }
@@ -306,7 +297,6 @@ class CaptureSessionTest {
         assertEquals(CaptureSession.State.RESPONDED, session.state)
         assertEquals(Persona.EDITOR, session.activePersona)
 
-        // setPersona on a terminal state is harmless — the value just doesn't get used.
         session.fail(RuntimeException("boom"))
         session.setPersona(Persona.HARDASS)
         assertEquals(CaptureSession.State.ERROR, session.state)

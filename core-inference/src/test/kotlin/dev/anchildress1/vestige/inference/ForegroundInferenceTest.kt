@@ -111,30 +111,13 @@ class ForegroundInferenceTest {
 
         val systemPrompt = (captured.captured[0] as Content.Text).text
         assertAll(
-            { assertTrue(systemPrompt.contains("Persona: Editor"), "Missing persona tag in prompt") },
-            { assertTrue(systemPrompt.contains("cognition tracker"), "Missing shared sentinel in prompt") },
-            // STT-B fallback: no `## RECENT TURNS` block in the prompt anymore. Single-turn-per-capture.
-            {
-                assertFalse(
-                    systemPrompt.contains("RECENT TURNS"),
-                    "Recent-turns block was removed by the STT-B fallback",
-                )
-            },
-            // The schema reminder describes the format prose-only — no literal example tags so
-            // the model can't echo placeholder content the parser would mistake for a response.
-            {
-                assertTrue(systemPrompt.contains("transcription tags"), "Output schema must mention transcription tags")
-            },
-            { assertTrue(systemPrompt.contains("follow_up tags"), "Output schema must mention follow_up tags") },
-            {
-                assertFalse(
-                    systemPrompt.contains("<transcription>"),
-                    "Schema example must not contain literal opening tag",
-                )
-            },
-            {
-                assertFalse(systemPrompt.contains("<follow_up>"), "Schema example must not contain literal opening tag")
-            },
+            { assertTrue(systemPrompt.contains("Persona: Editor")) },
+            { assertTrue(systemPrompt.contains("cognition tracker")) },
+            { assertFalse(systemPrompt.contains("RECENT TURNS")) },
+            { assertTrue(systemPrompt.contains("transcription tags")) },
+            { assertTrue(systemPrompt.contains("follow_up tags")) },
+            { assertFalse(systemPrompt.contains("<transcription>")) },
+            { assertFalse(systemPrompt.contains("<follow_up>")) },
         )
     }
 
@@ -155,8 +138,6 @@ class ForegroundInferenceTest {
             { assertInstanceOf(Content.Text::class.java, parts[0]) },
             { assertInstanceOf(Content.AudioFile::class.java, parts[1]) },
         )
-        // The temp WAV path must have lived inside cacheDir during the call. We can't read it
-        // back (deleted in finally), but we can verify the path prefix.
         val audioPath = (parts[1] as Content.AudioFile).absolutePath
         assertTrue(
             audioPath.startsWith(cacheDir.absolutePath),
@@ -282,20 +263,18 @@ class ForegroundInferenceTest {
     }
 
     @Test
-    fun `truncate-on-fail discards audio payload even when delete fails`(@TempDir cacheDir: File) {
-        // The discardTempWav helper falls back to truncate-then-retry-delete on initial delete
-        // failure so the audio payload is unrecoverable even if the inode survives. Unit-testing
-        // an actual delete-failure on the real File API requires platform-specific tricks
-        // (read-only parent dir, file locks); we assert the truncate primitive itself behaves as
-        // promised, which is the load-bearing privacy guarantee.
+    fun `truncate primitive zeros the audio payload`(@TempDir cacheDir: File) {
+        // Pins the load-bearing privacy guarantee in discardTempWav's delete-failure branch
+        // (truncate-then-retry-delete). Triggering a real delete-failure needs OS-specific
+        // setup (read-only parent dir, file locks); we verify the primitive in isolation.
         val payload = File(cacheDir, "vestige-fg-truncate-test.wav")
         payload.writeBytes(ByteArray(1024) { 0x42 })
-        assertEquals(1024, payload.length(), "Test setup: payload must contain audio bytes")
+        assertEquals(1024, payload.length())
 
-        payload.outputStream().use { /* truncate to zero bytes */ }
+        payload.outputStream().use { }
 
-        assertEquals(0L, payload.length(), "Truncate must zero out the audio payload")
-        assertTrue(payload.delete(), "After truncate the now-empty file should be deletable")
+        assertEquals(0L, payload.length())
+        assertTrue(payload.delete())
     }
 
     @Test
@@ -321,7 +300,7 @@ class ForegroundInferenceTest {
             runTest { inference.runForegroundCall(intermediate, Persona.WITNESS) }
         }
         assertTrue(
-            ex.message!!.contains("final-chunk only"),
+            ex.message!!.contains("audio.isFinal == true"),
             "Error must explain the final-chunk contract; was: ${ex.message}",
         )
     }
@@ -340,10 +319,6 @@ class ForegroundInferenceTest {
 
     @Test
     fun `per-capture persona reaches the engine prompt`(@TempDir cacheDir: File) = runTest {
-        // Post-fallback replacement for the deleted "session setPersona routes the next foreground
-        // call through the new persona prompt" multi-turn test. Two independent CaptureSession
-        // instances drive two foreground calls under different personas; each call's prompt must
-        // carry that capture's persona, and neither call sees a `## RECENT TURNS` block.
         val engine = mockk<LiteRtLmEngine>()
         val captured = mutableListOf<List<Content>>()
         coEvery { engine.sendMessageContents(capture(captured)) } returns rawSuccess("u", "f")
@@ -363,12 +338,12 @@ class ForegroundInferenceTest {
         val firstPrompt = (captured[0][0] as Content.Text).text
         val secondPrompt = (captured[1][0] as Content.Text).text
         assertAll(
-            { assertTrue(firstPrompt.contains("Persona: Witness"), "Capture 1 must carry Witness prompt") },
-            { assertFalse(firstPrompt.contains("Persona: Editor"), "Capture 1 must not carry Editor prompt") },
-            { assertTrue(secondPrompt.contains("Persona: Editor"), "Capture 2 must carry Editor prompt") },
-            { assertFalse(secondPrompt.contains("Persona: Witness"), "Capture 2 must not carry Witness prompt") },
-            { assertFalse(firstPrompt.contains("RECENT TURNS"), "STT-B fallback removed the recent-turns block") },
-            { assertFalse(secondPrompt.contains("RECENT TURNS"), "STT-B fallback removed the recent-turns block") },
+            { assertTrue(firstPrompt.contains("Persona: Witness")) },
+            { assertFalse(firstPrompt.contains("Persona: Editor")) },
+            { assertTrue(secondPrompt.contains("Persona: Editor")) },
+            { assertFalse(secondPrompt.contains("Persona: Witness")) },
+            { assertFalse(firstPrompt.contains("RECENT TURNS")) },
+            { assertFalse(secondPrompt.contains("RECENT TURNS")) },
         )
     }
 

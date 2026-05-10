@@ -3,22 +3,12 @@ package dev.anchildress1.vestige.inference
 import dev.anchildress1.vestige.model.Persona
 import java.time.Instant
 
-/**
- * Who produced the [Turn]. `USER` turns carry Gemma's transcription of the user's spoken audio;
- * `MODEL` turns carry the follow-up response, with the [Turn.persona] that produced them per
- * `concept-locked.md` §Personas. There is no third speaker — personas are a property of the
- * model turn, not a separate participant.
- */
+/** Who produced the [Turn]. Personas are a property of MODEL turns, not a separate speaker. */
 enum class Speaker { USER, MODEL }
 
 /**
- * One contribution inside a [Transcript]. Per `AGENTS.md` guardrail 11 the payload is text only
- * — audio bytes are not persisted on a `Turn` or anywhere else durably. Audio still flows through
- * memory (and a short-lived temp WAV when LiteRT-LM needs `Content.AudioFile`) per Story 1.4 /
- * Story 1.5; that is transient by design and discarded inside the same call.
- *
- * [timestamp] is when the turn entered the transcript (post-transcription for `USER`, post-response
- * for `MODEL`), not when audio capture began.
+ * One contribution inside a [Transcript]. Text only — no audio bytes (AGENTS.md guardrail 11).
+ * [timestamp] is when the turn entered the transcript, not when audio capture began.
  */
 data class Turn(val speaker: Speaker, val text: String, val timestamp: Instant, val persona: Persona? = null) {
     init {

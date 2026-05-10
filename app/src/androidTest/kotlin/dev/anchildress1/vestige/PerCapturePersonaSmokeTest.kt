@@ -23,35 +23,22 @@ import java.nio.ByteBuffer
 import java.nio.ByteOrder
 
 /**
- * Story 2.3 — per-capture persona smoke test (manual, visual inspection).
+ * Per-capture persona smoke test (manual, on-device, visual inspection).
  *
- * Post-STT-B-fallback replacement for `PersonaSwitchSessionSmokeTest` (deleted with the multi-turn
- * machinery). Drives the Story 2.2 foreground path three times — one **fresh** [CaptureSession]
- * per persona — against the same audio buffer and verifies that:
+ * Drives the foreground path three times — one fresh [CaptureSession] per persona — against
+ * the same audio buffer. Asserts each follow-up is non-blank, pairwise-different, and the
+ * recorded `Turn.persona` matches the capture's persona. Operator inspects logcat for tone.
  *
- *  - each persona produces a non-blank follow-up;
- *  - the follow-ups are pairwise different (per `concept-locked.md` §Personas — tone-only variants
- *    must produce visibly distinct prose for the same input);
- *  - each session's recorded `Turn` carries the persona that authored it (`Turn.persona`).
- *
- * The follow-ups are stochastic; the assertion is "different strings", not a fixed shape. The
- * human running this test compares the three logcat blocks visually.
- *
- * Prerequisites — adb-push the model and a sample WAV (16 kHz mono PCM_S16LE, ≤ 30 s) to the
- * device:
+ * Push artifacts then run:
  *
  *   adb push gemma-4-E4B-it.litertlm /data/local/tmp/
  *   adb push sample.wav              /data/local/tmp/
- *
- * Then run:
- *
  *   ./gradlew :app:connectedDebugAndroidTest \
  *     -PmodelPath=/data/local/tmp/gemma-4-E4B-it.litertlm \
  *     -PaudioPath=/data/local/tmp/sample.wav \
  *     -Pandroid.testInstrumentationRunnerArguments.class=dev.anchildress1.vestige.PerCapturePersonaSmokeTest
  *
- * If either argument is missing the test is skipped via [assumeTrue] so CI without the artifacts
- * stays green.
+ * Missing args → [assumeTrue] skips so CI without artifacts stays green.
  */
 @RunWith(AndroidJUnit4::class)
 class PerCapturePersonaSmokeTest {
@@ -114,12 +101,8 @@ class PerCapturePersonaSmokeTest {
     }
 
     /**
-     * Drive one fresh [CaptureSession] under [persona] through the Story 2.2 foreground path. The
-     * STT-B fallback made each session single-use, so this constructs a brand-new instance per
-     * persona — there is no `setPersona` mid-session anymore. Asserts the `Turn.persona` recorded
-     * on the model turn matches the persona we passed in. Returns a [CaptureResult] carrying the
-     * follow-up text + measured per-call latency so the caller can run pairwise-divergence and
-     * latency-budget checks together.
+     * Drive one fresh [CaptureSession] under [persona]. Returns the follow-up text + measured
+     * per-call latency for the caller's divergence + budget assertions.
      */
     private suspend fun runOneCaptureUnderPersona(
         inference: ForegroundInference,
@@ -146,32 +129,24 @@ class PerCapturePersonaSmokeTest {
     }
 
     /**
-     * Soft-assert per-capture latency against [latencyBudgetMs]. Default budget (60_000 ms) is
-     * deliberately generous — the post-fallback baseline on E4B CPU is ~24–33 s per call (Story
-     * 2.3 device record); the budget catches a 2× regression past that baseline without failing
-     * on the ADR-002 §"Latency budget" 1–5 s aspirational target that's known unmet on CPU.
-     * Override at run time with `-PlatencyBudgetMs=<ms>` to tighten or loosen.
+     * Default budget (60_000 ms) catches a ~2× regression past the documented ~24–33 s E4B CPU
+     * baseline without failing on the unmet 1–5 s ADR-002 target. Override with
+     * `-PlatencyBudgetMs=<ms>`.
      */
     private fun assertWithinLatencyBudget(captures: Map<Persona, CaptureResult>, latencyBudgetMs: Long) {
         val overruns = captures.filterValues { it.elapsedMs > latencyBudgetMs }
         if (overruns.isNotEmpty()) {
             val detail = overruns.entries.joinToString(", ") { (p, c) -> "${p.name}=${c.elapsedMs}ms" }
             error(
-                "Per-capture latency exceeded budget ${latencyBudgetMs}ms: $detail. " +
-                    "Story 2.3 device record baseline is ~24–33 s on E4B CPU; a budget overrun " +
-                    "indicates either a real regression or a busy device. Re-run on quiescent " +
-                    "hardware before treating this as a hard fail.",
+                "Per-capture latency exceeded ${latencyBudgetMs}ms: $detail. " +
+                    "Re-run on a quiescent device before treating as a hard fail.",
             )
         }
     }
 
-    /** Per-capture verdict carrying the follow-up text and the measured ForegroundResult elapsedMs. */
     private data class CaptureResult(val followUp: String, val elapsedMs: Long)
 
-    /**
-     * Reads a mono WAV (PCM_S16LE or IEEE_FLOAT) and returns normalized float samples. Mirrors
-     * the parser in `SttAAudioPlumbingTest` — kept inline so this smoke test stays a single file.
-     */
+    /** Mono WAV reader (PCM_S16LE or IEEE_FLOAT). Inlined; mirrors `SttAAudioPlumbingTest`. */
     private fun readMonoFloatWavSamples(file: File): FloatArray {
         val buf = ByteBuffer.wrap(file.readBytes()).order(ByteOrder.LITTLE_ENDIAN)
         buf.position(RIFF_WAVE_PREFIX_BYTES)

@@ -26,22 +26,12 @@ sealed interface BackendChoice {
 /**
  * Thin lifecycle wrapper around LiteRT-LM's [Engine]. Long-lived: call [initialize] once after
  * the model artifact is verified, then [generateText] (text-only) or [sendMessageContents]
- * (multimodal — STT-A audio probes) for each call. The native engine is released on [close].
+ * (multimodal) per call. The native engine is released on [close].
  *
- * **Single-turn-per-capture (v1).** Each [sendMessageContents] / [generateText] call opens a
- * fresh `engine.createConversation()` handle and closes it immediately. Per-capture session
- * state (active persona + the in-flight `CaptureSession` instance) lives in `:app`. Cross-
- * capture multi-turn — accumulated transcript, persistent SDK `Conversation`, KV-cache reuse —
- * does not exist in v1 per the STT-B v1 scope choice (see
- * `adrs/ADR-005-stt-b-scope-and-v1-single-turn.md`, which amends
- * `adrs/ADR-002-multi-lens-extraction-pattern.md` §"Multi-turn behavior"). The fresh-handle-
- * per-call pattern this wrapper exposes is the same pattern STT-B measured; a future revival
- * of multi-turn would need a different wrapper that holds the `Conversation` open across
- * multiple `sendMessage` calls (revival pointer in ADR-005 §"Future revival path").
- *
- * The on-device smoke test that exercises the actual Gemma 4 E4B model lives in
- * `:app/src/androidTest/.../LiteRtLmTextSmokeTest.kt` (Story 1.3) and the STT-A audio harness
- * lives at `:app/src/androidTest/.../SttAAudioPlumbingTest.kt` (Story 1.5).
+ * Each call opens a fresh `engine.createConversation()` and closes it immediately — the SDK's
+ * stateful Conversation (persistent handle across multiple `sendMessage` calls with native KV-
+ * cache reuse) is intentionally not exposed in v1. A future multi-turn revival would need a
+ * different wrapper; see `adrs/ADR-005-stt-b-scope-and-v1-single-turn.md` for context.
  */
 class LiteRtLmEngine(
     private val modelPath: String,
@@ -93,9 +83,8 @@ class LiteRtLmEngine(
     }
 
     /**
-     * Multimodal one-shot. Used by Story 1.5's STT-A probe to send `Content.AudioBytes` or
-     * `Content.AudioFile` alongside a transcription prompt. Single-turn — opens and closes a
-     * conversation per call.
+     * Multimodal one-shot for `Content.AudioBytes` / `Content.AudioFile` alongside a text prompt.
+     * Opens and closes a conversation per call.
      */
     suspend fun sendMessageContents(parts: List<Content>): String = withContext(ioDispatcher) {
         val active = checkNotNull(engine) {

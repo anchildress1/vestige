@@ -19,10 +19,8 @@ import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 
 /**
- * JVM-level checks for [AudioCapture]. The on-device read loop runs against a real
- * `AudioRecord` only in `PerCapturePersonaSmokeTest` (instrumented); these tests pin the
- * helpers + the precondition checks so the JVM coverage floor is real and the post-fallback
- * 30 s cap behavior is verified without needing the device.
+ * JVM-level checks for [AudioCapture]. The full `captureChunks` flow against a real
+ * `AudioRecord` runs in `PerCapturePersonaSmokeTest` (instrumented).
  */
 class AudioCaptureTest {
 
@@ -30,9 +28,8 @@ class AudioCaptureTest {
 
     @BeforeEach
     fun setUpLogStub() {
-        // Robolectric isn't applied here; android.util.Log is final and would throw on JVM.
-        // mockkStatic short-circuits the static calls so tryBuildCapChunk's WARN path runs and
-        // we can verify the message shape without dragging a Robolectric runtime in.
+        // android.util.Log is final and throws on JVM without a shadow; mockkStatic lets the
+        // tryBuildCapChunk WARN path run without pulling in Robolectric.
         mockkStatic(Log::class)
         every { Log.w(any<String>(), any<String>()) } returns 0
     }
@@ -67,8 +64,6 @@ class AudioCaptureTest {
 
     @Test
     fun `captureChunks throws when AudioRecord reports an unsupported format`() = runTest {
-        // With isReturnDefaultValues=true, AudioRecord.getMinBufferSize returns 0.
-        // check(0 > 0) raises the device-support error before any emission occurs.
         val capture = AudioCapture()
         val result = runCatching { capture.captureChunks().collect {} }
         assertTrue(result.isFailure) { "Expected failure when AudioRecord cannot initialize" }
@@ -109,8 +104,6 @@ class AudioCaptureTest {
 
     @Test
     fun `tryBuildCapChunk emits first chunk and WARN-logs when builder yields multiple complete chunks`() {
-        // ChunkBuilder with samplesPerChunk=2 + a 6-sample read produces 3 complete chunks. v1
-        // emits only the first; the rest are discarded with a WARN documenting the truncation.
         val capture = AudioCapture(sampleRateHz = 16_000, chunkDurationMs = 30_000L)
         val builder = ChunkBuilder(samplesPerChunk = 2)
         val readBuffer = floatArrayOf(1f, 2f, 3f, 4f, 5f, 6f)
@@ -135,7 +128,6 @@ class AudioCaptureTest {
         val builder = ChunkBuilder(samplesPerChunk = 4)
         val readBuffer = FloatArray(4)
         val record = mockk<AudioRecord>()
-        // Simulate AudioRecord.read filling the buffer with 4 samples of audio in one call.
         every {
             record.read(readBuffer, 0, readBuffer.size, AudioRecord.READ_BLOCKING)
         } answers {
@@ -157,7 +149,6 @@ class AudioCaptureTest {
     @Test
     fun `readUntilCapOrStop returns null when requestStop fires before the cap`() = runTest {
         val capture = AudioCapture(sampleRateHz = 16_000, chunkDurationMs = 30_000L)
-        // Big chunk; small reads → never completes within the requested-stop window.
         val builder = ChunkBuilder(samplesPerChunk = 1_000)
         val readBuffer = FloatArray(8)
         val record = mockk<AudioRecord>()
@@ -166,8 +157,6 @@ class AudioCaptureTest {
             record.read(readBuffer, 0, readBuffer.size, AudioRecord.READ_BLOCKING)
         } answers {
             reads += 1
-            // After a couple of partial reads, request the stop. The next loop iteration sees
-            // stopRequested==true at the head of the while predicate and exits.
             if (reads >= 2) capture.requestStop()
             8
         }
@@ -201,10 +190,7 @@ class AudioCaptureTest {
 
     @Test
     fun `readUntilCapOrStop returns null when read produces 0 samples and stop fires later`() = runTest {
-        // Defensive zero-read branch: AudioRecord.READ_BLOCKING can return 0 (no samples ready
-        // this tick) and the loop must continue without trying to build a chunk from nothing.
-        // After a couple of zero-reads we requestStop; the loop exits null without ever calling
-        // tryBuildCapChunk.
+        // AudioRecord.READ_BLOCKING can legitimately return 0; the loop must not synthesize a chunk.
         val capture = AudioCapture(sampleRateHz = 16_000, chunkDurationMs = 30_000L)
         val builder = ChunkBuilder(samplesPerChunk = 1_000)
         val readBuffer = FloatArray(8)

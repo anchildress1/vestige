@@ -286,6 +286,29 @@ class ConvergenceResolverTest {
     }
 
     @Test
+    fun `empty extraction list resolves to empty fields`() {
+        val resolved = resolver.resolve(emptyList())
+
+        assertEquals(emptyMap<String, ResolvedField>(), resolved.fields)
+    }
+
+    @Test
+    fun `tags fallback uses first populated lens when Literal has none`() {
+        val literal = LensExtraction(Lens.LITERAL, fields = mapOf("tags" to emptyList<String>()))
+        val inferential = LensExtraction(Lens.INFERENTIAL, fields = mapOf("tags" to listOf("roadmap")))
+        val skeptical = LensExtraction(Lens.SKEPTICAL, fields = mapOf("tags" to listOf("review")))
+
+        val resolved = resolver.resolve(listOf(literal, inferential, skeptical))
+
+        // No tag reaches majority and Literal contributed nothing — fallback is the first populated
+        // lens's first tag (Inferential's "roadmap").
+        assertEquals(
+            ResolvedField(value = listOf("roadmap"), verdict = ConfidenceVerdict.CANDIDATE),
+            resolved.fields["tags"],
+        )
+    }
+
+    @Test
     fun `field union covers keys present on only one lens`() {
         val literal = LensExtraction(Lens.LITERAL, fields = mapOf("template_label" to "aftermath"))
         val inferential = LensExtraction(Lens.INFERENTIAL, fields = mapOf("energy_descriptor" to "flattened"))

@@ -66,7 +66,7 @@ class DefaultConvergenceResolver : ConvergenceResolver {
         populated: List<Pair<Lens, Any>>,
         matchingFlags: List<String>,
     ): ResolvedField {
-        val groups: Map<Any?, List<Any>> = populated.groupBy(
+        val groups: Map<Any, List<Any>> = populated.groupBy(
             keySelector = { canonicalize(key, it.second) },
             valueTransform = { it.second },
         )

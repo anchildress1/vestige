@@ -101,6 +101,21 @@ class EntryEntitySmokeTest {
     }
 
     @Test
+    fun `non-terminal recovery query returns only pending and running entry ids`() {
+        val entryBox = boxStore.boxFor<EntryEntity>()
+        val pendingId = entryBox.put(EntryEntity(extractionStatus = ExtractionStatus.PENDING))
+        val runningId = entryBox.put(EntryEntity(extractionStatus = ExtractionStatus.RUNNING))
+        entryBox.put(EntryEntity(extractionStatus = ExtractionStatus.COMPLETED))
+        entryBox.put(EntryEntity(extractionStatus = ExtractionStatus.TIMED_OUT))
+        entryBox.put(EntryEntity(extractionStatus = ExtractionStatus.FAILED))
+
+        assertEquals(
+            listOf(pendingId, runningId),
+            VestigeBoxStore.findNonTerminalEntryIds(boxStore),
+        )
+    }
+
+    @Test
     fun `Pattern entity persists lifecycle state and observation timestamp`() {
         val patternBox = boxStore.boxFor<PatternEntity>()
         val pattern = PatternEntity(

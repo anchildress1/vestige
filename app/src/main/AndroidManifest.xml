@@ -9,6 +9,12 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
 
+    <!-- Conditional foreground service for background extraction (ADR-004). The service promotes
+         only while at least one entry's extraction_status is non-terminal; demotes after a 30s
+         keep-alive. POST_NOTIFICATIONS is asked at onboarding screen 3.5 in Phase 4. -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
+
     <!-- The mic is required hardware. -->
     <uses-feature
         android:name="android.hardware.microphone"
@@ -37,5 +43,10 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <service
+            android:name=".lifecycle.BackgroundExtractionService"
+            android:exported="false"
+            android:foregroundServiceType="dataSync" />
     </application>
 </manifest>

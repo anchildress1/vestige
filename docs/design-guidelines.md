@@ -124,7 +124,7 @@ Dark only — no light theme in v1.
 - Both accents *may* appear in the same component **when they carry different roles on different elements.** Example: a pattern card with a `glow` left-rule (identity) and a `vapor` focus ring when keyboard-focused (interaction state). Example: a Roast sheet with a `glow` header and a `vapor` active-recording indicator inside.
 - **Forbidden:** a single element rendered in both colors. No `glow → vapor` gradients, no half-and-half buttons, no two-tone icons. One element, one accent at a time.
 - **Forbidden:** the same semantic role rendered in different colors on the same screen. Two "active patterns" on one screen are both `glow`; don't alternate for variety.
-- No gradients between accents. No additional glows or halos beyond the atmospheric layer defined in `design-review.md` §2.4.
+- No gradients between accents. No **unspecified** glows or halos beyond what the design-review primitives define — `MistHero` (§"Component Conventions / MistHero") explicitly carries an outer halo that scales with audio level + a `vapor` rim on stop, and the atmospheric layer in `design-review.md` §2.4 defines the ambient noise/fog drift. Anything else is a forbidden ad-hoc glow.
 
 ### Where each accent lives
 

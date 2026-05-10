@@ -58,7 +58,7 @@ Edge cases:
 - Voice input via native Gemma 4 audio modality (no STT step)
 - Audio chunking per `adrs/ADR-001-stack-and-build-infra.md` §Q4: ≤30s capture = single call returns transcription + follow-up; >30s capture = transcription-only intermediate chunks + final call returns transcription + one follow-up over the concatenated transcript
 - Audio bytes discarded after each call; transcription persists as `entry_text` (same posture as a typed note)
-- Multi-turn conversation works — the model maintains session context across at least 4 exchanges
+- **Single-turn-per-capture** (STT-B fallback per `adrs/ADR-002-multi-lens-extraction-pattern.md` §"Multi-turn behavior"): each recording produces one self-contained transcription + follow-up exchange. Subsequent recordings start a fresh capture. The conversation transcript becomes a list of independent entries rather than a session.
 - Witness / Hardass / Editor personas fully working as prompt-and-copy variants. They change tone only, not extraction logic. This keeps onboarding honest and gives the demo its visible bite without adding a second analytical system.
 - Multi-lens extraction pipeline (3 lenses × 5 surfaces) producing the minimal v1 schema with convergence-based confidence. Templates are agent-emitted labels (Aftermath, Tunnel exit, Concrete shoes, Decision spiral, Goblin hours, Audit), not user-picked.
 - Tag extraction per entry, visible to user, stored as queryable structured data
@@ -86,7 +86,7 @@ Edge cases:
 
 **UX shell:**
 - Dark mode default, intentional design language
-- Onboarding flow handles persona pick → permission → Wi-Fi check → download → first-dump scaffold
+- Onboarding flow handles persona pick → mic permission → notification permission (per ADR-004 §"Permission Flow") → typed-fallback explainer → Wi-Fi check → model download → first-dump scaffold. Eight screens total per `ux-copy.md` §Onboarding.
 - **Persistent local model status indicator/screen visible from app shell or settings.** A judge should understand within 10 seconds that this is a local AI app; the indicator carries that signal alongside the capture screen.
 
 **Submission package:**
@@ -99,7 +99,7 @@ Edge cases:
 
 ### Nice-to-Have (P1) — fast follow-up
 
-- Per-session persona override
+- Per-capture persona selection (selected before each recording; STT-B fallback collapsed the prior "per-session override" framing)
 - All six template labels reliably emitted by agent (low false-positive rate for Audit fallback; specific archetype detection working well across edge cases)
 - **Re-eval / Reading on entry detail** — re-runs the 3-lens pipeline on the stored transcript, shows the diff per surface field, lets the user accept the new shape or keep the original. The implementation is cheap once the 3-lens pipeline exists; ships at P1 if scope holds, otherwise drops to v1.5.
 - **Roast me** bottom sheet from the Patterns screen — sourced, ephemeral, persona-flavored pattern cut. It may use the insufficient-data fallback before enough history exists. Ships only after the normal pattern list works; the core app is not a roast generator with storage attached.
@@ -126,13 +126,13 @@ Edge cases:
 ### Acceptance Criteria
 
 **Onboarding:**
-- Given a fresh install, when the user first opens the app, then they walk through persona pick → mic permission → Wi-Fi check → model download with progress → first-dump scaffold without dead ends.
+- Given a fresh install, when the user first opens the app, then they walk through persona pick → mic permission → notification permission (per ADR-004) → typed-fallback explainer → Wi-Fi check → model download with progress → first-dump scaffold without dead ends.
 
 **Voice capture:**
-- Given the user is in a session, when they tap record and speak ≤30s then stop, then audio is sent to E4B, model returns transcription + a contextually appropriate follow-up in a single response, transcription is shown in the transcript and saved as `entry_text`, and audio bytes are discarded immediately after the model call completes.
+- Given the user is on the capture screen, when they tap record and speak ≤30s then stop, then audio is sent to E4B, model returns transcription + a contextually appropriate follow-up in a single response, transcription is shown alongside the model response and saved as `entry_text`, and audio bytes are discarded immediately after the model call completes.
 
-**Multi-turn:**
-- Given a session has at least two prior exchanges, when the user records a third audio segment, then the model has session context and asks a contextually relevant follow-up referencing earlier turns.
+**Single-turn capture (STT-B fallback):**
+- Given the user records a new entry, when the model returns transcription + follow-up, then that exchange is one complete entry. Starting another recording begins a new entry — the prior turn is not threaded into the new prompt. Per `adrs/ADR-002-multi-lens-extraction-pattern.md` §"Multi-turn behavior", multi-turn was tested across three rounds on E4B CPU and never produced cross-turn context retention; the v1 design pivoted to single-turn-per-capture rather than ship a session UX whose conversation thread is decorative.
 
 **Tag extraction:**
 - Given the user finishes a session, when the entry is saved, then the entry shows ≥1 model-extracted tag and tags are stored as queryable structured data.
@@ -169,7 +169,7 @@ Edge cases:
 - Demo storyboard — exact 90s pitch and 5-min walkthrough beats. *Owner: design + writing, mid-phase.*
 
 **Blocking (must resolve at the relevant stop-and-test point):**
-- Does multi-turn conversation work on E4B with our prompt patterns? If broken at the Phase 2 multi-turn stop-and-test point, the spec rebuilds.
+- ~~Does multi-turn conversation work on E4B with our prompt patterns?~~ **Resolved 2026-05-09: NO.** Three STT-B rounds on E4B CPU (S24 Ultra) produced retention=0.0 even after the prompt was rewritten with an explicit instruction telling Gemma to reference prior turns. Spec pivoted to single-turn-per-capture per the documented STT-B fallback. See `adrs/ADR-002-multi-lens-extraction-pattern.md` §"Multi-turn behavior" for round-by-round numbers.
 - Is tool-calling reliable enough on E4B for a single agentic demo beat? Decides whether agentic feature ships.
 
 ## Timeline — Ordered Phases
@@ -185,7 +185,7 @@ The five stop-and-test points are:
 | # | Failure zone | Lives in | Failure mode | If it fails |
 |---|---|---|---|---|
 | **STT-A** | Audio input plumbing — can we feed bytes to E4B at all? | Phase 1, audio pipeline | Format/encoding error; LiteRT-LM `AudioBytes`/`AudioFile` doesn't accept what we're passing | Stop and replan. This is existential — without audio in, the pitch dies. Time-box debugging to a hard limit (e.g., one focused day). |
-| **STT-B** | Multi-turn conversation reliability on E4B | Phase 2, capture loop | Model loses session context across 3+ turns; per-benchmark E4B is fragile here | Drop to single-turn extract-and-respond. Loop weaker but product still ships. Spec re-write needed for the conversation UX. |
+| **STT-B** ~~| Multi-turn conversation reliability on E4B | Phase 2, capture loop | Model loses session context across 3+ turns~~ **FAILED 2026-05-09 — fallback executed.** Three rounds on E4B CPU (S24 Ultra) produced retention=0.0 even with an explicit instruction to use prior turns. v1 ships single-turn-per-capture. See `adrs/ADR-002-multi-lens-extraction-pattern.md` §"Multi-turn behavior" for round-by-round numbers and the post-fail spec pivot. |
 | **STT-C** | Tag extraction consistency across 10+ varied dumps | Phase 2, extraction | Model returns inconsistent tags for similar content; pattern engine downstream gets noisy | Tighten extraction prompt; if still bad, accept noisy patterns and document as known limitation. |
 | **STT-D** | 3-lens convergence is meaningfully different sometimes | Phase 2, multi-lens pipeline | Lenses always return identical outputs — architecture earns nothing | Drop multi-lens to single-pass. Remove "Reading" debug screen. Architecture story weakens but app ships. |
 | **STT-E** | EmbeddingGemma visibly outperforms tag-only on prepared sample data | Phase 3, retrieval | Same retrieval results between methods on demo scenarios | Ship without embeddings. Drop the ObjectBox vector index. EmbeddingGemma defers to v1.5. |
@@ -208,7 +208,7 @@ Sample data for STT-C, STT-D, STT-E lives in `sample-data-scenarios.md`.
 
 ### Phase 2 — Core capture loop
 1. Capture loop end-to-end: record → fast foreground transcription + follow-up → background 3-lens extraction → save with convergence confidence
-2. Multi-turn session state preservation. **🛑 STT-B — multi-turn reliability.** Test that model maintains context across 3+ turns. If broken on E4B, drop to single-turn extract-and-respond and re-write the conversation UX.
+2. ~~Multi-turn session state preservation.~~ **🛑 STT-B FAILED 2026-05-09 — fallback executed.** Three rounds on E4B CPU produced retention=0.0; multi-turn session state was dropped from v1. The capture loop is single-turn-per-recording: each new tap of record begins a fresh session and the model never sees prior turns. See `adrs/ADR-002-multi-lens-extraction-pattern.md` §"Multi-turn behavior".
 3. Multi-lens prompt architecture (5 surface modules + 3 lens modules, mix-and-match composition). **🛑 STT-D — 3-lens convergence differs.** Run sample transcripts (`sample-data-scenarios.md`) through all three lenses; verify lenses produce meaningfully different outputs at least sometimes. If they always agree, drop multi-lens to single-pass and remove the Reading screen.
 4. Convergence resolver (canonical / candidate / ambiguous per field). **🛑 STT-C — tag extraction consistency.** Run 10+ varied test dumps through the resolver; verify stable tag emission. If unstable, tighten prompts.
 5. Agent-emitted template labels with archetype detection rules
@@ -224,7 +224,7 @@ Sample data for STT-C, STT-D, STT-E lives in `sample-data-scenarios.md`.
 
 ### Phase 4 — UX surface
 1. Onboarding flow with model download UX
-2. Session UI polish (record button, chunk indicator, conversation transcript)
+2. Capture UI polish (`MistHero` capture stone with `AudioMeter` per `poc/design-review.md` §3.3 / §3.4, chunk indicator, single-turn entry transcript)
 3. History list + entry detail (transcript, tags, template label, per-entry observation)
 4. Polished Pattern List + Pattern Detail UI, action affordances, empty states
 5. Persistent Local Model Status indicator/screen (P0 — visible from app shell or settings)
@@ -232,7 +232,7 @@ Sample data for STT-C, STT-D, STT-E lives in `sample-data-scenarios.md`.
 7. Dark mode design language pass — color, type, spacing
 8. Empty states for major screens
 9. Top three polished error states (download fail/stall, inference timeout/fail, mic denied/unavailable)
-10. P1: per-session persona override
+10. P1: per-capture persona selection (the prior "per-session override" framing was retired with the STT-B fallback)
 11. P1: Re-eval / Reading on entry detail (if scope holds)
 12. P1: Roast me bottom sheet (if normal pattern evidence is already solid)
 
@@ -275,6 +275,7 @@ If no → reject, log to `backlog.md`, respond: *"this doesn't help us win, defe
 - `adrs/ADR-001-stack-and-build-infra.md` — stack and build-infra decisions
 - `adrs/ADR-002-multi-lens-extraction-pattern.md` — agent design pattern
 - `adrs/ADR-003-pattern-detection-and-persistence.md` — pattern detection algorithm and lifecycle
+- `adrs/ADR-004-app-backgrounding-and-model-handle-lifecycle.md` — conditional foreground service contract; Option 1 always-on as documented fallback
 - `architecture-brief.md` — module breakdown, build plan, interface contracts
 - `sample-data-scenarios.md` — stop-and-test validation transcripts (STT-C, STT-D, STT-E)
 - `backlog.md` — features deferred from v1, with rationale and "what would unblock" per entry

@@ -21,7 +21,7 @@ Keep these consistent. Don't mix.
 
 ---
 
-## Onboarding (7 screens, sequential)
+## Onboarding (8 screens, sequential)
 
 ### Screen 1 — Pick a persona
 
@@ -76,6 +76,30 @@ Secondary action:
 
 If denied:
 > Mic permission required to record. Settings → Permissions.
+
+---
+
+### Screen 3.5 — Notification permission
+
+Header:
+> **One status notification.**
+
+Body:
+> Vestige briefly shows a status when it's working locally on an entry. That's the only notification it will ever send. It disappears when work is done.
+
+Primary action:
+> **Allow notifications**
+
+Secondary action:
+> **Skip — work runs in foreground only**
+
+If skipped:
+> *(no error state — extractions only complete while the app is in the foreground; the cold-start sweep recovers the rest)*
+
+Notification text when posted (per `adrs/ADR-004-app-backgrounding-and-model-handle-lifecycle.md` §"Notification Contract"):
+> Reading the entry.
+
+This string is the same one used for mid-session inference loading copy (see §"Loading States" below — single source of truth for both surfaces).
 
 ---
 

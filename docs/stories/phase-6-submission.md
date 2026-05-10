@@ -150,7 +150,7 @@ Produce the four deliverables the submission requires: the **APK** (signed relea
 - [ ] Icon is rendered in the standard Android adaptive-icon sizes (foreground + background layers).
 - [ ] Icon ships in the final APK from Story 6.6.
 - [ ] Cover image (1200×630 for dev.to, video thumbnail aspect for the demo video) uses the locked palette: deep blue-black background, the partial footprint motif, the title `Vestige`, and the tagline (or the hook if the tagline is too long for the layout).
-- [ ] No purple or blue in the icon itself unless they earn the moment per `design-guidelines.md` §"Where each accent lives" (icon is generally a low-saturation moment; the accent lives in-app where the user is acting).
+- [ ] No `glow` or `vapor` in the icon itself unless they earn the moment per `design-guidelines.md` §"Where each accent lives" (icon is generally a low-saturation moment; the accent lives in-app where the user is acting).
 - [ ] Cover image embedded in the dev.to post (Story 6.4) and used as the video thumbnail (Story 6.3).
 
 **Notes / risks:** The icon is one of the four things every install begins with. A generic icon undercuts every other piece of brand work. The forensic-procedural / wellness-app traps from `design-guidelines.md` §"Iconography — wrong register" still apply: no fingerprints, no magnifiers, no brains, no leaves, no clipboards.

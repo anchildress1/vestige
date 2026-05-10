@@ -32,7 +32,7 @@ No extra modules in v1 unless they remove a real compile or ownership problem. D
 | Singleton | Lifecycle | Owns |
 |---|---|---|
 | `ModelArtifactStore` | process-scoped | model file path, download state, SHA-256 verification, re-download/delete model |
-| `ModelHandle` | process-scoped, lazy after artifact verified | loaded LiteRT-LM engine and conversation factory |
+| `ModelHandle` | process-scoped, lazy after artifact verified. Backgrounding/lifecycle behavior per `adrs/ADR-004-app-backgrounding-and-model-handle-lifecycle.md` (conditional foreground service in v1, Option 1 always-on as documented fallback). | loaded LiteRT-LM engine and conversation factory |
 | `NetworkGate` | process-scoped | sole HTTP/download path; `OPEN` only during model download, `SEALED` otherwise |
 | `EntryStore` | process-scoped | ObjectBox entry/tag writes plus markdown source-of-truth |
 | `PatternStore` | process-scoped | ObjectBox pattern persistence, lifecycle state machine, and pattern detection algorithm per `adrs/ADR-003-pattern-detection-and-persistence.md` |

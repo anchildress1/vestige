@@ -53,7 +53,7 @@ Produce one cohesive Android mobile design direction for the following screens:
 
 Plus:
 - One app icon direction (with 2 alternates)
-- Core component styling (record button, transcript turn, pattern card, persona toggle)
+- Core component styling (`MistHero`, transcript turn, pattern card with `TraceBar`, persona toggle, `AppShellTop` status pill — see `poc/design-review.md` §3 for primitives)
 - Embedded microcopy examples per screen
 
 ---
@@ -92,56 +92,79 @@ Do not:
 
 ## Visual System
 
-### Palette (dark only, no light theme in v1)
+### Source of truth
 
-- Background: `#0A0E1A`
-- Deep surface: `#0E1124`
-- Surface levels: `#161A2E`, `#1E2238`, `#2A2E48`
-- Primary text: `#E8ECF4`
-- Secondary text / mist gray: `#7B8497`
-- **Primary accent — vibrant purple: `#A855F7`** (luminous, slight magenta hint, "blacklight bloom")
-- **Active accent — electric blue: `#2563EB`** (deep, denser, calmer than neon)
+The canonical visual system — color tokens, typography, primitives, atmospheric layers — lives in **`../poc/design-review.md`** alongside the JSX reference and the screenshots in `../poc/screenshots/`. Token values mirror below for quick reference; if anything diverges, `design-review.md` wins.
+
+### Palette tokens (from `poc/design-review.md` §2.1)
+
+| Token | Value | Use |
+|---|---|---|
+| `void` / `deep` | `#0A0E1A` | Page / device floor |
+| `bg` | `#0E1124` | Deep surface |
+| `s1` | `#161A2E` | Card base |
+| `s2` | `#1E2238` | Raised / interactive |
+| `s3` | `#2A2E48` | Hover / pressed |
+| `ink` | `#E8ECF4` | Primary text |
+| `mist` | `#7B8497` | Secondary text |
+| `glow` | `#A855F7` | Purple — identity / pattern / depth |
+| `vapor` | `#2563EB` | Blue — active recording / focus |
+| `pulse` | `#38A169` | Ready status dot |
+| `error` | `#B3261E` | Destructive actions only |
+
+Dark only — no light theme in v1.
 
 ### Color rules
 
 - Never pure black (`#000000`) — vibration, harder for astigmatic users.
 - Never pure white text on dark — softens visual fatigue.
 - WCAG AA minimum (4.5:1) for body text. AAA target (7:1) for primary content.
-- Each accent is rare punctuation in its own domain. Neither becomes wallpaper.
-- Each accent owns a semantic role: **purple = identity / pattern / depth**; **blue = active / interaction / recording state**.
-- Both accents *may* appear in the same component **when they carry different roles on different elements.** Example: a pattern card with a purple left-rule (identity) and a blue focus ring when keyboard-focused (interaction state). Example: a Roast sheet with a purple header and a blue active-recording button inside.
-- **Forbidden:** a single element rendered in both colors. No purple→blue gradients, no half-and-half buttons, no two-tone icons. One element, one accent at a time.
-- **Forbidden:** the same semantic role rendered in different colors on the same screen. Two "active patterns" on one screen are both purple; don't alternate for variety.
-- No gradients between accents. No glows, no halos.
+- `glow` and `vapor` are rare punctuation in their own domains. Neither becomes wallpaper.
+- Each accent owns a semantic role: **`glow` = identity / pattern / depth**; **`vapor` = active / interaction / recording state**.
+- Both accents *may* appear in the same component **when they carry different roles on different elements.** Example: a pattern card with a `glow` left-rule (identity) and a `vapor` focus ring when keyboard-focused (interaction state). Example: a Roast sheet with a `glow` header and a `vapor` active-recording indicator inside.
+- **Forbidden:** a single element rendered in both colors. No `glow → vapor` gradients, no half-and-half buttons, no two-tone icons. One element, one accent at a time.
+- **Forbidden:** the same semantic role rendered in different colors on the same screen. Two "active patterns" on one screen are both `glow`; don't alternate for variety.
+- No gradients between accents. No additional glows or halos beyond the atmospheric layer defined in `design-review.md` §2.4.
 
 ### Where each accent lives
 
-**Vibrant purple `#A855F7` — primary accent. Patterns, identity, depth.**
-- Active pattern indicator (purple left-rule on cards with active patterns)
-- "Roast me" action button + Roast bottom-sheet header
+**`glow` — primary accent. Patterns, identity, depth.**
+- Active pattern indicator (`glow` left-rule on cards with active patterns)
+- `Roast me` action button + Roast bottom-sheet header (per `Sheet` primitive in `design-review.md` §3.1)
 - Currently-active persona pill in the persona selector
 - Pattern detail screen accent
 
-**Electric blue `#2563EB` — active accent. Recording, focus, "this is on."**
-- Active recording state (record button when user is talking)
-- Live audio waveform tint (during recording)
+**`vapor` — active accent. Recording, focus, "this is on."**
+- Active recording state on `MistHero` (per `design-review.md` §3.3)
+- Live audio waveform tint via `AudioMeter` during recording
 - Selected/focused control (subtle ring on focus, not on default selection)
-- Local Model Status indicator (when overriding system green for brand-identity reasons; see Local Model Status spec for the open question)
 - Links and ghost button outlines
 
-Everything else stays in the cool blue-gray atmosphere. System status conventions (e.g., default green "ready" indicators) stay system colors unless we have an explicit brand reason to override.
+**`pulse` — ready-status dot only.**
+- `LOCAL · READY` dot on `AppShellTop` per `design-review.md` §3.2 (`modelState=ready`).
+- No other use. The dot glows on idle-ready; it does not appear elsewhere.
 
-**System error red — destructive only.**
-- Delete entry, delete all data, delete model, and unrecoverable wipe confirmations use Android/Material error color, not purple.
-- Purple is identity/depth. It is not a delete affordance. A destructive button disguised as brand styling is how users lose data and then correctly hate us.
+Everything else stays in the cool blue-gray atmosphere of `void` / `bg` / `s1` / `s2` / `s3`.
+
+**`error` — destructive actions only.**
+- Delete entry, delete all data, delete model, and unrecoverable wipe confirmations use the `error` token, not `glow`.
+- `glow` is identity/depth. It is not a delete affordance. A destructive button disguised as brand styling is how users lose data and then correctly hate us.
 
 ---
 
 ## Typography
 
-System sans-serif. Roboto or Inter-like. Must read cleanly at 3am on a 6.8-inch phone.
+Three families per `poc/design-review.md` §2.2:
 
-Avoid: display fonts, script, rounded "friendly" sans, serif wellness typography.
+- **`Inter`** — UI body, sans
+- **`Newsreader`** (italic, opsz axis) — display moments only: app name, hero titles ("What lingered from yesterday?", "What keeps returning.", "This deletes everything.")
+- **`JetBrains Mono`** — forensic-instrument labels, eyebrows, persona names (`WITNESS`, `LOCAL · READY`, `25 DAYS`, `DESTRUCTIVE`)
+
+Type primitives (`HDisplay`, `H1`, `P`, `PersonaLabel`, `Eyebrow`) and Compose translation notes live in `design-review.md` §2.2 and §8. Don't redefine them here.
+
+Avoid: display fonts other than Newsreader for hero moments, script, rounded "friendly" sans, serif wellness typography (Newsreader's editorial italic is the chosen serif — anything else reads as wellness).
+
+Must read cleanly at 3am on a 6.8-inch phone.
 
 ---
 
@@ -149,17 +172,18 @@ Avoid: display fonts, script, rounded "friendly" sans, serif wellness typography
 
 Use Android **Material 3** structure and accessibility conventions, with **expressiveness suppressed.** We use the system, we choose restraint within it.
 
-**Components feel:** native, restrained, precise, quiet, slightly worn.
+**Components feel:** native, restrained, precise, quiet, slightly worn. **Atmospheric is the single visual system** per `design-review.md` §7.3 — no flat counterpoint.
 
-**Radius:**
-- cards and primary controls: 6–8px
-- small chrome: 4px
+**Radii:** Use the `RadiusTokens` scale from `design-review.md` §2.3 (`rPill`, `rXL`, `rL`, `rM`, `rS`, `rXS`). No raw `dp` for corner shapes that map to the scale.
+
+**Texture:** Two ambient layers per `design-review.md` §2.4 carry across nearly every surface — noise grain (`feTurbulence` 180×180 tile, `mix-blend-mode: overlay`, opacity ~0.05–0.18) and fog drift (two animated radial gradients, `vesDrift1`/`vesDrift2`, 22s/28s alternate).
 
 **Motion:**
 - minimal and functional only
-- subtle atmospheric drift on loading states (think fog moving past a window)
+- atmospheric drift on loading states is handled by the fog-drift layer above (think fog moving past a window)
 - predictive back gesture (Android 15+ default) — restrained and native, no fighting the system
 - no bounces, springs, celebrations, reward animations, confetti, sparkle transitions
+- keyframe set defined in `design-review.md` §2.5: `vesPulse`, `vesIn`, `vesFade`, `vesSlide`, `vesShimmer`, `vesBreath`, `vesSpin`, `vesDrift1`, `vesDrift2`. Compose translation notes in §8.
 
 ---
 
@@ -229,31 +253,33 @@ Forbidden across all personas: "thank you for sharing," "how does that make you 
    - Right: Persona dropdown pill (`WITNESS ▾`-style per `ux-copy.md`). Tap opens the per-session persona override (P1 — see PRD).
 2. **Patterns peek card** *(below status row, per `ux-copy.md` §"Patterns peek (below status)")*
    - Compact card with `{N} active patterns` title, one-line teaser of pattern names, subtle. No purple left-rule here — that's reserved for the full Patterns list. Empty-state copy comes from `ux-copy.md`.
-3. **Record action (dominant, center-low for thumb reach)**
-   - One round primary control. ≥72px touch target. Behavior per "Record button states" below.
-4. **Type-instead affordance**
-   - Small button under or beside record. Expands inline to a text input (placeholder + send copy from `ux-copy.md`). Never buried.
-5. **Footer metadata strip**
-   - Small dim text — last entry timestamp + duration + History link. Strings per `ux-copy.md` §"Footer metadata."
+3. **Hero title (above MistHero)**
+   - One short editorial line in `Newsreader` italic per `poc/design-review.md` §2.2 (e.g., the `What lingered from yesterday?` strings visible in `poc/screenshots/capture.png`). Hero copy belongs in `ux-copy.md` §Capture Screen — pull from there, do not invent.
+   - This is the *editorial* register: a short, observational, present-tense line. It is **not** a journal prompt or a wellness question. The `Newsreader` italic + restrained content distinguishes it from `How are you feeling today?`-class prompts (which remain forbidden — see below).
+4. **MistHero capture stone (dominant, center for hero presence)**
+   - The `MistHero` primitive per `poc/design-review.md` §3.3. 168px hero, five-layer moonstone composition. Behavior per the "MistHero" entry in §"Component Conventions" below.
+5. **Tagline strip (below MistHero)**
+   - Two short mono lines per `poc/screenshots/capture.png`: a directive (`HOLD THE STONE · SPEAK`-style) and a privacy-tagline (`30s chunks · audio discarded after extraction`-style). `JetBrains Mono`, eyebrow scale. Strings live in `ux-copy.md`.
+6. **Type-instead affordance**
+   - Small button below the tagline. Expands inline to a text input (placeholder + send copy from `ux-copy.md`). Never buried.
+7. **Patterns peek card** *(below the type affordance, per `poc/screenshots/capture.png` and `ux-copy.md` §"Patterns peek")*
+   - Compact card with `{N} ACTIVE TRACES`-style title, one-line teaser of pattern names, subtle `TraceBar` mini-strips. No `glow` left-rule here — that's reserved for the full Patterns list. Empty-state copy comes from `ux-copy.md`.
+8. **Footer metadata strip**
+   - Small dim text — last entry timestamp + duration + `PATTERNS` link. Strings per `ux-copy.md` §"Footer metadata."
 
 **Recording-state changes to the stack:**
-- The persona dropdown pill is **replaced** by a chunk timer pill (`00:04`-style — counts up, electric-blue-tinted, accent only on the indicator dot). The persona is fixed for the duration of a recording; switching mid-recording is forbidden.
+- The persona dropdown pill is **replaced** by a chunk-timer pill (`00:04`-style — counts up, `vapor`-tinted, accent only on the indicator dot). The persona is fixed for the duration of a recording; switching mid-recording is forbidden.
 - The patterns peek card and footer metadata can dim or fade out during active recording — capture is the only surface that matters in that state. Do not collapse the layout; just lower contrast.
-
-**Record button states:**
-- Idle: outlined ring, neutral cool gray. Center mark optional (small dot or no mark — restrained).
-- Active recording: filled with electric blue `#2563EB`, live blue-tinted amplitude waveform around or below the control, stop affordance (square or similar) center.
-- Post-stop / review (transcription pending): outlined ring with a thin electric-blue rim to signal "model is reading," no waveform. The "Reading the entry." placeholder copy from `ux-copy.md` shows in-line with the transcript area.
-- Approaching 30s chunk boundary: thin progress arc on the ring, soft cue at 25s. No copy.
+- The hero title can swap to a recording-state line per `ux-copy.md`, or stay; do not invent here.
 
 **Transcription appears after inference returns** (Phase 1/2 measures the real S24 Ultra latency; target 1-5 seconds per `adrs/ADR-002-multi-lens-extraction-pattern.md` §"Latency budget" — not a guarantee). Until it arrives, the placeholder copy from `ux-copy.md` sits in the user-turn slot. Streaming-as-you-speak transcription is v2; not in this design.
 
 **Forbidden on capture:**
-- No mood prompt, no suggested topics, no daily question header, no chat bubbles, no waveform when idle.
-- No motivational, journaling, or atmospheric question framings (`What would you like to journal about today?`, `What lingered from yesterday?`-style prompts). The user opens the app to dump, not to be prompted.
-- No serif "thought" headers. Body copy stays system sans per the Typography section.
+- No mood prompt, no suggested topics, no daily question header (the editorial hero title above is *not* a daily prompt — it's a fixed editorial line that doesn't ask the user to perform reflection), no chat bubbles, no waveform when idle.
+- No motivational or wellness-coded framings: `How are you feeling today?`, `What would you like to journal about today?`, `Let's reflect together`, `Tip of the day`, anything ending in `!`. The user opens the app to dump, not to be coached.
+- The hero title is `Newsreader` italic by design — that *one* serif moment is the only place editorial typography appears. No serif body copy, no serif buttons.
 
-**Microcopy:** pull every string from `ux-copy.md` §Capture Screen. Avoid `Start your reflection`, `How are you feeling?`, `What would you like to journal about today?`, anything with `!`.
+**Microcopy:** pull every string from `ux-copy.md` §Capture Screen. The forbidden-copy list above + `ux-copy.md` §"Things to NEVER Write" are the litmus test.
 
 ### First-Run Onboarding
 
@@ -421,17 +447,21 @@ Serious, sparse, unmistakable. No drama theater.
 >
 > [ Cancel ] [ **Wipe everything. No backup.** ]
 
-Use Material/system error red on the destructive button. The confirm field requires typing `DELETE` — no checkbox, no slider, no "Are you sure?" yes/no.
+Use the `error` token (`#B3261E` per `poc/design-review.md` §2.1) on the destructive button. The confirm field requires typing `DELETE` — no checkbox, no slider, no "Are you sure?" yes/no.
 
 ---
 
 ## Component Conventions
 
-### Record button (capture screen primary)
-- Single primary action. ≥72px touch target.
-- Idle: outlined ring, cool gray.
-- Active: filled electric blue `#2563EB`, with live blue-tinted amplitude waveform around it.
-- Approaching chunk boundary (25s of 30s): thin progress arc, soft visual cue.
+### MistHero (capture screen primary)
+- The central capture surface is the `MistHero` moonstone primitive per `poc/design-review.md` §3.3, not a flat record button. Five-layer composition: outer halo, conic moonstone ring, frosted-glass body, inner noise, center mark.
+- Single primary action. ≥168px hero size (per the POC `MistHero` 168px spec).
+- Idle: stone with subtle internal gradient, no outer halo amplitude.
+- Active recording: outer halo scales with audio level (`level` prop), `vapor` (#2563EB) tint on the halo and ring, `AudioMeter` renders below, stop affordance center.
+- Post-stop / review: halo collapses to outline state with a thin `vapor` rim, `Reading the entry.` placeholder copy from `ux-copy.md` shows in the transcript area.
+- Approaching chunk boundary (25s of 30s): thin progress arc on the ring, soft visual cue, no copy.
+
+Compose translation notes for `MistHero` live in `design-review.md` §8 (radial gradients, conic ring, infinite-transition halo).
 
 ### Conversation transcript
 - Vertical scroll, chronological within session.
@@ -484,7 +514,7 @@ Examples of in-family execution variation:
 
 - WCAG AA minimum contrast (4.5:1) for all text. AAA target (7:1) for primary content.
 - Touch targets ≥48dp. Record control larger than minimum.
-- Every interactive element has a screen-reader label. `contentDescription` on persona toggle, record button, pattern actions.
+- Every interactive element has a screen-reader label. `contentDescription` on persona toggle, `MistHero` (label: `Record` / `Stop` per `ux-copy.md` §"Capture Screen"), pattern actions.
 - **Typed fallback must exist** for users who cannot or will not speak. Not buried.
 - Predictive back gesture must not disable system accessibility navigation.
 - Dimmed whites and grays preferred over pure white to reduce visual vibration for astigmatic users.
@@ -517,7 +547,7 @@ A mockup succeeds if:
 - Capture is obviously the primary action.
 - Local AI/model presence is visible without generic AI sparkle language.
 - Pattern evidence is visually sourceable.
-- Purple and electric blue each appear rarely, meaningfully, and in their own domains. Neither becomes wallpaper. They never share a single component.
+- `glow` and `vapor` (with `pulse` and `error` reserved for ready-status and destructive respectively) each appear rarely, meaningfully, and in their own domains. None becomes wallpaper. `glow` and `vapor` never share a single component.
 - The words are sharper than the visuals.
 - The UI feels Android-native without becoming playful.
 - The app feels observational, not therapeutic.

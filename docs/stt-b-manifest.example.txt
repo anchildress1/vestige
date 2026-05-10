@@ -1,0 +1,55 @@
+# STT-B scripted-session manifest — example template (Story 2.4).
+#
+# Adapt this file to your local device paths, push it alongside the WAVs you record from the
+# 4-turn smoke script in `docs/sample-data-scenarios.md` §STT-B, then run:
+#
+#   ./gradlew :app:connectedDebugAndroidTest \
+#     -PmodelPath=<BASE>/models/gemma-4-E4B-it.litertlm \
+#     -PmanifestPath=<BASE>/stt-b-manifest.txt
+#
+# Grammar (see `SttBManifest.kt` kdoc for the full spec):
+#   - `#` lines are comments; everything after `#` on any line is stripped.
+#   - Blank lines separate sessions.
+#   - Each block: `session=<name>`, `persona=<WITNESS|HARDASS|EDITOR>`, then ≥1 `turn=`.
+#   - First `turn=` line must NOT carry `anchors=` (no prior turn to reference).
+#   - Subsequent `turn=` lines MUST carry `anchors=<a>;<b>;...` — case-insensitive substrings
+#     the model's follow-up should echo if it retained context.
+#
+# The five sessions below pair the canonical 4-turn STT-B script (`sample-data-scenarios.md`)
+# under each persona with two additional scripts derived from the corpus (Scenario B Invoice,
+# Scenario C Decision Spiral) so the operator hits ≥5 sessions × ≥3 turns without authoring new
+# fictional content. Re-record any line whose audio doesn't transcribe cleanly — bad audio in
+# turn N poisons the anchor signal for turn N+1.
+
+session=witness-aftermath
+persona=WITNESS
+turn=audio/stt-b/aftermath/turn1.wav
+turn=audio/stt-b/aftermath/turn2.wav anchors=launch doc;standup
+turn=audio/stt-b/aftermath/turn3.wav anchors=Nora;risk section
+turn=audio/stt-b/aftermath/turn4.wav anchors=outline;Nora
+
+session=hardass-aftermath
+persona=HARDASS
+turn=audio/stt-b/aftermath/turn1.wav
+turn=audio/stt-b/aftermath/turn2.wav anchors=launch doc;standup
+turn=audio/stt-b/aftermath/turn3.wav anchors=Nora;risk section
+turn=audio/stt-b/aftermath/turn4.wav anchors=outline;Nora
+
+session=editor-aftermath
+persona=EDITOR
+turn=audio/stt-b/aftermath/turn1.wav
+turn=audio/stt-b/aftermath/turn2.wav anchors=launch doc;standup
+turn=audio/stt-b/aftermath/turn3.wav anchors=Nora;risk section
+turn=audio/stt-b/aftermath/turn4.wav anchors=outline;Nora
+
+session=witness-invoice
+persona=WITNESS
+turn=audio/stt-b/invoice/turn1.wav
+turn=audio/stt-b/invoice/turn2.wav anchors=invoice;email
+turn=audio/stt-b/invoice/turn3.wav anchors=invoice;cursor
+
+session=hardass-decision-spiral
+persona=HARDASS
+turn=audio/stt-b/decision/turn1.wav
+turn=audio/stt-b/decision/turn2.wav anchors=task app;criteria
+turn=audio/stt-b/decision/turn3.wav anchors=comparison;weights

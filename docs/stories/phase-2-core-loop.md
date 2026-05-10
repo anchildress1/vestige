@@ -2,7 +2,7 @@
 
 **Status:** In progress
 **Dates:** 2026-05-09 – TBD
-**References:** `PRD.md` §Phase 2, `concept-locked.md` §"Multi-lens extraction architecture", `concept-locked.md` §Schema, `AGENTS.md`, `architecture-brief.md`, `adrs/ADR-001-stack-and-build-infra.md` §Q3 / §Q4, `adrs/ADR-002-multi-lens-extraction-pattern.md` (entire), `sample-data-scenarios.md`
+**References:** `PRD.md` §Phase 2, `concept-locked.md` §"Multi-lens extraction architecture", `concept-locked.md` §Schema, `AGENTS.md`, `architecture-brief.md`, `adrs/ADR-001-stack-and-build-infra.md` §Q3 / §Q4, `adrs/ADR-002-multi-lens-extraction-pattern.md` (entire), `adrs/ADR-004-app-backgrounding-and-model-handle-lifecycle.md` (entire), `sample-data-scenarios.md`
 
 ---
 
@@ -23,6 +23,7 @@ Build the end-to-end capture loop: user records or types → foreground call ret
 - [ ] Convergence resolver implementation lands into Story 1.12's test scaffolding and all happy-path tests pass.
 - [ ] Agent-emitted template labels work for all six archetypes on representative sample transcripts.
 - [ ] Background extraction populates the canonical schema on the reference device within 30–90 seconds per entry as specified.
+- [ ] Background extraction lifecycle service is wired per ADR-004 (conditional foreground service): app promotes when extraction begins, demotes after 30-second keep-alive once all extractions reach terminal status. Notification text matches `ux-copy.md` §"Loading States".
 - [ ] Personas (Witness / Hardass / Editor) demonstrably affect tone on the foreground response without affecting structured field extraction.
 
 ---
@@ -92,6 +93,8 @@ Build the end-to-end capture loop: user records or types → foreground call ret
 
 **Notes / risks:** Per `runtime-research.md` and earlier benchmark research, E4B's multi-turn behavior is one of the riskiest assumptions in the spec. Time-box the diagnosis: if scripted sessions show 0% multi-turn success after one focused day of prompt tuning, switch to the fallback rather than burning more days.
 
+**Harness:** `app/src/androidTest/.../SttBMultiTurnSmokeTest` drives a manifest-defined set of scripted multi-turn sessions through `ForegroundInference`, scoring context retention via `:core-inference`'s `SttBManifestParser` + `SttBRetentionScorer` (both JVM-unit-tested). The manifest grammar is documented in `SttBManifest.kt`'s kdoc; an example template lives at `docs/stt-b-manifest.example.txt`. Hard pass criterion is retention rate ≥ `contextRetentionThreshold` (default 0.80). Per-turn latency is logged on tag `VestigeSttB` for the operator to attach to the verdict — the harness does **not** fail on latency alone, because Story 2.3 already documented 37–41 s on E4B CPU and that signal would mask the existential context-retention check this STT exists to gate. Verdict boxes above stay unchecked until the operator runs the harness on the reference device and reports the rate, latency table, and forbidden-phrase audit per AGENTS.md guardrail 21.
+
 ---
 
 ### Story 2.5 — Multi-lens prompt assembly: surfaces, lenses, composer
@@ -123,6 +126,31 @@ Build the end-to-end capture loop: user records or types → foreground call ret
 - [ ] If a lens call fails (parse error, model error), the worker retries per ADR-001 Q3's retry policy. Two consecutive failures on the same lens marks the entry as `extraction_status=ambiguous_partial` rather than retrying indefinitely.
 
 **Notes / risks:** The three lens calls are sequential, not parallel — E4B is one model on one device. Don't try to parallelize. Total latency = ~3× single-lens latency.
+
+The worker does **not** own its own backgrounding behavior. The `BackgroundExtractionService` from Story 2.6.5 wraps the worker and keeps it alive across app backgrounding by promoting the process to a foreground service while extractions are in flight. Don't bake `Service` lifecycle handling into the worker class itself — that's the wrapper's job.
+
+---
+
+### Story 2.6.5 — Background extraction lifecycle service + state machine
+
+**As** the AI implementor, **I need** a `BackgroundExtractionService` that promotes the app to a foreground service whenever an entry's `extraction_status` is `RUNNING` and demotes back to a normal process after a 30-second keep-alive window once all extractions reach terminal status, **so that** background extraction completes reliably even when the user backgrounds the app between record and pattern reveal — and the user sees an on-brand transient notification rather than persistent always-on chrome (per ADR-004 §"Conditional foreground service").
+
+**Done when:**
+- [ ] `BackgroundExtractionService` declared in `:app/src/main/AndroidManifest.xml` with `android:foregroundServiceType="dataSync"` and the matching runtime-permission stanza for the AGP-current foreground-service-type spec.
+- [ ] `BackgroundExtractionService` extends `LifecycleService` (or equivalent) and is wired into `AppContainer` per `architecture-brief.md` §"AppContainer Ownership" (the `ModelHandle` row's lifecycle reference points here).
+- [ ] State machine implemented per ADR-004 §"State Machine": `NORMAL → PROMOTING → FOREGROUND → KEEP_ALIVE → DEMOTING → NORMAL`. Transitions are driven by changes in any `Entry.extraction_status` value: `RUNNING` triggers promote; all extractions reaching terminal status (`COMPLETED` / `TIMED_OUT` / `FAILED`) starts the keep-alive timer.
+- [ ] 30-second keep-alive timer prevents notification flicker between back-to-back captures. A new extraction starting during the keep-alive window cancels demote and re-enters `FOREGROUND` without re-firing the notification.
+- [ ] Notification channel `vestige.local_processing` registered at `Application.onCreate` with importance level **LOW** (visible in shade, no sound, no heads-up). Channel registration is idempotent across cold starts.
+- [ ] Notification text is `Reading the entry.` — sourced from `ux-copy.md` §"Loading States" (single source of truth, mirrored as a string resource so the in-app placeholder copy and the system notification stay in lockstep). Notification icon is the app icon per `design-guidelines.md` §"App icon".
+- [ ] Notification tap target launches the app to History (or Capture as an acceptable Phase-2 placeholder). Deep-link to the most-recent-in-flight entry is Phase 4 polish per Story 4.7.
+- [ ] Multiple in-flight extractions: the service's promote/demote logic gates on the count of entries with non-terminal `extraction_status`, not on "current handle in use." Per ADR-002 lens calls are sequential, so at most one extraction is actively executing — the count can exceed 1 if captures queue, and the service stays `FOREGROUND` until the count returns to zero.
+- [ ] Unit test `BackgroundExtractionServiceStateMachineTest` exercises every transition in the ADR-004 §"State Machine" table with synthetic `extraction_status` flips. Cases: cold start with no pending entries (stays `NORMAL`), single entry promote/demote cycle, back-to-back captures during keep-alive (no flicker), keep-alive expiry, recovery sweep entries promoting on cold start.
+- [ ] `POST_NOTIFICATIONS` runtime permission is **not** requested by this story. The permission ask flow lives in Phase 4 onboarding (Story 4.2 modification per ADR-004 §"Permission Flow"). Dev builds can grant the permission manually via system settings until Phase 4 lands.
+- [ ] Tests assert state machine and channel registration only. No tests assert on actual notification posting — that requires `POST_NOTIFICATIONS` granted, which is out of scope for this story.
+
+**Notes / risks:** The fallback to ADR-004 §"Option 1 — Always-on foreground service" is evaluated at the end of Phase 4 day 1 per ADR-004 §"Fallback Trigger," not here. If state-machine bugs block Phase 2 progress beyond half a day, escalate per the trigger criteria — don't quietly bypass the conditional logic. Recording the fallback decision goes in ADR-004's "Trigger recorded" line.
+
+Don't conflate this story with Story 2.6 (worker logic). Story 2.6 is *what* runs in the background; this story is *the lifecycle wrapper* that keeps the OS from killing it. Wiring is one-directional: the service observes `extraction_status` transitions; the worker doesn't know the service exists.
 
 ---
 
@@ -262,11 +290,12 @@ If a Phase 2 story starts pulling Phase 3+ scope, stop. Reference `backlog.md` a
 
 Phase 3 starts when all the following are true:
 
-- [ ] All thirteen stories above are Done or have an explicit, recorded fallback.
+- [ ] All fourteen stories above are Done or have an explicit, recorded fallback.
 - [ ] **STT-B resolved** — multi-turn works on E4B *or* the single-turn fallback is implemented and the spec updated.
 - [ ] **STT-D resolved** — 3-lens divergence is validated *or* multi-lens has been replaced with single-pass and ADR-002 has been superseded.
 - [ ] **STT-C resolved** — tag stability is ≥80% *or* the limitation is documented and Phase 3's pattern engine is designed around the noise floor.
 - [ ] Convergence resolver tests from Story 1.12 all pass.
+- [ ] `BackgroundExtractionService` state machine tests pass; service is wired into `AppContainer` per ADR-004.
 - [ ] Latency budget on the reference device is recorded (foreground per turn, background per entry).
 - [ ] Markdown + ObjectBox stay in sync across at least 10 saved sessions (smoke test).
 - [ ] No new entries logged to `backlog.md` from Phase 2 work that change the v1 contract beyond what an STT fallback already required.

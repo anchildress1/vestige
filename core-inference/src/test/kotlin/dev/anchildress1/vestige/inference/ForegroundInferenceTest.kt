@@ -263,6 +263,21 @@ class ForegroundInferenceTest {
     }
 
     @Test
+    fun `discardTempWav reaches the truncate-then-retry-delete branch when first delete fails`(
+        @TempDir cacheDir: File,
+    ) {
+        // First delete fails (file doesn't exist), so the helper falls through to the truncate
+        // primitive — outputStream().use {} creates the file empty — and the retry delete then
+        // succeeds.
+        val nonExistent = File(cacheDir, "vestige-fg-truncate-branch-test.wav")
+        assertFalse(nonExistent.exists())
+
+        ForegroundInference(mockk(), cacheDir, clock = fixedClock).discardTempWav(nonExistent)
+
+        assertFalse(nonExistent.exists(), "Retry delete after truncate must clean up the file")
+    }
+
+    @Test
     fun `truncate primitive zeros the audio payload`(@TempDir cacheDir: File) {
         // Pins the load-bearing privacy guarantee in discardTempWav's delete-failure branch
         // (truncate-then-retry-delete). Triggering a real delete-failure needs OS-specific

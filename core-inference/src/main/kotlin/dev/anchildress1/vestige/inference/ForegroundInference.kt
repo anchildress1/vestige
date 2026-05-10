@@ -82,9 +82,9 @@ class ForegroundInference(
      * Delete a temp foreground WAV. On delete failure (file locked, transient FS error) truncate
      * to zero bytes so the audio payload is unrecoverable even if the inode survives, retry
      * delete, then fall back to `deleteOnExit` (best-effort on Android — process kill skips it).
-     * AGENTS.md guardrail 11.
+     * AGENTS.md guardrail 11. `internal` for JVM testability.
      */
-    private fun discardTempWav(temp: File) {
+    internal fun discardTempWav(temp: File) {
         if (temp.delete()) return
         Log.w(TAG, "Initial delete failed for ${temp.absolutePath}; truncating audio payload")
         runCatching { temp.outputStream().use { } }

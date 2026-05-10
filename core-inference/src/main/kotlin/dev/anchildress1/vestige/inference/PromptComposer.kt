@@ -96,9 +96,11 @@ object PromptComposer {
     private fun budgetText(text: String): String {
         // Per-chunk cap so the top-3 retrieved-history block stays inside the ~500-token budget
         // from ADR-002 §Q2. Truncation preserves the leading sentence — the call is system
-        // context, not authoritative source text.
+        // context, not authoritative source text. Reserve room for the ellipsis so the cap is
+        // strict (output length ≤ MAX_HISTORY_CHARS_PER_CHUNK).
         if (text.length <= MAX_HISTORY_CHARS_PER_CHUNK) return text
-        return text.substring(0, MAX_HISTORY_CHARS_PER_CHUNK).trimEnd() + "…"
+        val budget = MAX_HISTORY_CHARS_PER_CHUNK - ELLIPSIS.length
+        return text.substring(0, budget).trimEnd() + ELLIPSIS
     }
 
     private fun renderHistory(chunks: List<HistoryChunk>): String {
@@ -128,4 +130,5 @@ object PromptComposer {
     private const val MAX_HISTORY_CHUNKS = 3
     private const val MAX_HISTORY_CHARS_PER_CHUNK = 600
     private const val CHARS_PER_TOKEN = 4
+    private const val ELLIPSIS = "…"
 }

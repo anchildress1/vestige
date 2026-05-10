@@ -23,8 +23,12 @@ class PromptComposerTest {
         val skepticalLensBlock = extractBlock(skeptical, header = "## Lens:", terminator = "## Surface:")
         assertNotEquals(literalLensBlock, skepticalLensBlock)
 
-        val withoutLensLiteral = literal.replace(literalLensBlock, "")
-        val withoutLensSkeptical = skeptical.replace(skepticalLensBlock, "")
+        // replaceFirst (not replace) — the lens block must be removed exactly once. If the same
+        // text ever recurred elsewhere in the prompt (e.g. inside retrieved history or the entry
+        // text), a global replace would silently mask the duplication and false-positive the
+        // "everything else is identical" assertion.
+        val withoutLensLiteral = literal.replaceFirst(literalLensBlock, "")
+        val withoutLensSkeptical = skeptical.replaceFirst(skepticalLensBlock, "")
         assertEquals(withoutLensLiteral, withoutLensSkeptical)
     }
 
@@ -80,14 +84,21 @@ class PromptComposerTest {
     }
 
     @Test
-    fun `oversize history chunks are truncated under the per-chunk char cap`() {
+    fun `oversize history chunks are truncated strictly under the per-chunk char cap`() {
         val giant = "x".repeat(2000)
         val chunks = listOf(HistoryChunk(patternId = "big", text = giant))
         val text = PromptComposer.compose(Lens.LITERAL, entry, retrievedHistory = chunks).text
 
-        // Cap is 600 chars + ellipsis. The full 2000-char block must not appear.
         assertFalse(text.contains(giant))
         assertTrue(text.contains("…"))
+
+        // Cap is strict: longest x-run + the ellipsis fits inside MAX_HISTORY_CHARS_PER_CHUNK
+        // (600). Earlier shape was "truncate to 600 + append ellipsis", which silently exceeded
+        // the budget by one char per oversize chunk.
+        val longestXRun = Regex("x+").findAll(text).maxOf { it.value.length }
+        assertTrue(longestXRun + "…".length <= 600) {
+            "Truncated chunk with ellipsis exceeded the 600-char cap: $longestXRun + 1 = ${longestXRun + 1}"
+        }
     }
 
     @Test

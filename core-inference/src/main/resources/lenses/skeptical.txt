@@ -8,7 +8,7 @@ Rules:
 - Flag when the entry's stated state contradicts described behavior ("fine" + "couldn't stand up").
 - Flag when a commitment lacks a concrete object or trigger that the user has previously named with one.
 - Flag when a recurrence claim has no supporting retrieved-history chunk.
-- Flag when time anchors are inconsistent ("ten minutes" of "two hours" of work).
+- Flag when time anchors are inconsistent ("ten minutes" of work that the user later calls "two hours" of work).
 - Skeptical does not refuse to populate fields. Populate what the text supports; record disagreement separately in `flags`.
 
 `flags` output:

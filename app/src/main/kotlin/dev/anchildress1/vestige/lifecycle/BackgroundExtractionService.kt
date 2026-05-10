@@ -32,25 +32,41 @@ class BackgroundExtractionService : LifecycleService() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         super.onStartCommand(intent, flags, startId)
         val machine = requireStateMachine()
-        if (machine.state.value == BackgroundExtractionLifecycleState.PROMOTING) {
-            try {
-                startForegroundCompat()
-                machine.onForegroundStartConfirmed()
-            } catch (@Suppress("TooGenericExceptionCaught") error: Exception) {
-                // FGS start can throw ForegroundServiceStartNotAllowedException, SecurityException,
-                // or MissingForegroundServiceTypeException. Wedging the machine in PROMOTING blocks
-                // every future capture for the process lifetime — surface the failure and let the
-                // machine re-arm a bounded retry while work is still in flight.
-                Log.e(TAG, "startForeground rejected", error)
-                machine.onForegroundStartFailed()
-                shutdownHandled = true
-                stopSelf(startId)
-            }
-        } else {
+        // The OS demands startForeground within ~5s of startForegroundService for every
+        // non-NORMAL state. NORMAL is the only legitimate "stale dispatch": the machine was
+        // reset (start failure / OS-kill recovery completing without queued work) before
+        // Android scheduled onStartCommand. PROMOTING is the only state that expects an
+        // ack — FOREGROUND / KEEP_ALIVE / DEMOTING reached us via paths that do not, and
+        // re-acking would reset the keep-alive timer. See ADR-007 §"Service / state-machine
+        // handshake" for the full table.
+        handleStartCommand(machine, machine.state.value, startId)
+        return START_NOT_STICKY
+    }
+
+    private fun handleStartCommand(
+        machine: BackgroundExtractionLifecycleStateMachine,
+        initialState: BackgroundExtractionLifecycleState,
+        startId: Int,
+    ) {
+        if (initialState == BackgroundExtractionLifecycleState.NORMAL) {
             shutdownHandled = true
             stopSelf(startId)
+            return
         }
-        return START_NOT_STICKY
+        try {
+            startForegroundCompat()
+        } catch (@Suppress("TooGenericExceptionCaught") error: Exception) {
+            Log.e(TAG, "startForeground rejected", error)
+            if (initialState == BackgroundExtractionLifecycleState.PROMOTING) {
+                machine.onForegroundStartFailed()
+            }
+            shutdownHandled = true
+            stopSelf(startId)
+            return
+        }
+        if (initialState == BackgroundExtractionLifecycleState.PROMOTING) {
+            machine.onForegroundStartConfirmed()
+        }
     }
 
     override fun onDestroy() {

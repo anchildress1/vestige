@@ -82,6 +82,47 @@ class BackgroundExtractionServiceIntegrationTest {
     }
 
     @Test
+    fun `late-start race — state drained to KEEP_ALIVE before onStartCommand stays alive`() {
+        val machine = app.appContainer.lifecycleStateMachine
+
+        // Production race: AppContainer dispatches startForegroundService while state is PROMOTING.
+        // Before Android schedules onCreate / onStartCommand, the worker reports COMPLETED, which
+        // drains the in-flight count and transitions PROMOTING → KEEP_ALIVE. The service must
+        // (a) satisfy the OS startForeground deadline and (b) stay alive so the keep-alive timer
+        // can transition KEEP_ALIVE → DEMOTING with a live collector to ack it.
+        app.appContainer.reportExtractionStatus(entryId = 11L, status = ExtractionStatus.RUNNING)
+        app.appContainer.reportExtractionStatus(entryId = 11L, status = ExtractionStatus.COMPLETED)
+        assertEquals(BackgroundExtractionLifecycleState.KEEP_ALIVE, machine.state.value)
+
+        serviceController.create().startCommand(0, 0)
+
+        assertEquals(
+            "machine must remain in KEEP_ALIVE — keep-alive timer still owns the demote transition",
+            BackgroundExtractionLifecycleState.KEEP_ALIVE,
+            machine.state.value,
+        )
+        assertTrue(
+            "service must remain alive to handle the eventual DEMOTING transition",
+            !shadowOf(serviceController.get()).isStoppedBySelf,
+        )
+    }
+
+    @Test
+    fun `late-start race — already-FOREGROUND on onStartCommand keeps the service alive without re-acking`() {
+        val machine = app.appContainer.lifecycleStateMachine
+        app.appContainer.reportExtractionStatus(entryId = 21L, status = ExtractionStatus.RUNNING)
+        // Simulate ack already arriving via a parallel path: state is FOREGROUND when the
+        // dispatched intent finally lands.
+        machine.onForegroundStartConfirmed()
+        assertEquals(BackgroundExtractionLifecycleState.FOREGROUND, machine.state.value)
+
+        serviceController.create().startCommand(0, 0)
+
+        assertEquals(BackgroundExtractionLifecycleState.FOREGROUND, machine.state.value)
+        assertTrue(!shadowOf(serviceController.get()).isStoppedBySelf)
+    }
+
+    @Test
     fun `dispatch fires startForegroundService on the application context`() {
         // The plumbing test: AppContainer's promote callback must produce a real intent the OS
         // can route. The default `foregroundServiceStarter` calls `applicationContext.startForegroundService`,

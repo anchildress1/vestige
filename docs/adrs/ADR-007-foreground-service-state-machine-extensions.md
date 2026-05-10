@@ -61,10 +61,20 @@ The Service is a thin reflection of the machine. The handshake at each transitio
 | Machine transition | Service action |
 |---|---|
 | `→ PROMOTING` | `onPromoteRequested` callback fires → `AppContainer.dispatchStartForegroundService(intent)` → Android creates / reuses the service instance |
-| Service `onStartCommand` with state == PROMOTING | `startForegroundCompat()` → on success: `onForegroundStartConfirmed`. On exception: `onForegroundStartFailed`, `stopSelf` |
-| Service `onStartCommand` with state != PROMOTING | `stopSelf` (stale intent — state already advanced) |
 | Machine `→ DEMOTING` | Service collector runs `stopForegroundCompat`, `onForegroundStopConfirmed`, `stopSelf`. Sets `shutdownHandled = true` |
 | Service `onDestroy` with `shutdownHandled == false` | `onServiceKilled()` on the machine — OS-only kill recovery |
+
+`onStartCommand` runs against whatever state the machine is in by the time Android schedules the service; the machine can legitimately progress past PROMOTING between the dispatch call and the service create (worker reports COMPLETED super-fast, ack arrives via a parallel path, OS kill / restart, etc.). `onStartCommand` resolves five distinct cases:
+
+| State at `onStartCommand` | Service action | Why |
+|---|---|---|
+| `PROMOTING` | `startForegroundCompat()` → `onForegroundStartConfirmed()` (machine → FOREGROUND or KEEP_ALIVE) | Happy path — confirm the start ack |
+| `FOREGROUND` | `startForegroundCompat()`, no machine ack | Late dispatch landing on an already-foreground process; re-acking would reset the keep-alive timer |
+| `KEEP_ALIVE` | `startForegroundCompat()`, no machine ack | Late-start race: count drained between dispatch and create; keep-alive timer still owns the demote transition |
+| `DEMOTING` | `startForegroundCompat()`, no machine ack | The state collector will reflect DEMOTING into `stopForeground` + `stopSelf` — service exits via the collector |
+| `NORMAL` | `stopSelf` immediately, no `startForeground` | Stale dispatch — state was reset (start failure / OS-kill recovery completing with no queued work) before Android scheduled the service |
+
+The OS `startForeground` deadline is satisfied for every non-NORMAL state. The NORMAL case is the only path that returns without `startForeground` — accepted as a deliberate trade because the machine guarantees no work is queued (otherwise it would be in PROMOTING).
 
 The 5s FGS retry runs in the state machine's coroutine scope. It is not a Service-side concern; the machine schedules and cancels independently of any service instance.
 

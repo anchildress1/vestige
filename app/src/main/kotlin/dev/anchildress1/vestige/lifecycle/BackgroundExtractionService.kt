@@ -13,7 +13,7 @@ import kotlinx.coroutines.launch
 class BackgroundExtractionService : LifecycleService() {
 
     private var collectorStarted: Boolean = false
-    private var killAcknowledged: Boolean = false
+    private var shutdownHandled: Boolean = false
 
     override fun onCreate() {
         super.onCreate()
@@ -23,9 +23,9 @@ class BackgroundExtractionService : LifecycleService() {
         lifecycleScope.launch {
             machine.state.collect { state ->
                 if (state == BackgroundExtractionLifecycleState.DEMOTING) {
+                    shutdownHandled = true
                     stopForegroundCompat()
                     machine.onForegroundStopConfirmed()
-                    killAcknowledged = true
                     stopSelf()
                 }
             }
@@ -35,23 +35,28 @@ class BackgroundExtractionService : LifecycleService() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         super.onStartCommand(intent, flags, startId)
         val machine = requireStateMachine()
-        try {
-            startForegroundCompat()
-        } catch (@Suppress("TooGenericExceptionCaught") error: Exception) {
-            // FGS start can throw ForegroundServiceStartNotAllowedException, SecurityException,
-            // or MissingForegroundServiceTypeException. Wedging the machine in PROMOTING blocks
-            // every future capture for the process lifetime — surface the failure and reset.
-            Log.e(TAG, "startForeground rejected", error)
-            machine.onForegroundStartFailed()
-            stopSelf()
-            return START_NOT_STICKY
+        if (machine.state.value == BackgroundExtractionLifecycleState.PROMOTING) {
+            try {
+                startForegroundCompat()
+                machine.onForegroundStartConfirmed()
+            } catch (@Suppress("TooGenericExceptionCaught") error: Exception) {
+                // FGS start can throw ForegroundServiceStartNotAllowedException, SecurityException,
+                // or MissingForegroundServiceTypeException. Wedging the machine in PROMOTING blocks
+                // every future capture for the process lifetime — surface the failure and reset.
+                Log.e(TAG, "startForeground rejected", error)
+                machine.onForegroundStartFailed()
+                shutdownHandled = true
+                stopSelf(startId)
+            }
+        } else {
+            shutdownHandled = true
+            stopSelf(startId)
         }
-        machine.onForegroundStartConfirmed()
-        return START_STICKY
+        return START_NOT_STICKY
     }
 
     override fun onDestroy() {
-        if (!killAcknowledged) {
+        if (!shutdownHandled) {
             // OS killed us mid-extraction; recovery follows ADR-001 §Q3 cold-start sweep.
             stateMachine()?.onServiceKilled()
         }

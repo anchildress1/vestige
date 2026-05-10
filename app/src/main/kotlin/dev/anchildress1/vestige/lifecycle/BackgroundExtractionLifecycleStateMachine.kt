@@ -14,6 +14,7 @@ import kotlin.time.Duration.Companion.seconds
 class BackgroundExtractionLifecycleStateMachine(
     private val scope: CoroutineScope,
     private val keepAlive: Duration = DEFAULT_KEEP_ALIVE,
+    private val onPromoteRequested: () -> Unit = {},
 ) {
 
     private val mutableState: MutableStateFlow<BackgroundExtractionLifecycleState> =
@@ -103,6 +104,9 @@ class BackgroundExtractionLifecycleStateMachine(
 
     private fun transition(next: BackgroundExtractionLifecycleState) {
         mutableState.value = next
+        if (next == BackgroundExtractionLifecycleState.PROMOTING) {
+            onPromoteRequested()
+        }
     }
 
     companion object {

@@ -13,8 +13,14 @@ import kotlin.time.Duration.Companion.seconds
 @OptIn(ExperimentalCoroutinesApi::class)
 class BackgroundExtractionServiceStateMachineTest {
 
-    private fun machine(scope: TestScope): BackgroundExtractionLifecycleStateMachine =
-        BackgroundExtractionLifecycleStateMachine(scope, keepAlive = 30.seconds)
+    private fun machine(
+        scope: TestScope,
+        onPromoteRequested: () -> Unit = {},
+    ): BackgroundExtractionLifecycleStateMachine = BackgroundExtractionLifecycleStateMachine(
+        scope = scope,
+        keepAlive = 30.seconds,
+        onPromoteRequested = onPromoteRequested,
+    )
 
     @Test
     fun `cold start with no pending entries stays NORMAL`() = runTest {
@@ -164,6 +170,26 @@ class BackgroundExtractionServiceStateMachineTest {
         machine.onServiceKilled()
 
         assertEquals(BackgroundExtractionLifecycleState.PROMOTING, machine.state.value)
+    }
+
+    @Test
+    fun `onPromoteRequested fires on every PROMOTING transition including the DEMOTING bounce`() = runTest {
+        var promoteCount = 0
+        val machine = machine(this) { promoteCount += 1 }
+
+        machine.onInFlightCountChange(1)
+        assertEquals(1, promoteCount)
+
+        machine.onForegroundStartConfirmed()
+        machine.onInFlightCountChange(0)
+        advanceTimeBy(30_001L)
+        assertEquals(BackgroundExtractionLifecycleState.DEMOTING, machine.state.value)
+
+        machine.onInFlightCountChange(1)
+        machine.onForegroundStopConfirmed()
+
+        assertEquals(BackgroundExtractionLifecycleState.PROMOTING, machine.state.value)
+        assertEquals(2, promoteCount)
     }
 
     @Test

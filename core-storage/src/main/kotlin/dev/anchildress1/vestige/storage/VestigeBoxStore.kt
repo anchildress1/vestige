@@ -4,6 +4,7 @@ import android.content.Context
 import dev.anchildress1.vestige.model.ExtractionStatus
 import io.objectbox.BoxStore
 import io.objectbox.kotlin.boxFor
+import io.objectbox.query.QueryBuilder
 import java.io.File
 
 /** Thin factory around the generated `MyObjectBox` builder. Caller owns BoxStore lifecycle. */
@@ -22,19 +23,19 @@ object VestigeBoxStore {
     }
 
     /**
-     * Cold-start recovery query: returns IDs of entries whose extraction did not finish. The
-     * caller owns the [BoxStore] — this avoids the duplicate-open crash once `EntryStore`
-     * (architecture-brief §"AppContainer Ownership") lands and becomes the sole BoxStore owner.
+     * Cold-start recovery query: returns IDs of entries whose extraction did not finish, sorted
+     * by id ascending. The caller owns the [BoxStore] — this avoids the duplicate-open crash
+     * once `EntryStore` (architecture-brief §"AppContainer Ownership") owns BoxStore lifecycle.
      */
     fun findNonTerminalEntryIds(boxStore: BoxStore): List<Long> = boxStore.boxFor<EntryEntity>()
-        .all
-        .asSequence()
-        .filter { entry -> !entry.extractionStatus.isTerminal() }
-        .map(EntryEntity::id)
-        .toList()
+        .query()
+        .`in`(EntryEntity_.extractionStatus, NON_TERMINAL_STATUS_NAMES, QueryBuilder.StringOrder.CASE_SENSITIVE)
+        .order(EntryEntity_.id)
+        .build()
+        .use { query -> query.findIds().toList() }
 
-    private fun ExtractionStatus.isTerminal(): Boolean = when (this) {
-        ExtractionStatus.COMPLETED, ExtractionStatus.TIMED_OUT, ExtractionStatus.FAILED -> true
-        ExtractionStatus.PENDING, ExtractionStatus.RUNNING -> false
-    }
+    private val NON_TERMINAL_STATUS_NAMES: Array<String> = arrayOf(
+        ExtractionStatus.PENDING.name,
+        ExtractionStatus.RUNNING.name,
+    )
 }

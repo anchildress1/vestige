@@ -18,6 +18,14 @@ import org.junit.jupiter.api.Test
  * with @Disabled until the real resolver lands; their setup blocks document the inputs Phase 2
  * is expected to handle.
  *
+ * **The four `@Disabled` tests in this file are project-sanctioned scaffolding** for Story 2.8
+ * (Phase 2 ConvergenceResolver implementation), not silenced failing tests. They intentionally
+ * pre-document the inputs + expected verdicts the real resolver must satisfy; each `@Disabled`
+ * carries the Story 2.8 enablement message inline. Per AGENTS.md guardrail 22 ("tests and docs
+ * ship with the change, every change") the resolver author enables them as the implementation
+ * lands. Do not delete or convert them to `@Test` until the resolver is wired; doing so loses
+ * the Phase 1 / Phase 2 handoff documentation Story 1.12 intentionally established.
+ *
  * Test infrastructure: JUnit Jupiter only — no separate fake LiteRT-LM client at this layer
  * because the resolver consumes already-parsed [LensExtraction]s, not engine output. The fake
  * engine for *prompt-side* Phase 2 tests is the `LiteRtLmEngine` lifecycle scaffolding plus

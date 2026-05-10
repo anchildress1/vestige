@@ -1,0 +1,20 @@
+## Output schema
+
+Return one JSON object. No prose outside the JSON, no commentary, no markdown.
+
+Required keys:
+
+- `tags`: array of short lowercase strings, kebab-case for multi-word tokens.
+- `energy_descriptor`: string or null.
+- `state_shift`: boolean.
+- `vocabulary_contradictions`: array of `{term_a, term_b, snippet}` or `[]`.
+- `stated_commitment`: array of `{text, topic_or_person, conditional}` or `[]`.
+- `recurrence_link`: string `pattern_id` or null.
+- `recurrence_kind`: `"exact"`, `"partial"`, or null.
+- `flags`: array of `{kind, snippet, note}` or `[]` — only the Skeptical lens populates this; the other two return `[]`.
+
+Hard rules:
+
+- Strings use straight quotes. No trailing commas. No comments.
+- Use `null` for missing data, not the string "null", and not omission.
+- Do not invent fields. The keys above are the entire schema for this call.

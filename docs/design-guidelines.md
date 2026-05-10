@@ -283,15 +283,16 @@ Forbidden across all personas: "thank you for sharing," "how does that make you 
 
 ### First-Run Onboarding
 
-One decision per screen, sequential.
+One decision per screen, sequential. **8 screens total** — matches `ux-copy.md` §Onboarding + `adrs/ADR-004-app-backgrounding-and-model-handle-lifecycle.md` §"Permission Flow" (Screen 3.5 was added after the conditional foreground service decision in ADR-004).
 
 1. Choose persona (default Witness highlighted, brief one-line descriptions)
 2. Explain local processing — visual moment establishing the on-device identity. Use plain language: "Everything runs on your phone. Your voice never leaves the device."
 3. Request microphone permission (with rationale)
-4. Show typed fallback (so non-voice users aren't stranded)
-5. Wi-Fi check
-6. Download local model (real progress, real ETA, real bytes)
-7. Start first entry (empty Capture screen with a one-line nudge)
+4. Request notification permission (Screen 3.5 per `ux-copy.md` + ADR-004 §"Permission Flow") — explains that Vestige shows a single status notification while working locally on an entry; no other notifications, ever
+5. Show typed fallback (so non-voice users aren't stranded)
+6. Wi-Fi check
+7. Download local model (real progress, real ETA, real bytes)
+8. Start first entry (empty Capture screen with a one-line nudge)
 
 Tone: plain, short, no emotional hand-holding. No "Welcome to your journey."
 

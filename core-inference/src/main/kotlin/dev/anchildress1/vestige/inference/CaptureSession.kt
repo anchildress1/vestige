@@ -22,10 +22,12 @@ import java.time.Clock
  * ```
  *
  * Illegal transitions throw `IllegalStateException`. Per `AGENTS.md` guardrail 11 the transcript
- * stores text only; no audio bytes flow through this class. Persona switching (Story 2.3) and the
- * foreground inference plumbing (Story 2.2) wrap this state machine — they do not bypass it.
+ * stores text only; no audio bytes flow through this class. Persona switching (Story 2.3) updates
+ * [activePersona] for the next foreground call; prior turns retain whichever persona authored
+ * them via [Turn.persona]. The foreground inference plumbing (Story 2.2) wraps this state machine
+ * — it does not bypass it.
  */
-class CaptureSession(private val clock: Clock = Clock.systemUTC()) {
+class CaptureSession(private val clock: Clock = Clock.systemUTC(), defaultPersona: Persona = Persona.WITNESS) {
 
     enum class State { IDLE, RECORDING, INFERRING, TRANSCRIBED, RESPONDED, ERROR }
 
@@ -35,6 +37,15 @@ class CaptureSession(private val clock: Clock = Clock.systemUTC()) {
         private set
 
     var lastError: Throwable? = null
+        private set
+
+    /**
+     * Active persona for the *next* foreground call (Story 2.3). Defaults to [Persona.WITNESS]
+     * per `concept-locked.md` §Personas. Prior turns in [transcript] keep the persona that
+     * authored them — switching does not rewrite history. Background extraction is persona-
+     * agnostic per `AGENTS.md` guardrail 9, so this value never reaches the lens prompts.
+     */
+    var activePersona: Persona = defaultPersona
         private set
 
     /** IDLE → RECORDING. */
@@ -86,6 +97,16 @@ class CaptureSession(private val clock: Clock = Clock.systemUTC()) {
         requireState("clearError", State.ERROR)
         lastError = null
         state = State.IDLE
+    }
+
+    /**
+     * Update [activePersona] for subsequent foreground calls. State-independent — callers may
+     * switch persona between turns or while idle. Mid-call switches do not affect the in-flight
+     * inference: the foreground call carries the persona the caller passed into it, and the
+     * resulting [Turn] records that persona on the transcript regardless of [activePersona].
+     */
+    fun setPersona(persona: Persona) {
+        activePersona = persona
     }
 
     private fun requireState(action: String, vararg allowed: State) {

@@ -49,6 +49,10 @@ class LensResponseParserTest {
 
     @Test
     fun `routes Skeptical flags off the fields map and onto the flags list`() {
+        // `flags` are emitted by the model as `{kind, snippet, note}` objects per
+        // `core-inference/src/main/resources/lenses/output-schema.txt`. The parser encodes each
+        // object into the stable `kind:snippet:note` form so convergence-time equality is
+        // deterministic regardless of JSON key order or sub-key spacing.
         val raw = """
             {
               "tags": ["audit"],
@@ -58,16 +62,53 @@ class LensResponseParserTest {
               "stated_commitment": null,
               "recurrence_link": null,
               "recurrence_kind": null,
-              "flags": ["energy_descriptor:contradicts:fine"]
+              "flags": [
+                {"kind":"state-behavior-mismatch","snippet":"fine but flatlined","note":"stated state contradicts described behavior"}
+              ]
             }
         """.trimIndent()
 
         val extraction = LensResponseParser.parse(Lens.SKEPTICAL, raw)
 
         assertNotNull(extraction)
-        assertEquals(listOf("energy_descriptor:contradicts:fine"), extraction!!.flags)
+        assertEquals(
+            listOf("state-behavior-mismatch:fine but flatlined:stated state contradicts described behavior"),
+            extraction!!.flags,
+        )
         assertNull(extraction.fields["energy_descriptor"])
         assertNull(extraction.fields["stated_commitment"])
+    }
+
+    @Test
+    fun `flag with missing sub-keys collapses to empty segments and keeps the colon count fixed`() {
+        val raw = """
+            {"flags":[{"kind":"unsupported-recurrence","snippet":"third Tuesday in a row"}]}
+        """.trimIndent()
+
+        val extraction = LensResponseParser.parse(Lens.SKEPTICAL, raw)
+
+        assertNotNull(extraction)
+        assertEquals(listOf("unsupported-recurrence:third Tuesday in a row:"), extraction!!.flags)
+    }
+
+    @Test
+    fun `flag with all sub-keys missing or empty is dropped`() {
+        val raw = """{"flags":[{},{"kind":""}]}"""
+
+        val extraction = LensResponseParser.parse(Lens.SKEPTICAL, raw)
+
+        assertNotNull(extraction)
+        assertTrue(extraction!!.flags.isEmpty())
+    }
+
+    @Test
+    fun `legacy bare-string flag entries pass through unchanged`() {
+        val raw = """{"flags":["energy_descriptor:contradicts:fine"]}"""
+
+        val extraction = LensResponseParser.parse(Lens.SKEPTICAL, raw)
+
+        assertNotNull(extraction)
+        assertEquals(listOf("energy_descriptor:contradicts:fine"), extraction!!.flags)
     }
 
     @Test

@@ -15,19 +15,28 @@ import org.json.JSONTokener
  * doesn't reduce to one parseable object is a parse failure and the caller (worker) treats the
  * lens as "no opinion" per ADR-002 §"Convergence edge cases".
  *
- * Field shape conventions (all schema keys are optional in the parsed map — the convergence
- * resolver sees `null` and absence as equivalent):
+ * Field shape conventions in the resulting [LensExtraction.fields] map (every schema key is
+ * present; missing or JSON-null values come through as `null`):
  *
- * - `tags` → `List<String>` of trimmed lowercase entries (empty list when missing).
+ * - `tags` → `List<*>?` — passed through as the model emitted it. The schema instructs the model
+ *   to use "short lowercase strings, kebab-case for multi-word tokens"; the parser does not
+ *   re-normalize so convergence sees the model's emit verbatim. A missing key is `null`, not an
+ *   empty list — the convergence resolver treats `null` and absence as equivalent.
  * - `energy_descriptor` → `String?`.
  * - `state_shift` → `Boolean?`.
- * - `vocabulary_contradictions` → `List<Map<String, Any?>>`.
+ * - `vocabulary_contradictions` → `List<Map<String, Any?>>?`.
  * - `stated_commitment` → `Map<String, Any?>?`.
  * - `recurrence_link` → `String?`.
  * - `recurrence_kind` → `String?`.
  *
  * Skeptical-only `flags` are routed off the [LensExtraction.fields] map and onto its
- * [LensExtraction.flags] list since they don't participate in field-level convergence.
+ * [LensExtraction.flags] list since they don't participate in field-level convergence. The
+ * schema specifies each flag as `{kind, snippet, note}`; the parser encodes that object into a
+ * stable `"$kind:$snippet:$note"` string so [LensExtraction.flags] stays a `List<String>` and
+ * convergence-time equality comparisons are deterministic regardless of JSON key order. Missing
+ * sub-keys collapse to empty segments so the colon count stays at three; entries that resolve
+ * to all-empty segments are dropped. A bare-string flag entry (the legacy convention) passes
+ * through unchanged.
  */
 internal object LensResponseParser {
 
@@ -47,11 +56,29 @@ internal object LensResponseParser {
         return root?.let {
             val fields = SCHEMA_KEYS.associateWith { key -> normalize(it.opt(key)) }
             val flags = (normalize(it.opt("flags")) as? List<*>)
-                ?.map { entry -> entry?.toString().orEmpty() }
-                ?.filter { entry -> entry.isNotBlank() }
+                ?.mapNotNull(::encodeFlag)
                 ?: emptyList()
             LensExtraction(lens = lens, fields = fields, flags = flags)
         }
+    }
+
+    /**
+     * Schema flag form is `{kind, snippet, note}` per `output-schema.txt`. The encoded string
+     * is `"$kind:$snippet:$note"` with empty segments for missing sub-keys so the colon count is
+     * fixed and a downstream split is unambiguous. Returns `null` for entries that have no
+     * useful content (every segment empty, or a non-string/non-object value).
+     */
+    private fun encodeFlag(entry: Any?): String? = when (entry) {
+        is String -> entry.takeIf { it.isNotBlank() }
+
+        is Map<*, *> -> {
+            val kind = entry["kind"]?.toString().orEmpty()
+            val snippet = entry["snippet"]?.toString().orEmpty()
+            val note = entry["note"]?.toString().orEmpty()
+            "$kind:$snippet:$note".takeIf { kind.isNotEmpty() || snippet.isNotEmpty() || note.isNotEmpty() }
+        }
+
+        else -> null
     }
 
     /**

@@ -8,7 +8,6 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import java.io.IOException
 
 /**
  * Runs the three-lens background extraction per Story 2.6 — for each of [Lens.LITERAL],
@@ -135,18 +134,18 @@ class BackgroundExtractionWorker(
         AttemptOutcome(raw = engine.generateText(composed.text), error = null)
     } catch (cancellation: CancellationException) {
         throw cancellation
-    } catch (engineError: IllegalStateException) {
-        recoverFromLensFailure(lens, attempt, engineError)
-    } catch (engineError: IOException) {
+    } catch (@Suppress("TooGenericExceptionCaught") engineError: Exception) {
+        // The lens-failure contract (ADR-002 §"Convergence edge cases") is explicit: any single
+        // lens failure must become "no opinion" rather than aborting the whole entry. The
+        // LiteRT-LM SDK's surface throws unchecked exception types from native code that can't
+        // be enumerated up-front (state-machine, IO, decode, OOM-adjacent), so a narrow catch
+        // would silently break the contract for whichever subtype slipped through. Catching
+        // [Exception] keeps the contract enforceable; [CancellationException] (a coroutine
+        // signal, not a failure) still propagates above this handler to honor structured
+        // concurrency, and `Error` (OOM, etc.) is intentionally not swallowed.
         recoverFromLensFailure(lens, attempt, engineError)
     }
 
-    /**
-     * Lens-level engine failures (engine state, IO) become a "no opinion" attempt instead of
-     * aborting the entry. ADR-002 §"Convergence edge cases" routes lens failures to convergence
-     * rather than retrying indefinitely; the worker's per-lens retry budget covers transient
-     * blips, the convergence resolver covers the rest.
-     */
     private fun recoverFromLensFailure(lens: Lens, attempt: Int, error: Throwable): AttemptOutcome {
         val reason = "engine-error:${error.javaClass.simpleName}"
         Log.w(TAG, "lens=$lens attempt=$attempt failed (${error.message ?: reason})")

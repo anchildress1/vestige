@@ -10,8 +10,10 @@ import dev.anchildress1.vestige.model.LensExtraction
  * reason to inflate convergence by retrying indefinitely.
  *
  * [attemptCount] is the per-lens count of model calls made (1 on first-try success, up to
- * [BackgroundExtractionWorker.maxAttemptsPerLens] when retries exhaust). The worker totals these
- * onto the entry's `attempt_count` (ADR-001 §Q3) when reporting status.
+ * [BackgroundExtractionWorker.maxAttemptsPerLens] when retries exhaust). It is per-lens
+ * diagnostic data only — [BackgroundExtractionWorker] does not roll it up into the
+ * caller-supplied entry retry counter (ADR-001 §Q3 `attempt_count`), which stays stable across
+ * lens retries within a single sweep.
  */
 data class LensResult(
     val lens: Lens,

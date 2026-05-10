@@ -7,7 +7,7 @@ import dev.anchildress1.vestige.model.ResolvedExtraction
 import dev.anchildress1.vestige.model.ResolvedField
 
 /**
- * Reduces three [LensExtraction]s to one [ResolvedExtraction] per the convergence rules:
+ * Reduces 0–3 surviving [LensExtraction]s to one [ResolvedExtraction] per the convergence rules:
  * ≥2 lenses agree → CANONICAL; only one lens populates → CANDIDATE; lenses disagree →
  * AMBIGUOUS (null value, noted); Skeptical flags conflict even on agreement →
  * CANONICAL_WITH_CONFLICT.
@@ -18,10 +18,11 @@ fun interface ConvergenceResolver {
 
 /**
  * Pure data merge. Iterates the union of field keys across the supplied lenses and applies the
- * four resolution rules per ADR-002 §"Convergence Resolver Contract". `tags` follow the
- * list-intersection rule (per-tag count across lenses); other fields use a per-key equality
- * predicate (case-insensitive for `energy_descriptor`, predicate-based for
- * `stated_commitment`, structural equality otherwise).
+ * four resolution rules per ADR-002 §"Convergence Resolver Contract". `tags` use a per-tag
+ * ≥2-of-3 majority count with a Literal-strongest fallback (CANDIDATE) when no tag reaches
+ * majority; other fields use a per-key equality predicate (case-insensitive trim for
+ * `energy_descriptor`, identity-tuple match for `stated_commitment`, structural equality
+ * otherwise).
  *
  * Lens parse failures are honored by the caller — a missing lens is treated as no opinion. With
  * one surviving lens the entry no longer has enough evidence to resolve any field, so every

@@ -5,26 +5,18 @@ import java.time.Clock
 
 /**
  * Single-use turn-by-turn state for one capture. After RESPONDED (or ERROR) the instance is
- * terminal — the next recording requires a fresh [CaptureSession]. Rationale + the rejected
- * multi-turn alternative live in `adrs/ADR-005-stt-b-scope-and-v1-single-turn.md`.
+ * terminal — the next recording requires a fresh session.
  *
- * State machine:
  * ```
  *   IDLE ──startRecording──▶ RECORDING ──submitForInference──▶ INFERRING
  *                                                                  │
  *                                                                  ▼
  *                                          RESPONDED ◀──recordModelResponse── TRANSCRIBED
- *                                          ▲                                  ▲
- *                                          │                                  │
- *                                          │                       recordTranscription
- *                                          │
- *                              (terminal — no transition out)
  *
- *   any ──fail──▶ ERROR (terminal)
+ *   any ──fail──▶ ERROR
  * ```
  *
- * Illegal transitions throw `IllegalStateException`. Per `AGENTS.md` guardrail 11 the transcript
- * stores text only; no audio bytes flow through this class.
+ * Illegal transitions throw. The transcript stores text only — no audio bytes.
  */
 class CaptureSession(private val clock: Clock = Clock.systemUTC(), defaultPersona: Persona = Persona.WITNESS) {
 
@@ -38,10 +30,7 @@ class CaptureSession(private val clock: Clock = Clock.systemUTC(), defaultPerson
     var lastError: Throwable? = null
         private set
 
-    /**
-     * Active persona for the upcoming foreground call. Default per `concept-locked.md` §Personas.
-     * Background extraction is persona-agnostic per `AGENTS.md` guardrail 9.
-     */
+    /** Active persona for the upcoming foreground call. Background extraction is persona-agnostic. */
     var activePersona: Persona = defaultPersona
         private set
 
@@ -67,17 +56,13 @@ class CaptureSession(private val clock: Clock = Clock.systemUTC(), defaultPerson
         state = State.RESPONDED
     }
 
-    /** Any → ERROR. Terminal; the prior transcript is preserved on the failed instance. */
     fun fail(error: Throwable) {
         lastError = error
         state = State.ERROR
     }
 
-    /**
-     * State-independent. The recorded `Turn.persona` comes from the explicit param to
-     * [recordModelResponse], not from [activePersona] — this only sets the default the next
-     * foreground call will use unless the caller passes something else.
-     */
+    // The Turn.persona comes from recordModelResponse's explicit param, not from this — setting
+    // the default here doesn't retroactively re-tag.
     fun setPersona(persona: Persona) {
         activePersona = persona
     }

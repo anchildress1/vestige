@@ -1,25 +1,16 @@
 package dev.anchildress1.vestige.model
 
-/**
- * Convergence outcome for a single extracted field per `concept-locked.md` §"Convergence rules".
- * The 3-lens × 5-surface pipeline (Phase 2) reduces three lens passes to one verdict per field.
- */
+/** Per-field outcome after the convergence resolver runs. */
 enum class ConfidenceVerdict {
-    /** ≥2 of 3 lenses agree on the field. Saved as authoritative. */
+    /** ≥2 of 3 lenses agree. Saved as authoritative. */
     CANONICAL,
 
-    /**
-     * Only Inferential populated the field. Saved at lower confidence; not used by the pattern
-     * engine until promoted.
-     */
+    /** Only Inferential populated. Lower confidence; not used by the pattern engine. */
     CANDIDATE,
 
-    /** Lenses disagree. Saved null with a note so re-eval can revisit. */
+    /** Lenses disagree. Saved null + note. */
     AMBIGUOUS,
 
-    /**
-     * ≥2 lenses agree but Skeptical flagged a conflict. Saved as canonical with a conflict
-     * marker.
-     */
+    /** ≥2 agree but Skeptical flagged a conflict. */
     CANONICAL_WITH_CONFLICT,
 }

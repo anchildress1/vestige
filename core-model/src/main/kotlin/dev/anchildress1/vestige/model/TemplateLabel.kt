@@ -1,10 +1,6 @@
 package dev.anchildress1.vestige.model
 
-/**
- * Six agent-emitted labels per `concept-locked.md` §Templates. Templates are model output, not
- * user-selected modes (AGENTS.md guardrail 10). [serial] is the kebab-case form persisted to
- * markdown frontmatter.
- */
+/** Agent-emitted (never user-selected). [serial] is the kebab-case form in markdown. */
 enum class TemplateLabel(val serial: String) {
     AFTERMATH("aftermath"),
     TUNNEL_EXIT("tunnel-exit"),

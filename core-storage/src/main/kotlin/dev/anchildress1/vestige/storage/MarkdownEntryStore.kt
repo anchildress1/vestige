@@ -8,31 +8,18 @@ import java.time.format.DateTimeFormatter
 import java.time.temporal.ChronoUnit
 
 /**
- * Read/write contract for the markdown source-of-truth files per architecture-brief.md
- * §"Markdown Entry Shape". Each entry lives at `{baseDir}/entries/{ISO8601}--{slug}.md`
- * with YAML frontmatter and the entry text as body.
- *
- * Phase 1 ships the schema only — empty `stated_commitment` / `entry_observations` /
- * `confidence` round-trip cleanly. Populated structured fields are Phase 2 work; this class
- * passes them through as JSON-string blocks (parseable but not yet expanded into structured
- * YAML), so the schema commitment is honored without overbuilding.
- *
- * The audio path stays out of here entirely — only transcription text persists per AGENTS.md
- * guardrail 11.
+ * Read/write the markdown source-of-truth files at `{baseDir}/entries/{ISO8601}--{slug}.md`.
+ * YAML frontmatter holds the structured fields; body is the entry text. Structured Phase-2
+ * fields (`stated_commitment`, `entry_observations`, `confidence`) round-trip as JSON blobs.
+ * Audio bytes never persist here.
  */
-// 13 small functions: 4 public read/write surface + 9 private YAML helpers. Splitting the
-// helpers across files would scatter parse/emit logic that lives on one shape.
-@Suppress("TooManyFunctions")
+@Suppress("TooManyFunctions") // 4 read/write surface + 9 YAML helpers on one shape.
 class MarkdownEntryStore(private val baseDir: File) {
 
     /**
-     * Write [entry] to `{baseDir}/entries/{filename}.md`. Returns the file. The filename is
-     * deterministic from the timestamp + entry text, with collision suffixes `-2` / `-3` if
-     * a file already exists at the target path.
-     *
-     * The `markdownFilename` field on [entry] is set to the resolved name so subsequent reads
-     * know where to look. If the entry already carries a non-blank `markdownFilename`, that
-     * filename is reused — re-eval rewrites the same file rather than minting a new one.
+     * Writes [entry], returning the file. Reuses [EntryEntity.markdownFilename] if set (re-eval
+     * overwrites in place); otherwise mints a deterministic name with `-2`/`-3` collision
+     * suffixes and stores it on the entry.
      */
     fun write(entry: EntryEntity): File {
         val entriesDir = ensureEntriesDir()

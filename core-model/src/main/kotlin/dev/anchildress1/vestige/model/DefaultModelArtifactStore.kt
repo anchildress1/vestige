@@ -13,15 +13,8 @@ import java.security.MessageDigest
 import java.util.HexFormat
 
 /**
- * Default file-on-disk + HTTP implementation of [ModelArtifactStore]. Uses `HttpURLConnection`
- * to keep `:core-model` dependency-free (no OkHttp / Ktor pull-in); Story 1.10 wraps the actual
- * outbound call in `NetworkGate` so this store is the only outbound primitive in v1.
- *
- * @param httpClient open-and-connect indirection so tests can swap in a fake without standing
- *  up a local HTTP server. The default uses [HttpURLConnection] and respects the manifest's
- *  `allowed_hosts` allowlist before opening the connection.
- * @param ioDispatcher dispatcher for blocking filesystem and HTTP work. Defaults to [Dispatchers.IO];
- *  tests inject a deterministic dispatcher (typically `runTest`'s scheduler) for fast, ordered runs.
+ * File-on-disk + HTTP implementation. Uses `HttpURLConnection` to keep `:core-model`
+ * dependency-free; the [NetworkGate]-wrapped client is the sole outbound primitive.
  */
 class DefaultModelArtifactStore(
     override val manifest: ModelManifest,
@@ -181,10 +174,7 @@ class DefaultModelArtifactStore(
     }
 }
 
-/**
- * Minimal HTTP indirection so the artifact store is testable without a network. Implementations
- * are responsible for honoring the manifest's `allowed_hosts` allowlist before opening a stream.
- */
+/** Implementations honor the manifest `allowed_hosts` allowlist before opening a stream. */
 interface HttpClient {
     fun open(url: String, resumeFromByte: Long): HttpResponse
 }
@@ -195,10 +185,8 @@ interface HttpResponse : AutoCloseable {
 }
 
 /**
- * Default `HttpURLConnection`-backed client. Fails fast on hosts not in [allowedHosts] and
- * consults the supplied [networkGate] before each connect — so a sealed gate prevents the
- * dial-out even if the allowlist would otherwise permit the host. The gate is required: there
- * is no production scenario where the model-download client should bypass the privacy gate.
+ * `HttpURLConnection`-backed client. Fails fast on hosts not in [allowedHosts]; consults
+ * [networkGate] before each connect so a sealed gate prevents dial-out regardless of allowlist.
  */
 class DefaultHttpClient(private val allowedHosts: List<String>, private val networkGate: NetworkGate) : HttpClient {
     override fun open(url: String, resumeFromByte: Long): HttpResponse {
@@ -274,12 +262,11 @@ private class UrlHttpResponse(private val connection: HttpURLConnection) : HttpR
     }
 }
 
-/** Pluggable retry timing — tests inject a deterministic shim. */
 fun interface BackoffPolicy {
     fun delayMs(attempt: Int): Long
 }
 
-/** Capped exponential backoff: 1s, 2s, 4s … with a [maxDelayMs] ceiling. */
+/** Capped exponential backoff: 1s, 2s, 4s … up to [maxDelayMs]. */
 class ExponentialBackoff(private val baseDelayMs: Long = 1_000L, private val maxDelayMs: Long = 30_000L) :
     BackoffPolicy {
     override fun delayMs(attempt: Int): Long {

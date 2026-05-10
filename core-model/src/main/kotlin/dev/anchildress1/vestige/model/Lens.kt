@@ -1,17 +1,13 @@
 package dev.anchildress1.vestige.model
 
-/**
- * Three orthogonal lens framings per `concept-locked.md` §"Multi-lens extraction architecture".
- * Each lens runs the same five-surface extraction; the convergence resolver reduces the three
- * outputs to one verdict per field.
- */
+/** Three orthogonal lens framings — each runs the same five-surface extraction. */
 enum class Lens {
-    /** Strict; only what's explicit in the entry text. */
+    /** Only what the entry text explicitly says. */
     LITERAL,
 
-    /** Charitable; explicit + reasonable contextual inference. */
+    /** Explicit + reasonable contextual inference. */
     INFERENTIAL,
 
-    /** Adversarial; flag contradictions, missing pieces, what doesn't add up. */
+    /** Adversarial — surface contradictions, missing pieces, things that don't add up. */
     SKEPTICAL,
 }

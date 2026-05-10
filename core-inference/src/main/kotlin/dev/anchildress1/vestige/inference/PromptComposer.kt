@@ -3,31 +3,17 @@ package dev.anchildress1.vestige.inference
 import android.util.Log
 import dev.anchildress1.vestige.model.Lens
 
-/**
- * One retrieved history chunk for the recurrence surface (ADR-002 §Q2). Top three are passed by
- * the caller; older entries are out-of-budget per the ~500-token cap.
- */
+/** One retrieved history chunk for the recurrence surface. Caller passes the top three. */
 data class HistoryChunk(val patternId: String?, val text: String)
 
-/**
- * The composed system prompt for one background lens call. [tokenEstimate] is the rough
- * 4-chars-per-token approximation logged for ADR-002 §"Token budget per call" validation.
- */
+/** Composed background-lens prompt. [tokenEstimate] uses a rough 4-chars-per-token rule. */
 data class ComposedPrompt(val lens: Lens, val text: String, val tokenEstimate: Int)
 
 /**
- * Builds the system prompt for one background-pass lens call by composing the lens framing on
- * top of all five surface instructions, the JSON output schema, the retrieved-history block, and
- * the entry text (`concept-locked.md` §"Multi-lens extraction architecture", Story 2.5,
- * ADR-002 §"Background lens prompt").
- *
- * Lens and surface text live as classpath resources at `lenses/{slug}.txt` and
- * `surfaces/{slug}.txt`. The composer loads each module independently — no surface text reads a
- * lens path and vice versa — so daily prompt tuning of one module cannot diff another
- * (ADR-002 §"Why separate storage").
- *
- * Persona modules are forbidden here. Lens framing is the only voice in extraction
- * (`AGENTS.md` guardrail 9; ADR-002 §"Background lens prompt").
+ * Builds one background lens prompt by stacking the lens framing on top of all five surface
+ * instructions, the output schema, the retrieved-history block, and the entry text. Lens and
+ * surface text load independently from `resources/lenses/` and `resources/surfaces/` so a tweak
+ * to one module cannot diff another. Persona modules never appear here — extraction is voice-free.
  */
 object PromptComposer {
 
@@ -44,11 +30,6 @@ object PromptComposer {
         "recurrence",
     )
 
-    /**
-     * Compose the prompt for [lens] over [entryText] with optional [retrievedHistory] (top 3,
-     * ~500-token cap per ADR-002 §Q2). The returned [ComposedPrompt] carries a token estimate
-     * that the caller logs against the 2K-per-system-block budget.
-     */
     fun compose(lens: Lens, entryText: String, retrievedHistory: List<HistoryChunk> = emptyList()): ComposedPrompt {
         require(entryText.isNotBlank()) { "PromptComposer.compose requires a non-blank entryText" }
         val capped = retrievedHistory.take(MAX_HISTORY_CHUNKS).map { it.copy(text = budgetText(it.text)) }
@@ -78,13 +59,9 @@ object PromptComposer {
         return ComposedPrompt(lens = lens, text = text, tokenEstimate = tokenEstimate)
     }
 
-    /**
-     * Dev-build prompt-body capture per ADR-002 §Consequences: "Logs must capture the exact
-     * composed prompt per call during dev builds." Gated on `Log.isLoggable(TAG, VERBOSE)` so
-     * release-build logcat stays quiet by default and a developer can opt in with
-     * `adb shell setprop log.tag.VestigePromptComposer VERBOSE`. Logcat truncates at ~4 kB per
-     * line, so the body is chunked and indexed for easy reassembly.
-     */
+    // Verbose-only so release builds stay quiet; opt in with
+    // `adb shell setprop log.tag.VestigePromptComposer VERBOSE`. Chunked at <4 kB to dodge
+    // logcat's per-line ceiling.
     private fun logComposedBody(lens: Lens, text: String) {
         if (!Log.isLoggable(TAG, Log.VERBOSE)) return
         val chunks = text.chunked(LOG_CHUNK_SIZE)
@@ -110,10 +87,7 @@ object PromptComposer {
     }
 
     private fun budgetText(text: String): String {
-        // Per-chunk cap so the top-3 retrieved-history block stays inside the ~500-token budget
-        // from ADR-002 §Q2. Truncation preserves the leading sentence — the call is system
-        // context, not authoritative source text. Reserve room for the ellipsis so the cap is
-        // strict (output length ≤ MAX_HISTORY_CHARS_PER_CHUNK).
+        // Reserve room for the ellipsis so the cap is strict (output ≤ MAX_HISTORY_CHARS_PER_CHUNK).
         if (text.length <= MAX_HISTORY_CHARS_PER_CHUNK) return text
         val budget = MAX_HISTORY_CHARS_PER_CHUNK - ELLIPSIS.length
         return text.substring(0, budget).trimEnd() + ELLIPSIS
@@ -136,8 +110,6 @@ object PromptComposer {
     }
 
     private fun estimateTokens(text: String): Int {
-        // 4-chars-per-token is the cheap rule of thumb. Phase 2 measurements replace this with a
-        // real tokenizer if the budget gets tight.
         if (text.isEmpty()) return 0
         return (text.length + CHARS_PER_TOKEN - 1) / CHARS_PER_TOKEN
     }

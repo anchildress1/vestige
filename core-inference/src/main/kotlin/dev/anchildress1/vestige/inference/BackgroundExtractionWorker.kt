@@ -10,33 +10,14 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 /**
- * Runs the three-lens background extraction per Story 2.6 — for each of [Lens.LITERAL],
- * [Lens.INFERENTIAL], [Lens.SKEPTICAL]: compose the system prompt (Story 2.5), call
- * [LiteRtLmEngine], parse the structured response, accumulate one [LensResult] per lens, and
- * hand the parsed extractions to [resolver] for convergence.
+ * Runs the three lenses sequentially against an already-persisted entry, retries each lens up to
+ * [maxAttemptsPerLens] times, and reduces the parsed lens outputs through [resolver]. A lens
+ * that exhausts its budget contributes a null extraction (convergence treats that as "no opinion").
  *
- * **Sequential by design.** ADR-002 §"Why three calls and not one combined call" requires
- * statistical independence between lens outputs, but E4B is one model on one device — the lens
- * calls run one after another. Total wall-clock time per entry ≈ 3× single-lens latency.
- *
- * **Per-lens retry budget.** Each lens is attempted up to [maxAttemptsPerLens] times (default 2,
- * matching Story 2.6's "two consecutive failures on the same lens" cap). After exhausting its
- * budget, that lens contributes a `null` extraction — convergence treats that as "no opinion"
- * per ADR-002 §"Convergence edge cases" rather than blocking the entry. Lens-call volume is
- * exposed on [BackgroundExtractionResult.modelCallCount] for diagnostics; it is intentionally
- * separate from the entry-level retry counter persisted as `attempt_count` (ADR-001 §Q3).
- *
- * **Status surfacing.** [ExtractionStatusListener.onUpdate] fires on every transition the entry
- * persistence layer needs to mirror onto the `EntryEntity` row: one `RUNNING` at start, one
- * `RUNNING` per lens-level retry (with the latest `lastError`), and exactly one terminal call —
- * [ExtractionStatus.COMPLETED] when the resolver runs (≥1 lens succeeded), or
- * [ExtractionStatus.FAILED] when every lens exhausted its budget. Every event carries the
- * caller-supplied entry retry count verbatim; lens retries do not mutate that persisted counter.
- * Terminal `lastError` is `null` on `COMPLETED` and populated only on `FAILED`.
- *
- * **Storage isolation.** This module does not depend on `:core-storage`. The worker takes the
- * already-persisted entry text as input and emits a result the caller writes to ObjectBox /
- * markdown (Story 2.12).
+ * The caller threads the entry's persisted retry count in via `entryAttemptCount`; the worker
+ * echoes it on every [ExtractionStatusListener] event. Lens-call volume is reported separately
+ * on [BackgroundExtractionResult.modelCallCount] so the persisted `attempt_count` stays
+ * sweep-level. Terminal `lastError` is `null` on `COMPLETED`, populated on `FAILED`.
  */
 class BackgroundExtractionWorker(
     private val engine: LiteRtLmEngine,
@@ -53,11 +34,6 @@ class BackgroundExtractionWorker(
         }
     }
 
-    /**
-     * Run the three-lens pipeline for [entryText]. [retrievedHistory] is forwarded to the prompt
-     * composer (top three chunks, ~500-token cap per ADR-002 §Q2). [listener] receives every
-     * status transition; the no-op default is fine for callers that read the result directly.
-     */
     suspend fun extract(
         entryText: String,
         retrievedHistory: List<HistoryChunk> = emptyList(),
@@ -135,14 +111,8 @@ class BackgroundExtractionWorker(
     } catch (cancellation: CancellationException) {
         throw cancellation
     } catch (@Suppress("TooGenericExceptionCaught") engineError: Exception) {
-        // The lens-failure contract (ADR-002 §"Convergence edge cases") is explicit: any single
-        // lens failure must become "no opinion" rather than aborting the whole entry. The
-        // LiteRT-LM SDK's surface throws unchecked exception types from native code that can't
-        // be enumerated up-front (state-machine, IO, decode, OOM-adjacent), so a narrow catch
-        // would silently break the contract for whichever subtype slipped through. Catching
-        // [Exception] keeps the contract enforceable; [CancellationException] (a coroutine
-        // signal, not a failure) still propagates above this handler to honor structured
-        // concurrency, and `Error` (OOM, etc.) is intentionally not swallowed.
+        // Native LiteRT-LM throws unchecked types we can't enumerate; a narrow catch would let
+        // a single lens crash the whole entry, breaking the "no opinion" contract.
         recoverFromLensFailure(lens, attempt, engineError)
     }
 
@@ -197,9 +167,6 @@ class BackgroundExtractionWorker(
     private data class AttemptOutcome(val raw: String, val error: String?)
 
     companion object {
-        // ADR-001 §Q3 caps entry-level retries at 3. Per-lens retries are a separate, per-run
-        // concern: one initial call + one retry to smooth transient failures without changing the
-        // persisted retry counter.
         const val DEFAULT_MAX_ATTEMPTS_PER_LENS = 2
 
         private val LENSES: List<Lens> = listOf(Lens.LITERAL, Lens.INFERENTIAL, Lens.SKEPTICAL)

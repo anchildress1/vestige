@@ -13,18 +13,9 @@ import kotlinx.coroutines.isActive
 import java.util.concurrent.atomic.AtomicBoolean
 
 /**
- * Mono 16 kHz PCM_FLOAT capture from `AudioRecord`, hard-capped at 30 s per recording per
- * ADR-001 §Q4. `ENCODING_PCM_FLOAT` returns normalized `[-1, 1]` floats directly so the cap
- * boundary cannot interleave with re-encoding artifacts.
- *
- * Lifecycle: caller collects [captureChunks]; either calls [requestStop] OR the flow self-
- * terminates at the cap. Either path emits exactly one [AudioChunk] (`isFinal = true`) then
- * completes. Hard cancellation (job.cancel) skips the emission. Audio past 30 s is silently
- * truncated at this layer; the UI owns the time-remaining indicator. The deferred >30 s
- * orchestration lives in backlog row `multi-chunk-foreground`.
- *
- * Never persists audio. The temp WAV that LiteRT-LM needs is owned by [ForegroundInference]
- * and deleted inside its own call.
+ * Mono 16 kHz PCM_FLOAT capture, hard-capped at 30 s per recording. The flow emits exactly one
+ * `isFinal=true` chunk on either [requestStop] or the cap, then completes; hard cancellation
+ * skips the emission. Never persists audio.
  */
 class AudioCapture(
     private val sampleRateHz: Int = SAMPLE_RATE_HZ,
@@ -32,11 +23,6 @@ class AudioCapture(
 ) {
     private val stopRequested = AtomicBoolean(false)
 
-    /**
-     * Stream the single capture chunk. Completes after one emission, triggered by either
-     * [requestStop] or the 30 s hard cap (whichever fires first). Hard cancellation skips the
-     * emission.
-     */
     @RequiresPermission(Manifest.permission.RECORD_AUDIO)
     fun captureChunks(): Flow<AudioChunk> = flow {
         stopRequested.set(false)
@@ -60,11 +46,8 @@ class AudioCapture(
         }
     }
 
-    /**
-     * Returns the cap chunk if the 30 s window completes, or `null` on [requestStop] /
-     * coroutine cancellation (caller drains the partial buffer). `internal` for JVM testability,
-     * not public API.
-     */
+    // `internal` for JVM testability. Returns the cap chunk if the window fills; null on stop
+    // or cancellation (caller drains the partial buffer).
     internal suspend fun readUntilCapOrStop(
         record: AudioRecord,
         readBuffer: FloatArray,
@@ -79,12 +62,7 @@ class AudioCapture(
         return null
     }
 
-    /**
-     * Returns the cap chunk if [builder] completes a window from [readCount] samples, otherwise
-     * null. Extras (multi-chunk readouts) are discarded with a WARN — v1 never buffers past the
-     * cap; the deferred orchestration lives in backlog row `multi-chunk-foreground`. `internal`
-     * for JVM testability, not public API.
-     */
+    // `internal` for JVM testability. Multi-chunk readouts past the cap are dropped with a WARN.
     internal fun tryBuildCapChunk(builder: ChunkBuilder, readBuffer: FloatArray, readCount: Int): AudioChunk? {
         val complete = builder.append(readBuffer, readCount)
         if (complete.isEmpty()) return null
@@ -122,7 +100,6 @@ class AudioCapture(
         return record
     }
 
-    /** Request the read loop to exit and the partial chunk to be emitted as the final chunk. */
     fun requestStop() {
         stopRequested.set(true)
     }
@@ -136,12 +113,8 @@ class AudioCapture(
     }
 }
 
-/**
- * Captured slice of audio destined for LiteRT-LM. The Gemma audio spec wants mono 16 kHz
- * float32 in `[-1, 1]`; emit as-is without resampling.
- */
+/** Mono 16 kHz float32 in `[-1, 1]`, headed straight to LiteRT-LM. */
 data class AudioChunk(val samples: FloatArray, val sampleRateHz: Int, val isFinal: Boolean) {
-    /** Duration of this chunk in milliseconds. */
     val durationMs: Long get() = samples.size * 1_000L / sampleRateHz
 
     override fun equals(other: Any?): Boolean {

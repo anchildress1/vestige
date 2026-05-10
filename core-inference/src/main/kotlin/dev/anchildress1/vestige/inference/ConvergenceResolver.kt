@@ -12,7 +12,7 @@ import dev.anchildress1.vestige.model.ResolvedField
  * AMBIGUOUS (null value, noted); Skeptical flags conflict even on agreement →
  * CANONICAL_WITH_CONFLICT.
  */
-interface ConvergenceResolver {
+fun interface ConvergenceResolver {
     fun resolve(extractions: List<LensExtraction>): ResolvedExtraction
 }
 

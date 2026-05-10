@@ -17,5 +17,6 @@ What goes in the schema:
 Constraints:
 
 - Do not invent a `pattern_id`. Use only IDs present in the retrieved-history block.
+- Retrieved chunks without a `pattern_id` are context-only. They can inform the reading, but they cannot populate `recurrence_link`.
 - Do not infer recurrence from semantic similarity if no retrieved chunk references it. The retrieval layer is the only source of historical context for this surface.
 - If the user content contains no retrieved-history block, `recurrence_link` is null. This is normal for early entries.

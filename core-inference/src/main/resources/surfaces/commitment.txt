@@ -17,6 +17,7 @@ What does NOT count:
 
 What goes in the schema:
 
-- Populate `stated_commitment` as a list of `{text, topic_or_person, conditional}` objects. `text` is the user's words, near-verbatim. `conditional` is true when an explicit trigger gates the action.
+- Populate `stated_commitment` as one object `{text, topic_or_person}` for the strongest qualifying commitment in the entry. `text` is the user's words, near-verbatim.
 - Null if no qualifying commitment appears.
 - Do not invent a topic; if the user did not name one, leave `topic_or_person` null.
+- Do not add `entry_id`; storage injects the current entry id after convergence.

@@ -52,6 +52,7 @@ class PromptComposerTest {
         assertTrue(composed.text.contains("## Output schema"))
         assertTrue(composed.text.contains("## ENTRY"))
         assertTrue(composed.text.contains(entry))
+        assertTrue(composed.text.contains("`stated_commitment`: object `{text, topic_or_person}` or `null`."))
     }
 
     @Test
@@ -96,10 +97,11 @@ class PromptComposerTest {
     }
 
     @Test
-    fun `chunks without a pattern id render pattern_id=null`() {
+    fun `chunks without a pattern id render as context only`() {
         val chunks = listOf(HistoryChunk(patternId = null, text = "ad-hoc historical chunk"))
         val text = PromptComposer.compose(Lens.LITERAL, entry, retrievedHistory = chunks).text
-        assertTrue(text.contains("pattern_id=null"))
+        assertTrue(text.contains("pattern_id unavailable; context-only"))
+        assertFalse(text.contains("pattern_id=null"))
     }
 
     @Test

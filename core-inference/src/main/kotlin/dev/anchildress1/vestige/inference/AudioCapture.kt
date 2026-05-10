@@ -54,38 +54,55 @@ class AudioCapture(
         val builder = ChunkBuilder(samplesPerChunk)
         try {
             record.startRecording()
-            var capReached = false
-            while (!capReached && !stopRequested.get() && currentCoroutineContext().isActive) {
-                val read = record.read(readBuffer, 0, readBuffer.size, AudioRecord.READ_BLOCKING)
-                when {
-                    read < 0 -> error("AudioRecord.read returned error code $read")
-
-                    read == 0 -> continue
-
-                    else -> {
-                        val complete = builder.append(readBuffer, read)
-                        if (complete.isNotEmpty()) {
-                            // The 30 s cap fired. v1 emits the first complete chunk and drops any
-                            // extras — multi-chunk orchestration is deferred to backlog
-                            // `multi-chunk-foreground`, so we never buffer past 30 s.
-                            if (complete.size > 1) {
-                                Log.w(TAG, "30s cap fired; ${complete.size - 1} tail chunk(s) discarded.")
-                            }
-                            emit(AudioChunk(samples = complete.first(), sampleRateHz = sampleRateHz, isFinal = true))
-                            capReached = true
-                        }
-                    }
-                }
+            val capChunk = readUntilCapOrStop(record, readBuffer, builder)
+            val finalChunk = capChunk ?: builder.drainFinal()?.let { tail ->
+                AudioChunk(samples = tail, sampleRateHz = sampleRateHz, isFinal = true)
             }
-            if (!capReached) {
-                builder.drainFinal()?.let { tail ->
-                    emit(AudioChunk(samples = tail, sampleRateHz = sampleRateHz, isFinal = true))
-                }
+            if (finalChunk != null) {
+                emit(finalChunk)
             }
         } finally {
             runCatching { record.stop() }.onFailure { Log.w(TAG, "stop() on un-started AudioRecord") }
             record.release()
         }
+    }
+
+    /**
+     * Pump the [record]'s read loop until either the 30 s cap fires (returns the cap chunk) or
+     * the loop exits via [requestStop] / coroutine cancellation (returns `null`; caller drains
+     * the partial buffer). Extracted from [captureChunks] to keep both methods under Sonar's
+     * cognitive-complexity ceiling and detekt's single-jump-per-loop ceiling.
+     */
+    private suspend fun readUntilCapOrStop(
+        record: AudioRecord,
+        readBuffer: FloatArray,
+        builder: ChunkBuilder,
+    ): AudioChunk? {
+        while (!stopRequested.get() && currentCoroutineContext().isActive) {
+            val read = record.read(readBuffer, 0, readBuffer.size, AudioRecord.READ_BLOCKING)
+            if (read < 0) error("AudioRecord.read returned error code $read")
+            val chunk = if (read > 0) tryBuildCapChunk(builder, readBuffer, read) else null
+            if (chunk != null) return chunk
+        }
+        return null
+    }
+
+    /**
+     * Append [readCount] samples from [readBuffer] into [builder]; return the cap chunk if
+     * `builder.append` produced a complete window, otherwise null. Extracted so the loop in
+     * [readUntilCapOrStop] only contains one jump statement and stays under detekt's
+     * `LoopWithTooManyJumpStatements` ceiling.
+     */
+    private fun tryBuildCapChunk(builder: ChunkBuilder, readBuffer: FloatArray, readCount: Int): AudioChunk? {
+        val complete = builder.append(readBuffer, readCount)
+        if (complete.isEmpty()) return null
+        // The 30 s cap fired. v1 emits the first complete chunk and drops any extras —
+        // multi-chunk orchestration is deferred to backlog `multi-chunk-foreground`, so we
+        // never buffer past 30 s.
+        if (complete.size > 1) {
+            Log.w(TAG, "30s cap fired; ${complete.size - 1} tail chunk(s) discarded.")
+        }
+        return AudioChunk(samples = complete.first(), sampleRateHz = sampleRateHz, isFinal = true)
     }
 
     private fun resolveBufferBytes(): Int {

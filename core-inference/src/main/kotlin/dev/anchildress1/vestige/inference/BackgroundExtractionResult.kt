@@ -1,6 +1,7 @@
 package dev.anchildress1.vestige.inference
 
 import dev.anchildress1.vestige.model.ResolvedExtraction
+import dev.anchildress1.vestige.model.TemplateLabel
 
 /**
  * One background pass per entry. [Success] carries the resolver's output plus at least one lens
@@ -18,6 +19,7 @@ sealed interface BackgroundExtractionResult {
         override val lensResults: List<LensResult>,
         override val modelCallCount: Int,
         val resolved: ResolvedExtraction,
+        val templateLabel: TemplateLabel,
     ) : BackgroundExtractionResult
 
     data class Failed(

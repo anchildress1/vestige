@@ -6,6 +6,7 @@ import dev.anchildress1.vestige.model.Lens
 import dev.anchildress1.vestige.model.LensExtraction
 import dev.anchildress1.vestige.model.ResolvedExtraction
 import dev.anchildress1.vestige.model.ResolvedField
+import dev.anchildress1.vestige.model.TemplateLabel
 import io.mockk.coEvery
 import io.mockk.mockk
 import kotlinx.coroutines.test.runTest
@@ -18,11 +19,17 @@ import org.junit.jupiter.api.Assertions.assertSame
 import org.junit.jupiter.api.Assertions.assertThrows
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
+import java.time.Instant
 
 class BackgroundExtractionWorkerTest {
 
+    private val capturedAt: Instant = Instant.parse("2026-05-09T08:00:00Z")
+    private val request = BackgroundExtractionRequest(entryText = "user words", capturedAt = capturedAt)
     private val resolved = ResolvedExtraction(
-        fields = mapOf("template_label" to ResolvedField("aftermath", ConfidenceVerdict.CANONICAL)),
+        fields = mapOf(
+            "energy_descriptor" to ResolvedField("crashed", ConfidenceVerdict.CANONICAL),
+            "state_shift" to ResolvedField(true, ConfidenceVerdict.CANONICAL),
+        ),
     )
 
     private fun extraction(lens: Lens, label: String = "aftermath"): LensExtraction = LensExtraction(
@@ -71,11 +78,15 @@ class BackgroundExtractionWorkerTest {
             composer = fakeComposer(),
         )
 
-        val result = worker.extract(entryText = "the user said something", listener = listener)
+        val result = worker.extract(
+            request = BackgroundExtractionRequest(entryText = "the user said something", capturedAt = capturedAt),
+            listener = listener,
+        )
 
         val success = assertInstanceOf(BackgroundExtractionResult.Success::class.java, result)
         assertAll(
             { assertSame(resolved, success.resolved) },
+            { assertEquals(TemplateLabel.AFTERMATH, success.templateLabel) },
             { assertEquals(3, success.lensResults.size) },
             { assertEquals(3, success.modelCallCount) },
             {
@@ -127,7 +138,7 @@ class BackgroundExtractionWorkerTest {
             composer = fakeComposer(),
         )
 
-        val result = worker.extract(entryText = "user words", listener = listener)
+        val result = worker.extract(request = request, listener = listener)
 
         val success = assertInstanceOf(BackgroundExtractionResult.Success::class.java, result)
         assertEquals(4, success.modelCallCount, "1 retry on LITERAL + 1 each on INFERENTIAL/SKEPTICAL = 4")
@@ -162,7 +173,7 @@ class BackgroundExtractionWorkerTest {
             resolver = resolver,
             parser = parser,
             composer = fakeComposer(),
-        ).extract(entryText = "user words", listener = listener)
+        ).extract(request = request, listener = listener)
 
         val success = assertInstanceOf(BackgroundExtractionResult.Success::class.java, result)
         assertEquals(
@@ -193,7 +204,7 @@ class BackgroundExtractionWorkerTest {
             resolver = resolver,
             parser = parser,
             composer = fakeComposer(),
-        ).extract(entryText = "user words", listener = listener)
+        ).extract(request = request, listener = listener)
 
         val failed = assertInstanceOf(BackgroundExtractionResult.Failed::class.java, result)
         assertAll(
@@ -229,7 +240,7 @@ class BackgroundExtractionWorkerTest {
             resolver = RecordingResolver(resolved),
             parser = parser,
             composer = fakeComposer(),
-        ).extract(entryText = "user words", listener = listener)
+        ).extract(request = request, listener = listener)
 
         val success = assertInstanceOf(BackgroundExtractionResult.Success::class.java, result)
         val literalResult = success.lensResults.first { it.lens == Lens.LITERAL }
@@ -245,6 +256,31 @@ class BackgroundExtractionWorkerTest {
     }
 
     @Test
+    fun `worker computes the template label from the supplied capture timestamp`() = runTest {
+        val engine = mockk<LiteRtLmEngine>()
+        coEvery { engine.generateText(any()) } returns "raw-ok"
+        val lateNightResolved = ResolvedExtraction(
+            fields = mapOf("tags" to ResolvedField(listOf("late-night"), ConfidenceVerdict.CANONICAL)),
+        )
+        val parser: (Lens, String) -> LensExtraction? = { lens, _ -> extraction(lens) }
+
+        val result = BackgroundExtractionWorker(
+            engine = engine,
+            resolver = RecordingResolver(lateNightResolved),
+            parser = parser,
+            composer = fakeComposer(),
+        ).extract(
+            request = BackgroundExtractionRequest(
+                entryText = "user words",
+                capturedAt = Instant.parse("2026-05-09T08:00:00Z"),
+            ),
+        )
+
+        val success = assertInstanceOf(BackgroundExtractionResult.Success::class.java, result)
+        assertEquals(TemplateLabel.GOBLIN_HOURS, success.templateLabel)
+    }
+
+    @Test
     fun `blank entry text fails fast`() {
         val worker = BackgroundExtractionWorker(
             engine = mockk(),
@@ -253,7 +289,9 @@ class BackgroundExtractionWorkerTest {
             composer = fakeComposer(),
         )
         assertThrows(IllegalArgumentException::class.java) {
-            kotlinx.coroutines.runBlocking { worker.extract(entryText = "   ") }
+            kotlinx.coroutines.runBlocking {
+                worker.extract(BackgroundExtractionRequest(entryText = "   ", capturedAt = capturedAt))
+            }
         }
     }
 
@@ -284,7 +322,14 @@ class BackgroundExtractionWorkerTest {
             resolver = RecordingResolver(resolved),
             parser = parser,
             composer = fakeComposer(),
-        ).extract(entryText = "user words", entryAttemptCount = 2, listener = listener)
+        ).extract(
+            request = BackgroundExtractionRequest(
+                entryText = "user words",
+                capturedAt = capturedAt,
+                entryAttemptCount = 2,
+            ),
+            listener = listener,
+        )
 
         assertEquals(
             listOf(
@@ -305,7 +350,15 @@ class BackgroundExtractionWorkerTest {
             composer = fakeComposer(),
         )
         assertThrows(IllegalArgumentException::class.java) {
-            kotlinx.coroutines.runBlocking { worker.extract(entryText = "ok", entryAttemptCount = -1) }
+            kotlinx.coroutines.runBlocking {
+                worker.extract(
+                    BackgroundExtractionRequest(
+                        entryText = "ok",
+                        capturedAt = capturedAt,
+                        entryAttemptCount = -1,
+                    ),
+                )
+            }
         }
     }
 
@@ -318,7 +371,9 @@ class BackgroundExtractionWorkerTest {
             composer = fakeComposer(),
         )
         assertThrows(IllegalArgumentException::class.java) {
-            kotlinx.coroutines.runBlocking { worker.extract(entryText = "ok", timeoutMs = 0L) }
+            kotlinx.coroutines.runBlocking {
+                worker.extract(BackgroundExtractionRequest(entryText = "ok", capturedAt = capturedAt, timeoutMs = 0L))
+            }
         }
     }
 
@@ -337,7 +392,7 @@ class BackgroundExtractionWorkerTest {
             resolver = throwingResolver,
             parser = parser,
             composer = fakeComposer(),
-        ).extract(entryText = "user words", listener = listener)
+        ).extract(request = request, listener = listener)
 
         val failed = assertInstanceOf(BackgroundExtractionResult.Failed::class.java, result)
         assertTrue(failed.lastError.startsWith("resolver-error:"))
@@ -365,7 +420,10 @@ class BackgroundExtractionWorkerTest {
             resolver = RecordingResolver(resolved),
             parser = parser,
             composer = fakeComposer(),
-        ).extract(entryText = "user words", timeoutMs = 50L, listener = listener)
+        ).extract(
+            request = BackgroundExtractionRequest(entryText = "user words", capturedAt = capturedAt, timeoutMs = 50L),
+            listener = listener,
+        )
 
         val timedOut = assertInstanceOf(BackgroundExtractionResult.TimedOut::class.java, result)
         assertEquals(50L, timedOut.timeoutMs)

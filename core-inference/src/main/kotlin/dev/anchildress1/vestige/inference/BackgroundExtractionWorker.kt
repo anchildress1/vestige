@@ -10,6 +10,15 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
+import java.time.Instant
+
+data class BackgroundExtractionRequest(
+    val entryText: String,
+    val capturedAt: Instant,
+    val retrievedHistory: List<HistoryChunk> = emptyList(),
+    val entryAttemptCount: Int = 0,
+    val timeoutMs: Long? = null,
+)
 
 /**
  * Runs the three lenses sequentially against an already-persisted entry, retries each lens up to
@@ -33,6 +42,7 @@ class BackgroundExtractionWorker(
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
     val maxAttemptsPerLens: Int = DEFAULT_MAX_ATTEMPTS_PER_LENS,
 ) {
+    private val templateLabeler = TemplateLabeler()
 
     init {
         require(maxAttemptsPerLens >= 1) {
@@ -41,35 +51,32 @@ class BackgroundExtractionWorker(
     }
 
     suspend fun extract(
-        entryText: String,
-        retrievedHistory: List<HistoryChunk> = emptyList(),
-        entryAttemptCount: Int = 0,
-        timeoutMs: Long? = null,
+        request: BackgroundExtractionRequest,
         listener: ExtractionStatusListener = NO_OP_LISTENER,
     ): BackgroundExtractionResult = withContext(ioDispatcher) {
-        require(entryText.isNotBlank()) {
+        require(request.entryText.isNotBlank()) {
             "BackgroundExtractionWorker.extract requires a non-blank entryText"
         }
-        require(entryAttemptCount >= 0) {
+        require(request.entryAttemptCount >= 0) {
             "BackgroundExtractionWorker.extract requires entryAttemptCount >= 0"
         }
-        require(timeoutMs == null || timeoutMs > 0) {
-            "BackgroundExtractionWorker.extract requires timeoutMs > 0 (got $timeoutMs)"
+        require(request.timeoutMs == null || request.timeoutMs > 0) {
+            "BackgroundExtractionWorker.extract requires timeoutMs > 0 (got ${request.timeoutMs})"
         }
 
         val started = System.nanoTime()
-        val state = RunState(entryAttemptCount)
-        listener.onUpdate(ExtractionStatus.RUNNING, entryAttemptCount, null)
+        val state = RunState(request.entryAttemptCount)
+        listener.onUpdate(ExtractionStatus.RUNNING, request.entryAttemptCount, null)
 
         try {
-            withTimeoutOrNoCap(timeoutMs) {
+            withTimeoutOrNoCap(request.timeoutMs) {
                 for (lens in LENSES) {
-                    state.results += runLens(lens, entryText, retrievedHistory, state, listener)
+                    state.results += runLens(lens, request.entryText, request.retrievedHistory, state, listener)
                 }
-                completeRun(state, started, listener)
+                completeRun(state, request.capturedAt, started, listener)
             }
         } catch (timeout: TimeoutCancellationException) {
-            handleTimeout(state, started, timeoutMs ?: 0L, listener, timeout)
+            handleTimeout(state, started, request.timeoutMs ?: 0L, listener, timeout)
         }
     }
 
@@ -141,6 +148,7 @@ class BackgroundExtractionWorker(
 
     private suspend fun completeRun(
         state: RunState,
+        capturedAt: Instant,
         startedNanos: Long,
         listener: ExtractionStatusListener,
     ): BackgroundExtractionResult {
@@ -153,6 +161,7 @@ class BackgroundExtractionWorker(
         val totalElapsedMs = (System.nanoTime() - startedNanos) / NANOS_PER_MILLI
         return when {
             resolved is Resolution.Ok -> {
+                val templateLabel = templateLabeler.label(resolved.value, capturedAt)
                 Log.d(
                     TAG,
                     "extract completed: lenses=${parsedExtractions.size}/${LENSES.size} " +
@@ -164,6 +173,7 @@ class BackgroundExtractionWorker(
                     lensResults = state.results,
                     modelCallCount = state.modelCallCount,
                     resolved = resolved.value,
+                    templateLabel = templateLabel,
                 )
             }
 

@@ -128,6 +128,7 @@ dependencies {
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.lifecycle.runtime.ktx)
+    implementation(libs.androidx.lifecycle.service)
     implementation(libs.androidx.lifecycle.viewmodel.compose)
 
     implementation(platform(libs.compose.bom))

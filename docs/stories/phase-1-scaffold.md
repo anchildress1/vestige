@@ -78,18 +78,18 @@ If STT-A fails after the time-box: stop. Write a superseding ADR. Do not proceed
 
 ---
 
-### Story 1.4 — AudioRecord pipeline and 30-second chunking
+### Story 1.4 — AudioRecord pipeline and 30-second hard cap
 
-**As** the AI implementor, **I need** an `AudioRecord`-based capture path that produces normalized audio buffers (mono 16 kHz float32 in `[-1, 1]`) and chunks streams >30 seconds per ADR-001 Q4, **so that** Story 1.5 can hand audio to Gemma 4 in the format the model expects.
+**As** the AI implementor, **I need** an `AudioRecord`-based capture path that produces normalized audio buffers (mono 16 kHz float32 in `[-1, 1]`) and **caps each capture at 30 s** per ADR-001 Q4 + the STT-B fallback's single-call-per-capture posture, **so that** Story 1.5 can hand audio to Gemma 4 in the format the model expects without ever needing the multi-chunk orchestration that was deferred to backlog (`multi-chunk-foreground`).
 
 **Done when:**
 - [x] `:core-inference` exposes an `AudioCapture` API that records mono audio with `AudioRecord` and emits normalized float32 buffers conforming to Google's Gemma audio spec.
 - [x] Capture ≤30 seconds emits a single buffer for the full recording.
-- [x] Capture >30 seconds emits sequential 30-second chunks per ADR-001 Q4 (Case B). Chunk boundaries do not interleave with re-encoding artifacts.
+- [x] ~~Capture >30 seconds emits sequential 30-second chunks per ADR-001 Q4 (Case B). Chunk boundaries do not interleave with re-encoding artifacts.~~ **Reframed 2026-05-09 by the STT-B fallback (`adrs/ADR-002-multi-lens-extraction-pattern.md` §"Multi-turn behavior").** v1 has no chunking: capture **auto-stops at 30 s** and emits exactly one `isFinal=true` chunk regardless of whether the user requested stop earlier or recorded right up to the cap. The multi-chunk orchestration (intermediate transcription-only call + final call with concatenated transcript-so-far) lives in `backlog.md` row `multi-chunk-foreground` and ships in a future story; until then the cap is the v1 contract.
 - [x] `AudioCapture` does not write audio to disk except as a temp file when Story 1.5 needs `Content.AudioFile`. Any temp file is deleted within the same call.
 - [x] Microphone permission request flow exists in `:app` for dev runs (full polished onboarding is Phase 4).
 
-**Notes / risks:** Do not introduce `SpeechRecognizer` or any third-party STT (per `AGENTS.md` guardrail 13 and `concept-locked.md` §Stack). The audio path is captured-by-us → handed-to-Gemma → discarded.
+**Notes / risks:** Do not introduce `SpeechRecognizer` or any third-party STT (per `AGENTS.md` guardrail 13 and `concept-locked.md` §Stack). The audio path is captured-by-us → handed-to-Gemma → discarded. The 30 s cap is silent at the audio layer — the UI (Phase 4) is responsible for showing the user how much time is left.
 
 ---
 

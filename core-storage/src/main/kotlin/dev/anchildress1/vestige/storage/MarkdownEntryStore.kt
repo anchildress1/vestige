@@ -40,7 +40,7 @@ class MarkdownEntryStore(private val baseDir: File) {
             append("recurrence_link: ").append(yamlScalar(entry.recurrenceLink)).append('\n')
             append("stated_commitment: ").append(yamlJsonBlob(entry.statedCommitmentJson)).append('\n')
             append("tags:").append('\n')
-            entry.tags.map { it.name }.sorted().forEach { tag -> append("  - ").append(tag).append('\n') }
+            entry.tags.map { it.name }.sorted().forEach { tag -> appendLine("  - $tag") }
             append("confidence: ").append(yamlJsonInline(entry.confidenceJson)).append('\n')
             append("entry_observations: ").append(yamlJsonInline(entry.entryObservationsJson)).append('\n')
             append(FRONTMATTER_FENCE).append('\n')

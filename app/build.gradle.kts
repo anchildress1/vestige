@@ -45,16 +45,20 @@ android {
         vectorDrawables.useSupportLibrary = true
 
         // Wire Gradle project properties through to the instrumentation runner so on-device
-        // tests can receive file paths without embedding them in the build file.
+        // tests can receive file paths and tunables without embedding them in the build file.
         // Pass via: ./gradlew ... -P<key>=<value>
-        //   modelPath  — required by every audio-bearing instrumented test
-        //   audioPath  — Story 1.5 STT-A probe + Story 2.3 per-capture persona smoke test
-        // The Story 2.4 STT-B harness knobs (manifestPath / minSessions /
-        // contextRetentionThreshold / latencyBudgetMs) were removed when the STT-B fallback
-        // landed 2026-05-09 — multi-turn was dropped from v1, the harness was deleted, and
-        // those knobs no longer have a consumer. See `adrs/ADR-002-multi-lens-extraction-pattern.md`
-        // §"Multi-turn behavior" for the verdict trail.
-        listOf("modelPath", "audioPath").forEach { key ->
+        //   modelPath        — required by every audio-bearing instrumented test
+        //   audioPath        — Story 1.5 STT-A probe + Story 2.3 per-capture persona smoke test
+        //   latencyBudgetMs  — Story 2.3 per-capture latency soft-assert (default 60_000 ms;
+        //                      overruns currently the only signal we have for a perf regression
+        //                      past the post-fallback 24-33s baseline on E4B CPU)
+        // The other Story 2.4 STT-B harness knobs (manifestPath / minSessions /
+        // contextRetentionThreshold) were removed when the STT-B fallback landed 2026-05-09 —
+        // multi-turn was dropped from v1, the harness was deleted, and those knobs no longer
+        // have a consumer. See `adrs/ADR-005-stt-b-scope-and-v1-single-turn.md` (amends
+        // `adrs/ADR-002-multi-lens-extraction-pattern.md` §"Multi-turn behavior") for the
+        // verdict trail.
+        listOf("modelPath", "audioPath", "latencyBudgetMs").forEach { key ->
             project.findProperty(key)?.toString()?.let { value ->
                 testInstrumentationRunnerArguments[key] = value
             }

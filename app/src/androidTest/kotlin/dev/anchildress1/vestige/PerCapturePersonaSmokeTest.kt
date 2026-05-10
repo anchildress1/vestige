@@ -61,6 +61,7 @@ class PerCapturePersonaSmokeTest {
         val args = InstrumentationRegistry.getArguments()
         val modelPath = args.getString("modelPath")
         val audioPath = args.getString("audioPath")
+        val latencyBudgetMs = args.getString("latencyBudgetMs")?.toLongOrNull() ?: DEFAULT_LATENCY_BUDGET_MS
         assumeTrue("modelPath instrumentation argument not provided", modelPath != null)
         assumeTrue("audioPath instrumentation argument not provided", audioPath != null)
         val modelFile = File(modelPath!!)
@@ -87,11 +88,12 @@ class PerCapturePersonaSmokeTest {
             it.initialize()
             val inference = ForegroundInference(it, cacheDir)
 
-            val followUps = Persona.entries.associateWith { persona ->
+            val captures = Persona.entries.associateWith { persona ->
                 runOneCaptureUnderPersona(inference, chunk, persona)
             }
 
-            assertPairwiseDifferent(followUps)
+            assertPairwiseDifferent(captures.mapValues { (_, capture) -> capture.followUp })
+            assertWithinLatencyBudget(captures, latencyBudgetMs)
         }
     }
 
@@ -115,13 +117,15 @@ class PerCapturePersonaSmokeTest {
      * Drive one fresh [CaptureSession] under [persona] through the Story 2.2 foreground path. The
      * STT-B fallback made each session single-use, so this constructs a brand-new instance per
      * persona — there is no `setPersona` mid-session anymore. Asserts the `Turn.persona` recorded
-     * on the model turn matches the persona we passed in.
+     * on the model turn matches the persona we passed in. Returns a [CaptureResult] carrying the
+     * follow-up text + measured per-call latency so the caller can run pairwise-divergence and
+     * latency-budget checks together.
      */
     private suspend fun runOneCaptureUnderPersona(
         inference: ForegroundInference,
         chunk: AudioChunk,
         persona: Persona,
-    ): String {
+    ): CaptureResult {
         val session = CaptureSession(defaultPersona = persona)
         assertEquals(persona, session.activePersona)
 
@@ -136,10 +140,33 @@ class PerCapturePersonaSmokeTest {
         val modelTurn = session.transcript.turns.single { it.speaker == Speaker.MODEL }
         assertEquals("Recorded model turn must carry the capture's persona", persona, modelTurn.persona)
 
-        android.util.Log.i(TAG, "=== ${persona.name} follow-up ===")
+        android.util.Log.i(TAG, "=== ${persona.name} follow-up (${success.elapsedMs}ms) ===")
         android.util.Log.i(TAG, success.followUp)
-        return success.followUp
+        return CaptureResult(followUp = success.followUp, elapsedMs = success.elapsedMs)
     }
+
+    /**
+     * Soft-assert per-capture latency against [latencyBudgetMs]. Default budget (60_000 ms) is
+     * deliberately generous — the post-fallback baseline on E4B CPU is ~24–33 s per call (Story
+     * 2.3 device record); the budget catches a 2× regression past that baseline without failing
+     * on the ADR-002 §"Latency budget" 1–5 s aspirational target that's known unmet on CPU.
+     * Override at run time with `-PlatencyBudgetMs=<ms>` to tighten or loosen.
+     */
+    private fun assertWithinLatencyBudget(captures: Map<Persona, CaptureResult>, latencyBudgetMs: Long) {
+        val overruns = captures.filterValues { it.elapsedMs > latencyBudgetMs }
+        if (overruns.isNotEmpty()) {
+            val detail = overruns.entries.joinToString(", ") { (p, c) -> "${p.name}=${c.elapsedMs}ms" }
+            error(
+                "Per-capture latency exceeded budget ${latencyBudgetMs}ms: $detail. " +
+                    "Story 2.3 device record baseline is ~24–33 s on E4B CPU; a budget overrun " +
+                    "indicates either a real regression or a busy device. Re-run on quiescent " +
+                    "hardware before treating this as a hard fail.",
+            )
+        }
+    }
+
+    /** Per-capture verdict carrying the follow-up text and the measured ForegroundResult elapsedMs. */
+    private data class CaptureResult(val followUp: String, val elapsedMs: Long)
 
     /**
      * Reads a mono WAV (PCM_S16LE or IEEE_FLOAT) and returns normalized float samples. Mirrors
@@ -192,6 +219,7 @@ class PerCapturePersonaSmokeTest {
 
     private companion object {
         const val TAG = "VestigePerCapturePersona"
+        const val DEFAULT_LATENCY_BUDGET_MS = 60_000L
         const val RIFF_WAVE_PREFIX_BYTES = 12
         const val CHUNK_HEADER_BYTES = 8
         const val CHUNK_ID_BYTES = 4

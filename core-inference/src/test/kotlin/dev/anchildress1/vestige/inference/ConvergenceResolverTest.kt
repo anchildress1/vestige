@@ -340,13 +340,13 @@ class ConvergenceResolverTest {
 
     @Test
     fun `tag plural variants converge to the first surface form`() {
-        val literal = LensExtraction(Lens.LITERAL, fields = mapOf("tags" to listOf("meeting", "doc")))
-        val inferential = LensExtraction(Lens.INFERENTIAL, fields = mapOf("tags" to listOf("meetings", "doc")))
+        val literal = LensExtraction(Lens.LITERAL, fields = mapOf("tags" to listOf("meetings", "docs")))
+        val inferential = LensExtraction(Lens.INFERENTIAL, fields = mapOf("tags" to listOf("meeting", "doc")))
         val skeptical = LensExtraction(Lens.SKEPTICAL, fields = mapOf("tags" to listOf("standup")))
 
         val resolved = resolver.resolve(listOf(literal, inferential, skeptical))
 
-        // "meeting" / "meetings" share a stem and reach majority via the per-stem count.
+        // "meeting" / "meetings" and "doc" / "docs" share stems and persist as normalized tags.
         assertEquals(
             ResolvedField(value = listOf("meeting", "doc"), verdict = ConfidenceVerdict.CANONICAL),
             resolved.fields["tags"],
@@ -355,8 +355,8 @@ class ConvergenceResolverTest {
 
     @Test
     fun `commitments converge on topic_or_person even when text is paraphrased`() {
-        // Production lens output never includes entry_id (storage injects it later); resolver
-        // identity must use topic_or_person alone so paraphrased text doesn't fragment agreement.
+        // Production lens output omits entry_id today, so topic_or_person still has to carry the
+        // comparator when the field is absent.
         val literal = LensExtraction(
             Lens.LITERAL,
             fields = mapOf(
@@ -384,6 +384,119 @@ class ConvergenceResolverTest {
                 value = mapOf(
                     "text" to "review the launch doc tonight",
                     "topic_or_person" to "Nora",
+                ),
+                verdict = ConfidenceVerdict.CANONICAL,
+            ),
+            resolved.fields["stated_commitment"],
+        )
+    }
+
+    @Test
+    fun `commitments with matching topic and entry id converge`() {
+        val literal = LensExtraction(
+            Lens.LITERAL,
+            fields = mapOf(
+                "stated_commitment" to mapOf(
+                    "text" to "review the launch doc tonight",
+                    "topic_or_person" to "Nora",
+                    "entry_id" to "entry-123",
+                ),
+            ),
+        )
+        val inferential = LensExtraction(
+            Lens.INFERENTIAL,
+            fields = mapOf(
+                "stated_commitment" to mapOf(
+                    "text" to "send Nora feedback tonight",
+                    "topic_or_person" to "Nora",
+                    "entry_id" to "entry-123",
+                ),
+            ),
+        )
+        val skeptical = LensExtraction(Lens.SKEPTICAL, fields = mapOf("stated_commitment" to null))
+
+        val resolved = resolver.resolve(listOf(literal, inferential, skeptical))
+
+        assertEquals(
+            ResolvedField(
+                value = mapOf(
+                    "text" to "review the launch doc tonight",
+                    "topic_or_person" to "Nora",
+                    "entry_id" to "entry-123",
+                ),
+                verdict = ConfidenceVerdict.CANONICAL,
+            ),
+            resolved.fields["stated_commitment"],
+        )
+    }
+
+    @Test
+    fun `commitments with matching topic but different entry ids stay ambiguous`() {
+        val literal = LensExtraction(
+            Lens.LITERAL,
+            fields = mapOf(
+                "stated_commitment" to mapOf(
+                    "text" to "review the launch doc tonight",
+                    "topic_or_person" to "Nora",
+                    "entry_id" to "entry-123",
+                ),
+            ),
+        )
+        val inferential = LensExtraction(
+            Lens.INFERENTIAL,
+            fields = mapOf(
+                "stated_commitment" to mapOf(
+                    "text" to "send Nora feedback tonight",
+                    "topic_or_person" to "Nora",
+                    "entry_id" to "entry-999",
+                ),
+            ),
+        )
+        val skeptical = LensExtraction(Lens.SKEPTICAL, fields = mapOf("stated_commitment" to null))
+
+        val resolved = resolver.resolve(listOf(literal, inferential, skeptical))
+
+        assertEquals(
+            ResolvedField(
+                value = null,
+                verdict = ConfidenceVerdict.AMBIGUOUS,
+                flags = listOf("lens-disagreement"),
+            ),
+            resolved.fields["stated_commitment"],
+        )
+    }
+
+    @Test
+    fun `commitments with null topic_or_person still converge on identity tuple`() {
+        // `topic_or_person` is nullable per `lenses/output-schema.txt`. Two lenses with no target
+        // and no entry_id should converge regardless of paraphrased text.
+        val literal = LensExtraction(
+            Lens.LITERAL,
+            fields = mapOf(
+                "stated_commitment" to mapOf(
+                    "text" to "do the thing later",
+                    "topic_or_person" to null,
+                ),
+            ),
+        )
+        val inferential = LensExtraction(
+            Lens.INFERENTIAL,
+            fields = mapOf(
+                "stated_commitment" to mapOf(
+                    "text" to "follow up on it tonight",
+                    "topic_or_person" to null,
+                ),
+            ),
+        )
+        val skeptical = LensExtraction(Lens.SKEPTICAL, fields = mapOf("stated_commitment" to null))
+
+        val resolved = resolver.resolve(listOf(literal, inferential, skeptical))
+
+        assertEquals(
+            ResolvedField(
+                value = mapOf(
+                    "text" to "do the thing later",
+                    "topic_or_person" to null,
                 ),
                 verdict = ConfidenceVerdict.CANONICAL,
             ),

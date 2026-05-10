@@ -25,9 +25,9 @@ fun interface ConvergenceResolver {
  * otherwise).
  *
  * Lens parse failures are honored by the caller — a missing lens is treated as no opinion. With
- * one surviving lens the entry no longer has enough evidence to resolve any field, so every
- * populated field stays AMBIGUOUS. With two surviving the threshold collapses to
- * "both must agree."
+ * only one surviving lens the entry is under-evidenced; every field (populated or not) resolves
+ * to AMBIGUOUS rather than minting candidates from a single witness. With two surviving the
+ * threshold collapses to "both must agree."
  */
 class DefaultConvergenceResolver : ConvergenceResolver {
 
@@ -137,14 +137,14 @@ class DefaultConvergenceResolver : ConvergenceResolver {
             .eachCount()
             .filterValues { it >= MAJORITY_THRESHOLD }
             .keys
-        // Walk lens order, picking the first surface form per canonical stem so the saved tag
-        // list keeps a real word rather than a stem and stays one-tag-per-concept.
+        // Walk lens order once so the saved list stays stable, but persist the normalized stem
+        // rather than whichever plural surface form happened to appear first.
         val orderedConsensus = mutableListOf<String>()
         val claimedStems = hashSetOf<String>()
         for ((_, tags) in populated) {
             for (tag in tags) {
                 val stem = stemForCount(tag)
-                if (stem in canonicalStems && claimedStems.add(stem)) orderedConsensus.add(tag)
+                if (stem in canonicalStems && claimedStems.add(stem)) orderedConsensus.add(stem)
             }
         }
         return if (orderedConsensus.isNotEmpty()) {
@@ -157,7 +157,7 @@ class DefaultConvergenceResolver : ConvergenceResolver {
             val fallback = byLens[Lens.LITERAL]?.tagsOrNull()?.firstOrNull()
             if (fallback != null) {
                 ResolvedField(
-                    value = listOf(fallback),
+                    value = listOf(stemForCount(fallback)),
                     verdict = ConfidenceVerdict.CANDIDATE,
                     flags = matchingFlags,
                     sourceLens = Lens.LITERAL,
@@ -196,13 +196,19 @@ class DefaultConvergenceResolver : ConvergenceResolver {
     }
 
     private fun canonicalizeCommitment(value: Any): Any {
-        // ADR-002 §"Per-field agreement" defines commitment agreement as "same topic_or_person AND
-        // same entry_id reference." Within a single resolver call all three lenses are extracting
-        // the same entry, so entry_id is implicit (and not yet assigned by storage at this stage).
-        // Reduce identity to topic_or_person alone — that's what actually disambiguates two
-        // commitments inside one entry without requiring an injected key.
-        val topicOrPerson = (value as? Map<*, *>)?.get(TOPIC_OR_PERSON_KEY)
-        return topicOrPerson?.let { CommitmentIdentity(topicOrPerson = it) } ?: value
+        // ADR-002 §"Per-field agreement" — commitment agreement is "same topic_or_person AND same
+        // entry_id reference." Both keys are nullable in the lens output (entry_id is injected by
+        // storage post-resolver; topic_or_person can be null per `lenses/output-schema.txt`), so
+        // any commitment Map produces a CommitmentIdentity. `hasEntryId` distinguishes "entry_id
+        // not yet assigned" from "entry_id explicitly null" — without it two lenses tagged with
+        // different storage entry_ids would still converge as null-vs-null.
+        val commitment = value as? Map<*, *> ?: return value
+        val entryId = commitment[ENTRY_ID_KEY]
+        return CommitmentIdentity(
+            topicOrPerson = commitment[TOPIC_OR_PERSON_KEY],
+            entryId = entryId,
+            hasEntryId = commitment.containsKey(ENTRY_ID_KEY),
+        )
     }
 
     private fun flagBelongsToField(flag: String, field: String): Boolean =
@@ -216,6 +222,7 @@ class DefaultConvergenceResolver : ConvergenceResolver {
         const val ENERGY_DESCRIPTOR_KEY = "energy_descriptor"
         const val STATED_COMMITMENT_KEY = "stated_commitment"
         const val TOPIC_OR_PERSON_KEY = "topic_or_person"
+        const val ENTRY_ID_KEY = "entry_id"
         const val LENS_DISAGREEMENT_FLAG = "lens-disagreement"
         const val MAJORITY_THRESHOLD = 2
         const val MIN_SURVIVING_LENSES_FOR_AMBIGUOUS = 1
@@ -237,4 +244,4 @@ class DefaultConvergenceResolver : ConvergenceResolver {
     }
 }
 
-private data class CommitmentIdentity(val topicOrPerson: Any)
+private data class CommitmentIdentity(val topicOrPerson: Any?, val entryId: Any?, val hasEntryId: Boolean)

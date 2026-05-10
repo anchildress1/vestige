@@ -3,12 +3,8 @@ package dev.anchildress1.vestige.model
 import java.util.Properties
 
 /**
- * Pinned descriptor for the Gemma 4 E4B model artifact. Loaded from a checked-in
- * `model/manifest.properties` resource at startup so the SHA-256 + size + allowed download
- * hosts ship as code, not config a user can edit.
- *
- * Per ADR-001 §Q6 the submitted APK has exactly one schema shape — there is no fallback
- * artifact, no model-version negotiation. Schema bumps require a superseding ADR.
+ * Pinned descriptor for the model artifact, loaded from `resources/model/manifest.properties` at
+ * startup. SHA-256, size, and allowed download hosts ship as code — never user-editable config.
  */
 data class ModelManifest(
     val schemaVersion: Int,
@@ -19,7 +15,6 @@ data class ModelManifest(
     val sha256: String,
     val allowedHosts: List<String>,
 ) {
-    /** True once the human-run STT-A download probe has filled in the canonical hash. */
     val sha256IsResolved: Boolean get() = sha256 != PENDING_HASH_TOKEN
 
     companion object {

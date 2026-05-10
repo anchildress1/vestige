@@ -6,24 +6,12 @@ import java.nio.ByteBuffer
 import java.nio.ByteOrder
 
 /**
- * STT-A audio plumbing harness (Story 1.5 — existential).
- *
- * Tries both `Content.AudioBytes` and `Content.AudioFile` paths so the on-device run can record
- * which one actually transcribes coherently against Gemma 4 E4B. Whichever wins gets pinned in
- * ADR-001 §Q4 by the human running the test.
- *
- * Lifecycle invariant: when the AudioFile path is used, the temp WAV is created, handed to the
- * model, and deleted in the same call. No audio is ever persisted as product data per AGENTS.md
- * guardrail 11.
+ * Audio plumbing harness — exercises both `Content.AudioBytes` and `Content.AudioFile` paths so
+ * the on-device run can record which one transcribes coherently against E4B. Temp WAV is
+ * always deleted in the same call.
  */
 class SttAProbe(private val engine: LiteRtLmEngine) {
 
-    /**
-     * Pack [samples] as little-endian float32 bytes and send them via `Content.AudioBytes`. This
-     * is the most likely packing for a Gemma 4 model that expects `[-1, 1]` floats; if it fails
-     * coherence on the reference device, swap to [transcribeAudioFile] before declaring STT-A
-     * blocked.
-     */
     suspend fun transcribeAudioBytesAsFloat32Le(samples: FloatArray, prompt: String = DEFAULT_PROMPT): String {
         require(samples.isNotEmpty()) { "STT-A probe requires non-empty audio samples." }
         val bytes = floatsToLittleEndianBytes(samples)
@@ -35,10 +23,7 @@ class SttAProbe(private val engine: LiteRtLmEngine) {
         )
     }
 
-    /**
-     * Send a path to an existing audio file via `Content.AudioFile`. Caller owns the file's
-     * lifecycle.
-     */
+    /** Caller owns the file's lifecycle. */
     suspend fun transcribeAudioFile(path: String, prompt: String = DEFAULT_PROMPT): String {
         require(path.isNotBlank()) { "STT-A probe requires a non-blank audio file path." }
         return engine.sendMessageContents(
@@ -49,12 +34,7 @@ class SttAProbe(private val engine: LiteRtLmEngine) {
         )
     }
 
-    /**
-     * Convenience: write [samples] as a temp mono PCM_S16LE WAV in [cacheDir] (per
-     * [WavWriter.writeMonoFloatWav] — LiteRT-LM 0.11.0's miniaudio decoder rejects IEEE_FLOAT,
-     * see ADR-001 §Q4), hand it to Gemma, and delete the temp file inside this call regardless
-     * of outcome.
-     */
+    /** Writes [samples] as a temp PCM_S16LE WAV, transcribes, and always deletes the file. */
     suspend fun transcribeViaTempWav(
         samples: FloatArray,
         sampleRateHz: Int,

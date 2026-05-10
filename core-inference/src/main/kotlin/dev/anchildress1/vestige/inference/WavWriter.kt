@@ -6,14 +6,8 @@ import java.nio.ByteBuffer
 import java.nio.ByteOrder
 
 /**
- * Writes mono PCM_S16LE WAV files for LiteRT-LM's `Content.AudioFile` path.
- *
- * STT-A (Story 1.5) established that LiteRT-LM 0.11.0's miniaudio decoder accepts PCM_S16LE
- * (format code 1) but rejects IEEE_FLOAT (format code 3) with MA_INVALID_DATA. Float32 samples
- * from [AudioCapture] are scaled to the int16 range [-32768, 32767] on write.
- *
- * Used by [SttAProbe.transcribeViaTempWav] — the file is created, handed to the model, and
- * deleted within the same call. No persisted audio.
+ * Writes mono PCM_S16LE WAV files. LiteRT-LM 0.11.0's miniaudio decoder accepts format code 1
+ * (PCM_S16LE) but rejects format code 3 (IEEE_FLOAT). Float32 samples are scaled to int16 here.
  */
 internal object WavWriter {
 
@@ -25,10 +19,7 @@ internal object WavWriter {
     private const val BITS_PER_SAMPLE: Short = 16
     private const val PCM16_SCALE = 32767f
 
-    /**
-     * Write [samples] (float32, `[-1, 1]`) to [target] as mono [sampleRateHz] PCM_S16LE WAV.
-     * Clips samples outside `[-1, 1]` before scaling to avoid int16 overflow.
-     */
+    /** Clips samples outside `[-1, 1]` before scaling to avoid int16 overflow. */
     fun writeMonoFloatWav(target: File, samples: FloatArray, sampleRateHz: Int) {
         require(samples.isNotEmpty()) { "WAV write requires at least one sample." }
         require(sampleRateHz > 0) { "sampleRateHz must be positive, was $sampleRateHz" }

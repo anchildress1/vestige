@@ -3,13 +3,9 @@ package dev.anchildress1.vestige.inference
 import dev.anchildress1.vestige.model.Persona
 import java.time.Instant
 
-/** Who produced the [Turn]. Personas are a property of MODEL turns, not a separate speaker. */
 enum class Speaker { USER, MODEL }
 
-/**
- * One contribution inside a [Transcript]. Text only — no audio bytes (AGENTS.md guardrail 11).
- * [timestamp] is when the turn entered the transcript, not when audio capture began.
- */
+/** One transcript entry — text only, no audio bytes. [timestamp] is when this entered the transcript. */
 data class Turn(val speaker: Speaker, val text: String, val timestamp: Instant, val persona: Persona? = null) {
     init {
         when (speaker) {
@@ -20,11 +16,8 @@ data class Turn(val speaker: Speaker, val text: String, val timestamp: Instant, 
 }
 
 /**
- * Append-only ordered log of [Turn]s for a single capture session. One [CaptureSession] owns one
- * `Transcript`; `entry_text` is derived from the ordered USER turns only, never from model output.
- *
- * Read access returns a snapshot — callers cannot mutate the underlying list. Writes go through
- * `CaptureSession`'s state-machine methods so transcript advances stay synchronized with state.
+ * Append-only ordered log of [Turn]s for one capture. `entry_text` derives from USER turns only.
+ * Reads return a snapshot; writes go through [CaptureSession] so state stays synchronized.
  */
 class Transcript {
     private val mutableTurns = mutableListOf<Turn>()

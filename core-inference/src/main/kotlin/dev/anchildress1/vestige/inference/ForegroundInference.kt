@@ -11,20 +11,10 @@ import java.time.Clock
 import java.util.concurrent.ConcurrentHashMap
 
 /**
- * One foreground capture call: persona system prompt + audio → `{transcription, follow_up}`.
- * Single-turn-per-capture (caller constructs a fresh [CaptureSession] for the next recording);
- * rationale in `adrs/ADR-005-stt-b-scope-and-v1-single-turn.md`.
- *
- * Audio is handed to LiteRT-LM as `Content.AudioFile` against a temp PCM_S16LE WAV — the only
- * handoff that works on LiteRT-LM 0.11.0 per ADR-001 §Q4. The temp WAV is created, used, and
- * deleted inside this call even on engine error or coroutine cancellation (AGENTS.md
- * guardrail 11).
- *
- * Final-chunk only: `AudioCapture` caps recordings at 30 s and emits one `isFinal=true` chunk;
- * the >30 s multi-chunk orchestration is in backlog row `multi-chunk-foreground`.
- *
- * Pure with respect to [CaptureSession]: the caller advances state (recordTranscription →
- * recordModelResponse) so the user's transcription appears before the follow-up renders.
+ * Single-turn foreground call: persona prompt + audio → `{transcription, follow_up}`. Audio is
+ * handed off as a temp PCM_S16LE WAV (the only handoff that works on LiteRT-LM 0.11.0); the file
+ * is always deleted before this call returns, even on cancellation. Pure with respect to
+ * [CaptureSession] — the caller advances session state from the parsed result.
  */
 class ForegroundInference(
     private val engine: LiteRtLmEngine,
@@ -33,10 +23,7 @@ class ForegroundInference(
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) {
 
-    /**
-     * Suspends on the IO dispatcher. The LiteRT-LM engine handle is single-threaded; callers
-     * must not invoke this concurrently against the same engine.
-     */
+    // Engine handle is single-threaded; do not call concurrently against the same engine.
     suspend fun runForegroundCall(audio: AudioChunk, persona: Persona): ForegroundResult = withContext(ioDispatcher) {
         require(audio.samples.isNotEmpty()) { "ForegroundInference requires non-empty audio samples." }
         require(audio.isFinal) {
@@ -78,12 +65,8 @@ class ForegroundInference(
         )
     }
 
-    /**
-     * Delete a temp foreground WAV. On delete failure (file locked, transient FS error) truncate
-     * to zero bytes so the audio payload is unrecoverable even if the inode survives, retry
-     * delete, then fall back to `deleteOnExit` (best-effort on Android — process kill skips it).
-     * AGENTS.md guardrail 11. `internal` for JVM testability.
-     */
+    // Truncate-then-retry-delete on failure so audio bytes are unrecoverable even if the inode
+    // survives. `internal` for JVM testability.
     internal fun discardTempWav(temp: File) {
         if (temp.delete()) return
         Log.w(TAG, "Initial delete failed for ${temp.absolutePath}; truncating audio payload")
@@ -94,11 +77,7 @@ class ForegroundInference(
         temp.deleteOnExit()
     }
 
-    /**
-     * Delete leftover `vestige-fg-*.wav` files from a prior crash. Skips files held by an
-     * in-flight call ([activeTempWavs]); reuses [discardTempWav] so the truncate-on-failure
-     * privacy guarantee applies to crash leftovers too.
-     */
+    // Cleans up leftovers from prior crashes. Skips files held by an in-flight call.
     private fun sweepStaleTempWavs() {
         cacheDir.listFiles { _, name -> name.startsWith(TEMP_PREFIX) && name.endsWith(TEMP_SUFFIX) }
             ?.forEach { stale ->
@@ -123,9 +102,8 @@ class ForegroundInference(
         internal const val TEMP_PREFIX = "vestige-fg-"
         internal const val TEMP_SUFFIX = ".wav"
 
-        // Prose-only schema (no literal `<transcription>` / `<follow_up>` tags) so a chatty model
-        // echoing the format reminder cannot collide with the parser's tag matching. The parser
-        // requires the actual tag literals in the response and rejects duplicate blocks.
+        // Prose-only — naming the tag literals here would collide with the parser if the model
+        // echoes the reminder back.
         internal val OUTPUT_SCHEMA_REMINDER = listOf(
             "## OUTPUT FORMAT",
             "Wrap the user's spoken words verbatim in lowercase transcription tags " +
@@ -141,11 +119,9 @@ class ForegroundInference(
         private const val NANOS_PER_MILLI = 1_000_000L
         private val activeTempWavs: MutableSet<String> = ConcurrentHashMap.newKeySet()
 
-        /**
-         * Held only across sweep + create + register so an overlapping call's sweep cannot
-         * delete a just-created temp WAV before it lands in [activeTempWavs]. The slow engine
-         * call runs outside this lock so concurrent inference is allowed.
-         */
+        // Held only across sweep+create+register so an overlapping call's sweep can't delete a
+        // just-created WAV before it lands in [activeTempWavs]. The slow engine call runs
+        // outside this lock.
         private val tempWavLock: Any = Any()
     }
 }

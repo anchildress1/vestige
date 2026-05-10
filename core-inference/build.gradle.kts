@@ -54,6 +54,9 @@ dependencies {
     testImplementation(libs.turbine)
     testImplementation(libs.kotlinx.coroutines.test)
     testImplementation(libs.robolectric)
+    // Android's android.jar ships org.json at runtime; the mockable test jar stubs it. Pin the
+    // upstream artifact on the test classpath only so LensResponseParser hits a real parser.
+    testImplementation(libs.json)
 }
 
 tasks.withType<Test>().configureEach {

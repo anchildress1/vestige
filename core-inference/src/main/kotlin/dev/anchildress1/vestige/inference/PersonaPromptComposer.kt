@@ -3,13 +3,8 @@ package dev.anchildress1.vestige.inference
 import dev.anchildress1.vestige.model.Persona
 
 /**
- * Builds the system prompt for a foreground capture call by composing the shared cognition-
- * tracker rules with one of three persona-specific tone wrappers (per `concept-locked.md`
- * §Personas — tone-only variants).
- *
- * Persona text lives as classpath resources at `personas/{slug}.txt` so the prompts can be
- * iterated on without recompiling Kotlin and so the linter doesn't carry multi-page string
- * literals. Phase 1 ships the scaffold; Phase 2 may refine the wording in place.
+ * Foreground system prompt = shared cognition-tracker rules + a persona tone wrapper. Personas
+ * are tone-only — they never alter extraction. Text lives under `resources/personas/`.
  */
 object PersonaPromptComposer {
 
@@ -18,10 +13,6 @@ object PersonaPromptComposer {
     private const val HARDASS_RESOURCE = "/personas/hardass.txt"
     private const val EDITOR_RESOURCE = "/personas/editor.txt"
 
-    /**
-     * Returns the assembled system prompt for [persona]. Shared rules first, persona-specific
-     * tone wrapper second. Stable string — callers can cache.
-     */
     fun compose(persona: Persona): String {
         val shared = loadResource(SHARED_RESOURCE)
         val personaText = loadResource(resourceFor(persona))

@@ -6,29 +6,16 @@ import java.time.format.DateTimeFormatter
 import java.time.temporal.ChronoUnit
 
 /**
- * Markdown filename generator for `:core-storage`. Format per architecture-brief.md
- * §"Markdown Entry Shape":
- *
- *   {filesDir}/entries/{ISO8601-utc-second}--{slug}.md
- *
- * Filenames are stable for the life of an entry. Re-eval re-writes the *contents* of an
- * existing file via atomic temp-rename; it does not move the file.
+ * Generates `{ISO8601-utc-second}--{slug}.md` filenames. Filenames are stable for the life of
+ * an entry; re-eval rewrites contents in place.
  */
 internal object EntryFilename {
 
-    /** Maximum slug length per architecture-brief.md §"Filename". */
     const val SLUG_MAX_CHARS = 32
-
-    /** Slug derives from the first 5–6 content words after stop-word strip. */
     private const val SLUG_MAX_WORDS = 6
-
     private const val SLUG_FALLBACK = "entry"
 
-    /**
-     * Common English stop words. Stripped before slug generation so the kebab carries the
-     * salient nouns/verbs from the entry text — `the-launch-doc-stared-flattened` beats
-     * `i-was-just-the-launch-doc`.
-     */
+    // Stripped so the slug carries salient nouns/verbs, not filler.
     private val STOP_WORDS = setOf(
         "a", "about", "after", "an", "and", "are", "as", "at",
         "be", "been", "before", "being", "but", "by",
@@ -47,21 +34,12 @@ internal object EntryFilename {
         "you", "your",
     )
 
-    /**
-     * Build the filename portion (no directory) for the given timestamp + entry text.
-     * Caller resolves collisions via [resolveUnique].
-     */
     fun buildFilename(timestampEpochMs: Long, entryText: String): String {
         val iso = formatIsoSecondUtc(timestampEpochMs)
         val slug = generateSlug(entryText)
         return "$iso--$slug.md"
     }
 
-    /**
-     * Generate a kebab-case slug ≤ [SLUG_MAX_CHARS] from the first content words of
-     * [entryText]. Stop words are stripped, non-`[a-z0-9-]` characters are dropped, and an
-     * empty result falls back to `entry`.
-     */
     fun generateSlug(entryText: String): String {
         val words = entryText
             .lowercase()
@@ -76,10 +54,7 @@ internal object EntryFilename {
         return joined.ifEmpty { SLUG_FALLBACK }
     }
 
-    /**
-     * Resolve a non-colliding filename by appending `-2`, `-3`, … to the slug portion.
-     * Returns the input unchanged when no file exists at `dir/baseName`.
-     */
+    /** Returns [baseName] unchanged on no collision, otherwise appends `-2`, `-3`, … */
     fun resolveUnique(dir: File, baseName: String): String {
         if (!File(dir, baseName).exists()) return baseName
         val (stem, dotMd) = baseName.split(".md").let { it[0] to ".md" }

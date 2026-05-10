@@ -3,11 +3,7 @@ package dev.anchildress1.vestige.inference
 import dev.anchildress1.vestige.model.Persona
 import java.time.Instant
 
-/**
- * Outcome of one foreground capture call. The call does not retry on parse failure — STT-C
- * tracks the rate (ADR-002 §"Structured-output reliability"). `elapsedMs` + `completedAt` are
- * recorded on every result so the latency budget (ADR-002 §"Latency budget") can be measured.
- */
+/** Outcome of one foreground capture call. No retry on parse failure — STT-C tracks the rate. */
 sealed interface ForegroundResult {
     val persona: Persona
     val rawResponse: String
@@ -23,11 +19,7 @@ sealed interface ForegroundResult {
         val followUp: String,
     ) : ForegroundResult
 
-    /**
-     * `recoveredTranscription` carries the user's transcription when the transcription block
-     * parsed cleanly but the follow-up block didn't, so the caller can still advance
-     * `entry_text` instead of dropping the user's words.
-     */
+    /** `recoveredTranscription` is set when the transcription parsed but the follow_up didn't. */
     data class ParseFailure(
         override val persona: Persona,
         override val rawResponse: String,

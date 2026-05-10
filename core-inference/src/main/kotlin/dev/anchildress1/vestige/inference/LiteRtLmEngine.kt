@@ -11,12 +11,7 @@ import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
-/**
- * Backend selection mapped to LiteRT-LM SDK options. Phase 1 only exercises [Cpu]; [Gpu] and
- * [Npu] are wired so STT-A and later phases can flip the flag without re-shaping this API.
- * NPU requires the host's `nativeLibraryDir`, which only an Android `Context` can hand over —
- * the caller passes it in.
- */
+/** Backend selection. NPU needs the host's `nativeLibraryDir` — only Android `Context` has it. */
 sealed interface BackendChoice {
     data object Cpu : BackendChoice
     data object Gpu : BackendChoice
@@ -24,14 +19,9 @@ sealed interface BackendChoice {
 }
 
 /**
- * Thin lifecycle wrapper around LiteRT-LM's [Engine]. Long-lived: call [initialize] once after
- * the model artifact is verified, then [generateText] (text-only) or [sendMessageContents]
- * (multimodal) per call. The native engine is released on [close].
- *
- * Each call opens a fresh `engine.createConversation()` and closes it immediately — the SDK's
- * stateful Conversation (persistent handle across multiple `sendMessage` calls with native KV-
- * cache reuse) is intentionally not exposed in v1. A future multi-turn revival would need a
- * different wrapper; see `adrs/ADR-005-stt-b-scope-and-v1-single-turn.md` for context.
+ * Lifecycle wrapper around LiteRT-LM's [Engine]. [initialize] once, then [generateText] /
+ * [sendMessageContents] per call. Each call opens and closes a fresh conversation — the SDK's
+ * stateful KV-cache Conversation handle is not exposed in v1.
  */
 class LiteRtLmEngine(
     private val modelPath: String,

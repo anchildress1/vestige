@@ -1,0 +1,17 @@
+## Surface: Behavioral
+
+Extract activities, sequence, time-of-day, and environmental context from the entry text.
+
+What to capture:
+
+- Activities the user did, started, abandoned, or returned to.
+- Sequence anchors: "before standup", "after the call", "around 11", "since 3am".
+- Time-of-day: explicit clock times, named windows (morning / afternoon / late / overnight), durations.
+- Environmental context: location, posture, device, people physically present, ambient state.
+- Things-ignored or skipped during a focus block, when the user named them.
+
+What goes in the schema:
+
+- Append behavioral signals to `tags` as short lowercase tokens (e.g. `standup`, `late-night`, `q3-doc`, `chair`).
+- One token per discrete signal. Multi-word activities use kebab-case.
+- Do not invent activities that the user did not name. Implicit context belongs to the lens, not this surface.

@@ -1,0 +1,21 @@
+## Surface: Recurrence
+
+Match the entry against retrieved history chunks (provided in the user content block).
+
+What to capture:
+
+- Whether this entry repeats a behavior, vocabulary pattern, or state shift seen in a retrieved historical entry.
+- Which retrieved chunk(s) are the closest match, by `pattern_id` if present in the chunk metadata.
+- Whether the recurrence is exact (same activity + same context) or partial (same activity, different context).
+
+What goes in the schema:
+
+- Populate `recurrence_link` with the `pattern_id` of the matched historical pattern, or null when no match.
+- Populate `recurrence_kind` with `exact` or `partial` when `recurrence_link` is non-null.
+- Append a `recurrence:{pattern_id}` token to `tags` when a match is found.
+
+Constraints:
+
+- Do not invent a `pattern_id`. Use only IDs present in the retrieved-history block.
+- Do not infer recurrence from semantic similarity if no retrieved chunk references it. The retrieval layer is the only source of historical context for this surface.
+- If the user content contains no retrieved-history block, `recurrence_link` is null. This is normal for early entries.

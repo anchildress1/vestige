@@ -1,0 +1,17 @@
+## Surface: Vocabulary
+
+Extract recurring words and in-entry contradictions from the entry text.
+
+What to capture:
+
+- Words the user used more than once (excluding stop words). Frequency hints at salience.
+- Contradictions inside the same entry: "fine" alongside "couldn't stand up"; "quick break" alongside "two hours later".
+- Hedge or imprecise words used to stand in for something concrete: "the thing", "stuff", "whatever", "kind of", "I guess".
+- Repeated phrasings across nearby sentences that suggest the user is circling a topic.
+
+What goes in the schema:
+
+- Append vocabulary signals to `tags` as short lowercase tokens.
+- Populate `vocabulary_contradictions` as a list of `{term_a, term_b, snippet}` entries when the entry contains an explicit contradiction. Snippet is the user's words, not paraphrase.
+- Do not flag a word as contradictory if it appears in different unrelated contexts within the entry.
+- Do not extract emotional vocabulary as a state. State words go to the State surface; this surface tracks linguistic patterns only.

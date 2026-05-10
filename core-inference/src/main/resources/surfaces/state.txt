@@ -1,0 +1,18 @@
+## Surface: State
+
+Extract attention and energy markers from the entry text.
+
+What to capture:
+
+- Energy descriptors the user named: "crashed", "wired", "fried", "sharp", "slow", "scattered", "tunnel", "blank".
+- Attention shifts: "couldn't focus", "locked in for hours", "kept tabbing away", "blanked".
+- State transitions across the entry: "was sharp this morning, flatlined by 11".
+- Late-night markers between midnight and 5am.
+- Decision-looping markers: re-doing the same choice, opening and closing the same task, restating the same dilemma.
+
+What goes in the schema:
+
+- Populate `energy_descriptor` with the dominant state word the user used. Lowercase, exact-as-spoken when possible. Null if the user named no state.
+- Populate `state_shift` (boolean) when the entry describes a transition between two distinct states.
+- Append state-related signals to `tags` (e.g. `crashed`, `tunnel-exit`, `decision-loop`, `late-night`).
+- Do not infer a state the user did not name. "Stressed" is not extractable unless the user said "stressed".

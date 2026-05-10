@@ -8,13 +8,19 @@ import org.json.JSONTokener
 
 /**
  * Parses a lens call's raw response into a [LensExtraction] (schema:
- * `resources/lenses/output-schema.txt`). Tolerant of surrounding prose / markdown fences by
- * extracting the first balanced `{...}` block. Returns `null` on any parse failure — the worker
- * treats that as "no opinion."
+ * `resources/lenses/output-schema.txt`). Tolerant of surrounding prose / markdown fences — finds
+ * the first balanced `{...}` that parses as a JSON object, skipping earlier blocks that don't
+ * (e.g. schema commentary like `{kind, snippet, note}`). Rejects array-wrapped payloads
+ * (`[{...}]`) so a malformed top-level shape can't masquerade as valid extraction data. Returns
+ * `null` on any parse failure — the worker treats that as "no opinion."
  *
- * Field values pass through as the model emitted them; missing or JSON-null keys come through
- * as `null`. Schema-shaped flag objects (`{kind, snippet, note}`) collapse to a stable
- * `"$kind:$snippet:$note"` string so equality comparisons stay deterministic.
+ * `tags` are normalized at parse time (trim + lowercase, empty strings dropped) so a "Standup"
+ * from one lens equals a "standup" from another at convergence-time string comparison.
+ *
+ * Schema-shaped flag objects (`{kind, snippet, note}`) collapse to a stable
+ * `"$kind:$snippet:$note"` string. Only Skeptical lens output keeps its flags; Literal /
+ * Inferential `flags` are dropped — the schema makes this single-lens contract explicit and
+ * propagating drift would corrupt convergence.
  */
 internal object LensResponseParser {
 
@@ -29,16 +35,23 @@ internal object LensResponseParser {
     )
 
     fun parse(lens: Lens, raw: String): LensExtraction? {
-        val payload = extractFirstJsonObject(raw)
-        val root = payload?.let { runCatching { JSONTokener(it).nextValue() as? JSONObject }.getOrNull() }
-        return root?.let {
-            val fields = SCHEMA_KEYS.associateWith { key -> normalize(it.opt(key)) }
-            val flags = (normalize(it.opt("flags")) as? List<*>)
-                ?.mapNotNull(::encodeFlag)
-                ?: emptyList()
-            LensExtraction(lens = lens, fields = fields, flags = flags)
+        val root = findFirstParseableObject(raw) ?: return null
+        val fields = SCHEMA_KEYS.associateWith { key -> normalizeField(key, root.opt(key)) }
+        val flags = if (lens == Lens.SKEPTICAL) {
+            (normalize(root.opt("flags")) as? List<*>)?.mapNotNull(::encodeFlag) ?: emptyList()
+        } else {
+            emptyList()
         }
+        return LensExtraction(lens = lens, fields = fields, flags = flags)
     }
+
+    /** Per-field normalization. Tags get trimmed + lowercased; everything else passes through. */
+    private fun normalizeField(key: String, value: Any?): Any? {
+        val normalized = normalize(value)
+        return if (key == "tags") (normalized as? List<*>)?.mapNotNull(::normalizeTag) else normalized
+    }
+
+    private fun normalizeTag(entry: Any?): String? = (entry as? String)?.trim()?.lowercase()?.takeIf { it.isNotEmpty() }
 
     private fun encodeFlag(entry: Any?): String? = when (entry) {
         is String -> entry.takeIf { it.isNotBlank() }
@@ -53,18 +66,49 @@ internal object LensResponseParser {
         else -> null
     }
 
-    private fun extractFirstJsonObject(raw: String): String? {
-        val start = raw.takeIf { it.isNotBlank() }?.indexOf('{')?.takeIf { it >= 0 } ?: return null
+    /**
+     * Walk forward, find every balanced `{...}` block, return the first that parses as a
+     * JSONObject. Rejects array-wrapped payloads (`[{...}]`): a `[` whose only-whitespace
+     * separation from the first `{` indicates the bracket opens the payload itself, not
+     * prose like `[note] {...}`.
+     */
+    private fun findFirstParseableObject(raw: String): JSONObject? {
+        val firstBrace = raw.takeIf { it.isNotBlank() }?.indexOf('{')?.takeIf { it >= 0 }
+        if (firstBrace == null || isArrayWrapped(raw, firstBrace)) return null
+        var cursor = 0
+        var found: JSONObject? = null
+        var keepScanning = true
+        while (keepScanning && found == null) {
+            val open = raw.indexOf('{', cursor).takeIf { it >= 0 }
+            val close = open?.let { scanBalancedClose(raw, it) }
+            if (open == null || close == null) {
+                keepScanning = false
+            } else {
+                val candidate = raw.substring(open, close + 1)
+                found = runCatching { JSONTokener(candidate).nextValue() as? JSONObject }.getOrNull()
+                cursor = open + 1
+            }
+        }
+        return found
+    }
+
+    private fun isArrayWrapped(raw: String, firstBrace: Int): Boolean {
+        val firstBracket = raw.indexOf('[')
+        return firstBracket in 0 until firstBrace &&
+            (firstBracket + 1 >= firstBrace || raw.substring(firstBracket + 1, firstBrace).all(Char::isWhitespace))
+    }
+
+    private fun scanBalancedClose(raw: String, openIdx: Int): Int? {
         val state = ScanState()
-        var endExclusive = -1
-        for (i in start until raw.length) {
+        var closeIdx = -1
+        for (i in openIdx until raw.length) {
             advance(state, raw[i])
             if (state.closed) {
-                endExclusive = i + 1
+                closeIdx = i
                 break
             }
         }
-        return if (endExclusive > 0) raw.substring(start, endExclusive) else null
+        return closeIdx.takeIf { it >= 0 }
     }
 
     private fun advance(state: ScanState, c: Char) {

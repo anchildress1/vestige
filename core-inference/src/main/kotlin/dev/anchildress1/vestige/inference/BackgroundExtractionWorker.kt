@@ -7,7 +7,9 @@ import dev.anchildress1.vestige.model.LensExtraction
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeout
 
 /**
  * Runs the three lenses sequentially against an already-persisted entry, retries each lens up to
@@ -17,7 +19,11 @@ import kotlinx.coroutines.withContext
  * The caller threads the entry's persisted retry count in via `entryAttemptCount`; the worker
  * echoes it on every [ExtractionStatusListener] event. Lens-call volume is reported separately
  * on [BackgroundExtractionResult.modelCallCount] so the persisted `attempt_count` stays
- * sweep-level. Terminal `lastError` is `null` on `COMPLETED`, populated on `FAILED`.
+ * sweep-level. Terminal `lastError` is `null` on `COMPLETED`, populated on `FAILED` / `TIMED_OUT`.
+ *
+ * Pass `timeoutMs` to bound a hung native call — the wall clock measures from the first lens
+ * call through resolver completion. On timeout the worker emits [ExtractionStatus.TIMED_OUT]
+ * with whatever lens results completed before the cap.
  */
 class BackgroundExtractionWorker(
     private val engine: LiteRtLmEngine,
@@ -38,6 +44,7 @@ class BackgroundExtractionWorker(
         entryText: String,
         retrievedHistory: List<HistoryChunk> = emptyList(),
         entryAttemptCount: Int = 0,
+        timeoutMs: Long? = null,
         listener: ExtractionStatusListener = NO_OP_LISTENER,
     ): BackgroundExtractionResult = withContext(ioDispatcher) {
         require(entryText.isNotBlank()) {
@@ -46,17 +53,29 @@ class BackgroundExtractionWorker(
         require(entryAttemptCount >= 0) {
             "BackgroundExtractionWorker.extract requires entryAttemptCount >= 0"
         }
+        require(timeoutMs == null || timeoutMs > 0) {
+            "BackgroundExtractionWorker.extract requires timeoutMs > 0 (got $timeoutMs)"
+        }
 
         val started = System.nanoTime()
         val state = RunState(entryAttemptCount)
         listener.onUpdate(ExtractionStatus.RUNNING, entryAttemptCount, null)
 
-        for (lens in LENSES) {
-            state.results += runLens(lens, entryText, retrievedHistory, state, listener)
+        try {
+            withTimeoutOrNoCap(timeoutMs) {
+                for (lens in LENSES) {
+                    state.results += runLens(lens, entryText, retrievedHistory, state, listener)
+                }
+            }
+        } catch (timeout: TimeoutCancellationException) {
+            return@withContext handleTimeout(state, started, timeoutMs ?: 0L, listener, timeout)
         }
 
-        val totalElapsedMs = (System.nanoTime() - started) / NANOS_PER_MILLI
-        finalize(state, totalElapsedMs, listener)
+        completeRun(state, started, listener)
+    }
+
+    private suspend inline fun withTimeoutOrNoCap(timeoutMs: Long?, crossinline block: suspend () -> Unit) {
+        if (timeoutMs == null) block() else withTimeout(timeoutMs) { block() }
     }
 
     private suspend fun runLens(
@@ -122,39 +141,85 @@ class BackgroundExtractionWorker(
         return AttemptOutcome(raw = "", error = reason)
     }
 
-    private suspend fun finalize(
+    private suspend fun completeRun(
         state: RunState,
-        totalElapsedMs: Long,
+        startedNanos: Long,
         listener: ExtractionStatusListener,
     ): BackgroundExtractionResult {
         val parsedExtractions = state.results.mapNotNull(LensResult::extraction)
-        if (parsedExtractions.isEmpty()) {
-            val terminalError = state.lastError ?: "all-lenses-failed"
-            Log.w(
-                TAG,
-                "extract failed: every lens exhausted its retry budget " +
-                    "(model_calls=${state.modelCallCount} elapsed=${totalElapsedMs}ms last_error=$terminalError)",
-            )
-            listener.onUpdate(ExtractionStatus.FAILED, state.entryAttemptCount, terminalError)
-            return BackgroundExtractionResult.Failed(
-                totalElapsedMs = totalElapsedMs,
-                lensResults = state.results,
-                modelCallCount = state.modelCallCount,
-                lastError = terminalError,
-            )
+        val resolved = if (parsedExtractions.isEmpty()) {
+            null
+        } else {
+            tryResolve(parsedExtractions, state.lastError)
         }
-        val resolved = resolver.resolve(parsedExtractions)
-        Log.d(
-            TAG,
-            "extract completed: lenses=${parsedExtractions.size}/${LENSES.size} " +
-                "model_calls=${state.modelCallCount} elapsed=${totalElapsedMs}ms",
-        )
-        listener.onUpdate(ExtractionStatus.COMPLETED, state.entryAttemptCount, null)
-        return BackgroundExtractionResult.Success(
+        val totalElapsedMs = (System.nanoTime() - startedNanos) / NANOS_PER_MILLI
+        return when {
+            resolved is Resolution.Ok -> {
+                Log.d(
+                    TAG,
+                    "extract completed: lenses=${parsedExtractions.size}/${LENSES.size} " +
+                        "model_calls=${state.modelCallCount} elapsed=${totalElapsedMs}ms",
+                )
+                listener.onUpdate(ExtractionStatus.COMPLETED, state.entryAttemptCount, null)
+                BackgroundExtractionResult.Success(
+                    totalElapsedMs = totalElapsedMs,
+                    lensResults = state.results,
+                    modelCallCount = state.modelCallCount,
+                    resolved = resolved.value,
+                )
+            }
+
+            else -> {
+                val terminalError = (resolved as? Resolution.Failure)?.error
+                    ?: state.lastError
+                    ?: "all-lenses-failed"
+                Log.w(
+                    TAG,
+                    "extract failed (model_calls=${state.modelCallCount} " +
+                        "elapsed=${totalElapsedMs}ms last_error=$terminalError)",
+                )
+                listener.onUpdate(ExtractionStatus.FAILED, state.entryAttemptCount, terminalError)
+                BackgroundExtractionResult.Failed(
+                    totalElapsedMs = totalElapsedMs,
+                    lensResults = state.results,
+                    modelCallCount = state.modelCallCount,
+                    lastError = terminalError,
+                )
+            }
+        }
+    }
+
+    private fun tryResolve(parsed: List<LensExtraction>, currentLastError: String?): Resolution = try {
+        Resolution.Ok(resolver.resolve(parsed))
+    } catch (cancellation: CancellationException) {
+        throw cancellation
+    } catch (@Suppress("TooGenericExceptionCaught") resolverError: Exception) {
+        val terminalError = "resolver-error:${resolverError.javaClass.simpleName}"
+        Log.w(TAG, "resolver failed (${resolverError.message ?: terminalError}); prior last_error=$currentLastError")
+        Resolution.Failure(terminalError)
+    }
+
+    private sealed interface Resolution {
+        data class Ok(val value: dev.anchildress1.vestige.model.ResolvedExtraction) : Resolution
+        data class Failure(val error: String) : Resolution
+    }
+
+    private suspend fun handleTimeout(
+        state: RunState,
+        startedNanos: Long,
+        timeoutMs: Long,
+        listener: ExtractionStatusListener,
+        cause: TimeoutCancellationException,
+    ): BackgroundExtractionResult.TimedOut {
+        val totalElapsedMs = (System.nanoTime() - startedNanos) / NANOS_PER_MILLI
+        val terminalError = "timeout-after-${timeoutMs}ms"
+        Log.w(TAG, "extract timed out (${cause.message ?: terminalError})")
+        listener.onUpdate(ExtractionStatus.TIMED_OUT, state.entryAttemptCount, terminalError)
+        return BackgroundExtractionResult.TimedOut(
             totalElapsedMs = totalElapsedMs,
-            lensResults = state.results,
+            lensResults = state.results.toList(),
             modelCallCount = state.modelCallCount,
-            resolved = resolved,
+            timeoutMs = timeoutMs,
         )
     }
 

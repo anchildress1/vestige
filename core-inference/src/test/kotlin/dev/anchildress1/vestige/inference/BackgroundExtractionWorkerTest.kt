@@ -308,4 +308,71 @@ class BackgroundExtractionWorkerTest {
             kotlinx.coroutines.runBlocking { worker.extract(entryText = "ok", entryAttemptCount = -1) }
         }
     }
+
+    @Test
+    fun `non-positive timeout fails fast`() {
+        val worker = BackgroundExtractionWorker(
+            engine = mockk(),
+            resolver = RecordingResolver(resolved),
+            parser = { _, _ -> null },
+            composer = fakeComposer(),
+        )
+        assertThrows(IllegalArgumentException::class.java) {
+            kotlinx.coroutines.runBlocking { worker.extract(entryText = "ok", timeoutMs = 0L) }
+        }
+    }
+
+    @Test
+    fun `resolver throwing emits terminal FAILED instead of leaving status RUNNING`() = runTest {
+        val engine = mockk<LiteRtLmEngine>()
+        coEvery { engine.generateText(any()) } returns "raw-ok"
+        val parser: (Lens, String) -> LensExtraction? = { lens, _ -> extraction(lens) }
+        val throwingResolver = object : ConvergenceResolver {
+            override fun resolve(extractions: List<LensExtraction>): ResolvedExtraction = error("resolver-explosion")
+        }
+        val listener = RecordingListener()
+
+        val result = BackgroundExtractionWorker(
+            engine = engine,
+            resolver = throwingResolver,
+            parser = parser,
+            composer = fakeComposer(),
+        ).extract(entryText = "user words", listener = listener)
+
+        val failed = assertInstanceOf(BackgroundExtractionResult.Failed::class.java, result)
+        assertTrue(failed.lastError.startsWith("resolver-error:"))
+        // Persistence layer needs the terminal transition — without it the entry stalls in RUNNING.
+        assertEquals(ExtractionStatus.FAILED, listener.updates.last().status)
+        assertTrue(listener.updates.last().lastError!!.startsWith("resolver-error:"))
+    }
+
+    @Test
+    fun `timeout produces TimedOut with whatever lens results completed before the cap`() = runTest {
+        val engine = mockk<LiteRtLmEngine>()
+        // First lens completes; second lens hangs forever; the cap fires before the third runs.
+        coEvery { engine.generateText("prompt-for-LITERAL") } returns "raw-literal"
+        coEvery { engine.generateText("prompt-for-INFERENTIAL") } coAnswers {
+            kotlinx.coroutines.delay(Long.MAX_VALUE / 2)
+            "never"
+        }
+        val parser: (Lens, String) -> LensExtraction? = { lens, raw ->
+            if (raw == "raw-literal") extraction(lens) else null
+        }
+        val listener = RecordingListener()
+
+        val result = BackgroundExtractionWorker(
+            engine = engine,
+            resolver = RecordingResolver(resolved),
+            parser = parser,
+            composer = fakeComposer(),
+        ).extract(entryText = "user words", timeoutMs = 50L, listener = listener)
+
+        val timedOut = assertInstanceOf(BackgroundExtractionResult.TimedOut::class.java, result)
+        assertEquals(50L, timedOut.timeoutMs)
+        // LITERAL completed before the cap; INFERENTIAL was in-flight, so it doesn't appear yet.
+        assertEquals(listOf(Lens.LITERAL), timedOut.lensResults.map { it.lens })
+        val terminal = listener.updates.last()
+        assertEquals(ExtractionStatus.TIMED_OUT, terminal.status)
+        assertEquals("timeout-after-50ms", terminal.lastError)
+    }
 }

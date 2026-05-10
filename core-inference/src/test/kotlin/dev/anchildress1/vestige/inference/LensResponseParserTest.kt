@@ -168,6 +168,69 @@ class LensResponseParserTest {
     }
 
     @Test
+    fun `normalizes tags by trimming and lowercasing so cross-lens equality works`() {
+        val raw = """{"tags":["  Standup  ", "Launch-Doc", "", "  "]}"""
+        val extraction = LensResponseParser.parse(Lens.LITERAL, raw)
+
+        assertNotNull(extraction)
+        // Mixed-case + padded tags converge to the same form across lenses; empty tags drop.
+        assertEquals(listOf("standup", "launch-doc"), extraction!!.fields["tags"])
+    }
+
+    @Test
+    fun `drops flags from non-Skeptical lens output`() {
+        // Literal/Inferential drift into emitting flags would corrupt convergence; the schema is
+        // explicit that flags belong only to the Skeptical lens.
+        val raw = """{"flags":[{"kind":"state-behavior-mismatch","snippet":"x","note":"y"}]}"""
+
+        val literal = LensResponseParser.parse(Lens.LITERAL, raw)
+        val inferential = LensResponseParser.parse(Lens.INFERENTIAL, raw)
+        val skeptical = LensResponseParser.parse(Lens.SKEPTICAL, raw)
+
+        assertNotNull(literal)
+        assertNotNull(inferential)
+        assertNotNull(skeptical)
+        assertTrue(literal!!.flags.isEmpty())
+        assertTrue(inferential!!.flags.isEmpty())
+        assertEquals(listOf("state-behavior-mismatch:x:y"), skeptical!!.flags)
+    }
+
+    @Test
+    fun `keeps scanning when an earlier brace block is not parseable JSON`() {
+        // A model that echoes schema commentary like `{kind, snippet, note}` ahead of the actual
+        // payload would have made a single-shot parser return null and burn a retry. The parser
+        // walks past the unparseable block and finds the real object.
+        val raw = """
+            We expect each flag as {kind, snippet, note}. Here it is:
+            {"tags":["a"],"flags":[]}
+        """.trimIndent()
+
+        val extraction = LensResponseParser.parse(Lens.LITERAL, raw)
+
+        assertNotNull(extraction)
+        assertEquals(listOf("a"), extraction!!.fields["tags"])
+    }
+
+    @Test
+    fun `rejects array-wrapped payload like square-bracket inner object`() {
+        // The schema requires a top-level object; `[{...}]` violates that. The parser refuses to
+        // unpack the inner object so a malformed shape can't masquerade as valid extraction data.
+        val raw = """[{"tags":["a"]}]"""
+        assertNull(LensResponseParser.parse(Lens.LITERAL, raw))
+    }
+
+    @Test
+    fun `accepts a brace after an unrelated bracket pair earlier in the prose`() {
+        // `[note]` is prose, not an array opener for the payload. The "is the payload wrapped"
+        // check looks at whether nothing-but-whitespace separates the bracket from the brace.
+        val raw = """[note] {"tags":["a"]}"""
+        val extraction = LensResponseParser.parse(Lens.LITERAL, raw)
+
+        assertNotNull(extraction)
+        assertEquals(listOf("a"), extraction!!.fields["tags"])
+    }
+
+    @Test
     fun `treats JSON null and missing keys as equivalent absence`() {
         val raw = """{"tags":[],"energy_descriptor":null}"""
         val extraction = LensResponseParser.parse(Lens.LITERAL, raw)

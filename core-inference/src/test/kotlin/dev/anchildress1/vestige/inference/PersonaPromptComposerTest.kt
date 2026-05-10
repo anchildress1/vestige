@@ -60,4 +60,15 @@ class PersonaPromptComposerTest {
         val second = PersonaPromptComposer.compose(Persona.WITNESS)
         assertEquals(first, second)
     }
+
+    @Test
+    fun `editor prompt includes sparse-input fallback instead of requiring hallucinated contradictions`() {
+        val editor = PersonaPromptComposer.compose(Persona.EDITOR)
+        assertTrue(editor.contains("if the transcription has neither")) {
+            "Editor prompt must define a sparse-input fallback when no contradiction or vague noun exists"
+        }
+        assertTrue(editor.contains("quote one broad action/state word")) {
+            "Editor prompt must fall back to tightening an imprecise user word on thin inputs"
+        }
+    }
 }

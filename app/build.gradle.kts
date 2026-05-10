@@ -44,14 +44,13 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables.useSupportLibrary = true
 
-        // Wire Gradle project properties through to the instrumentation runner so on-device
-        // tests can receive file paths without embedding them in the build file.
-        // Pass via: ./gradlew ... -PmodelPath=<path> -PaudioPath=<path>
-        project.findProperty("modelPath")?.toString()?.let {
-            testInstrumentationRunnerArguments["modelPath"] = it
-        }
-        project.findProperty("audioPath")?.toString()?.let {
-            testInstrumentationRunnerArguments["audioPath"] = it
+        // Forward `-PmodelPath=<path>` / `-PaudioPath=<path>` / `-PlatencyBudgetMs=<ms>` into
+        // instrumentation runner args (consumed by SttAAudioPlumbingTest, PersonaToneSmokeTest,
+        // LiteRtLmTextSmokeTest, PerCapturePersonaSmokeTest).
+        listOf("modelPath", "audioPath", "latencyBudgetMs").forEach { key ->
+            project.findProperty(key)?.toString()?.let { value ->
+                testInstrumentationRunnerArguments[key] = value
+            }
         }
     }
 

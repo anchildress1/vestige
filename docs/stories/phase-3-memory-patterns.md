@@ -172,7 +172,7 @@ Stand up the memory layer (hybrid retrieval over saved entries) and the pattern 
 
 **Done when:**
 - [ ] Pattern list is reachable from the app shell (rough navigation; polish is Phase 4).
-- [ ] Each pattern card shows: name, agent-emitted template label, one-line observation, "{N} of {M} entries · Last seen {date}", and a purple left-rule per `design-guidelines.md` §"Pattern card".
+- [ ] Each pattern card shows: name, agent-emitted template label, one-line observation, "{N} of {M} entries · Last seen {date}", and a `glow` left-rule per `design-guidelines.md` §"Pattern card".
 - [ ] Cards are sorted by `last_seen` descending.
 - [ ] Empty state displays per `ux-copy.md` §"Pattern List / Empty states" (`Insufficient data.` / `Nothing repeating yet.`).
 - [ ] Pattern actions from Story 3.8 are reachable from each card via overflow menu (`Dismiss` / `Snooze 7 days` / `Mark resolved`).

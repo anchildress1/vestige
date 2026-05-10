@@ -11,17 +11,9 @@ import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 
 /**
- * Phase 1 scaffold for the convergence resolver per ADR-002 §Q4 + Story 1.12.
- *
- * The happy path (all three lenses identical → CANONICAL) is fully written so Phase 2 has a
- * worked example to drop the real implementation into. The other four cases are scaffolded
- * with @Disabled until the real resolver lands; their setup blocks document the inputs Phase 2
- * is expected to handle.
- *
- * Test infrastructure: JUnit Jupiter only — no separate fake LiteRT-LM client at this layer
- * because the resolver consumes already-parsed [LensExtraction]s, not engine output. The fake
- * engine for *prompt-side* Phase 2 tests is the `LiteRtLmEngine` lifecycle scaffolding plus
- * the LiteRT-LM SDK's own deterministic responses for canned inputs.
+ * Convergence resolver scaffold per ADR-002 §Q4. Happy path is written; the four `@Disabled`
+ * cases are intentional scaffolding (each carries the enablement criterion inline) — the
+ * resolver author flips them to `@Test` as the real implementation lands. Do not delete.
  */
 class ConvergenceResolverTest {
 

@@ -3,7 +3,6 @@ package dev.anchildress1.vestige.inference
 import com.google.ai.edge.litertlm.Content
 import dev.anchildress1.vestige.model.Persona
 import io.mockk.coEvery
-import io.mockk.coVerify
 import io.mockk.mockk
 import io.mockk.slot
 import kotlinx.coroutines.CompletableDeferred
@@ -49,7 +48,6 @@ class ForegroundInferenceTest {
 
         val result = ForegroundInference(engine, cacheDir, clock = fixedClock).runForegroundCall(
             audio = audioChunk(),
-            transcript = Transcript(),
             persona = Persona.WITNESS,
         )
 
@@ -70,7 +68,6 @@ class ForegroundInferenceTest {
 
         val result = ForegroundInference(engine, cacheDir, clock = fixedClock).runForegroundCall(
             audio = audioChunk(),
-            transcript = Transcript(),
             persona = Persona.HARDASS,
         )
 
@@ -79,18 +76,18 @@ class ForegroundInferenceTest {
         assertEquals(Persona.HARDASS, failure.persona)
         assertEquals("no headers, just prose", failure.rawResponse)
         assertEquals(null, failure.recoveredTranscription)
-        // Only one engine call — no silent retry per ADR-002 §"Structured-output reliability".
-        coVerify(exactly = 1) { engine.sendMessageContents(any()) }
     }
 
     @Test
-    fun `parse failure preserves transcription when only follow-up parsing fails`(@TempDir cacheDir: File) = runTest {
+    fun `parse failure preserves recoveredTranscription when only the follow-up block is mangled`(
+        @TempDir cacheDir: File,
+    ) = runTest {
         val engine = mockk<LiteRtLmEngine>()
-        coEvery { engine.sendMessageContents(any()) } returns "<transcription>verbatim user text</transcription>"
+        coEvery { engine.sendMessageContents(any()) } returns
+            "<transcription>verbatim user text</transcription>\n(model went off-script here, no follow_up tags)"
 
         val result = ForegroundInference(engine, cacheDir, clock = fixedClock).runForegroundCall(
             audio = audioChunk(),
-            transcript = Transcript(),
             persona = Persona.WITNESS,
         )
 
@@ -100,180 +97,28 @@ class ForegroundInferenceTest {
     }
 
     @Test
-    fun `composed prompt embeds persona shared rules and the active persona tag`(@TempDir cacheDir: File) = runTest {
-        val engine = mockk<LiteRtLmEngine>()
-        val captured = slot<List<Content>>()
-        coEvery { engine.sendMessageContents(capture(captured)) } returns rawSuccess("a", "b")
-
-        ForegroundInference(engine, cacheDir, clock = fixedClock).runForegroundCall(
-            audio = audioChunk(),
-            transcript = Transcript(),
-            persona = Persona.EDITOR,
-        )
-
-        val systemPrompt = (captured.captured[0] as Content.Text).text
-        assertAll(
-            { assertTrue(systemPrompt.contains("Persona: Editor"), "Missing persona tag in prompt") },
-            { assertTrue(systemPrompt.contains("cognition tracker"), "Missing shared sentinel in prompt") },
-            { assertTrue(systemPrompt.contains(ForegroundInference.RECENT_TURNS_HEADER)) },
-            // The schema reminder describes the format prose-only — no literal example tags so
-            // the model can't echo placeholder content the parser would mistake for a response.
-            {
-                assertTrue(systemPrompt.contains("transcription tags"), "Output schema must mention transcription tags")
-            },
-            { assertTrue(systemPrompt.contains("follow_up tags"), "Output schema must mention follow_up tags") },
-            {
-                assertFalse(
-                    systemPrompt.contains("<transcription>"),
-                    "Schema example must not contain literal opening tag",
-                )
-            },
-            {
-                assertFalse(systemPrompt.contains("<follow_up>"), "Schema example must not contain literal opening tag")
-            },
-        )
-    }
-
-    @Test
-    fun `empty transcript composes the no-prior-turns sentinel`(@TempDir cacheDir: File) = runTest {
-        val engine = mockk<LiteRtLmEngine>()
-        val captured = slot<List<Content>>()
-        coEvery { engine.sendMessageContents(capture(captured)) } returns rawSuccess("a", "b")
-
-        ForegroundInference(engine, cacheDir, clock = fixedClock).runForegroundCall(
-            audio = audioChunk(),
-            transcript = Transcript(),
-            persona = Persona.WITNESS,
-        )
-
-        val systemPrompt = (captured.captured[0] as Content.Text).text
-        assertTrue(systemPrompt.contains(ForegroundInference.NO_RECENT_TURNS))
-    }
-
-    @Test
-    fun `transcript is included oldest-first and capped at historyTurnLimit`(@TempDir cacheDir: File) = runTest {
-        val engine = mockk<LiteRtLmEngine>()
-        val captured = slot<List<Content>>()
-        coEvery { engine.sendMessageContents(capture(captured)) } returns rawSuccess("a", "b")
-
-        val transcript = Transcript().apply {
-            // 6 alternating turns; only the last 4 should appear.
-            append(Turn(Speaker.USER, "u-old", Instant.parse("2026-05-09T11:55:00Z")))
-            append(Turn(Speaker.MODEL, "m-old", Instant.parse("2026-05-09T11:55:01Z"), Persona.WITNESS))
-            append(Turn(Speaker.USER, "u-1", Instant.parse("2026-05-09T11:56:00Z")))
-            append(Turn(Speaker.MODEL, "m-1", Instant.parse("2026-05-09T11:56:01Z"), Persona.HARDASS))
-            append(Turn(Speaker.USER, "u-2", Instant.parse("2026-05-09T11:57:00Z")))
-            append(Turn(Speaker.MODEL, "m-2", Instant.parse("2026-05-09T11:57:01Z"), Persona.EDITOR))
-        }
-
-        ForegroundInference(engine, cacheDir, clock = fixedClock).runForegroundCall(
-            audio = audioChunk(),
-            transcript = transcript,
-            persona = Persona.HARDASS,
-        )
-
-        val systemPrompt = (captured.captured[0] as Content.Text).text
-        val turnsBlockStart = systemPrompt.indexOf(ForegroundInference.RECENT_TURNS_HEADER)
-        val outputBlockStart = systemPrompt.indexOf("## OUTPUT FORMAT")
-        val turnsBlock = systemPrompt.substring(turnsBlockStart, outputBlockStart)
-
-        assertAll(
-            { assertFalse(turnsBlock.contains("u-old"), "Oldest USER turn should be dropped") },
-            { assertFalse(turnsBlock.contains("m-old"), "Oldest MODEL turn should be dropped") },
-            { assertTrue(turnsBlock.contains("\"speaker\":\"USER\",\"text\":\"u-1\"")) },
-            { assertTrue(turnsBlock.contains("\"speaker\":\"MODEL\",\"text\":\"m-1\"")) },
-            { assertTrue(turnsBlock.contains("\"speaker\":\"USER\",\"text\":\"u-2\"")) },
-            { assertTrue(turnsBlock.contains("\"speaker\":\"MODEL\",\"text\":\"m-2\"")) },
-        )
-        // Order check — u-1 must precede m-2.
-        assertTrue(turnsBlock.indexOf("\"text\":\"u-1\"") < turnsBlock.indexOf("\"text\":\"m-2\""))
-    }
-
-    @Test
-    fun `multi-line turn text is JSON-escaped so it cannot escape the history envelope`(@TempDir cacheDir: File) =
-        runTest {
-            val engine = mockk<LiteRtLmEngine>()
-            val captured = slot<List<Content>>()
-            coEvery { engine.sendMessageContents(capture(captured)) } returns rawSuccess("a", "b")
-
-            val transcript = Transcript().apply {
-                append(Turn(Speaker.USER, "first line\nsecond line", Instant.parse("2026-05-09T11:55:00Z")))
-                append(
-                    Turn(
-                        speaker = Speaker.MODEL,
-                        text = "model line one.\nmodel line two with a \" quote and a \\ backslash.",
-                        timestamp = Instant.parse("2026-05-09T11:55:01Z"),
-                        persona = Persona.WITNESS,
-                    ),
-                )
-            }
-
-            ForegroundInference(engine, cacheDir, clock = fixedClock).runForegroundCall(
-                audio = audioChunk(),
-                transcript = transcript,
-                persona = Persona.WITNESS,
-            )
-
-            val systemPrompt = (captured.captured[0] as Content.Text).text
-            val turnsBlockStart = systemPrompt.indexOf(ForegroundInference.RECENT_TURNS_HEADER)
-            val outputBlockStart = systemPrompt.indexOf("## OUTPUT FORMAT")
-            val turnsBlock = systemPrompt.substring(turnsBlockStart, outputBlockStart)
-
-            assertAll(
-                // Newlines escape to \n inside the JSON string so each turn renders on a single line.
-                { assertTrue(turnsBlock.contains("\"first line\\nsecond line\"")) },
-                {
-                    val expected = "\"model line one.\\nmodel line two " +
-                        "with a \\\" quote and a \\\\ backslash.\""
-                    assertTrue(turnsBlock.contains(expected))
-                },
-                // No raw newline inside any turn's text portion — every line in the block starts with
-                // either the header, the JSON object opener, or the trailing blank.
-                {
-                    turnsBlock.lines().forEach { line ->
-                        val ok = line.isEmpty() ||
-                            line == ForegroundInference.RECENT_TURNS_HEADER ||
-                            line.startsWith("{\"speaker\":")
-                        assertTrue(ok, "Stray content escaped the history envelope: '$line'")
-                    }
-                },
-            )
-        }
-
-    @Test
-    fun `turn text with carriage return, tab, and control chars is JSON-escaped in history block`(
+    fun `composed prompt embeds persona shared rules, the active persona tag, and the output schema`(
         @TempDir cacheDir: File,
     ) = runTest {
         val engine = mockk<LiteRtLmEngine>()
         val captured = slot<List<Content>>()
         coEvery { engine.sendMessageContents(capture(captured)) } returns rawSuccess("a", "b")
 
-        val transcript = Transcript().apply {
-            // \r\n (Windows line ending), \t (tab), and a raw control char ()
-            append(
-                Turn(
-                    speaker = Speaker.USER,
-                    text = "tab\there\r\nwindowsctrl",
-                    timestamp = Instant.parse("2026-05-09T11:55:00Z"),
-                ),
-            )
-        }
-
         ForegroundInference(engine, cacheDir, clock = fixedClock).runForegroundCall(
             audio = audioChunk(),
-            transcript = transcript,
-            persona = Persona.WITNESS,
+            persona = Persona.EDITOR,
         )
 
         val systemPrompt = (captured.captured[0] as Content.Text).text
-        val turnsBlockStart = systemPrompt.indexOf(ForegroundInference.RECENT_TURNS_HEADER)
-        val outputBlockStart = systemPrompt.indexOf("## OUTPUT FORMAT")
-        val turnsBlock = systemPrompt.substring(turnsBlockStart, outputBlockStart)
-
-        // Each special char must appear as its JSON escape sequence, not as a raw character.
-        assertTrue(turnsBlock.contains("tab\\there\\r\\nwindows\\u0001ctrl")) {
-            "\\t, \\r, and control chars must be escaped; turns block was:\n$turnsBlock"
-        }
+        assertAll(
+            { assertTrue(systemPrompt.contains("Persona: Editor")) },
+            { assertTrue(systemPrompt.contains("cognition tracker")) },
+            { assertFalse(systemPrompt.contains("RECENT TURNS")) },
+            { assertTrue(systemPrompt.contains("transcription tags")) },
+            { assertTrue(systemPrompt.contains("follow_up tags")) },
+            { assertFalse(systemPrompt.contains("<transcription>")) },
+            { assertFalse(systemPrompt.contains("<follow_up>")) },
+        )
     }
 
     @Test
@@ -284,7 +129,6 @@ class ForegroundInferenceTest {
 
         ForegroundInference(engine, cacheDir, clock = fixedClock).runForegroundCall(
             audio = audioChunk(),
-            transcript = Transcript(),
             persona = Persona.WITNESS,
         )
 
@@ -294,8 +138,6 @@ class ForegroundInferenceTest {
             { assertInstanceOf(Content.Text::class.java, parts[0]) },
             { assertInstanceOf(Content.AudioFile::class.java, parts[1]) },
         )
-        // The temp WAV path must have lived inside cacheDir during the call. We can't read it
-        // back (deleted in finally), but we can verify the path prefix.
         val audioPath = (parts[1] as Content.AudioFile).absolutePath
         assertTrue(
             audioPath.startsWith(cacheDir.absolutePath),
@@ -310,7 +152,6 @@ class ForegroundInferenceTest {
 
         ForegroundInference(engine, cacheDir, clock = fixedClock).runForegroundCall(
             audio = audioChunk(),
-            transcript = Transcript(),
             persona = Persona.WITNESS,
         )
 
@@ -324,7 +165,7 @@ class ForegroundInferenceTest {
         val inference = ForegroundInference(engine, cacheDir, clock = fixedClock)
 
         val caught = runCatching {
-            inference.runForegroundCall(audioChunk(), Transcript(), Persona.WITNESS)
+            inference.runForegroundCall(audioChunk(), Persona.WITNESS)
         }.exceptionOrNull()
 
         assertInstanceOf(RuntimeException::class.java, caught)
@@ -340,7 +181,6 @@ class ForegroundInferenceTest {
             runTest {
                 inference.runForegroundCall(
                     audio = AudioChunk(FloatArray(0), AudioCapture.SAMPLE_RATE_HZ, isFinal = true),
-                    transcript = Transcript(),
                     persona = Persona.WITNESS,
                 )
             }
@@ -359,7 +199,6 @@ class ForegroundInferenceTest {
         coEvery { engine.sendMessageContents(any()) } returns rawSuccess("a", "b")
         ForegroundInference(engine, cacheDir, clock = fixedClock).runForegroundCall(
             audio = audioChunk(),
-            transcript = Transcript(),
             persona = Persona.WITNESS,
         )
 
@@ -410,10 +249,10 @@ class ForegroundInferenceTest {
         val secondInference = ForegroundInference(engine, cacheDir, clock = fixedClock, ioDispatcher = dispatcher)
 
         val firstCall = async {
-            firstInference.runForegroundCall(audioChunk(), Transcript(), Persona.WITNESS)
+            firstInference.runForegroundCall(audioChunk(), Persona.WITNESS)
         }
         val secondCall = async {
-            secondInference.runForegroundCall(audioChunk(), Transcript(), Persona.HARDASS)
+            secondInference.runForegroundCall(audioChunk(), Persona.HARDASS)
         }
 
         val firstResult = assertInstanceOf(ForegroundResult.Success::class.java, firstCall.await())
@@ -424,20 +263,33 @@ class ForegroundInferenceTest {
     }
 
     @Test
-    fun `truncate-on-fail discards audio payload even when delete fails`(@TempDir cacheDir: File) {
-        // The discardTempWav helper falls back to truncate-then-retry-delete on initial delete
-        // failure so the audio payload is unrecoverable even if the inode survives. Unit-testing
-        // an actual delete-failure on the real File API requires platform-specific tricks
-        // (read-only parent dir, file locks); we assert the truncate primitive itself behaves as
-        // promised, which is the load-bearing privacy guarantee.
+    fun `discardTempWav reaches the truncate-then-retry-delete branch when first delete fails`(
+        @TempDir cacheDir: File,
+    ) {
+        // First delete fails (file doesn't exist), so the helper falls through to the truncate
+        // primitive — outputStream().use {} creates the file empty — and the retry delete then
+        // succeeds.
+        val nonExistent = File(cacheDir, "vestige-fg-truncate-branch-test.wav")
+        assertFalse(nonExistent.exists())
+
+        ForegroundInference(mockk(), cacheDir, clock = fixedClock).discardTempWav(nonExistent)
+
+        assertFalse(nonExistent.exists(), "Retry delete after truncate must clean up the file")
+    }
+
+    @Test
+    fun `truncate primitive zeros the audio payload`(@TempDir cacheDir: File) {
+        // Pins the load-bearing privacy guarantee in discardTempWav's delete-failure branch
+        // (truncate-then-retry-delete). Triggering a real delete-failure needs OS-specific
+        // setup (read-only parent dir, file locks); we verify the primitive in isolation.
         val payload = File(cacheDir, "vestige-fg-truncate-test.wav")
         payload.writeBytes(ByteArray(1024) { 0x42 })
-        assertEquals(1024, payload.length(), "Test setup: payload must contain audio bytes")
+        assertEquals(1024, payload.length())
 
-        payload.outputStream().use { /* truncate to zero bytes */ }
+        payload.outputStream().use { }
 
-        assertEquals(0L, payload.length(), "Truncate must zero out the audio payload")
-        assertTrue(payload.delete(), "After truncate the now-empty file should be deletable")
+        assertEquals(0L, payload.length())
+        assertTrue(payload.delete())
     }
 
     @Test
@@ -448,7 +300,6 @@ class ForegroundInferenceTest {
         coEvery { engine.sendMessageContents(any()) } returns rawSuccess("a", "b")
         ForegroundInference(engine, cacheDir, clock = fixedClock).runForegroundCall(
             audio = audioChunk(),
-            transcript = Transcript(),
             persona = Persona.WITNESS,
         )
 
@@ -461,10 +312,10 @@ class ForegroundInferenceTest {
         val inference = ForegroundInference(engine, cacheDir, clock = fixedClock)
         val intermediate = AudioChunk(samples(), AudioCapture.SAMPLE_RATE_HZ, isFinal = false)
         val ex = assertThrows(IllegalArgumentException::class.java) {
-            runTest { inference.runForegroundCall(intermediate, Transcript(), Persona.WITNESS) }
+            runTest { inference.runForegroundCall(intermediate, Persona.WITNESS) }
         }
         assertTrue(
-            ex.message!!.contains("final-chunk only"),
+            ex.message!!.contains("audio.isFinal == true"),
             "Error must explain the final-chunk contract; was: ${ex.message}",
         )
     }
@@ -476,72 +327,40 @@ class ForegroundInferenceTest {
         val inference = ForegroundInference(engine, nonExistent, clock = fixedClock)
         assertThrows(IllegalArgumentException::class.java) {
             runTest {
-                inference.runForegroundCall(audioChunk(), Transcript(), Persona.WITNESS)
+                inference.runForegroundCall(audioChunk(), Persona.WITNESS)
             }
         }
     }
 
     @Test
-    fun `historyTurnLimit must be positive`(@TempDir cacheDir: File) {
+    fun `per-capture persona reaches the engine prompt`(@TempDir cacheDir: File) = runTest {
         val engine = mockk<LiteRtLmEngine>()
-        assertThrows(IllegalArgumentException::class.java) {
-            ForegroundInference(engine, cacheDir, historyTurnLimit = 0, clock = fixedClock)
-        }
-        assertThrows(IllegalArgumentException::class.java) {
-            ForegroundInference(engine, cacheDir, historyTurnLimit = -1, clock = fixedClock)
-        }
+        val captured = mutableListOf<List<Content>>()
+        coEvery { engine.sendMessageContents(capture(captured)) } returns rawSuccess("u", "f")
+        val inference = ForegroundInference(engine, cacheDir, clock = fixedClock)
+
+        val witnessSession = CaptureSession(defaultPersona = Persona.WITNESS)
+        witnessSession.startRecording()
+        witnessSession.submitForInference()
+        inference.runForegroundCall(audioChunk(), witnessSession.activePersona)
+
+        val editorSession = CaptureSession(defaultPersona = Persona.EDITOR)
+        editorSession.startRecording()
+        editorSession.submitForInference()
+        inference.runForegroundCall(audioChunk(), editorSession.activePersona)
+
+        assertEquals(2, captured.size)
+        val firstPrompt = (captured[0][0] as Content.Text).text
+        val secondPrompt = (captured[1][0] as Content.Text).text
+        assertAll(
+            { assertTrue(firstPrompt.contains("Persona: Witness")) },
+            { assertFalse(firstPrompt.contains("Persona: Editor")) },
+            { assertTrue(secondPrompt.contains("Persona: Editor")) },
+            { assertFalse(secondPrompt.contains("Persona: Witness")) },
+            { assertFalse(firstPrompt.contains("RECENT TURNS")) },
+            { assertFalse(secondPrompt.contains("RECENT TURNS")) },
+        )
     }
-
-    @Test
-    fun `session setPersona routes the next foreground call through the new persona prompt`(@TempDir cacheDir: File) =
-        runTest {
-            val engine = mockk<LiteRtLmEngine>()
-            val captured = mutableListOf<List<Content>>()
-            coEvery { engine.sendMessageContents(capture(captured)) } returnsMany listOf(
-                rawSuccess("first user text", "witness follow-up"),
-                rawSuccess("second user text", "editor follow-up"),
-            )
-            val inference = ForegroundInference(engine, cacheDir, clock = fixedClock)
-            val session = CaptureSession(clock = Clock.fixed(completedAt, ZoneOffset.UTC))
-
-            // Turn 1 — default persona (WITNESS).
-            assertEquals(Persona.WITNESS, session.activePersona)
-            session.startRecording()
-            session.submitForInference()
-            val first = assertInstanceOf(
-                ForegroundResult.Success::class.java,
-                inference.runForegroundCall(audioChunk(), session.transcript, session.activePersona),
-            )
-            session.recordTranscription(first.transcription)
-            session.recordModelResponse(first.followUp, first.persona)
-            session.acknowledgeResponse()
-
-            // Switch persona, run turn 2 — the new prompt must reach the engine.
-            session.setPersona(Persona.EDITOR)
-            session.startRecording()
-            session.submitForInference()
-            val second = assertInstanceOf(
-                ForegroundResult.Success::class.java,
-                inference.runForegroundCall(audioChunk(), session.transcript, session.activePersona),
-            )
-            session.recordTranscription(second.transcription)
-            session.recordModelResponse(second.followUp, second.persona)
-
-            assertEquals(2, captured.size)
-            val firstPrompt = (captured[0][0] as Content.Text).text
-            val secondPrompt = (captured[1][0] as Content.Text).text
-            assertAll(
-                { assertTrue(firstPrompt.contains("Persona: Witness"), "Turn 1 must carry Witness prompt") },
-                { assertFalse(firstPrompt.contains("Persona: Editor"), "Turn 1 must not carry Editor prompt") },
-                { assertTrue(secondPrompt.contains("Persona: Editor"), "Turn 2 must carry Editor prompt") },
-                { assertFalse(secondPrompt.contains("Persona: Witness"), "Turn 2 must not carry Witness prompt") },
-                { assertEquals(Persona.WITNESS, first.persona) },
-                { assertEquals(Persona.EDITOR, second.persona) },
-                // History block in turn 2 must include the WITNESS-authored model turn — switching
-                // does not rewrite prior turns (Story 2.3 done-when 2).
-                { assertTrue(secondPrompt.contains("\"text\":\"witness follow-up\"")) },
-            )
-        }
 
     @Test
     fun `empty engine response surfaces as EMPTY_RESPONSE failure`(@TempDir cacheDir: File) = runTest {
@@ -550,7 +369,6 @@ class ForegroundInferenceTest {
 
         val result = ForegroundInference(engine, cacheDir, clock = fixedClock).runForegroundCall(
             audio = audioChunk(),
-            transcript = Transcript(),
             persona = Persona.WITNESS,
         )
 

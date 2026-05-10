@@ -2,13 +2,13 @@
 
 **Status:** Not started
 **Dates:** TBD — kicks off after Phase 3 exits with STT-E resolved (Story 3.4 either Done or explicitly skipped)
-**References:** `PRD.md` §Phase 4, `concept-locked.md`, `design-guidelines.md` (entire), `ux-copy.md` (entire), `AGENTS.md`, `architecture-brief.md`, `adrs/ADR-002-multi-lens-extraction-pattern.md` §Q3 (re-eval cost story)
+**References:** `PRD.md` §Phase 4, `concept-locked.md`, `design-guidelines.md` (entire), `ux-copy.md` (entire), `AGENTS.md`, `architecture-brief.md`, `adrs/ADR-002-multi-lens-extraction-pattern.md` §Q3 (re-eval cost story), `adrs/ADR-004-app-backgrounding-and-model-handle-lifecycle.md` (entire — notification permission, tap target, fallback evaluation)
 
 ---
 
 ## Goal
 
-Wrap the app in a coherent, dark, atmospheric UX that meets the 10-second judge test — opening the app makes it obvious this is a *local AI cognition tracker*, not another journaling app. Onboarding handles the 3.66 GB model download gracefully. Capture, History, Patterns, and Settings are all reachable, navigable, and styled to the locked palette and typography. Three top error states have polished handling. Empty states use the locked microcopy. P1 features (per-session persona override, Re-eval/Reading screen if STT-D passed, Roast me bottom sheet if pattern evidence is solid) ship if scope holds.
+Wrap the app in a coherent, dark, atmospheric UX that meets the 10-second judge test — opening the app makes it obvious this is a *local AI cognition tracker*, not another journaling app. Onboarding handles the 3.66 GB model download gracefully. Capture, History, Patterns, and Settings are all reachable, navigable, and styled to the locked palette and typography. Three top error states have polished handling. Empty states use the locked microcopy. P1 features (per-capture persona selection, Re-eval/Reading screen if STT-D passed, Roast me bottom sheet if pattern evidence is solid) ship if scope holds.
 
 **Output of this phase:** the demo-ready app on the reference device. Every primary surface from `design-guidelines.md` §"Screen Specs" is implemented to spec. Phase 5 (demo optimization) starts with a stable, polished app — not a half-styled scaffold.
 
@@ -16,15 +16,16 @@ Wrap the app in a coherent, dark, atmospheric UX that meets the 10-second judge 
 
 ## Phase-level acceptance criteria
 
-- [ ] Design language pass complete: locked palette (`#0A0E1A` background, `#A855F7` purple primary accent, `#2563EB` electric blue active accent) applied across all screens. Typography is system sans (Roboto/Inter) with the contrast targets from `design-guidelines.md` §"Visual System".
-- [ ] Onboarding 7-screen flow per `ux-copy.md` §Onboarding works end-to-end on a fresh install on the reference S24 Ultra.
+- [ ] Design language pass complete: full palette tokens (`void` / `bg` / `s1` / `s2` / `s3` / `ink` / `mist` / `glow` / `vapor` / `pulse` / `error`) per `poc/design-review.md` §2.1 applied across all screens. Three-font system (`Inter` body, `Newsreader` italic for hero titles only, `JetBrains Mono` for forensic labels) per `design-review.md` §2.2. Atmospheric layer (noise grain + fog drift, §2.4) on all surfaces. Contrast targets per `design-guidelines.md` §"Color rules".
+- [ ] Onboarding 8-screen flow per `ux-copy.md` §Onboarding (includes Screen 3.5 notification permission per `adrs/ADR-004-app-backgrounding-and-model-handle-lifecycle.md` §"Permission Flow") works end-to-end on a fresh install on the reference S24 Ultra.
 - [ ] Model download UX handles Wi-Fi gating, real progress, retry on stall/failure, and survives app restart mid-download.
 - [ ] Persistent Local Model Status surface exists and is reachable from app shell or settings; status is accurate.
-- [ ] Capture screen polished per `design-guidelines.md` §"Capture Screen" with active-record blue, live waveform during recording, transcription appearing 1-3 seconds post-chunk, conversation transcript with muted user turns + primary model turns.
+- [ ] Capture screen polished per `design-guidelines.md` §"Capture Screen" with the `MistHero` capture stone + `AudioMeter` primitive per `poc/design-review.md` §3.3 / §3.4 (no flat record button, no separate live waveform widget), transcription appearing post-inference (latency budget per `adrs/ADR-002-multi-lens-extraction-pattern.md` §"Latency budget" — 1–5 s target unmet on E4B CPU, currently ~24–33 s per `docs/stories/phase-2-core-loop.md` §Story 2.3 device record), entry transcript with muted user transcription + primary model follow-up (single-turn-per-capture per the STT-B v1 scope choice; see `adrs/ADR-005-stt-b-scope-and-v1-single-turn.md`).
 - [ ] History list, Entry Detail, Pattern List, and Pattern Detail are all polished and navigable per their `design-guidelines.md` specs.
 - [ ] Settings screen P0 scope works: persona default, export all entries (zip of markdown), delete all data, model status / re-download / delete.
 - [ ] Empty states across major screens use the locked microcopy from `ux-copy.md` §"Empty states".
 - [ ] Top three error states polished: download fail/stall, inference timeout/fail, mic permission denied/unavailable.
+- [ ] Notification permission flow ships in onboarding (Screen 3.5 per ADR-004 §"Permission Flow"); notification tap target lands on the entry detail of the most-recent-in-flight extraction. Lifecycle fallback evaluation per ADR-004 §"Fallback Trigger" recorded by end of Phase 4 day 1 if invoked.
 - [ ] P1 stories shipped or explicitly punted to v1.5 with a recorded reason (scope held / didn't hold).
 
 ---
@@ -33,15 +34,18 @@ Wrap the app in a coherent, dark, atmospheric UX that meets the 10-second judge 
 
 ### Story 4.1 — Design language pass
 
-**As** the AI implementor, **I need** the locked design system from `design-guidelines.md` (palette, typography, spacing, shape, motion, accent rules) applied as Compose theme tokens and reusable component styles, **so that** every Phase 4 UI story implements against shared tokens instead of re-deciding colors and sizes per screen.
+**As** the AI implementor, **I need** the canonical visual system from `poc/design-review.md` applied as Compose theme tokens, primitives, and reusable styles, **so that** every Phase 4 UI story implements against shared tokens and primitives instead of re-deciding colors, type, or shapes per screen.
 
 **Done when:**
-- [ ] `:app` Compose theme defines color tokens for the locked palette: `Background = #0A0E1A`, `DeepSurface = #0E1124`, `SurfaceLevels = [#161A2E, #1E2238, #2A2E48]`, `PrimaryText = #E8ECF4`, `MistGray = #7B8497`, `PrimaryAccent = #A855F7` (purple), `ActiveAccent = #2563EB` (blue).
-- [ ] Typography uses system sans (Roboto on Android default) with the contrast ratios from `design-guidelines.md` §"Visual System" — body text ≥4.5:1 (WCAG AA), primary content ≥7:1 (WCAG AAA target).
-- [ ] Shape tokens: 6–8px radius for cards and primary controls, 4px for small chrome.
-- [ ] Motion tokens follow the restraint rule from `design-guidelines.md` §"Shape, Spacing, Motion" — Material 3 expressive motion *suppressed*; only functional state transitions remain.
-- [ ] Each accent's allowed scope per `design-guidelines.md` §"Where each accent lives" is encoded as Compose modifier conventions (e.g., `.purpleLeftRule()` for active patterns, `.activeRecordingFill()` for the record button when recording).
+- [ ] `:app` Compose theme defines color tokens for the full palette per `poc/design-review.md` §2.1: `void` / `deep` (`#0A0E1A`), `bg` (`#0E1124`), `s1` (`#161A2E`), `s2` (`#1E2238`), `s3` (`#2A2E48`), `ink` (`#E8ECF4`), `mist` (`#7B8497`), `glow` (`#A855F7`), `vapor` (`#2563EB`), `pulse` (`#38A169`), `error` (`#B3261E`).
+- [ ] Three font families wired per `design-review.md` §2.2: `Inter` (UI body), `Newsreader` italic with opsz axis (display moments only — app name and hero titles like the `What lingered from yesterday?` line in `poc/screenshots/capture.png`), `JetBrains Mono` (forensic labels, eyebrows, persona names). Compose translation notes in `design-review.md` §8.
+- [ ] Type primitives implemented: `HDisplay` (display sans 38px), `H1` (sans 26px), `P` (15px), `PersonaLabel` (mono 10px / 0.24em), `Eyebrow` (mono 10px / 0.20em). Contrast targets per `design-guidelines.md` §"Color rules": body ≥4.5:1 (WCAG AA), primary content ≥7:1 (AAA target).
+- [ ] Radius scale per `design-review.md` §2.3 (`rPill: 9999`, `rXL: 8`, `rL: 8`, `rM: 6`, `rS: 4`, `rXS: 4`) as a `RadiusTokens` object. No raw `dp` for corner shapes.
+- [ ] Atmospheric layer per `design-review.md` §2.4 implemented: noise grain (pre-baked tile, `BlendMode.Overlay`, opacity 0.05–0.18) and fog drift (two animated radial gradients, 22s/28s alternate, via `rememberInfiniteTransition`). Both layers persist on nearly every surface inside the phone frame. **Atmospheric is the single visual system per `design-review.md` §7.3 — no flat counterpoint.**
+- [ ] Three shared Compose primitives built per `design-review.md` §7.3: `Surface` (glass + noise card), `Row` (key/value line), `ListCard` (selectable Surface variant). All other screens compose against these.
+- [ ] Each accent's allowed scope per `design-guidelines.md` §"Where each accent lives" is encoded as Compose modifier conventions (e.g., `.glowLeftRule()` for active patterns, `.vaporHaloOnRecording()` for `MistHero`, `.pulseDotForReady()` for `LOCAL · READY`, `.errorFillForDestructive()` for wipe confirmations).
 - [ ] No light theme. Dark mode is the only theme. The Compose theme does not branch on `isSystemInDarkTheme()`.
+- [ ] Motion: only functional state transitions and the atmospheric drift from `design-review.md` §2.5 keyframe set (`vesPulse`, `vesIn`, `vesFade`, `vesSlide`, `vesShimmer`, `vesBreath`, `vesSpin`, `vesDrift1`, `vesDrift2`). Material 3 expressive motion suppressed.
 - [ ] Predictive back gestures are wired per `design-guidelines.md` §"Shape, Spacing, Motion" — restrained, native, no fighting the system default.
 
 **Notes / risks:** Material 3's expressive features default to bolder motion and shapes. We use the system but suppress expressivity per `design-guidelines.md`. If a Material 3 component has a "subtle" / "standard" / "expressive" variant, pick subtle/standard. No carousels, no FAB menus, no vertical floating toolbars unless they earn their keep.
@@ -50,12 +54,13 @@ Wrap the app in a coherent, dark, atmospheric UX that meets the 10-second judge 
 
 ### Story 4.2 — Onboarding flow
 
-**As** a first-time user, **I need** to walk through the 7 onboarding screens per `ux-copy.md` §Onboarding without dead-ends, **so that** I can pick a persona, grant mic permission, see a typed-fallback affordance, and start the model download — and so that judges installing the APK have a credible first 60 seconds.
+**As** a first-time user, **I need** to walk through the 8 onboarding screens per `ux-copy.md` §Onboarding without dead-ends, **so that** I can pick a persona, grant mic and notification permissions, see a typed-fallback affordance, and start the model download — and so that judges installing the APK have a credible first 60 seconds.
 
 **Done when:**
 - [ ] Screen 1 — Persona pick: three persona cards (Witness default highlighted, Hardass, Editor) with the locked one-line descriptions per `ux-copy.md`. Tap-to-select + Continue.
 - [ ] Screen 2 — Local processing explainer: copy from `ux-copy.md` §"Screen 2". One primary action.
 - [ ] Screen 3 — Microphone permission: copy from `ux-copy.md` §"Screen 3". Allow + Skip-typing affordance. Denied path lands on the correct error state (Story 4.11).
+- [ ] Screen 3.5 — Notification permission per ADR-004 §"Permission Flow." Copy from `ux-copy.md` §"Screen 3.5" (added alongside this story). On Android 13+, requests `POST_NOTIFICATIONS` runtime permission. Allow + Skip affordances. Skip path is supported: extractions only complete while the app is in the foreground; cold-start sweep from ADR-001 Q3 recovers the rest. No degraded copy on skip.
 - [ ] Screen 4 — Typed fallback explainer: copy from `ux-copy.md` §"Screen 4".
 - [ ] Screen 5 — Wi-Fi check: branches per `ux-copy.md` §"Screen 5" based on connectivity.
 - [ ] Screen 6 — Model download: hands off to Story 4.3.
@@ -64,7 +69,7 @@ Wrap the app in a coherent, dark, atmospheric UX that meets the 10-second judge 
 - [ ] Onboarding state survives backgrounding — closing the app between screens resumes at the same step.
 - [ ] After completion, opening the app skips onboarding and lands directly on Capture.
 
-**Notes / risks:** No "Welcome to your journey" copy anywhere, ever. `ux-copy.md` §"Things to NEVER Write" is the litmus test.
+**Notes / risks:** No "Welcome to your journey" copy anywhere, ever. `ux-copy.md` §"Things to NEVER Write" is the litmus test. Screen 3.5 copy must clear the same bar — single-status framing, not "we'll keep you posted." The notification permission and channel registration plumbing land in Phase 2 Story 2.6.5; this story owns the user-facing ask flow only.
 
 ---
 
@@ -91,34 +96,55 @@ Wrap the app in a coherent, dark, atmospheric UX that meets the 10-second judge 
 **As** the user (and as a judge taking the 10-second test), **I need** the app shell to surface a local-AI status indicator that's always visible (or one-tap accessible from settings), **so that** "this is local AI" is legible at a glance, not hidden in a deep menu.
 
 **Done when:**
-- [ ] App shell shows a compact `LOCAL · READY` (or `· LOADING` / `· DOWNLOADING` / `· STALLED`) status indicator per `design-guidelines.md` §"Capture Screen / Status row" and `ux-copy.md` §"Capture Screen / Status row".
-- [ ] The status indicator uses the cool-blue active accent only when in the active state per `design-guidelines.md` §"Where each accent lives". `LOCAL · READY` (idle, model loaded) uses the system convention green dot per the locked palette discussion (system status indicators stay system colors).
-- [ ] Tapping the status indicator opens the Local Model Status full screen, reachable from settings as well per `ux-copy.md` §"Local Model Status".
+- [ ] App shell uses the `AppShellTop` primitive per `poc/design-review.md` §3.2. Status pill renders the `modelState` string (`ready` / `downloading` / `stalled` / `updating` / `off`) per `ux-copy.md` §"Capture Screen / Status row".
+- [ ] `pulse` token (`#38A169`) drives the `LOCAL · READY` dot when `modelState=ready` (the dot glows per `design-review.md` §3.2). `vapor` (`#2563EB`) drives the dot during active recording or active downloading state. Other states use neutral `mist` until they need an accent.
+- [ ] Tapping the status pill dispatches the `vestige:open-status` event (per `design-review.md` §3.2) and opens the Local Model Status full screen. Listener is scoped post-onboarding only; the pill is non-interactive (`interactive=false`) during onboarding to prevent first-run trap.
 - [ ] Full screen shows: model name (`Gemma 4 E4B`), runtime (`Running locally`), version, on-device storage size, plus action affordances `Re-download model` / `Delete model` per `ux-copy.md` §"Local Model Status — Settings actions".
-- [ ] Re-download confirms with the destructive flow per `ux-copy.md` §"Re-download model" (purple accent on confirm). Delete model confirms with `ux-copy.md` §"Delete model".
+- [ ] Re-download confirms with the destructive flow per `ux-copy.md` §"Re-download model" (`error` token on confirm). Delete model confirms with `ux-copy.md` §"Delete model".
 - [ ] Status accurately reflects state across all transitions (loading → ready, ready → downloading on re-download, downloading → ready on success, etc.).
+- [ ] The in-app `LOCAL · READY` status indicator and the transient ADR-004 system-shade notification serve different roles and must not visually duplicate each other. The indicator is the always-visible in-app surface; the notification is a system-shade transient that only appears during active extraction work (`extraction_status=RUNNING`). No system-shade `LOCAL · READY` notification when nothing is running, and no in-app icon that says "background extraction running" while the notification already does.
 
 **Notes / risks:** This is a 10-second-judge-test feature. If a judge installs the APK and never sees `LOCAL · READY` in their first minute of the demo video, the local-AI claim is harder to land verbally. The indicator earns its persistence.
 
 ---
 
-### Story 4.5 — Capture screen polish
+### Story 4.4.5 — Lifecycle fallback evaluation gate
 
-**As** the user during a session, **I need** the polished capture screen per `design-guidelines.md` §"Capture Screen" — record button states, live waveform during recording, chunk boundary indicator, transcript with the locked muted-user / primary-model treatment — **so that** the demo's primary surface lands and recording feels alive instead of a static button on a dark background.
+**As** the AI implementor at the end of Phase 4 day 1, **I need** to evaluate the conditional foreground service state machine (Phase 2 Story 2.6.5) against the ADR-004 §"Fallback Trigger" criteria, **so that** if the state machine has bugs or eats more time than the Phase 4 budget allows, we switch to the Option 1 always-on fallback before it derails the rest of Phase 4.
 
 **Done when:**
-- [ ] Record button per `design-guidelines.md` §"Record button":
-  - Idle: outlined ring, neutral cool gray.
-  - Active recording: filled with electric blue `#2563EB`, with a live blue-tinted amplitude waveform rendered around or above the button.
-  - Approaching 30s chunk boundary (~25s): thin progress arc around the button.
-  - Touch target ≥72px.
-- [ ] Conversation transcript per `design-guidelines.md` §"Conversation transcript":
-  - Vertical scroll, chronological.
-  - User turns: monospace `YOU` label + transcribed text in muted/dimmed tone (`MistGray`).
-  - Model turns: monospace `WITNESS` (or active persona name) label + body text in `PrimaryText` weight.
+- [ ] At end of Phase 4 day 1 (or when Story 2.6.5 first surfaces a bug blocking Phase 4 UI work, whichever comes first), evaluate against ADR-004 §"Fallback Trigger" criteria 1–3.
+- [ ] If none of the trigger criteria fire: record `Trigger recorded: not invoked, evaluated {date}` inline in ADR-004 and proceed with the conditional state machine.
+- [ ] If any trigger criterion fires: record `Trigger recorded: invoked {date}, reason: {one-line reason}` inline in ADR-004 and apply the §"Fallback action" steps:
+  - Replace conditional state machine with `startForeground()` in `Application.onCreate()`.
+  - Replace `stopForeground()` calls with no-ops.
+  - Update notification text to `Local model active.` (and update `ux-copy.md` §"Loading States" + Screen 3.5 onboarding copy in the same change).
+- [ ] If the fallback fires, also update Story 4.2 Screen 3.5 done-when bullet copy and `ux-copy.md` §"Screen 3.5" to match the always-on framing.
+- [ ] Phase 4 day 1 ends with the lifecycle decision recorded one way or the other — no third state of "we'll figure it out later."
+
+**Notes / risks:** This is a small but mandatory gate. The point is to prevent the state-machine implementation from quietly slipping into Phase 4 day 3 while UI work waits. If it's broken, switch fast and ship with the simpler model. ADR-004 explicitly designed for this fallback — using it is on-brand, not a regression.
+
+---
+
+### Story 4.5 — Capture screen polish
+
+**As** the user opening the capture screen, **I need** the polished capture surface per `design-guidelines.md` §"Capture Screen" + `poc/screenshots/capture.png` — `MistHero` capture stone, hero title, live `AudioMeter` during recording, 30 s cap indicator, entry transcript with the locked muted-user / primary-model treatment — **so that** the demo's primary surface lands and recording feels alive instead of a static button on a dark background.
+
+**Done when:**
+- [ ] `MistHero` primitive per `poc/design-review.md` §3.3 + `design-guidelines.md` §"Component Conventions / MistHero":
+  - 168px hero, five-layer composition (outer halo, conic moonstone ring, frosted-glass body, inner noise, center mark).
+  - Idle: stone with subtle internal gradient, no outer halo amplitude.
+  - Active recording: outer halo scales with audio `level`, `vapor` (`#2563EB`) tint on halo and ring, `AudioMeter` renders below.
+  - Post-stop / review: halo collapses to outline state with thin `vapor` rim. `Reading the entry.` placeholder shows in transcript area.
+  - Approaching 30s chunk boundary (~25s): thin progress arc on the ring, no copy.
+- [ ] Hero title slot above `MistHero` renders an editorial italic line (`Newsreader`) — pulled from `ux-copy.md` §Capture Screen, never invented inline. Example from `poc/screenshots/capture.png`: `What lingered from yesterday?`
+- [ ] Mono tagline strip below `MistHero` per `poc/screenshots/capture.png`: directive (`HOLD THE STONE · SPEAK`-style) and privacy tagline (`30s chunks · audio discarded after extraction`-style). `JetBrains Mono`, eyebrow scale. Strings from `ux-copy.md`.
+- [ ] Entry transcript per `design-guidelines.md` §"Entry transcript" (single-turn-per-capture per the STT-B v1 scope choice — exactly one USER turn + one MODEL turn per entry, no scroll across multiple exchanges):
+  - User transcription: `JetBrains Mono` `YOU` label + transcribed text in `mist` tone.
+  - Model follow-up: `JetBrains Mono` `WITNESS` (or active persona name) label + body text in `ink` weight.
   - No chat bubbles. Left-rule indicators distinguish speakers.
 - [ ] Type affordance: small `Type` button at the bottom of the screen per `ux-copy.md` §"Capture Screen / Type affordance". Expanding opens a text input with placeholder `What just happened.` and a `Log entry` action.
-- [ ] Persona switcher chrome: top-right pill `WITNESS ▾` (or active persona) per `ux-copy.md` §"Capture Screen / Status row". Tapping opens the persona selector. Per-session override (Story 4.12) hooks into this.
+- [ ] Persona switcher chrome: top-right pill `WITNESS ▾` (or active persona) per `ux-copy.md` §"Capture Screen / Status row". Tapping opens the persona selector. Per-capture selection (Story 4.12) hooks into this — the chosen persona applies to the next capture's foreground call.
 - [ ] Patterns peek: card per `ux-copy.md` §"Capture Screen / Patterns peek" showing `{N} active patterns` with a one-line teaser. Empty state when none.
 - [ ] Footer metadata: `Last entry · {date} · {duration}` per `ux-copy.md` §"Capture Screen / Footer metadata". History link.
 - [ ] The dead-middle problem from earlier mockups is resolved: empty space carries faint mist-gradient atmosphere or surfaces ambient state (last entry summary, current pattern peek). No literal forgotten pixels.
@@ -150,15 +176,16 @@ Wrap the app in a coherent, dark, atmospheric UX that meets the 10-second judge 
 
 **Done when:**
 - [ ] Header shows: timestamp + template label.
-- [ ] Body shows: the full conversation transcript (user turns muted, model turns primary, same treatment as Story 4.5).
+- [ ] Body shows: the entry transcript (one USER turn + one MODEL turn per the v1 single-turn lifecycle, user transcription muted, model follow-up primary, same treatment as Story 4.5).
 - [ ] A "Tags" row below the transcript shows the model-extracted tags as quiet chips.
 - [ ] A "Observation" section shows the 1-2 per-entry observations (from Story 2.13) with their evidence references.
 - [ ] An overflow menu offers `Delete entry` (destructive flow per `ux-copy.md` §"Destructive Confirmations / Delete single entry").
 - [ ] Reading / Re-eval section is **deferred to Story 4.13** as P1 contingent.
 - [ ] Vocabulary chip cloud below the observation is **deferred to Story 4.13** if it ships at all (it ships only if STT-E passed; otherwise the observation copy carries the vocabulary observation in plain text).
 - [ ] Source-link integration: tapping a pattern source from Story 3.10's pattern detail navigates here and the entry is highlighted briefly.
+- [ ] Notification tap target deep-links here per ADR-004 §"Notification Contract": tapping the system-shade `Reading the entry.` notification opens this screen scrolled to the most recent entry whose `extraction_status` is non-terminal. Falls back to History if no in-flight entry exists at tap time (e.g., the user tapped the notification right as the keep-alive expired).
 
-**Notes / risks:** Don't show audio waveform or play-back controls — audio doesn't persist. The entry detail is the *text* view. Per `design-guidelines.md` §"Conversation transcript", the user's transcribed words show but never as a waveform.
+**Notes / risks:** Don't show audio waveform or play-back controls — audio doesn't persist. The entry detail is the *text* view. Per `design-guidelines.md` §"Entry transcript", the user's transcribed words show but never as a waveform.
 
 ---
 
@@ -174,7 +201,8 @@ Wrap the app in a coherent, dark, atmospheric UX that meets the 10-second judge 
   - Has entries, no patterns: `Nothing repeating yet.`
   - All dismissed: `All clear.`
   - Filter returns nothing: `Nothing matches.`
-- [ ] Pattern card uses the purple left-rule treatment per `design-guidelines.md` §"Pattern card" only on cards with `state=active`. Snoozed/resolved/dismissed cards lose the rule.
+- [ ] Pattern card uses the `glow` left-rule treatment per `design-guidelines.md` §"Pattern card" only on cards with `state=active`. Snoozed/resolved/dismissed cards lose the rule.
+- [ ] Pattern card embeds the `TraceBar` primitive per `poc/design-review.md` §3.4 (30 cells, lit cells = days the pattern showed up, full-height + glow on lit, 34% height + hairline on unlit). Single source of truth for "how often does this return" visual. Sourced from `Pattern.traceHits[]`.
 - [ ] Pattern action overflow menu uses the locked microcopy: `Dismiss` / `Snooze 7 days` / `Mark resolved`.
 - [ ] Snackbars after each action use `ux-copy.md` §"System Messages" copy with `Undo` affordance.
 - [ ] Pattern detail screen polished per `design-guidelines.md` §"Pattern Detail":
@@ -225,11 +253,11 @@ Wrap the app in a coherent, dark, atmospheric UX that meets the 10-second judge 
 
 ### Story 4.11 — Top three error states
 
-**As** the user, **I need** the three most-likely failure modes — model download fail/stall, inference timeout/fail, mic permission denied/unavailable — to render clear error states with retry affordances per `ux-copy.md` §"Error States", **so that** the most predictable failure paths in the demo (or in real use) don't end the session.
+**As** the user, **I need** the three most-likely failure modes — model download fail/stall, inference timeout/fail, mic permission denied/unavailable — to render clear error states with retry affordances per `ux-copy.md` §"Error States", **so that** the most predictable failure paths in the demo (or in real use) don't end the capture without a clear recovery path.
 
 **Done when:**
 - [ ] **Model download fail/stall**: handled within Story 4.3's flow. `ux-copy.md` strings: `Download stalled. Retry.` / `Network choked.`. Retry button works. After 3 failed attempts, shows the failed state and surfaces the user to settings → re-download.
-- [ ] **Inference timeout / fail**: appears in the conversation transcript when the foreground or background extraction call fails. `ux-copy.md` strings: `Model timed out. Try a shorter chunk.` / `Model couldn't read that. Try again.`. Retry option re-runs the same call.
+- [ ] **Inference timeout / fail**: appears in the entry transcript when the foreground or background extraction call fails. `ux-copy.md` strings: `Model timed out. Try a shorter chunk.` / `Model couldn't read that. Try again.`. Retry option re-runs the same call.
 - [ ] **Mic permission denied or unavailable**: capture screen shows `Mic permission required to record. Settings → Permissions.` per `ux-copy.md`. Tapping the deep-link opens system settings. If the mic is unavailable (hardware), shows `Mic unavailable. Try typing.`.
 - [ ] All three error states use the design tokens from Story 4.1 (no orange-warning convention; system status colors only).
 - [ ] Other error states from `ux-copy.md` §"Error States — catalog" are implemented as strings/handlers but get *unpolished* presentations (toast / generic dialog) only when naturally encountered. We polish only the top three for v1; the rest defer to v1.5 per the scope rule.
@@ -238,19 +266,21 @@ Wrap the app in a coherent, dark, atmospheric UX that meets the 10-second judge 
 
 ---
 
-### Story 4.12 — P1: Per-session persona override
+### Story 4.12 — P1: Per-capture persona selection
 
-**As** the user, **I need** to switch personas mid-session by tapping the persona dropdown chrome from Story 4.5 and the change to take effect on the next foreground call (without affecting prior turns), **so that** I can switch tones if Witness is being too gentle today without leaving capture.
+**Reframed from "P1: Per-session persona override"** by the STT-B v1 scope choice (see `adrs/ADR-005-stt-b-scope-and-v1-single-turn.md`, which amends `adrs/ADR-002-multi-lens-extraction-pattern.md` §"Multi-turn behavior"). The original story assumed mid-session persona switches on a multi-turn `CaptureSession`; v1 makes each `CaptureSession` single-use, so persona is selected *before* a fresh capture, not switched *during* an ongoing one.
+
+**As** the user, **I need** to choose a persona before each capture by tapping the persona dropdown chrome from Story 4.5, **so that** I can pick a different tone (Witness / Hardass / Editor) for an entry without leaving the capture screen and without affecting any prior entry's recorded persona.
 
 **Done when:**
-- [ ] Tapping the persona dropdown in the capture screen chrome opens a small selector (segmented control or list) with the three personas and a checkmark on the active one.
-- [ ] Selecting a different persona updates the session's active persona via Story 2.3's `setPersona(persona)` API.
-- [ ] The change takes effect on the next foreground call. Prior turns retain their original persona's voice.
-- [ ] The chrome label updates to reflect the new active persona (`WITNESS ▾` → `HARDASS ▾`).
-- [ ] The change does not persist as a default — that's a separate Settings action (Story 4.9). It's session-scoped.
-- [ ] Per-session override is **P1**: ships only if Phase 4 scope holds. If we're behind, this drops to v1.5 with the note "session always uses default persona; switch from Settings between sessions."
+- [ ] Tapping the persona dropdown in the capture screen chrome opens a small selector (segmented control or list) with the three personas and a checkmark on the currently-selected one.
+- [ ] Selecting a different persona updates the next capture's active persona — the UI constructs a fresh `CaptureSession(defaultPersona = selectedPersona)` when the user next taps record (Story 2.3's `setPersona(persona)` API can also be called on an idle session before `startRecording`; either path is acceptable).
+- [ ] The chrome label updates to reflect the newly-selected persona (`WITNESS ▾` → `HARDASS ▾`).
+- [ ] Selection does not affect prior entries. Each saved entry's `Turn.persona` records the persona that authored it (Story 2.3 invariant).
+- [ ] The selection does not persist as a default — that's a separate Settings action (Story 4.9). It's per-capture-scoped.
+- [ ] Per-capture selection is **P1**: ships only if Phase 4 scope holds. If we're behind, this drops to v1.5 with the note "captures always use the Settings default persona; switch from Settings between captures."
 
-**Notes / risks:** Story 2.3 already exists and works at the API level. This is purely UI plumbing.
+**Notes / risks:** Story 2.3 (post-fallback) already exposes the per-capture persona API. This is purely UI plumbing. The "switch mid-session" behavior the original story assumed no longer exists at the lifecycle level — the persona selector applies prospectively, not retroactively.
 
 ---
 
@@ -262,7 +292,8 @@ Wrap the app in a coherent, dark, atmospheric UX that meets the 10-second judge 
 
 **Done when:**
 - [ ] Entry detail screen shows a collapsed "Reading" section by default. Expanding opens the per-lens output view per `design-guidelines.md` §"Pattern Detail" (similar treatment).
-- [ ] An action affordance `Re-read` triggers a fresh 3-lens pass via Story 2.6's background worker on the existing `entry_text`.
+- [ ] An action affordance `Re-read this entry` (label per `ux-copy.md` §"Re-eval / Reading") triggers a fresh 3-lens pass via Story 2.6's background worker on the existing `entry_text`.
+- [ ] **Re-eval cost confirmation per `adrs/ADR-002-multi-lens-extraction-pattern.md` §Q3:** on the *second* re-read tap within 60 seconds, show the soft-confirm copy `Costs ~30s of inference. Continue?` from `ux-copy.md` §"Re-eval / Reading" before triggering another pipeline pass. First tap of the session goes through without the prompt.
 - [ ] During re-read, a placeholder per `ux-copy.md` §"Loading States — Roast generation" or similar shows. The user can leave the screen and the work continues in the background.
 - [ ] When the re-read completes, the per-lens outputs are shown side-by-side with the original convergence-resolved fields. Differences are highlighted.
 - [ ] User affordances: `Apply this read` (replaces the saved canonical fields with the new ones) or `Keep original` (discards the new read).
@@ -280,11 +311,11 @@ Wrap the app in a coherent, dark, atmospheric UX that meets the 10-second judge 
 **As** the user, **I need** a Roast me bottom sheet from the patterns screen that produces 3-5 short, persona-flavored cuts on my full history per `design-guidelines.md` §"The Roast" and `ux-copy.md` §"The Roast", **so that** I have an on-demand "tell me what's repeating, sharper" moment that's distinct from the patterns list's data view.
 
 **Done when:**
-- [ ] Tapping `Roast me` from Story 4.8's pattern list header opens a Material 3 Modal Bottom Sheet per `design-guidelines.md` §"The Roast".
-- [ ] Sheet header shows `{Persona} · Roast · {date}`.
+- [ ] Tapping `Roast me` from Story 4.8's pattern list header opens the `Sheet` primitive per `poc/design-review.md` §3.1 (`ModalBottomSheet` in Compose, scrim with backdrop blur, `vesSlide` in). `glow` accent.
+- [ ] Sheet header shows `{Persona} · Roast · {date}` in `JetBrains Mono` per design-review §2.2.
 - [ ] Body shows 3-5 lines (per `design-guidelines.md` §"The Roast — body") generated by a single model call composing the pattern data + persona system prompt with the explicit Roast tone instructions.
 - [ ] Lines are *cuts*, not data recitations per the test in `design-guidelines.md` §"The Roast — distinction" — *"Tuesday meetings have a body count"* not *"Tuesday meetings: four entries"*.
-- [ ] Footer: `Drawn from {N} entries · Last 30 days`, plus `Close` and `Wipe and start over` (destructive — purple accent) actions.
+- [ ] Footer: `Drawn from {N} entries · Last 30 days`, plus `Close` action only. Wipe-and-start-over is **not** in the Roast footer per `ux-copy.md` §"The Roast (modal bottom sheet)" — destructive flows live in Settings, not Roast.
 - [ ] Roast is ephemeral — not saved as a separate artifact. Regenerates fresh on each tap.
 - [ ] Insufficient data fallback: if fewer than 10 entries, show `Insufficient data. Come back when you've left more behind.` per `ux-copy.md` §"The Roast — empty fallback".
 
@@ -297,7 +328,7 @@ Wrap the app in a coherent, dark, atmospheric UX that meets the 10-second judge 
 - No demo storyboard work — Phase 5 owns it.
 - No agentic tool-calling beat anywhere — cut entirely.
 - No light theme — dark only.
-- No notifications, reminders, or scheduled patterns surface — `backlog.md` candidates.
+- No notifications beyond the single ADR-004 `vestige.local_processing` channel from Phase 2 Story 2.6.5 (Story 4.2 Screen 3.5 owns the user-facing permission ask). Reminders, scheduled-pattern surfaces, and any other notification channels are `backlog.md` candidates.
 - No filter chips on history list — v1 has chronological only; filter by tag/template/date is P2.
 - No vocabulary chip cloud on entry detail unless STT-E passed (Story 3.4) and Story 4.13 ships.
 - No advanced settings (pattern threshold, cooldown tuning, default-input toggle, transcription-visibility toggle). Per the PRD note, these are removed from v1 `ux-copy.md`.
@@ -312,7 +343,8 @@ If a Phase 4 story starts pulling a backlog entry or a Phase 5/6 task, stop. Ref
 
 Phase 5 starts when all the following are true:
 
-- [ ] Stories 4.1 – 4.11 are Done. (Stories 4.12 – 4.14 are P1; their state is recorded as Done or Punted-to-v1.5 with a reason.)
+- [ ] Stories 4.1 – 4.11 plus 4.4.5 are Done. (Stories 4.12 – 4.14 are P1; their state is recorded as Done or Punted-to-v1.5 with a reason.)
+- [ ] ADR-004 lifecycle decision recorded inline in the ADR (conditional state machine kept, or fallback applied with date + reason).
 - [ ] Onboarding flow runs end-to-end on a fresh install on the reference S24 Ultra.
 - [ ] Capture screen, History list, Entry Detail, Pattern List, Pattern Detail, Local Model Status, and Settings all load and navigate correctly.
 - [ ] Top 3 error states render correctly when triggered intentionally.

@@ -243,6 +243,18 @@ Pretending neither risk exists, the pattern is the right shape for the product a
 
 ---
 
+## Multi-turn behavior — STT-B device-test record
+
+**Round 1 (2026-05-09, S24 Ultra, E4B CPU, 3 personas × 4 turns = 12 turns):** harness reported `retention=1.0/3 sessions`. Investigation showed the manifest's anchors for turns 3 and 4 included substrings (`Nora`, `outline`, `risk section`) first introduced in those turns' own audio — Gemma echoing this-turn vocabulary in the follow-up tripped the substring matcher and looked like context retention. False positive; harness output was misleading.
+
+**Round 2 (2026-05-09, same device, corrected manifest):** anchors restricted to substrings introduced in earlier turns AND absent from the current turn's audio per `docs/sample-data-scenarios.md` §STT-B. Result: `retention=0.0/3 sessions`. Across all 9 turn-≥2 lookups, **zero cross-turn anchors hit**. Read of every follow-up: each probe quotes only the audio Gemma just heard; `launch doc` / `standup` / `the doc` / `roadmap call` are never referenced after introduction. The `## RECENT TURNS` JSON history block is composed and sent (verified in `composeSystemPrompt`); E4B receives it and ignores it on this prompt design.
+
+**Round 3 (in flight, 2026-05-09 — explicit instruction try):** added `RECENT_TURNS_INSTRUCTION` to `ForegroundInference` — a prose block emitted between `## RECENT TURNS` and the JSON lines telling the model the JSON below is conversation context and that follow-ups must explicitly name prior facts when the new audio relates to them. Same audio, same corrected manifest re-run pending. If round 3 still produces `retention=0.0`, the Story 2.4 fallback fires (drop multi-turn from v1, single-turn becomes the v1 path, dependent docs and stories rewrite).
+
+Latency record across all rounds, E4B CPU on S24 Ultra: per-turn 32.7–43.3 s. The ADR-002 §"Latency budget" 1–5 s target remains unmet; latency tuning is Phase 4/5 territory and does not gate the STT-B existential verdict.
+
+---
+
 ## Action Items
 
 1. [ ] STT-B — verify foreground call returns transcription + follow-up reliably as structured output across multi-turn. Output decision: structured JSON vs markdown-with-headers.

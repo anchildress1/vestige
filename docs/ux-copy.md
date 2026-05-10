@@ -21,7 +21,7 @@ Keep these consistent. Don't mix.
 
 ---
 
-## Onboarding (7 screens, sequential)
+## Onboarding (8 screens, sequential)
 
 ### Screen 1 — Pick a persona
 
@@ -76,6 +76,30 @@ Secondary action:
 
 If denied:
 > Mic permission required to record. Settings → Permissions.
+
+---
+
+### Screen 3.5 — Notification permission
+
+Header:
+> **One status notification.**
+
+Body:
+> Vestige briefly shows a status when it's working locally on an entry. That's the only notification it will ever send. It disappears when work is done.
+
+Primary action:
+> **Allow notifications**
+
+Secondary action:
+> **Skip — work runs in foreground only**
+
+If skipped:
+> *(no error state — extractions only complete while the app is in the foreground; the cold-start sweep recovers the rest)*
+
+Notification text when posted (per `adrs/ADR-004-app-backgrounding-and-model-handle-lifecycle.md` §"Notification Contract"):
+> Reading the entry.
+
+This string is the same one used for mid-capture inference loading copy (see §"Loading States" below — single source of truth for both surfaces).
 
 ---
 
@@ -255,7 +279,7 @@ Header:
 > **Persona.**
 
 Subhead:
-> Default voice. Changes how the model talks back. You can override per session.
+> Default voice. Changes how the model talks back. You can override per capture.
 
 Persona descriptions (same as onboarding):
 - **Witness** — Observes. Names the pattern. Keeps quiet otherwise.
@@ -395,7 +419,7 @@ Diff actions:
 | Audio recording failed | `Recording failed. Try again.` |
 | Entry save failed | `Entry not saved. Try again.` |
 | Pattern detection failed | `Pattern read failed. Patterns reload on next entry.` |
-| Background killed mid-session | `Session interrupted. Last entry saved up to {timestamp}.` |
+| Background killed mid-capture | `Capture interrupted. Last entry saved up to {timestamp}.` |
 | Device thermal throttle | `Device running hot. Inference may be slow.` |
 | Explicit self-harm help request | `Vestige is not a crisis tool. If you might hurt yourself or someone else, contact local emergency services or a crisis hotline now.` |
 
@@ -497,7 +521,7 @@ Use sparingly. Only for actions where the user needs confirmation that something
 | Action | Snackbar |
 |---|---|
 | Entry saved | *(no snackbar — the transcript appearing is the confirmation)* |
-| Persona changed for session | `Active persona: {name}.` |
+| Persona changed for next capture | `Active persona: {name}.` |
 | Pattern dismissed | `Dismissed.` *(with Undo)* |
 | Pattern snoozed | `Snoozed 7 days.` *(with Undo)* |
 | Pattern marked resolved | `Marked resolved.` *(with Undo)* |

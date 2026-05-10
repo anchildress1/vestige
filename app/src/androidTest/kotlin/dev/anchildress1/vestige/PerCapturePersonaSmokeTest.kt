@@ -23,42 +23,32 @@ import java.nio.ByteBuffer
 import java.nio.ByteOrder
 
 /**
- * Story 2.3 — persona-switching smoke test (manual, visual inspection).
+ * Per-capture persona smoke test (manual, on-device, visual inspection).
  *
- * Drives the full Story 2.2 foreground path three times inside a single [CaptureSession], swapping
- * persona between turns via [CaptureSession.setPersona] — Witness → Hardass → Editor — and
- * verifies that:
- *  - each turn's follow-up is non-blank and pairwise-different from the others;
- *  - prior model turns retain their authoring persona (Story 2.3 done-when 2);
- *  - the same audio buffer fed through all three personas produces visibly different follow-ups
- *    on logcat tag `[VestigePersonaSwitch]` (Story 2.3 done-when 5).
+ * Drives the foreground path three times — one fresh [CaptureSession] per persona — against
+ * the same audio buffer. Asserts each follow-up is non-blank, pairwise-different, and the
+ * recorded `Turn.persona` matches the capture's persona. Operator inspects logcat for tone.
  *
- * The follow-ups are stochastic; the assertion is "different strings", not a fixed shape. The
- * human running this test compares the two logcat blocks visually.
+ * Push artifacts then run:
  *
- * Prerequisites — adb-push the model and a sample WAV (16 kHz mono PCM_S16LE, ≤ 30 s) to the
- * device's `Android/data/.../files` directory:
- *
- *   adb push gemma-4-E4B-it.litertlm <BASE>/models/
- *   adb push sample.wav <BASE>/audio/
- *
- * Then run:
- *
+ *   adb push gemma-4-E4B-it.litertlm /data/local/tmp/
+ *   adb push sample.wav              /data/local/tmp/
  *   ./gradlew :app:connectedDebugAndroidTest \
- *     -Pandroid.testInstrumentationRunnerArguments.modelPath=<BASE>/models/gemma-4-E4B-it.litertlm \
- *     -Pandroid.testInstrumentationRunnerArguments.audioPath=<BASE>/audio/sample.wav
+ *     -PmodelPath=/data/local/tmp/gemma-4-E4B-it.litertlm \
+ *     -PaudioPath=/data/local/tmp/sample.wav \
+ *     -Pandroid.testInstrumentationRunnerArguments.class=dev.anchildress1.vestige.PerCapturePersonaSmokeTest
  *
- * If either argument is missing the test is skipped via [assumeTrue] so CI without the
- * artifacts stays green.
+ * Missing args → [assumeTrue] skips so CI without artifacts stays green.
  */
 @RunWith(AndroidJUnit4::class)
-class PersonaSwitchSessionSmokeTest {
+class PerCapturePersonaSmokeTest {
 
     @Test
-    fun setPersona_acrossThreeTurns_producesDivergentFollowUps() = runBlocking {
+    fun threePersonas_eachInOwnSession_produceDivergentFollowUps() = runBlocking {
         val args = InstrumentationRegistry.getArguments()
         val modelPath = args.getString("modelPath")
         val audioPath = args.getString("audioPath")
+        val latencyBudgetMs = args.getString("latencyBudgetMs")?.toLongOrNull() ?: DEFAULT_LATENCY_BUDGET_MS
         assumeTrue("modelPath instrumentation argument not provided", modelPath != null)
         assumeTrue("audioPath instrumentation argument not provided", audioPath != null)
         val modelFile = File(modelPath!!)
@@ -84,16 +74,13 @@ class PersonaSwitchSessionSmokeTest {
         engine.use {
             it.initialize()
             val inference = ForegroundInference(it, cacheDir)
-            val session = CaptureSession()
 
-            val followUps = Persona.entries.associateWith { persona ->
-                if (session.activePersona != persona) session.setPersona(persona)
-                assertEquals(persona, session.activePersona)
-                runOneTurn(inference, session, chunk, persona.name)
+            val captures = Persona.entries.associateWith { persona ->
+                runOneCaptureUnderPersona(inference, chunk, persona)
             }
 
-            assertPairwiseDifferent(followUps)
-            assertHistoryPreservesAuthoringPersona(session, expectedOrder = Persona.entries)
+            assertPairwiseDifferent(captures.mapValues { (_, capture) -> capture.followUp })
+            assertWithinLatencyBudget(captures, latencyBudgetMs)
         }
     }
 
@@ -113,46 +100,53 @@ class PersonaSwitchSessionSmokeTest {
         }
     }
 
-    private fun assertHistoryPreservesAuthoringPersona(session: CaptureSession, expectedOrder: List<Persona>) {
-        val modelTurns = session.transcript.turns.filter { turn -> turn.speaker == Speaker.MODEL }
-        assertEquals(expectedOrder.size, modelTurns.size)
-        expectedOrder.forEachIndexed { index, persona ->
-            assertEquals(
-                "Turn $index model persona must remain ${persona.name} — setPersona does not rewrite history",
-                persona,
-                modelTurns[index].persona,
+    /**
+     * Drive one fresh [CaptureSession] under [persona]. Returns the follow-up text + measured
+     * per-call latency for the caller's divergence + budget assertions.
+     */
+    private suspend fun runOneCaptureUnderPersona(
+        inference: ForegroundInference,
+        chunk: AudioChunk,
+        persona: Persona,
+    ): CaptureResult {
+        val session = CaptureSession(defaultPersona = persona)
+        assertEquals(persona, session.activePersona)
+
+        session.startRecording()
+        session.submitForInference()
+        val result = inference.runForegroundCall(chunk, session.activePersona)
+        assertTrue("${persona.name} capture must succeed; was $result", result is ForegroundResult.Success)
+        val success = result as ForegroundResult.Success
+        session.recordTranscription(success.transcription)
+        session.recordModelResponse(success.followUp, success.persona)
+
+        val modelTurn = session.transcript.turns.single { it.speaker == Speaker.MODEL }
+        assertEquals("Recorded model turn must carry the capture's persona", persona, modelTurn.persona)
+
+        android.util.Log.i(TAG, "=== ${persona.name} follow-up (${success.elapsedMs}ms) ===")
+        android.util.Log.i(TAG, success.followUp)
+        return CaptureResult(followUp = success.followUp, elapsedMs = success.elapsedMs)
+    }
+
+    /**
+     * Default budget (60_000 ms) catches a ~2× regression past the documented ~24–33 s E4B CPU
+     * baseline without failing on the unmet 1–5 s ADR-002 target. Override with
+     * `-PlatencyBudgetMs=<ms>`.
+     */
+    private fun assertWithinLatencyBudget(captures: Map<Persona, CaptureResult>, latencyBudgetMs: Long) {
+        val overruns = captures.filterValues { it.elapsedMs > latencyBudgetMs }
+        if (overruns.isNotEmpty()) {
+            val detail = overruns.entries.joinToString(", ") { (p, c) -> "${p.name}=${c.elapsedMs}ms" }
+            error(
+                "Per-capture latency exceeded ${latencyBudgetMs}ms: $detail. " +
+                    "Re-run on a quiescent device before treating as a hard fail.",
             )
         }
     }
 
-    /**
-     * Drives one turn through the Story 2.2 foreground path against [session]'s active persona,
-     * advances the state machine through TRANSCRIBED → RESPONDED → IDLE, logs the follow-up
-     * under [label], and returns the follow-up text for the caller to compare across turns.
-     */
-    private suspend fun runOneTurn(
-        inference: ForegroundInference,
-        session: CaptureSession,
-        chunk: AudioChunk,
-        label: String,
-    ): String {
-        session.startRecording()
-        session.submitForInference()
-        val result = inference.runForegroundCall(chunk, session.transcript, session.activePersona)
-        assertTrue("$label turn must succeed; was $result", result is ForegroundResult.Success)
-        val success = result as ForegroundResult.Success
-        session.recordTranscription(success.transcription)
-        session.recordModelResponse(success.followUp, success.persona)
-        session.acknowledgeResponse()
-        android.util.Log.i(TAG, "=== $label follow-up ===")
-        android.util.Log.i(TAG, success.followUp)
-        return success.followUp
-    }
+    private data class CaptureResult(val followUp: String, val elapsedMs: Long)
 
-    /**
-     * Reads a mono WAV (PCM_S16LE or IEEE_FLOAT) and returns normalized float samples. Mirrors
-     * the parser in `SttAAudioPlumbingTest` — kept inline so this smoke test stays a single file.
-     */
+    /** Mono WAV reader (PCM_S16LE or IEEE_FLOAT). Inlined; mirrors `SttAAudioPlumbingTest`. */
     private fun readMonoFloatWavSamples(file: File): FloatArray {
         val buf = ByteBuffer.wrap(file.readBytes()).order(ByteOrder.LITTLE_ENDIAN)
         buf.position(RIFF_WAVE_PREFIX_BYTES)
@@ -199,7 +193,8 @@ class PersonaSwitchSessionSmokeTest {
     }
 
     private companion object {
-        const val TAG = "VestigePersonaSwitch"
+        const val TAG = "VestigePerCapturePersona"
+        const val DEFAULT_LATENCY_BUDGET_MS = 60_000L
         const val RIFF_WAVE_PREFIX_BYTES = 12
         const val CHUNK_HEADER_BYTES = 8
         const val CHUNK_ID_BYTES = 4

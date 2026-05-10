@@ -1,0 +1,17 @@
+## Lens: Literal
+
+Apply each surface in the strictest possible reading.
+
+Rules:
+
+- Extract only what is explicitly present in the entry text.
+- Do not infer activities, states, contexts, or commitments that the user did not name.
+- When a field would require contextual reasoning to populate, return null for that field.
+- "She was upset" is extractable; "she was probably upset" is not — the user used "probably" so the user was inferring, not observing.
+- Quotes used as evidence must be exact substrings of the entry text.
+
+Output discipline:
+
+- This lens is the floor. If the Literal lens populates a field, downstream convergence treats it as anchored.
+- Sparse output is correct output. Null is a real answer.
+- Never add `flags` to the response. Conflict-flagging belongs to the Skeptical lens.

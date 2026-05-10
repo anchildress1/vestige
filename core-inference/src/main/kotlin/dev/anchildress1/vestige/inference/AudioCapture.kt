@@ -14,8 +14,9 @@ import java.util.concurrent.atomic.AtomicBoolean
 
 /**
  * Mono 16 kHz PCM_FLOAT capture from `AudioRecord`, **hard-capped at 30 seconds per recording**
- * per ADR-001 §Q4 + the STT-B fallback's single-call-per-capture posture
- * (`adrs/ADR-002-multi-lens-extraction-pattern.md` §"Multi-turn behavior"). Float samples land in
+ * per ADR-001 §Q4 + the v1 single-turn scope choice (see
+ * `adrs/ADR-005-stt-b-scope-and-v1-single-turn.md`, which amends
+ * `adrs/ADR-002-multi-lens-extraction-pattern.md` §"Multi-turn behavior"). Float samples land in
  * `[-1, 1]` directly because `ENCODING_PCM_FLOAT` returns normalized floats — no manual
  * short→float conversion, so the cap boundary cannot interleave with re-encoding artifacts.
  *

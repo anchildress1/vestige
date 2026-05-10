@@ -62,7 +62,7 @@ Each entry runs through a **3-lens × 5-surface** extraction pipeline. Three len
 - Skeptical flags conflict even when others agree → **canonical with conflict marker**
 
 **Two-tier processing:**
-- *Foreground:* fast pass returns transcription + follow-up question only. **Single-turn-per-capture** as a v1 scope choice (the STT-B prompt-stuffing pattern was tested and produced retention=0.0; the LiteRT-LM SDK's stateful Conversation path was not measured — see `adrs/ADR-002-multi-lens-extraction-pattern.md` §"Multi-turn behavior"). Each tap of record begins a fresh exchange and the model never sees prior turns.
+- *Foreground:* fast pass returns transcription + follow-up question only. **Single-turn-per-capture** as a v1 scope choice (the STT-B prompt-stuffing pattern was tested and produced retention=0.0; the LiteRT-LM SDK's stateful Conversation path was not measured — see `adrs/ADR-005-stt-b-scope-and-v1-single-turn.md` (amends `adrs/ADR-002-multi-lens-extraction-pattern.md` §"Multi-turn behavior")). Each tap of record begins a fresh exchange and the model never sees prior turns.
 - *Background:* 3-lens multi-pass runs after the chunk is acknowledged. Canonical extraction populates over the next 30–90 seconds.
 
 ## Schema (minimal v1)

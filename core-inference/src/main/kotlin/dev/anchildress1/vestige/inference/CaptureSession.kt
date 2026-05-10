@@ -5,13 +5,14 @@ import java.time.Clock
 
 /**
  * Single-use turn-by-turn state for one capture per `phase-2-core-loop.md` §Story 2.1 (v1 single-
- * turn scope per the STT-B test boundary — see `adrs/ADR-002-multi-lens-extraction-pattern.md`
- * §"Multi-turn behavior"). One [CaptureSession] models one entry's worth of recording-and-response:
- * the user records, Gemma transcribes + answers, the entry saves, done. Subsequent recordings
- * construct a fresh [CaptureSession] — the v1 lifecycle never loops back for a second turn. The
- * STT-B prompt-stuffing pattern was tested and produced retention=0.0; the LiteRT-LM SDK's
- * stateful Conversation path was not measured. v1 ships single-use sessions for simplicity, not
- * because multi-turn was conclusively impossible.
+ * turn scope per the STT-B test boundary — see `adrs/ADR-005-stt-b-scope-and-v1-single-turn.md`,
+ * which amends `adrs/ADR-002-multi-lens-extraction-pattern.md` §"Multi-turn behavior"). One
+ * [CaptureSession] models one entry's worth of recording-and-response: the user records, Gemma
+ * transcribes + answers, the entry saves, done. Subsequent recordings construct a fresh
+ * [CaptureSession] — the v1 lifecycle never loops back for a second turn. The STT-B
+ * prompt-stuffing pattern was tested and produced retention=0.0; the LiteRT-LM SDK's stateful
+ * Conversation path was not measured. v1 ships single-use sessions for simplicity, not because
+ * multi-turn was conclusively impossible.
  *
  * State machine:
  * ```

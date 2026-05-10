@@ -25,6 +25,7 @@ import java.util.concurrent.ConcurrentHashMap
  *    handoff that works on LiteRT-LM 0.11.0 per ADR-001 §Q4 STT-A record).
  *
  * **Single-turn-per-capture as a v1 scope choice** (see
+ * `adrs/ADR-005-stt-b-scope-and-v1-single-turn.md`, which amends
  * `adrs/ADR-002-multi-lens-extraction-pattern.md` §"Multi-turn behavior"). The prompt no longer
  * carries any prior-turn context. Three on-device rounds in May 2026 confirmed that under the
  * prompt-stuffing pattern (fresh `engine.createConversation()` per turn + history crammed into

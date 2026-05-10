@@ -464,7 +464,7 @@ Use the `error` token (`#B3261E` per `poc/design-review.md` §2.1) on the destru
 Compose translation notes for `MistHero` live in `design-review.md` §8 (radial gradients, conic ring, infinite-transition halo).
 
 ### Entry transcript
-- **Single-turn-per-capture** per the STT-B fallback (`adrs/ADR-002-multi-lens-extraction-pattern.md` §"Multi-turn behavior"): one entry contains exactly one `YOU` turn (your transcription) and one `WITNESS`/`HARDASS`/`EDITOR` turn (the model's follow-up). No scroll across multiple exchanges, no session thread — the entry IS the exchange.
+- **Single-turn-per-capture** per the STT-B fallback (`adrs/ADR-005-stt-b-scope-and-v1-single-turn.md` (amends `adrs/ADR-002-multi-lens-extraction-pattern.md` §"Multi-turn behavior")): one entry contains exactly one `YOU` turn (your transcription) and one `WITNESS`/`HARDASS`/`EDITOR` turn (the model's follow-up). No scroll across multiple exchanges, no session thread — the entry IS the exchange.
 - **Avoid messenger-style chat bubbles** — too consumer-coded.
 - Treatment: left-rule indicators in different tones per speaker, monospace label (`WITNESS` / `YOU`) above each turn, body text in regular sans.
 - User's transcribed words shown in **muted/dimmed tone** (visually secondary). Model's response in primary text weight. User can verify; model stays the focal point.

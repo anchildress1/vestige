@@ -71,9 +71,11 @@ class AudioCapture(
      * Pump the [record]'s read loop until either the 30 s cap fires (returns the cap chunk) or
      * the loop exits via [requestStop] / coroutine cancellation (returns `null`; caller drains
      * the partial buffer). Extracted from [captureChunks] to keep both methods under Sonar's
-     * cognitive-complexity ceiling and detekt's single-jump-per-loop ceiling.
+     * cognitive-complexity ceiling and detekt's single-jump-per-loop ceiling. `internal` only
+     * so the JVM unit tests in `AudioCaptureTest` can drive it directly with a mocked
+     * [AudioRecord]; not part of the public API.
      */
-    private suspend fun readUntilCapOrStop(
+    internal suspend fun readUntilCapOrStop(
         record: AudioRecord,
         readBuffer: FloatArray,
         builder: ChunkBuilder,
@@ -91,9 +93,11 @@ class AudioCapture(
      * Append [readCount] samples from [readBuffer] into [builder]; return the cap chunk if
      * `builder.append` produced a complete window, otherwise null. Extracted so the loop in
      * [readUntilCapOrStop] only contains one jump statement and stays under detekt's
-     * `LoopWithTooManyJumpStatements` ceiling.
+     * `LoopWithTooManyJumpStatements` ceiling. `internal` only so the JVM unit tests in
+     * `AudioCaptureTest` can pin the empty / single-chunk / multi-chunk-WARN paths without
+     * routing through a real `AudioRecord`; not part of the public API.
      */
-    private fun tryBuildCapChunk(builder: ChunkBuilder, readBuffer: FloatArray, readCount: Int): AudioChunk? {
+    internal fun tryBuildCapChunk(builder: ChunkBuilder, readBuffer: FloatArray, readCount: Int): AudioChunk? {
         val complete = builder.append(readBuffer, readCount)
         if (complete.isEmpty()) return null
         // The 30 s cap fired. v1 emits the first complete chunk and drops any extras —

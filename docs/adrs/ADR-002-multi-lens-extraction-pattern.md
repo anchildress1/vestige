@@ -76,19 +76,21 @@ Three distinct prompts ship in v1 — one for the foreground call, one for each 
 
 Persona modules are **forbidden** here. The lens framing is the only voice. Adding persona tone to extraction would corrupt the convergence signal — Witness, Hardass, and Editor would produce different `tags` for the same transcript, which is exactly the failure mode AGENTS.md guardrail 9 prevents.
 
-### 2. Foreground prompt (1 call per capture; single-turn-per-capture per the STT-B fallback)
+### 2. Foreground prompt (1 call per chunk; final chunk only for >30s captures per ADR-001 Q4)
 
 ```
 [system role — conversational, on-device-only context]
 [persona module — one of: witness | hardass | editor]
+[session context — last 4 turns, oldest-first; per Q5]
 [output schema reminder — transcription + follow-up, structured]
 [user content — current audio chunk (or typed text)]
 ```
 
 - **Persona module location:** immediately after the system role. Single block. No splicing into surface or lens content.
-- ~~Session context format~~ **Removed 2026-05-09 per the STT-B fallback** (§"Multi-turn behavior" above). The foreground prompt no longer carries prior-turn context — each capture is a self-contained exchange.
-- **Output:** structured `{transcription: string, follow_up: string}`. Same shape across personas; only `follow_up` content varies. STT-C covers tag-extraction consistency under single-turn, with parse-success rate captured as instrumentation (per `PRD.md` §"Build philosophy: build first, test at failure zones" + Action Item #2 below).
-- **For >30s captures:** intermediate chunks use a stripped-down variant of this prompt — system role + transcription-only output reminder + audio chunk. No persona, no follow-up. The final chunk uses the full foreground prompt with the concatenated transcript-so-far injected into the user content. (This is single-turn-internal-to-one-capture, not multi-turn across captures.)
+- **Session context format:** each prior turn as `{speaker: USER|MODEL, text: "..."}` in chronological order. Audio bytes are never replayed; transcribed text only.
+- **Multi-turn cap:** last 4 turns by default (Q5). Foreground prompt does not see retrieved history — that is a background-pass concern. Foreground stays small for latency.
+- **Output:** structured `{transcription: string, follow_up: string}`. Same shape across personas; only `follow_up` content varies. STT-B verifies reliability of multi-turn structured output on E4B; STT-C covers tag-extraction consistency, with parse-success rate captured as instrumentation (per `PRD.md` §"Build philosophy: build first, test at failure zones" + Action Item #2 below).
+- **For >30s captures:** intermediate chunks use a stripped-down variant of this prompt — system role + transcription-only output reminder + audio chunk. No persona, no session context, no follow-up. The final chunk uses the full foreground prompt with the concatenated transcript-so-far injected into the user content.
 
 ### 3. Observation-generation prompt (conditional, after resolver)
 
@@ -112,7 +114,7 @@ Prompts will be tuned daily through Phase 1 and Phase 2. A lens-only tweak shoul
 
 ### Token budget
 
-E4B's effective context with KV cache pressure is the constraint. Phase 2 must measure actual token counts for each prompt type and confirm headroom for variable user content (long entries; the multi-turn history concern is moot under the single-turn fallback). If any composed system block exceeds ~2K tokens, the relevant module gets tightened — not split into more calls.
+E4B's effective context with KV cache pressure is the constraint. Phase 2 must measure actual token counts for each prompt type and confirm headroom for variable user content (long entries, multi-turn history). If any composed system block exceeds ~2K tokens, the relevant module gets tightened — not split into more calls.
 
 ---
 
@@ -160,7 +162,7 @@ Each lens call returns JSON conforming to the extracted-field schema. Parsing fa
 
 ### Foreground call (always runs first)
 
-- **Input:** audio bytes (or typed text) — single-turn-per-capture, no prior session context (STT-B fallback)
+- **Input:** audio bytes (or typed text) + session context
 - **Output:** transcription + persona-flavored follow-up question, in **one structured response**
 - **Latency budget:** show a placeholder immediately after audio chunk completion; Phase 1/2 measures actual S24 Ultra latency. Use 1-5 seconds as the target range, not a contractual promise.
 - **Persistence:** transcription saved as `entry_text` immediately. Audio bytes discarded.
@@ -202,11 +204,9 @@ Re-eval re-runs the full 3-lens pipeline. A power user tapping re-eval frequentl
 
 The resolver is the most high-leverage piece of code in the build (every entry goes through it; bugs here corrupt the canonical store). It needs unit tests against synthetic 3-lens output sets covering: all-agree, 2-of-3 agree, all-disagree, only-Inferential, Skeptical-conflict, lens-error fallbacks. Phase 1 must ship this test suite before Phase 2 begins relying on the resolver.
 
-### Q5. Foreground call's session context — SUPERSEDED 2026-05-09
+### Q5. Foreground call's session context
 
-~~Multi-turn requires the model to see prior exchanges. We pass the last N turns as context. **Default: last 4 turns**, matching `PRD.md` §Multi-turn acceptance criteria. If E4B's KV cache makes this expensive on every chunk, drop to last 2.~~
-
-**Superseded by §"Multi-turn behavior" above.** STT-B verdict 2026-05-09: E4B does not use prior-turn context regardless of count or instruction. The foreground call's system prompt no longer includes a recent-turns block. `historyTurnLimit` is removed from `ForegroundInference`; `runForegroundCall(audio, persona)` is the v1 signature.
+Multi-turn requires the model to see prior exchanges. We pass the last N turns as context. **Default: last 4 turns**, matching `PRD.md` §Multi-turn acceptance criteria. If E4B's KV cache makes this expensive on every chunk, drop to last 2.
 
 ---
 
@@ -249,19 +249,15 @@ Pretending neither risk exists, the pattern is the right shape for the product a
 
 **Round 2 (2026-05-09, same device, corrected manifest):** anchors restricted to substrings introduced in earlier turns AND absent from the current turn's audio per `docs/sample-data-scenarios.md` §STT-B. Result: `retention=0.0/3 sessions`. Across all 9 turn-≥2 lookups, **zero cross-turn anchors hit**. Read of every follow-up: each probe quotes only the audio Gemma just heard; `launch doc` / `standup` / `the doc` / `roadmap call` are never referenced after introduction. The `## RECENT TURNS` JSON history block is composed and sent (verified in `composeSystemPrompt`); E4B receives it and ignores it on this prompt design.
 
-**Round 3 (2026-05-09 — explicit instruction try):** added `RECENT_TURNS_INSTRUCTION` to `ForegroundInference` — a prose block emitted between `## RECENT TURNS` and the JSON lines telling the model the JSON below is conversation context and that follow-ups must explicitly name prior facts when the new audio relates to them. Same audio, same corrected manifest. Result: `retention=0.0/3 sessions` again. **Zero cross-turn anchor hits across 18 turn-≥2 lookups across all three rounds (24 turns total).** The instruction did slow inference (per-turn 34.9–65.3 s vs round 2's 33.3–43.3 s — longer prompt = more CPU tokens) without changing model behavior. Every follow-up across all three rounds references only the audio Gemma just heard; `launch doc`, `standup`, `the doc`, and `roadmap call` are never echoed after introduction.
+**Round 3 (in flight, 2026-05-09 — explicit instruction try):** added `RECENT_TURNS_INSTRUCTION` to `ForegroundInference` — a prose block emitted between `## RECENT TURNS` and the JSON lines telling the model the JSON below is conversation context and that follow-ups must explicitly name prior facts when the new audio relates to them. Same audio, same corrected manifest re-run pending. If round 3 still produces `retention=0.0`, the Story 2.4 fallback fires (drop multi-turn from v1, single-turn becomes the v1 path, dependent docs and stories rewrite).
 
-**Verdict (2026-05-09): STT-B FAILED. Story 2.4 fallback executed.** Multi-turn dropped from v1. The `## RECENT TURNS` block, the 4-turn history limit, the `transcript` parameter on `runForegroundCall`, and the `RECENT_TURNS_INSTRUCTION` block are all removed from `ForegroundInference`. `CaptureSession` becomes single-use (terminal at RESPONDED). Each capture is a self-contained `{transcription, follow_up}` exchange; subsequent recordings begin fresh sessions. Q5 below is **superseded** by this section.
-
-Latency record across all rounds, E4B CPU on S24 Ultra: per-turn 32.7–65.3 s. The §"Latency budget" 1–5 s target remains unmet; latency tuning is Phase 4/5 territory and is unrelated to the STT-B fail mode (every round was an attention/instruction-following failure, not a speed failure).
-
-The Round 1 false-positive lesson is worth preserving for future stop-and-test work: substring-anchor scoring is only meaningful when the anchor lists are restricted to substrings introduced in PRIOR turns AND absent from the CURRENT turn's audio. Anchors that appear in this turn's own audio measure same-turn echo, not cross-turn retention. Round 1 reported `retention=1.0` on a manifest with that bug; round 2's corrected manifest exposed `retention=0.0`. Same model, same prompt, same audio, opposite verdict.
+Latency record across all rounds, E4B CPU on S24 Ultra: per-turn 32.7–43.3 s. The ADR-002 §"Latency budget" 1–5 s target remains unmet; latency tuning is Phase 4/5 territory and does not gate the STT-B existential verdict.
 
 ---
 
 ## Action Items
 
-1. [x] STT-B — ~~verify foreground call returns transcription + follow-up reliably as structured output across multi-turn~~ **FAILED 2026-05-09; fallback executed.** See §"Multi-turn behavior" above for the round-by-round record. Structured-output reliability under single-turn is captured separately by STT-C (Action Item #2).
+1. [ ] STT-B — verify foreground call returns transcription + follow-up reliably as structured output across multi-turn. Output decision: structured JSON vs markdown-with-headers.
 2. [ ] STT-C instrumentation — measure JSON-parse success rate across 10+ varied test dumps per lens as part of tag-consistency assessment. If parse <95%, switch all lens outputs to markdown-with-headers and update `:core-inference` parser accordingly. Parse reliability is the prerequisite that lets STT-C measure tag consistency at all; it is not a separate stop-and-test.
 3. [ ] STT-D — confirm 3-lens outputs differ meaningfully on at least 30% of test entries. If not, halt and replan.
 4. [ ] Phase 1 — implement `:core-inference` prompt composer with separate lens/surface module storage. Log composed prompts in dev builds.

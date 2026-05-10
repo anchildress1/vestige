@@ -46,12 +46,18 @@ android {
 
         // Wire Gradle project properties through to the instrumentation runner so on-device
         // tests can receive file paths without embedding them in the build file.
-        // Pass via: ./gradlew ... -PmodelPath=<path> -PaudioPath=<path>
-        project.findProperty("modelPath")?.toString()?.let {
-            testInstrumentationRunnerArguments["modelPath"] = it
-        }
-        project.findProperty("audioPath")?.toString()?.let {
-            testInstrumentationRunnerArguments["audioPath"] = it
+        // Pass via: ./gradlew ... -P<key>=<value>
+        //   modelPath  — required by every audio-bearing instrumented test
+        //   audioPath  — Story 1.5 STT-A probe + Story 2.3 per-capture persona smoke test
+        // The Story 2.4 STT-B harness knobs (manifestPath / minSessions /
+        // contextRetentionThreshold / latencyBudgetMs) were removed when the STT-B fallback
+        // landed 2026-05-09 — multi-turn was dropped from v1, the harness was deleted, and
+        // those knobs no longer have a consumer. See `adrs/ADR-002-multi-lens-extraction-pattern.md`
+        // §"Multi-turn behavior" for the verdict trail.
+        listOf("modelPath", "audioPath").forEach { key ->
+            project.findProperty(key)?.toString()?.let { value ->
+                testInstrumentationRunnerArguments[key] = value
+            }
         }
     }
 

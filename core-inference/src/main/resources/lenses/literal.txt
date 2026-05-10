@@ -14,4 +14,4 @@ Output discipline:
 
 - This lens is the floor. If the Literal lens populates a field, downstream convergence treats it as anchored.
 - Sparse output is correct output. Null is a real answer.
-- Never add `flags` to the response. Conflict-flagging belongs to the Skeptical lens.
+- Always emit `flags` as `[]` (empty array). Conflict-flagging belongs to the Skeptical lens, but the schema requires the key on every response — omitting it breaks strict parsing.

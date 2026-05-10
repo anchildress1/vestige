@@ -74,7 +74,23 @@ object PromptComposer {
 
         val tokenEstimate = estimateTokens(text)
         Log.d(TAG, "compose lens=$lens chars=${text.length} tokens~=$tokenEstimate history=${capped.size}")
+        logComposedBody(lens, text)
         return ComposedPrompt(lens = lens, text = text, tokenEstimate = tokenEstimate)
+    }
+
+    /**
+     * Dev-build prompt-body capture per ADR-002 §Consequences: "Logs must capture the exact
+     * composed prompt per call during dev builds." Gated on `Log.isLoggable(TAG, VERBOSE)` so
+     * release-build logcat stays quiet by default and a developer can opt in with
+     * `adb shell setprop log.tag.VestigePromptComposer VERBOSE`. Logcat truncates at ~4 kB per
+     * line, so the body is chunked and indexed for easy reassembly.
+     */
+    private fun logComposedBody(lens: Lens, text: String) {
+        if (!Log.isLoggable(TAG, Log.VERBOSE)) return
+        val chunks = text.chunked(LOG_CHUNK_SIZE)
+        chunks.forEachIndexed { index, chunk ->
+            Log.v(TAG, "compose lens=$lens body[${index + 1}/${chunks.size}]=$chunk")
+        }
     }
 
     private fun loadLens(lens: Lens): String = loadResource(lensResourcePath(lens)).trimEnd()
@@ -131,4 +147,5 @@ object PromptComposer {
     private const val MAX_HISTORY_CHARS_PER_CHUNK = 600
     private const val CHARS_PER_TOKEN = 4
     private const val ELLIPSIS = "…"
+    private const val LOG_CHUNK_SIZE = 3500
 }

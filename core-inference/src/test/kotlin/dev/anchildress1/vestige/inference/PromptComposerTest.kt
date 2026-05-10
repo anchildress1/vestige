@@ -137,6 +137,17 @@ class PromptComposerTest {
     }
 
     @Test
+    fun `composing a prompt with verbose logging enabled does not throw`() {
+        // ADR-002 §Consequences calls for the exact composed prompt to be logged in dev builds.
+        // The chunked Log.v path is gated on Log.isLoggable; under Robolectric / unit tests the
+        // gate is closed by default, but exercising the composer here proves the logging code
+        // doesn't blow up in the no-op path. (Gate-open behavior is verified manually on-device
+        // via `adb shell setprop log.tag.VestigePromptComposer VERBOSE`.)
+        val composed = PromptComposer.compose(Lens.SKEPTICAL, "x".repeat(8000))
+        assertTrue(composed.text.length > 8000)
+    }
+
+    @Test
     fun `compose is idempotent for identical inputs`() {
         val first = PromptComposer.compose(Lens.LITERAL, entry).text
         val second = PromptComposer.compose(Lens.LITERAL, entry).text

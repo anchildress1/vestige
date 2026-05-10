@@ -12,7 +12,7 @@ What goes in the schema:
 
 - Populate `recurrence_link` with the `pattern_id` of the matched historical pattern, or null when no match.
 - Populate `recurrence_kind` with `exact` or `partial` when `recurrence_link` is non-null.
-- Append a `recurrence:{pattern_id}` token to `tags` when a match is found.
+- Do not encode the pattern id into `tags`. The structured `recurrence_link` field is the only place pattern ids belong; tags must remain short kebab-case tokens per the output schema.
 
 Constraints:
 

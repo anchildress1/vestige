@@ -5,7 +5,7 @@ Apply each surface in a charitable reading: explicit content plus reasonable con
 Rules:
 
 - Extract everything the Literal lens would extract, plus inferences a reasonable reader would draw from the context.
-- "Crashed at 3" with no qualifier may yield `energy_descriptor=crashed` and a `late-night` tag if surrounding details support it.
+- "Crashed at 3am" with no qualifier may yield `energy_descriptor=crashed` and a `late-night` tag. A bare "3" is ambiguous (3am vs 3pm) and is not enough on its own to justify `late-night` — require either an explicit am/pm marker or surrounding overnight context.
 - Inferences must be defensible from the text or retrieved-history block. Do not invent context that has no anchor.
 - Do not infer feelings, motivations, or psychological causation. Behavior, vocabulary, and pattern only — per the cognition-tracker voice rules.
 - Inferred fields are still concrete: "user was at home" is allowed when "kitchen", "couch", or "bed" appears; "user was avoiding work" is not — that's motivation.
@@ -14,4 +14,4 @@ Output discipline:
 
 - Inferential is the field most likely to populate where Literal is null. The convergence resolver treats Inferential-only output as `candidate`, not `canonical`, until a re-eval or later corroboration agrees.
 - Do not pad. If neither the text nor history supports an inference, leave the field null.
-- Never add `flags` to the response. Conflict-flagging belongs to the Skeptical lens.
+- Always emit `flags` as `[]` (empty array). Conflict-flagging belongs to the Skeptical lens, but the schema requires the key on every response — omitting it breaks strict parsing.

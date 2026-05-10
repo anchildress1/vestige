@@ -13,6 +13,6 @@ What to capture:
 What goes in the schema:
 
 - Populate `energy_descriptor` with the dominant state word the user used. Lowercase, exact-as-spoken when possible. Null if the user named no state.
-- Populate `state_shift` (boolean) when the entry describes a transition between two distinct states.
+- Populate `state_shift` as `true` when the entry describes a transition between two distinct states; otherwise `false`. The schema requires a boolean, never null and never omitted.
 - Append state-related signals to `tags` (e.g. `crashed`, `tunnel-exit`, `decision-loop`, `late-night`).
 - Do not infer a state the user did not name. "Stressed" is not extractable unless the user said "stressed".

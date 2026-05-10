@@ -251,20 +251,18 @@ Forbidden across all personas: "thank you for sharing," "how does that make you 
 1. **Top status row**
    - Left: Local Model Status indicator (`LOCAL · READY`-style chip per `ux-copy.md`). The chip is **clickable**; tap opens the persistent Local Model Status screen. Contributes to the 10-second judge test — a visible "this is on-device" signal lives on the primary surface.
    - Right: Persona dropdown pill (`WITNESS ▾`-style per `ux-copy.md`). Tap opens the per-capture persona selector (P1 — see PRD; the prior "per-session override" framing was retired with the STT-B fallback).
-2. **Patterns peek card** *(below status row, per `ux-copy.md` §"Patterns peek (below status)")*
-   - Compact card with `{N} active patterns` title, one-line teaser of pattern names, subtle. No purple left-rule here — that's reserved for the full Patterns list. Empty-state copy comes from `ux-copy.md`.
-3. **Hero title (above MistHero)**
+2. **Hero title (above MistHero)**
    - One short editorial line in `Newsreader` italic per `poc/design-review.md` §2.2 (e.g., the `What lingered from yesterday?` strings visible in `poc/screenshots/capture.png`). Hero copy belongs in `ux-copy.md` §Capture Screen — pull from there, do not invent.
    - This is the *editorial* register: a short, observational, present-tense line. It is **not** a journal prompt or a wellness question. The `Newsreader` italic + restrained content distinguishes it from `How are you feeling today?`-class prompts (which remain forbidden — see below).
-4. **MistHero capture stone (dominant, center for hero presence)**
+3. **MistHero capture stone (dominant, center for hero presence)**
    - The `MistHero` primitive per `poc/design-review.md` §3.3. 168px hero, five-layer moonstone composition. Behavior per the "MistHero" entry in §"Component Conventions" below.
-5. **Tagline strip (below MistHero)**
+4. **Tagline strip (below MistHero)**
    - Two short mono lines per `poc/screenshots/capture.png`: a directive (`HOLD THE STONE · SPEAK`-style) and a privacy-tagline (`30s chunks · audio discarded after extraction`-style). `JetBrains Mono`, eyebrow scale. Strings live in `ux-copy.md`.
-6. **Type-instead affordance**
+5. **Type-instead affordance**
    - Small button below the tagline. Expands inline to a text input (placeholder + send copy from `ux-copy.md`). Never buried.
-7. **Patterns peek card** *(below the type affordance, per `poc/screenshots/capture.png` and `ux-copy.md` §"Patterns peek")*
+6. **Patterns peek card** *(below the type affordance, per `poc/screenshots/capture.png` and `ux-copy.md` §"Patterns peek")*
    - Compact card with `{N} ACTIVE TRACES`-style title, one-line teaser of pattern names, subtle `TraceBar` mini-strips. No `glow` left-rule here — that's reserved for the full Patterns list. Empty-state copy comes from `ux-copy.md`.
-8. **Footer metadata strip**
+7. **Footer metadata strip**
    - Small dim text — last entry timestamp + duration + `PATTERNS` link. Strings per `ux-copy.md` §"Footer metadata."
 
 **Recording-state changes to the stack:**

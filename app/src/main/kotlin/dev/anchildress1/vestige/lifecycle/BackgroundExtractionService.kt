@@ -12,14 +12,11 @@ import kotlinx.coroutines.launch
 /** Foreground-service wrapper for [BackgroundExtractionLifecycleStateMachine] (ADR-004). */
 class BackgroundExtractionService : LifecycleService() {
 
-    private var collectorStarted: Boolean = false
     private var shutdownHandled: Boolean = false
 
     override fun onCreate() {
         super.onCreate()
         val machine = requireStateMachine()
-        if (collectorStarted) return
-        collectorStarted = true
         lifecycleScope.launch {
             machine.state.collect { state ->
                 if (state == BackgroundExtractionLifecycleState.DEMOTING) {
@@ -42,7 +39,8 @@ class BackgroundExtractionService : LifecycleService() {
             } catch (@Suppress("TooGenericExceptionCaught") error: Exception) {
                 // FGS start can throw ForegroundServiceStartNotAllowedException, SecurityException,
                 // or MissingForegroundServiceTypeException. Wedging the machine in PROMOTING blocks
-                // every future capture for the process lifetime — surface the failure and reset.
+                // every future capture for the process lifetime — surface the failure and let the
+                // machine re-arm a bounded retry while work is still in flight.
                 Log.e(TAG, "startForeground rejected", error)
                 machine.onForegroundStartFailed()
                 shutdownHandled = true
@@ -57,7 +55,9 @@ class BackgroundExtractionService : LifecycleService() {
 
     override fun onDestroy() {
         if (!shutdownHandled) {
-            // OS killed us mid-extraction; recovery follows ADR-001 §Q3 cold-start sweep.
+            // OS killed us mid-extraction (service-only kill, process survives) — the cold-start
+            // sweep can't catch this because the process didn't die. Reset the machine so a
+            // queued extraction re-promotes via the dispatch callback.
             stateMachine()?.onServiceKilled()
         }
         super.onDestroy()

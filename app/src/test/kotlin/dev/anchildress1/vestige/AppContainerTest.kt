@@ -33,7 +33,7 @@ class AppContainerTest {
     }
 
     @Test
-    fun `startForegroundService rejection resets the machine instead of wedging PROMOTING`() = runTest {
+    fun `startForegroundService rejection schedules a retry for the active extraction`() = runTest {
         var serviceStarts = 0
         val container = AppContainer(
             applicationContext = mockk<Context>(relaxed = true),
@@ -41,16 +41,19 @@ class AppContainerTest {
             foregroundServiceIntentFactory = { Intent("dev.anchildress1.vestige.TEST_START") },
             foregroundServiceStarter = {
                 serviceStarts += 1
-                error("background-start denied")
+                if (serviceStarts == 1) error("background-start denied")
             },
             scope = backgroundScope,
         )
 
         container.reportExtractionStatus(entryId = 7L, status = ExtractionStatus.RUNNING)
+        assertEquals(BackgroundExtractionLifecycleState.NORMAL, container.lifecycleStateMachine.state.value)
+
+        advanceTimeBy(5_001L)
         advanceUntilIdle()
 
-        assertEquals(1, serviceStarts)
-        assertEquals(BackgroundExtractionLifecycleState.NORMAL, container.lifecycleStateMachine.state.value)
+        assertEquals(2, serviceStarts)
+        assertEquals(BackgroundExtractionLifecycleState.PROMOTING, container.lifecycleStateMachine.state.value)
     }
 
     @Test

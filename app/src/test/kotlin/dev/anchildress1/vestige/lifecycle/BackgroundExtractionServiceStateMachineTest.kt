@@ -8,6 +8,7 @@ import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertThrows
 import org.junit.jupiter.api.Test
+import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -15,10 +16,12 @@ class BackgroundExtractionServiceStateMachineTest {
 
     private fun machine(
         scope: TestScope,
+        foregroundStartRetryDelay: Duration = 5.seconds,
         onPromoteRequested: () -> Unit = {},
     ): BackgroundExtractionLifecycleStateMachine = BackgroundExtractionLifecycleStateMachine(
         scope = scope,
         keepAlive = 30.seconds,
+        foregroundStartRetryDelay = foregroundStartRetryDelay,
         onPromoteRequested = onPromoteRequested,
     )
 
@@ -150,26 +153,27 @@ class BackgroundExtractionServiceStateMachineTest {
     }
 
     @Test
-    fun `start failure resets PROMOTING to NORMAL`() = runTest {
-        val machine = machine(this)
+    fun `start failure resets PROMOTING to NORMAL then retries while work is still queued`() = runTest {
+        val machine = machine(this, foregroundStartRetryDelay = 1.seconds)
         machine.onInFlightCountChange(1)
         assertEquals(BackgroundExtractionLifecycleState.PROMOTING, machine.state.value)
 
         machine.onForegroundStartFailed()
-
         assertEquals(BackgroundExtractionLifecycleState.NORMAL, machine.state.value)
+
+        advanceTimeBy(1_001L)
+        assertEquals(BackgroundExtractionLifecycleState.PROMOTING, machine.state.value)
     }
 
     @Test
-    fun `OS kill resets state and re-promotes if work is still queued`() = runTest {
-        val machine = machine(this)
-        machine.onInFlightCountChange(2)
-        machine.onForegroundStartConfirmed()
-        assertEquals(BackgroundExtractionLifecycleState.FOREGROUND, machine.state.value)
+    fun `draining the queue cancels a pending foreground-start retry`() = runTest {
+        val machine = machine(this, foregroundStartRetryDelay = 1.seconds)
+        machine.onInFlightCountChange(1)
+        machine.onForegroundStartFailed()
+        machine.onInFlightCountChange(0)
 
-        machine.onServiceKilled()
-
-        assertEquals(BackgroundExtractionLifecycleState.PROMOTING, machine.state.value)
+        advanceTimeBy(1_001L)
+        assertEquals(BackgroundExtractionLifecycleState.NORMAL, machine.state.value)
     }
 
     @Test
@@ -190,6 +194,31 @@ class BackgroundExtractionServiceStateMachineTest {
 
         assertEquals(BackgroundExtractionLifecycleState.PROMOTING, machine.state.value)
         assertEquals(2, promoteCount)
+    }
+
+    @Test
+    fun `OS kill resets state and re-promotes if work is still queued`() = runTest {
+        val machine = machine(this)
+        machine.onInFlightCountChange(2)
+        machine.onForegroundStartConfirmed()
+        assertEquals(BackgroundExtractionLifecycleState.FOREGROUND, machine.state.value)
+
+        machine.onServiceKilled()
+
+        assertEquals(BackgroundExtractionLifecycleState.PROMOTING, machine.state.value)
+    }
+
+    @Test
+    fun `OS kill with no queued work lands at NORMAL`() = runTest {
+        val machine = machine(this)
+        machine.onInFlightCountChange(1)
+        machine.onForegroundStartConfirmed()
+        machine.onInFlightCountChange(0)
+        assertEquals(BackgroundExtractionLifecycleState.KEEP_ALIVE, machine.state.value)
+
+        machine.onServiceKilled()
+
+        assertEquals(BackgroundExtractionLifecycleState.NORMAL, machine.state.value)
     }
 
     @Test

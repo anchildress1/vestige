@@ -14,6 +14,7 @@ import kotlin.time.Duration.Companion.seconds
 class BackgroundExtractionLifecycleStateMachine(
     private val scope: CoroutineScope,
     private val keepAlive: Duration = DEFAULT_KEEP_ALIVE,
+    private val foregroundStartRetryDelay: Duration = DEFAULT_FOREGROUND_START_RETRY_DELAY,
     private val onPromoteRequested: () -> Unit = {},
 ) {
 
@@ -23,14 +24,24 @@ class BackgroundExtractionLifecycleStateMachine(
 
     private var inFlightCount: Int = 0
     private var keepAliveJob: Job? = null
+    private var foregroundStartRetryJob: Job? = null
 
     @Synchronized
     fun onInFlightCountChange(count: Int) {
         require(count >= 0) { "inFlightCount must be ≥ 0 (got $count)" }
         inFlightCount = count
+        if (count == 0) {
+            foregroundStartRetryJob?.cancel()
+            foregroundStartRetryJob = null
+        }
         when (mutableState.value) {
-            BackgroundExtractionLifecycleState.NORMAL ->
-                if (count > 0) transition(BackgroundExtractionLifecycleState.PROMOTING)
+            BackgroundExtractionLifecycleState.NORMAL -> {
+                if (count > 0) {
+                    foregroundStartRetryJob?.cancel()
+                    foregroundStartRetryJob = null
+                    transition(BackgroundExtractionLifecycleState.PROMOTING)
+                }
+            }
 
             BackgroundExtractionLifecycleState.PROMOTING,
             BackgroundExtractionLifecycleState.FOREGROUND,
@@ -46,6 +57,8 @@ class BackgroundExtractionLifecycleStateMachine(
     @Synchronized
     fun onForegroundStartConfirmed() {
         if (mutableState.value == BackgroundExtractionLifecycleState.PROMOTING) {
+            foregroundStartRetryJob?.cancel()
+            foregroundStartRetryJob = null
             transition(BackgroundExtractionLifecycleState.FOREGROUND)
             if (inFlightCount == 0) startKeepAlive()
         }
@@ -59,24 +72,28 @@ class BackgroundExtractionLifecycleStateMachine(
         }
     }
 
-    /** Reset to NORMAL when the OS killed the service mid-flight. Pending work re-promotes. */
-    @Synchronized
-    fun onServiceKilled() {
-        cancelKeepAlive()
-        transition(BackgroundExtractionLifecycleState.NORMAL)
-        if (inFlightCount > 0) transition(BackgroundExtractionLifecycleState.PROMOTING)
-    }
-
     /** Reset on platform start failure so the machine doesn't wedge in PROMOTING. */
     @Synchronized
     fun onForegroundStartFailed() {
         if (mutableState.value == BackgroundExtractionLifecycleState.PROMOTING) {
             transition(BackgroundExtractionLifecycleState.NORMAL)
+            if (inFlightCount > 0) scheduleForegroundStartRetry()
         }
     }
 
+    /** Recovery hook for OS-kill cases the cold-start sweep can't catch (service-only kill). */
+    @Synchronized
+    fun onServiceKilled() {
+        keepAliveJob?.cancel()
+        keepAliveJob = null
+        foregroundStartRetryJob?.cancel()
+        foregroundStartRetryJob = null
+        transition(BackgroundExtractionLifecycleState.NORMAL)
+        if (inFlightCount > 0) transition(BackgroundExtractionLifecycleState.PROMOTING)
+    }
+
     private fun startKeepAlive() {
-        cancelKeepAlive()
+        keepAliveJob?.cancel()
         transition(BackgroundExtractionLifecycleState.KEEP_ALIVE)
         keepAliveJob = scope.launch {
             delay(keepAlive)
@@ -93,13 +110,22 @@ class BackgroundExtractionLifecycleStateMachine(
     }
 
     private fun cancelKeepAliveAndResume() {
-        cancelKeepAlive()
+        keepAliveJob?.cancel()
+        keepAliveJob = null
         transition(BackgroundExtractionLifecycleState.FOREGROUND)
     }
 
-    private fun cancelKeepAlive() {
-        keepAliveJob?.cancel()
-        keepAliveJob = null
+    private fun scheduleForegroundStartRetry() {
+        if (foregroundStartRetryJob?.isActive == true) return
+        foregroundStartRetryJob = scope.launch {
+            delay(foregroundStartRetryDelay)
+            synchronized(this@BackgroundExtractionLifecycleStateMachine) {
+                foregroundStartRetryJob = null
+                if (mutableState.value == BackgroundExtractionLifecycleState.NORMAL && inFlightCount > 0) {
+                    transition(BackgroundExtractionLifecycleState.PROMOTING)
+                }
+            }
+        }
     }
 
     private fun transition(next: BackgroundExtractionLifecycleState) {
@@ -111,5 +137,6 @@ class BackgroundExtractionLifecycleStateMachine(
 
     companion object {
         val DEFAULT_KEEP_ALIVE: Duration = 30.seconds
+        val DEFAULT_FOREGROUND_START_RETRY_DELAY: Duration = 5.seconds
     }
 }

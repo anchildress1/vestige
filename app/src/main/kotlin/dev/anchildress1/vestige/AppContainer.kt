@@ -60,7 +60,8 @@ class AppContainer(
             foregroundServiceStarter(intent)
         } catch (@Suppress("TooGenericExceptionCaught") error: Exception) {
             // Background-launch restrictions (Android 12+), battery-saver, or app-standby buckets
-            // can refuse the start. Reset the machine so the next capture can try again.
+            // can refuse the start. Reset the machine so its bounded retry path can re-attempt
+            // promotion while the current extraction is still in flight.
             Log.e(TAG, "startForegroundService rejected", error)
             lifecycleStateMachine.onForegroundStartFailed()
         }

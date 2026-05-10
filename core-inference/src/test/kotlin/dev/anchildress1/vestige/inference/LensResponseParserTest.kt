@@ -240,6 +240,19 @@ class LensResponseParserTest {
     }
 
     @Test
+    fun `rejects array-wrapped payload even after earlier non-JSON brace commentary`() {
+        // A leading `{kind, snippet, note}` block used to bypass the array-wrapper guard because
+        // the parser only checked the first `{` in the whole response. Each candidate brace block
+        // now gets checked independently.
+        val raw = """
+            We expect flags shaped like {kind, snippet, note}.
+            [{"tags":["a"]}]
+        """.trimIndent()
+
+        assertNull(LensResponseParser.parse(Lens.LITERAL, raw))
+    }
+
+    @Test
     fun `treats JSON null and missing keys as equivalent absence`() {
         val raw = """{"tags":[],"energy_descriptor":null}"""
         val extraction = LensResponseParser.parse(Lens.LITERAL, raw)

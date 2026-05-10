@@ -68,13 +68,12 @@ internal object LensResponseParser {
 
     /**
      * Walk forward, find every balanced `{...}` block, return the first that parses as a
-     * JSONObject. Rejects array-wrapped payloads (`[{...}]`): a `[` whose only-whitespace
-     * separation from the first `{` indicates the bracket opens the payload itself, not
-     * prose like `[note] {...}`.
+     * JSONObject. Rejects array-wrapped payloads (`[{...}]`) at each candidate brace block:
+     * a `[` whose only-whitespace separation from that `{` indicates the bracket opens the
+     * payload itself, not prose like `[note] {...}`.
      */
     private fun findFirstParseableObject(raw: String): JSONObject? {
-        val firstBrace = raw.takeIf { it.isNotBlank() }?.indexOf('{')?.takeIf { it >= 0 }
-        if (firstBrace == null || isArrayWrapped(raw, firstBrace)) return null
+        if (raw.isBlank()) return null
         var cursor = 0
         var found: JSONObject? = null
         var keepScanning = true
@@ -84,8 +83,10 @@ internal object LensResponseParser {
             if (open == null || close == null) {
                 keepScanning = false
             } else {
-                val candidate = raw.substring(open, close + 1)
-                found = runCatching { JSONTokener(candidate).nextValue() as? JSONObject }.getOrNull()
+                if (!isArrayWrapped(raw, open)) {
+                    val candidate = raw.substring(open, close + 1)
+                    found = runCatching { JSONTokener(candidate).nextValue() as? JSONObject }.getOrNull()
+                }
                 cursor = open + 1
             }
         }

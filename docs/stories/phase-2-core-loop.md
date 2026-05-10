@@ -10,7 +10,7 @@
 
 Build the end-to-end capture loop: user records or types → foreground call returns transcription + follow-up at human pace → background 3-lens pipeline runs the multi-lens extraction → convergence resolver writes canonical/candidate/ambiguous fields → entry persists to markdown + ObjectBox. By the end of Phase 2, voice-in produces saved entries with the full content schema populated, and three of the five stop-and-test points (STT-B, STT-C, STT-D) are resolved.
 
-**Output of this phase:** a working capture loop on the reference device. User can hold a multi-turn voice session, the foreground response renders fast, and the background 3-lens extraction populates the entry's structured fields within the documented latency budget. No history UI, no patterns engine, no settings screen yet.
+**Output of this phase:** a working capture loop on the reference device. User records one capture per entry (single-turn-per-capture per the STT-B v1 scope choice — see `adrs/ADR-005-stt-b-scope-and-v1-single-turn.md`, which amends `adrs/ADR-002-multi-lens-extraction-pattern.md` §"Multi-turn behavior"), the foreground response renders fast, and the background 3-lens extraction populates the entry's structured fields within the documented latency budget. No history UI, no patterns engine, no settings screen yet.
 
 ---
 
@@ -39,19 +39,19 @@ Build the end-to-end capture loop: user records or types → foreground call ret
 - [x] `Transcript` model holds an ordered list of `Turn { speaker: USER | MODEL, text: String, timestamp: Instant }`. _(`Transcript` is append-only; `turns` returns a defensive snapshot, not the live list.)_
 - [x] User turns store transcription text only; no audio bytes (per `AGENTS.md` guardrail 11). _(`Turn.text: String` is the only payload — no `ByteArray`/`FloatArray` field exists on `Turn` or `Transcript`.)_
 - [x] Model turns store text response only.
-- [x] A unit test exercises the state machine through one full multi-turn session in memory. _(`CaptureSessionTest."full multi-turn session walks the happy path and preserves chronological order"` runs 3 user/model turns end-to-end with an injected ticking `Clock`; pos/neg/err/edge coverage in sibling tests.)_
+- [x] A unit test exercises the state machine through one full session in memory. _(`CaptureSessionTest."single-turn happy path walks IDLE to RESPONDED in chronological order"` runs the IDLE → RECORDING → INFERRING → TRANSCRIBED → RESPONDED happy path with an injected ticking `Clock` — single-turn-per-capture replaced the original multi-turn shape per the STT-B v1 scope choice; pos/neg/err/edge coverage in sibling tests including the new RESPONDED-is-terminal + ERROR-is-terminal assertions.)_
 
-**Notes / risks:** The transcript is session history, not the storage substrate. `entry_text` must be derived from the ordered USER transcriptions only — never from model turns — so retrieval, slugging, and pattern counts stay grounded in the user's words. Don't conflate per-turn state with per-entry state — one entry corresponds to one full session, multiple turns.
+**Notes / risks:** The transcript is the entry's text-only history (one USER turn + one MODEL turn under the v1 single-use lifecycle), not the storage substrate. `entry_text` must be derived from the USER transcription only — never from the model turn — so retrieval, slugging, and pattern counts stay grounded in the user's words. The v1 single-use lifecycle (RESPONDED is terminal) means one `CaptureSession` instance maps to one entry; the original "one entry corresponds to one full session, multiple turns" framing was retired with the STT-B v1 scope choice (see `adrs/ADR-005-stt-b-scope-and-v1-single-turn.md`, which amends `adrs/ADR-002-multi-lens-extraction-pattern.md` §"Multi-turn behavior").
 
 ---
 
 ### Story 2.2 — Foreground inference: audio → transcription + follow-up
 
-**As** the AI implementor, **I need** the foreground inference call that takes a normalized audio buffer (from Story 1.4) and the active persona's system prompt (from Story 1.8) and returns a structured `{transcription, follow_up}` response, **so that** the user gets text back at human conversation pace and the conversation transcript advances.
+**As** the AI implementor, **I need** the foreground inference call that takes a normalized audio buffer (from Story 1.4) and the active persona's system prompt (from Story 1.8) and returns a structured `{transcription, follow_up}` response, **so that** the user gets text back at human conversation pace and the entry transcript renders.
 
 **Done when:**
-- [x] `:core-inference` exposes a `runForegroundCall(audioBuffer, sessionTranscript, persona): ForegroundResult` API. _(Class `ForegroundInference` in `:core-inference`; `ForegroundResult` is a sealed `Success` / `ParseFailure` pair.)_
-- [x] The call composes the persona system prompt + the in-session transcript (as multi-turn history) + the new audio buffer. _(Persona via `PersonaPromptComposer`; last 4 turns appended under `## RECENT TURNS` header per ADR-002 §Q5; audio handed off as `Content.AudioFile` against a temp PCM_S16LE WAV per ADR-001 §Q4.)_
+- [x] `:core-inference` exposes a `runForegroundCall(audio, persona): ForegroundResult` API. _(Class `ForegroundInference` in `:core-inference`; `ForegroundResult` is a sealed `Success` / `ParseFailure` pair. Original 3-arg signature `runForegroundCall(audioBuffer, sessionTranscript, persona)` was simplified to 2-arg per the STT-B v1 scope choice — the prompt no longer carries prior-turn context.)_
+- [x] ~~The call composes the persona system prompt + the in-session transcript (as multi-turn history) + the new audio buffer.~~ **Reframed by the STT-B v1 scope choice** — see `adrs/ADR-005-stt-b-scope-and-v1-single-turn.md` (amends `adrs/ADR-002-multi-lens-extraction-pattern.md` §"Multi-turn behavior"). Current shape: persona system prompt + output-schema reminder + the new audio buffer. No `## RECENT TURNS` block; ADR-002 §Q5's "last 4 turns" plan is superseded for v1. _(Persona via `PersonaPromptComposer`; audio handed off as `Content.AudioFile` against a temp PCM_S16LE WAV per ADR-001 §Q4.)_
 - [x] The response is parsed as structured output (JSON or markdown-with-headers per ADR-002 §"Structured-output reliability"). On parse failure, return a typed error — do not silently retry. _(XML-style tags `<transcription>...</transcription>` / `<follow_up>...</follow_up>` chosen after codex review round 2 surfaced that markdown-with-headers (`## TRANSCRIPTION` / `## FOLLOW_UP`) collide with verbatim transcriptions that legitimately contain those marker lines. Tags bound the section unambiguously, allow multi-line content without escaping the envelope, and remain easy for E4B to emit. `ForegroundResponseParser` returns `ForegroundResult.ParseFailure(EMPTY_RESPONSE | MISSING_TRANSCRIPTION | MISSING_FOLLOW_UP | AMBIGUOUS_BLOCKS)` and preserves `recoveredTranscription` when the transcription block parsed cleanly but the follow-up did not. STT-C will measure the parse-failure rate.)_
 - [x] The transcription appears in the transcript before the follow-up renders. _(`ForegroundInference` is pure — it does not advance `CaptureSession`. The caller threads `Success.transcription` through `recordTranscription` (state → TRANSCRIBED) before `recordModelResponse(Success.followUp, persona)` (state → RESPONDED), preserving the Story 2.1 ordering.)_
 - [x] Audio buffer is discarded after the call returns. _(Temp WAV is created, used, and `delete()`d in a `finally` block — even on engine error or coroutine cancellation. No `ByteArray` / `FloatArray` is retained on the result type.)_
@@ -232,11 +232,11 @@ Don't conflate this story with Story 2.6 (worker logic). Story 2.6 is *what* run
 
 ### Story 2.11 — Inference latency UI: foreground placeholder
 
-**As** the AI implementor, **I need** an immediate visual placeholder in the conversation transcript when a foreground call starts and a real-time render of the model's response when it returns, **so that** the user sees motion during the 1–5 second foreground latency window without the UI feeling broken.
+**As** the AI implementor, **I need** an immediate visual placeholder in the entry transcript when a foreground call starts and a real-time render of the model's response when it returns, **so that** the user sees motion during the 1–5 second foreground latency window without the UI feeling broken.
 
 **Done when:**
-- [ ] When the foreground call is in flight, the user-turn slot in the transcript shows an inline placeholder ("Reading the entry." or persona-flavored copy from `ux-copy.md` §"Loading States").
-- [ ] When the response returns, the placeholder is replaced with the transcribed text (in muted/dimmed tone per `design-guidelines.md` §"Conversation transcript") and the model's follow-up renders below in primary text weight.
+- [ ] When the foreground call is in flight, the user-turn slot in the entry transcript shows an inline placeholder ("Reading the entry." or persona-flavored copy from `ux-copy.md` §"Loading States").
+- [ ] When the response returns, the placeholder is replaced with the transcribed text (in muted/dimmed tone per `design-guidelines.md` §"Entry transcript") and the model's follow-up renders below in primary text weight.
 - [ ] The placeholder displays for no less than 200ms (avoid the jarring instant-replace flash on fast inferences) and no more than the actual call duration (no fake delay).
 - [ ] If the foreground call fails or times out, the placeholder is replaced with the appropriate error state from `ux-copy.md` §"Error States".
 - [ ] No streaming UI in this story — see Note below.

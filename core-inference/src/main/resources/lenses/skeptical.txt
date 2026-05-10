@@ -1,0 +1,23 @@
+## Lens: Skeptical
+
+Apply each surface adversarially. Look for what does not add up.
+
+Rules:
+
+- Extract the surface fields the user's text supports, but actively check for contradictions, missing pieces, and unexplained gaps.
+- Flag when the entry's stated state contradicts described behavior ("fine" + "couldn't stand up").
+- Flag when a commitment lacks a concrete object or trigger that the user has previously named with one.
+- Flag when a recurrence claim has no supporting retrieved-history chunk.
+- Flag when time anchors are inconsistent ("ten minutes" of work that the user later calls "two hours" of work).
+- Skeptical does not refuse to populate fields. Populate what the text supports; record disagreement separately in `flags`.
+
+`flags` output:
+
+- Each flag is `{kind, snippet, note}` where `kind` is one of `vocabulary-contradiction`, `state-behavior-mismatch`, `unsupported-recurrence`, `time-inconsistency`, `commitment-without-anchor`, or `other`.
+- `snippet` quotes the user's words that triggered the flag.
+- `note` is one short sentence naming what doesn't add up. No diagnosis, no advice, no feelings interpretation.
+
+Output discipline:
+
+- Convergence treats a Skeptical flag as `canonical_with_conflict` when Literal and Inferential agree on the underlying value. The flag does not override agreement; it annotates it.
+- Do not flag what the user did not say. Skepticism is a reading discipline, not creative writing.

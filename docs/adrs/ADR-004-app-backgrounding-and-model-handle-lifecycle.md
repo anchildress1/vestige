@@ -208,12 +208,12 @@ Insert one screen between mic permission (current onboarding screen 3) and typed
 
 ## Action Items
 
-**Ordering note (per ADR-001 Action Items §"Ordering note"):** Phase 1 implements the lifecycle scaffolding only after Phase 0's stop-and-test points STT-A through STT-C pass. Pre-Phase-0 work limited to validation spikes and documentation per AGENTS.md.
+**Ordering note:** the repo no longer has a Phase 0; build-first is the standing rule. This lifecycle work lands in **Phase 2** after STT-A proves the audio path exists, because the service only matters once foreground capture is already producing entries that can queue background extraction.
 
-1. [ ] **Phase 1** — declare a `LifecycleService` (e.g., `BackgroundExtractionService`) in AndroidManifest with `foregroundServiceType="dataSync"` (or the v15-current equivalent). Wire to `AppContainer`.
-2. [ ] **Phase 1** — add the state-machine implementation per the §"State Machine" pseudocode above. Unit-test the transition table.
-3. [ ] **Phase 1** — define notification channel `vestige.local_processing` at `Application.onCreate`. Importance LOW.
-4. [ ] **Phase 1** — runtime-permission helper for `POST_NOTIFICATIONS` (Android 13+). Used by onboarding screen 3.5.
+1. [ ] **Phase 2** — declare a `LifecycleService` (e.g., `BackgroundExtractionService`) in AndroidManifest with `foregroundServiceType="dataSync"` (or the v15-current equivalent). Wire to `AppContainer`.
+2. [ ] **Phase 2** — add the state-machine implementation per the §"State Machine" pseudocode above. Unit-test the transition table.
+3. [ ] **Phase 2** — define notification channel `vestige.local_processing` at `Application.onCreate`. Importance LOW.
+4. [ ] **Phase 2** — runtime-permission helper for `POST_NOTIFICATIONS` (Android 13+). Used by onboarding screen 3.5.
 5. [ ] **Phase 4 day 1** — evaluate state-machine progress against §"Fallback Trigger" criteria. If triggered, apply the fallback action and record the date here.
 6. [ ] **Phase 4** — onboarding screen 3.5 implementation per §"Permission Flow." Cross-doc updates (`ux-copy.md`, `concept-locked.md` §Onboarding, `PRD.md` §P0 UX shell) committed alongside.
 7. [ ] **Phase 4** — wire notification tap target to History screen with deep-link to most-recent-in-flight entry.

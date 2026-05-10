@@ -157,7 +157,7 @@ class ConvergenceResolverTest {
     }
 
     @Test
-    fun `single surviving lens treats every populated field as candidate`() {
+    fun `single surviving lens leaves populated fields ambiguous`() {
         // Two lenses parsed-failed at the worker; only Literal reaches the resolver.
         val literal = LensExtraction(
             Lens.LITERAL,
@@ -167,11 +167,11 @@ class ConvergenceResolverTest {
         val resolved = resolver.resolve(listOf(literal))
 
         assertEquals(
-            ResolvedField("flattened", ConfidenceVerdict.CANDIDATE),
+            ResolvedField(value = null, verdict = ConfidenceVerdict.AMBIGUOUS),
             resolved.fields["energy_descriptor"],
         )
         assertEquals(
-            ResolvedField("aftermath", ConfidenceVerdict.CANDIDATE),
+            ResolvedField(value = null, verdict = ConfidenceVerdict.AMBIGUOUS),
             resolved.fields["template_label"],
         )
     }
@@ -293,18 +293,59 @@ class ConvergenceResolverTest {
     }
 
     @Test
-    fun `tags fallback uses first populated lens when Literal has none`() {
+    fun `tags with no Literal fallback stay ambiguous`() {
         val literal = LensExtraction(Lens.LITERAL, fields = mapOf("tags" to emptyList<String>()))
         val inferential = LensExtraction(Lens.INFERENTIAL, fields = mapOf("tags" to listOf("roadmap")))
         val skeptical = LensExtraction(Lens.SKEPTICAL, fields = mapOf("tags" to listOf("review")))
 
         val resolved = resolver.resolve(listOf(literal, inferential, skeptical))
 
-        // No tag reaches majority and Literal contributed nothing — fallback is the first populated
-        // lens's first tag (Inferential's "roadmap").
         assertEquals(
-            ResolvedField(value = listOf("roadmap"), verdict = ConfidenceVerdict.CANDIDATE),
+            ResolvedField(
+                value = null,
+                verdict = ConfidenceVerdict.AMBIGUOUS,
+                flags = listOf("lens-disagreement"),
+            ),
             resolved.fields["tags"],
+        )
+    }
+
+    @Test
+    fun `stated commitment agreement uses topic and entry id rather than full object equality`() {
+        val literal = LensExtraction(
+            Lens.LITERAL,
+            fields = mapOf(
+                "stated_commitment" to mapOf(
+                    "text" to "review the launch doc tonight",
+                    "topic_or_person" to "Nora",
+                    "entry_id" to "entry-123",
+                ),
+            ),
+        )
+        val inferential = LensExtraction(
+            Lens.INFERENTIAL,
+            fields = mapOf(
+                "stated_commitment" to mapOf(
+                    "text" to "send Nora feedback tonight",
+                    "topic_or_person" to "Nora",
+                    "entry_id" to "entry-123",
+                ),
+            ),
+        )
+        val skeptical = LensExtraction(Lens.SKEPTICAL, fields = mapOf("stated_commitment" to null))
+
+        val resolved = resolver.resolve(listOf(literal, inferential, skeptical))
+
+        assertEquals(
+            ResolvedField(
+                value = mapOf(
+                    "text" to "review the launch doc tonight",
+                    "topic_or_person" to "Nora",
+                    "entry_id" to "entry-123",
+                ),
+                verdict = ConfidenceVerdict.CANONICAL,
+            ),
+            resolved.fields["stated_commitment"],
         )
     }
 

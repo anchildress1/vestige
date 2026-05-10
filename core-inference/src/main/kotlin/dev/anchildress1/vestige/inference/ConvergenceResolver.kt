@@ -137,14 +137,16 @@ class DefaultConvergenceResolver : ConvergenceResolver {
             .eachCount()
             .filterValues { it >= MAJORITY_THRESHOLD }
             .keys
-        // Walk lens order once so the saved list stays stable, but persist the normalized stem
-        // rather than whichever plural surface form happened to appear first.
+        // Walk lens order once and persist the first-seen surface form per stem. Stems are a
+        // counting aid only — never the saved value — because the singularizer is naive and would
+        // corrupt legitimate singular tags ending in `s` / `ies` (e.g. `news` → `new`,
+        // `series` → `sery`).
         val orderedConsensus = mutableListOf<String>()
         val claimedStems = hashSetOf<String>()
         for ((_, tags) in populated) {
             for (tag in tags) {
                 val stem = stemForCount(tag)
-                if (stem in canonicalStems && claimedStems.add(stem)) orderedConsensus.add(stem)
+                if (stem in canonicalStems && claimedStems.add(stem)) orderedConsensus.add(tag)
             }
         }
         return if (orderedConsensus.isNotEmpty()) {
@@ -157,7 +159,7 @@ class DefaultConvergenceResolver : ConvergenceResolver {
             val fallback = byLens[Lens.LITERAL]?.tagsOrNull()?.firstOrNull()
             if (fallback != null) {
                 ResolvedField(
-                    value = listOf(stemForCount(fallback)),
+                    value = listOf(fallback),
                     verdict = ConfidenceVerdict.CANDIDATE,
                     flags = matchingFlags,
                     sourceLens = Lens.LITERAL,

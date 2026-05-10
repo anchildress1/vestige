@@ -346,9 +346,28 @@ class ConvergenceResolverTest {
 
         val resolved = resolver.resolve(listOf(literal, inferential, skeptical))
 
-        // "meeting" / "meetings" and "doc" / "docs" share stems and persist as normalized tags.
+        // "meeting" / "meetings" share a stem and reach majority via the per-stem count; the saved
+        // value preserves the first-seen surface form (Literal) rather than the (naive) stem so a
+        // legitimate plural surface stays a real word.
         assertEquals(
-            ResolvedField(value = listOf("meeting", "doc"), verdict = ConfidenceVerdict.CANONICAL),
+            ResolvedField(value = listOf("meetings", "docs"), verdict = ConfidenceVerdict.CANONICAL),
+            resolved.fields["tags"],
+        )
+    }
+
+    @Test
+    fun `singular tags ending in s or ies are persisted intact`() {
+        // The naive singularizer would corrupt `news` → `new` and `series` → `sery` if the stem
+        // were ever persisted. Guard test: stems are counting aids only; saved values keep the
+        // original surface form.
+        val literal = LensExtraction(Lens.LITERAL, fields = mapOf("tags" to listOf("news", "series")))
+        val inferential = LensExtraction(Lens.INFERENTIAL, fields = mapOf("tags" to listOf("news", "series")))
+        val skeptical = LensExtraction(Lens.SKEPTICAL, fields = mapOf("tags" to listOf("news", "series")))
+
+        val resolved = resolver.resolve(listOf(literal, inferential, skeptical))
+
+        assertEquals(
+            ResolvedField(value = listOf("news", "series"), verdict = ConfidenceVerdict.CANONICAL),
             resolved.fields["tags"],
         )
     }

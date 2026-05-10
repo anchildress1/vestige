@@ -11,7 +11,8 @@ import java.time.Clock
 import java.util.concurrent.ConcurrentHashMap
 
 /**
- * Foreground capture inference (Phase 2 Story 2.2; reframed by the STT-B fallback).
+ * Foreground capture inference (Phase 2 Story 2.2; v1 single-turn scope per the STT-B test
+ * boundary).
  *
  * Takes a normalized **final-chunk** [AudioChunk] from `AudioCapture` (Story 1.4) and runs one
  * Gemma 4 E4B call composed of:
@@ -23,11 +24,15 @@ import java.util.concurrent.ConcurrentHashMap
  *  - the audio buffer handed off as `Content.AudioFile` against a temp PCM_S16LE WAV (the only
  *    handoff that works on LiteRT-LM 0.11.0 per ADR-001 §Q4 STT-A record).
  *
- * **Single-turn-per-capture** per the STT-B fallback (`adrs/ADR-002-multi-lens-extraction-pattern.md`
- * §"Multi-turn behavior"). The prompt no longer carries any prior-turn context — three on-device
- * rounds in May 2026 confirmed Gemma 4 E4B does not reference `## RECENT TURNS` history in its
- * follow-up regardless of count or instruction. Each capture is a self-contained exchange and the
- * caller is expected to construct a fresh [CaptureSession] for the next recording.
+ * **Single-turn-per-capture as a v1 scope choice** (see
+ * `adrs/ADR-002-multi-lens-extraction-pattern.md` §"Multi-turn behavior"). The prompt no longer
+ * carries any prior-turn context. Three on-device rounds in May 2026 confirmed that under the
+ * prompt-stuffing pattern (fresh `engine.createConversation()` per turn + history crammed into
+ * the system prompt) Gemma 4 E4B does not reference the prior turns in its follow-up; the
+ * LiteRT-LM SDK's stateful Conversation path (one persistent handle, multiple `sendMessage`
+ * calls) was **not** measured. v1 ships single-turn for simplicity. Each capture is a
+ * self-contained exchange and the caller is expected to construct a fresh [CaptureSession] for
+ * the next recording.
  *
  * **Final-chunk only.** Per ADR-001 §Q4 the audio path is capped at 30 s and `AudioCapture` emits
  * exactly one chunk per recording with `isFinal == true`. This API rejects non-final chunks at the

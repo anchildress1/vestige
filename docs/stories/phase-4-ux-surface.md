@@ -8,7 +8,7 @@
 
 ## Goal
 
-Wrap the app in a coherent, dark, atmospheric UX that meets the 10-second judge test — opening the app makes it obvious this is a *local AI cognition tracker*, not another journaling app. Onboarding handles the 3.66 GB model download gracefully. Capture, History, Patterns, and Settings are all reachable, navigable, and styled to the locked palette and typography. Three top error states have polished handling. Empty states use the locked microcopy. P1 features (per-session persona override, Re-eval/Reading screen if STT-D passed, Roast me bottom sheet if pattern evidence is solid) ship if scope holds.
+Wrap the app in a coherent, dark, atmospheric UX that meets the 10-second judge test — opening the app makes it obvious this is a *local AI cognition tracker*, not another journaling app. Onboarding handles the 3.66 GB model download gracefully. Capture, History, Patterns, and Settings are all reachable, navigable, and styled to the locked palette and typography. Three top error states have polished handling. Empty states use the locked microcopy. P1 features (per-capture persona selection, Re-eval/Reading screen if STT-D passed, Roast me bottom sheet if pattern evidence is solid) ship if scope holds.
 
 **Output of this phase:** the demo-ready app on the reference device. Every primary surface from `design-guidelines.md` §"Screen Specs" is implemented to spec. Phase 5 (demo optimization) starts with a stable, polished app — not a half-styled scaffold.
 
@@ -20,7 +20,7 @@ Wrap the app in a coherent, dark, atmospheric UX that meets the 10-second judge 
 - [ ] Onboarding 7-screen flow per `ux-copy.md` §Onboarding works end-to-end on a fresh install on the reference S24 Ultra.
 - [ ] Model download UX handles Wi-Fi gating, real progress, retry on stall/failure, and survives app restart mid-download.
 - [ ] Persistent Local Model Status surface exists and is reachable from app shell or settings; status is accurate.
-- [ ] Capture screen polished per `design-guidelines.md` §"Capture Screen" with active-record blue, live waveform during recording, transcription appearing 1-3 seconds post-chunk, conversation transcript with muted user turns + primary model turns.
+- [ ] Capture screen polished per `design-guidelines.md` §"Capture Screen" with active-record blue, live waveform during recording, transcription appearing 1-3 seconds post-chunk, entry transcript with muted user transcription + primary model follow-up (single-turn-per-capture per the STT-B v1 scope choice; see `adrs/ADR-005-stt-b-scope-and-v1-single-turn.md`).
 - [ ] History list, Entry Detail, Pattern List, and Pattern Detail are all polished and navigable per their `design-guidelines.md` specs.
 - [ ] Settings screen P0 scope works: persona default, export all entries (zip of markdown), delete all data, model status / re-download / delete.
 - [ ] Empty states across major screens use the locked microcopy from `ux-copy.md` §"Empty states".
@@ -128,7 +128,7 @@ Wrap the app in a coherent, dark, atmospheric UX that meets the 10-second judge 
 
 ### Story 4.5 — Capture screen polish
 
-**As** the user during a session, **I need** the polished capture screen per `design-guidelines.md` §"Capture Screen" + `poc/screenshots/capture.png` — `MistHero` capture stone, hero title, live `AudioMeter` during recording, chunk boundary indicator, transcript with the locked muted-user / primary-model treatment — **so that** the demo's primary surface lands and recording feels alive instead of a static button on a dark background.
+**As** the user opening the capture screen, **I need** the polished capture surface per `design-guidelines.md` §"Capture Screen" + `poc/screenshots/capture.png` — `MistHero` capture stone, hero title, live `AudioMeter` during recording, 30 s cap indicator, entry transcript with the locked muted-user / primary-model treatment — **so that** the demo's primary surface lands and recording feels alive instead of a static button on a dark background.
 
 **Done when:**
 - [ ] `MistHero` primitive per `poc/design-review.md` §3.3 + `design-guidelines.md` §"Component Conventions / MistHero":
@@ -139,13 +139,12 @@ Wrap the app in a coherent, dark, atmospheric UX that meets the 10-second judge 
   - Approaching 30s chunk boundary (~25s): thin progress arc on the ring, no copy.
 - [ ] Hero title slot above `MistHero` renders an editorial italic line (`Newsreader`) — pulled from `ux-copy.md` §Capture Screen, never invented inline. Example from `poc/screenshots/capture.png`: `What lingered from yesterday?`
 - [ ] Mono tagline strip below `MistHero` per `poc/screenshots/capture.png`: directive (`HOLD THE STONE · SPEAK`-style) and privacy tagline (`30s chunks · audio discarded after extraction`-style). `JetBrains Mono`, eyebrow scale. Strings from `ux-copy.md`.
-- [ ] Conversation transcript per `design-guidelines.md` §"Conversation transcript":
-  - Vertical scroll, chronological.
-  - User turns: `JetBrains Mono` `YOU` label + transcribed text in `mist` tone.
-  - Model turns: `JetBrains Mono` `WITNESS` (or active persona name) label + body text in `ink` weight.
+- [ ] Entry transcript per `design-guidelines.md` §"Entry transcript" (single-turn-per-capture per the STT-B v1 scope choice — exactly one USER turn + one MODEL turn per entry, no scroll across multiple exchanges):
+  - User transcription: `JetBrains Mono` `YOU` label + transcribed text in `mist` tone.
+  - Model follow-up: `JetBrains Mono` `WITNESS` (or active persona name) label + body text in `ink` weight.
   - No chat bubbles. Left-rule indicators distinguish speakers.
 - [ ] Type affordance: small `Type` button at the bottom of the screen per `ux-copy.md` §"Capture Screen / Type affordance". Expanding opens a text input with placeholder `What just happened.` and a `Log entry` action.
-- [ ] Persona switcher chrome: top-right pill `WITNESS ▾` (or active persona) per `ux-copy.md` §"Capture Screen / Status row". Tapping opens the persona selector. Per-session override (Story 4.12) hooks into this.
+- [ ] Persona switcher chrome: top-right pill `WITNESS ▾` (or active persona) per `ux-copy.md` §"Capture Screen / Status row". Tapping opens the persona selector. Per-capture selection (Story 4.12) hooks into this — the chosen persona applies to the next capture's foreground call.
 - [ ] Patterns peek: card per `ux-copy.md` §"Capture Screen / Patterns peek" showing `{N} active patterns` with a one-line teaser. Empty state when none.
 - [ ] Footer metadata: `Last entry · {date} · {duration}` per `ux-copy.md` §"Capture Screen / Footer metadata". History link.
 - [ ] The dead-middle problem from earlier mockups is resolved: empty space carries faint mist-gradient atmosphere or surfaces ambient state (last entry summary, current pattern peek). No literal forgotten pixels.
@@ -177,7 +176,7 @@ Wrap the app in a coherent, dark, atmospheric UX that meets the 10-second judge 
 
 **Done when:**
 - [ ] Header shows: timestamp + template label.
-- [ ] Body shows: the full conversation transcript (user turns muted, model turns primary, same treatment as Story 4.5).
+- [ ] Body shows: the entry transcript (one USER turn + one MODEL turn per the v1 single-turn lifecycle, user transcription muted, model follow-up primary, same treatment as Story 4.5).
 - [ ] A "Tags" row below the transcript shows the model-extracted tags as quiet chips.
 - [ ] A "Observation" section shows the 1-2 per-entry observations (from Story 2.13) with their evidence references.
 - [ ] An overflow menu offers `Delete entry` (destructive flow per `ux-copy.md` §"Destructive Confirmations / Delete single entry").
@@ -186,7 +185,7 @@ Wrap the app in a coherent, dark, atmospheric UX that meets the 10-second judge 
 - [ ] Source-link integration: tapping a pattern source from Story 3.10's pattern detail navigates here and the entry is highlighted briefly.
 - [ ] Notification tap target deep-links here per ADR-004 §"Notification Contract": tapping the system-shade `Reading the entry.` notification opens this screen scrolled to the most recent entry whose `extraction_status` is non-terminal. Falls back to History if no in-flight entry exists at tap time (e.g., the user tapped the notification right as the keep-alive expired).
 
-**Notes / risks:** Don't show audio waveform or play-back controls — audio doesn't persist. The entry detail is the *text* view. Per `design-guidelines.md` §"Conversation transcript", the user's transcribed words show but never as a waveform.
+**Notes / risks:** Don't show audio waveform or play-back controls — audio doesn't persist. The entry detail is the *text* view. Per `design-guidelines.md` §"Entry transcript", the user's transcribed words show but never as a waveform.
 
 ---
 
@@ -254,11 +253,11 @@ Wrap the app in a coherent, dark, atmospheric UX that meets the 10-second judge 
 
 ### Story 4.11 — Top three error states
 
-**As** the user, **I need** the three most-likely failure modes — model download fail/stall, inference timeout/fail, mic permission denied/unavailable — to render clear error states with retry affordances per `ux-copy.md` §"Error States", **so that** the most predictable failure paths in the demo (or in real use) don't end the session.
+**As** the user, **I need** the three most-likely failure modes — model download fail/stall, inference timeout/fail, mic permission denied/unavailable — to render clear error states with retry affordances per `ux-copy.md` §"Error States", **so that** the most predictable failure paths in the demo (or in real use) don't end the capture without a clear recovery path.
 
 **Done when:**
 - [ ] **Model download fail/stall**: handled within Story 4.3's flow. `ux-copy.md` strings: `Download stalled. Retry.` / `Network choked.`. Retry button works. After 3 failed attempts, shows the failed state and surfaces the user to settings → re-download.
-- [ ] **Inference timeout / fail**: appears in the conversation transcript when the foreground or background extraction call fails. `ux-copy.md` strings: `Model timed out. Try a shorter chunk.` / `Model couldn't read that. Try again.`. Retry option re-runs the same call.
+- [ ] **Inference timeout / fail**: appears in the entry transcript when the foreground or background extraction call fails. `ux-copy.md` strings: `Model timed out. Try a shorter chunk.` / `Model couldn't read that. Try again.`. Retry option re-runs the same call.
 - [ ] **Mic permission denied or unavailable**: capture screen shows `Mic permission required to record. Settings → Permissions.` per `ux-copy.md`. Tapping the deep-link opens system settings. If the mic is unavailable (hardware), shows `Mic unavailable. Try typing.`.
 - [ ] All three error states use the design tokens from Story 4.1 (no orange-warning convention; system status colors only).
 - [ ] Other error states from `ux-copy.md` §"Error States — catalog" are implemented as strings/handlers but get *unpolished* presentations (toast / generic dialog) only when naturally encountered. We polish only the top three for v1; the rest defer to v1.5 per the scope rule.
@@ -267,19 +266,21 @@ Wrap the app in a coherent, dark, atmospheric UX that meets the 10-second judge 
 
 ---
 
-### Story 4.12 — P1: Per-session persona override
+### Story 4.12 — P1: Per-capture persona selection
 
-**As** the user, **I need** to switch personas mid-session by tapping the persona dropdown chrome from Story 4.5 and the change to take effect on the next foreground call (without affecting prior turns), **so that** I can switch tones if Witness is being too gentle today without leaving capture.
+**Reframed from "P1: Per-session persona override"** by the STT-B v1 scope choice (see `adrs/ADR-005-stt-b-scope-and-v1-single-turn.md`, which amends `adrs/ADR-002-multi-lens-extraction-pattern.md` §"Multi-turn behavior"). The original story assumed mid-session persona switches on a multi-turn `CaptureSession`; v1 makes each `CaptureSession` single-use, so persona is selected *before* a fresh capture, not switched *during* an ongoing one.
+
+**As** the user, **I need** to choose a persona before each capture by tapping the persona dropdown chrome from Story 4.5, **so that** I can pick a different tone (Witness / Hardass / Editor) for an entry without leaving the capture screen and without affecting any prior entry's recorded persona.
 
 **Done when:**
-- [ ] Tapping the persona dropdown in the capture screen chrome opens a small selector (segmented control or list) with the three personas and a checkmark on the active one.
-- [ ] Selecting a different persona updates the session's active persona via Story 2.3's `setPersona(persona)` API.
-- [ ] The change takes effect on the next foreground call. Prior turns retain their original persona's voice.
-- [ ] The chrome label updates to reflect the new active persona (`WITNESS ▾` → `HARDASS ▾`).
-- [ ] The change does not persist as a default — that's a separate Settings action (Story 4.9). It's session-scoped.
-- [ ] Per-session override is **P1**: ships only if Phase 4 scope holds. If we're behind, this drops to v1.5 with the note "session always uses default persona; switch from Settings between sessions."
+- [ ] Tapping the persona dropdown in the capture screen chrome opens a small selector (segmented control or list) with the three personas and a checkmark on the currently-selected one.
+- [ ] Selecting a different persona updates the next capture's active persona — the UI constructs a fresh `CaptureSession(defaultPersona = selectedPersona)` when the user next taps record (Story 2.3's `setPersona(persona)` API can also be called on an idle session before `startRecording`; either path is acceptable).
+- [ ] The chrome label updates to reflect the newly-selected persona (`WITNESS ▾` → `HARDASS ▾`).
+- [ ] Selection does not affect prior entries. Each saved entry's `Turn.persona` records the persona that authored it (Story 2.3 invariant).
+- [ ] The selection does not persist as a default — that's a separate Settings action (Story 4.9). It's per-capture-scoped.
+- [ ] Per-capture selection is **P1**: ships only if Phase 4 scope holds. If we're behind, this drops to v1.5 with the note "captures always use the Settings default persona; switch from Settings between captures."
 
-**Notes / risks:** Story 2.3 already exists and works at the API level. This is purely UI plumbing.
+**Notes / risks:** Story 2.3 (post-fallback) already exposes the per-capture persona API. This is purely UI plumbing. The "switch mid-session" behavior the original story assumed no longer exists at the lifecycle level — the persona selector applies prospectively, not retroactively.
 
 ---
 

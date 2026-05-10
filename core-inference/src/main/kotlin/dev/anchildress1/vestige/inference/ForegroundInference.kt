@@ -11,13 +11,11 @@ import java.time.Clock
 import java.util.concurrent.ConcurrentHashMap
 
 /**
- * Foreground capture inference (Phase 2 Story 2.2).
+ * Foreground capture inference (Phase 2 Story 2.2; reframed by the STT-B fallback).
  *
- * Takes a normalized **final-chunk** [AudioChunk] from `AudioCapture` (Story 1.4) plus the
- * in-session [Transcript] and runs one Gemma 4 E4B call composed of:
+ * Takes a normalized **final-chunk** [AudioChunk] from `AudioCapture` (Story 1.4) and runs one
+ * Gemma 4 E4B call composed of:
  *  - the active [Persona]'s system prompt (via [PersonaPromptComposer]) — Story 1.8;
- *  - the last [historyTurnLimit] turns of the transcript as recent context, oldest-first
- *    (ADR-002 §Q5 — default last 4);
  *  - an XML-tag output schema reminder asking for `<transcription>`/`<follow_up>` blocks
  *    (ADR-002 §"Structured-output reliability"; the markdown-with-headers approach was
  *    rejected after codex review round 2 because verbatim transcriptions can legitimately
@@ -25,11 +23,16 @@ import java.util.concurrent.ConcurrentHashMap
  *  - the audio buffer handed off as `Content.AudioFile` against a temp PCM_S16LE WAV (the only
  *    handoff that works on LiteRT-LM 0.11.0 per ADR-001 §Q4 STT-A record).
  *
- * **Final-chunk only.** Per ADR-002 §"For >30s captures" intermediate chunks (`isFinal == false`)
- * must run a stripped-down transcription-only call — no persona, no session context, no follow-up.
- * This API rejects non-final chunks at the precondition; multi-chunk orchestration (concatenating
- * transcript-so-far before the final foreground call) is a separate story. A non-final chunk
- * arriving here is a caller bug, not a fallback to handle silently.
+ * **Single-turn-per-capture** per the STT-B fallback (`adrs/ADR-002-multi-lens-extraction-pattern.md`
+ * §"Multi-turn behavior"). The prompt no longer carries any prior-turn context — three on-device
+ * rounds in May 2026 confirmed Gemma 4 E4B does not reference `## RECENT TURNS` history in its
+ * follow-up regardless of count or instruction. Each capture is a self-contained exchange and the
+ * caller is expected to construct a fresh [CaptureSession] for the next recording.
+ *
+ * **Final-chunk only.** Per ADR-001 §Q4 the audio path is capped at 30 s and `AudioCapture` emits
+ * exactly one chunk per recording with `isFinal == true`. This API rejects non-final chunks at the
+ * precondition; the >30 s multi-chunk orchestration was deferred to backlog row
+ * `multi-chunk-foreground` and does not exist in v1.
  *
  * Per AGENTS.md guardrail 11 the temp WAV is created, used, and deleted inside this call — even
  * on engine error or coroutine cancellation. No audio bytes survive past the response.
@@ -45,68 +48,63 @@ import java.util.concurrent.ConcurrentHashMap
 class ForegroundInference(
     private val engine: LiteRtLmEngine,
     private val cacheDir: File,
-    private val historyTurnLimit: Int = DEFAULT_HISTORY_TURN_LIMIT,
     private val clock: Clock = Clock.systemUTC(),
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) {
-
-    init {
-        require(historyTurnLimit > 0) { "historyTurnLimit must be positive, was $historyTurnLimit" }
-    }
 
     /**
      * Run the foreground call. Suspends on the IO dispatcher; the engine handle is single-threaded
      * inside LiteRT-LM, so callers must not invoke this concurrently against the same engine.
      */
-    suspend fun runForegroundCall(audio: AudioChunk, transcript: Transcript, persona: Persona): ForegroundResult =
-        withContext(ioDispatcher) {
-            require(audio.samples.isNotEmpty()) { "ForegroundInference requires non-empty audio samples." }
-            require(audio.isFinal) {
-                "runForegroundCall is final-chunk only (ADR-002 §\"For >30s captures\"); " +
-                    "intermediate chunks need a transcription-only call."
-            }
-            require(cacheDir.isDirectory) { "cacheDir must be an existing directory: $cacheDir" }
-
-            // Sweep crash leftovers, create the new temp WAV, and register it as active in a
-            // single critical section. Without the lock, two overlapping `runForegroundCall`
-            // invocations race: call A creates its temp file; before A registers it in
-            // `activeTempWavs`, call B sweeps and deletes A's just-created file (codex review
-            // round 6 P1). Holding `tempWavLock` makes sweep + create + register atomic
-            // against the same lock taken by other in-flight calls. The expensive engine call
-            // happens OUTSIDE the lock so concurrent inference is still allowed.
-            val systemPrompt = composeSystemPrompt(persona, transcript)
-            val temp = synchronized(tempWavLock) {
-                sweepStaleTempWavs()
-                File.createTempFile(TEMP_PREFIX, TEMP_SUFFIX, cacheDir).also {
-                    activeTempWavs += it.absolutePath
-                }
-            }
-            val started = System.nanoTime()
-            val rawResponse = try {
-                WavWriter.writeMonoFloatWav(temp, audio.samples, audio.sampleRateHz)
-                engine.sendMessageContents(
-                    listOf(
-                        Content.Text(systemPrompt),
-                        Content.AudioFile(temp.absolutePath),
-                    ),
-                )
-            } finally {
-                discardTempWav(temp)
-                activeTempWavs -= temp.absolutePath
-            }
-            val elapsedMs = (System.nanoTime() - started) / NANOS_PER_MILLI
-            Log.d(
-                TAG,
-                "runForegroundCall persona=$persona elapsed=${elapsedMs}ms raw=${rawResponse.length}c",
-            )
-
-            ForegroundResponseParser.parse(
-                raw = rawResponse,
-                persona = persona,
-                elapsedMs = elapsedMs,
-                completedAt = clock.instant(),
-            )
+    suspend fun runForegroundCall(audio: AudioChunk, persona: Persona): ForegroundResult = withContext(ioDispatcher) {
+        require(audio.samples.isNotEmpty()) { "ForegroundInference requires non-empty audio samples." }
+        require(audio.isFinal) {
+            "runForegroundCall is final-chunk only — `AudioCapture` caps each recording at " +
+                "30 s and emits one isFinal=true chunk (ADR-001 §Q4 + STT-B fallback). " +
+                "Multi-chunk orchestration is deferred to backlog `multi-chunk-foreground`."
         }
+        require(cacheDir.isDirectory) { "cacheDir must be an existing directory: $cacheDir" }
+
+        // Sweep crash leftovers, create the new temp WAV, and register it as active in a
+        // single critical section. Without the lock, two overlapping `runForegroundCall`
+        // invocations race: call A creates its temp file; before A registers it in
+        // `activeTempWavs`, call B sweeps and deletes A's just-created file (codex review
+        // round 6 P1). Holding `tempWavLock` makes sweep + create + register atomic
+        // against the same lock taken by other in-flight calls. The expensive engine call
+        // happens OUTSIDE the lock so concurrent inference is still allowed.
+        val systemPrompt = composeSystemPrompt(persona)
+        val temp = synchronized(tempWavLock) {
+            sweepStaleTempWavs()
+            File.createTempFile(TEMP_PREFIX, TEMP_SUFFIX, cacheDir).also {
+                activeTempWavs += it.absolutePath
+            }
+        }
+        val started = System.nanoTime()
+        val rawResponse = try {
+            WavWriter.writeMonoFloatWav(temp, audio.samples, audio.sampleRateHz)
+            engine.sendMessageContents(
+                listOf(
+                    Content.Text(systemPrompt),
+                    Content.AudioFile(temp.absolutePath),
+                ),
+            )
+        } finally {
+            discardTempWav(temp)
+            activeTempWavs -= temp.absolutePath
+        }
+        val elapsedMs = (System.nanoTime() - started) / NANOS_PER_MILLI
+        Log.d(
+            TAG,
+            "runForegroundCall persona=$persona elapsed=${elapsedMs}ms raw=${rawResponse.length}c",
+        )
+
+        ForegroundResponseParser.parse(
+            raw = rawResponse,
+            persona = persona,
+            elapsedMs = elapsedMs,
+            completedAt = clock.instant(),
+        )
+    }
 
     /**
      * Discard a temp foreground WAV per AGENTS.md guardrail 11. Try delete first; if delete
@@ -142,69 +140,17 @@ class ForegroundInference(
             }
     }
 
-    private fun composeSystemPrompt(persona: Persona, transcript: Transcript): String {
+    private fun composeSystemPrompt(persona: Persona): String {
         val personaPrompt = PersonaPromptComposer.compose(persona).trimEnd()
-        val recentTurns = transcript.turns.takeLast(historyTurnLimit)
         return buildString {
             append(personaPrompt)
             append("\n\n")
-            append(RECENT_TURNS_HEADER)
-            append('\n')
-            if (recentTurns.isEmpty()) {
-                append(NO_RECENT_TURNS)
-                append('\n')
-            } else {
-                recentTurns.forEach { turn ->
-                    append(turn.toJsonLine())
-                    append('\n')
-                }
-            }
-            append('\n')
             append(OUTPUT_SCHEMA_REMINDER)
             append('\n')
         }
     }
 
-    /**
-     * Render one prior turn as a single-line JSON object per ADR-002 §"Session context format"
-     * (`{speaker: USER|MODEL, text: "..."}`). JSON encoding properly escapes embedded newlines and
-     * quotes, so a multi-line model reply (now possible because [ForegroundResponseParser] accepts
-     * multi-line `<follow_up>` bodies) cannot escape the history block and inject stray prompt
-     * lines outside the envelope. Hand-rolled because there's no JSON dep in `:core-inference`.
-     */
-    private fun Turn.toJsonLine(): String = "{\"speaker\":\"${speaker.name}\",\"text\":\"${escapeJsonString(text)}\"}"
-
-    private fun escapeJsonString(input: String): String = buildString(input.length) {
-        input.forEach { ch ->
-            when (ch) {
-                '\\' -> append("\\\\")
-
-                '"' -> append("\\\"")
-
-                '\n' -> append("\\n")
-
-                '\r' -> append("\\r")
-
-                '\t' -> append("\\t")
-
-                '\b' -> append("\\b")
-
-                '\u000c' -> append("\\f")
-
-                else -> if (ch.code < CONTROL_CHAR_LIMIT) {
-                    append("\\u%04x".format(ch.code))
-                } else {
-                    append(ch)
-                }
-            }
-        }
-    }
-
     companion object {
-        const val DEFAULT_HISTORY_TURN_LIMIT: Int = 4
-
-        internal const val RECENT_TURNS_HEADER = "## RECENT TURNS"
-        internal const val NO_RECENT_TURNS = "(no prior turns in this session)"
         internal const val TEMP_PREFIX = "vestige-fg-"
         internal const val TEMP_SUFFIX = ".wav"
 
@@ -225,7 +171,6 @@ class ForegroundInference(
 
         private const val TAG = "VestigeForegroundInference"
         private const val NANOS_PER_MILLI = 1_000_000L
-        private const val CONTROL_CHAR_LIMIT = 0x20
         private val activeTempWavs: MutableSet<String> = ConcurrentHashMap.newKeySet()
 
         /**

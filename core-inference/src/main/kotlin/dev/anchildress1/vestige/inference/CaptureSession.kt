@@ -4,28 +4,31 @@ import dev.anchildress1.vestige.model.Persona
 import java.time.Clock
 
 /**
- * Turn-by-turn state for one capture session per `phase-2-core-loop.md` §Story 2.1. A session is
- * one [Transcript] worth of conversation between the user and Gemma; it produces one saved entry
- * (Story 2.12) at end of session.
+ * Single-use turn-by-turn state for one capture per `phase-2-core-loop.md` §Story 2.1 (reframed
+ * by the STT-B fallback — see `adrs/ADR-002-multi-lens-extraction-pattern.md` §"Multi-turn
+ * behavior"). One [CaptureSession] models one entry's worth of recording-and-response: the user
+ * records, Gemma transcribes + answers, the entry saves, done. Subsequent recordings construct a
+ * fresh [CaptureSession] — the v1 lifecycle never loops back for a second turn.
  *
  * State machine:
  * ```
  *   IDLE ──startRecording──▶ RECORDING ──submitForInference──▶ INFERRING
- *    ▲                                                              │
- *    │                                                              ▼
- *    └──acknowledgeResponse──── RESPONDED ◀──recordModelResponse── TRANSCRIBED
- *                                                                  ▲
  *                                                                  │
- *                                                    recordTranscription
+ *                                                                  ▼
+ *                                          RESPONDED ◀──recordModelResponse── TRANSCRIBED
+ *                                          ▲                                  ▲
+ *                                          │                                  │
+ *                                          │                       recordTranscription
+ *                                          │
+ *                              (terminal — no transition out)
  *
- *   any ──fail──▶ ERROR ──clearError──▶ IDLE
+ *   any ──fail──▶ ERROR (terminal)
  * ```
  *
  * Illegal transitions throw `IllegalStateException`. Per `AGENTS.md` guardrail 11 the transcript
- * stores text only; no audio bytes flow through this class. Persona switching (Story 2.3) updates
- * [activePersona] for the next foreground call; prior turns retain whichever persona authored
- * them via [Turn.persona]. The foreground inference plumbing (Story 2.2) wraps this state machine
- * — it does not bypass it.
+ * stores text only; no audio bytes flow through this class. Persona selection (Story 2.3) updates
+ * [activePersona] for the foreground call; the recorded [Turn] permanently carries whichever
+ * persona authored it.
  */
 class CaptureSession(private val clock: Clock = Clock.systemUTC(), defaultPersona: Persona = Persona.WITNESS) {
 
@@ -40,10 +43,9 @@ class CaptureSession(private val clock: Clock = Clock.systemUTC(), defaultPerson
         private set
 
     /**
-     * Active persona for the *next* foreground call (Story 2.3). Defaults to [Persona.WITNESS]
-     * per `concept-locked.md` §Personas. Prior turns in [transcript] keep the persona that
-     * authored them — switching does not rewrite history. Background extraction is persona-
-     * agnostic per `AGENTS.md` guardrail 9, so this value never reaches the lens prompts.
+     * Active persona for the upcoming foreground call (Story 2.3). Defaults to [Persona.WITNESS]
+     * per `concept-locked.md` §Personas. Background extraction is persona-agnostic per
+     * `AGENTS.md` guardrail 9, so this value never reaches the lens prompts.
      */
     var activePersona: Persona = defaultPersona
         private set
@@ -69,7 +71,8 @@ class CaptureSession(private val clock: Clock = Clock.systemUTC(), defaultPerson
 
     /**
      * TRANSCRIBED → RESPONDED. Appends the model's follow-up after the user's transcription is
-     * already visible in the transcript.
+     * already visible in the transcript. RESPONDED is terminal — the next recording requires a
+     * fresh [CaptureSession] instance per the STT-B fallback's single-use lifecycle.
      */
     fun recordModelResponse(modelText: String, persona: Persona) {
         requireState("recordModelResponse", State.TRANSCRIBED)
@@ -77,33 +80,21 @@ class CaptureSession(private val clock: Clock = Clock.systemUTC(), defaultPerson
         state = State.RESPONDED
     }
 
-    /** RESPONDED → IDLE — UI has shown the response, ready for the next turn or save. */
-    fun acknowledgeResponse() {
-        requireState("acknowledgeResponse", State.RESPONDED)
-        state = State.IDLE
-    }
-
     /**
-     * Any → ERROR. Stores [error] for the foreground UI to render and stops further transitions
-     * until [clearError]. The transcript is preserved — error recovery does not lose history.
+     * Any → ERROR. Stores [error] for the foreground UI to render. ERROR is terminal — the
+     * caller constructs a fresh [CaptureSession] to retry; the prior session's transcript is
+     * preserved on the failed instance for diagnostics until it goes out of scope.
      */
     fun fail(error: Throwable) {
         lastError = error
         state = State.ERROR
     }
 
-    /** ERROR → IDLE. Clears [lastError]; transcript is untouched so the user can retry. */
-    fun clearError() {
-        requireState("clearError", State.ERROR)
-        lastError = null
-        state = State.IDLE
-    }
-
     /**
-     * Update [activePersona] for subsequent foreground calls. State-independent — callers may
-     * switch persona between turns or while idle. Mid-call switches do not affect the in-flight
-     * inference: the foreground call carries the persona the caller passed into it, and the
-     * resulting [Turn] records that persona on the transcript regardless of [activePersona].
+     * Update [activePersona] for the upcoming foreground call. State-independent — callers may
+     * switch persona while idle or during recording. The foreground call carries whichever
+     * persona the caller passes into it; the resulting [Turn] records that persona regardless of
+     * any later [setPersona] call on this session.
      */
     fun setPersona(persona: Persona) {
         activePersona = persona

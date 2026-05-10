@@ -22,19 +22,6 @@ class CaptureSessionTest {
         override fun instant(): Instant = pending.removeAt(0)
     }
 
-    private fun runSuccessfulTurn(session: CaptureSession, userText: String, modelText: String, persona: Persona) {
-        session.startRecording()
-        assertEquals(CaptureSession.State.RECORDING, session.state)
-        session.submitForInference()
-        assertEquals(CaptureSession.State.INFERRING, session.state)
-        session.recordTranscription(userText = userText)
-        assertEquals(CaptureSession.State.TRANSCRIBED, session.state)
-        session.recordModelResponse(modelText = modelText, persona = persona)
-        assertEquals(CaptureSession.State.RESPONDED, session.state)
-        session.acknowledgeResponse()
-        assertEquals(CaptureSession.State.IDLE, session.state)
-    }
-
     private fun assertTranscript(
         session: CaptureSession,
         texts: List<String>,
@@ -58,51 +45,26 @@ class CaptureSessionTest {
     }
 
     @Test
-    fun `full multi-turn session walks the happy path and preserves chronological order`() {
-        val firstTurnAt = Instant.parse("2026-05-09T12:00:00Z")
-        val firstResponseAt = Instant.parse("2026-05-09T12:00:05Z")
-        val secondTurnAt = Instant.parse("2026-05-09T12:00:30Z")
-        val secondResponseAt = Instant.parse("2026-05-09T12:00:35Z")
-        val thirdTurnAt = Instant.parse("2026-05-09T12:01:00Z")
-        val thirdResponseAt = Instant.parse("2026-05-09T12:01:05Z")
-        val session = CaptureSession(
-            clock = tickingClock(
-                firstTurnAt,
-                firstResponseAt,
-                secondTurnAt,
-                secondResponseAt,
-                thirdTurnAt,
-                thirdResponseAt,
-            ),
-        )
-        val personas = listOf(Persona.WITNESS, Persona.HARDASS, Persona.EDITOR)
+    fun `single-turn happy path walks IDLE to RESPONDED in chronological order`() {
+        val transcriptionAt = Instant.parse("2026-05-09T12:00:00Z")
+        val responseAt = Instant.parse("2026-05-09T12:00:05Z")
+        val session = CaptureSession(clock = tickingClock(transcriptionAt, responseAt))
 
-        repeat(3) { index ->
-            runSuccessfulTurn(session, "user-$index", "model-$index", personas[index])
-        }
+        session.startRecording()
+        assertEquals(CaptureSession.State.RECORDING, session.state)
+        session.submitForInference()
+        assertEquals(CaptureSession.State.INFERRING, session.state)
+        session.recordTranscription("user said this")
+        assertEquals(CaptureSession.State.TRANSCRIBED, session.state)
+        session.recordModelResponse("model replied this", Persona.WITNESS)
+        assertEquals(CaptureSession.State.RESPONDED, session.state)
 
-        assertEquals(6, session.transcript.size)
         assertTranscript(
             session = session,
-            texts = listOf("user-0", "model-0", "user-1", "model-1", "user-2", "model-2"),
-            speakers =
-            listOf(
-                Speaker.USER,
-                Speaker.MODEL,
-                Speaker.USER,
-                Speaker.MODEL,
-                Speaker.USER,
-                Speaker.MODEL,
-            ),
-            timestamps = listOf(
-                firstTurnAt,
-                firstResponseAt,
-                secondTurnAt,
-                secondResponseAt,
-                thirdTurnAt,
-                thirdResponseAt,
-            ),
-            personas = listOf(null, Persona.WITNESS, null, Persona.HARDASS, null, Persona.EDITOR),
+            texts = listOf("user said this", "model replied this"),
+            speakers = listOf(Speaker.USER, Speaker.MODEL),
+            timestamps = listOf(transcriptionAt, responseAt),
+            personas = listOf(null, Persona.WITNESS),
         )
     }
 
@@ -121,10 +83,7 @@ class CaptureSessionTest {
             session = session,
             texts = listOf("u", "m"),
             speakers = listOf(Speaker.USER, Speaker.MODEL),
-            timestamps = listOf(
-                transcriptionAt,
-                responseAt,
-            ),
+            timestamps = listOf(transcriptionAt, responseAt),
             personas = listOf(null, Persona.WITNESS),
         )
     }
@@ -173,24 +132,33 @@ class CaptureSessionTest {
     }
 
     @Test
-    fun `acknowledgeResponse from TRANSCRIBED throws — model reply hasn't landed yet`() {
-        val session = CaptureSession()
+    fun `RESPONDED is terminal — startRecording is illegal after the model has replied`() {
+        val session = CaptureSession(clock = fixedClock())
         session.startRecording()
         session.submitForInference()
         session.recordTranscription("u")
-        assertThrows(IllegalStateException::class.java) { session.acknowledgeResponse() }
+        session.recordModelResponse("m", Persona.WITNESS)
+        assertEquals(CaptureSession.State.RESPONDED, session.state)
+
+        // The STT-B fallback made each session single-use. Looping a second turn from RESPONDED
+        // would silently re-introduce the multi-turn semantics that failed STT-B; the contract
+        // is "construct a fresh CaptureSession for the next recording" instead.
+        val ex = assertThrows(IllegalStateException::class.java) { session.startRecording() }
+        assertTrue(ex.message!!.contains("startRecording"))
+        assertTrue(ex.message!!.contains("RESPONDED"))
     }
 
     @Test
-    fun `acknowledgeResponse from IDLE throws`() {
-        val session = CaptureSession()
-        assertThrows(IllegalStateException::class.java) { session.acknowledgeResponse() }
-    }
+    fun `RESPONDED is terminal — recordTranscription, recordModelResponse, and submitForInference all throw`() {
+        val session = CaptureSession(clock = fixedClock())
+        session.startRecording()
+        session.submitForInference()
+        session.recordTranscription("u")
+        session.recordModelResponse("m", Persona.WITNESS)
 
-    @Test
-    fun `clearError from non-ERROR state throws`() {
-        val session = CaptureSession()
-        assertThrows(IllegalStateException::class.java) { session.clearError() }
+        assertThrows(IllegalStateException::class.java) { session.submitForInference() }
+        assertThrows(IllegalStateException::class.java) { session.recordTranscription("u2") }
+        assertThrows(IllegalStateException::class.java) { session.recordModelResponse("m2", Persona.HARDASS) }
     }
 
     @Test
@@ -203,55 +171,25 @@ class CaptureSessionTest {
     }
 
     @Test
-    fun `fail mid-recording transitions to ERROR without losing transcript history`() {
+    fun `fail mid-recording transitions to ERROR and preserves the partial transcript for diagnostics`() {
         val session = CaptureSession(clock = fixedClock())
         session.startRecording()
         session.submitForInference()
-        session.recordTranscription("first user")
-        session.recordModelResponse("first model", Persona.WITNESS)
-        session.acknowledgeResponse()
-
-        session.startRecording()
+        session.recordTranscription("got this far")
         session.fail(RuntimeException("audio buffer underrun"))
 
         assertEquals(CaptureSession.State.ERROR, session.state)
-        assertEquals(2, session.transcript.size)
-        assertEquals("first user", session.transcript.turns[0].text)
-        assertEquals("first model", session.transcript.turns[1].text)
+        assertEquals(1, session.transcript.size)
+        assertEquals("got this far", session.transcript.turns[0].text)
     }
 
     @Test
-    fun `clearError returns to IDLE, clears lastError, and preserves transcript`() {
-        val session = CaptureSession(clock = fixedClock())
-        session.startRecording()
-        session.submitForInference()
-        session.recordTranscription("kept")
-        session.recordModelResponse("still here", Persona.WITNESS)
-        session.acknowledgeResponse()
+    fun `ERROR is terminal — startRecording is illegal after fail`() {
+        val session = CaptureSession()
         session.fail(RuntimeException("boom"))
-
-        session.clearError()
-
-        assertEquals(CaptureSession.State.IDLE, session.state)
-        assertNull(session.lastError)
-        assertEquals(2, session.transcript.size)
-    }
-
-    @Test
-    fun `recovered session can keep recording new turns after clearError`() {
-        val session = CaptureSession(clock = fixedClock())
-        session.startRecording()
-        session.fail(RuntimeException("boom"))
-        session.clearError()
-
-        session.startRecording()
-        session.submitForInference()
-        session.recordTranscription("post-recovery")
-        session.recordModelResponse("ack", Persona.EDITOR)
-        session.acknowledgeResponse()
-
-        assertEquals(CaptureSession.State.IDLE, session.state)
-        assertEquals(listOf("post-recovery", "ack"), session.transcript.turns.map { it.text })
+        // Recovery from ERROR means constructing a fresh CaptureSession; no in-place clearError.
+        val ex = assertThrows(IllegalStateException::class.java) { session.startRecording() }
+        assertTrue(ex.message!!.contains("ERROR"))
     }
 
     @Test
@@ -302,7 +240,7 @@ class CaptureSessionTest {
     }
 
     @Test
-    fun `setPersona updates activePersona for subsequent foreground calls`() {
+    fun `setPersona updates activePersona for the upcoming foreground call`() {
         val session = CaptureSession()
         assertEquals(Persona.WITNESS, session.activePersona)
 
@@ -314,28 +252,7 @@ class CaptureSessionTest {
     }
 
     @Test
-    fun `setPersona does not rewrite history — prior model turns keep their authoring persona`() {
-        val session = CaptureSession(clock = fixedClock())
-        session.startRecording()
-        session.submitForInference()
-        session.recordTranscription("first user text")
-        session.recordModelResponse("witness reply", Persona.WITNESS)
-        session.acknowledgeResponse()
-
-        session.setPersona(Persona.HARDASS)
-        session.startRecording()
-        session.submitForInference()
-        session.recordTranscription("second user text")
-        session.recordModelResponse("hardass reply", Persona.HARDASS)
-
-        val modelTurns = session.transcript.turns.filter { it.speaker == Speaker.MODEL }
-        assertEquals(2, modelTurns.size)
-        assertEquals(Persona.WITNESS, modelTurns[0].persona)
-        assertEquals(Persona.HARDASS, modelTurns[1].persona)
-    }
-
-    @Test
-    fun `setPersona is allowed in every state and preserves state and transcript`() {
+    fun `setPersona is allowed in every state including the terminal RESPONDED and ERROR states`() {
         val transcriptionAt = Instant.parse("2026-05-09T08:30:00Z")
         val responseAt = Instant.parse("2026-05-09T08:30:04Z")
         val session = CaptureSession(clock = tickingClock(transcriptionAt, responseAt))
@@ -359,11 +276,12 @@ class CaptureSessionTest {
         session.recordModelResponse("m", Persona.WITNESS)
         session.setPersona(Persona.EDITOR)
         assertEquals(CaptureSession.State.RESPONDED, session.state)
+        assertEquals(Persona.EDITOR, session.activePersona)
 
+        // setPersona on a terminal state is harmless — the value just doesn't get used.
         session.fail(RuntimeException("boom"))
         session.setPersona(Persona.HARDASS)
         assertEquals(CaptureSession.State.ERROR, session.state)
         assertEquals(Persona.HARDASS, session.activePersona)
-        assertEquals(2, session.transcript.size)
     }
 }

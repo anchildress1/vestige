@@ -7,8 +7,8 @@ import dev.anchildress1.vestige.model.ExtractionStatus
  * The worker calls [onUpdate] at every transition listed in ADR-001 §Q3:
  *
  * - `RUNNING` once when the first lens call begins.
- * - `RUNNING` again on each lens-level retry, with `attemptCount` incremented and `lastError`
- *   populated from the most recent failure.
+ * - `RUNNING` again on each lens-level retry, with the same entry-level retry count and
+ *   `lastError` populated from the most recent failure.
  * - `COMPLETED` (or `FAILED`) exactly once at the terminal state.
  *
  * `:core-inference` does not depend on `:core-storage`, so this listener is the seam the entry-
@@ -16,5 +16,5 @@ import dev.anchildress1.vestige.model.ExtractionStatus
  * onto the `EntryEntity.extraction_status / attempt_count / last_error` triplet.
  */
 fun interface ExtractionStatusListener {
-    suspend fun onUpdate(status: ExtractionStatus, attemptCount: Int, lastError: String?)
+    suspend fun onUpdate(status: ExtractionStatus, entryAttemptCount: Int, lastError: String?)
 }

@@ -43,10 +43,10 @@ class BackgroundExtractionWorkerTest {
     }
 
     private class RecordingListener : ExtractionStatusListener {
-        data class Update(val status: ExtractionStatus, val attemptCount: Int, val lastError: String?)
+        data class Update(val status: ExtractionStatus, val entryAttemptCount: Int, val lastError: String?)
         val updates: MutableList<Update> = mutableListOf()
-        override suspend fun onUpdate(status: ExtractionStatus, attemptCount: Int, lastError: String?) {
-            updates += Update(status, attemptCount, lastError)
+        override suspend fun onUpdate(status: ExtractionStatus, entryAttemptCount: Int, lastError: String?) {
+            updates += Update(status, entryAttemptCount, lastError)
         }
     }
 
@@ -77,7 +77,7 @@ class BackgroundExtractionWorkerTest {
         assertAll(
             { assertSame(resolved, success.resolved) },
             { assertEquals(3, success.lensResults.size) },
-            { assertEquals(3, success.attemptCount) },
+            { assertEquals(3, success.modelCallCount) },
             {
                 assertEquals(
                     listOf(Lens.LITERAL, Lens.INFERENTIAL, Lens.SKEPTICAL),
@@ -103,7 +103,7 @@ class BackgroundExtractionWorkerTest {
         assertEquals(
             listOf(
                 RecordingListener.Update(ExtractionStatus.RUNNING, 0, null),
-                RecordingListener.Update(ExtractionStatus.COMPLETED, 3, null),
+                RecordingListener.Update(ExtractionStatus.COMPLETED, 0, null),
             ),
             listener.updates,
         )
@@ -130,17 +130,16 @@ class BackgroundExtractionWorkerTest {
         val result = worker.extract(entryText = "user words", listener = listener)
 
         val success = assertInstanceOf(BackgroundExtractionResult.Success::class.java, result)
-        assertEquals(4, success.attemptCount, "1 retry on LITERAL + 1 each on INFERENTIAL/SKEPTICAL = 4")
+        assertEquals(4, success.modelCallCount, "1 retry on LITERAL + 1 each on INFERENTIAL/SKEPTICAL = 4")
         assertEquals(2, success.lensResults.first { it.lens == Lens.LITERAL }.attemptCount)
-        // Listener: initial RUNNING(0,null) → retry RUNNING(1,parse-fail) → terminal COMPLETED(4,parse-fail).
-        // The terminal `lastError` carries the last failure seen across the run; convergence still
-        // succeeded because the retry produced parseable output, so the entry's last_error
-        // captures the transient failure for the debug surface (ADR-001 §Q3 last_error column).
+        // Listener: initial RUNNING(0,null) → retry RUNNING(0,parse-fail) → terminal COMPLETED(0,null).
+        // The entry-level retry counter is stable for the whole run; per-lens retries are
+        // reported only through the repeated RUNNING update and lens-level diagnostics.
         assertEquals(
             listOf(
                 RecordingListener.Update(ExtractionStatus.RUNNING, 0, null),
-                RecordingListener.Update(ExtractionStatus.RUNNING, 1, "parse-fail"),
-                RecordingListener.Update(ExtractionStatus.COMPLETED, 4, "parse-fail"),
+                RecordingListener.Update(ExtractionStatus.RUNNING, 0, "parse-fail"),
+                RecordingListener.Update(ExtractionStatus.COMPLETED, 0, null),
             ),
             listener.updates,
         )
@@ -178,7 +177,7 @@ class BackgroundExtractionWorkerTest {
             { assertEquals("parse-fail", inferentialResult.lastError) },
         )
         // 1 (LITERAL ok) + 2 (INFERENTIAL exhausted) + 1 (SKEPTICAL ok) = 4
-        assertEquals(4, success.attemptCount)
+        assertEquals(4, success.modelCallCount)
     }
 
     @Test
@@ -198,7 +197,7 @@ class BackgroundExtractionWorkerTest {
 
         val failed = assertInstanceOf(BackgroundExtractionResult.Failed::class.java, result)
         assertAll(
-            { assertEquals(6, failed.attemptCount, "3 lenses × 2 attempts each = 6") },
+            { assertEquals(6, failed.modelCallCount, "3 lenses × 2 attempts each = 6") },
             { assertEquals(3, failed.lensResults.size) },
             { assertTrue(failed.lensResults.all { it.extraction == null }) },
             { assertEquals("parse-fail", failed.lastError) },
@@ -211,7 +210,7 @@ class BackgroundExtractionWorkerTest {
             },
         )
         assertEquals(ExtractionStatus.FAILED, listener.updates.last().status)
-        assertEquals(6, listener.updates.last().attemptCount)
+        assertEquals(0, listener.updates.last().entryAttemptCount)
     }
 
     @Test
@@ -242,7 +241,7 @@ class BackgroundExtractionWorkerTest {
         )
         val terminal = listener.updates.last()
         assertEquals(ExtractionStatus.COMPLETED, terminal.status)
-        assertTrue(terminal.lastError!!.startsWith("engine-error:"))
+        assertNull(terminal.lastError)
     }
 
     @Test
@@ -266,6 +265,47 @@ class BackgroundExtractionWorkerTest {
                 resolver = RecordingResolver(resolved),
                 maxAttemptsPerLens = 0,
             )
+        }
+    }
+
+    @Test
+    fun `listener preserves caller supplied entry attempt count across lens retries`() = runTest {
+        val engine = mockk<LiteRtLmEngine>()
+        coEvery { engine.generateText("prompt-for-LITERAL") } returnsMany listOf("garbage-1", "raw-literal")
+        coEvery { engine.generateText("prompt-for-INFERENTIAL") } returns "raw-inferential"
+        coEvery { engine.generateText("prompt-for-SKEPTICAL") } returns "raw-skeptical"
+        val parser: (Lens, String) -> LensExtraction? = { lens, raw ->
+            if (raw == "garbage-1") null else extraction(lens)
+        }
+        val listener = RecordingListener()
+
+        BackgroundExtractionWorker(
+            engine = engine,
+            resolver = RecordingResolver(resolved),
+            parser = parser,
+            composer = fakeComposer(),
+        ).extract(entryText = "user words", entryAttemptCount = 2, listener = listener)
+
+        assertEquals(
+            listOf(
+                RecordingListener.Update(ExtractionStatus.RUNNING, 2, null),
+                RecordingListener.Update(ExtractionStatus.RUNNING, 2, "parse-fail"),
+                RecordingListener.Update(ExtractionStatus.COMPLETED, 2, null),
+            ),
+            listener.updates,
+        )
+    }
+
+    @Test
+    fun `negative entry attempt count fails fast`() {
+        val worker = BackgroundExtractionWorker(
+            engine = mockk(),
+            resolver = RecordingResolver(resolved),
+            parser = { _, _ -> null },
+            composer = fakeComposer(),
+        )
+        assertThrows(IllegalArgumentException::class.java) {
+            kotlinx.coroutines.runBlocking { worker.extract(entryText = "ok", entryAttemptCount = -1) }
         }
     }
 }

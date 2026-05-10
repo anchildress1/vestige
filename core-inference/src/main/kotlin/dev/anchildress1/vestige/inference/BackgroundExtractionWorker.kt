@@ -23,12 +23,16 @@ import java.io.IOException
  * **Per-lens retry budget.** Each lens is attempted up to [maxAttemptsPerLens] times (default 2,
  * matching Story 2.6's "two consecutive failures on the same lens" cap). After exhausting its
  * budget, that lens contributes a `null` extraction — convergence treats that as "no opinion"
- * per ADR-002 §"Convergence edge cases" rather than blocking the entry. The entry-level
- * `attempt_count` (ADR-001 §Q3) is the sum of attempts across all three lenses.
+ * per ADR-002 §"Convergence edge cases" rather than blocking the entry. Lens-call volume is
+ * exposed on [BackgroundExtractionResult.modelCallCount] for diagnostics; it is intentionally
+ * separate from the entry-level retry counter persisted as `attempt_count` (ADR-001 §Q3).
  *
  * **Status surfacing.** [ExtractionStatusListener.onUpdate] fires on every transition the entry
  * persistence layer needs to mirror onto the `EntryEntity` row: one `RUNNING` at start, one
- * `RUNNING` per retry (with the latest `lastError`), and exactly one terminal call —
+ * `RUNNING` per retry (with the latest `lastError`), and exactly one terminal call. The listener
+ * receives the caller-supplied entry retry count for the whole run; lens retries do not mutate
+ * that persisted counter. Terminal `lastError` is `null` on [ExtractionStatus.COMPLETED] and
+ * populated only on [ExtractionStatus.FAILED]. Exactly one terminal call —
  * [ExtractionStatus.COMPLETED] when the resolver runs (≥1 lens succeeded), or
  * [ExtractionStatus.FAILED] when every lens exhausted its budget.
  *
@@ -59,15 +63,19 @@ class BackgroundExtractionWorker(
     suspend fun extract(
         entryText: String,
         retrievedHistory: List<HistoryChunk> = emptyList(),
+        entryAttemptCount: Int = 0,
         listener: ExtractionStatusListener = NO_OP_LISTENER,
     ): BackgroundExtractionResult = withContext(ioDispatcher) {
         require(entryText.isNotBlank()) {
             "BackgroundExtractionWorker.extract requires a non-blank entryText"
         }
+        require(entryAttemptCount >= 0) {
+            "BackgroundExtractionWorker.extract requires entryAttemptCount >= 0"
+        }
 
         val started = System.nanoTime()
-        val state = RunState()
-        listener.onUpdate(ExtractionStatus.RUNNING, 0, null)
+        val state = RunState(entryAttemptCount)
+        listener.onUpdate(ExtractionStatus.RUNNING, entryAttemptCount, null)
 
         for (lens in LENSES) {
             state.results += runLens(lens, entryText, retrievedHistory, state, listener)
@@ -92,7 +100,7 @@ class BackgroundExtractionWorker(
 
         while (attempts < maxAttemptsPerLens && parsed == null) {
             attempts += 1
-            state.totalAttempts += 1
+            state.modelCallCount += 1
             val composed = composer(lens, entryText, retrievedHistory)
             val attempt = attemptOnce(lens, composed, attempts)
             lastRaw = attempt.raw
@@ -108,7 +116,7 @@ class BackgroundExtractionWorker(
                 }
             }
             if (parsed == null && attempts < maxAttemptsPerLens) {
-                listener.onUpdate(ExtractionStatus.RUNNING, state.totalAttempts, state.lastError)
+                listener.onUpdate(ExtractionStatus.RUNNING, state.entryAttemptCount, state.lastError)
             }
         }
 
@@ -157,13 +165,13 @@ class BackgroundExtractionWorker(
             Log.w(
                 TAG,
                 "extract failed: every lens exhausted its retry budget " +
-                    "(total_attempts=${state.totalAttempts} elapsed=${totalElapsedMs}ms last_error=$terminalError)",
+                    "(model_calls=${state.modelCallCount} elapsed=${totalElapsedMs}ms last_error=$terminalError)",
             )
-            listener.onUpdate(ExtractionStatus.FAILED, state.totalAttempts, terminalError)
+            listener.onUpdate(ExtractionStatus.FAILED, state.entryAttemptCount, terminalError)
             return BackgroundExtractionResult.Failed(
                 totalElapsedMs = totalElapsedMs,
                 lensResults = state.results,
-                attemptCount = state.totalAttempts,
+                modelCallCount = state.modelCallCount,
                 lastError = terminalError,
             )
         }
@@ -171,28 +179,29 @@ class BackgroundExtractionWorker(
         Log.d(
             TAG,
             "extract completed: lenses=${parsedExtractions.size}/${LENSES.size} " +
-                "total_attempts=${state.totalAttempts} elapsed=${totalElapsedMs}ms",
+                "model_calls=${state.modelCallCount} elapsed=${totalElapsedMs}ms",
         )
-        listener.onUpdate(ExtractionStatus.COMPLETED, state.totalAttempts, state.lastError)
+        listener.onUpdate(ExtractionStatus.COMPLETED, state.entryAttemptCount, null)
         return BackgroundExtractionResult.Success(
             totalElapsedMs = totalElapsedMs,
             lensResults = state.results,
-            attemptCount = state.totalAttempts,
+            modelCallCount = state.modelCallCount,
             resolved = resolved,
         )
     }
 
-    private class RunState {
+    private class RunState(val entryAttemptCount: Int) {
         val results: MutableList<LensResult> = mutableListOf()
-        var totalAttempts: Int = 0
+        var modelCallCount: Int = 0
         var lastError: String? = null
     }
 
     private data class AttemptOutcome(val raw: String, val error: String?)
 
     companion object {
-        // ADR-001 §Q3 caps the entry-level retry budget at 3; per-lens we use 2 (one initial +
-        // one retry) so a single bad lens can't burn the entry-level budget by itself.
+        // ADR-001 §Q3 caps entry-level retries at 3. Per-lens retries are a separate, per-run
+        // concern: one initial call + one retry to smooth transient failures without changing the
+        // persisted retry counter.
         const val DEFAULT_MAX_ATTEMPTS_PER_LENS = 2
 
         private val LENSES: List<Lens> = listOf(Lens.LITERAL, Lens.INFERENTIAL, Lens.SKEPTICAL)

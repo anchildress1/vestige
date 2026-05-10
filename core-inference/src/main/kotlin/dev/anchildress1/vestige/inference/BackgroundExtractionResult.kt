@@ -10,25 +10,26 @@ import dev.anchildress1.vestige.model.ResolvedExtraction
  * the case where every lens exhausted its retry budget; convergence is not invoked.
  *
  * `totalElapsedMs` measures wall time from the first lens call through resolver completion (or
- * the last failed lens). `attemptCount` totals model calls across all lenses for the entry's
- * `attempt_count` field (ADR-001 §Q3).
+ * the last failed lens). `modelCallCount` totals model calls across all lenses for latency/debug
+ * surfaces; it is intentionally separate from the entry row's retry-oriented `attempt_count`
+ * field (ADR-001 §Q3).
  */
 sealed interface BackgroundExtractionResult {
     val totalElapsedMs: Long
     val lensResults: List<LensResult>
-    val attemptCount: Int
+    val modelCallCount: Int
 
     data class Success(
         override val totalElapsedMs: Long,
         override val lensResults: List<LensResult>,
-        override val attemptCount: Int,
+        override val modelCallCount: Int,
         val resolved: ResolvedExtraction,
     ) : BackgroundExtractionResult
 
     data class Failed(
         override val totalElapsedMs: Long,
         override val lensResults: List<LensResult>,
-        override val attemptCount: Int,
+        override val modelCallCount: Int,
         val lastError: String,
     ) : BackgroundExtractionResult
 }

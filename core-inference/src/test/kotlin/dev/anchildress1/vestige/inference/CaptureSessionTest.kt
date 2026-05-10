@@ -252,6 +252,34 @@ class CaptureSessionTest {
     }
 
     @Test
+    fun `transcript snapshot taken at RESPONDED is unchanged by subsequent illegal transitions`() {
+        val transcriptionAt = Instant.parse("2026-05-09T08:30:00Z")
+        val responseAt = Instant.parse("2026-05-09T08:30:04Z")
+        val session = CaptureSession(clock = tickingClock(transcriptionAt, responseAt))
+        session.startRecording()
+        session.submitForInference()
+        session.recordTranscription("user said this")
+        session.recordModelResponse("model replied", Persona.WITNESS)
+
+        // Capture the snapshot AT RESPONDED, then attempt every illegal transition the
+        // single-use lifecycle forbids. Each throws; the snapshot taken before the throws
+        // must be unchanged afterward (Transcript.turns returns a defensive copy + the
+        // illegal transitions cannot mutate state because they throw before the
+        // transcript.append call inside the body).
+        val snapshot = session.transcript.turns
+
+        assertThrows(IllegalStateException::class.java) { session.startRecording() }
+        assertThrows(IllegalStateException::class.java) { session.submitForInference() }
+        assertThrows(IllegalStateException::class.java) { session.recordTranscription("u2") }
+        assertThrows(IllegalStateException::class.java) { session.recordModelResponse("m2", Persona.HARDASS) }
+
+        assertEquals(2, snapshot.size, "Snapshot taken before illegal transitions must stay 2-deep")
+        assertEquals(snapshot, session.transcript.turns, "Live transcript must also be unchanged")
+        assertEquals("user said this", snapshot[0].text)
+        assertEquals("model replied", snapshot[1].text)
+    }
+
+    @Test
     fun `setPersona is allowed in every state including the terminal RESPONDED and ERROR states`() {
         val transcriptionAt = Instant.parse("2026-05-09T08:30:00Z")
         val responseAt = Instant.parse("2026-05-09T08:30:04Z")

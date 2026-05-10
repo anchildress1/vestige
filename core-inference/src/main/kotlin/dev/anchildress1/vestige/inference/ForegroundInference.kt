@@ -3,6 +3,7 @@ package dev.anchildress1.vestige.inference
 import android.util.Log
 import com.google.ai.edge.litertlm.Content
 import dev.anchildress1.vestige.model.Persona
+import dev.anchildress1.vestige.model.TemplateLabel
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -125,9 +126,9 @@ class ForegroundInference(
                 "tagged blocks. The transcription must be exact and unaltered.",
         ).joinToString(separator = "\n")
 
-        // Goblin-hours local-time window per `concept-locked.md` §"Templates" —
-        // midnight–5am reads as 00:00 inclusive to 05:00 exclusive.
-        internal val GOBLIN_HOURS_RANGE = 0..4
+        // Shared with TemplateLabeler so the addendum window and the post-extraction label
+        // window cannot drift. Source of truth: TemplateLabel.GOBLIN_HOURS_LOCAL_HOUR_RANGE.
+        internal val GOBLIN_HOURS_RANGE: IntRange = TemplateLabel.GOBLIN_HOURS_LOCAL_HOUR_RANGE
         internal const val GOBLIN_HOURS_RESOURCE = "/foreground/goblin-hours-addendum.txt"
 
         private val GOBLIN_HOURS_ADDENDUM: String by lazy {

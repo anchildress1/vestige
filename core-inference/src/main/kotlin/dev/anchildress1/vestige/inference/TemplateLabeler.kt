@@ -66,8 +66,7 @@ class TemplateLabeler(private val zoneId: ZoneId = ZoneId.systemDefault()) {
 
         const val CRASHED = "crashed"
 
-        // 00:00–04:59 inclusive — the "midnight–5am" window from concept-locked.md §Templates.
-        val GOBLIN_HOURS_RANGE = 0..4
+        val GOBLIN_HOURS_RANGE: IntRange = TemplateLabel.GOBLIN_HOURS_LOCAL_HOUR_RANGE
 
         // State-surface late-night markers per `surfaces/state.txt`. "overnight" is the parallel
         // behavioral signal listed in `surfaces/behavioral.txt`.

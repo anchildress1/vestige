@@ -6,7 +6,17 @@ package dev.anchildress1.vestige.model
  */
 data class LensExtraction(val lens: Lens, val fields: Map<String, Any?>, val flags: List<String> = emptyList())
 
-/** One field's convergence outcome. `value` is null when [verdict] is `AMBIGUOUS`. */
-data class ResolvedField(val value: Any?, val verdict: ConfidenceVerdict, val flags: List<String> = emptyList())
+/**
+ * One field's convergence outcome. `value` is null when [verdict] is `AMBIGUOUS`. [sourceLens] is
+ * populated only when [verdict] is `CANDIDATE` (single lens contributed the value, per ADR-002
+ * §"Resolution rules" rule 2 — recorded so the pattern engine can promote candidates by source
+ * later); `null` for every other verdict.
+ */
+data class ResolvedField(
+    val value: Any?,
+    val verdict: ConfidenceVerdict,
+    val flags: List<String> = emptyList(),
+    val sourceLens: Lens? = null,
+)
 
 data class ResolvedExtraction(val fields: Map<String, ResolvedField>)

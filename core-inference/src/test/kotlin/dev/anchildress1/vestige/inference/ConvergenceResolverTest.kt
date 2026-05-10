@@ -47,7 +47,7 @@ class ConvergenceResolverTest {
     }
 
     @Test
-    fun `only Inferential populates a field resolves to candidate`() {
+    fun `only Inferential populates a field resolves to candidate with source lens recorded`() {
         val literal = LensExtraction(Lens.LITERAL, fields = mapOf("stated_commitment" to null))
         val inferential = LensExtraction(
             Lens.INFERENTIAL,
@@ -61,6 +61,7 @@ class ConvergenceResolverTest {
             ResolvedField(
                 value = mapOf("text" to "review the doc", "topic_or_person" to "Nora"),
                 verdict = ConfidenceVerdict.CANDIDATE,
+                sourceLens = Lens.INFERENTIAL,
             ),
             resolved.fields["stated_commitment"],
         )
@@ -91,7 +92,8 @@ class ConvergenceResolverTest {
         val skeptical = LensExtraction(
             Lens.SKEPTICAL,
             fields = mapOf("energy_descriptor" to "flattened"),
-            flags = listOf("energy_descriptor:contradicts:fine"),
+            // Real Skeptical flag shape from `lenses/skeptical.txt`: kind = vocabulary-contradiction.
+            flags = listOf("vocabulary-contradiction:fine before:state word contradicts later flattened"),
         )
 
         val resolved = resolver.resolve(listOf(literal, inferential, skeptical))
@@ -100,7 +102,7 @@ class ConvergenceResolverTest {
             ResolvedField(
                 value = "flattened",
                 verdict = ConfidenceVerdict.CANONICAL_WITH_CONFLICT,
-                flags = listOf("energy_descriptor:contradicts:fine"),
+                flags = listOf("vocabulary-contradiction:fine before:state word contradicts later flattened"),
             ),
             resolved.fields["energy_descriptor"],
         )
@@ -138,10 +140,11 @@ class ConvergenceResolverTest {
     fun `Skeptical-only flag without populated value still surfaces conflict on consensus`() {
         val literal = LensExtraction(Lens.LITERAL, fields = mapOf("energy_descriptor" to "flattened"))
         val inferential = LensExtraction(Lens.INFERENTIAL, fields = mapOf("energy_descriptor" to "flattened"))
+        val flag = "state-behavior-mismatch:fine before:claims fine but described as flattened"
         val skeptical = LensExtraction(
             Lens.SKEPTICAL,
             fields = mapOf("energy_descriptor" to null),
-            flags = listOf("energy_descriptor:contradicts:fine"),
+            flags = listOf(flag),
         )
 
         val resolved = resolver.resolve(listOf(literal, inferential, skeptical))
@@ -150,7 +153,7 @@ class ConvergenceResolverTest {
             ResolvedField(
                 value = "flattened",
                 verdict = ConfidenceVerdict.CANONICAL_WITH_CONFLICT,
-                flags = listOf("energy_descriptor:contradicts:fine"),
+                flags = listOf(flag),
             ),
             resolved.fields["energy_descriptor"],
         )
@@ -240,7 +243,7 @@ class ConvergenceResolverTest {
     }
 
     @Test
-    fun `tags with no majority falls back to Literal's strongest as candidate`() {
+    fun `tags with no majority falls back to Literal's strongest as candidate with source lens recorded`() {
         val literal = LensExtraction(Lens.LITERAL, fields = mapOf("tags" to listOf("standup", "launch-doc")))
         val inferential = LensExtraction(Lens.INFERENTIAL, fields = mapOf("tags" to listOf("roadmap")))
         val skeptical = LensExtraction(Lens.SKEPTICAL, fields = mapOf("tags" to listOf("review")))
@@ -248,7 +251,11 @@ class ConvergenceResolverTest {
         val resolved = resolver.resolve(listOf(literal, inferential, skeptical))
 
         assertEquals(
-            ResolvedField(value = listOf("standup"), verdict = ConfidenceVerdict.CANDIDATE),
+            ResolvedField(
+                value = listOf("standup"),
+                verdict = ConfidenceVerdict.CANDIDATE,
+                sourceLens = Lens.LITERAL,
+            ),
             resolved.fields["tags"],
         )
     }
@@ -268,13 +275,15 @@ class ConvergenceResolverTest {
     }
 
     @Test
-    fun `Skeptical flags whose prefix does not match a field are ignored on canonical fields`() {
+    fun `Skeptical flags whose kind does not bind to a field do not flip canonical verdicts`() {
         val literal = LensExtraction(Lens.LITERAL, fields = mapOf("template_label" to "aftermath"))
         val inferential = LensExtraction(Lens.INFERENTIAL, fields = mapOf("template_label" to "aftermath"))
         val skeptical = LensExtraction(
             Lens.SKEPTICAL,
             fields = mapOf("template_label" to "aftermath"),
-            flags = listOf("energy_descriptor:contradicts:fine"),
+            // `time-inconsistency` and `other` are entry-level kinds with no field binding —
+            // they ride the entry's persisted flags but don't flip any verdict.
+            flags = listOf("time-inconsistency:ten minutes:later called two hours"),
         )
 
         val resolved = resolver.resolve(listOf(literal, inferential, skeptical))
@@ -311,45 +320,6 @@ class ConvergenceResolverTest {
     }
 
     @Test
-    fun `stated commitment agreement uses topic and entry id rather than full object equality`() {
-        val literal = LensExtraction(
-            Lens.LITERAL,
-            fields = mapOf(
-                "stated_commitment" to mapOf(
-                    "text" to "review the launch doc tonight",
-                    "topic_or_person" to "Nora",
-                    "entry_id" to "entry-123",
-                ),
-            ),
-        )
-        val inferential = LensExtraction(
-            Lens.INFERENTIAL,
-            fields = mapOf(
-                "stated_commitment" to mapOf(
-                    "text" to "send Nora feedback tonight",
-                    "topic_or_person" to "Nora",
-                    "entry_id" to "entry-123",
-                ),
-            ),
-        )
-        val skeptical = LensExtraction(Lens.SKEPTICAL, fields = mapOf("stated_commitment" to null))
-
-        val resolved = resolver.resolve(listOf(literal, inferential, skeptical))
-
-        assertEquals(
-            ResolvedField(
-                value = mapOf(
-                    "text" to "review the launch doc tonight",
-                    "topic_or_person" to "Nora",
-                    "entry_id" to "entry-123",
-                ),
-                verdict = ConfidenceVerdict.CANONICAL,
-            ),
-            resolved.fields["stated_commitment"],
-        )
-    }
-
-    @Test
     fun `field union covers keys present on only one lens`() {
         val literal = LensExtraction(Lens.LITERAL, fields = mapOf("template_label" to "aftermath"))
         val inferential = LensExtraction(Lens.INFERENTIAL, fields = mapOf("energy_descriptor" to "flattened"))
@@ -363,8 +333,61 @@ class ConvergenceResolverTest {
             resolved.fields["template_label"],
         )
         assertEquals(
-            ResolvedField("flattened", ConfidenceVerdict.CANDIDATE),
+            ResolvedField("flattened", ConfidenceVerdict.CANDIDATE, sourceLens = Lens.INFERENTIAL),
             resolved.fields["energy_descriptor"],
+        )
+    }
+
+    @Test
+    fun `tag plural variants converge to the first surface form`() {
+        val literal = LensExtraction(Lens.LITERAL, fields = mapOf("tags" to listOf("meeting", "doc")))
+        val inferential = LensExtraction(Lens.INFERENTIAL, fields = mapOf("tags" to listOf("meetings", "doc")))
+        val skeptical = LensExtraction(Lens.SKEPTICAL, fields = mapOf("tags" to listOf("standup")))
+
+        val resolved = resolver.resolve(listOf(literal, inferential, skeptical))
+
+        // "meeting" / "meetings" share a stem and reach majority via the per-stem count.
+        assertEquals(
+            ResolvedField(value = listOf("meeting", "doc"), verdict = ConfidenceVerdict.CANONICAL),
+            resolved.fields["tags"],
+        )
+    }
+
+    @Test
+    fun `commitments converge on topic_or_person even when text is paraphrased`() {
+        // Production lens output never includes entry_id (storage injects it later); resolver
+        // identity must use topic_or_person alone so paraphrased text doesn't fragment agreement.
+        val literal = LensExtraction(
+            Lens.LITERAL,
+            fields = mapOf(
+                "stated_commitment" to mapOf(
+                    "text" to "review the launch doc tonight",
+                    "topic_or_person" to "Nora",
+                ),
+            ),
+        )
+        val inferential = LensExtraction(
+            Lens.INFERENTIAL,
+            fields = mapOf(
+                "stated_commitment" to mapOf(
+                    "text" to "send Nora feedback tonight",
+                    "topic_or_person" to "Nora",
+                ),
+            ),
+        )
+        val skeptical = LensExtraction(Lens.SKEPTICAL, fields = mapOf("stated_commitment" to null))
+
+        val resolved = resolver.resolve(listOf(literal, inferential, skeptical))
+
+        assertEquals(
+            ResolvedField(
+                value = mapOf(
+                    "text" to "review the launch doc tonight",
+                    "topic_or_person" to "Nora",
+                ),
+                verdict = ConfidenceVerdict.CANONICAL,
+            ),
+            resolved.fields["stated_commitment"],
         )
     }
 }

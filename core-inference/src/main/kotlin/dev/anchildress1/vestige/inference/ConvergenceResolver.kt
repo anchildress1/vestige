@@ -66,6 +66,7 @@ class DefaultConvergenceResolver : ConvergenceResolver {
                 value = populated.single().second,
                 verdict = ConfidenceVerdict.CANDIDATE,
                 flags = matchingFlags,
+                sourceLens = populated.single().first,
             )
 
             else -> resolveMultiple(key, populated, matchingFlags)
@@ -110,6 +111,9 @@ class DefaultConvergenceResolver : ConvergenceResolver {
             val tags = (raw as? List<*>)?.mapNotNull { it as? String }?.distinct().orEmpty()
             lens.takeIf { tags.isNotEmpty() }?.let { it to tags }
         }
+        // ADR-002 §"Per-field agreement" — normalize plurals for majority counting; keep the
+        // original surface form for the saved value. Two lenses emitting "meeting" / "meetings"
+        // count as the same tag.
         return when {
             populated.isEmpty() -> ResolvedField(
                 value = emptyList<String>(),
@@ -126,26 +130,38 @@ class DefaultConvergenceResolver : ConvergenceResolver {
         populated: List<Pair<Lens, List<String>>>,
         matchingFlags: List<String>,
     ): ResolvedField {
-        val canonical: Set<String> = populated
-            .flatMap { it.second }
+        // Count by plural-stripped stem so "meeting" / "meetings" converge.
+        val canonicalStems: Set<String> = populated
+            .flatMap { (_, tags) -> tags.map(::stemForCount).distinct() }
             .groupingBy { it }
             .eachCount()
             .filterValues { it >= MAJORITY_THRESHOLD }
             .keys
-        return if (canonical.isNotEmpty()) {
+        // Walk lens order, picking the first surface form per canonical stem so the saved tag
+        // list keeps a real word rather than a stem and stays one-tag-per-concept.
+        val orderedConsensus = mutableListOf<String>()
+        val claimedStems = hashSetOf<String>()
+        for ((_, tags) in populated) {
+            for (tag in tags) {
+                val stem = stemForCount(tag)
+                if (stem in canonicalStems && claimedStems.add(stem)) orderedConsensus.add(tag)
+            }
+        }
+        return if (orderedConsensus.isNotEmpty()) {
             val verdict =
                 if (matchingFlags.isEmpty()) ConfidenceVerdict.CANONICAL else ConfidenceVerdict.CANONICAL_WITH_CONFLICT
-            ResolvedField(
-                value = orderedConsensusTags(populated, canonical),
-                verdict = verdict,
-                flags = matchingFlags,
-            )
+            ResolvedField(value = orderedConsensus, verdict = verdict, flags = matchingFlags)
         } else {
             // No tag reaches majority — surface Literal's strongest tag as a candidate so the P0
             // floor ("at least one visible tag") survives sparse entries.
             val fallback = byLens[Lens.LITERAL]?.tagsOrNull()?.firstOrNull()
             if (fallback != null) {
-                ResolvedField(value = listOf(fallback), verdict = ConfidenceVerdict.CANDIDATE, flags = matchingFlags)
+                ResolvedField(
+                    value = listOf(fallback),
+                    verdict = ConfidenceVerdict.CANDIDATE,
+                    flags = matchingFlags,
+                    sourceLens = Lens.LITERAL,
+                )
             } else {
                 ResolvedField(
                     value = null,
@@ -156,12 +172,21 @@ class DefaultConvergenceResolver : ConvergenceResolver {
         }
     }
 
-    private fun orderedConsensusTags(populated: List<Pair<Lens, List<String>>>, canonical: Set<String>): List<String> {
-        val seen = linkedSetOf<String>()
-        for ((_, tags) in populated) {
-            for (tag in tags) if (tag in canonical) seen.add(tag)
+    /**
+     * Lightweight singularizer: drops a trailing `s` when the word is long enough and the suffix
+     * is a regular plural (not `ss` / `us` / `is` which are usually singular endings). Adequate
+     * for v1 tag domains (people, topics, activities). Irregular plurals are not handled —
+     * tightening lands when STT-C surfaces real flakiness.
+     */
+    private fun stemForCount(tag: String): String {
+        val lower = tag.lowercase()
+        if (lower.length <= MIN_STEM_LENGTH) return lower
+        return when {
+            lower.endsWith(IES_SUFFIX) -> lower.dropLast(IES_SUFFIX.length) + "y"
+            lower.endsWith("ss") || lower.endsWith("us") || lower.endsWith("is") -> lower
+            lower.endsWith('s') -> lower.dropLast(1)
+            else -> lower
         }
-        return seen.toList()
     }
 
     private fun canonicalize(key: String, value: Any): Any = when (key) {
@@ -171,17 +196,17 @@ class DefaultConvergenceResolver : ConvergenceResolver {
     }
 
     private fun canonicalizeCommitment(value: Any): Any {
-        val commitment = value as? Map<*, *>
-        val topicOrPerson = commitment?.get(TOPIC_OR_PERSON_KEY)
-        val entryId = commitment?.get(ENTRY_ID_KEY)
-        return if (topicOrPerson != null && entryId != null) {
-            CommitmentIdentity(topicOrPerson = topicOrPerson, entryId = entryId)
-        } else {
-            value
-        }
+        // ADR-002 §"Per-field agreement" defines commitment agreement as "same topic_or_person AND
+        // same entry_id reference." Within a single resolver call all three lenses are extracting
+        // the same entry, so entry_id is implicit (and not yet assigned by storage at this stage).
+        // Reduce identity to topic_or_person alone — that's what actually disambiguates two
+        // commitments inside one entry without requiring an injected key.
+        val topicOrPerson = (value as? Map<*, *>)?.get(TOPIC_OR_PERSON_KEY)
+        return topicOrPerson?.let { CommitmentIdentity(topicOrPerson = it) } ?: value
     }
 
-    private fun flagBelongsToField(flag: String, field: String): Boolean = flag.substringBefore(':') == field
+    private fun flagBelongsToField(flag: String, field: String): Boolean =
+        FLAG_KIND_TO_FIELD[flag.substringBefore(':')] == field
 
     private fun LensExtraction.tagsOrNull(): List<String>? =
         (fields[TAGS_KEY] as? List<*>)?.mapNotNull { it as? String }?.takeIf { it.isNotEmpty() }
@@ -191,11 +216,25 @@ class DefaultConvergenceResolver : ConvergenceResolver {
         const val ENERGY_DESCRIPTOR_KEY = "energy_descriptor"
         const val STATED_COMMITMENT_KEY = "stated_commitment"
         const val TOPIC_OR_PERSON_KEY = "topic_or_person"
-        const val ENTRY_ID_KEY = "entry_id"
         const val LENS_DISAGREEMENT_FLAG = "lens-disagreement"
         const val MAJORITY_THRESHOLD = 2
         const val MIN_SURVIVING_LENSES_FOR_AMBIGUOUS = 1
+        const val MIN_STEM_LENGTH = 3
+        const val IES_SUFFIX = "ies"
+
+        /**
+         * Skeptical flag `kind` (per `core-inference/.../resources/lenses/skeptical.txt`) → schema
+         * field the flag annotates. `time-inconsistency` and `other` are entry-level concerns
+         * with no specific field binding; they ride the entry's persisted `LensResult.flags` and
+         * surface in Phase 4's Reading view rather than flipping any field's verdict.
+         */
+        val FLAG_KIND_TO_FIELD: Map<String, String> = mapOf(
+            "vocabulary-contradiction" to ENERGY_DESCRIPTOR_KEY,
+            "state-behavior-mismatch" to ENERGY_DESCRIPTOR_KEY,
+            "commitment-without-anchor" to STATED_COMMITMENT_KEY,
+            "unsupported-recurrence" to "recurrence_link",
+        )
     }
 }
 
-private data class CommitmentIdentity(val topicOrPerson: Any, val entryId: Any)
+private data class CommitmentIdentity(val topicOrPerson: Any)

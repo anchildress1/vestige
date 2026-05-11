@@ -206,6 +206,54 @@ class PatternDetectionOrchestratorTest {
     }
 
     @Test
+    fun `non-matching entries leave the cooldown counter alone`() = runTest {
+        patternStore.put(
+            PatternEntity(
+                patternId = "x".repeat(64),
+                kind = PatternKind.TEMPLATE_RECURRENCE,
+                signatureJson = "{\"label\":\"aftermath\"}",
+                title = "Aftermath",
+                templateLabel = TemplateLabel.AFTERMATH.serial,
+                firstSeenTimestamp = 1L,
+                lastSeenTimestamp = 2L,
+                state = PatternState.ACTIVE,
+                latestCalloutText = "Worth noting.",
+            ),
+        )
+        // Fire once → cooldown counter set to 3.
+        orchestrator.onEntryCommitted(putEntry(templateLabel = TemplateLabel.AFTERMATH))
+        // Three non-matching entries in a row must NOT decrement the counter — only
+        // suppressed candidates count toward the window.
+        repeat(3) {
+            orchestrator.onEntryCommitted(putEntry(templateLabel = TemplateLabel.TUNNEL_EXIT))
+        }
+        // Counter is still 3 → the next matching entry is still suppressed.
+        val nextMatch = orchestrator.onEntryCommitted(putEntry(templateLabel = TemplateLabel.AFTERMATH))
+        assertNull("cooldown must still be active because non-match entries did not consume slots", nextMatch)
+    }
+
+    @Test
+    fun `matched pattern with blank callout text returns null without touching cooldown`() = runTest {
+        patternStore.put(
+            PatternEntity(
+                patternId = "x".repeat(64),
+                kind = PatternKind.TEMPLATE_RECURRENCE,
+                signatureJson = "{\"label\":\"aftermath\"}",
+                title = "Aftermath",
+                templateLabel = TemplateLabel.AFTERMATH.serial,
+                firstSeenTimestamp = 1L,
+                lastSeenTimestamp = 2L,
+                state = PatternState.ACTIVE,
+                latestCalloutText = "", // data-integrity smell — broken write path upstream
+            ),
+        )
+        val first = orchestrator.onEntryCommitted(putEntry(templateLabel = TemplateLabel.AFTERMATH))
+        assertNull(first)
+        // Cooldown was never started, so a follow-up entry with valid pattern would fire normally.
+        assertTrue(cooldownStore.isCalloutPermitted())
+    }
+
+    @Test
     fun `dismissed patterns do not surface as callouts even when matching`() = runTest {
         patternStore.put(
             PatternEntity(

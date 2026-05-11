@@ -128,28 +128,42 @@ class PatternDetectionOrchestrator(
     }
 
     private fun selectAndRecordCallout(entry: EntryEntity): EntryObservation? {
-        val text = chooseCalloutText(entry)
-        if (text == null) {
-            cooldownStore.consumeOneEntry()
-            return null
+        val matched = chooseMatchingPattern(entry) ?: return null
+        val text = matched.latestCalloutText
+        return when {
+            // ADR-003 §"Pattern primitives" guarantees every primitive ships a templated
+            // callout via PatternCalloutText.build. A blank stored value means an upstream
+            // write path skipped it — surface, never silently burn a cooldown slot.
+            text.isBlank() -> {
+                Log.w(TAG, "active pattern ${matched.patternId} has blank latestCalloutText (entry id=${entry.id})")
+                null
+            }
+
+            // Candidate existed but the suppression window blocked it. Decrement is the
+            // window's load-bearing semantic — "next 3 entries even when active patterns match."
+            !cooldownStore.isCalloutPermitted() -> {
+                cooldownStore.consumeOneEntry()
+                null
+            }
+
+            else -> {
+                cooldownStore.recordFired(entry.id, clock.millis())
+                EntryObservation(
+                    text = text,
+                    evidence = ObservationEvidence.PATTERN_CALLOUT,
+                    fields = emptyList(),
+                )
+            }
         }
-        cooldownStore.recordFired(entry.id, clock.millis())
-        return EntryObservation(
-            text = text,
-            evidence = ObservationEvidence.PATTERN_CALLOUT,
-            fields = emptyList(),
-        )
     }
 
-    private fun chooseCalloutText(entry: EntryEntity): String? {
-        if (!cooldownStore.isCalloutPermitted()) return null
+    private fun chooseMatchingPattern(entry: EntryEntity): PatternEntity? {
         val candidates = patternStore.all()
             .filter { it.state == PatternState.ACTIVE && PatternMatcher.matches(entry, it, zoneId) }
-        val chosen = candidates.sortedWith(
+        return candidates.sortedWith(
             compareByDescending<PatternEntity> { it.supportingEntries.size }
                 .thenByDescending { it.lastSeenTimestamp },
         ).firstOrNull()
-        return chosen?.latestCalloutText?.takeIf { it.isNotBlank() }
     }
 
     private fun loadSupporting(ids: List<Long>): List<EntryEntity> {

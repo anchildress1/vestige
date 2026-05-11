@@ -111,6 +111,26 @@ class RetrievalRepoTest {
     }
 
     @Test
+    fun `space-separated query matches kebab-case stored tags`() {
+        val tagged = insertEntry("unrelated body text", daysAgo = 5, tagNames = listOf("tuesday-meeting"))
+        insertEntry("unrelated body text", daysAgo = 5, tagNames = listOf("laundry"))
+
+        val results = repo.query("tuesday meeting")
+
+        assertEquals(listOf(tagged), results.map { it.id })
+    }
+
+    @Test
+    fun `singular query matches plural stored tag surface`() {
+        val tagged = insertEntry("unrelated body text", daysAgo = 5, tagNames = listOf("meetings"))
+        insertEntry("unrelated body text", daysAgo = 5, tagNames = listOf("laundry"))
+
+        val results = repo.query("meeting")
+
+        assertEquals(listOf(tagged), results.map { it.id })
+    }
+
+    @Test
     fun `recency breaks ties when keyword and tag signals match`() {
         val recent = insertEntry("crashed after standup", daysAgo = 1)
         val older = insertEntry("crashed after standup", daysAgo = 60)

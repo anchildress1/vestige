@@ -29,16 +29,13 @@ class RetrievalRepo(private val boxStore: BoxStore, private val clock: Clock = C
         require(topN > 0) { "RetrievalRepo.query requires topN > 0 (got $topN)" }
         require(recencyWeight in 0f..1f) { "RetrievalRepo.query requires recencyWeight in [0,1] (got $recencyWeight)" }
 
-        val queryTokens = tokenize(text)
-        if (queryTokens.isEmpty()) return emptyList()
+        val queryTerms = tokenizeToList(text)
+        if (queryTerms.isEmpty()) return emptyList()
+        val queryTokens = queryTerms.toSet()
 
         val entryBox = boxStore.boxFor<EntryEntity>()
         val tagBox = boxStore.boxFor<TagEntity>()
-
-        val queryTagNames = tagBox.all
-            .map { it.name }
-            .filter { it in queryTokens }
-            .toSet()
+        val queryTagNames = QueryTagMatcher.resolve(queryTerms, tagBox.all.map { it.name })
 
         val nowMs = clock.millis()
         val scored = entryBox.all.mapNotNull { entry ->
@@ -76,15 +73,17 @@ class RetrievalRepo(private val boxStore: BoxStore, private val clock: Clock = C
         return max(0.0, min(1.0, 1.0 - ageDays / RECENCY_WINDOW_DAYS))
     }
 
-    private fun tokenize(text: String): Set<String> {
-        if (text.isBlank()) return emptySet()
+    private fun tokenizeToList(text: String): List<String> {
+        if (text.isBlank()) return emptyList()
         return text.lowercase()
             .split(TOKEN_SPLIT)
             .asSequence()
             .map { it.trim('-') }
             .filter { it.isNotEmpty() }
-            .toSet()
+            .toList()
     }
+
+    private fun tokenize(text: String): Set<String> = tokenizeToList(text).toSet()
 
     private data class Scored(val entry: EntryEntity, val score: Double)
 
@@ -94,5 +93,62 @@ class RetrievalRepo(private val boxStore: BoxStore, private val clock: Clock = C
         const val MILLIS_PER_DAY = 86_400_000.0
         const val RECENCY_WINDOW_DAYS = 90.0
         val TOKEN_SPLIT: Regex = Regex("[^a-z0-9-]+")
+    }
+}
+
+private object QueryTagMatcher {
+    private const val MIN_STEM_LENGTH = 3
+    private const val IES_SUFFIX = "ies"
+    private val tokenSplit: Regex = Regex("[^a-z0-9-]+")
+
+    fun resolve(queryTerms: List<String>, storedTagNames: List<String>): Set<String> {
+        if (queryTerms.isEmpty() || storedTagNames.isEmpty()) return emptySet()
+        val maxTagWords = storedTagNames.maxOf { storedTagWordCount(it) }
+        val queryTagKeys = buildQueryTagKeys(queryTerms, maxTagWords)
+        return storedTagNames.filterTo(linkedSetOf()) { storedTag ->
+            comparisonKey(storedTag) in queryTagKeys
+        }
+    }
+
+    private fun buildQueryTagKeys(queryTerms: List<String>, maxTagWords: Int): Set<String> {
+        if (queryTerms.isEmpty()) return emptySet()
+        val cappedMaxWords = min(maxTagWords, queryTerms.size)
+        val keys = linkedSetOf<String>()
+        for (windowSize in 1..cappedMaxWords) {
+            for (start in 0..queryTerms.size - windowSize) {
+                val phrase = queryTerms.subList(start, start + windowSize).joinToString("-")
+                comparisonKey(phrase)?.let(keys::add)
+            }
+        }
+        return keys
+    }
+
+    private fun storedTagWordCount(tag: String): Int = normalizeTagPhrase(tag)?.split('-')?.size ?: 0
+
+    private fun comparisonKey(text: String): String? =
+        normalizeTagPhrase(text)?.split('-')?.joinToString("-") { stemForCompare(it) }
+
+    private fun normalizeTagPhrase(text: String): String? =
+        tokenizeToList(text).takeIf { it.isNotEmpty() }?.joinToString("-")
+
+    // Mirror ADR-002's comparison-only plural folding: the stored surface form stays intact.
+    private fun stemForCompare(token: String): String {
+        if (token.length <= MIN_STEM_LENGTH) return token
+        return when {
+            token.endsWith(IES_SUFFIX) -> token.dropLast(IES_SUFFIX.length) + "y"
+            token.endsWith("ss") || token.endsWith("us") || token.endsWith("is") -> token
+            token.endsWith('s') -> token.dropLast(1)
+            else -> token
+        }
+    }
+
+    private fun tokenizeToList(text: String): List<String> {
+        if (text.isBlank()) return emptyList()
+        return text.lowercase()
+            .split(tokenSplit)
+            .asSequence()
+            .map { it.trim('-') }
+            .filter { it.isNotEmpty() }
+            .toList()
     }
 }

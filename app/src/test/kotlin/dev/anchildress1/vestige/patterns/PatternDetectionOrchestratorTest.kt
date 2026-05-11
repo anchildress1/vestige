@@ -3,6 +3,8 @@ package dev.anchildress1.vestige.patterns
 import androidx.test.core.app.ApplicationProvider
 import dev.anchildress1.vestige.inference.LiteRtLmEngine
 import dev.anchildress1.vestige.inference.PatternTitleGenerator
+import dev.anchildress1.vestige.model.DetectedPattern
+import dev.anchildress1.vestige.model.ExtractionStatus
 import dev.anchildress1.vestige.model.ObservationEvidence
 import dev.anchildress1.vestige.model.PatternKind
 import dev.anchildress1.vestige.model.PatternState
@@ -16,8 +18,10 @@ import dev.anchildress1.vestige.storage.PatternStore
 import dev.anchildress1.vestige.storage.TagEntity
 import dev.anchildress1.vestige.storage.VestigeBoxStore
 import io.mockk.coEvery
+import io.mockk.every
 import io.mockk.mockk
 import io.objectbox.BoxStore
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.runTest
 import org.junit.After
@@ -87,11 +91,13 @@ class PatternDetectionOrchestratorTest {
         tags: List<String> = emptyList(),
         text: String = "",
         timestamp: Instant = now,
+        extractionStatus: ExtractionStatus = ExtractionStatus.COMPLETED,
     ): EntryEntity {
         val entry = EntryEntity(
             entryText = text,
             templateLabel = templateLabel,
             timestampEpochMs = timestamp.toEpochMilli(),
+            extractionStatus = extractionStatus,
         )
         val entryBox = boxStore.boxFor(EntryEntity::class.java)
         entryBox.put(entry)
@@ -229,7 +235,7 @@ class PatternDetectionOrchestratorTest {
     }
 
     @Test
-    fun `non-matching entries leave the cooldown counter alone`() = runTest {
+    fun `non-matching entries still consume the global cooldown window`() = runTest {
         patternStore.put(
             PatternEntity(
                 patternId = "x".repeat(64),
@@ -245,14 +251,13 @@ class PatternDetectionOrchestratorTest {
         )
         // Fire once → cooldown counter set to 3.
         orchestrator.onEntryCommitted(putEntry(templateLabel = TemplateLabel.AFTERMATH))
-        // Three non-matching entries in a row must NOT decrement the counter — only
-        // suppressed candidates count toward the window.
+        // Three committed entries later — matching or not — the global cooldown is spent.
         repeat(3) {
             orchestrator.onEntryCommitted(putEntry(templateLabel = TemplateLabel.TUNNEL_EXIT))
         }
-        // Counter is still 3 → the next matching entry is still suppressed.
+        // Fourth entry after the callout is eligible again.
         val nextMatch = orchestrator.onEntryCommitted(putEntry(templateLabel = TemplateLabel.AFTERMATH))
-        assertNull("cooldown must still be active because non-match entries did not consume slots", nextMatch)
+        assertNotNull("cooldown must burn across the next three committed entries", nextMatch)
     }
 
     @Test
@@ -407,6 +412,20 @@ class PatternDetectionOrchestratorTest {
     }
 
     @Test
+    fun `snoozed pattern with unexpired snoozedUntil stays snoozed on detection run`() = runTest {
+        repeat(10) { commitOne() }
+        val original = patternStore.all().single { it.kind == PatternKind.TEMPLATE_RECURRENCE }
+
+        val snoozeUntil = now.toEpochMilli() + 7L * 24 * 60 * 60 * 1000
+        patternStore.transitionState(original.patternId, PatternState.SNOOZED, snoozedUntilMs = snoozeUntil)
+
+        repeat(10) { commitOne() }
+        val stillSnoozed = patternStore.findByPatternId(original.patternId)!!
+        assertEquals(PatternState.SNOOZED, stillSnoozed.state)
+        assertEquals(snoozeUntil, stillSnoozed.snoozedUntil)
+    }
+
+    @Test
     fun `new pattern inserts with deterministic title when generator returns null`() = runTest {
         // Title generator returns blank → orchestrator falls back to the deterministic title.
         coEvery { engine.generateText(any()) } returns ""
@@ -418,5 +437,142 @@ class PatternDetectionOrchestratorTest {
             "fallback title is the kebab template label, title-cased",
             pattern.title.equals("Aftermath", ignoreCase = true),
         )
+    }
+
+    @Test
+    fun `new pattern falls back to kind title and skips missing supporting rows when generator throws`() = runTest {
+        val supporting = putEntry(templateLabel = TemplateLabel.AFTERMATH)
+        repeat(8) { putEntry(templateLabel = TemplateLabel.AFTERMATH) }
+
+        val detector: PatternDetector = mockk()
+        coEvery { engine.generateText(any()) } throws RuntimeException("boom")
+        every { detector.detect() } returns listOf(
+            DetectedPattern(
+                patternId = "z".repeat(64),
+                kind = PatternKind.COMMITMENT_RECURRENCE,
+                signatureJson = "{\"kind\":\"commitment_recurrence\",\"topic_or_person\":\"jamie\"}",
+                templateLabel = null,
+                supportingEntryIds = listOf(supporting.id, 999_999L),
+                firstSeenTimestamp = now.minusSeconds(60).toEpochMilli(),
+                lastSeenTimestamp = now.toEpochMilli(),
+            ),
+        )
+        val fallbackOrchestrator = PatternDetectionOrchestrator(
+            boxStore = boxStore,
+            detector = detector,
+            patternStore = patternStore,
+            titleGenerator = PatternTitleGenerator(
+                engine = engine,
+                personaPromptComposer = { "P" },
+                templateLoader = { "T" },
+                forbiddenPhraseDetector = { false },
+            ),
+            cooldownStore = cooldownStore,
+            activePersonaProvider = { Persona.WITNESS },
+            clock = clock,
+            zoneId = ZoneOffset.UTC,
+        )
+
+        fallbackOrchestrator.onEntryCommitted(putEntry(templateLabel = TemplateLabel.AFTERMATH))
+
+        val pattern = patternStore.findByPatternId("z".repeat(64))!!
+        assertEquals("Commitment recurrence", pattern.title)
+        assertEquals(1, pattern.supportingEntries.size)
+        assertEquals(supporting.id, pattern.supportingEntries.single().id)
+    }
+
+    @Test
+    fun `failed entries do not advance the every-10 completed-entry cadence`() = runTest {
+        repeat(8) { commitOne() }
+        repeat(2) {
+            orchestrator.onEntryCommitted(
+                putEntry(
+                    templateLabel = TemplateLabel.AFTERMATH,
+                    extractionStatus = ExtractionStatus.FAILED,
+                ),
+            )
+        }
+
+        assertTrue("failed entries must not trigger detection", patternStore.all().isEmpty())
+
+        repeat(2) { commitOne() }
+        assertTrue(patternStore.all().any { it.kind == PatternKind.TEMPLATE_RECURRENCE })
+    }
+
+    @Test
+    fun `zero completed entries do not trigger detection`() = runTest {
+        val detector: PatternDetector = mockk()
+        every { detector.detect() } returns emptyList()
+        val freshOrchestrator = PatternDetectionOrchestrator(
+            boxStore = boxStore,
+            detector = detector,
+            patternStore = patternStore,
+            titleGenerator = PatternTitleGenerator(
+                engine = engine,
+                personaPromptComposer = { "P" },
+                templateLoader = { "T" },
+                forbiddenPhraseDetector = { false },
+            ),
+            cooldownStore = cooldownStore,
+            clock = clock,
+            zoneId = ZoneOffset.UTC,
+        )
+
+        freshOrchestrator.onEntryCommitted(
+            putEntry(
+                templateLabel = TemplateLabel.AFTERMATH,
+                extractionStatus = ExtractionStatus.FAILED,
+            ),
+        )
+
+        assertTrue(patternStore.all().isEmpty())
+    }
+
+    @Test(expected = CancellationException::class)
+    fun `cancellation while generating a title is not swallowed`() = runTest {
+        repeat(9) { putEntry(templateLabel = TemplateLabel.AFTERMATH) }
+        val detector: PatternDetector = mockk()
+        every { detector.detect() } returns listOf(
+            DetectedPattern(
+                patternId = "c".repeat(64),
+                kind = PatternKind.TEMPLATE_RECURRENCE,
+                signatureJson = "{\"kind\":\"template_recurrence\",\"label\":\"aftermath\"}",
+                templateLabel = TemplateLabel.AFTERMATH.serial,
+                supportingEntryIds = emptyList(),
+                firstSeenTimestamp = now.minusSeconds(60).toEpochMilli(),
+                lastSeenTimestamp = now.toEpochMilli(),
+            ),
+        )
+        coEvery { engine.generateText(any()) } throws CancellationException("stop")
+        val cancelOrchestrator = PatternDetectionOrchestrator(
+            boxStore = boxStore,
+            detector = detector,
+            patternStore = patternStore,
+            titleGenerator = PatternTitleGenerator(
+                engine = engine,
+                personaPromptComposer = { "P" },
+                templateLoader = { "T" },
+                forbiddenPhraseDetector = { false },
+            ),
+            cooldownStore = cooldownStore,
+            clock = clock,
+            zoneId = ZoneOffset.UTC,
+        )
+
+        cancelOrchestrator.onEntryCommitted(putEntry(templateLabel = TemplateLabel.AFTERMATH))
+    }
+
+    @Test
+    fun `snoozed pattern without snoozedUntil does not auto-promote`() = runTest {
+        repeat(10) { commitOne() }
+        val original = patternStore.all().single { it.kind == PatternKind.TEMPLATE_RECURRENCE }
+        val row = patternStore.findByPatternId(original.patternId)!!
+        row.state = PatternState.SNOOZED
+        row.snoozedUntil = null
+        patternStore.put(row)
+
+        repeat(10) { commitOne() }
+        val persisted = patternStore.findByPatternId(original.patternId)!!
+        assertEquals(PatternState.SNOOZED, persisted.state)
     }
 }

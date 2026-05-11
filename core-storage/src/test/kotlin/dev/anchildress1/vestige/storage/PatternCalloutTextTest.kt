@@ -73,4 +73,31 @@ class PatternCalloutTextTest {
         )
         assertTrue(text.contains("Tunnel Exit"))
     }
+
+    @Test
+    fun `template recurrence falls back cleanly when signature json is malformed`() {
+        val text = PatternCalloutText.build(detected(PatternKind.TEMPLATE_RECURRENCE, "{bad-json"))
+        assertEquals("3  entries logged. Worth noting.", text)
+    }
+
+    @Test
+    fun `tag pair callout tolerates missing tag array`() {
+        val text = PatternCalloutText.build(
+            detected(PatternKind.TAG_PAIR_CO_OCCURRENCE, "{\"label\":\"aftermath\"}"),
+        )
+        assertEquals("Aftermath entries:  across 3 entries.", text)
+    }
+
+    @Test
+    fun `commitment and vocab callouts tolerate missing signature fields`() {
+        val commitment = PatternCalloutText.build(
+            detected(PatternKind.COMMITMENT_RECURRENCE, "{}"),
+        )
+        val vocab = PatternCalloutText.build(
+            detected(PatternKind.VOCAB_FREQUENCY, "{}", supporting = listOf(1L, 2L, 3L, 4L)),
+        )
+
+        assertEquals("3 entries with a commitment about .", commitment)
+        assertEquals("'' appears across 4 entries with multiple framings.", vocab)
+    }
 }

@@ -1,6 +1,7 @@
 package dev.anchildress1.vestige.storage
 
 import androidx.test.core.app.ApplicationProvider
+import dev.anchildress1.vestige.model.ExtractionStatus
 import dev.anchildress1.vestige.model.PatternKind
 import dev.anchildress1.vestige.model.TemplateLabel
 import io.objectbox.BoxStore
@@ -45,12 +46,14 @@ class PatternDetectorTest {
         BoxStore.deleteAllFiles(dataDir)
     }
 
+    @Suppress("LongParameterList")
     private fun putEntry(
         text: String = "",
         templateLabel: TemplateLabel? = null,
         timestamp: Instant = now,
         tagNames: List<String> = emptyList(),
         commitmentTopic: String? = null,
+        extractionStatus: ExtractionStatus = ExtractionStatus.COMPLETED,
     ): EntryEntity {
         val tagBox = boxStore.boxFor<TagEntity>()
         val entry = EntryEntity(
@@ -58,6 +61,7 @@ class PatternDetectorTest {
             timestampEpochMs = timestamp.toEpochMilli(),
             templateLabel = templateLabel,
             statedCommitmentJson = commitmentTopic?.let { """{"topic_or_person":"$it","text":"do it"}""" },
+            extractionStatus = extractionStatus,
         )
         boxStore.boxFor<EntryEntity>().put(entry)
         if (tagNames.isNotEmpty()) {
@@ -70,6 +74,13 @@ class PatternDetectorTest {
         }
         return entry
     }
+
+    private fun putRawCommitmentEntry(rawCommitmentJson: String): EntryEntity = EntryEntity(
+        entryText = "",
+        timestampEpochMs = now.toEpochMilli(),
+        statedCommitmentJson = rawCommitmentJson,
+        extractionStatus = ExtractionStatus.COMPLETED,
+    ).also { boxStore.boxFor<EntryEntity>().put(it) }
 
     @Test
     fun `empty database produces no patterns`() {
@@ -116,6 +127,14 @@ class PatternDetectorTest {
     }
 
     @Test
+    fun `tag-pair ignores single-tag entries while still counting valid pairs`() {
+        putEntry(templateLabel = TemplateLabel.AFTERMATH, tagNames = listOf("standup"))
+        repeat(3) { putEntry(templateLabel = TemplateLabel.AFTERMATH, tagNames = listOf("standup", "crashed")) }
+        val pair = detector.detect().single { it.kind == PatternKind.TAG_PAIR_CO_OCCURRENCE }
+        assertEquals(3, pair.supportingEntryCount)
+    }
+
+    @Test
     fun `goblin hours pattern uses the 30-day window`() {
         // 3 entries between 00:00 and 04:59 UTC inside 30 days.
         val midnight = Instant.parse("2026-05-10T02:00:00Z")
@@ -140,6 +159,20 @@ class PatternDetectorTest {
     }
 
     @Test
+    fun `goblin hours ignores entries inside 30 days when they are outside the local hour band`() {
+        val midday = Instant.parse("2026-05-10T12:00:00Z")
+        repeat(3) { putEntry(timestamp = midday) }
+        assertNull(detector.detect().firstOrNull { it.kind == PatternKind.TIME_OF_DAY_CLUSTER })
+    }
+
+    @Test
+    fun `goblin hours excludes 5am boundary entries`() {
+        val fiveAm = Instant.parse("2026-05-10T05:00:00Z")
+        repeat(3) { putEntry(timestamp = fiveAm) }
+        assertNull(detector.detect().firstOrNull { it.kind == PatternKind.TIME_OF_DAY_CLUSTER })
+    }
+
+    @Test
     fun `commitment recurrence groups by topic_or_person`() {
         repeat(3) { putEntry(commitmentTopic = "Jamie") }
         val pattern = detector.detect().single { it.kind == PatternKind.COMMITMENT_RECURRENCE }
@@ -151,6 +184,34 @@ class PatternDetectorTest {
     fun `commitment below threshold does not pattern`() {
         repeat(2) { putEntry(commitmentTopic = "Jamie") }
         assertNull(detector.detect().firstOrNull { it.kind == PatternKind.COMMITMENT_RECURRENCE })
+    }
+
+    @Test
+    fun `malformed commitment json is ignored`() {
+        repeat(3) { putRawCommitmentEntry("{bad json") }
+        assertNull(detector.detect().firstOrNull { it.kind == PatternKind.COMMITMENT_RECURRENCE })
+    }
+
+    @Test
+    fun `blank commitment topic is ignored`() {
+        repeat(3) { putRawCommitmentEntry("""{"topic_or_person":"   ","text":"do it"}""") }
+        assertNull(detector.detect().firstOrNull { it.kind == PatternKind.COMMITMENT_RECURRENCE })
+    }
+
+    @Test
+    fun `blank commitment payload is ignored`() {
+        repeat(3) { putRawCommitmentEntry("   ") }
+        assertNull(detector.detect().firstOrNull { it.kind == PatternKind.COMMITMENT_RECURRENCE })
+    }
+
+    @Test
+    fun `commitment recurrence normalizes topic variants into one signature`() {
+        putEntry(commitmentTopic = "Jamie")
+        putEntry(commitmentTopic = " jamie ")
+        putEntry(commitmentTopic = "JAMIE")
+        val pattern = detector.detect().single { it.kind == PatternKind.COMMITMENT_RECURRENCE }
+        assertTrue(pattern.signatureJson.contains("\"topic_or_person\":\"jamie\""))
+        assertEquals(3, pattern.supportingEntryCount)
     }
 
     @Test
@@ -241,6 +302,24 @@ class PatternDetectorTest {
         val pattern = detector.detect().single { it.kind == PatternKind.TEMPLATE_RECURRENCE }
         assertNotNull(pattern.signatureJson)
         assertTrue(pattern.signatureJson.contains("\"kind\":\"template_recurrence\""))
+    }
+
+    @Test
+    fun `failed and timed-out entries are excluded from supporting sets`() {
+        repeat(2) { putEntry(templateLabel = TemplateLabel.AFTERMATH) }
+        putEntry(
+            templateLabel = TemplateLabel.AFTERMATH,
+            extractionStatus = ExtractionStatus.FAILED,
+        )
+        putEntry(
+            templateLabel = TemplateLabel.AFTERMATH,
+            extractionStatus = ExtractionStatus.TIMED_OUT,
+        )
+
+        assertTrue(
+            "only completed entries should count toward template recurrence",
+            detector.detect().none { it.kind == PatternKind.TEMPLATE_RECURRENCE },
+        )
     }
 
     @Test

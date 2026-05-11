@@ -106,6 +106,16 @@ class PatternMatcherTest {
     }
 
     @Test
+    fun `tag_pair rejects malformed or incomplete signatures`() {
+        val entry = putEntry(templateLabel = TemplateLabel.AFTERMATH, tags = listOf("standup", "crashed"))
+        val malformed = pattern(PatternKind.TAG_PAIR_CO_OCCURRENCE, "{bad-json")
+        val missingTags = pattern(PatternKind.TAG_PAIR_CO_OCCURRENCE, "{\"label\":\"aftermath\"}")
+
+        assertFalse(PatternMatcher.matches(entry, malformed, ZoneOffset.UTC))
+        assertFalse(PatternMatcher.matches(entry, missingTags, ZoneOffset.UTC))
+    }
+
+    @Test
     fun `goblin matches when entry timestamp falls in 0 to 5am local`() {
         val entry = putEntry(timestamp = Instant.parse("2026-05-11T02:00:00Z"))
         val p = pattern(PatternKind.TIME_OF_DAY_CLUSTER, "{\"bucket\":\"goblin\"}")
@@ -134,6 +144,22 @@ class PatternMatcherTest {
     }
 
     @Test
+    fun `commitment rejects malformed entry json and blank target topics`() {
+        val malformedEntry = EntryEntity(
+            entryText = "",
+            statedCommitmentJson = "{bad-json",
+            timestampEpochMs = Instant.parse("2026-05-11T12:00:00Z").toEpochMilli(),
+        )
+        boxStore.boxFor<EntryEntity>().put(malformedEntry)
+
+        val blankTarget = pattern(PatternKind.COMMITMENT_RECURRENCE, "{}")
+        val normalTarget = pattern(PatternKind.COMMITMENT_RECURRENCE, "{\"topic_or_person\":\"jamie\"}")
+
+        assertFalse(PatternMatcher.matches(malformedEntry, normalTarget, ZoneOffset.UTC))
+        assertFalse(PatternMatcher.matches(malformedEntry, blankTarget, ZoneOffset.UTC))
+    }
+
+    @Test
     fun `vocab matches when tag contains the token`() {
         val entry = putEntry(tags = listOf("tired"))
         val p = pattern(PatternKind.VOCAB_FREQUENCY, "{\"token\":\"tired\"}")
@@ -151,6 +177,13 @@ class PatternMatcherTest {
     fun `vocab rejects unrelated text`() {
         val entry = putEntry(text = "rested and great", tags = emptyList())
         val p = pattern(PatternKind.VOCAB_FREQUENCY, "{\"token\":\"tired\"}")
+        assertFalse(PatternMatcher.matches(entry, p, ZoneOffset.UTC))
+    }
+
+    @Test
+    fun `vocab rejects blank signature token`() {
+        val entry = putEntry(text = "tired all day", tags = emptyList())
+        val p = pattern(PatternKind.VOCAB_FREQUENCY, "{}")
         assertFalse(PatternMatcher.matches(entry, p, ZoneOffset.UTC))
     }
 

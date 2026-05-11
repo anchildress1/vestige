@@ -50,9 +50,13 @@ class PatternDetectionOrchestrator(
      * append to the entry (caller wires it back with [dev.anchildress1.vestige.storage.EntryStore.appendObservation]).
      */
     suspend fun onEntryCommitted(entry: EntryEntity): EntryObservation? {
-        val entryCount = boxStore.boxFor(EntryEntity::class.java).count()
+        val entryCount = completedEntryCount(boxStore)
         if (entryCount > 0 && entryCount % DETECTION_INTERVAL == 0L) {
             runDetection()
+        }
+        if (!cooldownStore.isCalloutPermitted()) {
+            cooldownStore.consumeOneEntry()
+            return null
         }
         return selectAndRecordCallout(entry)
     }
@@ -144,13 +148,6 @@ class PatternDetectionOrchestrator(
                 null
             }
 
-            // Candidate existed but the suppression window blocked it. Decrement is the
-            // window's load-bearing semantic — "next 3 entries even when active patterns match."
-            !cooldownStore.isCalloutPermitted() -> {
-                cooldownStore.consumeOneEntry()
-                null
-            }
-
             else -> {
                 cooldownStore.recordFired(entry.id, clock.millis())
                 EntryObservation(
@@ -181,7 +178,6 @@ class PatternDetectionOrchestrator(
         val source = detected.templateLabel ?: detected.kind.serial.replace('_', ' ')
         return source.replaceFirstChar { it.titlecase() }.take(MAX_TITLE_CHARS)
     }
-
     companion object {
         const val DETECTION_INTERVAL: Long = 10
         const val MAX_TITLE_CHARS: Int = 24
@@ -189,3 +185,8 @@ class PatternDetectionOrchestrator(
         private const val TAG = "VestigePatternOrch"
     }
 }
+
+private fun completedEntryCount(boxStore: BoxStore): Long = boxStore.boxFor(EntryEntity::class.java)
+    .all
+    .count { it.extractionStatus == dev.anchildress1.vestige.model.ExtractionStatus.COMPLETED }
+    .toLong()

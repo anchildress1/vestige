@@ -1,6 +1,7 @@
 package dev.anchildress1.vestige.storage
 
 import dev.anchildress1.vestige.model.DetectedPattern
+import dev.anchildress1.vestige.model.ExtractionStatus
 import dev.anchildress1.vestige.model.PatternKind
 import dev.anchildress1.vestige.model.TemplateLabel
 import io.objectbox.BoxStore
@@ -28,6 +29,7 @@ class PatternDetector(
     fun detect(): List<DetectedPattern> {
         val nowMs = clock.millis()
         val entries = boxStore.boxFor<EntryEntity>().all
+            .filter { it.extractionStatus == ExtractionStatus.COMPLETED }
         val withinWindow = entries.filter { nowMs - it.timestampEpochMs <= WINDOW_90D_MS }
         val withinGoblinWindow = entries.filter { nowMs - it.timestampEpochMs <= WINDOW_30D_MS }
 
@@ -183,6 +185,7 @@ private fun parseCommitmentTopic(json: String?): String? {
             )
             null
         }
+
         else -> obj.optString("topic_or_person").trim().takeIf { it.isNotEmpty() }
     }
 }

@@ -53,6 +53,9 @@ dependencies {
     testImplementation(libs.robolectric)
     testImplementation(libs.androidx.test.core)
     testImplementation(libs.androidx.test.core.ktx)
+    // Android's android.jar ships org.json at runtime; the mockable test jar stubs it. Pin the
+    // upstream artifact on the test classpath only so EntryStore hits a real parser.
+    testImplementation(libs.json)
 }
 
 tasks.withType<Test>().configureEach {

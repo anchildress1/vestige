@@ -24,8 +24,12 @@ import java.time.Instant
  *   2. [completeEntry] / [failEntry] — background extraction terminal. Updates the row + rewrites
  *      the markdown front-matter atomically.
  *
- * Markdown is the source of truth: write order is markdown first, ObjectBox second. If the
- * markdown write fails, no row is committed.
+ * **Transactional contract.** Markdown is the source of truth, but the box write is staged first
+ * inside `boxStore.callInTx` / `runInTx` so the row can mint its auto-id; the markdown write
+ * happens next; on markdown failure the throw escapes the transaction and ObjectBox rolls back
+ * the staged row before it commits. From a durable-state perspective the contract that holds is
+ * "no markdown ⇒ no ObjectBox row" — the order of the in-flight operations is box-first only
+ * within the un-committed transaction window.
  */
 class EntryStore(private val boxStore: BoxStore, private val markdownStore: MarkdownEntryStore) {
 

@@ -167,6 +167,23 @@ class ObservationResponseParserTest {
     }
 
     @Test
+    fun `parser advances past an unclosed brace and finds a later valid object`() {
+        // The bare `{` at the head of the string has no matching `}` — scanBalancedClose returns
+        // null for that candidate. The cursor must advance past it so the valid JSON object
+        // that follows is found.
+        val raw = """{ stray-fence
+            here is the actual output:
+            {"observations":[{"text":"obs","evidence":"theme-noticing","fields":[]}]}
+        """.trimIndent()
+
+        val observations = ObservationResponseParser.parse(raw)
+
+        assertNotNull(observations)
+        assertEquals(1, observations!!.size)
+        assertEquals("obs", observations.first().text)
+    }
+
+    @Test
     fun `parser handles braces embedded in JSON string literals without losing balance`() {
         val raw =
             """{"observations":[{"text":"opens with { and ends with }","evidence":"theme-noticing","fields":[]}]}"""

@@ -83,7 +83,14 @@ internal object ObservationResponseParser {
         var cursor = 0
         while (cursor < raw.length) {
             val open = raw.indexOf('{', cursor).takeIf { it >= 0 } ?: return null
-            val close = scanBalancedClose(raw, open) ?: return null
+            val close = scanBalancedClose(raw, open)
+            // Unbalanced first `{` (e.g. stray prose-brace or unclosed code fence) must not
+            // abort the search — advance past it and look for the next candidate. Returning
+            // null here was the bug Copilot caught on PR #18.
+            if (close == null) {
+                cursor = open + 1
+                continue
+            }
             val candidate = raw.substring(open, close + 1)
             val parsed = runCatching { JSONTokener(candidate).nextValue() as? JSONObject }.getOrNull()
             if (parsed != null) return parsed

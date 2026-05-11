@@ -4,6 +4,7 @@ import android.util.Log
 import dev.anchildress1.vestige.model.EntryObservation
 import dev.anchildress1.vestige.model.ObservationEvidence
 import dev.anchildress1.vestige.model.ResolvedExtraction
+import dev.anchildress1.vestige.model.TemplateLabel
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
@@ -85,11 +86,15 @@ class ObservationGenerator(
     }
 
     private fun goblinHoursObservation(capturedAt: ZonedDateTime): EntryObservation? {
-        if (capturedAt.hour !in GOBLIN_HOUR_RANGE) return null
+        if (capturedAt.hour !in TemplateLabel.GOBLIN_HOURS_LOCAL_HOUR_RANGE) return null
+        // `fields` is empty per ADR-002 §3: the array maps to canonical extraction field names
+        // (tags / energy_descriptor / recurrence_link / stated_commitment) or a snippet ref.
+        // The capture timestamp is metadata, not a resolved extraction field — surfacing it
+        // as a fields[] entry would corrupt the persisted schema for downstream consumers.
         return EntryObservation(
             text = "Captured between midnight and 5am — flagged as goblin hours.",
             evidence = ObservationEvidence.VOLUNTEERED_CONTEXT,
-            fields = listOf(KEY_CAPTURED_AT),
+            fields = emptyList(),
         )
     }
 
@@ -150,11 +155,9 @@ class ObservationGenerator(
         private const val TAG = "VestigeObservationGen"
         private const val MAX_OBSERVATIONS = 2
         private const val MAX_MODEL_ATTEMPTS = 2
-        private val GOBLIN_HOUR_RANGE = 0..4
 
         private const val KEY_COMMITMENT = "stated_commitment"
         private const val KEY_VOCAB_CONTRADICTIONS = "vocabulary_contradictions"
-        private const val KEY_CAPTURED_AT = "captured_at"
 
         private fun loadResource(path: String): String {
             val stream = ObservationGenerator::class.java.getResourceAsStream(path)

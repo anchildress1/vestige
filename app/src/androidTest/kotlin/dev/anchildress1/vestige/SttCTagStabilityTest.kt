@@ -4,7 +4,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import dev.anchildress1.vestige.corpus.CorpusEntry
 import dev.anchildress1.vestige.corpus.CorpusManifest
-import dev.anchildress1.vestige.inference.BackendChoice
+import dev.anchildress1.vestige.corpus.InferenceBackendArg
 import dev.anchildress1.vestige.inference.BackgroundExtractionRequest
 import dev.anchildress1.vestige.inference.BackgroundExtractionResult
 import dev.anchildress1.vestige.inference.BackgroundExtractionWorker
@@ -63,9 +63,11 @@ class SttCTagStabilityTest {
         require(corpus.isNotEmpty()) { "STT-C manifest is empty" }
 
         val cacheDir = InstrumentationRegistry.getInstrumentation().targetContext.cacheDir
+        val backend = InferenceBackendArg.resolve(args)
+        android.util.Log.i(TAG, "STT-C using backend=$backend runsPerEntry=$runsPerEntry")
         val engine = LiteRtLmEngine(
             modelPath = modelPath,
-            backend = BackendChoice.Cpu,
+            backend = backend,
             cacheDir = cacheDir.absolutePath,
         )
 

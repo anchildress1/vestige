@@ -47,7 +47,15 @@ android {
         // Forward `-P<key>=<value>` into instrumentation runner args. Consumers:
         //   modelPath, audioPath, latencyBudgetMs — existing smoke tests.
         //   manifestPath, runsPerEntry — SttDLensDivergenceTest, SttCTagStabilityTest.
-        listOf("modelPath", "audioPath", "latencyBudgetMs", "manifestPath", "runsPerEntry").forEach { key ->
+        //   inferenceBackend — STT-C/STT-D harnesses (cpu | gpu).
+        listOf(
+            "modelPath",
+            "audioPath",
+            "latencyBudgetMs",
+            "manifestPath",
+            "runsPerEntry",
+            "inferenceBackend",
+        ).forEach { key ->
             project.findProperty(key)?.toString()?.let { value ->
                 testInstrumentationRunnerArguments[key] = value
             }

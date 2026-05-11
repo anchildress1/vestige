@@ -237,7 +237,7 @@ Don't conflate this story with Story 2.6 (worker logic). Story 2.6 is *what* run
 
 Phase 2 has no capture screen — `MainActivity` is still the Phase-1 mic-permission shell — so the "user-turn slot in the entry transcript" surface that 2.11 expects to mutate doesn't exist yet. Building it in Phase 2 means writing a throwaway scaffold that Story 4.5 immediately replaces (`MistHero`, `AudioMeter`, locked muted-user / primary-model entry transcript, persona-pill chrome). That's the kind of churn AGENTS.md guardrail 20 ("Stick to the plan. Do not overbuild") tells us to skip.
 
-Story 4.5's `Done when` list already covers the placeholder display ("`Reading the entry.` placeholder shows in transcript area"). The two additional Phase-2 acceptance items — 200 ms minimum placeholder hold and explicit error-state replacement on parse-fail / timeout — were folded into Story 4.5 in this same change. **All five of this story's `Done when` boxes now belong to Story 4.5; track them there.**
+Story 4.5's `Done when` list already covers the placeholder display ("`Reading the entry.` placeholder shows in transcript area"). The two additional Phase-2 acceptance items — 200 ms minimum placeholder hold and explicit error-state replacement on parse-fail / timeout — landed alongside this deferral as a new `Inference placeholder lifecycle (absorbed from Story 2.11)` bullet under Story 4.5. **All five of this story's `Done when` boxes now belong to Story 4.5; track them there.**
 
 Phase-2 still benefits from this story by *not* shipping a placeholder UI on top of an absent capture screen — the build-order discipline matters more than the story-numbering bookkeeping.
 

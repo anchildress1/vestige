@@ -47,8 +47,27 @@ kover {
             }
             verify {
                 rule {
+                    // INSTRUCTION default — bytecode-level coverage. Kept so the historical
+                    // gate continues to fire on raw bytecode regressions.
                     bound {
                         minValue = 85
+                    }
+                }
+                rule {
+                    // LINE — matches Sonar's overall-line-coverage metric so the local hook
+                    // doesn't ship code that fails the cloud gate. Same 85% floor by intent.
+                    bound {
+                        coverageUnits = kotlinx.kover.gradle.plugin.dsl.CoverageUnit.LINE
+                        minValue = 85
+                    }
+                }
+                rule {
+                    // BRANCH — Sonar's "Coverage on New Code" gate (default 80%) is line-based
+                    // but condition coverage drives the same kind of regression. Keep at 80%
+                    // so the floor isn't lower than Sonar's new-code rule.
+                    bound {
+                        coverageUnits = kotlinx.kover.gradle.plugin.dsl.CoverageUnit.BRANCH
+                        minValue = 80
                     }
                 }
             }

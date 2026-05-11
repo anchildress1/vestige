@@ -11,7 +11,7 @@ This folder is the canonical source-of-truth for the v1 build. The CLI agent rea
 1. **`concept-locked.md`** — full product spec. Read first.
 2. **`PRD.md`** — formal P0/P1/P2 requirements + acceptance criteria + phase schedule + the five stop-and-test points (build philosophy section). Read second.
 3. **[`../AGENTS.md`](../AGENTS.md)** — implementor guardrails and non-negotiables. Lives at repo root. Read before changing anything.
-4. **`adrs/`** — architecture decision records. ADR-001 (stack & build infra), ADR-002 (multi-lens extraction pattern), ADR-003 (pattern detection algorithm & persistence), ADR-004 (app backgrounding & model-handle lifecycle), ADR-005 (STT-B scope correction + v1 single-turn decision), ADR-006 (foreground service restart policy), ADR-007 (foreground service state machine extensions), ADR-008 (parallel lens execution via Engine/Session). Read before Phase 1.
+4. **`adrs/`** — architecture decision records. ADR-001 (stack & build infra), ADR-002 (multi-lens extraction pattern), ADR-003 (pattern detection algorithm & persistence), ADR-004 (app backgrounding & model-handle lifecycle), ADR-005 (STT-B scope correction + v1 single-turn decision), ADR-006 (foreground service restart policy), ADR-007 (foreground service state machine extensions), ADR-008 (parallel lens execution via Engine/Session — superseded by ADR-009), ADR-009 (LiteRT-LM Kotlin Session.clone() unavailable; restores ADR-002 sequential for v1). Read before Phase 1.
 5. **`architecture-brief.md`** — module ownership, data flow, and Phase-1 build sequence.
 6. **`stories/`** — phased build stories. Drives what to work on right now.
 7. **`design-guidelines.md`** + **`ux-copy.md`** — when implementing UI for any screen.
@@ -27,7 +27,7 @@ This folder is the canonical source-of-truth for the v1 build. The CLI agent rea
 | `concept-locked.md` | Canonical product spec — templates-as-labels, multi-lens architecture (3×5), schema, personas, voice rules, privacy claims |
 | `PRD.md` | Formal requirements: P0 (must-have) / P1 (nice-to-have) / P2 (future). Acceptance criteria + phase schedule with dates |
 | `architecture-brief.md` | Module ownership, AppContainer singletons, data flow, ObjectBox shape, Phase-1 build sequence |
-| `adrs/` | Architecture decision records. ADR-001 stack & build infra, ADR-002 multi-lens extraction pattern, ADR-003 pattern detection algorithm & persistence, ADR-004 app backgrounding & model-handle lifecycle, ADR-005 STT-B scope correction + v1 single-turn decision, ADR-006 foreground service restart policy, ADR-007 foreground service state machine extensions, ADR-008 parallel lens execution via Engine/Session. |
+| `adrs/` | Architecture decision records. ADR-001 stack & build infra, ADR-002 multi-lens extraction pattern, ADR-003 pattern detection algorithm & persistence, ADR-004 app backgrounding & model-handle lifecycle, ADR-005 STT-B scope correction + v1 single-turn decision, ADR-006 foreground service restart policy, ADR-007 foreground service state machine extensions, ADR-008 parallel lens execution via Engine/Session (superseded by ADR-009), ADR-009 LiteRT-LM Kotlin Session.clone() unavailable + ADR-002 sequential restored. |
 | `design-guidelines.md` | Visual system, microcopy register, screen specs, persona voices, anti-patterns, accessibility rules |
 | `ux-copy.md` | Literal copy strings for every UI surface. Pull strings directly from here. |
 | `runtime-research.md` | Android stack rationale (LiteRT-LM SDK) with sources |

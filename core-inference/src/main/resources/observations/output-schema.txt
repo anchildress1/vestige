@@ -1,0 +1,24 @@
+## Output schema
+
+Return one JSON object. No prose outside the JSON, no commentary, no markdown.
+
+Required keys:
+
+- `observations`: array of 1 or 2 objects. Never 0. Never more than 2.
+
+Each `observations[]` object has exactly these keys:
+
+- `text`: string. The observation line itself, as the user will read it. Specific, sourced, no
+  diagnosis. Quote the entry verbatim when quoting; do not paraphrase quoted text.
+- `evidence`: one of `"vocabulary-contradiction"`, `"commitment-flag"`,
+  `"volunteered-context"`, `"theme-noticing"`. The kind of signal the observation surfaces.
+- `fields`: array of structured-field names from the resolved extraction (`tags`,
+  `energy_descriptor`, `recurrence_link`, `stated_commitment`). Empty array `[]` if the
+  observation cites only `entry_text` without a structured-field source.
+
+Hard rules:
+
+- Strings use straight quotes. No trailing commas. No comments. Use `null` only for absent
+  values, not the string "null".
+- Do not invent fields. The keys above are the entire schema for this call.
+- Emit 1 well-evidenced observation rather than 2 thin ones if there is not enough material.

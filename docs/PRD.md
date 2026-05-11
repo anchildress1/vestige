@@ -281,7 +281,8 @@ If no → reject, log to `backlog.md`, respond: *"this doesn't help us win, defe
 - `adrs/ADR-005-stt-b-scope-and-v1-single-turn.md` — STT-B scope correction; v1 single-turn-per-capture decision
 - `adrs/ADR-006-foreground-service-restart-policy.md` — foreground service restart policy
 - `adrs/ADR-007-foreground-service-state-machine-extensions.md` — foreground service state machine extensions
-- `adrs/ADR-008-parallel-lens-execution.md` — parallel 3-lens execution via LiteRT-LM Engine/Session cloning
+- `adrs/ADR-008-parallel-lens-execution.md` — parallel 3-lens execution via LiteRT-LM Engine/Session cloning **(superseded 2026-05-11 by ADR-009; historical)**
+- `adrs/ADR-009-litertlm-kotlin-session-clone-unavailable.md` — supersedes ADR-008; documents the `litertlm-android:0.11.0` Kotlin SDK gap and restores ADR-002's original sequential 3-lens rule for v1
 - `architecture-brief.md` — module breakdown, build plan, interface contracts
 - `sample-data-scenarios.md` — stop-and-test validation transcripts (STT-C, STT-D, STT-E)
 - `backlog.md` — features deferred from v1, with rationale and "what would unblock" per entry

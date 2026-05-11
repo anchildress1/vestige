@@ -40,7 +40,9 @@ android {
 dependencies {
     api(project(":core-model"))
 
-    implementation(libs.objectbox.android)
+    // ObjectBox types (BoxStore, etc.) leak into AppContainer's public surface; promote to `api`
+    // so `:app` can wire and observe lifecycle without a separate dependency declaration.
+    api(libs.objectbox.android)
     implementation(libs.objectbox.kotlin)
 
     testImplementation(libs.junit) // Robolectric runner is JUnit 4
@@ -53,6 +55,9 @@ dependencies {
     testImplementation(libs.robolectric)
     testImplementation(libs.androidx.test.core)
     testImplementation(libs.androidx.test.core.ktx)
+    // Android's android.jar ships org.json at runtime; the mockable test jar stubs it. Pin the
+    // upstream artifact on the test classpath only so EntryStore hits a real parser.
+    testImplementation(libs.json)
 }
 
 tasks.withType<Test>().configureEach {

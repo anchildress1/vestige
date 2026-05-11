@@ -2,7 +2,7 @@
 
 **Status:** In progress
 **Dates:** 2026-05-09 – TBD
-**References:** `PRD.md` §Phase 2, `concept-locked.md` §"Multi-lens extraction architecture", `concept-locked.md` §Schema, `AGENTS.md`, `architecture-brief.md`, `adrs/ADR-001-stack-and-build-infra.md` §Q3 / §Q4, `adrs/ADR-002-multi-lens-extraction-pattern.md` (entire), `adrs/ADR-004-app-backgrounding-and-model-handle-lifecycle.md` (entire), `adrs/ADR-008-parallel-lens-execution.md` (entire), `sample-data-scenarios.md`
+**References:** `PRD.md` §Phase 2, `concept-locked.md` §"Multi-lens extraction architecture", `concept-locked.md` §Schema, `AGENTS.md`, `architecture-brief.md`, `adrs/ADR-001-stack-and-build-infra.md` §Q3 / §Q4, `adrs/ADR-002-multi-lens-extraction-pattern.md` (entire), `adrs/ADR-004-app-backgrounding-and-model-handle-lifecycle.md` (entire), `adrs/ADR-009-litertlm-kotlin-session-clone-unavailable.md` (supersedes ADR-008 — sequential is the v1 rule), `sample-data-scenarios.md`
 
 ---
 
@@ -22,7 +22,7 @@ Build the end-to-end capture loop: user records or types → foreground call ret
 - [x] **STT-C passes**: tag extraction is stable (≥80% same-tag emission on equivalent test dumps). If unstable, prompts have been tightened until stable, or the limitation is documented. _(2026-05-11 — **PASSED at 1.00** on S24 Ultra GPU. 41/41 (entry, tag) pairs stable across 3 runs over 17 of 18 corpus entries. C2 produced zero tags on all 3 runs (INFERENTIAL + SKEPTICAL parse-fail × 2 retries on GPU) — same regression flagged in Story 2.7's GPU re-run. Stability gate is unaffected; C2 parse-rate is tracked separately.)_
 - [ ] Convergence resolver implementation lands into Story 1.12's test scaffolding and all happy-path tests pass.
 - [ ] Agent-emitted template labels work for all six archetypes on representative sample transcripts.
-- [ ] Background extraction populates the canonical schema on the reference device. Target latency per ADR-008: ~7–10s wall-clock per entry via parallel Session cloning on E4B GPU. The legacy 30–90s ceiling stays as the time-budget timeout guard.
+- [x] Background extraction populates the canonical schema on the reference device. **Latency target reverted to ADR-002 sequential per `adrs/ADR-009-litertlm-kotlin-session-clone-unavailable.md` (2026-05-11)** — Story 2.7's device record stands as the measured baseline: ~5–7 s per lens, 25–55 s per entry on E4B GPU after the `libOpenCL.so` manifest fix. The 30–90s ceiling remains the timeout guard. _(2026-05-11 — measured under Story 2.7 GPU re-run.)_
 - [ ] Background extraction lifecycle service is wired per ADR-004 (conditional foreground service): app promotes when extraction begins, demotes after 30-second keep-alive once all extractions reach terminal status. Notification text matches `ux-copy.md` §"Loading States".
 - [ ] Personas (Witness / Hardass / Editor) demonstrably affect tone on the foreground response without affecting structured field extraction.
 
@@ -129,7 +129,7 @@ Build the end-to-end capture loop: user records or types → foreground call ret
 - [x] Latency per entry on the reference device is logged; total foreground + background time per entry is recorded for the latency note. _(`Log.d("VestigeBackgroundExtraction", …)` per lens (`elapsed=Xms`) and per entry (`extract completed: lenses=N/3 model_calls=K elapsed=Yms`). Reference-device measurements get added under ADR-002 §"Latency budget" once the worker is wired into the running app.)_
 - [x] If a lens call fails (parse error, model error), the worker retries per ADR-001 Q3's retry policy. Two consecutive failures on the same lens marks the lens as "no opinion" rather than retrying indefinitely. _(`maxAttemptsPerLens = 2` (one initial + one retry) per lens. After exhausting that budget the lens contributes `LensResult(extraction = null, lastError = ...)` and the resolver receives only the lenses that parsed — ADR-002 §"Convergence edge cases" already routes parse-fail to "no opinion" rather than agreement. The original story copy said `extraction_status=ambiguous_partial`; the entry-level enum stays `COMPLETED` (≥1 lens parsed) or `FAILED` (every lens failed) per ADR-001 §Q3, with the per-field ambiguity expressed by the resolver's `ConfidenceVerdict.AMBIGUOUS` rather than a new entry-level status.)_
 
-**Notes / risks:** The three lens calls run **in parallel** per `adrs/ADR-008-parallel-lens-execution.md`. Build one base Session for the entry (shared prefix: system + 5 surfaces + entry text + retrieved history), clone it three times for the three lens module suffixes, fire all three concurrently against the single Engine. Copy-on-Write KV-cache handles the divergence. Total wall-clock ≈ one parallel call's latency + parallelization overhead, not 3× sequential. If LiteRT-LM Session cloning errors on the E4B audio artifact, **stop and write a superseding ADR** — do not silently fall back to sequential.
+**Notes / risks:** Lens calls run **sequentially** for v1 per `adrs/ADR-002-multi-lens-extraction-pattern.md` §"Background pass (3 lens calls, sequential)" — restored by `adrs/ADR-009-litertlm-kotlin-session-clone-unavailable.md` (supersedes ADR-008). The parallel-via-Session-cloning design ADR-008 prescribed is not buildable against `litertlm-android:0.11.0`; Story 2.6.6 was deferred and is tracked in `backlog.md` under `parallel-lens-execution-via-clone`.
 
 The worker does **not** own its own backgrounding behavior. The `BackgroundExtractionService` from Story 2.6.5 wraps the worker and keeps it alive across app backgrounding by promoting the process to a foreground service while extractions are in flight. Don't bake `Service` lifecycle handling into the worker class itself — that's the wrapper's job.
 
@@ -160,7 +160,16 @@ Don't conflate this story with Story 2.6 (worker logic). Story 2.6 is *what* run
 
 ---
 
-### Story 2.6.6 — Parallel lens execution via Engine/Session cloning (per ADR-008)
+### Story 2.6.6 — Parallel lens execution via Engine/Session cloning — **SUPERSEDED 2026-05-11; DEFERRED TO BACKLOG**
+
+🪦 **Superseded by [ADR-009](../adrs/ADR-009-litertlm-kotlin-session-clone-unavailable.md).** The API-feasibility probe run 2026-05-11 (ADR-008 Action Item 6) confirmed the `litertlm-android:0.11.0` Kotlin SDK does not expose `Session.clone()` or any equivalent parent-Session API. `Engine.createSession(SessionConfig)` takes no parent reference; the JNI binding (`nativeCreateSession(engineHandle, samplerConfig)`) confirms it at the native layer. Upstream PR #1515 (Kotlin clone surface) was closed unmerged 2026-03-09 and no replacement landed in the two months before this story's feasibility check. The C++ runtime (`runtime/core/session_advanced.cc`) has cloning; the Android SDK does not bind to it. No newer artifact is published — Google Android Maven `lastUpdated 2026-05-04` shows 0.11.0 is `<latest>`.
+
+ADR-009 restores ADR-002's original sequential rule for v1. Story 2.6's sequential `BackgroundExtractionWorker` ships as-is. This story is deferred to `backlog.md` under `parallel-lens-execution-via-clone` with the SDK-gap revival triggers recorded.
+
+**Original story preserved below for historical context. No `Done when` boxes will be ticked on this story — the feasibility check itself was the work, and its outcome was "defer."**
+
+<details>
+<summary>Original Story 2.6.6 contents (2026-05-10 draft, superseded)</summary>
 
 **As** the AI implementor, **I need** to refactor `BackgroundExtractionWorker` from sequential lens iteration to parallel execution via LiteRT-LM's Engine/Session API with Copy-on-Write KV-cache (per `adrs/ADR-008-parallel-lens-execution.md`), **so that** per-entry wall-clock drops from ~3× single-call (sequential) to ~1× single-call (parallel) and the extraction queue drains in real-time under ADHD-cadence capture.
 
@@ -186,6 +195,8 @@ Story 2.6 shipped a sequential 3-lens iteration that works correctly but is wall
 ADR-008 §"Wall-Clock Math" estimates ~7–9s per entry on E4B GPU after this refactor lands. If measured latency is materially worse than that, the issue is parallelization overhead (LiteRT-LM Session orchestration), not the model — surface it explicitly before assuming the architecture is at fault.
 
 This story is **infra-only**; no user-visible UX changes. The "Reading the entry" notification from ADR-004 stays visible for the (shorter) parallel call's duration. The convergence verdicts the resolver writes are identical.
+
+</details>
 
 ---
 
@@ -281,13 +292,13 @@ Phase 2 has no capture screen to attach a placeholder to — Story 4.5 builds th
 **As** the AI implementor, **I need** the entry to persist to both the ObjectBox `Entry` row and the markdown source-of-truth file (per Story 1.7) after the convergence resolver has populated the canonical fields, **so that** the entry is durably saved before the user leaves the session and the markdown export is always in sync with the ObjectBox index.
 
 **Done when:**
-- [ ] Save fires after Story 2.8 convergence resolution completes — not after the foreground call alone. (Foreground gets the user a response immediately; the durable save lands when extraction finishes.)
-- [ ] The `Entry` row in ObjectBox carries: `entry_text` (joined USER transcriptions only), `timestamp`, `template_label` (Story 2.10), `tags`, `energy_descriptor`, `recurrence_link`, `stated_commitment`, `entry_observations`, `confidence` (per-field), and the operational triplet from ADR-001 Q3.
-- [ ] The markdown file (per Story 1.7) is written with front-matter mirroring the row's structured fields and the body containing `entry_text` + `entry_observations`.
-- [ ] If the markdown write fails, the ObjectBox row is rolled back — the two stay in sync.
-- [ ] **The save flow registers `AppContainer.extractionStatusListener(entryId)` with the `BackgroundExtractionWorker` (Story 2.6) so each entry's status flips drive the foreground service lifecycle.** Story 2.6.5 staged the listener API; this story closes the loop. Until this lands, the foreground service never promotes — there is no other production caller.
-- [ ] **The save flow's persistence layer also wires `AppContainer.recoveredEntryIdsLoader` to the `EntryStore`-owned `BoxStore` via `VestigeBoxStore.findNonTerminalEntryIds(boxStore)` per ADR-006 Action Item #4** — replacing the Phase-2 default `{ emptyList() }`. Cold-start sweep recovery is non-functional until this lands.
-- [ ] A smoke test runs a full session through the pipeline and verifies both ObjectBox and markdown reflect the same canonical fields.
+- [x] Save fires after Story 2.8 convergence resolution completes — not after the foreground call alone. _(`BackgroundExtractionSaveFlow.saveAndExtract` (in `:app/save/`) awaits `BackgroundExtractionWorker.extract`'s terminal `BackgroundExtractionResult` before calling `EntryStore.completeEntry` / `failEntry`. Foreground transcription persists earlier via `EntryStore.createPendingEntry` which writes `entry_text` + `extraction_status=PENDING` so the user's words are durable before the model finishes.)_
+- [x] The `Entry` row in ObjectBox carries: `entry_text` (joined USER transcriptions only), `timestamp`, `template_label` (Story 2.10), `tags`, `energy_descriptor`, `recurrence_link`, `stated_commitment`, `entry_observations`, `confidence` (per-field), and the operational triplet from ADR-001 Q3. _(`EntryEntity` already declares all twelve fields; `EntryStore.completeEntry` populates them from `ResolvedExtraction.fields[…]` + the `templateLabel` argument. `entryObservationsJson` defaults to `"[]"` until Story 2.13's generator lands.)_
+- [x] The markdown file (per Story 1.7) is written with front-matter mirroring the row's structured fields and the body containing `entry_text` + `entry_observations`. _(`MarkdownEntryStore.write` (Story 1.7) renders the front-matter; `EntryStore` invokes it inside the same transaction as the box write so the two stay aligned.)_
+- [x] If the markdown write fails, the ObjectBox row is rolled back — the two stay in sync. _(`EntryStoreTest."createPendingEntry rolls back row when markdown write fails"` exercises the path — markdown-first inside `boxStore.callInTx { … }` means a write throw aborts the transaction before the row commits.)_
+- [x] **The save flow registers `AppContainer.extractionStatusListener(entryId)` with the `BackgroundExtractionWorker` (Story 2.6) so each entry's status flips drive the foreground service lifecycle.** _(The orchestrator threads `listenerFactory(entryId)` into `worker.extract(request, listener)` immediately after `createPendingEntry` returns the id; production wiring uses `AppContainer.extractionStatusListener` as the factory.)_
+- [x] **The save flow's persistence layer also wires `AppContainer.recoveredEntryIdsLoader` to the `EntryStore`-owned `BoxStore` via `VestigeBoxStore.findNonTerminalEntryIds(boxStore)` per ADR-006 Action Item #4** — replacing the Phase-2 default `{ emptyList() }`. _(`AppContainer.seedRecoveredExtractions` now falls back to the live query when no test loader is injected. The parameter is preserved nullable so `AppContainerTest` stays BoxStore-free with `recoveredEntryIdsLoader = { listOf(11L, 12L) }`.)_
+- [x] A smoke test runs a full session through the pipeline and verifies both ObjectBox and markdown reflect the same canonical fields. _(End-to-end coverage splits across two test classes by JNI boundary: `EntryStoreTest` (Robolectric + real BoxStore + real `MarkdownEntryStore`) covers the persistence half; `BackgroundExtractionSaveFlowTest` (JVM + mockk) covers the worker-result-to-store routing — `createPendingEntry → worker.extract → completeEntry` / `failEntry` with listener fan-out. Together they replicate the full Story 2.12 contract without depending on a live LiteRT-LM engine.)_
 
 **Notes / risks:** Per Story 1.7's note: if they diverge, markdown wins. Phase 4 export-to-zip and Phase 4 delete-all flows depend on this invariant.
 
@@ -298,11 +309,11 @@ Phase 2 has no capture screen to attach a placeholder to — Story 4.5 builds th
 **As** the AI implementor, **I need** the model to emit 1–2 per-entry observations from the convergence-resolved fields and the entry text — linguistic contradictions, captured commitments, volunteered context with one observation, theme noticing — **so that** every saved entry has user-visible signal even before any cross-entry pattern exists.
 
 **Done when:**
-- [ ] After convergence resolution (Story 2.8), an `ObservationGenerator` runs one model call composing: the entry text + the resolved structured fields + a system prompt that instructs the model to surface 1–2 observations per `concept-locked.md` §"Analysis (two-layer)".
-- [ ] Each observation includes evidence — either a quoted snippet from `entry_text` or a reference to a structured field.
-- [ ] Observations refuse interpretation per `concept-locked.md` §"Voice rules / Interpretation rule": no "you might be feeling," no "this could indicate," no diagnostic language. The system prompt enforces this.
-- [ ] Observations persist in the `entry_observations` field.
-- [ ] A smoke test confirms observations across at least three sample transcripts contain only behavior/vocabulary/pattern observations and no forbidden phrasings.
+- [x] After convergence resolution (Story 2.8), an `ObservationGenerator` runs one model call composing: the entry text + the resolved structured fields + a system prompt that instructs the model to surface 1–2 observations per `concept-locked.md` §"Analysis (two-layer)". _(`:core-inference/ObservationGenerator` runs **deterministic-first** per ADR-002 §3 — commitment-flag from `stated_commitment`, vocabulary-contradiction from `vocabulary_contradictions`, volunteered-context for goblin-hours captures (00:00–04:59 local). One model call only when deterministic assembly produces nothing, against the `/observations/system.txt` + `/observations/output-schema.txt` prompt resources. `BackgroundExtractionSaveFlow` invokes the generator after `BackgroundExtractionWorker.extract` resolves Success, threads observations into `EntryStore.completeEntry`.)_
+- [x] Each observation includes evidence — either a quoted snippet from `entry_text` or a reference to a structured field. _(`EntryObservation` carries `text` + an `ObservationEvidence` enum (vocabulary-contradiction / commitment-flag / volunteered-context / theme-noticing / pattern-callout) + a `fields[]` list of structured-field names. Deterministic paths emit field references; model fallback's parser rejects responses without recognized evidence values.)_
+- [x] Observations refuse interpretation per `concept-locked.md` §"Voice rules / Interpretation rule": no "you might be feeling," no "this could indicate," no diagnostic language. The system prompt enforces this. _(System prompt lists the forbidden openings and instructs the model to rewrite. `ObservationResponseParser` post-validates against a case-insensitive substring scan of the AGENTS.md §7 / `concept-locked.md` §"Voice rules" phrase list (`you might be feeling`, `it seems you're`, `this could indicate`, `i sense that`, `perhaps you're`, `it sounds like you're feeling`, `you may want to consider`, `you should`); any match drops the response. `ObservationGenerator.runModelFallback` retries once on rejection, then returns empty list rather than persist noise.)_
+- [x] Observations persist in the `entry_observations` field. _(`EntryStore.completeEntry` serializes the `List<EntryObservation>` via `JSONArray` into `EntryEntity.entryObservationsJson`; `MarkdownEntryStore.write` renders it as the front-matter `entry_observations:` inline JSON per `architecture-brief.md` §"Field placement rules".)_
+- [x] A smoke test confirms observations across at least three sample transcripts contain only behavior/vocabulary/pattern observations and no forbidden phrasings. _(`ObservationResponseParserTest` exercises three sample-transcript shapes (commitment + theme-noticing, theme-noticing only, vocabulary-contradiction), plus forbidden-phrase rejection at the start of a line, embedded mid-sentence, and across case. `ObservationGeneratorTest` covers the deterministic-first paths + the model-call retry on forbidden-phrase rejection + the empty-list outcome on two-attempts-violated. None of the test fixtures embed a forbidden phrase that would actually persist.)_
 
 **Notes / risks:** This is a single model call per entry, not a 3-lens pass. The output is 1–2 observations max — if the model returns more, truncate to two. Don't pad observations across entries with little content; one well-evidenced observation beats two thin ones.
 
@@ -327,14 +338,14 @@ If a Phase 2 story starts pulling Phase 3+ scope, stop. Reference `backlog.md` a
 
 Phase 3 starts when all the following are true:
 
-- [ ] All fifteen stories above are Done or have an explicit, recorded fallback. (Story 2.6.6 — parallel refactor per ADR-008 — added 2026-05-10.)
-- [ ] **STT-B resolved** — multi-turn works on E4B *or* the single-turn fallback is implemented and the spec updated.
+- [x] All fifteen stories above are Done or have an explicit, recorded fallback. (Story 2.6.6 — parallel refactor per ADR-008 — added 2026-05-10, **superseded by ADR-009 on 2026-05-11 and deferred to `backlog.md` as `parallel-lens-execution-via-clone`**. Fallback recorded; the v1 contract is ADR-002's original sequential rule.)
+- [x] **STT-B resolved** — multi-turn works on E4B *or* the single-turn fallback is implemented and the spec updated. _(2026-05-09 — single-turn fallback shipped per `adrs/ADR-005-stt-b-scope-and-v1-single-turn.md`; `concept-locked.md`, `PRD.md`, `design-guidelines.md` updated; `CaptureSession` made single-use; multi-turn harness deleted.)_
 - [x] **STT-D resolved** — 3-lens divergence is validated *or* multi-lens has been replaced with single-pass and ADR-002 has been superseded. _(2026-05-10 — validated at 83%.)_
 - [x] **STT-C resolved** — tag stability is ≥80% *or* the limitation is documented and Phase 3's pattern engine is designed around the noise floor. _(2026-05-11 — passed at 1.00 on GPU; C2 GPU parse-failure documented under Story 2.7's GPU regression note.)_
-- [ ] Convergence resolver tests from Story 1.12 all pass.
-- [ ] `BackgroundExtractionService` state machine tests pass; service is wired into `AppContainer` per ADR-004.
-- [ ] Latency budget on the reference device is recorded (foreground per turn, background per entry).
-- [ ] Markdown + ObjectBox stay in sync across at least 10 saved sessions (smoke test).
-- [ ] No new entries logged to `backlog.md` from Phase 2 work that change the v1 contract beyond what an STT fallback already required.
+- [x] Convergence resolver tests from Story 1.12 all pass. _(Story 2.8 flipped the four `@Disabled` cases and added eleven more; `:core-inference` test suite stays green.)_
+- [x] `BackgroundExtractionService` state machine tests pass; service is wired into `AppContainer` per ADR-004. _(Story 2.6.5 covered the state-machine + service integration; Story 2.12 closed the wiring loop by routing `extractionStatusListener(entryId)` from `BackgroundExtractionSaveFlow` and replacing the no-op `recoveredEntryIdsLoader` default with the live `VestigeBoxStore.findNonTerminalEntryIds(boxStore)` query.)_
+- [x] Latency budget on the reference device is recorded (foreground per turn, background per entry). _(Foreground per-turn: 24.4 / 31.2 / 33.4 s on E4B CPU post-fallback (Story 2.3 smoke). Background per-entry: 25–55 s on E4B GPU after the `libOpenCL.so` manifest fix (Story 2.7 device record); 5–7 s per lens. Both are outside the ADR-002 §"Latency budget" 1–5 s foreground target — GPU / NPU latency work lives in Phase 4/5.)_
+- [ ] Markdown + ObjectBox stay in sync across at least 10 saved sessions (smoke test). _(Per-save sync is validated under `EntryStoreTest` + `BackgroundExtractionSaveFlowTest` from Story 2.12 — the ≥10-sessions volume check stays open until Phase 4's history UI exercises it end-to-end.)_
+- [x] No new entries logged to `backlog.md` from Phase 2 work that change the v1 contract beyond what an STT fallback already required. _(One Phase-2 deferral added: `parallel-lens-execution-via-clone` from the ADR-009 supersede. ADR-002's original sequential rule stays the v1 contract; the deferral records future SDK-gap work, not a contract shift.)_
 
 If STT-B or STT-D fired their fallbacks: the v1 contract has shifted. Update `concept-locked.md`, `PRD.md`, and the relevant stories in `phase-3-memory-patterns.md`, `phase-4-ux-surface.md` (when those are written) before starting Phase 3 work.

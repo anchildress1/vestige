@@ -1,10 +1,12 @@
 # ADR-008 — Parallel 3-Lens Execution via LiteRT-LM Engine/Session Pattern
 
-**Status:** Accepted
+**Status:** Superseded by [ADR-009](ADR-009-litertlm-kotlin-session-clone-unavailable.md) on 2026-05-11.
 **Date:** 2026-05-10
 **Deciders:** Ashley (sole owner). AI implementors read this as authoritative.
 **Depends on:** `adrs/ADR-002-multi-lens-extraction-pattern.md` (supersedes the "sequential" sequencing rule)
 **Supersedes:** ADR-002 §"Background pass (3 lens calls, sequential)" — that rule was based on the assumption that "E4B is one model on one device" forced serialization. LiteRT-LM's Engine/Session API with Copy-on-Write KV-cache invalidates that assumption.
+
+> **Superseded by [ADR-009](ADR-009-litertlm-kotlin-session-clone-unavailable.md) on 2026-05-11.** Probe against `litertlm-android:0.11.0` (the latest published artifact, `lastUpdated 2026-05-04`) confirmed the Kotlin SDK does not expose `Session.clone()` or any equivalent parent-Session API. The C++ runtime (`runtime/core/session_advanced.cc`) has the capability; the Android JNI bridge does not bind to it. Upstream PR #1515 (Kotlin clone surface) was closed unmerged 2026-03-09. Issue #1226 remains open with no shipped timeline. ADR-009 restores ADR-002's original sequential rule for v1 and defers the parallel design to backlog with explicit revival triggers. The decision recorded below — and ADR-008's amendments to ADR-002 §"Background pass" / §"Why three calls" footnote — are historical context only; do not treat them as authoritative.
 
 ---
 

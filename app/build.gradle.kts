@@ -5,6 +5,10 @@ plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.kover)
+    // ObjectBox plugin is applied here for the host-OS JVM native-lib dependency it auto-detects
+    // and adds to the test classpath. `:app` declares no @Entity types (those live in
+    // `:core-storage`); the plugin's entity-processing surface is a no-op here.
+    alias(libs.plugins.objectbox)
 }
 
 // Release signing per ADR-001 §Q5. Reads `keystore.properties` from the repo root if present.

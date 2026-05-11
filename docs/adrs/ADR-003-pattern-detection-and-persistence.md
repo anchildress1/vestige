@@ -355,14 +355,22 @@ and trims edge hyphens. The same helper is called in the signature builder, the 
 grouping keys, and the matcher's compare path so the hash inputs cannot drift between
 subsystems.
 
-### Addendum (2026-05-11) — callout cooldown decrements only on suppressed candidates
+### Addendum (2026-05-11) — callout cooldown is counted per committed entry, globally
 
 §"Cooldown (callout-side only, global)" reads "After a callout fires on entry E, suppress
-callouts on the next 3 entries even when active patterns match." The phrase "even when
-active patterns match" qualifies the window — it counts callout-eligible entries, not every
-committed entry.
+callouts on the next 3 entries even when active patterns match." Operational reading: the
+window is wall-clock-by-entry — every entry committed during the window decrements the
+counter, regardless of whether that entry would have matched a pattern.
 
-Implementation: the cooldown counter decrements only when a candidate pattern existed but
-the suppression window blocked it (or its `latestCalloutText` was blank, in which case a
-warning is logged and the counter is left alone — broken row, not a real fire). Entries
-with no matching active pattern leave the counter alone.
+Implementation: `PatternDetectionOrchestrator.onEntryCommitted` consumes one slot at the
+top of every call when the cooldown is active, then short-circuits. Only when the cooldown
+is permitted does callout selection run. A blank `latestCalloutText` on a matched pattern
+logs a warning and returns null without firing — it does not start a fresh window.
+
+Trade-off rationale: a streak of unrelated entries between two matches can expire the
+window invisibly, which means two semantically-adjacent callouts can land back-to-back if
+the user logged unrelated entries between them. To the user that reads as appropriate
+spacing (other entries did go by); to the engine it's the simpler invariant — one rule,
+no carve-out, deterministic wall-clock pacing. The "anti-pushy brand" rule is satisfied
+either way because the perceived nag-rate is what the user types between, not what the
+counter says internally.

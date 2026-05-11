@@ -76,20 +76,7 @@ class LiteRtLmEngine(
         response
     }
 
-    /**
-     * Streaming counterpart to [generateText]. Emits each [com.google.ai.edge.litertlm.Message]'s
-     * text payload as the SDK delivers it — incremental tokens, not cumulative — so the UI can
-     * render partial output during the 25–55 s GPU foreground latency window per Story 2.7
-     * measurements. The flow runs on [ioDispatcher] and closes the underlying conversation in a
-     * terminal `onCompletion` so cancellation or error paths can't leak the native handle.
-     *
-     * The structured-output parser (`ForegroundResponseParser`) consumes a complete response, so
-     * callers that need parsed `{transcription, follow_up}` should reduce this flow to a string
-     * via `fold(StringBuilder()) { acc, c -> acc.append(c) }.toString()` and feed the result to
-     * the existing parser. Incremental rendering and incremental parsing are independent
-     * concerns; tackle parsing-of-partial-output only after the SDK emission shape is verified
-     * on device by `LiteRtLmStreamingTextSmokeTest`.
-     */
+    /** Streaming counterpart to [generateText]. Closes the conversation on flow completion. */
     fun streamText(prompt: String): Flow<String> {
         val active = checkNotNull(engine) {
             "LiteRtLmEngine.streamText called before initialize()."

@@ -157,12 +157,12 @@ Query-side tag extraction goes beyond exact-substring match: a free-form query b
 **As** the AI implementor, **I need** the three pattern actions wired to the persistence layer per ADR-003 with explicit semantics for each, **so that** the user can manage their pattern list without friction and the patterns view (Story 3.9) has actions to bind to.
 
 **Done when:**
-- [ ] `:core-storage` exposes `PatternRepo.dismiss(patternId)`, `PatternRepo.snooze(patternId, days = 7)`, `PatternRepo.markResolved(patternId)`.
-- [ ] `dismiss` transitions `state=active → dismissed`. The pattern stops appearing in the active list but remains in the database for future re-surfacing logic.
-- [ ] `snooze` transitions `state=active → snoozed` and records a `snooze_until` timestamp. After `snooze_until` passes (checked at next pattern detection run), state returns to `active`.
-- [ ] `markResolved` transitions `state=active → resolved`. The pattern remains in the database; future detections of equivalent shapes do not re-surface unless the user explicitly clears the resolved state (out of scope for v1 per `backlog.md`).
-- [ ] Each action is durable across app restart (smoke test).
-- [ ] Each action has an associated undo affordance available for at least 5 seconds after the action (UI is Phase 4; the API takes a `undo: Boolean = false` parameter so callers can re-issue with `true` to revert).
+- [x] `:core-storage` exposes `PatternRepo.dismiss(patternId)`, `PatternRepo.snooze(patternId, days = 7)`, `PatternRepo.markResolved(patternId)`.
+- [x] `dismiss` transitions `state=active → dismissed`. The pattern stops appearing in the active list but remains in the database for future re-surfacing logic.
+- [x] `snooze` transitions `state=active → snoozed` and records a `snooze_until` timestamp. After `snooze_until` passes (checked at next pattern detection run), state returns to `active`.
+- [x] `markResolved` transitions `state=active → resolved`. The pattern remains in the database; future detections of equivalent shapes do not re-surface unless the user explicitly clears the resolved state (out of scope for v1 per `backlog.md`).
+- [x] Each action is durable across app restart (smoke test).
+- [x] Each action has an associated undo affordance available for at least 5 seconds after the action (UI is Phase 4; the API takes a `undo: Boolean = false` parameter so callers can re-issue with `true` to revert).
 
 **Notes / risks:** Don't auto-promote a pattern from `dismissed` back to `active` — that's a v1.5 entry per `backlog.md`. v1 dismiss is a permanent dismissal until manually cleared (which we don't surface in v1).
 

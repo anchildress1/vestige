@@ -153,4 +153,22 @@ class PatternMatcherTest {
         val p = pattern(PatternKind.VOCAB_FREQUENCY, "{\"token\":\"tired\"}")
         assertFalse(PatternMatcher.matches(entry, p, ZoneOffset.UTC))
     }
+
+    @Test
+    fun `vocab stems entry text via the shared TokenStemmer — no prefix-overreach`() {
+        // `newscast` should NOT match the `news` signature — naive startsWith would let it through.
+        val entry = putEntry(text = "I watched the newscast last night", tags = emptyList())
+        val p = pattern(PatternKind.VOCAB_FREQUENCY, "{\"token\":\"news\"}")
+        assertFalse(
+            "preserved-surface tokens must not match longer words",
+            PatternMatcher.matches(entry, p, ZoneOffset.UTC),
+        )
+    }
+
+    @Test
+    fun `vocab matches plural form when stemmer folds it`() {
+        val entry = putEntry(text = "I had three meetings", tags = emptyList())
+        val p = pattern(PatternKind.VOCAB_FREQUENCY, "{\"token\":\"meeting\"}")
+        assertTrue(PatternMatcher.matches(entry, p, ZoneOffset.UTC))
+    }
 }

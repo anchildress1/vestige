@@ -120,14 +120,14 @@ class PatternDetector(
     }
 
     private fun vocabTokensFor(entry: EntryEntity): Set<String> {
-        val fromTags = entry.tags.map { stemForCompare(it.name) }
+        val fromTags = entry.tags.map { TokenStemmer.stem(it.name) }
         val fromText = entry.entryText
             .lowercase(Locale.ROOT)
             .split(WORD_SPLIT)
             .asSequence()
             .map { it.trim() }
             .filter { it.length >= MIN_VOCAB_LENGTH }
-            .map(::stemForCompare)
+            .map { TokenStemmer.stem(it) }
         return (fromTags.asSequence() + fromText).toSet()
     }
 
@@ -158,23 +158,7 @@ class PatternDetector(
     }
 }
 
-// Top-level helpers — kept off the class to satisfy the function-count budget. Mirror the
-// `stemForCompare` rules in RetrievalRepo so the vocab pattern and a tag query never disagree
-// on what "tired" means.
-private const val MIN_STEM_LENGTH = 3
-private val PRESERVED_SURFACES: Set<String> = setOf("news", "series", "species")
-
-private fun stemForCompare(token: String): String {
-    val lower = token.lowercase(Locale.ROOT)
-    return when {
-        lower in PRESERVED_SURFACES -> lower
-        lower.length <= MIN_STEM_LENGTH -> lower
-        lower.endsWith("ss") || lower.endsWith("us") || lower.endsWith("is") -> lower
-        lower.endsWith('s') -> lower.dropLast(1)
-        else -> lower
-    }
-}
-
+// Top-level helper — kept off the class to satisfy the function-count budget.
 private fun parseCommitmentTopic(json: String?): String? {
     val text = json?.takeIf { it.isNotBlank() } ?: return null
     val obj = runCatching { JSONObject(text) }.getOrNull()

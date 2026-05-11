@@ -4,13 +4,13 @@ import dev.anchildress1.vestige.model.PatternState
 import java.time.Clock
 
 /**
- * Action surface for the Patterns view per Story 3.8. Each action funnels through
+ * Action surface for the Patterns view. Each action funnels through
  * [PatternStore.transitionState] so ADR-003's lifecycle invariants are enforced in one place.
  *
  * `undo = true` re-issues the inverse transition for the action just taken — `dismiss(..., undo
- * = true)` brings a `DISMISSED` row back to `ACTIVE`. The UI affordance is a 5-second snackbar
- * (Story 3.9), so callers re-issue while the snackbar is alive; v1 does not surface an undo
- * path past that window.
+ * = true)` brings a `DISMISSED` row back to `ACTIVE`. v1 only exposes undo through the
+ * snackbar that follows the action, so callers re-issue while that affordance is alive; there
+ * is no other path out of the terminal states.
  */
 class PatternRepo(private val store: PatternStore, private val clock: Clock = Clock.systemUTC()) {
 

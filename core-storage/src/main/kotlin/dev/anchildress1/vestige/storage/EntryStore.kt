@@ -108,8 +108,8 @@ class EntryStore(private val boxStore: BoxStore, private val markdownStore: Mark
 
     /**
      * Append one observation to an already-completed entry's persisted list. Used by the
-     * pattern-detection orchestrator (Story 3.7) when a callout fires after `completeEntry`
-     * has already landed. Throws when the entry is missing — callers must hold a valid id.
+     * pattern-detection orchestrator when a callout fires after `completeEntry` has already
+     * landed. Throws when the entry is missing — callers must hold a valid id.
      */
     fun appendObservation(entryId: Long, observation: EntryObservation) {
         boxStore.runInTx {

@@ -5,8 +5,8 @@ import dev.anchildress1.vestige.inference.PatternTitleGenerator
 import dev.anchildress1.vestige.model.DetectedPattern
 import dev.anchildress1.vestige.model.EntryObservation
 import dev.anchildress1.vestige.model.ObservationEvidence
-import dev.anchildress1.vestige.model.Persona
 import dev.anchildress1.vestige.model.PatternState
+import dev.anchildress1.vestige.model.Persona
 import dev.anchildress1.vestige.storage.CalloutCooldownStore
 import dev.anchildress1.vestige.storage.EntryEntity
 import dev.anchildress1.vestige.storage.PatternCalloutText
@@ -20,8 +20,8 @@ import java.time.Clock
 import java.time.ZoneId
 
 /**
- * Story 3.7's wiring layer. Called by `BackgroundExtractionSaveFlow` after `completeEntry` so
- * the new entry is already persisted with its tags + template label. Two side effects:
+ * Wiring layer called by `BackgroundExtractionSaveFlow` after `completeEntry` so the new entry
+ * is already persisted with its tags + template label. Two side effects:
  *
  * 1. Every 10th entry, run [PatternDetector] + upsert results into [PatternStore]. New patterns
  *    get a model-generated title (one short call via [PatternTitleGenerator]); existing rows
@@ -71,9 +71,9 @@ class PatternDetectionOrchestrator(
             insertNewActive(detected, supportingEntries)
             return
         }
-        promoteSnoozedIfExpired(existing)
-        applySupportingAndCallout(existing, detected, supportingEntries)
-        patternStore.put(existing)
+        val current = promoteSnoozedIfExpired(existing) ?: existing
+        applySupportingAndCallout(current, detected, supportingEntries)
+        patternStore.put(current)
     }
 
     private suspend fun insertNewActive(detected: DetectedPattern, supporting: List<EntryEntity>) {
@@ -106,14 +106,13 @@ class PatternDetectionOrchestrator(
         patternStore.put(saved)
     }
 
-    private fun promoteSnoozedIfExpired(pattern: PatternEntity) {
-        if (pattern.state != PatternState.SNOOZED) return
-        val expiry = pattern.snoozedUntil ?: return
-        if (clock.millis() >= expiry) {
-            pattern.state = PatternState.ACTIVE
-            pattern.snoozedUntil = null
-            pattern.stateChangedTimestamp = clock.millis()
-        }
+    private fun promoteSnoozedIfExpired(pattern: PatternEntity): PatternEntity? {
+        val expired = pattern.state == PatternState.SNOOZED &&
+            pattern.snoozedUntil != null &&
+            clock.millis() >= pattern.snoozedUntil!!
+        // Route through the validator chokepoint — ADR-003 §"Auto-promotion of snoozed → active"
+        // is an explicit transition and must be auditable via `PatternStore.transitionState`.
+        return if (expired) patternStore.transitionState(pattern.patternId, PatternState.ACTIVE) else null
     }
 
     private fun applySupportingAndCallout(

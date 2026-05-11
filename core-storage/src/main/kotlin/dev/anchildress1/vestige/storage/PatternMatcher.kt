@@ -60,13 +60,14 @@ object PatternMatcher {
 
     private fun matchesVocab(entry: EntryEntity, signature: JSONObject): Boolean {
         val token = signature.optString("token").lowercase(Locale.ROOT)
-        val tagHit = token.isNotEmpty() && entry.tags.any { it.name.lowercase(Locale.ROOT) == token }
-        val textHit = token.isNotEmpty() && entry.entryText.lowercase(Locale.ROOT)
+        if (token.isEmpty()) return false
+        // Apply the same stemmer the detector used to mint the signature so a `tireds` /
+        // `Tired` entry text matches a `tired` signature without an extra prefix-startsWith
+        // heuristic the detector would not have produced.
+        val tagHit = entry.tags.any { TokenStemmer.stem(it.name) == token }
+        val textHit = entry.entryText.lowercase(Locale.ROOT)
             .split(VOCAB_SPLIT)
-            .map { it.trim() }
-            .let { tokens ->
-                tokens.contains(token) || tokens.any { it.length > token.length && it.startsWith(token) }
-            }
+            .any { TokenStemmer.stem(it.trim()) == token }
         return tagHit || textHit
     }
 

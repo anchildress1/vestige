@@ -1,12 +1,16 @@
 package dev.anchildress1.vestige.save
 
+import android.util.Log
 import dev.anchildress1.vestige.inference.BackgroundExtractionRequest
 import dev.anchildress1.vestige.inference.BackgroundExtractionResult
 import dev.anchildress1.vestige.inference.BackgroundExtractionWorker
 import dev.anchildress1.vestige.inference.ExtractionStatusListener
 import dev.anchildress1.vestige.inference.HistoryChunk
+import dev.anchildress1.vestige.inference.ObservationGenerator
+import dev.anchildress1.vestige.model.EntryObservation
 import dev.anchildress1.vestige.model.ExtractionStatus
 import dev.anchildress1.vestige.storage.EntryStore
+import kotlinx.coroutines.CancellationException
 import java.time.ZonedDateTime
 
 /**
@@ -25,6 +29,7 @@ import java.time.ZonedDateTime
 class BackgroundExtractionSaveFlow(
     private val entryStore: EntryStore,
     private val worker: BackgroundExtractionWorker,
+    private val observationGenerator: ObservationGenerator,
     private val listenerFactory: (Long) -> ExtractionStatusListener,
 ) {
 
@@ -46,8 +51,9 @@ class BackgroundExtractionSaveFlow(
 
         return when (val result = worker.extract(request, listener)) {
             is BackgroundExtractionResult.Success -> {
-                entryStore.completeEntry(entryId, result.resolved, result.templateLabel)
-                SaveOutcome.Completed(entryId, result)
+                val observations = runObservations(entryText, result, capturedAt)
+                entryStore.completeEntry(entryId, result.resolved, result.templateLabel, observations)
+                SaveOutcome.Completed(entryId, result, observations)
             }
 
             is BackgroundExtractionResult.Failed -> {
@@ -61,12 +67,37 @@ class BackgroundExtractionSaveFlow(
             }
         }
     }
+
+    private suspend fun runObservations(
+        entryText: String,
+        success: BackgroundExtractionResult.Success,
+        capturedAt: ZonedDateTime,
+    ): List<EntryObservation> = try {
+        observationGenerator.generate(entryText, success.resolved, capturedAt)
+    } catch (cancellation: CancellationException) {
+        throw cancellation
+    } catch (@Suppress("TooGenericExceptionCaught") error: Exception) {
+        // Generator failures must not block the save — the entry's resolved fields are the
+        // load-bearing surface; observations are additive and may be regenerated later under
+        // re-eval (Phase 4). Persist an empty list and move on.
+        Log.w(TAG, "ObservationGenerator threw ${error.javaClass.simpleName}: ${error.message}")
+        emptyList()
+    }
+
+    private companion object {
+        private const val TAG = "VestigeSaveFlow"
+    }
 }
 
 sealed interface SaveOutcome {
     val entryId: Long
 
-    data class Completed(override val entryId: Long, val result: BackgroundExtractionResult.Success) : SaveOutcome
+    data class Completed(
+        override val entryId: Long,
+        val result: BackgroundExtractionResult.Success,
+        val observations: List<EntryObservation>,
+    ) : SaveOutcome
+
     data class Failed(override val entryId: Long, val result: BackgroundExtractionResult.Failed) : SaveOutcome
     data class TimedOut(override val entryId: Long, val result: BackgroundExtractionResult.TimedOut) : SaveOutcome
 }

@@ -1,6 +1,7 @@
 package dev.anchildress1.vestige.storage
 
 import dev.anchildress1.vestige.model.ConfidenceVerdict
+import dev.anchildress1.vestige.model.EntryObservation
 import dev.anchildress1.vestige.model.ExtractionStatus
 import dev.anchildress1.vestige.model.ResolvedExtraction
 import dev.anchildress1.vestige.model.TemplateLabel
@@ -58,15 +59,24 @@ class EntryStore(private val boxStore: BoxStore, private val markdownStore: Mark
     }
 
     /**
-     * Convergence resolved successfully. Maps [resolved] + [templateLabel] onto the row and
-     * rewrites the markdown front-matter. Status transitions to `COMPLETED`; `lastError` clears.
+     * Convergence resolved successfully. Maps [resolved] + [templateLabel] + [observations] onto
+     * the row and rewrites the markdown front-matter. Status transitions to `COMPLETED`;
+     * `lastError` clears. Pass an empty [observations] list when none are available — the
+     * markdown front-matter renders `entry_observations: []` and the pattern engine ignores the
+     * row for observation surfacing.
      */
-    fun completeEntry(entryId: Long, resolved: ResolvedExtraction, templateLabel: TemplateLabel?) {
+    fun completeEntry(
+        entryId: Long,
+        resolved: ResolvedExtraction,
+        templateLabel: TemplateLabel?,
+        observations: List<EntryObservation> = emptyList(),
+    ) {
         boxStore.runInTx {
             val box = boxStore.boxFor<EntryEntity>()
             val entry = box.get(entryId)
                 ?: throw EntryPersistenceException("No entry row id=$entryId to complete")
             applyResolved(entry, resolved, templateLabel)
+            entry.entryObservationsJson = observationsJson(observations)
             entry.extractionStatus = ExtractionStatus.COMPLETED
             entry.lastError = null
             attachTags(entry, resolved)
@@ -108,8 +118,6 @@ class EntryStore(private val boxStore: BoxStore, private val markdownStore: Mark
         entry.recurrenceLink = stringField(resolved, KEY_RECURRENCE)
         entry.statedCommitmentJson = commitmentJson(resolved)
         entry.confidenceJson = confidenceJson(resolved)
-        // entry_observations is the Story 2.13 generator's surface; default empty until it ships.
-        if (entry.entryObservationsJson.isBlank()) entry.entryObservationsJson = "[]"
     }
 
     private fun attachTags(entry: EntryEntity, resolved: ResolvedExtraction) {
@@ -160,10 +168,17 @@ class EntryStore(private val boxStore: BoxStore, private val markdownStore: Mark
         return payload.toString()
     }
 
-    @Suppress("unused") // Forward-looking: Story 2.13 will land observations through this seam.
-    private fun observationsJson(observations: List<Map<String, Any?>>): String {
+    private fun observationsJson(observations: List<EntryObservation>): String {
         if (observations.isEmpty()) return "[]"
-        return JSONArray(observations.map { JSONObject(it) }).toString()
+        val array = JSONArray()
+        observations.forEach { observation ->
+            val obj = JSONObject()
+                .put("text", observation.text)
+                .put("evidence", observation.evidence.serial)
+                .put("fields", JSONArray(observation.fields))
+            array.put(obj)
+        }
+        return array.toString()
     }
 
     private companion object {

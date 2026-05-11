@@ -2,8 +2,10 @@ package dev.anchildress1.vestige.storage
 
 import androidx.test.core.app.ApplicationProvider
 import dev.anchildress1.vestige.model.ConfidenceVerdict
+import dev.anchildress1.vestige.model.EntryObservation
 import dev.anchildress1.vestige.model.ExtractionStatus
 import dev.anchildress1.vestige.model.Lens
+import dev.anchildress1.vestige.model.ObservationEvidence
 import dev.anchildress1.vestige.model.ResolvedExtraction
 import dev.anchildress1.vestige.model.ResolvedField
 import dev.anchildress1.vestige.model.TemplateLabel
@@ -226,6 +228,35 @@ class EntryStoreTest {
         val row = boxStore.boxFor<EntryEntity>().get(id)
         val observations = JSONArray(row.entryObservationsJson)
         assertEquals(0, observations.length())
+    }
+
+    @Test
+    fun `completeEntry serializes provided observations into entryObservationsJson`() {
+        val id = entryStore.createPendingEntry(SAMPLE_TEXT, SAMPLE_INSTANT)
+        val observations = listOf(
+            EntryObservation(
+                text = "You said \"fine\" and \"flattened\" in the same entry.",
+                evidence = ObservationEvidence.VOCABULARY_CONTRADICTION,
+                fields = listOf("vocabulary_contradictions"),
+            ),
+            EntryObservation(
+                text = "You said you'd talk to her — flagged.",
+                evidence = ObservationEvidence.COMMITMENT_FLAG,
+                fields = listOf("stated_commitment"),
+            ),
+        )
+
+        entryStore.completeEntry(id, resolvedSample(), TemplateLabel.AFTERMATH, observations)
+
+        val row = boxStore.boxFor<EntryEntity>().get(id)
+        val array = JSONArray(row.entryObservationsJson)
+        assertEquals(2, array.length())
+        val first = array.getJSONObject(0)
+        assertEquals(observations[0].text, first.getString("text"))
+        assertEquals("vocabulary-contradiction", first.getString("evidence"))
+        assertEquals("vocabulary_contradictions", first.getJSONArray("fields").getString(0))
+        val second = array.getJSONObject(1)
+        assertEquals("commitment-flag", second.getString("evidence"))
     }
 
     @Test

@@ -4,17 +4,20 @@ import android.util.Log
 import dev.anchildress1.vestige.inference.PatternTitleGenerator
 import dev.anchildress1.vestige.model.DetectedPattern
 import dev.anchildress1.vestige.model.EntryObservation
+import dev.anchildress1.vestige.model.ExtractionStatus
 import dev.anchildress1.vestige.model.ObservationEvidence
 import dev.anchildress1.vestige.model.PatternState
 import dev.anchildress1.vestige.model.Persona
 import dev.anchildress1.vestige.storage.CalloutCooldownStore
 import dev.anchildress1.vestige.storage.EntryEntity
+import dev.anchildress1.vestige.storage.EntryEntity_
 import dev.anchildress1.vestige.storage.PatternCalloutText
 import dev.anchildress1.vestige.storage.PatternDetector
 import dev.anchildress1.vestige.storage.PatternEntity
 import dev.anchildress1.vestige.storage.PatternMatcher
 import dev.anchildress1.vestige.storage.PatternStore
 import io.objectbox.BoxStore
+import io.objectbox.query.QueryBuilder
 import kotlinx.coroutines.CancellationException
 import java.time.Clock
 import java.time.ZoneId
@@ -166,8 +169,11 @@ class PatternDetectionOrchestrator(
     }
 
     private fun chooseMatchingPattern(entry: EntryEntity): PatternEntity? {
-        val candidates = patternStore.all()
-            .filter { it.state == PatternState.ACTIVE && PatternMatcher.matches(entry, it, zoneId) }
+        // Indexed ACTIVE-only query avoids the full-table scan on every committed entry — at
+        // 100+ patterns this is the difference between "fine" and "the save-flow hot path is
+        // O(n)" on the reference device.
+        val candidates = patternStore.findActive()
+            .filter { PatternMatcher.matches(entry, it, zoneId) }
         return candidates.sortedWith(
             compareByDescending<PatternEntity> { it.supportingEntries.size }
                 .thenByDescending { it.lastSeenTimestamp },
@@ -189,9 +195,10 @@ class PatternDetectionOrchestrator(
 }
 
 private fun completedEntryCount(boxStore: BoxStore): Long = boxStore.boxFor(EntryEntity::class.java)
-    .all
-    .count { it.extractionStatus == dev.anchildress1.vestige.model.ExtractionStatus.COMPLETED }
-    .toLong()
+    .query()
+    .equal(EntryEntity_.extractionStatus, ExtractionStatus.COMPLETED.name, QueryBuilder.StringOrder.CASE_SENSITIVE)
+    .build()
+    .use { it.count() }
 
 private fun deterministicFallbackTitle(detected: DetectedPattern): String {
     val source = detected.templateLabel ?: detected.kind.serial.replace('_', ' ')

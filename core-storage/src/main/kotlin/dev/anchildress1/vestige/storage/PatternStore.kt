@@ -24,6 +24,16 @@ class PatternStore(private val boxStore: BoxStore, private val clock: Clock = Cl
 
     fun all(): List<PatternEntity> = box.all
 
+    /**
+     * Query only ACTIVE rows — indexed lookup via the stored state serial. Used by the
+     * orchestrator's per-entry callout selection, which otherwise paid for a full-table scan
+     * on every committed entry.
+     */
+    fun findActive(): List<PatternEntity> = box.query()
+        .equal(PatternEntity_.state, PatternState.ACTIVE.serial, QueryBuilder.StringOrder.CASE_SENSITIVE)
+        .build()
+        .use { it.find() }
+
     fun put(entity: PatternEntity): Long = box.put(entity)
 
     /**

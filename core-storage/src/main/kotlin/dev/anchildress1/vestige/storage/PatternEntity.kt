@@ -41,6 +41,7 @@ class PatternEntity(
     var lastSeenTimestamp: Long = 0,
 
     @io.objectbox.annotation.Convert(converter = PatternStateConverter::class, dbType = String::class)
+    @Index
     var state: PatternState = PatternState.ACTIVE,
 
     /** Unix millis when state==SNOOZED expires. Null otherwise. */

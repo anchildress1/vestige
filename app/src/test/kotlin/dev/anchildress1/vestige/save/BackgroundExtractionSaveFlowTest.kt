@@ -22,6 +22,7 @@ import io.mockk.slot
 import io.mockk.verify
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.fail
 import org.junit.jupiter.api.Test
 import java.time.ZoneId
 import java.time.ZonedDateTime
@@ -166,6 +167,79 @@ class BackgroundExtractionSaveFlowTest {
 
         assertEquals(listOf(ENTRY_ID), capturedIds)
         assertEquals(ENTRY_ID, outcome.entryId)
+    }
+
+    @Test
+    fun `terminal completion reaches the lifecycle listener only after completeEntry succeeds`() = runTest {
+        val downstream: ExtractionStatusListener = mockk(relaxed = true)
+        val flowWithMockListener =
+            BackgroundExtractionSaveFlow(entryStore, worker, observationGenerator) { downstream }
+        every { entryStore.createPendingEntry(any(), any()) } returns ENTRY_ID
+        coEvery {
+            worker.extract(any(), capture(capturedListener))
+        } coAnswers {
+            capturedListener.captured.onUpdate(ExtractionStatus.RUNNING, 0, null)
+            capturedListener.captured.onUpdate(ExtractionStatus.COMPLETED, 0, null)
+            BackgroundExtractionResult.Success(
+                totalElapsedMs = 25_000L,
+                lensResults = emptyList(),
+                modelCallCount = 3,
+                resolved = canonicalSample(),
+                templateLabel = TemplateLabel.AFTERMATH,
+            )
+        }
+        coEvery { observationGenerator.generate(any(), any(), any()) } returns emptyList()
+
+        flowWithMockListener.saveAndExtract(SAMPLE_TEXT, SAMPLE_TIMESTAMP)
+
+        coVerifyOrder {
+            downstream.onUpdate(ExtractionStatus.RUNNING, 0, null)
+            observationGenerator.generate(SAMPLE_TEXT, canonicalSample(), SAMPLE_TIMESTAMP)
+            entryStore.completeEntry(ENTRY_ID, canonicalSample(), TemplateLabel.AFTERMATH, emptyList())
+            downstream.onUpdate(ExtractionStatus.COMPLETED, 0, null)
+        }
+        verify(exactly = 0) { entryStore.failEntry(any(), any(), any()) }
+    }
+
+    @Test
+    fun `persistence failure after worker success emits FAILED instead of leaking worker COMPLETED`() = runTest {
+        val downstream: ExtractionStatusListener = mockk(relaxed = true)
+        val flowWithMockListener =
+            BackgroundExtractionSaveFlow(entryStore, worker, observationGenerator) { downstream }
+        val resolved = canonicalSample()
+        every { entryStore.createPendingEntry(any(), any()) } returns ENTRY_ID
+        coEvery {
+            worker.extract(any(), capture(capturedListener))
+        } coAnswers {
+            capturedListener.captured.onUpdate(ExtractionStatus.RUNNING, 0, null)
+            capturedListener.captured.onUpdate(ExtractionStatus.COMPLETED, 0, null)
+            BackgroundExtractionResult.Success(
+                totalElapsedMs = 25_000L,
+                lensResults = emptyList(),
+                modelCallCount = 3,
+                resolved = resolved,
+                templateLabel = TemplateLabel.AFTERMATH,
+            )
+        }
+        coEvery { observationGenerator.generate(any(), any(), any()) } returns emptyList()
+        every {
+            entryStore.completeEntry(ENTRY_ID, resolved, TemplateLabel.AFTERMATH, emptyList())
+        } throws IllegalStateException("disk blew up")
+
+        try {
+            flowWithMockListener.saveAndExtract(SAMPLE_TEXT, SAMPLE_TIMESTAMP)
+            fail("expected persistence failure to escape")
+        } catch (expected: IllegalStateException) {
+            assertEquals("disk blew up", expected.message)
+        }
+
+        coVerifyOrder {
+            downstream.onUpdate(ExtractionStatus.RUNNING, 0, null)
+            entryStore.completeEntry(ENTRY_ID, resolved, TemplateLabel.AFTERMATH, emptyList())
+            entryStore.failEntry(ENTRY_ID, ExtractionStatus.FAILED, "persistence-error:IllegalStateException")
+            downstream.onUpdate(ExtractionStatus.FAILED, 0, "persistence-error:IllegalStateException")
+        }
+        coVerify(exactly = 0) { downstream.onUpdate(ExtractionStatus.COMPLETED, 0, null) }
     }
 
     @Test

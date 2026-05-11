@@ -2,6 +2,7 @@ package dev.anchildress1.vestige
 
 import android.content.Context
 import android.content.Intent
+import dev.anchildress1.vestige.inference.LiteRtLmEngine
 import dev.anchildress1.vestige.lifecycle.BackgroundExtractionLifecycleState
 import dev.anchildress1.vestige.model.ExtractionStatus
 import dev.anchildress1.vestige.storage.MarkdownEntryStore
@@ -12,6 +13,7 @@ import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertNotNull
 import org.junit.jupiter.api.Test
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -111,5 +113,21 @@ class AppContainerTest {
         listener.onUpdate(ExtractionStatus.COMPLETED, entryAttemptCount = 0, lastError = null)
 
         assertEquals(BackgroundExtractionLifecycleState.KEEP_ALIVE, container.lifecycleStateMachine.state.value)
+    }
+
+    @Test
+    fun `backgroundExtractionSaveFlow is exposed from the production container wiring`() {
+        val container = AppContainer(
+            applicationContext = mockk<Context>(relaxed = true),
+            boxStoreFactory = { mockk<BoxStore>(relaxed = true) },
+            markdownStoreFactory = { mockk<MarkdownEntryStore>(relaxed = true) },
+            modelPathLoader = { "/tmp/fake-model.litertlm" },
+            backgroundEngineFactory = { _, _ -> mockk<LiteRtLmEngine>(relaxed = true) },
+            recoveredEntryIdsLoader = { emptyList() },
+            foregroundServiceIntentFactory = { Intent("dev.anchildress1.vestige.TEST_START") },
+            foregroundServiceStarter = {},
+        )
+
+        assertNotNull(container.backgroundExtractionSaveFlow)
     }
 }

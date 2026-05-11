@@ -250,6 +250,21 @@ STT-A says this must work. The 30s constraint is a runtime cap — `AudioRecord`
 
 **Consequence:** `WavWriter` updated to emit PCM_S16LE (format 1, 16-bit int, 16 kHz) instead of IEEE_FLOAT. Float32 samples from `AudioCapture` are scaled to `[-32767, 32767]` on write. `Content.AudioBytes` is dead for this SDK version — the only live path is `Content.AudioFile` via a temp PCM_S16LE WAV.
 
+### Addendum (2026-05-10) — GPU backend works on the same artifact
+
+Story 2.7's STT-D re-run on PR #14 surfaced that the `litert-community/gemma-4-E4B-it-litert-lm` model file ships GPU-compatible. The original Q3 "Backend selected: CPU" line above was a measurement choice, not an artifact constraint. The missing piece was the AndroidManifest `<uses-native-library>` block — `libOpenCL.so` and `libvndksupport.so` are vendor-namespace libraries Android 12+ hides from app linkers without an explicit declaration (per `https://ai.google.dev/edge/litert-lm/android`). With both libs declared, `Backend.GPU()` initializes cleanly.
+
+| Field | Value |
+|---|---|
+| Date run | 2026-05-10 |
+| Engine init (cold) | ~19,700 ms (vs ~11,500 ms on CPU — first GPU compile is slower, then cached) |
+| Per-lens-call latency (clean runs) | **~8–13 s on GPU** vs ~35–55 s on CPU (~5× faster) |
+| Per-entry latency (3 lenses, clean) | ~25–37 s on GPU vs ~127–161 s on CPU |
+| STT-D verdict | 4/6 entries `meaningful=true` on GPU (CPU was 5/6); architecture still clears the 30% threshold |
+| Parse-failure observation | C2 and D1 each had non-Literal lenses parse-fail × 2 retries on GPU; CPU had zero parse failures on the same six entries. Same model, same prompts. Worth tracking — see Story 2.7 GPU re-run notes |
+
+**Consequence:** the working backend is now GPU on devices that ship OpenCL through the vendor namespace (the S24 Ultra does). CPU remains the fallback and the `-PinferenceBackend=cpu` instrumentation arg keeps the comparison path open. The 1–5 s per-call target from ADR-002 §"Latency budget" is still unmet — 8–13 s is closer but not there. Phase 4/5 NPU work and prompt-shrinkage on the lens templates are the remaining levers; this addendum does not change either timeline.
+
 ### Q5. Distribution & signing
 
 GitHub Releases sideload means a single signing key, stored somewhere. **Not** in the repo. **Not** in plain text on the dev machine.

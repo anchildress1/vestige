@@ -19,7 +19,7 @@ Build the end-to-end capture loop: user records or types → foreground call ret
 - [ ] Capture session can run record → transcription + follow-up → save end-to-end on the reference device.
 - [ ] **STT-B passes** (or has an explicit fallback recorded): multi-turn conversation maintains context across 3+ exchanges on E4B. If broken, single-turn fallback is implemented and the spec is updated.
 - [x] **STT-D passes** (or the architecture is dropped): the 3-lens pipeline produces meaningfully different outputs on at least 30% of the prepared sample transcripts. If lenses always agree, multi-lens drops to single-pass and the Reading section is removed from the entry detail spec. _(2026-05-10 — 5/6 entries (83%) on E4B CPU. See Story 2.7.)_
-- [ ] **STT-C passes**: tag extraction is stable (≥80% same-tag emission on equivalent test dumps). If unstable, prompts have been tightened until stable, or the limitation is documented. _(2026-05-10 — **deferred** pending backlog `gpu-model-artifact`; harness ships, measurement is impractical on CPU baseline.)_
+- [ ] **STT-C passes**: tag extraction is stable (≥80% same-tag emission on equivalent test dumps). If unstable, prompts have been tightened until stable, or the limitation is documented. _(2026-05-10 — harness ships; GPU manifest fix landed (`libOpenCL.so` / `libvndksupport.so`); ready to run at ~27 min on GPU. Measurement still owed.)_
 - [ ] Convergence resolver implementation lands into Story 1.12's test scaffolding and all happy-path tests pass.
 - [ ] Agent-emitted template labels work for all six archetypes on representative sample transcripts.
 - [ ] Background extraction populates the canonical schema on the reference device within 30–90 seconds per entry as specified.
@@ -173,10 +173,18 @@ Don't conflate this story with Story 2.6 (worker logic). Story 2.6 is *what* run
 - [x] If the threshold is met, this story closes — the multi-lens architecture is validated.
 - [ ] If the threshold is not met after one focused day of prompt tuning, the architecture is dropped: replace the 3-lens worker with a single-pass extraction call, remove the convergence resolver, drop "candidate" and "ambiguous" confidence values from the schema, and remove the Reading section spec from `design-guidelines.md`. Update `concept-locked.md` and `PRD.md` to match. ADR-002 gets superseded by a new ADR documenting single-pass extraction. _(Not triggered — threshold met on first run.)_
 
-**Notes from the device run (2026-05-10):**
+**Notes from the device runs (2026-05-10):**
+
+*CPU run (initial):*
 - Energy descriptor came back null on 5/6 entries even when transcripts described state shifts ("flattened by 11," "battery got yanked"). A1 was the exception — all three lenses agreed on `flattened`. STT-C will surface whether this is a prompt-tightening opportunity or stable noise.
 - Skeptical surfaced 1 flag on A1 (likely `vocabulary-contradiction` between `fine before` and `flattened`) and 1 on B2 (likely `commitment-without-anchor` on "send the invoice today" — no entry id yet). Both align with ADR-002's expected pressure points.
 - Inferential never refused what Literal made; the "Literal-refuses-vs-Inferential-makes" divergence channel didn't fire on any of the six entries. Field-level disagreement is real but channelled through tag-set drift rather than refusal/inference asymmetry. Update ADR-002 §"Why three calls" if Phase 3 evidence keeps pointing the same way.
+
+*GPU re-run (post-`libOpenCL.so` manifest fix):*
+- **4/6 entries `meaningful=true`** — still clears the 30% threshold, so the architecture verdict stands.
+- **Per-lens-call latency 8–13 s, per-entry 25–55 s** — about 5× faster than CPU. Engine init 19.7 s (vs 11.5 s on CPU; first GPU compile is slower, expected).
+- **Parse failures appeared on GPU that CPU didn't have.** C2 (INFERENTIAL + SKEPTICAL parse-fail × 2 retries → 1/3 lenses) and D1 (INFERENTIAL parse-fail × 2 retries → 2/3 lenses). Same model, same prompts, same entries — only the backend differs. The retries inflated their latencies to 55 s and 50 s; clean entries stayed at 25–37 s. Worth tracking — if GPU parse-failure rate persists, ADR-002 §"Structured-output reliability" may need a GPU-specific addendum, or the lens prompts need a GPU-quality pass.
+- `stated_commitment` disagreement on B2 was reported as a `disagree_fields` entry rather than a Skeptical flag this run — the underlying Skeptical-flag emission may itself be backend-sensitive.
 
 **Fallback if STT-D fails:** the demo's "intentional model use" story shifts. Native audio multimodal stays the headline (it always was). The agentic-as-product layer is no longer present, so the technical walkthrough loses the "Reading" beat. The 5-min walkthrough script changes — add a comment in `demo-storyboard.md` (when written) noting the cut.
 
@@ -200,13 +208,13 @@ Don't conflate this story with Story 2.6 (worker logic). Story 2.6 is *what* run
 
 ---
 
-### Story 2.9 — STT-C: tag extraction consistency — **DEFERRED 2026-05-10 (gated on `gpu-model-artifact`)**
+### Story 2.9 — STT-C: tag extraction consistency
 
 🛑 **Stop-and-test point.** If tag extraction is unstable across equivalent dumps, downstream pattern detection is noisy. Tighten prompts; if still bad, document as known limitation.
 
 **As** the AI implementor, **I need** to verify that the convergence resolver emits stable tag sets on equivalent test dumps (≥80% same-tag emission across re-runs of similar inputs), **so that** Phase 3's pattern engine has reliable signal to count.
 
-**Status (2026-05-10):** `SttCTagStabilityTest` harness ships and runs end-to-end against the 18-entry corpus (see Phase-2 commit history). **Measurement is deferred** because the CPU-compiled `.litertlm` artifact takes ~30–55 s per lens call → ~2.5 hr for the spec's 162-call sweep. GPU init fails native LiteRT-LM (`llm_litert_compiled_model_executor.cc:1928`) because the model file ships CPU-only per ADR-001 §Q3. Backlog row `gpu-model-artifact` tracks the unblock; when a GPU-compiled E4B variant lands, run `SttCTagStabilityTest -PinferenceBackend=gpu` and fill in the result + flip the boxes below.
+**Status (2026-05-10):** `SttCTagStabilityTest` harness ships. Earlier "deferred pending GPU artifact" framing was wrong — the artifact was always GPU-capable; the manifest missed the `libOpenCL.so` / `libvndksupport.so` `<uses-native-library>` declarations LiteRT-LM needs on Android 12+ (per `https://ai.google.dev/edge/litert-lm/android`). With that fix in place, GPU runs at 8–13 s per lens call, so the 162-call sweep is ~27 min instead of ~2.5 hr. Ready to run; left unchecked until the measurement actually lands.
 
 **Done when:**
 - [ ] The STT-C sample-dump set from `sample-data-scenarios.md` runs through the foreground + background pipeline at least three times each. _(Harness exists; waiting on backlog `gpu-model-artifact`.)_
@@ -311,7 +319,7 @@ Phase 3 starts when all the following are true:
 - [ ] All fourteen stories above are Done or have an explicit, recorded fallback.
 - [ ] **STT-B resolved** — multi-turn works on E4B *or* the single-turn fallback is implemented and the spec updated.
 - [x] **STT-D resolved** — 3-lens divergence is validated *or* multi-lens has been replaced with single-pass and ADR-002 has been superseded. _(2026-05-10 — validated at 83%.)_
-- [ ] **STT-C resolved** — tag stability is ≥80% *or* the limitation is documented and Phase 3's pattern engine is designed around the noise floor. _(2026-05-10 — deferred; backlog `gpu-model-artifact`. Phase 3 designs against the 80% assumption until the artifact lands.)_
+- [ ] **STT-C resolved** — tag stability is ≥80% *or* the limitation is documented and Phase 3's pattern engine is designed around the noise floor. _(2026-05-10 — measurement still owed; harness + GPU runtime ready, just hasn't been run.)_
 - [ ] Convergence resolver tests from Story 1.12 all pass.
 - [ ] `BackgroundExtractionService` state machine tests pass; service is wired into `AppContainer` per ADR-004.
 - [ ] Latency budget on the reference device is recorded (foreground per turn, background per entry).

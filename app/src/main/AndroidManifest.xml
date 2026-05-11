@@ -34,6 +34,17 @@
         android:usesCleartextTraffic="false"
         tools:targetApi="35">
 
+        <!-- LiteRT-LM GPU backend needs OpenCL via the vendor namespace. Android 12+ namespace
+             isolation hides /vendor/lib*/libOpenCL.so from app linkers unless declared here.
+             Both libs are marked optional so devices without GPU OpenCL (or CPU-only runs) still
+             load. Per https://ai.google.dev/edge/litert-lm/android. -->
+        <uses-native-library
+            android:name="libvndksupport.so"
+            android:required="false" />
+        <uses-native-library
+            android:name="libOpenCL.so"
+            android:required="false" />
+
         <activity
             android:name=".MainActivity"
             android:exported="true"

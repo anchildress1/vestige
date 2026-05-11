@@ -3,6 +3,7 @@ package dev.anchildress1.vestige.storage
 import io.objectbox.BoxStore
 import io.objectbox.kotlin.boxFor
 import java.time.Clock
+import java.util.Locale
 import kotlin.math.max
 import kotlin.math.min
 
@@ -88,7 +89,9 @@ private val TOKEN_SPLIT: Regex = Regex("[^a-z0-9-]+")
 
 private fun tokenizeToList(text: String): List<String> {
     if (text.isBlank()) return emptyList()
-    return text.lowercase()
+    // Locale.ROOT keeps lowercasing deterministic across devices — without it Turkish locales
+    // fold 'I' → 'ı' (dotless i) and break the round-trip between stored and queried tokens.
+    return text.lowercase(Locale.ROOT)
         .split(TOKEN_SPLIT)
         .asSequence()
         .map { it.trim('-') }
@@ -98,7 +101,6 @@ private fun tokenizeToList(text: String): List<String> {
 
 private object QueryTagMatcher {
     private const val MIN_STEM_LENGTH = 3
-    private const val IES_SUFFIX = "ies"
 
     // ADR-002 §"Plural folding addendum" names singular tags that naive singularizers corrupt
     // (news → new, series → sery). Comparison-only: stored surface forms are never rewritten.
@@ -134,11 +136,14 @@ private object QueryTagMatcher {
     private fun normalizeTagPhrase(text: String): String? =
         tokenizeToList(text).takeIf { it.isNotEmpty() }?.joinToString("-")
 
+    // Drops a trailing 's' to fold simple English plurals (meeting/meetings, tag/tags).
+    // The ies→y rule was removed because it broke movie/movies (→ "movy") with no surface-form
+    // way to distinguish it from candy/candies. ADR-002 §"Plural folding addendum" tolerates
+    // residual plural drift for retrieval; the candy/candies path is deferred.
     private fun stemForCompare(token: String): String = when {
         token in PRESERVED_SURFACES -> token
         token.length <= MIN_STEM_LENGTH -> token
         token.endsWith("ss") || token.endsWith("us") || token.endsWith("is") -> token
-        token.endsWith(IES_SUFFIX) -> token.dropLast(IES_SUFFIX.length) + "y"
         token.endsWith('s') -> token.dropLast(1)
         else -> token
     }

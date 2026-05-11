@@ -257,6 +257,34 @@ class RetrievalRepoTest {
     }
 
     @Test
+    fun `ie-singular and ies-plural fold via trailing-s drop — movies bridges to movie`() {
+        // Codex review P1: the previous ies→y rule corrupted 'movies' to 'movy'. Trailing-s drop
+        // matches 'movie' to 'movies' on both directions without that corruption.
+        val moviesTag = insertEntry("unrelated body text", daysAgo = 5, tagNames = listOf("movies"))
+        val movieTag = insertEntry("unrelated body text", daysAgo = 5, tagNames = listOf("movie"))
+
+        // Query in either direction surfaces both entries (same stem 'movie').
+        val plural = repo.query("movies").map { it.id }
+        val singular = repo.query("movie").map { it.id }
+        assertTrue("expected $movieTag in $plural", movieTag in plural)
+        assertTrue("expected $moviesTag in $plural", moviesTag in plural)
+        assertTrue("expected $movieTag in $singular", movieTag in singular)
+        assertTrue("expected $moviesTag in $singular", moviesTag in singular)
+    }
+
+    @Test
+    fun `lowercasing uses Locale_ROOT and survives Turkish-style I quirks`() {
+        // Codex review P2: default locale on Turkish locales folds 'I' to 'ı' (dotless i), breaking
+        // round-trips. Locale.ROOT keeps tokenization device-independent.
+        val tagged = insertEntry("Important Notes", daysAgo = 5, tagNames = listOf("notes"))
+        insertEntry("plain body", daysAgo = 5)
+
+        // Query with uppercase 'I' must match the lowercased body token 'important'.
+        val results = repo.query("IMPORTANT")
+        assertEquals(listOf(tagged), results.map { it.id })
+    }
+
+    @Test
     fun `plural-singular tag pair scores 1_0 on comparison keys`() {
         // Both 'meeting' and 'meetings' coexist as separate TagEntity rows — Copilot review #2.
         // tagScore must be computed on stems, so the entry tagged only 'meeting' still gets a

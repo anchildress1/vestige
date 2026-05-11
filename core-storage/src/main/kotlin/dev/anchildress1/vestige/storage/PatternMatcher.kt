@@ -29,19 +29,19 @@ object PatternMatcher {
     }
 
     private fun matchesTemplate(entry: EntryEntity, signature: JSONObject): Boolean {
-        val target = signature.optString("label").lowercase(Locale.ROOT)
+        val target = TagNormalize.kebab(signature.optString("label"))
         return entry.templateLabel?.serial == target
     }
 
     private fun matchesTagPair(entry: EntryEntity, signature: JSONObject): Boolean {
-        val label = signature.optString("label").lowercase(Locale.ROOT)
+        val label = TagNormalize.kebab(signature.optString("label"))
         val tagsArray = signature.optJSONArray("tags")
         val labelMatches = entry.templateLabel?.serial == label
         if (!labelMatches || tagsArray == null) return false
         val pair = (0 until tagsArray.length()).mapTo(linkedSetOf()) {
-            tagsArray.optString(it).lowercase(Locale.ROOT)
+            TagNormalize.kebab(tagsArray.optString(it))
         }
-        val entryTags = entry.tags.map { it.name.lowercase(Locale.ROOT) }.toSet()
+        val entryTags = entry.tags.map { TagNormalize.kebab(it.name) }.toSet()
         return pair.isNotEmpty() && entryTags.containsAll(pair)
     }
 
@@ -51,10 +51,10 @@ object PatternMatcher {
     }
 
     private fun matchesCommitment(entry: EntryEntity, signature: JSONObject): Boolean {
-        val target = signature.optString("topic_or_person").lowercase(Locale.ROOT)
+        val target = TagNormalize.kebab(signature.optString("topic_or_person"))
         val commitment = entry.statedCommitmentJson?.takeIf { it.isNotBlank() }
             ?.let { runCatching { JSONObject(it) }.getOrNull() }
-        val topic = commitment?.optString("topic_or_person")?.trim()?.lowercase(Locale.ROOT)
+        val topic = commitment?.optString("topic_or_person")?.trim()?.let(TagNormalize::kebab)
         return target.isNotEmpty() && topic == target
     }
 

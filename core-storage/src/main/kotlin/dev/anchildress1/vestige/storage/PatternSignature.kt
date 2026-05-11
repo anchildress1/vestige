@@ -8,15 +8,15 @@ import java.util.HexFormat
 import java.util.Locale
 
 /**
- * Canonical signature serialization per ADR-003 §"`pattern_id` generation". Tags are normalized
- * (lowercase, kebab-case, sorted) before hashing; tokens are stemmed and lowercased. Stability
+ * Canonical signature serialization per ADR-003 §"`pattern_id` generation". Tags + labels are
+ * lowercased + kebab-cased + sorted before hashing; tokens are stemmed and lowercased. Stability
  * across re-detection runs is the load-bearing property — adding a supporting entry must never
- * change the hash.
+ * change the hash, and surface-form drift between separator conventions must collapse to one id.
  */
 internal object PatternSignature {
 
     fun forTemplateRecurrence(label: String): Signature {
-        val canonical = label.lowercase(Locale.ROOT)
+        val canonical = TagNormalize.kebab(label)
         val json = JSONObject()
             .put("kind", PatternKind.TEMPLATE_RECURRENCE.serial)
             .put("label", canonical)
@@ -26,8 +26,8 @@ internal object PatternSignature {
 
     fun forTagPair(label: String, tags: Set<String>): Signature {
         require(tags.size == 2) { "tag pair signature requires exactly 2 tags, got ${tags.size}" }
-        val canonicalLabel = label.lowercase(Locale.ROOT)
-        val canonicalTags = tags.map { it.lowercase(Locale.ROOT) }.sorted()
+        val canonicalLabel = TagNormalize.kebab(label)
+        val canonicalTags = tags.map(TagNormalize::kebab).sorted()
         val json = JSONObject()
             .put("kind", PatternKind.TAG_PAIR_CO_OCCURRENCE.serial)
             .put("label", canonicalLabel)
@@ -45,7 +45,7 @@ internal object PatternSignature {
     }
 
     fun forCommitment(topicOrPerson: String): Signature {
-        val canonical = topicOrPerson.lowercase(Locale.ROOT)
+        val canonical = TagNormalize.kebab(topicOrPerson)
         val json = JSONObject()
             .put("kind", PatternKind.COMMITMENT_RECURRENCE.serial)
             .put("topic_or_person", canonical)

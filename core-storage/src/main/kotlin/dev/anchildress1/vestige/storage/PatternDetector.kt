@@ -49,23 +49,26 @@ class PatternDetector(
             detected(sig, supporting)
         }
 
-    private fun detectTagPair(entries: List<EntryEntity>): List<DetectedPattern> =
-        entries
-            .filter { it.templateLabel != null }
-            .groupBy { it.templateLabel!! }
-            .flatMap { (label, group) ->
-                pairsWithinGroup(group)
-                    .filterValues { it.size >= SUPPORTING_THRESHOLD }
-                    .map { (pair, supporting) ->
-                        val sig = PatternSignature.forTagPair(label.serial, setOf(pair.first, pair.second))
-                        detected(sig, supporting)
-                    }
-            }
+    private fun detectTagPair(entries: List<EntryEntity>): List<DetectedPattern> = entries
+        .filter { it.templateLabel != null }
+        .groupBy { it.templateLabel!! }
+        .flatMap { (label, group) ->
+            pairsWithinGroup(group)
+                .filterValues { it.size >= SUPPORTING_THRESHOLD }
+                .map { (pair, supporting) ->
+                    val sig = PatternSignature.forTagPair(label.serial, setOf(pair.first, pair.second))
+                    detected(sig, supporting)
+                }
+        }
 
     private fun pairsWithinGroup(group: List<EntryEntity>): Map<Pair<String, String>, List<EntryEntity>> {
         val pairs = linkedMapOf<Pair<String, String>, MutableList<EntryEntity>>()
         for (entry in group) {
-            val tags = entry.tags.map { it.name.lowercase(Locale.ROOT) }.distinct().sorted()
+            val tags = entry.tags
+                .map { TagNormalize.kebab(it.name) }
+                .filter { it.isNotEmpty() }
+                .distinct()
+                .sorted()
             if (tags.size < TAG_PAIR_SIZE) continue
             for (i in tags.indices) {
                 for (j in (i + 1) until tags.size) {
@@ -89,8 +92,11 @@ class PatternDetector(
     private fun detectCommitments(entries: List<EntryEntity>): List<DetectedPattern> {
         val byTopic = linkedMapOf<String, MutableList<EntryEntity>>()
         for (entry in entries) {
-            val topic = parseCommitmentTopic(entry.statedCommitmentJson) ?: continue
-            byTopic.getOrPut(topic.lowercase(Locale.ROOT)) { mutableListOf() }.add(entry)
+            val topic = parseCommitmentTopic(entry.statedCommitmentJson)
+                ?.let(TagNormalize::kebab)
+                ?.takeIf { it.isNotEmpty() }
+                ?: continue
+            byTopic.getOrPut(topic) { mutableListOf() }.add(entry)
         }
         return byTopic
             .filter { it.value.size >= SUPPORTING_THRESHOLD }

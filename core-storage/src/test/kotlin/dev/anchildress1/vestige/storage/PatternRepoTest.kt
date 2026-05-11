@@ -76,6 +76,18 @@ class PatternRepoTest {
     }
 
     @Test
+    fun `dismiss undo rejects rows that are not currently DISMISSED`() {
+        // Misrouted undo callback on a RESOLVED pattern must NOT reopen it. ADR-003 §"Mark-
+        // resolved is sticky" — a stale snackbar from a previous action shouldn't bypass
+        // terminal-state semantics.
+        val id = seed()
+        repo.markResolved(id)
+        val raised = runCatching { repo.dismiss(id, undo = true) }
+        assertTrue("dismiss undo on RESOLVED must throw", raised.exceptionOrNull() is IllegalArgumentException)
+        assertEquals(PatternState.RESOLVED, store.findByPatternId(id)!!.state)
+    }
+
+    @Test
     fun `snooze default sets 7-day window`() {
         val id = seed()
         repo.snooze(id)
@@ -91,6 +103,15 @@ class PatternRepoTest {
         repo.snooze(id, days = 3)
         val expected = now.toEpochMilli() + 3L * 24 * 60 * 60 * 1000
         assertEquals(expected, store.findByPatternId(id)!!.snoozedUntil)
+    }
+
+    @Test
+    fun `snooze undo rejects rows that are not currently SNOOZED`() {
+        val id = seed()
+        // Pattern is ACTIVE; snooze-undo must not "un-snooze" an active row (no-op-via-error).
+        val raised = runCatching { repo.snooze(id, undo = true) }
+        assertTrue("snooze undo on ACTIVE must throw", raised.exceptionOrNull() is IllegalArgumentException)
+        assertEquals(PatternState.ACTIVE, store.findByPatternId(id)!!.state)
     }
 
     @Test

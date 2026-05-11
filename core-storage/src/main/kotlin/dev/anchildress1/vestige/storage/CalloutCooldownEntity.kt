@@ -15,4 +15,6 @@ class CalloutCooldownEntity(
     var lastCalloutTimestamp: Long? = null,
     /** Entries to suppress callouts on, counting down toward 0. */
     var remainingSuppression: Int = 0,
+    /** Entry currently holding the single global callout slot until append either confirms or fails. */
+    var pendingCalloutEntryId: Long? = null,
 )

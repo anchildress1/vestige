@@ -40,6 +40,7 @@ class CalloutCooldownStoreTest {
     fun `default state permits callout`() {
         assertTrue(store.isCalloutPermitted())
         assertNull(store.snapshot().lastCalloutEntryId)
+        assertNull(store.snapshot().pendingCalloutEntryId)
     }
 
     @Test
@@ -69,5 +70,54 @@ class CalloutCooldownStoreTest {
         store = CalloutCooldownStore(boxStore)
         assertEquals(2, store.snapshot().remainingSuppression)
         assertEquals(9L, store.snapshot().lastCalloutEntryId)
+    }
+
+    @Test
+    fun `tryReserveCallout claims the slot until confirmed`() {
+        assertEquals(CalloutCooldownStore.ReservationOutcome.RESERVED, store.tryReserveCallout(42L))
+        assertFalse(store.isCalloutPermitted())
+        assertEquals(42L, store.snapshot().pendingCalloutEntryId)
+
+        assertEquals(
+            CalloutCooldownStore.ReservationOutcome.BLOCKED_BY_PENDING_RESERVATION,
+            store.tryReserveCallout(84L),
+        )
+    }
+
+    @Test
+    fun `confirmReservedCallout clears reservation and starts suppression`() {
+        store.tryReserveCallout(42L)
+
+        store.confirmReservedCallout(entryId = 42L, timestampMs = 1_000L)
+
+        val snapshot = store.snapshot()
+        assertNull(snapshot.pendingCalloutEntryId)
+        assertEquals(42L, snapshot.lastCalloutEntryId)
+        assertEquals(3, snapshot.remainingSuppression)
+    }
+
+    @Test
+    fun `releaseReservedCallout restores eligibility without starting suppression`() {
+        store.tryReserveCallout(42L)
+
+        store.releaseReservedCallout(42L)
+
+        val snapshot = store.snapshot()
+        assertTrue(store.isCalloutPermitted())
+        assertNull(snapshot.pendingCalloutEntryId)
+        assertEquals(0, snapshot.remainingSuppression)
+        assertNull(snapshot.lastCalloutEntryId)
+    }
+
+    @Test
+    fun `suppressed reservation attempt burns one entry and rejects the callout`() {
+        store.recordFired(entryId = 42L, timestampMs = 1_000L)
+
+        assertEquals(
+            CalloutCooldownStore.ReservationOutcome.SUPPRESSED_BY_COOLDOWN,
+            store.tryReserveCallout(84L),
+        )
+        assertEquals(2, store.snapshot().remainingSuppression)
+        assertNull(store.snapshot().pendingCalloutEntryId)
     }
 }

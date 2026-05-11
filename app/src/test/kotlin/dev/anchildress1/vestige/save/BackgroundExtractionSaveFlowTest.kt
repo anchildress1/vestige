@@ -80,23 +80,27 @@ class BackgroundExtractionSaveFlowTest {
         coEvery {
             orchestrator.onEntryCommitted(storedEntry, dev.anchildress1.vestige.model.Persona.WITNESS)
         } returns callout
-        every { orchestrator.confirmCalloutFired(storedEntry) } returns Unit
+        every { orchestrator.settleReservedCallout(storedEntry, fired = true) } returns Unit
+        every { entryStore.appendObservation(ENTRY_ID, callout, any()) } answers {
+            @Suppress("UNCHECKED_CAST")
+            (args[2] as () -> Unit).invoke()
+        }
 
         val outcome = flowWithOrch.saveAndExtract(SAMPLE_TEXT, SAMPLE_TIMESTAMP) as SaveOutcome.Completed
 
         assertEquals(listOf(callout), outcome.observations)
-        // Order is the load-bearing fix: appendObservation MUST land before confirmCalloutFired.
-        // An exception in append leaves the cooldown unchanged.
+        // Order is the load-bearing fix: appendObservation MUST invoke the settlement callback
+        // inside the same persistence transaction.
         coVerifyOrder {
             entryStore.completeEntry(ENTRY_ID, resolved, TemplateLabel.AFTERMATH, emptyList())
             orchestrator.onEntryCommitted(storedEntry, dev.anchildress1.vestige.model.Persona.WITNESS)
-            entryStore.appendObservation(ENTRY_ID, callout)
-            orchestrator.confirmCalloutFired(storedEntry)
+            entryStore.appendObservation(ENTRY_ID, callout, any())
+            orchestrator.settleReservedCallout(storedEntry, fired = true)
         }
     }
 
     @Test
-    fun `appendObservation failure prevents confirmCalloutFired so cooldown is not bumped`() = runTest {
+    fun `appendObservation failure releases the reservation and skips confirm`() = runTest {
         val orchestrator = mockk<dev.anchildress1.vestige.patterns.PatternDetectionOrchestrator>()
         val flowWithOrch = BackgroundExtractionSaveFlow(
             entryStore = entryStore,
@@ -128,15 +132,16 @@ class BackgroundExtractionSaveFlowTest {
         coEvery {
             orchestrator.onEntryCommitted(storedEntry, dev.anchildress1.vestige.model.Persona.WITNESS)
         } returns callout
-        every { entryStore.appendObservation(ENTRY_ID, callout) } throws RuntimeException("markdown disk full")
+        every { entryStore.appendObservation(ENTRY_ID, callout, any()) } throws RuntimeException("markdown disk full")
 
         val outcome = flowWithOrch.saveAndExtract(SAMPLE_TEXT, SAMPLE_TIMESTAMP)
 
         // Save still completes; orchestrator failure swallowed.
         assertTrue(outcome is SaveOutcome.Completed, "append failure must not abort the save")
-        // CRITICAL: confirmCalloutFired must not run when append throws — otherwise the
-        // cooldown bumps for a callout the user never saw.
-        coVerify(exactly = 0) { orchestrator.confirmCalloutFired(any()) }
+        // CRITICAL: confirm must not run when append throws — the reservation gets released
+        // instead because the user never saw the callout.
+        verify(exactly = 0) { orchestrator.settleReservedCallout(any(), fired = true) }
+        verify(exactly = 1) { orchestrator.settleReservedCallout(storedEntry, fired = false) }
     }
 
     @Test
@@ -166,7 +171,7 @@ class BackgroundExtractionSaveFlowTest {
 
         // ADR-003 §"Detection algorithm" step-8 fail mode: log + continue. Save succeeds.
         assertTrue(outcome is SaveOutcome.Completed, "orchestrator failure must not abort the save")
-        coVerify(exactly = 0) { entryStore.appendObservation(any(), any()) }
+        verify(exactly = 0) { entryStore.appendObservation(any(), any(), any()) }
     }
 
     @Test

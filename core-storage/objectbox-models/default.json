@@ -194,7 +194,7 @@
     },
     {
       "id": "4:1734609473925323709",
-      "lastPropertyId": "4:7215131885737073624",
+      "lastPropertyId": "5:4610561580918816659",
       "name": "CalloutCooldownEntity",
       "properties": [
         {
@@ -217,6 +217,11 @@
           "id": "4:7215131885737073624",
           "name": "remainingSuppression",
           "type": 5
+        },
+        {
+          "id": "5:4610561580918816659",
+          "name": "pendingCalloutEntryId",
+          "type": 6
         }
       ],
       "relations": []

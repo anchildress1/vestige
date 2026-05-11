@@ -130,11 +130,19 @@ class BackgroundExtractionSaveFlow(
     ): EntryObservation? {
         val entry = entryStore.readEntry(entryId)
         val callout = entry?.let { orchestrator.onEntryCommitted(it, persona) }
-        // Persist first, then record the fire. If appendObservation throws, the cooldown stays
-        // unchanged — the user never saw the callout, so the next 3 entries are still eligible.
-        if (callout != null) {
-            entryStore.appendObservation(entryId, callout)
-            orchestrator.confirmCalloutFired(entry!!)
+        if (callout == null) return null
+        try {
+            // Confirm inside the same write transaction as the markdown/ObjectBox append so
+            // either both land or neither does.
+            entryStore.appendObservation(entryId, callout) {
+                orchestrator.settleReservedCallout(entry, fired = true)
+            }
+        } catch (cancellation: CancellationException) {
+            orchestrator.settleReservedCallout(entry, fired = false)
+            throw cancellation
+        } catch (@Suppress("TooGenericExceptionCaught") error: Exception) {
+            orchestrator.settleReservedCallout(entry, fired = false)
+            throw error
         }
         return callout
     }

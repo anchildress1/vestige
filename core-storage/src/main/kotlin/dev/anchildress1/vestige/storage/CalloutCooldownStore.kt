@@ -16,7 +16,37 @@ class CalloutCooldownStore(private val boxStore: BoxStore) {
         ?: CalloutCooldownEntity().also { box.put(it) }
 
     /** True when a callout is permitted on the next entry (no suppression remaining). */
-    fun isCalloutPermitted(): Boolean = snapshot().remainingSuppression == 0
+    fun isCalloutPermitted(): Boolean = snapshot().let { current ->
+        current.remainingSuppression == 0 && current.pendingCalloutEntryId == null
+    }
+
+    /**
+     * Atomically claim the single global callout slot for [entryId].
+     *
+     * - If the cooldown window is active, this entry spends one suppressed slot and is rejected.
+     * - If another entry already holds the slot, this entry is rejected without mutating state.
+     * - Otherwise this entry becomes the sole pending reservation until confirm/release.
+     */
+    fun tryReserveCallout(entryId: Long): ReservationOutcome = boxStore.callInTx {
+        val current = snapshot()
+        when {
+            current.pendingCalloutEntryId == entryId -> ReservationOutcome.RESERVED
+
+            current.pendingCalloutEntryId != null -> ReservationOutcome.BLOCKED_BY_PENDING_RESERVATION
+
+            current.remainingSuppression > 0 -> {
+                current.remainingSuppression -= 1
+                box.put(current)
+                ReservationOutcome.SUPPRESSED_BY_COOLDOWN
+            }
+
+            else -> {
+                current.pendingCalloutEntryId = entryId
+                box.put(current)
+                ReservationOutcome.RESERVED
+            }
+        }
+    }
 
     /** Record a fired callout. Suppresses the next [windowEntries] entries. */
     fun recordFired(entryId: Long, timestampMs: Long, windowEntries: Int = DEFAULT_WINDOW) {
@@ -25,19 +55,54 @@ class CalloutCooldownStore(private val boxStore: BoxStore) {
         current.lastCalloutEntryId = entryId
         current.lastCalloutTimestamp = timestampMs
         current.remainingSuppression = windowEntries
+        current.pendingCalloutEntryId = null
         box.put(current)
+    }
+
+    /** Convert a previously reserved slot into a durable cooldown window. */
+    fun confirmReservedCallout(entryId: Long, timestampMs: Long, windowEntries: Int = DEFAULT_WINDOW) {
+        require(windowEntries >= 0) { "windowEntries >= 0 required (got $windowEntries)" }
+        boxStore.runInTx {
+            val current = snapshot()
+            check(current.pendingCalloutEntryId == entryId) {
+                "No pending callout reservation for entry id=$entryId"
+            }
+            current.lastCalloutEntryId = entryId
+            current.lastCalloutTimestamp = timestampMs
+            current.remainingSuppression = windowEntries
+            current.pendingCalloutEntryId = null
+            box.put(current)
+        }
+    }
+
+    /** Drop a reservation when the callout never becomes user-visible. */
+    fun releaseReservedCallout(entryId: Long) {
+        boxStore.runInTx {
+            val current = snapshot()
+            if (current.pendingCalloutEntryId != entryId) return@runInTx
+            current.pendingCalloutEntryId = null
+            box.put(current)
+        }
     }
 
     /** Decrement the counter after a non-callout entry. Idempotent at zero. */
     fun consumeOneEntry() {
-        val current = snapshot()
-        if (current.remainingSuppression == 0) return
-        current.remainingSuppression -= 1
-        box.put(current)
+        boxStore.runInTx {
+            val current = snapshot()
+            if (current.remainingSuppression == 0) return@runInTx
+            current.remainingSuppression -= 1
+            box.put(current)
+        }
     }
 
     companion object {
         /** ADR-003 default: suppress callouts on the next 3 entries after one fires. */
         const val DEFAULT_WINDOW: Int = 3
+    }
+
+    enum class ReservationOutcome {
+        RESERVED,
+        SUPPRESSED_BY_COOLDOWN,
+        BLOCKED_BY_PENDING_RESERVATION,
     }
 }

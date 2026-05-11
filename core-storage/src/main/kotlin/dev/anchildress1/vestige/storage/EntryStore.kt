@@ -100,9 +100,11 @@ class EntryStore(private val boxStore: BoxStore, private val markdownStore: Mark
     /**
      * Append one observation to an already-completed entry's persisted list. Used by the
      * pattern-detection orchestrator when a callout fires after `completeEntry` has already
-     * landed. Throws when the entry is missing — callers must hold a valid id.
+     * landed. [afterPersist] runs inside the same ObjectBox write transaction so the caller can
+     * atomically update adjacent structured state (for example, the global callout cooldown row).
+     * Throws when the entry is missing — callers must hold a valid id.
      */
-    fun appendObservation(entryId: Long, observation: EntryObservation) {
+    fun appendObservation(entryId: Long, observation: EntryObservation, afterPersist: (() -> Unit)? = null) {
         boxStore.runInTx {
             val box = boxStore.boxFor<EntryEntity>()
             val entry = box.get(entryId)
@@ -118,6 +120,7 @@ class EntryStore(private val boxStore: BoxStore, private val markdownStore: Mark
                 )
             }
             box.put(entry)
+            afterPersist?.invoke()
         }
     }
 

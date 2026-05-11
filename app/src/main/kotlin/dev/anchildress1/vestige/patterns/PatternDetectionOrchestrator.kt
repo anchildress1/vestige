@@ -48,12 +48,11 @@ class PatternDetectionOrchestrator(
 ) {
 
     /**
-     * Compute the optional callout for [entry] under the given [persona]. Decrements the
-     * cooldown when the suppression window is active (callout-eligibility consumed by the
-     * entry passing through), but does NOT record a new fire — the save flow calls
-     * [confirmCalloutFired] only after the observation has been persisted. Splitting the two
-     * halves means an `appendObservation` failure can't bump the cooldown for a callout the
-     * user never saw.
+     * Compute the optional callout for [entry] under the given [persona]. A returned observation
+     * means this entry now holds the single global callout reservation; the save flow must either
+     * confirm it after persistence or release it when append fails. Suppressed entries burn down
+     * the cooldown in the store transaction; entries blocked by another in-flight reservation just
+     * skip the callout path.
      *
      * [persona] is per-call (not constructor-pinned) so the same orchestrator instance can
      * serve every session — capture sessions own persona, the orchestrator is process-scoped.
@@ -63,16 +62,22 @@ class PatternDetectionOrchestrator(
         if (entryCount > 0 && entryCount % DETECTION_INTERVAL == 0L) {
             runDetection(persona)
         }
-        if (!cooldownStore.isCalloutPermitted()) {
-            cooldownStore.consumeOneEntry()
+        if (cooldownStore.tryReserveCallout(entry.id) != CalloutCooldownStore.ReservationOutcome.RESERVED) {
             return null
         }
-        return prepareCallout(entry)
+        return prepareCallout(entry) ?: run {
+            cooldownStore.releaseReservedCallout(entry.id)
+            null
+        }
     }
 
-    /** Bump the cooldown counter after the save flow finishes persisting the callout. */
-    fun confirmCalloutFired(entry: EntryEntity) {
-        cooldownStore.recordFired(entry.id, clock.millis())
+    /** Finalize a pending reservation after the save flow either persists or drops the callout. */
+    fun settleReservedCallout(entry: EntryEntity, fired: Boolean) {
+        if (fired) {
+            cooldownStore.confirmReservedCallout(entry.id, clock.millis())
+            return
+        }
+        cooldownStore.releaseReservedCallout(entry.id)
     }
 
     private suspend fun runDetection(persona: Persona) {
@@ -98,11 +103,7 @@ class PatternDetectionOrchestrator(
         }
     }
 
-    private suspend fun insertNewActive(
-        detected: DetectedPattern,
-        supporting: List<EntryEntity>,
-        persona: Persona,
-    ) {
+    private suspend fun insertNewActive(detected: DetectedPattern, supporting: List<EntryEntity>, persona: Persona) {
         val title = titleGenerator
             .runCatching { generate(persona, detected) }
             .getOrElse {

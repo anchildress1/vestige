@@ -4,8 +4,8 @@ import androidx.test.core.app.ApplicationProvider
 import dev.anchildress1.vestige.inference.LiteRtLmEngine
 import dev.anchildress1.vestige.inference.PatternTitleGenerator
 import dev.anchildress1.vestige.model.DetectedPattern
-import dev.anchildress1.vestige.model.ExtractionStatus
 import dev.anchildress1.vestige.model.EntryObservation
+import dev.anchildress1.vestige.model.ExtractionStatus
 import dev.anchildress1.vestige.model.ObservationEvidence
 import dev.anchildress1.vestige.model.PatternKind
 import dev.anchildress1.vestige.model.PatternState
@@ -114,7 +114,8 @@ class PatternDetectionOrchestratorTest {
 
     /**
      * Seeds + commits one entry at a time, mirroring how the save flow drives the orchestrator.
-     * Calls `confirmCalloutFired` on any returned observation so the cooldown advances exactly
+     * Calls `settleReservedCallout(..., fired = true)` on any returned observation so the
+     * cooldown advances exactly
      * as it would in production after `EntryStore.appendObservation` succeeds.
      */
     private suspend fun commitOne(
@@ -123,7 +124,7 @@ class PatternDetectionOrchestratorTest {
     ): EntryObservation? {
         val entry = putEntry(templateLabel = templateLabel)
         val callout = orchestrator.onEntryCommitted(entry, persona)
-        if (callout != null) orchestrator.confirmCalloutFired(entry)
+        if (callout != null) orchestrator.settleReservedCallout(entry, fired = true)
         return callout
     }
 
@@ -270,10 +271,9 @@ class PatternDetectionOrchestratorTest {
     }
 
     @Test
-    fun `onEntryCommitted does not bump cooldown when confirmCalloutFired is skipped`() = runTest {
-        // Race fix: the orchestrator returns the observation but does NOT record the fire.
-        // The save flow records the fire only after `appendObservation` succeeds. If the
-        // append throws, confirmCalloutFired never runs and the cooldown stays at 0.
+    fun `onEntryCommitted holds a reservation until the save flow confirms or releases it`() = runTest {
+        // The orchestrator now reserves the single global slot before returning the callout.
+        // The save flow must confirm it after append succeeds or release it after append fails.
         patternStore.put(
             PatternEntity(
                 patternId = "x".repeat(64),
@@ -287,13 +287,18 @@ class PatternDetectionOrchestratorTest {
                 latestCalloutText = "Worth noting.",
             ),
         )
-        val callout = orchestrator.onEntryCommitted(putEntry(templateLabel = TemplateLabel.AFTERMATH), Persona.WITNESS)
+        val entry = putEntry(templateLabel = TemplateLabel.AFTERMATH)
+        val callout = orchestrator.onEntryCommitted(entry, Persona.WITNESS)
         assertNotNull(callout)
-        // Save flow's append failed (simulated by not calling confirm). Next entry must still
-        // be callout-eligible because no fire was ever confirmed.
-        assertTrue(
-            "no confirmCalloutFired → cooldown stays at 0",
-            cooldownStore.isCalloutPermitted(),
+        assertEquals(
+            "entry holds the pending reservation until append resolves",
+            entry.id,
+            cooldownStore.snapshot().pendingCalloutEntryId,
+        )
+        assertEquals(
+            "no fire confirmed yet, so suppression window stays at 0",
+            0,
+            cooldownStore.snapshot().remainingSuppression,
         )
     }
 
@@ -314,8 +319,34 @@ class PatternDetectionOrchestratorTest {
         )
         val first = orchestrator.onEntryCommitted(putEntry(templateLabel = TemplateLabel.AFTERMATH), Persona.WITNESS)
         assertNull(first)
-        // Cooldown was never started, so a follow-up entry with valid pattern would fire normally.
+        // Reservation was released, so a follow-up entry with valid pattern would fire normally.
         assertTrue(cooldownStore.isCalloutPermitted())
+    }
+
+    @Test
+    fun `pending reservation blocks another matching entry from sneaking through`() = runTest {
+        patternStore.put(
+            PatternEntity(
+                patternId = "x".repeat(64),
+                kind = PatternKind.TEMPLATE_RECURRENCE,
+                signatureJson = "{\"label\":\"aftermath\"}",
+                title = "Aftermath",
+                templateLabel = TemplateLabel.AFTERMATH.serial,
+                firstSeenTimestamp = 1L,
+                lastSeenTimestamp = 2L,
+                state = PatternState.ACTIVE,
+                latestCalloutText = "Worth noting.",
+            ),
+        )
+        val firstEntry = putEntry(templateLabel = TemplateLabel.AFTERMATH)
+        val secondEntry = putEntry(templateLabel = TemplateLabel.AFTERMATH)
+
+        val firstCallout = orchestrator.onEntryCommitted(firstEntry, Persona.WITNESS)
+        val secondCallout = orchestrator.onEntryCommitted(secondEntry, Persona.WITNESS)
+
+        assertNotNull(firstCallout)
+        assertNull("second entry must block behind the in-flight reservation", secondCallout)
+        assertEquals(firstEntry.id, cooldownStore.snapshot().pendingCalloutEntryId)
     }
 
     @Test

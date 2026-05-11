@@ -2,7 +2,7 @@
 
 **Status:** In progress
 **Dates:** 2026-05-09 – TBD
-**References:** `PRD.md` §Phase 2, `concept-locked.md` §"Multi-lens extraction architecture", `concept-locked.md` §Schema, `AGENTS.md`, `architecture-brief.md`, `adrs/ADR-001-stack-and-build-infra.md` §Q3 / §Q4, `adrs/ADR-002-multi-lens-extraction-pattern.md` (entire), `adrs/ADR-004-app-backgrounding-and-model-handle-lifecycle.md` (entire), `adrs/ADR-008-parallel-lens-execution.md` (entire), `sample-data-scenarios.md`
+**References:** `PRD.md` §Phase 2, `concept-locked.md` §"Multi-lens extraction architecture", `concept-locked.md` §Schema, `AGENTS.md`, `architecture-brief.md`, `adrs/ADR-001-stack-and-build-infra.md` §Q3 / §Q4, `adrs/ADR-002-multi-lens-extraction-pattern.md` (entire), `adrs/ADR-004-app-backgrounding-and-model-handle-lifecycle.md` (entire), `adrs/ADR-009-litertlm-kotlin-session-clone-unavailable.md` (supersedes ADR-008 — sequential is the v1 rule), `sample-data-scenarios.md`
 
 ---
 
@@ -22,7 +22,7 @@ Build the end-to-end capture loop: user records or types → foreground call ret
 - [x] **STT-C passes**: tag extraction is stable (≥80% same-tag emission on equivalent test dumps). If unstable, prompts have been tightened until stable, or the limitation is documented. _(2026-05-11 — **PASSED at 1.00** on S24 Ultra GPU. 41/41 (entry, tag) pairs stable across 3 runs over 17 of 18 corpus entries. C2 produced zero tags on all 3 runs (INFERENTIAL + SKEPTICAL parse-fail × 2 retries on GPU) — same regression flagged in Story 2.7's GPU re-run. Stability gate is unaffected; C2 parse-rate is tracked separately.)_
 - [ ] Convergence resolver implementation lands into Story 1.12's test scaffolding and all happy-path tests pass.
 - [ ] Agent-emitted template labels work for all six archetypes on representative sample transcripts.
-- [ ] Background extraction populates the canonical schema on the reference device. Target latency per ADR-008: ~7–10s wall-clock per entry via parallel Session cloning on E4B GPU. The legacy 30–90s ceiling stays as the time-budget timeout guard.
+- [x] Background extraction populates the canonical schema on the reference device. **Latency target reverted to ADR-002 sequential per `adrs/ADR-009-litertlm-kotlin-session-clone-unavailable.md` (2026-05-11)** — Story 2.7's device record stands as the measured baseline: ~5–7 s per lens, 25–55 s per entry on E4B GPU after the `libOpenCL.so` manifest fix. The 30–90s ceiling remains the timeout guard. _(2026-05-11 — measured under Story 2.7 GPU re-run.)_
 - [ ] Background extraction lifecycle service is wired per ADR-004 (conditional foreground service): app promotes when extraction begins, demotes after 30-second keep-alive once all extractions reach terminal status. Notification text matches `ux-copy.md` §"Loading States".
 - [ ] Personas (Witness / Hardass / Editor) demonstrably affect tone on the foreground response without affecting structured field extraction.
 
@@ -129,7 +129,7 @@ Build the end-to-end capture loop: user records or types → foreground call ret
 - [x] Latency per entry on the reference device is logged; total foreground + background time per entry is recorded for the latency note. _(`Log.d("VestigeBackgroundExtraction", …)` per lens (`elapsed=Xms`) and per entry (`extract completed: lenses=N/3 model_calls=K elapsed=Yms`). Reference-device measurements get added under ADR-002 §"Latency budget" once the worker is wired into the running app.)_
 - [x] If a lens call fails (parse error, model error), the worker retries per ADR-001 Q3's retry policy. Two consecutive failures on the same lens marks the lens as "no opinion" rather than retrying indefinitely. _(`maxAttemptsPerLens = 2` (one initial + one retry) per lens. After exhausting that budget the lens contributes `LensResult(extraction = null, lastError = ...)` and the resolver receives only the lenses that parsed — ADR-002 §"Convergence edge cases" already routes parse-fail to "no opinion" rather than agreement. The original story copy said `extraction_status=ambiguous_partial`; the entry-level enum stays `COMPLETED` (≥1 lens parsed) or `FAILED` (every lens failed) per ADR-001 §Q3, with the per-field ambiguity expressed by the resolver's `ConfidenceVerdict.AMBIGUOUS` rather than a new entry-level status.)_
 
-**Notes / risks:** The three lens calls run **in parallel** per `adrs/ADR-008-parallel-lens-execution.md`. Build one base Session for the entry (shared prefix: system + 5 surfaces + entry text + retrieved history), clone it three times for the three lens module suffixes, fire all three concurrently against the single Engine. Copy-on-Write KV-cache handles the divergence. Total wall-clock ≈ one parallel call's latency + parallelization overhead, not 3× sequential. If LiteRT-LM Session cloning errors on the E4B audio artifact, **stop and write a superseding ADR** — do not silently fall back to sequential.
+**Notes / risks:** Lens calls run **sequentially** for v1 per `adrs/ADR-002-multi-lens-extraction-pattern.md` §"Background pass (3 lens calls, sequential)" — restored by `adrs/ADR-009-litertlm-kotlin-session-clone-unavailable.md` (supersedes ADR-008). The parallel-via-Session-cloning design ADR-008 prescribed is not buildable against `litertlm-android:0.11.0`; Story 2.6.6 was deferred and is tracked in `backlog.md` under `parallel-lens-execution-via-clone`.
 
 The worker does **not** own its own backgrounding behavior. The `BackgroundExtractionService` from Story 2.6.5 wraps the worker and keeps it alive across app backgrounding by promoting the process to a foreground service while extractions are in flight. Don't bake `Service` lifecycle handling into the worker class itself — that's the wrapper's job.
 
@@ -160,7 +160,16 @@ Don't conflate this story with Story 2.6 (worker logic). Story 2.6 is *what* run
 
 ---
 
-### Story 2.6.6 — Parallel lens execution via Engine/Session cloning (per ADR-008)
+### Story 2.6.6 — Parallel lens execution via Engine/Session cloning — **SUPERSEDED 2026-05-11; DEFERRED TO BACKLOG**
+
+🪦 **Superseded by [ADR-009](../adrs/ADR-009-litertlm-kotlin-session-clone-unavailable.md).** The API-feasibility probe run 2026-05-11 (ADR-008 Action Item 6) confirmed the `litertlm-android:0.11.0` Kotlin SDK does not expose `Session.clone()` or any equivalent parent-Session API. `Engine.createSession(SessionConfig)` takes no parent reference; the JNI binding (`nativeCreateSession(engineHandle, samplerConfig)`) confirms it at the native layer. Upstream PR #1515 (Kotlin clone surface) was closed unmerged 2026-03-09 and no replacement landed in the two months before this story's feasibility check. The C++ runtime (`runtime/core/session_advanced.cc`) has cloning; the Android SDK does not bind to it. No newer artifact is published — Google Android Maven `lastUpdated 2026-05-04` shows 0.11.0 is `<latest>`.
+
+ADR-009 restores ADR-002's original sequential rule for v1. Story 2.6's sequential `BackgroundExtractionWorker` ships as-is. This story is deferred to `backlog.md` under `parallel-lens-execution-via-clone` with the SDK-gap revival triggers recorded.
+
+**Original story preserved below for historical context. No `Done when` boxes will be ticked on this story — the feasibility check itself was the work, and its outcome was "defer."**
+
+<details>
+<summary>Original Story 2.6.6 contents (2026-05-10 draft, superseded)</summary>
 
 **As** the AI implementor, **I need** to refactor `BackgroundExtractionWorker` from sequential lens iteration to parallel execution via LiteRT-LM's Engine/Session API with Copy-on-Write KV-cache (per `adrs/ADR-008-parallel-lens-execution.md`), **so that** per-entry wall-clock drops from ~3× single-call (sequential) to ~1× single-call (parallel) and the extraction queue drains in real-time under ADHD-cadence capture.
 
@@ -186,6 +195,8 @@ Story 2.6 shipped a sequential 3-lens iteration that works correctly but is wall
 ADR-008 §"Wall-Clock Math" estimates ~7–9s per entry on E4B GPU after this refactor lands. If measured latency is materially worse than that, the issue is parallelization overhead (LiteRT-LM Session orchestration), not the model — surface it explicitly before assuming the architecture is at fault.
 
 This story is **infra-only**; no user-visible UX changes. The "Reading the entry" notification from ADR-004 stays visible for the (shorter) parallel call's duration. The convergence verdicts the resolver writes are identical.
+
+</details>
 
 ---
 
@@ -327,7 +338,7 @@ If a Phase 2 story starts pulling Phase 3+ scope, stop. Reference `backlog.md` a
 
 Phase 3 starts when all the following are true:
 
-- [ ] All fifteen stories above are Done or have an explicit, recorded fallback. (Story 2.6.6 — parallel refactor per ADR-008 — added 2026-05-10.)
+- [ ] All fifteen stories above are Done or have an explicit, recorded fallback. (Story 2.6.6 — parallel refactor per ADR-008 — added 2026-05-10, **superseded by ADR-009 on 2026-05-11 and deferred to `backlog.md` as `parallel-lens-execution-via-clone`**. Fallback recorded; the v1 contract is ADR-002's original sequential rule.)
 - [ ] **STT-B resolved** — multi-turn works on E4B *or* the single-turn fallback is implemented and the spec updated.
 - [x] **STT-D resolved** — 3-lens divergence is validated *or* multi-lens has been replaced with single-pass and ADR-002 has been superseded. _(2026-05-10 — validated at 83%.)_
 - [x] **STT-C resolved** — tag stability is ≥80% *or* the limitation is documented and Phase 3's pattern engine is designed around the noise floor. _(2026-05-11 — passed at 1.00 on GPU; C2 GPU parse-failure documented under Story 2.7's GPU regression note.)_

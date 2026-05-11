@@ -31,7 +31,7 @@ class PatternDetector(
         val nowMs = clock.millis()
         // Indexed query — `EntryEntity.extractionStatus` is `@Index`-annotated, so this is an
         // O(log n) index seek rather than the prior O(total entries) JVM filter.
-        val entries = boxStore.boxFor<EntryEntity>().query()
+        val entries: List<EntryEntity> = boxStore.boxFor<EntryEntity>().query()
             .equal(
                 EntryEntity_.extractionStatus,
                 ExtractionStatus.COMPLETED.name,
@@ -116,7 +116,10 @@ class PatternDetector(
                 ?: continue
             byTopic.getOrPut(topic) { mutableListOf() }.add(entry)
         }
+        // Convert to immutable view after the build phase — the supporting lists are only read
+        // downstream, so narrow the type for callers and satisfy `kotlin:S6524`.
         return byTopic
+            .mapValues { it.value.toList() }
             .filter { it.value.size >= SUPPORTING_THRESHOLD }
             .map { (topic, supporting) ->
                 val sig = PatternSignature.forCommitment(topic)
@@ -139,6 +142,7 @@ class PatternDetector(
         // four entries with `templateLabel = null`, which is the predominant shape early in
         // the corpus); using entry distinctness instead matches the ADR's stated intent.
         return tokenToEntries
+            .mapValues { it.value.toList() }
             .filter { (_, supporting) -> supporting.distinctBy { it.id }.size >= VOCAB_THRESHOLD }
             .map { (token, supporting) ->
                 val sig = PatternSignature.forVocabToken(token)

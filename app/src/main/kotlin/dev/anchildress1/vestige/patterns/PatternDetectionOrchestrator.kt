@@ -87,8 +87,12 @@ class PatternDetectionOrchestrator(
             return
         }
         val current = promoteSnoozedIfExpired(existing) ?: existing
-        applySupportingAndCallout(current, detected, supportingEntries)
-        patternStore.put(current)
+        // Wrap the read-modify-write of supportingEntries in a tx so concurrent save calls
+        // can't lose-update each other's evidence sets. ObjectBox tx is read-write-isolated.
+        boxStore.runInTx {
+            applySupportingAndCallout(current, detected, supportingEntries)
+            patternStore.put(current)
+        }
     }
 
     private suspend fun insertNewActive(detected: DetectedPattern, supporting: List<EntryEntity>) {
@@ -114,11 +118,15 @@ class PatternDetectionOrchestrator(
             stateChangedTimestamp = now,
             latestCalloutText = callout,
         )
-        patternStore.put(entity)
-        val saved = patternStore.findByPatternId(detected.patternId) ?: return
-        saved.supportingEntries.clear()
-        saved.supportingEntries.addAll(supporting)
-        patternStore.put(saved)
+        // Tx wraps insert + supporting-relation attach so a concurrent save can't see the row
+        // mid-state (insert visible but evidence set still empty).
+        boxStore.runInTx {
+            patternStore.put(entity)
+            val saved = patternStore.findByPatternId(detected.patternId) ?: return@runInTx
+            saved.supportingEntries.clear()
+            saved.supportingEntries.addAll(supporting)
+            patternStore.put(saved)
+        }
     }
 
     private fun promoteSnoozedIfExpired(pattern: PatternEntity): PatternEntity? {

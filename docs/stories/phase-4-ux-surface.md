@@ -135,8 +135,13 @@ Wrap the app in a coherent, dark, atmospheric UX that meets the 10-second judge 
   - 168px hero, five-layer composition (outer halo, conic moonstone ring, frosted-glass body, inner noise, center mark).
   - Idle: stone with subtle internal gradient, no outer halo amplitude.
   - Active recording: outer halo scales with audio `level`, `vapor` (`#2563EB`) tint on halo and ring, `AudioMeter` renders below.
-  - Post-stop / review: halo collapses to outline state with thin `vapor` rim. `Reading the entry.` placeholder shows in transcript area.
+  - Post-stop / review: halo collapses to outline state with thin `vapor` rim. `Reading the entry.` placeholder shows in transcript area (per `ux-copy.md` §"Loading States").
   - Approaching 30s chunk boundary (~25s): thin progress arc on the ring, no copy.
+- [ ] Inference placeholder lifecycle (absorbed from Story 2.11):
+  - Placeholder appears the moment the foreground call starts and holds for **no less than 200 ms** even on fast inferences — the floor exists to avoid a jarring instant-replace flash, not to fake latency. Beyond that, the placeholder duration equals the actual call duration.
+  - On `ForegroundResult.Success`, the placeholder is replaced by the transcribed text in muted/dimmed tone (per `design-guidelines.md` §"Entry transcript") and the model follow-up renders below in primary text weight.
+  - On `ForegroundResult.ParseFailure` or call timeout, the placeholder is replaced by the matching error copy from `ux-copy.md` §"Error States" — not the placeholder text and not a blank space.
+  - No token streaming. Streaming is deferred until structured-output measurements show parsing remains reliable when streamed (ADR-002 §Q1); revisit during Phase-5 demo dry runs if non-streaming feels slow.
 - [ ] Hero title slot above `MistHero` renders an editorial italic line (`Newsreader`) — pulled from `ux-copy.md` §Capture Screen, never invented inline. Example from `poc/screenshots/capture.png`: `What lingered from yesterday?`
 - [ ] Mono tagline strip below `MistHero` per `poc/screenshots/capture.png`: directive (`HOLD THE STONE · SPEAK`-style) and privacy tagline (`30s chunks · audio discarded after extraction`-style). `JetBrains Mono`, eyebrow scale. Strings from `ux-copy.md`.
 - [ ] Entry transcript per `design-guidelines.md` §"Entry transcript" (single-turn-per-capture per the STT-B v1 scope choice — exactly one USER turn + one MODEL turn per entry, no scroll across multiple exchanges):

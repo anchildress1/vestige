@@ -233,18 +233,13 @@ Don't conflate this story with Story 2.6 (worker logic). Story 2.6 is *what* run
 
 ---
 
-### Story 2.11 — Inference latency UI: foreground placeholder
+### Story 2.11 — Inference latency UI: foreground placeholder — **MERGED INTO STORY 4.5 (2026-05-10)**
 
-**As** the AI implementor, **I need** an immediate visual placeholder in the entry transcript when a foreground call starts and a real-time render of the model's response when it returns, **so that** the user sees motion during the 1–5 second foreground latency window without the UI feeling broken.
+Phase 2 has no capture screen — `MainActivity` is still the Phase-1 mic-permission shell — so the "user-turn slot in the entry transcript" surface that 2.11 expects to mutate doesn't exist yet. Building it in Phase 2 means writing a throwaway scaffold that Story 4.5 immediately replaces (`MistHero`, `AudioMeter`, locked muted-user / primary-model entry transcript, persona-pill chrome). That's the kind of churn AGENTS.md guardrail 20 ("Stick to the plan. Do not overbuild") tells us to skip.
 
-**Done when:**
-- [ ] When the foreground call is in flight, the user-turn slot in the entry transcript shows an inline placeholder ("Reading the entry." or persona-flavored copy from `ux-copy.md` §"Loading States").
-- [ ] When the response returns, the placeholder is replaced with the transcribed text (in muted/dimmed tone per `design-guidelines.md` §"Entry transcript") and the model's follow-up renders below in primary text weight.
-- [ ] The placeholder displays for no less than 200ms (avoid the jarring instant-replace flash on fast inferences) and no more than the actual call duration (no fake delay).
-- [ ] If the foreground call fails or times out, the placeholder is replaced with the appropriate error state from `ux-copy.md` §"Error States".
-- [ ] No streaming UI in this story — see Note below.
+Story 4.5's `Done when` list already covers the placeholder display ("`Reading the entry.` placeholder shows in transcript area"). The two additional Phase-2 acceptance items — 200 ms minimum placeholder hold and explicit error-state replacement on parse-fail / timeout — were folded into Story 4.5 in this same change. **All five of this story's `Done when` boxes now belong to Story 4.5; track them there.**
 
-**Notes / risks:** Streaming the model's response token-by-token is deferred until STT-D's structured-output measurements show parsing remains reliable when streamed (per ADR-002 §Q1). If non-streaming feels noticeably slow during demo dry runs in Phase 5, revisit then. For now: placeholder, then full response.
+Phase-2 still benefits from this story by *not* shipping a placeholder UI on top of an absent capture screen — the build-order discipline matters more than the story-numbering bookkeeping.
 
 ---
 

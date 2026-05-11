@@ -336,4 +336,87 @@ class PatternDetectionOrchestratorTest {
         val callout = orchestrator.onEntryCommitted(putEntry(templateLabel = TemplateLabel.AFTERMATH))
         assertEquals("Higher-support text.", callout?.text)
     }
+
+    @Test
+    fun `equal supporting counts — lastSeenTimestamp tiebreak picks the most recent`() = runTest {
+        // Two active patterns matching AFTERMATH, identical supporting counts (0 in this seed),
+        // differ only on lastSeenTimestamp. The orchestrator must pick the more recent.
+        patternStore.put(
+            PatternEntity(
+                patternId = "p1".padEnd(64, 'a'),
+                kind = PatternKind.TEMPLATE_RECURRENCE,
+                signatureJson = "{\"label\":\"aftermath\"}",
+                title = "Older",
+                templateLabel = TemplateLabel.AFTERMATH.serial,
+                firstSeenTimestamp = 1L,
+                lastSeenTimestamp = 100L,
+                state = PatternState.ACTIVE,
+                latestCalloutText = "older-text",
+            ),
+        )
+        patternStore.put(
+            PatternEntity(
+                patternId = "p2".padEnd(64, 'b'),
+                kind = PatternKind.TEMPLATE_RECURRENCE,
+                signatureJson = "{\"label\":\"aftermath\"}",
+                title = "Newer",
+                templateLabel = TemplateLabel.AFTERMATH.serial,
+                firstSeenTimestamp = 1L,
+                lastSeenTimestamp = 200L,
+                state = PatternState.ACTIVE,
+                latestCalloutText = "newer-text",
+            ),
+        )
+        val callout = orchestrator.onEntryCommitted(putEntry(templateLabel = TemplateLabel.AFTERMATH))
+        assertEquals("newer-text", callout?.text)
+    }
+
+    @Test
+    fun `snoozed pattern with expired snoozedUntil auto-promotes to ACTIVE on detection run`() = runTest {
+        // Drive 10 entries → detector inserts ACTIVE pattern with model-generated title.
+        repeat(10) { commitOne() }
+        val original = patternStore.all().single { it.kind == PatternKind.TEMPLATE_RECURRENCE }
+
+        // User snoozes 7 days.
+        val snoozeUntil = now.toEpochMilli() + 7L * 24 * 60 * 60 * 1000
+        patternStore.transitionState(original.patternId, PatternState.SNOOZED, snoozedUntilMs = snoozeUntil)
+        assertEquals(PatternState.SNOOZED, patternStore.findByPatternId(original.patternId)!!.state)
+
+        // Time advances past snoozedUntil; clock-bound store sees expiry. New orchestrator
+        // with later clock — detector runs again on the next 10-entry tick.
+        val laterClock = Clock.fixed(now.plusSeconds(8L * 24 * 60 * 60), ZoneOffset.UTC)
+        val laterOrchestrator = PatternDetectionOrchestrator(
+            boxStore = boxStore,
+            detector = PatternDetector(boxStore, laterClock, ZoneOffset.UTC),
+            patternStore = PatternStore(boxStore, laterClock),
+            titleGenerator = PatternTitleGenerator(
+                engine = engine,
+                personaPromptComposer = { "P" },
+                templateLoader = { "T" },
+                forbiddenPhraseDetector = { false },
+            ),
+            cooldownStore = cooldownStore,
+            clock = laterClock,
+            zoneId = ZoneOffset.UTC,
+        )
+        // Ten more matching entries → detection upserts and promotes the row to ACTIVE.
+        repeat(10) { laterOrchestrator.onEntryCommitted(putEntry(templateLabel = TemplateLabel.AFTERMATH)) }
+        val promoted = patternStore.findByPatternId(original.patternId)!!
+        assertEquals(PatternState.ACTIVE, promoted.state)
+        assertNull("snoozedUntil cleared on auto-promote", promoted.snoozedUntil)
+    }
+
+    @Test
+    fun `new pattern inserts with deterministic title when generator returns null`() = runTest {
+        // Title generator returns blank → orchestrator falls back to the deterministic title.
+        coEvery { engine.generateText(any()) } returns ""
+        repeat(10) { commitOne() }
+        val pattern = patternStore.all().first { it.kind == PatternKind.TEMPLATE_RECURRENCE }
+        assertEquals(PatternState.ACTIVE, pattern.state)
+        assertTrue("fallback title must be non-blank", pattern.title.isNotBlank())
+        assertTrue(
+            "fallback title is the kebab template label, title-cased",
+            pattern.title.equals("Aftermath", ignoreCase = true),
+        )
+    }
 }

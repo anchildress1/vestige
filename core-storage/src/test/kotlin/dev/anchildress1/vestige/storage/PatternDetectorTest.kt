@@ -98,6 +98,12 @@ class PatternDetectorTest {
     }
 
     @Test
+    fun `tag-pair below threshold does not pattern`() {
+        repeat(2) { putEntry(templateLabel = TemplateLabel.AFTERMATH, tagNames = listOf("standup", "crashed")) }
+        assertNull(detector.detect().firstOrNull { it.kind == PatternKind.TAG_PAIR_CO_OCCURRENCE })
+    }
+
+    @Test
     fun `tag-pair supports a subset — an extra tag does not break it`() {
         putEntry(templateLabel = TemplateLabel.AFTERMATH, tagNames = listOf("standup", "crashed"))
         putEntry(templateLabel = TemplateLabel.AFTERMATH, tagNames = listOf("standup", "crashed", "tuesday"))
@@ -120,6 +126,13 @@ class PatternDetectorTest {
     }
 
     @Test
+    fun `goblin hours below threshold does not pattern`() {
+        val midnight = Instant.parse("2026-05-10T02:00:00Z")
+        repeat(2) { i -> putEntry(timestamp = midnight.plusSeconds((i * 3600L))) }
+        assertNull(detector.detect().firstOrNull { it.kind == PatternKind.TIME_OF_DAY_CLUSTER })
+    }
+
+    @Test
     fun `goblin hours excludes entries outside 30-day window`() {
         val oldGoblin = Instant.parse("2026-03-01T02:00:00Z") // > 30 days back
         repeat(3) { putEntry(timestamp = oldGoblin) }
@@ -132,6 +145,12 @@ class PatternDetectorTest {
         val pattern = detector.detect().single { it.kind == PatternKind.COMMITMENT_RECURRENCE }
         assertEquals(3, pattern.supportingEntryCount)
         assertTrue(pattern.signatureJson.contains("\"topic_or_person\":\"jamie\""))
+    }
+
+    @Test
+    fun `commitment below threshold does not pattern`() {
+        repeat(2) { putEntry(commitmentTopic = "Jamie") }
+        assertNull(detector.detect().firstOrNull { it.kind == PatternKind.COMMITMENT_RECURRENCE })
     }
 
     @Test

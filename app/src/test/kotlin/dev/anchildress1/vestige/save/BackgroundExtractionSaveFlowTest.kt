@@ -48,6 +48,78 @@ class BackgroundExtractionSaveFlowTest {
     private val flow = BackgroundExtractionSaveFlow(entryStore, worker, observationGenerator, listenerFactory)
 
     @Test
+    fun `pattern orchestrator callout is appended to the persisted observations`() = runTest {
+        val orchestrator = mockk<dev.anchildress1.vestige.patterns.PatternDetectionOrchestrator>()
+        val flowWithOrch = BackgroundExtractionSaveFlow(
+            entryStore = entryStore,
+            worker = worker,
+            observationGenerator = observationGenerator,
+            listenerFactory = listenerFactory,
+            patternOrchestrator = orchestrator,
+        )
+        val storedEntry = dev.anchildress1.vestige.storage.EntryEntity(
+            id = ENTRY_ID,
+            extractionStatus = ExtractionStatus.COMPLETED,
+        )
+        val callout = dev.anchildress1.vestige.model.EntryObservation(
+            text = "Worth noting.",
+            evidence = dev.anchildress1.vestige.model.ObservationEvidence.PATTERN_CALLOUT,
+            fields = emptyList(),
+        )
+        val resolved = canonicalSample()
+        every { entryStore.createPendingEntry(any(), any()) } returns ENTRY_ID
+        every { entryStore.readEntry(ENTRY_ID) } returns storedEntry
+        coEvery { worker.extract(any(), any()) } returns BackgroundExtractionResult.Success(
+            totalElapsedMs = 25_000L,
+            lensResults = emptyList(),
+            modelCallCount = 3,
+            resolved = resolved,
+            templateLabel = TemplateLabel.AFTERMATH,
+        )
+        coEvery { observationGenerator.generate(any(), any(), any()) } returns emptyList()
+        coEvery { orchestrator.onEntryCommitted(storedEntry) } returns callout
+
+        val outcome = flowWithOrch.saveAndExtract(SAMPLE_TEXT, SAMPLE_TIMESTAMP) as SaveOutcome.Completed
+
+        assertEquals(listOf(callout), outcome.observations)
+        coVerifyOrder {
+            entryStore.completeEntry(ENTRY_ID, resolved, TemplateLabel.AFTERMATH, emptyList())
+            orchestrator.onEntryCommitted(storedEntry)
+            entryStore.appendObservation(ENTRY_ID, callout)
+        }
+    }
+
+    @Test
+    fun `pattern orchestrator throwing is swallowed and does not block save`() = runTest {
+        val orchestrator = mockk<dev.anchildress1.vestige.patterns.PatternDetectionOrchestrator>()
+        val flowWithOrch = BackgroundExtractionSaveFlow(
+            entryStore = entryStore,
+            worker = worker,
+            observationGenerator = observationGenerator,
+            listenerFactory = listenerFactory,
+            patternOrchestrator = orchestrator,
+        )
+        val resolved = canonicalSample()
+        every { entryStore.createPendingEntry(any(), any()) } returns ENTRY_ID
+        every { entryStore.readEntry(ENTRY_ID) } returns dev.anchildress1.vestige.storage.EntryEntity(id = ENTRY_ID)
+        coEvery { worker.extract(any(), any()) } returns BackgroundExtractionResult.Success(
+            totalElapsedMs = 25_000L,
+            lensResults = emptyList(),
+            modelCallCount = 3,
+            resolved = resolved,
+            templateLabel = TemplateLabel.AFTERMATH,
+        )
+        coEvery { observationGenerator.generate(any(), any(), any()) } returns emptyList()
+        coEvery { orchestrator.onEntryCommitted(any()) } throws RuntimeException("native crash")
+
+        val outcome = flowWithOrch.saveAndExtract(SAMPLE_TEXT, SAMPLE_TIMESTAMP)
+
+        // ADR-003 §"Detection algorithm" step-8 fail mode: log + continue. Save succeeds.
+        assertTrue(outcome is SaveOutcome.Completed, "orchestrator failure must not abort the save")
+        coVerify(exactly = 0) { entryStore.appendObservation(any(), any()) }
+    }
+
+    @Test
     fun `success routes to completeEntry with resolver output, template label, and observations`() = runTest {
         every { entryStore.createPendingEntry(any(), any()) } returns ENTRY_ID
         val resolved = canonicalSample()

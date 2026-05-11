@@ -144,6 +144,40 @@ class PatternStoreTest {
     }
 
     @Test
+    fun `illegal transitions matrix — every rejected pair throws`() {
+        // ADR-003 §"Lifecycle & state transitions" — enumerate every state pair and assert
+        // the validator rejects exactly the pairs the ADR forbids. Legal pairs land in their
+        // dedicated tests above; this one is the negative matrix.
+        val illegalFromActive = setOf(PatternState.ACTIVE) // self-transitions not legal
+        val illegalFromSnoozed = setOf(PatternState.SNOOZED, PatternState.BELOW_THRESHOLD, PatternState.RESOLVED)
+        val illegalFromBelowThreshold = PatternState.entries.toSet() -
+            setOf(PatternState.ACTIVE, PatternState.BELOW_THRESHOLD)
+
+        assertAllRejected(PatternState.ACTIVE, illegalFromActive)
+        assertAllRejected(PatternState.SNOOZED, illegalFromSnoozed)
+        assertAllRejected(PatternState.BELOW_THRESHOLD, illegalFromBelowThreshold)
+    }
+
+    private fun assertAllRejected(from: PatternState, illegalTargets: Set<PatternState>) {
+        for (target in illegalTargets) {
+            // Fresh row per assertion — the validator mutates state on success, and a prior
+            // successful transition inside the same row would let an "illegal" follow-up pass.
+            val pid = "${from.serial}-${target.serial}".padEnd(64, 'x')
+            seed(state = from, patternId = pid)
+            assertThrows(
+                "Illegal transition $from->$target must throw",
+                Throwable::class.java,
+            ) {
+                if (target == PatternState.SNOOZED) {
+                    store.transitionState(pid, target, snoozedUntilMs = now.toEpochMilli() + 1_000)
+                } else {
+                    store.transitionState(pid, target)
+                }
+            }
+        }
+    }
+
+    @Test
     fun `state survives BoxStore restart`() {
         val seeded = seed()
         store.transitionState(seeded.patternId, PatternState.SNOOZED, snoozedUntilMs = now.toEpochMilli() + 1_000)

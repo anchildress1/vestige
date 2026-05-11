@@ -205,6 +205,57 @@ class RetrievalRepoTest {
         assertThrows(IllegalArgumentException::class.java) { repo.query("x", recencyWeight = 1.1f) }
     }
 
+    @Test
+    fun `ss-guarded tags stay unstemmed — query 'kis' does not bridge to 'kiss'`() {
+        val kiss = insertEntry("unrelated body text", daysAgo = 5, tagNames = listOf("kiss"))
+        insertEntry("unrelated body text", daysAgo = 5, tagNames = listOf("laundry"))
+
+        // 'kiss' (len > MIN_STEM_LENGTH, ends with 'ss') exits the stemmer unchanged.
+        assertEquals(listOf(kiss), repo.query("kiss").map { it.id })
+        assertTrue(repo.query("kis").isEmpty())
+    }
+
+    @Test
+    fun `is-guarded tags stay unstemmed — query 'thi' does not bridge to 'this'`() {
+        val thisTag = insertEntry("unrelated body text", daysAgo = 5, tagNames = listOf("this"))
+        insertEntry("unrelated body text", daysAgo = 5, tagNames = listOf("laundry"))
+
+        // 'this' (len > MIN_STEM_LENGTH, ends with 'is') exits the stemmer unchanged.
+        assertEquals(listOf(thisTag), repo.query("this").map { it.id })
+        assertTrue(repo.query("thi").isEmpty())
+    }
+
+    @Test
+    fun `us-guarded tags stay unstemmed — query 'bu' does not bridge to 'bus'`() {
+        // 'bus' is length 3 — guarded by MIN_STEM_LENGTH alone. 'cactus' would exercise the
+        // 'us'-suffix guard, but the demo vocabulary has no Latin plurals worth testing here.
+        val bus = insertEntry("unrelated body text", daysAgo = 5, tagNames = listOf("bus"))
+        insertEntry("unrelated body text", daysAgo = 5, tagNames = listOf("laundry"))
+
+        assertEquals(listOf(bus), repo.query("bus").map { it.id })
+        assertTrue(repo.query("bu").isEmpty())
+    }
+
+    @Test
+    fun `stored tag surface forms are never mutated by query stemming`() {
+        // ADR-002 §"Plural folding addendum" requires comparison-only normalization — the stored
+        // tag entity must keep its original surface form even when surfaced via a stemmed query.
+        val newsId = insertEntry("unrelated body text", daysAgo = 5, tagNames = listOf("news"))
+        val seriesId = insertEntry("unrelated body text", daysAgo = 5, tagNames = listOf("series"))
+
+        repo.query("news") // stems internally; must not write back
+        repo.query("series")
+
+        val storedTags = boxStore.boxFor<TagEntity>().all.map { it.name }.toSet()
+        assertTrue("'news' must survive stemming intact", "news" in storedTags)
+        assertTrue("'series' must survive stemming intact", "series" in storedTags)
+        // Verify the entities themselves still carry the original names through the relation.
+        val newsEntry = boxStore.boxFor<EntryEntity>().get(newsId)
+        val seriesEntry = boxStore.boxFor<EntryEntity>().get(seriesId)
+        assertEquals(listOf("news"), newsEntry.tags.map { it.name })
+        assertEquals(listOf("series"), seriesEntry.tags.map { it.name })
+    }
+
     private fun insertEntry(text: String, daysAgo: Int, tagNames: List<String> = emptyList()): Long {
         val ts = now.minusSeconds(daysAgo * SECONDS_PER_DAY).toEpochMilli()
         val entryBox = boxStore.boxFor<EntryEntity>()

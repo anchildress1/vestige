@@ -39,7 +39,7 @@ class RetrievalRepo(private val boxStore: BoxStore, private val clock: Clock = C
 
         val nowMs = clock.millis()
         val scored = entryBox.all.mapNotNull { entry ->
-            val entryTokens = tokenize(entry.entryText)
+            val entryTokens = tokenizeToList(entry.entryText).toSet()
             val keywordScore = jaccardishKeyword(queryTokens, entryTokens)
             val entryTagNames = entry.tags.map { it.name }.toSet()
             val tagScore = jaccard(queryTagNames, entryTagNames)
@@ -73,18 +73,6 @@ class RetrievalRepo(private val boxStore: BoxStore, private val clock: Clock = C
         return max(0.0, min(1.0, 1.0 - ageDays / RECENCY_WINDOW_DAYS))
     }
 
-    private fun tokenizeToList(text: String): List<String> {
-        if (text.isBlank()) return emptyList()
-        return text.lowercase()
-            .split(TOKEN_SPLIT)
-            .asSequence()
-            .map { it.trim('-') }
-            .filter { it.isNotEmpty() }
-            .toList()
-    }
-
-    private fun tokenize(text: String): Set<String> = tokenizeToList(text).toSet()
-
     private data class Scored(val entry: EntryEntity, val score: Double)
 
     private companion object {
@@ -92,14 +80,24 @@ class RetrievalRepo(private val boxStore: BoxStore, private val clock: Clock = C
         const val DEFAULT_RECENCY_WEIGHT = 0.3f
         const val MILLIS_PER_DAY = 86_400_000.0
         const val RECENCY_WINDOW_DAYS = 90.0
-        val TOKEN_SPLIT: Regex = Regex("[^a-z0-9-]+")
     }
+}
+
+private val TOKEN_SPLIT: Regex = Regex("[^a-z0-9-]+")
+
+private fun tokenizeToList(text: String): List<String> {
+    if (text.isBlank()) return emptyList()
+    return text.lowercase()
+        .split(TOKEN_SPLIT)
+        .asSequence()
+        .map { it.trim('-') }
+        .filter { it.isNotEmpty() }
+        .toList()
 }
 
 private object QueryTagMatcher {
     private const val MIN_STEM_LENGTH = 3
     private const val IES_SUFFIX = "ies"
-    private val tokenSplit: Regex = Regex("[^a-z0-9-]+")
 
     fun resolve(queryTerms: List<String>, storedTagNames: List<String>): Set<String> {
         if (queryTerms.isEmpty() || storedTagNames.isEmpty()) return emptySet()
@@ -131,7 +129,9 @@ private object QueryTagMatcher {
     private fun normalizeTagPhrase(text: String): String? =
         tokenizeToList(text).takeIf { it.isNotEmpty() }?.joinToString("-")
 
-    // Mirror ADR-002's comparison-only plural folding: the stored surface form stays intact.
+    // ADR-002 §"Plural folding addendum" authorizes comparison-only normalization when retrieval
+    // (or resolver agreement counting) needs it — never persist the stem. The ss/us/is exceptions
+    // and MIN_STEM_LENGTH guard cover the news/series/bus corruptions that motivated the addendum.
     private fun stemForCompare(token: String): String {
         if (token.length <= MIN_STEM_LENGTH) return token
         return when {
@@ -140,15 +140,5 @@ private object QueryTagMatcher {
             token.endsWith('s') -> token.dropLast(1)
             else -> token
         }
-    }
-
-    private fun tokenizeToList(text: String): List<String> {
-        if (text.isBlank()) return emptyList()
-        return text.lowercase()
-            .split(tokenSplit)
-            .asSequence()
-            .map { it.trim('-') }
-            .filter { it.isNotEmpty() }
-            .toList()
     }
 }

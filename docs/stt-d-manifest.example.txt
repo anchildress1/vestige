@@ -1,0 +1,12 @@
+# STT-D corpus — 3-lens divergence verification fixture.
+# Source: docs/sample-data-scenarios.md §"STT-D" + §"Core Corpus".
+# Format: id|ISO_ZONED_DATETIME|entry_text   (# comments and blank lines ignored)
+# Pipes inside transcript text are not supported.
+# Push to device + run per SttDLensDivergenceTest KDoc.
+
+A1|2026-04-21T11:15:00-07:00[America/Los_Angeles]|Standup ran long again. I was fine before it, then completely flattened by 11. Opened the doc and just stared at it.
+A4|2026-04-24T10:25:00-07:00[America/Los_Angeles]|Not tired exactly. More like the battery got yanked after the sync.
+B1|2026-04-22T14:00:00-07:00[America/Los_Angeles]|Invoice email is still sitting there. I opened it twice and did the sacred ritual of closing it immediately.
+B2|2026-04-23T15:30:00-07:00[America/Los_Angeles]|Said I would send the invoice today. Instead I reorganized the desktop. Bold strategy.
+C2|2026-04-22T20:10:00-07:00[America/Los_Angeles]|Task app decision still looping. I keep changing the weights and pretending that is progress.
+D1|2026-04-23T03:12:00-07:00[America/Los_Angeles]|3:12am. I am rearranging the notes app again instead of sleeping. This is not a system, it's a small administrative haunting.

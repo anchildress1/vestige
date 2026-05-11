@@ -19,7 +19,7 @@ Build the end-to-end capture loop: user records or types → foreground call ret
 - [ ] Capture session can run record → transcription + follow-up → save end-to-end on the reference device.
 - [ ] **STT-B passes** (or has an explicit fallback recorded): multi-turn conversation maintains context across 3+ exchanges on E4B. If broken, single-turn fallback is implemented and the spec is updated.
 - [x] **STT-D passes** (or the architecture is dropped): the 3-lens pipeline produces meaningfully different outputs on at least 30% of the prepared sample transcripts. If lenses always agree, multi-lens drops to single-pass and the Reading section is removed from the entry detail spec. _(2026-05-10 — 5/6 entries (83%) on E4B CPU. See Story 2.7.)_
-- [ ] **STT-C passes**: tag extraction is stable (≥80% same-tag emission on equivalent test dumps). If unstable, prompts have been tightened until stable, or the limitation is documented. _(2026-05-10 — harness ships; GPU manifest fix landed (`libOpenCL.so` / `libvndksupport.so`); ready to run at ~27 min on GPU. Measurement still owed.)_
+- [x] **STT-C passes**: tag extraction is stable (≥80% same-tag emission on equivalent test dumps). If unstable, prompts have been tightened until stable, or the limitation is documented. _(2026-05-11 — **PASSED at 1.00** on S24 Ultra GPU. 41/41 (entry, tag) pairs stable across 3 runs over 17 of 18 corpus entries. C2 produced zero tags on all 3 runs (INFERENTIAL + SKEPTICAL parse-fail × 2 retries on GPU) — same regression flagged in Story 2.7's GPU re-run. Stability gate is unaffected; C2 parse-rate is tracked separately.)_
 - [ ] Convergence resolver implementation lands into Story 1.12's test scaffolding and all happy-path tests pass.
 - [ ] Agent-emitted template labels work for all six archetypes on representative sample transcripts.
 - [ ] Background extraction populates the canonical schema on the reference device. Target latency per ADR-008: ~7–10s wall-clock per entry via parallel Session cloning on E4B GPU. The legacy 30–90s ceiling stays as the time-budget timeout guard.
@@ -233,21 +233,19 @@ This story is **infra-only**; no user-visible UX changes. The "Reading the entry
 
 ---
 
-### Story 2.9 — STT-C: tag extraction consistency
+### Story 2.9 — STT-C: tag extraction consistency — **PASSED 2026-05-11**
 
 🛑 **Stop-and-test point.** If tag extraction is unstable across equivalent dumps, downstream pattern detection is noisy. Tighten prompts; if still bad, document as known limitation.
 
 **As** the AI implementor, **I need** to verify that the convergence resolver emits stable tag sets on equivalent test dumps (≥80% same-tag emission across re-runs of similar inputs), **so that** Phase 3's pattern engine has reliable signal to count.
 
-**Status (2026-05-10):** `SttCTagStabilityTest` harness ships. GPU runs at 8–13 s/call → 162-call sweep ~27 min. Measurement owed.
-
 **Done when:**
-- [ ] STT-C corpus runs through the background pipeline at least three times each (harness ships; `VestigeSttC` logcat tag emits per-entry stable/total + global rate).
-- [ ] ≥80% of (entry, tag) pairs stable across all three runs.
-- [ ] If <80%, tighten surface prompts and re-run.
-- [ ] If <80% after one focused day of tuning, document in `PRD.md` §"Acceptance criteria — Tag extraction" with the noisy-pattern caveat.
+- [x] STT-C corpus runs through the background pipeline at least three times each. _(S24 Ultra GPU, 2026-05-11; 18 entries × 3 runs; 41 m 23 s wall-clock.)_
+- [x] ≥80% of (entry, tag) pairs stable across all three runs. _(**1.00 / 41 of 41 pairs.** Every tag that emitted, emitted on all three runs.)_
+- [ ] If <80%, tighten surface prompts and re-run. _(Not triggered.)_
+- [ ] If <80% after one focused day of tuning, document in `PRD.md` §"Acceptance criteria — Tag extraction" with the noisy-pattern caveat. _(Not triggered.)_
 
-**Notes / risks:** 80% is a floor, not a quality bar. Phase 3's pattern engine designs against this assumption — if measurement defers past Phase 3 kickoff, surface the noise floor in `PRD.md` so Phase 4 demo dry-runs interpret pattern false-positives correctly.
+**C2 caveat — GPU parse-failure regression (cross-ref Story 2.7):** C2 produced zero tags on all 3 runs because INFERENTIAL + SKEPTICAL lenses parse-failed × 2 retries each, leaving only Literal — which under the resolver's lone-survivor rule yields AMBIGUOUS on every field (including `tags`). Same backend-sensitive parse-failure pattern Story 2.7's GPU re-run flagged on C2 and D1. STT-C's stability gate is unaffected: the 17 entries that emit tags emit them stably. C2 parse-rate is tracked separately under Story 2.7. The harness logs zero-tag entries as a warning (not an assertion) so the signal stays visible without over-gating STT-C scope.
 
 ---
 
@@ -332,7 +330,7 @@ Phase 3 starts when all the following are true:
 - [ ] All fifteen stories above are Done or have an explicit, recorded fallback. (Story 2.6.6 — parallel refactor per ADR-008 — added 2026-05-10.)
 - [ ] **STT-B resolved** — multi-turn works on E4B *or* the single-turn fallback is implemented and the spec updated.
 - [x] **STT-D resolved** — 3-lens divergence is validated *or* multi-lens has been replaced with single-pass and ADR-002 has been superseded. _(2026-05-10 — validated at 83%.)_
-- [ ] **STT-C resolved** — tag stability is ≥80% *or* the limitation is documented and Phase 3's pattern engine is designed around the noise floor. _(2026-05-10 — measurement still owed; harness + GPU runtime ready, just hasn't been run.)_
+- [x] **STT-C resolved** — tag stability is ≥80% *or* the limitation is documented and Phase 3's pattern engine is designed around the noise floor. _(2026-05-11 — passed at 1.00 on GPU; C2 GPU parse-failure documented under Story 2.7's GPU regression note.)_
 - [ ] Convergence resolver tests from Story 1.12 all pass.
 - [ ] `BackgroundExtractionService` state machine tests pass; service is wired into `AppContainer` per ADR-004.
 - [ ] Latency budget on the reference device is recorded (foreground per turn, background per entry).

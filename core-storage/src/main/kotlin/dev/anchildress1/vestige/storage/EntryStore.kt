@@ -129,7 +129,6 @@ class EntryStore(private val boxStore: BoxStore, private val markdownStore: Mark
         }
     }
 
-
     /**
      * Terminal failure path — [status] is one of [ExtractionStatus.FAILED] or
      * [ExtractionStatus.TIMED_OUT]. Leaves the structured fields untouched; the row keeps the

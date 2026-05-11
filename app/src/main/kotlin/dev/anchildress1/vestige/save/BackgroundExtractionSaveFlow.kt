@@ -128,9 +128,23 @@ class BackgroundExtractionSaveFlow(
         entryId: Long,
         persona: Persona,
     ): EntryObservation? {
-        val entry = entryStore.readEntry(entryId)
-        val callout = entry?.let { orchestrator.onEntryCommitted(it, persona) }
-        if (callout == null) return null
+        // Elvis-return locks `entry` as non-null without relying on `val`-flow inference. A
+        // future refactor that splits the method or hoists `entry` to a `var` would otherwise
+        // silently surface NPE risk through the settle calls below.
+        val entry = entryStore.readEntry(entryId) ?: return null
+        val callout = orchestrator.onEntryCommitted(entry, persona)
+        if (callout != null) {
+            appendAndConfirmCallout(orchestrator, entry, entryId, callout)
+        }
+        return callout
+    }
+
+    private suspend fun appendAndConfirmCallout(
+        orchestrator: PatternDetectionOrchestrator,
+        entry: dev.anchildress1.vestige.storage.EntryEntity,
+        entryId: Long,
+        callout: EntryObservation,
+    ) {
         try {
             // Confirm inside the same write transaction as the markdown/ObjectBox append so
             // either both land or neither does.
@@ -144,7 +158,6 @@ class BackgroundExtractionSaveFlow(
             orchestrator.settleReservedCallout(entry, fired = false)
             throw error
         }
-        return callout
     }
 
     private suspend fun handleFailure(

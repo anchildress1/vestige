@@ -109,7 +109,12 @@ class EntryStore(private val boxStore: BoxStore, private val markdownStore: Mark
             val box = boxStore.boxFor<EntryEntity>()
             val entry = box.get(entryId)
                 ?: throw EntryPersistenceException("No entry row id=$entryId to append observation")
-            val existing = decodeObservations(entry.entryObservationsJson)
+            // Refuse to overwrite a malformed observations array. `decodeObservations` returns an
+            // empty list on parse failure (with a logged warning); appending in that branch would
+            // silently destroy every previously persisted observation for this entry. Aborting
+            // here surfaces the corruption via `EntryPersistenceException`, which the save flow's
+            // orchestrator-wrapper catches → callout is dropped, cooldown reservation released.
+            val existing = parseObservationsForAppend(entry.entryObservationsJson, entryId)
             entry.entryObservationsJson = observationsJson(existing + observation)
             try {
                 markdownStore.write(entry)
@@ -123,6 +128,7 @@ class EntryStore(private val boxStore: BoxStore, private val markdownStore: Mark
             afterPersist?.invoke()
         }
     }
+
 
     /**
      * Terminal failure path — [status] is one of [ExtractionStatus.FAILED] or
@@ -232,6 +238,19 @@ private fun observationsJson(observations: List<EntryObservation>): String {
 // flooded by a single corrupt row. 80 chars is enough to identify the shape (object vs
 // array, leading keys) without paying for the long tail.
 private const val LOG_PREVIEW_CHARS = 80
+
+// Used by `appendObservation` only — distinguishes legit empty from malformed-and-fell-back.
+// Throws so the malformed-existing case can't silently overwrite real persisted observations.
+private fun parseObservationsForAppend(json: String, entryId: Long): List<EntryObservation> {
+    if (json.isBlank() || json.trim() == "[]") return emptyList()
+    val parsed = decodeObservations(json)
+    if (parsed.isEmpty()) {
+        throw EntryPersistenceException(
+            "Refusing to append observation to entry id=$entryId — existing JSON is malformed",
+        )
+    }
+    return parsed
+}
 
 private fun decodeObservations(json: String): List<EntryObservation> {
     val raw = json.takeIf { it.isNotBlank() } ?: return emptyList()

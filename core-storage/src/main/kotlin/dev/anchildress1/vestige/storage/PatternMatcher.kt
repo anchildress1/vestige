@@ -15,7 +15,7 @@ import java.util.Locale
  * Tag matching uses subset semantics (an entry with `{a, b, c}` still supports a pattern whose
  * signature pair is `{a, b}` per ADR-003 §"Subset semantics for tag pairs").
  */
-internal object PatternMatcher {
+object PatternMatcher {
 
     fun matches(entry: EntryEntity, pattern: PatternEntity, zoneId: ZoneId): Boolean {
         val signature = runCatching { JSONObject(pattern.signatureJson) }.getOrNull() ?: return false

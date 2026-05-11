@@ -3,6 +3,7 @@ package dev.anchildress1.vestige.storage
 import dev.anchildress1.vestige.model.ConfidenceVerdict
 import dev.anchildress1.vestige.model.EntryObservation
 import dev.anchildress1.vestige.model.ExtractionStatus
+import dev.anchildress1.vestige.model.ObservationEvidence
 import dev.anchildress1.vestige.model.ResolvedExtraction
 import dev.anchildress1.vestige.model.TemplateLabel
 import io.objectbox.BoxStore
@@ -102,6 +103,33 @@ class EntryStore(private val boxStore: BoxStore, private val markdownStore: Mark
      * recovery path, not by this terminal call. The sweep increments before re-invoking the
      * worker; a single terminal failure does not advance the counter on its own.
      */
+    /** Read-only lookup. Returns `null` for missing rows so callers can act without throwing. */
+    fun readEntry(entryId: Long): EntryEntity? = boxStore.boxFor<EntryEntity>().get(entryId)
+
+    /**
+     * Append one observation to an already-completed entry's persisted list. Used by the
+     * pattern-detection orchestrator (Story 3.7) when a callout fires after `completeEntry`
+     * has already landed. Throws when the entry is missing — callers must hold a valid id.
+     */
+    fun appendObservation(entryId: Long, observation: EntryObservation) {
+        boxStore.runInTx {
+            val box = boxStore.boxFor<EntryEntity>()
+            val entry = box.get(entryId)
+                ?: throw EntryPersistenceException("No entry row id=$entryId to append observation")
+            val existing = decodeObservations(entry.entryObservationsJson)
+            entry.entryObservationsJson = observationsJson(existing + observation)
+            try {
+                markdownStore.write(entry)
+            } catch (@Suppress("TooGenericExceptionCaught") writeFail: Exception) {
+                throw EntryPersistenceException(
+                    "Markdown rewrite failed appending observation to id=$entryId",
+                    writeFail,
+                )
+            }
+            box.put(entry)
+        }
+    }
+
     fun failEntry(entryId: Long, status: ExtractionStatus, lastError: String?) {
         require(status == ExtractionStatus.FAILED || status == ExtractionStatus.TIMED_OUT) {
             "EntryStore.failEntry requires terminal-fail status (got $status)"
@@ -172,19 +200,6 @@ class EntryStore(private val boxStore: BoxStore, private val markdownStore: Mark
         return payload.toString()
     }
 
-    private fun observationsJson(observations: List<EntryObservation>): String {
-        if (observations.isEmpty()) return "[]"
-        val array = JSONArray()
-        observations.forEach { observation ->
-            val obj = JSONObject()
-                .put("text", observation.text)
-                .put("evidence", observation.evidence.serial)
-                .put("fields", JSONArray(observation.fields))
-            array.put(obj)
-        }
-        return array.toString()
-    }
-
     private companion object {
         private const val KEY_TAGS = "tags"
         private const val KEY_ENERGY = "energy_descriptor"
@@ -199,3 +214,32 @@ class EntryStore(private val boxStore: BoxStore, private val markdownStore: Mark
 
 /** Failure on the markdown/ObjectBox join. The transaction the throw escapes from rolls back. */
 class EntryPersistenceException(message: String, cause: Throwable? = null) : IOException(message, cause)
+
+// Top-level helpers — kept off `EntryStore` to stay under detekt's function budget.
+private fun observationsJson(observations: List<EntryObservation>): String {
+    if (observations.isEmpty()) return "[]"
+    val array = JSONArray()
+    observations.forEach { observation ->
+        val obj = JSONObject()
+            .put("text", observation.text)
+            .put("evidence", observation.evidence.serial)
+            .put("fields", JSONArray(observation.fields))
+        array.put(obj)
+    }
+    return array.toString()
+}
+
+private fun decodeObservations(json: String): List<EntryObservation> {
+    val array = json.takeIf { it.isNotBlank() }?.let { runCatching { JSONArray(it) }.getOrNull() }
+    return array?.let { (0 until it.length()).mapNotNull { idx -> decodeOne(it.optJSONObject(idx)) } }
+        ?: emptyList()
+}
+
+private fun decodeOne(obj: JSONObject?): EntryObservation? {
+    val text = obj?.optString("text")?.takeIf { it.isNotBlank() }
+    val evidence = obj?.optString("evidence")?.let { ObservationEvidence.fromSerial(it) }
+    val fields = obj?.optJSONArray("fields")?.let { arr ->
+        (0 until arr.length()).mapNotNull { (arr.opt(it) as? String)?.takeIf { s -> s.isNotEmpty() } }
+    } ?: emptyList()
+    return if (text != null && evidence != null) EntryObservation(text, evidence, fields) else null
+}

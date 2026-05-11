@@ -14,7 +14,7 @@ import java.util.Locale
  * Persona-flavored variants live in `:core-inference` if v1.5 brings them in; for v1 the
  * templated string already mirrors the ADR's "Witness tone" examples.
  */
-internal object PatternCalloutText {
+object PatternCalloutText {
 
     fun build(detected: DetectedPattern): String {
         val count = detected.supportingEntryCount

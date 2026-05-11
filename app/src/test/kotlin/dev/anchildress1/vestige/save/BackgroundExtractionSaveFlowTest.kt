@@ -175,7 +175,7 @@ class BackgroundExtractionSaveFlowTest {
     fun `terminal completion reaches the lifecycle listener only after completeEntry succeeds`() = runTest {
         val downstream: ExtractionStatusListener = mockk(relaxed = true)
         val flowWithMockListener =
-            BackgroundExtractionSaveFlow(entryStore, worker, observationGenerator) { downstream }
+            BackgroundExtractionSaveFlow(entryStore, worker, observationGenerator, listenerFactory = { downstream })
         every { entryStore.createPendingEntry(any(), any()) } returns ENTRY_ID
         coEvery {
             worker.extract(any(), capture(capturedListener))
@@ -207,7 +207,7 @@ class BackgroundExtractionSaveFlowTest {
     fun `persistence failure after worker success emits FAILED instead of leaking worker COMPLETED`() = runTest {
         val downstream: ExtractionStatusListener = mockk(relaxed = true)
         val flowWithMockListener =
-            BackgroundExtractionSaveFlow(entryStore, worker, observationGenerator) { downstream }
+            BackgroundExtractionSaveFlow(entryStore, worker, observationGenerator, listenerFactory = { downstream })
         val resolved = canonicalSample()
         every { entryStore.createPendingEntry(any(), any()) } returns ENTRY_ID
         coEvery {
@@ -248,7 +248,7 @@ class BackgroundExtractionSaveFlowTest {
     fun `failed result reaches lifecycle listener only after failEntry succeeds`() = runTest {
         val downstream: ExtractionStatusListener = mockk(relaxed = true)
         val flowWithMockListener =
-            BackgroundExtractionSaveFlow(entryStore, worker, observationGenerator) { downstream }
+            BackgroundExtractionSaveFlow(entryStore, worker, observationGenerator, listenerFactory = { downstream })
         val failEntryReturned = CompletableDeferred<Unit>()
         every { entryStore.createPendingEntry(any(), any()) } returns ENTRY_ID
         coEvery {
@@ -291,7 +291,7 @@ class BackgroundExtractionSaveFlowTest {
     fun `timed out result reaches lifecycle listener only after failEntry succeeds`() = runTest {
         val downstream: ExtractionStatusListener = mockk(relaxed = true)
         val flowWithMockListener =
-            BackgroundExtractionSaveFlow(entryStore, worker, observationGenerator) { downstream }
+            BackgroundExtractionSaveFlow(entryStore, worker, observationGenerator, listenerFactory = { downstream })
         val failEntryReturned = CompletableDeferred<Unit>()
         every { entryStore.createPendingEntry(any(), any()) } returns ENTRY_ID
         coEvery {
@@ -334,7 +334,7 @@ class BackgroundExtractionSaveFlowTest {
     fun `persistence failure on Failed path routes through compensation`() = runTest {
         val downstream: ExtractionStatusListener = mockk(relaxed = true)
         val flowWithMockListener =
-            BackgroundExtractionSaveFlow(entryStore, worker, observationGenerator) { downstream }
+            BackgroundExtractionSaveFlow(entryStore, worker, observationGenerator, listenerFactory = { downstream })
         every { entryStore.createPendingEntry(any(), any()) } returns ENTRY_ID
         coEvery { worker.extract(any(), any()) } returns BackgroundExtractionResult.Failed(
             totalElapsedMs = 12_000L,
@@ -369,7 +369,7 @@ class BackgroundExtractionSaveFlowTest {
     fun `persistence failure on TimedOut path routes through compensation`() = runTest {
         val downstream: ExtractionStatusListener = mockk(relaxed = true)
         val flowWithMockListener =
-            BackgroundExtractionSaveFlow(entryStore, worker, observationGenerator) { downstream }
+            BackgroundExtractionSaveFlow(entryStore, worker, observationGenerator, listenerFactory = { downstream })
         every { entryStore.createPendingEntry(any(), any()) } returns ENTRY_ID
         coEvery { worker.extract(any(), any()) } returns BackgroundExtractionResult.TimedOut(
             totalElapsedMs = 90_000L,
@@ -402,7 +402,7 @@ class BackgroundExtractionSaveFlowTest {
     fun `compensation that itself throws is swallowed so the original error escapes`() = runTest {
         val downstream: ExtractionStatusListener = mockk(relaxed = true)
         val flowWithMockListener =
-            BackgroundExtractionSaveFlow(entryStore, worker, observationGenerator) { downstream }
+            BackgroundExtractionSaveFlow(entryStore, worker, observationGenerator, listenerFactory = { downstream })
         val resolved = canonicalSample()
         every { entryStore.createPendingEntry(any(), any()) } returns ENTRY_ID
         coEvery { worker.extract(any(), any()) } returns BackgroundExtractionResult.Success(

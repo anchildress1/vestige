@@ -9,6 +9,7 @@ import dev.anchildress1.vestige.inference.HistoryChunk
 import dev.anchildress1.vestige.inference.ObservationGenerator
 import dev.anchildress1.vestige.model.EntryObservation
 import dev.anchildress1.vestige.model.ExtractionStatus
+import dev.anchildress1.vestige.patterns.PatternDetectionOrchestrator
 import dev.anchildress1.vestige.storage.EntryStore
 import kotlinx.coroutines.CancellationException
 import java.time.ZonedDateTime
@@ -32,6 +33,7 @@ class BackgroundExtractionSaveFlow(
     private val worker: BackgroundExtractionWorker,
     private val observationGenerator: ObservationGenerator,
     private val listenerFactory: (Long) -> ExtractionStatusListener,
+    private val patternOrchestrator: PatternDetectionOrchestrator? = null,
 ) {
 
     suspend fun saveAndExtract(
@@ -95,7 +97,28 @@ class BackgroundExtractionSaveFlow(
         ) {
             entryStore.completeEntry(entryId, result.resolved, result.templateLabel, observations)
         }
-        return SaveOutcome.Completed(entryId, result, observations)
+        val calloutObservation = runPatternOrchestration(entryId)
+        val finalObservations = if (calloutObservation != null) observations + calloutObservation else observations
+        return SaveOutcome.Completed(entryId, result, finalObservations)
+    }
+
+    private suspend fun runPatternOrchestration(entryId: Long): EntryObservation? {
+        val orchestrator = patternOrchestrator ?: return null
+        return try {
+            val entry = entryStore.readEntry(entryId)
+            val callout = entry?.let { orchestrator.onEntryCommitted(it) }
+            callout?.also { entryStore.appendObservation(entryId, it) }
+        } catch (cancellation: CancellationException) {
+            throw cancellation
+        } catch (@Suppress("TooGenericExceptionCaught") error: Exception) {
+            // ADR-003: pattern detection is a best-effort layer, not blocking. Swallow + log.
+            Log.w(
+                TAG,
+                "Pattern orchestration failed for entryId=$entryId: " +
+                    "${error.javaClass.simpleName} ${error.message}",
+            )
+            null
+        }
     }
 
     private suspend fun handleFailure(

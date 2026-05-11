@@ -6,6 +6,7 @@ import dev.anchildress1.vestige.inference.LiteRtLmEngine
 import dev.anchildress1.vestige.lifecycle.BackgroundExtractionLifecycleState
 import dev.anchildress1.vestige.model.ExtractionStatus
 import dev.anchildress1.vestige.storage.MarkdownEntryStore
+import io.mockk.every
 import io.mockk.mockk
 import io.objectbox.BoxStore
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -129,5 +130,128 @@ class AppContainerTest {
         )
 
         assertNotNull(container.backgroundExtractionSaveFlow)
+    }
+
+    @Test
+    fun `backgroundEngine is built from the injected factory exactly once`() {
+        val engine = mockk<LiteRtLmEngine>(relaxed = true)
+        var modelPathCalls = 0
+        var engineFactoryCalls = 0
+        var capturedModelPath: String? = null
+        var capturedCacheDir: String? = null
+        val context = mockk<Context>(relaxed = true) {
+            every { cacheDir } returns java.io.File("/tmp/cache-stub")
+        }
+        val container = AppContainer(
+            applicationContext = context,
+            boxStoreFactory = { mockk<BoxStore>(relaxed = true) },
+            markdownStoreFactory = { mockk<MarkdownEntryStore>(relaxed = true) },
+            modelPathLoader = {
+                modelPathCalls += 1
+                "/tmp/fake-model.litertlm"
+            },
+            backgroundEngineFactory = { modelPath, cacheDir ->
+                engineFactoryCalls += 1
+                capturedModelPath = modelPath
+                capturedCacheDir = cacheDir
+                engine
+            },
+            recoveredEntryIdsLoader = { emptyList() },
+            foregroundServiceIntentFactory = { Intent("dev.anchildress1.vestige.TEST_START") },
+            foregroundServiceStarter = {},
+        )
+
+        // Force the lazy property; reading again must not re-invoke the factories.
+        val first = container.backgroundEngine
+        val second = container.backgroundEngine
+
+        assertEquals(engine, first)
+        assertEquals(engine, second)
+        assertEquals(1, modelPathCalls)
+        assertEquals(1, engineFactoryCalls)
+        assertEquals("/tmp/fake-model.litertlm", capturedModelPath)
+        assertEquals("/tmp/cache-stub", capturedCacheDir)
+    }
+
+    @Test
+    fun `worker, observation generator, and save flow all share the lazy backgroundEngine`() {
+        val engine = mockk<LiteRtLmEngine>(relaxed = true)
+        var engineFactoryCalls = 0
+        val context = mockk<Context>(relaxed = true) {
+            every { cacheDir } returns java.io.File("/tmp/cache-stub")
+        }
+        val container = AppContainer(
+            applicationContext = context,
+            boxStoreFactory = { mockk<BoxStore>(relaxed = true) },
+            markdownStoreFactory = { mockk<MarkdownEntryStore>(relaxed = true) },
+            modelPathLoader = { "/tmp/fake-model.litertlm" },
+            backgroundEngineFactory = { _, _ ->
+                engineFactoryCalls += 1
+                engine
+            },
+            recoveredEntryIdsLoader = { emptyList() },
+            foregroundServiceIntentFactory = { Intent("dev.anchildress1.vestige.TEST_START") },
+            foregroundServiceStarter = {},
+        )
+
+        // Touch all three properties — they must all reuse the same engine instance.
+        assertNotNull(container.backgroundExtractionWorker)
+        assertNotNull(container.observationGenerator)
+        assertNotNull(container.backgroundExtractionSaveFlow)
+        // backgroundEngine touched transitively by the three properties above.
+        assertEquals(1, engineFactoryCalls)
+    }
+
+    @Test
+    fun `close skips engine teardown when the lazy engine was never touched`() {
+        val engine = mockk<LiteRtLmEngine>(relaxed = true)
+        val boxStore = mockk<BoxStore>(relaxed = true)
+        var engineFactoryCalls = 0
+        val container = AppContainer(
+            applicationContext = mockk<Context>(relaxed = true),
+            boxStoreFactory = { boxStore },
+            markdownStoreFactory = { mockk<MarkdownEntryStore>(relaxed = true) },
+            modelPathLoader = { "/tmp/fake-model.litertlm" },
+            backgroundEngineFactory = { _, _ ->
+                engineFactoryCalls += 1
+                engine
+            },
+            recoveredEntryIdsLoader = { emptyList() },
+            foregroundServiceIntentFactory = { Intent("dev.anchildress1.vestige.TEST_START") },
+            foregroundServiceStarter = {},
+        )
+
+        // Never touch backgroundEngine — close() must not force its initialization.
+        container.close()
+
+        assertEquals(0, engineFactoryCalls)
+        io.mockk.verify(exactly = 0) { engine.close() }
+        io.mockk.verify(exactly = 1) { boxStore.close() }
+    }
+
+    @Test
+    fun `close tears down the engine when it was lazily initialized`() {
+        val engine = mockk<LiteRtLmEngine>(relaxed = true)
+        val boxStore = mockk<BoxStore>(relaxed = true)
+        val context = mockk<Context>(relaxed = true) {
+            every { cacheDir } returns java.io.File("/tmp/cache-stub")
+        }
+        val container = AppContainer(
+            applicationContext = context,
+            boxStoreFactory = { boxStore },
+            markdownStoreFactory = { mockk<MarkdownEntryStore>(relaxed = true) },
+            modelPathLoader = { "/tmp/fake-model.litertlm" },
+            backgroundEngineFactory = { _, _ -> engine },
+            recoveredEntryIdsLoader = { emptyList() },
+            foregroundServiceIntentFactory = { Intent("dev.anchildress1.vestige.TEST_START") },
+            foregroundServiceStarter = {},
+        )
+
+        // Force lazy init then close — engine.close() must fire.
+        container.backgroundEngine
+        container.close()
+
+        io.mockk.verify(exactly = 1) { engine.close() }
+        io.mockk.verify(exactly = 1) { boxStore.close() }
     }
 }

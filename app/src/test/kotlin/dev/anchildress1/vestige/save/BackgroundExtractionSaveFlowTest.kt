@@ -331,6 +331,112 @@ class BackgroundExtractionSaveFlowTest {
     }
 
     @Test
+    fun `persistence failure on Failed path routes through compensation`() = runTest {
+        val downstream: ExtractionStatusListener = mockk(relaxed = true)
+        val flowWithMockListener =
+            BackgroundExtractionSaveFlow(entryStore, worker, observationGenerator) { downstream }
+        every { entryStore.createPendingEntry(any(), any()) } returns ENTRY_ID
+        coEvery { worker.extract(any(), any()) } returns BackgroundExtractionResult.Failed(
+            totalElapsedMs = 12_000L,
+            lensResults = emptyList(),
+            modelCallCount = 6,
+            lastError = "all-lenses-parse-fail",
+        )
+        // First failEntry — the handleFailure persist — throws.
+        // Second failEntry — the compensation call — succeeds.
+        every {
+            entryStore.failEntry(ENTRY_ID, ExtractionStatus.FAILED, "all-lenses-parse-fail")
+        } throws IllegalStateException("disk blew up")
+        every {
+            entryStore.failEntry(ENTRY_ID, ExtractionStatus.FAILED, "persistence-error:IllegalStateException")
+        } answers { Unit }
+
+        try {
+            flowWithMockListener.saveAndExtract(SAMPLE_TEXT, SAMPLE_TIMESTAMP)
+            fail("expected persistence failure to escape")
+        } catch (expected: IllegalStateException) {
+            assertEquals("disk blew up", expected.message)
+        }
+
+        coVerifyOrder {
+            entryStore.failEntry(ENTRY_ID, ExtractionStatus.FAILED, "all-lenses-parse-fail")
+            entryStore.failEntry(ENTRY_ID, ExtractionStatus.FAILED, "persistence-error:IllegalStateException")
+            downstream.onUpdate(ExtractionStatus.FAILED, 0, "persistence-error:IllegalStateException")
+        }
+    }
+
+    @Test
+    fun `persistence failure on TimedOut path routes through compensation`() = runTest {
+        val downstream: ExtractionStatusListener = mockk(relaxed = true)
+        val flowWithMockListener =
+            BackgroundExtractionSaveFlow(entryStore, worker, observationGenerator) { downstream }
+        every { entryStore.createPendingEntry(any(), any()) } returns ENTRY_ID
+        coEvery { worker.extract(any(), any()) } returns BackgroundExtractionResult.TimedOut(
+            totalElapsedMs = 90_000L,
+            lensResults = emptyList(),
+            modelCallCount = 2,
+            timeoutMs = 90_000L,
+        )
+        every {
+            entryStore.failEntry(ENTRY_ID, ExtractionStatus.TIMED_OUT, "timeout-after-90000ms")
+        } throws IllegalStateException("fs read-only")
+        every {
+            entryStore.failEntry(ENTRY_ID, ExtractionStatus.FAILED, "persistence-error:IllegalStateException")
+        } answers { Unit }
+
+        try {
+            flowWithMockListener.saveAndExtract(SAMPLE_TEXT, SAMPLE_TIMESTAMP)
+            fail("expected persistence failure to escape")
+        } catch (expected: IllegalStateException) {
+            assertEquals("fs read-only", expected.message)
+        }
+
+        coVerifyOrder {
+            entryStore.failEntry(ENTRY_ID, ExtractionStatus.TIMED_OUT, "timeout-after-90000ms")
+            entryStore.failEntry(ENTRY_ID, ExtractionStatus.FAILED, "persistence-error:IllegalStateException")
+            downstream.onUpdate(ExtractionStatus.FAILED, 0, "persistence-error:IllegalStateException")
+        }
+    }
+
+    @Test
+    fun `compensation that itself throws is swallowed so the original error escapes`() = runTest {
+        val downstream: ExtractionStatusListener = mockk(relaxed = true)
+        val flowWithMockListener =
+            BackgroundExtractionSaveFlow(entryStore, worker, observationGenerator) { downstream }
+        val resolved = canonicalSample()
+        every { entryStore.createPendingEntry(any(), any()) } returns ENTRY_ID
+        coEvery { worker.extract(any(), any()) } returns BackgroundExtractionResult.Success(
+            totalElapsedMs = 25_000L,
+            lensResults = emptyList(),
+            modelCallCount = 3,
+            resolved = resolved,
+            templateLabel = TemplateLabel.AFTERMATH,
+        )
+        coEvery { observationGenerator.generate(any(), any(), any()) } returns emptyList()
+        every {
+            entryStore.completeEntry(ENTRY_ID, resolved, TemplateLabel.AFTERMATH, emptyList())
+        } throws IllegalStateException("primary disk error")
+        // Compensation also throws — the failure must not mask the original IllegalStateException.
+        every {
+            entryStore.failEntry(ENTRY_ID, ExtractionStatus.FAILED, "persistence-error:IllegalStateException")
+        } throws RuntimeException("secondary fs error")
+
+        try {
+            flowWithMockListener.saveAndExtract(SAMPLE_TEXT, SAMPLE_TIMESTAMP)
+            fail("expected the original persistence error to escape")
+        } catch (expected: IllegalStateException) {
+            assertEquals("primary disk error", expected.message)
+        }
+
+        // The compensation write still fired, the lifecycle was still notified.
+        coVerifyOrder {
+            entryStore.completeEntry(ENTRY_ID, resolved, TemplateLabel.AFTERMATH, emptyList())
+            entryStore.failEntry(ENTRY_ID, ExtractionStatus.FAILED, "persistence-error:IllegalStateException")
+            downstream.onUpdate(ExtractionStatus.FAILED, 0, "persistence-error:IllegalStateException")
+        }
+    }
+
+    @Test
     fun `worker listener events flow through the AppContainer-provided listener`() = runTest {
         every { entryStore.createPendingEntry(any(), any()) } returns ENTRY_ID
         coEvery {

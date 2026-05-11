@@ -152,4 +152,93 @@ class ObservationResponseParserTest {
         assertEquals(true, ObservationResponseParser.containsForbiddenPhrase("This Could Indicate a slump"))
         assertEquals(false, ObservationResponseParser.containsForbiddenPhrase("Three mentions of boss"))
     }
+
+    @Test
+    fun `parser walks past invalid JSON candidate blocks and recovers the next valid one`() {
+        val raw = """
+            { unbalanced }} prose
+            {"observations": [{"text": "obs", "evidence": "theme-noticing", "fields": []}]}
+        """.trimIndent()
+
+        val observations = ObservationResponseParser.parse(raw)
+
+        assertNotNull(observations)
+        assertEquals(1, observations!!.size)
+    }
+
+    @Test
+    fun `parser handles braces embedded in JSON string literals without losing balance`() {
+        val raw =
+            """{"observations":[{"text":"opens with { and ends with }","evidence":"theme-noticing","fields":[]}]}"""
+
+        val observations = ObservationResponseParser.parse(raw)
+
+        assertNotNull(observations)
+        assertEquals("opens with { and ends with }", observations!!.first().text)
+    }
+
+    @Test
+    fun `parser handles escaped quotes inside JSON string literals`() {
+        val raw =
+            """{"observations":[{"text":"You said \"fine\".","evidence":"vocabulary-contradiction","fields":[]}]}"""
+
+        val observations = ObservationResponseParser.parse(raw)
+
+        assertNotNull(observations)
+        assertEquals("You said \"fine\".", observations!!.first().text)
+    }
+
+    @Test
+    fun `parser returns null on blank input`() {
+        assertNull(ObservationResponseParser.parse(""))
+        assertNull(ObservationResponseParser.parse("   "))
+    }
+
+    @Test
+    fun `parser returns null when no balanced object can be found`() {
+        assertNull(ObservationResponseParser.parse("only prose, no JSON"))
+        assertNull(ObservationResponseParser.parse("{never closed"))
+    }
+
+    @Test
+    fun `parser drops observation that is not a JSON object`() {
+        val raw = """{"observations": ["just a string"]}"""
+        assertNull(ObservationResponseParser.parse(raw))
+    }
+
+    @Test
+    fun `parser drops observation when text key is missing`() {
+        val raw = """{"observations": [{"evidence": "theme-noticing", "fields": []}]}"""
+        assertNull(ObservationResponseParser.parse(raw))
+    }
+
+    @Test
+    fun `parser drops observation when evidence key is missing`() {
+        val raw = """{"observations": [{"text": "obs", "fields": []}]}"""
+        assertNull(ObservationResponseParser.parse(raw))
+    }
+
+    @Test
+    fun `parser tolerates missing fields array as empty list`() {
+        val raw = """{"observations": [{"text": "obs", "evidence": "theme-noticing"}]}"""
+
+        val observations = ObservationResponseParser.parse(raw)
+
+        assertNotNull(observations)
+        assertEquals(emptyList<String>(), observations!!.first().fields)
+    }
+
+    @Test
+    fun `parser drops blank entries inside the fields array`() {
+        val raw = """
+            {"observations":[
+              {"text":"obs","evidence":"theme-noticing","fields":["tags","","   ", 99]}
+            ]}
+        """.trimIndent()
+
+        val observations = ObservationResponseParser.parse(raw)
+
+        assertNotNull(observations)
+        assertEquals(listOf("tags"), observations!!.first().fields)
+    }
 }

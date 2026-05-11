@@ -188,6 +188,120 @@ class ObservationGeneratorTest {
         coVerify(exactly = 0) { engine.generateText(any()) }
     }
 
+    @Test
+    fun `commitment without topic_or_person emits the no-topic line shape`() = runTest {
+        val resolved = ResolvedExtraction(
+            mapOf(
+                "stated_commitment" to ResolvedField(
+                    mapOf("text" to "ship the doc"),
+                    ConfidenceVerdict.CANONICAL,
+                ),
+            ),
+        )
+
+        val observations = newGenerator().generate(SAMPLE_TEXT, resolved, SAMPLE_DAY)
+
+        assertEquals(1, observations.size)
+        assertTrue(observations.first().text.contains("ship the doc"))
+        assertEquals(false, observations.first().text.contains("re:"))
+        coVerify(exactly = 0) { engine.generateText(any()) }
+    }
+
+    @Test
+    fun `commitment with blank text falls through to other deterministic paths`() = runTest {
+        val resolved = ResolvedExtraction(
+            mapOf(
+                "stated_commitment" to ResolvedField(
+                    mapOf("text" to "   ", "topic_or_person" to "Nora"),
+                    ConfidenceVerdict.CANONICAL,
+                ),
+            ),
+        )
+        // No vocab, no goblin — model fallback should fire.
+        coEvery { engine.generateText(any()) } returns themeNoticingPayload("Theme noted.")
+
+        val observations = newGenerator().generate(SAMPLE_TEXT, resolved, SAMPLE_DAY)
+
+        assertEquals(1, observations.size)
+        assertEquals(ObservationEvidence.THEME_NOTICING, observations.first().evidence)
+        coVerify(exactly = 1) { engine.generateText(any()) }
+    }
+
+    @Test
+    fun `vocabulary contradiction with missing term skips to next deterministic or model`() = runTest {
+        val resolved = ResolvedExtraction(
+            mapOf(
+                "vocabulary_contradictions" to ResolvedField(
+                    listOf(mapOf("term_a" to "fine")),
+                    ConfidenceVerdict.CANONICAL,
+                ),
+            ),
+        )
+        coEvery { engine.generateText(any()) } returns themeNoticingPayload("Theme noted.")
+
+        val observations = newGenerator().generate(SAMPLE_TEXT, resolved, SAMPLE_DAY)
+
+        assertEquals(1, observations.size)
+        assertEquals(ObservationEvidence.THEME_NOTICING, observations.first().evidence)
+        coVerify(exactly = 1) { engine.generateText(any()) }
+    }
+
+    @Test
+    fun `vocabulary contradictions value with wrong shape is ignored`() = runTest {
+        val resolved = ResolvedExtraction(
+            mapOf(
+                "vocabulary_contradictions" to ResolvedField(
+                    listOf("not-a-map"),
+                    ConfidenceVerdict.CANONICAL,
+                ),
+            ),
+        )
+        coEvery { engine.generateText(any()) } returns themeNoticingPayload("Theme noted.")
+
+        val observations = newGenerator().generate(SAMPLE_TEXT, resolved, SAMPLE_DAY)
+
+        assertEquals(1, observations.size)
+        coVerify(exactly = 1) { engine.generateText(any()) }
+    }
+
+    @Test
+    fun `model fallback renders all resolved field value shapes into the prompt`() = runTest {
+        val resolved = ResolvedExtraction(
+            mapOf(
+                "tags" to ResolvedField(listOf("focus", "long-stretch"), ConfidenceVerdict.CANONICAL),
+                "energy_descriptor" to ResolvedField("locked-in", ConfidenceVerdict.CANONICAL_WITH_CONFLICT),
+                "recurrence_link" to ResolvedField(null, ConfidenceVerdict.AMBIGUOUS),
+                "state_shift" to ResolvedField(true, ConfidenceVerdict.CANONICAL),
+                "nested" to ResolvedField(mapOf("a" to 1, "b" to listOf(2, 3)), ConfidenceVerdict.CANDIDATE),
+            ),
+        )
+        val capturedPrompt = io.mockk.slot<String>()
+        coEvery { engine.generateText(capture(capturedPrompt)) } returns
+            themeNoticingPayload("Theme noted.")
+
+        newGenerator().generate(SAMPLE_TEXT, resolved, SAMPLE_DAY)
+
+        val prompt = capturedPrompt.captured
+        // String / List / Map / Boolean / null branches in renderValue all exercised.
+        assertTrue(prompt.contains("[\"focus\""), "prompt should render tags list")
+        assertTrue(prompt.contains("\"locked-in\""), "prompt should render scalar string")
+        assertTrue(prompt.contains("recurrence_link"), "prompt should render null")
+        assertTrue(prompt.contains("state_shift"), "prompt should render boolean")
+        assertTrue(prompt.contains("a=1"), "prompt should render nested map")
+    }
+
+    @Test
+    fun `model fallback with empty resolved fields renders the no-fields sentinel`() = runTest {
+        val resolved = ResolvedExtraction(emptyMap())
+        val capturedPrompt = io.mockk.slot<String>()
+        coEvery { engine.generateText(capture(capturedPrompt)) } returns
+            themeNoticingPayload("Empty entry observation.")
+
+        newGenerator().generate(SAMPLE_TEXT, resolved, SAMPLE_DAY)
+
+        assertTrue(capturedPrompt.captured.contains("(no resolved fields)"))
+    }
+
     private fun themeNoticingPayload(text: String): String =
         "{\"observations\":[{\"text\":\"$text\",\"evidence\":\"theme-noticing\",\"fields\":[\"tags\"]}]}"
 

@@ -96,6 +96,21 @@ class RetrievalRepoTest {
     }
 
     @Test
+    fun `keyword and tag signals stack — both surface, combined score wins`() {
+        // Same query token "standup" — tagged entry pays Jaccard, body entry pays keyword.
+        val tagOnly = insertEntry("nothing matches here", daysAgo = 5, tagNames = listOf("standup"))
+        val bodyOnly = insertEntry("standup wrecked me", daysAgo = 5)
+
+        val results = repo.query("standup")
+
+        assertEquals(2, results.size)
+        // tag-only: keyword=0, tagJaccard=1.0 → score 1.0 + recency
+        // body-only: keyword=1.0 (1/1), tagJaccard=0 (queryTags={standup}, entryTags={}) → score 1.0 + recency
+        // Identical scores → id-asc breaks to tagOnly (inserted first).
+        assertEquals(listOf(tagOnly, bodyOnly), results.map { it.id })
+    }
+
+    @Test
     fun `recency breaks ties when keyword and tag signals match`() {
         val recent = insertEntry("crashed after standup", daysAgo = 1)
         val older = insertEntry("crashed after standup", daysAgo = 60)
@@ -133,14 +148,17 @@ class RetrievalRepoTest {
     }
 
     @Test
-    fun `recencyWeight of zero disables recency contribution`() {
-        // Same keyword score, older first by id → without recency, id-asc tiebreak keeps older first.
+    fun `recencyWeight flips ordering on the same fixture`() {
         val older = insertEntry("standup crashed", daysAgo = 60)
         val recent = insertEntry("standup crashed", daysAgo = 1)
 
-        val results = repo.query("standup", recencyWeight = 0f)
+        // With recency disabled, scores tie → id-asc → older first (inserted first).
+        val noRecency = repo.query("standup", recencyWeight = 0f)
+        assertEquals(listOf(older, recent), noRecency.map { it.id })
 
-        assertEquals(listOf(older, recent), results.map { it.id })
+        // With the default 0.3 weight, recent's recency boost flips ordering.
+        val withRecency = repo.query("standup")
+        assertEquals(listOf(recent, older), withRecency.map { it.id })
     }
 
     @Test

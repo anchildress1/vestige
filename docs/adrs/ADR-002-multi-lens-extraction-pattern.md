@@ -54,6 +54,8 @@ Three independent calls cost more tokens and more battery. They are also the ent
 
 **One concession:** within a single lens call, all five surfaces share a rollout. That is intentional — surfaces are orthogonal *information* but they share the same lens framing, so co-rollout doesn't violate independence at the lens level.
 
+> **ADR-008 footnote — Session cloning preserves independence.** Running the three lens calls in parallel via cloned Sessions does not collapse them into a combined call. Each clone diverges at the lens-module token and generates its own rollout from there; the shared *prefix* KV-cache (system + 5 surfaces + entry text + history) is precomputed once but the *generated* tokens per lens are independent. The 3-of-3 canonical rule still applies to three independent rollouts, just executed concurrently on top of a shared prefix.
+
 ---
 
 ## Prompt Composition Contracts
@@ -178,13 +180,15 @@ Supersedes the earlier `tags` wording that implied plural normalization should r
 - **Persistence:** transcription saved as `entry_text` immediately. Audio bytes discarded.
 - **Returns to user:** the transcript + follow-up appear in the conversation. Background pass kicks off without blocking the next user turn.
 
-### Background pass (3 lens calls, sequential)
+### Background pass (3 lens calls, parallel — superseded by ADR-008)
+
+> **Superseded by [ADR-008](ADR-008-parallel-lens-execution.md) for sequencing.** Lens calls now run in **parallel** via LiteRT-LM Session cloning with Copy-on-Write KV-cache. The independence-of-lenses rationale in §"Why three calls and not one combined call" above is preserved; only the sequencing changed. The original "sequential because E4B is one model handle" justification was based on a single-instance assumption that the Engine/Session API invalidates.
 
 - **Trigger:** foreground call completes and the entry row is committed with `extraction_status=PENDING` (per ADR-001 Q3).
-- **Sequencing:** lens calls run **sequentially**, not in parallel. E4B holds one model handle on-device — parallel calls would either OOM or serialize at the runtime layer anyway, with worse error surfaces.
-- **Status transitions:** `PENDING` → `RUNNING` at start of the first lens call → `COMPLETED` / `TIMED_OUT` / `FAILED` after the resolver runs (or the time budget trips).
-- **Time budget:** 30–90 seconds total. If exceeded, abort, set `extraction_status=TIMED_OUT`, suggest re-eval to user.
-- **On completion:** convergence resolver runs synchronously after the third lens. Fields and the terminal `extraction_status` are written to ObjectBox in the same transaction.
+- **Sequencing:** lens calls run **in parallel** via Session cloning per ADR-008. One Engine, one base Session per entry (computes the shared prefix KV-cache once), three cloned Sessions for the three lens module suffixes, all three fired concurrently. CoW handles divergence.
+- **Status transitions:** `PENDING` → `RUNNING` at start of the parallel lens fan-out → `COMPLETED` / `TIMED_OUT` / `FAILED` after the resolver runs (or the time budget trips).
+- **Time budget:** ~7–10 seconds wall-clock with parallel + GPU per ADR-008. Old 30–90s ceiling stays as the timeout guard for retry-based recovery; in practice the bound is one parallel call's latency plus resolver overhead.
+- **On completion:** convergence resolver runs synchronously after all three cloned Sessions return. Fields and the terminal `extraction_status` are written to ObjectBox in the same transaction.
 
 ### Retry-based recovery (per ADR-001 Q3)
 

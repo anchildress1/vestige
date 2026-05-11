@@ -278,6 +278,10 @@ If no → reject, log to `backlog.md`, respond: *"this doesn't help us win, defe
 - `adrs/ADR-002-multi-lens-extraction-pattern.md` — agent design pattern
 - `adrs/ADR-003-pattern-detection-and-persistence.md` — pattern detection algorithm and lifecycle
 - `adrs/ADR-004-app-backgrounding-and-model-handle-lifecycle.md` — conditional foreground service contract; Option 1 always-on as documented fallback
+- `adrs/ADR-005-stt-b-scope-and-v1-single-turn.md` — STT-B scope correction; v1 single-turn-per-capture decision
+- `adrs/ADR-006-foreground-service-restart-policy.md` — foreground service restart policy
+- `adrs/ADR-007-foreground-service-state-machine-extensions.md` — foreground service state machine extensions
+- `adrs/ADR-008-parallel-lens-execution.md` — parallel 3-lens execution via LiteRT-LM Engine/Session cloning
 - `architecture-brief.md` — module breakdown, build plan, interface contracts
 - `sample-data-scenarios.md` — stop-and-test validation transcripts (STT-C, STT-D, STT-E)
 - `backlog.md` — features deferred from v1, with rationale and "what would unblock" per entry

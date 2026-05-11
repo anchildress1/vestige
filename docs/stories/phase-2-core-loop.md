@@ -2,7 +2,7 @@
 
 **Status:** In progress
 **Dates:** 2026-05-09 – TBD
-**References:** `PRD.md` §Phase 2, `concept-locked.md` §"Multi-lens extraction architecture", `concept-locked.md` §Schema, `AGENTS.md`, `architecture-brief.md`, `adrs/ADR-001-stack-and-build-infra.md` §Q3 / §Q4, `adrs/ADR-002-multi-lens-extraction-pattern.md` (entire), `adrs/ADR-004-app-backgrounding-and-model-handle-lifecycle.md` (entire), `sample-data-scenarios.md`
+**References:** `PRD.md` §Phase 2, `concept-locked.md` §"Multi-lens extraction architecture", `concept-locked.md` §Schema, `AGENTS.md`, `architecture-brief.md`, `adrs/ADR-001-stack-and-build-infra.md` §Q3 / §Q4, `adrs/ADR-002-multi-lens-extraction-pattern.md` (entire), `adrs/ADR-004-app-backgrounding-and-model-handle-lifecycle.md` (entire), `adrs/ADR-008-parallel-lens-execution.md` (entire), `sample-data-scenarios.md`
 
 ---
 
@@ -22,7 +22,7 @@ Build the end-to-end capture loop: user records or types → foreground call ret
 - [ ] **STT-C passes**: tag extraction is stable (≥80% same-tag emission on equivalent test dumps). If unstable, prompts have been tightened until stable, or the limitation is documented. _(2026-05-10 — harness ships; GPU manifest fix landed (`libOpenCL.so` / `libvndksupport.so`); ready to run at ~27 min on GPU. Measurement still owed.)_
 - [ ] Convergence resolver implementation lands into Story 1.12's test scaffolding and all happy-path tests pass.
 - [ ] Agent-emitted template labels work for all six archetypes on representative sample transcripts.
-- [ ] Background extraction populates the canonical schema on the reference device within 30–90 seconds per entry as specified.
+- [ ] Background extraction populates the canonical schema on the reference device. Target latency per ADR-008: ~7–10s wall-clock per entry via parallel Session cloning on E4B GPU. The legacy 30–90s ceiling stays as the time-budget timeout guard.
 - [ ] Background extraction lifecycle service is wired per ADR-004 (conditional foreground service): app promotes when extraction begins, demotes after 30-second keep-alive once all extractions reach terminal status. Notification text matches `ux-copy.md` §"Loading States".
 - [ ] Personas (Witness / Hardass / Editor) demonstrably affect tone on the foreground response without affecting structured field extraction.
 
@@ -129,7 +129,7 @@ Build the end-to-end capture loop: user records or types → foreground call ret
 - [x] Latency per entry on the reference device is logged; total foreground + background time per entry is recorded for the latency note. _(`Log.d("VestigeBackgroundExtraction", …)` per lens (`elapsed=Xms`) and per entry (`extract completed: lenses=N/3 model_calls=K elapsed=Yms`). Reference-device measurements get added under ADR-002 §"Latency budget" once the worker is wired into the running app.)_
 - [x] If a lens call fails (parse error, model error), the worker retries per ADR-001 Q3's retry policy. Two consecutive failures on the same lens marks the lens as "no opinion" rather than retrying indefinitely. _(`maxAttemptsPerLens = 2` (one initial + one retry) per lens. After exhausting that budget the lens contributes `LensResult(extraction = null, lastError = ...)` and the resolver receives only the lenses that parsed — ADR-002 §"Convergence edge cases" already routes parse-fail to "no opinion" rather than agreement. The original story copy said `extraction_status=ambiguous_partial`; the entry-level enum stays `COMPLETED` (≥1 lens parsed) or `FAILED` (every lens failed) per ADR-001 §Q3, with the per-field ambiguity expressed by the resolver's `ConfidenceVerdict.AMBIGUOUS` rather than a new entry-level status.)_
 
-**Notes / risks:** The three lens calls are sequential, not parallel — E4B is one model on one device. Don't try to parallelize. Total latency = ~3× single-lens latency.
+**Notes / risks:** The three lens calls run **in parallel** per `adrs/ADR-008-parallel-lens-execution.md`. Build one base Session for the entry (shared prefix: system + 5 surfaces + entry text + retrieved history), clone it three times for the three lens module suffixes, fire all three concurrently against the single Engine. Copy-on-Write KV-cache handles the divergence. Total wall-clock ≈ one parallel call's latency + parallelization overhead, not 3× sequential. If LiteRT-LM Session cloning errors on the E4B audio artifact, **stop and write a superseding ADR** — do not silently fall back to sequential.
 
 The worker does **not** own its own backgrounding behavior. The `BackgroundExtractionService` from Story 2.6.5 wraps the worker and keeps it alive across app backgrounding by promoting the process to a foreground service while extractions are in flight. Don't bake `Service` lifecycle handling into the worker class itself — that's the wrapper's job.
 
@@ -157,6 +157,35 @@ The worker does **not** own its own backgrounding behavior. The `BackgroundExtra
 **Production wiring gap (intentional, deferred to Story 2.12):** This story stages the lifecycle plumbing but does **not** connect it to extraction events. `AppContainer.extractionStatusListener(entryId)` is callable but no production code calls it — the foreground service therefore never promotes in Phase-2 builds even if the worker runs. Story 2.12 (save flow) wires `BackgroundExtractionWorker` to register an `ExtractionStatusListener` from the container per entry; that's where the loop closes. Treat this story's green checkboxes as "lifecycle is staged for Story 2.12," not "extractions drive the service today."
 
 Don't conflate this story with Story 2.6 (worker logic). Story 2.6 is *what* runs in the background; this story is *the lifecycle wrapper* that keeps the OS from killing it. Wiring is one-directional: the service observes `extraction_status` transitions; the worker doesn't know the service exists.
+
+---
+
+### Story 2.6.6 — Parallel lens execution via Engine/Session cloning (per ADR-008)
+
+**As** the AI implementor, **I need** to refactor `BackgroundExtractionWorker` from sequential lens iteration to parallel execution via LiteRT-LM's Engine/Session API with Copy-on-Write KV-cache (per `adrs/ADR-008-parallel-lens-execution.md`), **so that** per-entry wall-clock drops from ~3× single-call (sequential) to ~1× single-call (parallel) and the extraction queue drains in real-time under ADHD-cadence capture.
+
+Story 2.6 shipped a sequential 3-lens iteration that works correctly but is wall-clock-bound by 3× per-call latency. ADR-008 lifts that constraint by using LiteRT-LM's documented Engine/Session pattern: one Engine owns the model weights; multiple Sessions can run against it; cloned Sessions share KV-cache via CoW until divergence. This is exactly what the 3-lens architecture needs.
+
+**Done when:**
+- [ ] `ModelHandle` in `AppContainer` is renamed/clarified to be the **Engine wrapper** per `architecture-brief.md` §"AppContainer Ownership". One Engine per process; loaded once.
+- [ ] `BackgroundExtractionWorker` no longer iterates `LENSES = [LITERAL, INFERENTIAL, SKEPTICAL]` sequentially. Instead:
+  - Builds **one base Session** per entry containing the shared prefix (system role + 5 surface modules + retrieved history + `entry_text` + output schema reminder). Compute base Session's KV-cache once.
+  - **Clones the base Session three times.** Each clone appends one lens module suffix (literal/inferential/skeptical).
+  - **Fires all three cloned Sessions concurrently** (coroutine fan-out — `awaitAll` or equivalent).
+  - Collects three `LensResult` tuples as they return.
+  - Hands the three results to the convergence resolver (Story 2.8), unchanged.
+- [ ] Status transitions: `RUNNING` set at fan-out start (single transition, not per-lens). Terminal `COMPLETED` / `TIMED_OUT` / `FAILED` set after all three Sessions return or the time budget trips.
+- [ ] Per-clone failure handling: if one cloned Session errors (parse-fail, model error), retry that single clone per ADR-001 Q3's retry policy. Two consecutive failures on the same lens → that lens contributes "no opinion" to the resolver per existing 2-of-3 fallback. The other two clones' results still feed the resolver.
+- [ ] Latency budget: ~7–10 seconds wall-clock target on E4B GPU (one parallel call + parallelization overhead + resolver). Logged per entry to `VestigeBackgroundExtraction` tag for measurement.
+- [ ] RAM budget verified on reference S24 Ultra: Engine (3.66 GB) + base Session KV + 3 clone Sessions' divergent KV stays under ~5 GB total runtime overhead. Logged at process startup in dev builds.
+- [ ] Unit/integration tests cover: happy path (all 3 clones succeed), one clone fails (2-of-3 fallback), all 3 clones fail (`FAILED`), time-budget timeout (`TIMED_OUT`), Session-clone API error on first attempt (**stop and write superseding ADR** per the next bullet — do not silently fall back).
+- [ ] If LiteRT-LM Session cloning errors on the E4B audio artifact (any failure that suggests the API isn't supported for this specific model), **stop and write a superseding ADR** that supersedes ADR-008 with the documented failure mode. Do not silently revert to sequential — the wall-clock collapse is the whole point of ADR-008 and a quiet revert defeats it.
+
+**Notes / risks:** Don't refactor Story 2.6's worker tests away. The parsing, retry, and "no opinion" logic Story 2.6 already validated stays correct under parallel; only the iteration shape changes. The convergence resolver (Story 2.8) sees the same `LensResult` shape regardless of execution order.
+
+ADR-008 §"Wall-Clock Math" estimates ~7–9s per entry on E4B GPU after this refactor lands. If measured latency is materially worse than that, the issue is parallelization overhead (LiteRT-LM Session orchestration), not the model — surface it explicitly before assuming the architecture is at fault.
+
+This story is **infra-only**; no user-visible UX changes. The "Reading the entry" notification from ADR-004 stays visible for the (shorter) parallel call's duration. The convergence verdicts the resolver writes are identical.
 
 ---
 
@@ -311,7 +340,7 @@ If a Phase 2 story starts pulling Phase 3+ scope, stop. Reference `backlog.md` a
 
 Phase 3 starts when all the following are true:
 
-- [ ] All fourteen stories above are Done or have an explicit, recorded fallback.
+- [ ] All fifteen stories above are Done or have an explicit, recorded fallback. (Story 2.6.6 — parallel refactor per ADR-008 — added 2026-05-10.)
 - [ ] **STT-B resolved** — multi-turn works on E4B *or* the single-turn fallback is implemented and the spec updated.
 - [x] **STT-D resolved** — 3-lens divergence is validated *or* multi-lens has been replaced with single-pass and ADR-002 has been superseded. _(2026-05-10 — validated at 83%.)_
 - [ ] **STT-C resolved** — tag stability is ≥80% *or* the limitation is documented and Phase 3's pattern engine is designed around the noise floor. _(2026-05-10 — measurement still owed; harness + GPU runtime ready, just hasn't been run.)_

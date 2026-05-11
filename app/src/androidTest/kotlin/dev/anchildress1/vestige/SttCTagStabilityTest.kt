@@ -92,10 +92,13 @@ class SttCTagStabilityTest {
         runsPerEntry: Int,
     ): EntryStability {
         val perRun: List<RunOutcome> = (1..runsPerEntry).map { runIndex ->
+            // Per-entry timeout backstop: a hung native call shouldn't drag the whole
+            // 54-entry suite into the instrumentation-runner ceiling.
             val result = worker.extract(
                 BackgroundExtractionRequest(
                     entryText = entry.entryText,
                     capturedAt = entry.capturedAt,
+                    timeoutMs = PER_ENTRY_TIMEOUT_MS,
                 ),
             )
             val tags = extractCanonicalTags(result)
@@ -177,5 +180,6 @@ class SttCTagStabilityTest {
         const val DEFAULT_RUNS_PER_ENTRY = 3
         const val MIN_RUNS_PER_ENTRY = 2
         const val STABILITY_THRESHOLD = 0.80
+        const val PER_ENTRY_TIMEOUT_MS = 5 * 60_000L
     }
 }

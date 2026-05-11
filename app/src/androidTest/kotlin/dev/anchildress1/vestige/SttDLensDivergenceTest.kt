@@ -82,10 +82,13 @@ class SttDLensDivergenceTest {
     }
 
     private suspend fun runEntry(worker: BackgroundExtractionWorker, entry: CorpusEntry): EntryReport {
+        // Per-entry timeout backstop so a hung native call doesn't drag the suite into the
+        // instrumentation-runner ceiling.
         val result = worker.extract(
             BackgroundExtractionRequest(
                 entryText = entry.entryText,
                 capturedAt = entry.capturedAt,
+                timeoutMs = PER_ENTRY_TIMEOUT_MS,
             ),
         )
         val lensResults = result.lensResults.associateBy { it.lens }
@@ -205,6 +208,7 @@ class SttDLensDivergenceTest {
         const val MIN_CORPUS_SIZE = 6
         const val MIN_DIVERGENT_ENTRIES = 2
         const val MIN_DISTINCT_FOR_DISAGREEMENT = 2
+        const val PER_ENTRY_TIMEOUT_MS = 5 * 60_000L
 
         /** Schema fields the STT-D divergence verdict compares across lenses. */
         val COMPARABLE_FIELDS: List<String> = listOf(

@@ -1,7 +1,7 @@
 # STT-D corpus — 3-lens divergence verification fixture.
 # Source: docs/sample-data-scenarios.md §"STT-D" + §"Core Corpus".
 # Format: id|ISO_ZONED_DATETIME|entry_text   (# comments and blank lines ignored)
-# Pipes inside transcript text are not supported.
+# Extra pipes inside transcript text are tolerated (absorbed into the entry_text field).
 # Push to device + run per SttDLensDivergenceTest KDoc.
 
 A1|2026-04-21T11:15:00-07:00[America/Los_Angeles]|Standup ran long again. I was fine before it, then completely flattened by 11. Opened the doc and just stared at it.

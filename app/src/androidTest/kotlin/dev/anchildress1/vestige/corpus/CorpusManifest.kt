@@ -8,8 +8,9 @@ data class CorpusEntry(val id: String, val capturedAt: ZonedDateTime, val entryT
 
 /**
  * Pipe-delimited fixture loader. `#` lines and blank lines are skipped; every other line must be
- * `id|isoZonedDateTime|entryText`. Pipes inside transcripts are not supported — sample-data
- * transcripts never contain `|`, and a brittle escape syntax is worse than the rule.
+ * `id|isoZonedDateTime|entryText`. The first two pipes split out id and timestamp; any further
+ * pipes are absorbed into `entryText` verbatim (no escape syntax). Sample-data transcripts never
+ * contain `|` today, so this just means the loader is forgiving rather than brittle.
  */
 object CorpusManifest {
     fun load(file: File): List<CorpusEntry> {

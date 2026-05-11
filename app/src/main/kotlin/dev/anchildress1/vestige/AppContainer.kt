@@ -6,6 +6,7 @@ import android.util.Log
 import dev.anchildress1.vestige.inference.BackgroundExtractionWorker
 import dev.anchildress1.vestige.inference.DefaultConvergenceResolver
 import dev.anchildress1.vestige.inference.ExtractionStatusListener
+import dev.anchildress1.vestige.inference.HistoryChunk
 import dev.anchildress1.vestige.inference.LiteRtLmEngine
 import dev.anchildress1.vestige.inference.ObservationGenerator
 import dev.anchildress1.vestige.lifecycle.BackgroundExtractionLifecycleStateMachine
@@ -14,6 +15,7 @@ import dev.anchildress1.vestige.lifecycle.BackgroundExtractionStatusBus
 import dev.anchildress1.vestige.model.ExtractionStatus
 import dev.anchildress1.vestige.model.ModelManifest
 import dev.anchildress1.vestige.save.BackgroundExtractionSaveFlow
+import dev.anchildress1.vestige.save.SaveOutcome
 import dev.anchildress1.vestige.storage.EntryStore
 import dev.anchildress1.vestige.storage.MarkdownEntryStore
 import dev.anchildress1.vestige.storage.VestigeBoxStore
@@ -22,7 +24,10 @@ import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import java.io.File
+import java.time.ZonedDateTime
 
 /** Process-singleton hub for Phase-2 cross-cutting concerns. */
 @Suppress("LongParameterList") // Constructor-injection seams: factories + lifecycle + scope.
@@ -37,6 +42,20 @@ class AppContainer(
     private val backgroundEngineFactory: (String, String) -> LiteRtLmEngine = { modelPath, cacheDir ->
         LiteRtLmEngine(modelPath = modelPath, cacheDir = cacheDir)
     },
+    private val backgroundExtractionSaveFlowFactory: (
+        EntryStore,
+        BackgroundExtractionWorker,
+        ObservationGenerator,
+        (Long) -> ExtractionStatusListener,
+    ) -> BackgroundExtractionSaveFlow =
+        { entryStore, worker, observationGenerator, listenerFactory ->
+            BackgroundExtractionSaveFlow(
+                entryStore = entryStore,
+                worker = worker,
+                observationGenerator = observationGenerator,
+                listenerFactory = listenerFactory,
+            )
+        },
     // Cold-start sweep — `null` means the live `VestigeBoxStore.findNonTerminalEntryIds(boxStore)`
     // query (production default per ADR-006 §"Action Item #4"). Tests inject a fixed seed to keep
     // them BoxStore-free.
@@ -54,9 +73,13 @@ class AppContainer(
     val boxStore: BoxStore = boxStoreFactory(applicationContext)
 
     val entryStore: EntryStore = EntryStore(boxStore, markdownStoreFactory(applicationContext))
+    private val backgroundEngineInitMutex = Mutex()
 
-    // Story 2.12's production DI surface. The caller still lands later with the capture flow,
-    // but the save orchestrator is no longer test-only dead weight.
+    @Volatile
+    private var backgroundEngineInitialized = false
+
+    // Story 2.12's production DI surface. `saveAndExtract(...)` below is the app-owned entrypoint
+    // that closes the loop; capture/UI code calls AppContainer, not the save flow directly.
     private val backgroundEngineDelegate = lazy {
         backgroundEngineFactory(
             modelPathLoader(applicationContext),
@@ -77,11 +100,11 @@ class AppContainer(
     }
 
     val backgroundExtractionSaveFlow: BackgroundExtractionSaveFlow by lazy {
-        BackgroundExtractionSaveFlow(
-            entryStore = entryStore,
-            worker = backgroundExtractionWorker,
-            observationGenerator = observationGenerator,
-            listenerFactory = ::extractionStatusListener,
+        backgroundExtractionSaveFlowFactory(
+            entryStore,
+            backgroundExtractionWorker,
+            observationGenerator,
+            ::extractionStatusListener,
         )
     }
 
@@ -104,6 +127,30 @@ class AppContainer(
 
     fun extractionStatusListener(entryId: Long): ExtractionStatusListener = ExtractionStatusListener { status, _, _ ->
         reportExtractionStatus(entryId, status)
+    }
+
+    suspend fun saveAndExtract(
+        entryText: String,
+        capturedAt: ZonedDateTime,
+        retrievedHistory: List<HistoryChunk> = emptyList(),
+        timeoutMs: Long? = null,
+    ): SaveOutcome {
+        ensureBackgroundEngineInitialized()
+        return backgroundExtractionSaveFlow.saveAndExtract(
+            entryText = entryText,
+            capturedAt = capturedAt,
+            retrievedHistory = retrievedHistory,
+            timeoutMs = timeoutMs,
+        )
+    }
+
+    internal suspend fun ensureBackgroundEngineInitialized() {
+        if (backgroundEngineInitialized) return
+        backgroundEngineInitMutex.withLock {
+            if (backgroundEngineInitialized) return
+            backgroundEngine.initialize()
+            backgroundEngineInitialized = true
+        }
     }
 
     private fun seedRecoveredExtractions() {

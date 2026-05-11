@@ -2,10 +2,17 @@ package dev.anchildress1.vestige
 
 import android.content.Context
 import android.content.Intent
+import dev.anchildress1.vestige.inference.BackgroundExtractionResult
+import dev.anchildress1.vestige.inference.HistoryChunk
 import dev.anchildress1.vestige.inference.LiteRtLmEngine
 import dev.anchildress1.vestige.lifecycle.BackgroundExtractionLifecycleState
 import dev.anchildress1.vestige.model.ExtractionStatus
+import dev.anchildress1.vestige.save.BackgroundExtractionSaveFlow
+import dev.anchildress1.vestige.save.SaveOutcome
 import dev.anchildress1.vestige.storage.MarkdownEntryStore
+import io.mockk.coEvery
+import io.mockk.coVerify
+import io.mockk.coVerifyOrder
 import io.mockk.every
 import io.mockk.mockk
 import io.objectbox.BoxStore
@@ -16,6 +23,8 @@ import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNotNull
 import org.junit.jupiter.api.Test
+import java.time.ZoneId
+import java.time.ZonedDateTime
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class AppContainerTest {
@@ -130,6 +139,115 @@ class AppContainerTest {
         )
 
         assertNotNull(container.backgroundExtractionSaveFlow)
+    }
+
+    @Test
+    fun `ensureBackgroundEngineInitialized only initializes the lazy engine once`() = runTest {
+        val engine = mockk<LiteRtLmEngine>(relaxed = true)
+        val container = AppContainer(
+            applicationContext = mockk<Context>(relaxed = true),
+            boxStoreFactory = { mockk<BoxStore>(relaxed = true) },
+            markdownStoreFactory = { mockk<MarkdownEntryStore>(relaxed = true) },
+            modelPathLoader = { "/tmp/fake-model.litertlm" },
+            backgroundEngineFactory = { _, _ -> engine },
+            recoveredEntryIdsLoader = { emptyList() },
+            foregroundServiceIntentFactory = { Intent("dev.anchildress1.vestige.TEST_START") },
+            foregroundServiceStarter = {},
+        )
+
+        container.ensureBackgroundEngineInitialized()
+        container.ensureBackgroundEngineInitialized()
+
+        coVerify(exactly = 1) { engine.initialize() }
+    }
+
+    @Test
+    fun `saveAndExtract initializes the engine before delegating to the save flow`() = runTest {
+        val engine = mockk<LiteRtLmEngine>(relaxed = true)
+        val saveFlow = mockk<BackgroundExtractionSaveFlow>()
+        val expected = SaveOutcome.Failed(
+            entryId = 42L,
+            result = BackgroundExtractionResult.Failed(
+                totalElapsedMs = 0L,
+                lensResults = emptyList(),
+                modelCallCount = 0,
+                lastError = "boom",
+            ),
+        )
+        val capturedAt = ZonedDateTime.of(2026, 5, 11, 7, 21, 24, 0, ZoneId.of("America/New_York"))
+        coEvery {
+            saveFlow.saveAndExtract(
+                entryText = "persist me",
+                capturedAt = capturedAt,
+                retrievedHistory = emptyList(),
+                timeoutMs = null,
+            )
+        } returns expected
+        val container = AppContainer(
+            applicationContext = mockk<Context>(relaxed = true),
+            boxStoreFactory = { mockk<BoxStore>(relaxed = true) },
+            markdownStoreFactory = { mockk<MarkdownEntryStore>(relaxed = true) },
+            modelPathLoader = { "/tmp/fake-model.litertlm" },
+            backgroundEngineFactory = { _, _ -> engine },
+            backgroundExtractionSaveFlowFactory = { _, _, _, _ -> saveFlow },
+            recoveredEntryIdsLoader = { emptyList() },
+            foregroundServiceIntentFactory = { Intent("dev.anchildress1.vestige.TEST_START") },
+            foregroundServiceStarter = {},
+        )
+
+        val actual = container.saveAndExtract("persist me", capturedAt)
+
+        assertEquals(expected, actual)
+        coVerifyOrder {
+            engine.initialize()
+            saveFlow.saveAndExtract(
+                entryText = "persist me",
+                capturedAt = capturedAt,
+                retrievedHistory = emptyList(),
+                timeoutMs = null,
+            )
+        }
+    }
+
+    @Test
+    fun `saveAndExtract reuses the initialized engine across repeated saves`() = runTest {
+        val engine = mockk<LiteRtLmEngine>(relaxed = true)
+        val saveFlow = mockk<BackgroundExtractionSaveFlow>()
+        val capturedAt = ZonedDateTime.of(2026, 5, 11, 7, 21, 24, 0, ZoneId.of("America/New_York"))
+        val outcome = SaveOutcome.TimedOut(
+            entryId = 7L,
+            result = BackgroundExtractionResult.TimedOut(
+                totalElapsedMs = 90_000L,
+                lensResults = emptyList(),
+                modelCallCount = 0,
+                timeoutMs = 90_000L,
+            ),
+        )
+        coEvery {
+            saveFlow.saveAndExtract(
+                entryText = any(),
+                capturedAt = capturedAt,
+                retrievedHistory = any<List<HistoryChunk>>(),
+                timeoutMs = any(),
+            )
+        } returns outcome
+        val container = AppContainer(
+            applicationContext = mockk<Context>(relaxed = true),
+            boxStoreFactory = { mockk<BoxStore>(relaxed = true) },
+            markdownStoreFactory = { mockk<MarkdownEntryStore>(relaxed = true) },
+            modelPathLoader = { "/tmp/fake-model.litertlm" },
+            backgroundEngineFactory = { _, _ -> engine },
+            backgroundExtractionSaveFlowFactory = { _, _, _, _ -> saveFlow },
+            recoveredEntryIdsLoader = { emptyList() },
+            foregroundServiceIntentFactory = { Intent("dev.anchildress1.vestige.TEST_START") },
+            foregroundServiceStarter = {},
+        )
+
+        container.saveAndExtract("first", capturedAt)
+        container.saveAndExtract("second", capturedAt, timeoutMs = 90_000L)
+
+        coVerify(exactly = 1) { engine.initialize() }
+        coVerify(exactly = 2) { saveFlow.saveAndExtract(any(), capturedAt, any(), any()) }
     }
 
     @Test

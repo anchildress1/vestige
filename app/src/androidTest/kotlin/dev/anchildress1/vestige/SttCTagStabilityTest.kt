@@ -83,9 +83,6 @@ class SttCTagStabilityTest {
             val stability = summarizeStability(perEntry, runsPerEntry)
             logSummary(perEntry, stability, runsPerEntry)
 
-            // Story 2.9 wants pattern-engine signal on every entry — silently dropping entries
-            // that produced no tags across all runs would let the gate pass on a subset of "easy"
-            // corpus rows while harder entries quietly fail.
             val zeroTagEntries = perEntry.filter { it.emittedTags.isEmpty() }
             assertTrue(
                 "STT-C failed: ${zeroTagEntries.size} entries produced zero tags across all " +
@@ -109,8 +106,6 @@ class SttCTagStabilityTest {
         runsPerEntry: Int,
     ): EntryStability {
         val perRun: List<RunOutcome> = (1..runsPerEntry).map { runIndex ->
-            // Per-entry timeout backstop: a hung native call shouldn't drag the whole
-            // 54-entry suite into the instrumentation-runner ceiling.
             val result = worker.extract(
                 BackgroundExtractionRequest(
                     entryText = entry.entryText,
@@ -145,9 +140,6 @@ class SttCTagStabilityTest {
     }
 
     private fun tagsFromResolved(resolved: ResolvedExtraction): Set<String> {
-        // Per ADR-002 §"Convergence rules" the saved value is canonical (>=2 lenses agreed) or a
-        // single Literal-strongest candidate; both flow through here. Ambiguous-tag entries
-        // contribute the empty set on that run, which the stability ratio counts as a miss.
         val raw = resolved.fields["tags"]?.value ?: return emptySet()
         return (raw as? List<*>)?.mapNotNullTo(linkedSetOf()) { (it as? String)?.trim()?.lowercase() }
             ?.filter { it.isNotEmpty() }

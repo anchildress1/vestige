@@ -202,18 +202,14 @@ This story is **infra-only**; no user-visible UX changes. The "Reading the entry
 - [x] If the threshold is met, this story closes — the multi-lens architecture is validated.
 - [ ] If the threshold is not met after one focused day of prompt tuning, the architecture is dropped: replace the 3-lens worker with a single-pass extraction call, remove the convergence resolver, drop "candidate" and "ambiguous" confidence values from the schema, and remove the Reading section spec from `design-guidelines.md`. Update `concept-locked.md` and `PRD.md` to match. ADR-002 gets superseded by a new ADR documenting single-pass extraction. _(Not triggered — threshold met on first run.)_
 
-**Notes from the device runs (2026-05-10):**
+**Device-run record (2026-05-10):**
 
-*CPU run (initial):*
-- Energy descriptor came back null on 5/6 entries even when transcripts described state shifts ("flattened by 11," "battery got yanked"). A1 was the exception — all three lenses agreed on `flattened`. STT-C will surface whether this is a prompt-tightening opportunity or stable noise.
-- Skeptical surfaced 1 flag on A1 (likely `vocabulary-contradiction` between `fine before` and `flattened`) and 1 on B2 (likely `commitment-without-anchor` on "send the invoice today" — no entry id yet). Both align with ADR-002's expected pressure points.
-- Inferential never refused what Literal made; the "Literal-refuses-vs-Inferential-makes" divergence channel didn't fire on any of the six entries. Field-level disagreement is real but channelled through tag-set drift rather than refusal/inference asymmetry. Update ADR-002 §"Why three calls" if Phase 3 evidence keeps pointing the same way.
+| Run | Backend | Engine init | Per-lens | Per-entry | Verdict | Notes |
+|---|---|---|---|---|---|---|
+| CPU initial | CPU | 11.5 s | 35–55 s | 127–161 s | 5/6 meaningful | Skeptical flags on A1 + B2; only C2 unanimous. `energy_descriptor` null on 5/6. |
+| GPU re-run | GPU (post-`libOpenCL.so` fix) | 19.7 s | 8–13 s | 25–55 s | 4/6 meaningful | C2 + D1 hit INFERENTIAL parse-fail × 2 retries (1/3 and 2/3 lenses survived). B2's `stated_commitment` reported as `disagree_fields` not Skeptical flag. |
 
-*GPU re-run (post-`libOpenCL.so` manifest fix):*
-- **4/6 entries `meaningful=true`** — still clears the 30% threshold, so the architecture verdict stands.
-- **Per-lens-call latency 8–13 s, per-entry 25–55 s** — about 5× faster than CPU. Engine init 19.7 s (vs 11.5 s on CPU; first GPU compile is slower, expected).
-- **Parse failures appeared on GPU that CPU didn't have.** C2 (INFERENTIAL + SKEPTICAL parse-fail × 2 retries → 1/3 lenses) and D1 (INFERENTIAL parse-fail × 2 retries → 2/3 lenses). Same model, same prompts, same entries — only the backend differs. The retries inflated their latencies to 55 s and 50 s; clean entries stayed at 25–37 s. Worth tracking — if GPU parse-failure rate persists, ADR-002 §"Structured-output reliability" may need a GPU-specific addendum, or the lens prompts need a GPU-quality pass.
-- `stated_commitment` disagreement on B2 was reported as a `disagree_fields` entry rather than a Skeptical flag this run — the underlying Skeptical-flag emission may itself be backend-sensitive.
+**GPU regressions to track:** parse-failure rate higher than CPU under identical prompts; Skeptical-flag emission appears backend-sensitive. ADR-002 §"Structured-output reliability" addendum if pattern holds.
 
 **Fallback if STT-D fails:** the demo's "intentional model use" story shifts. Native audio multimodal stays the headline (it always was). The agentic-as-product layer is no longer present, so the technical walkthrough loses the "Reading" beat. The 5-min walkthrough script changes — add a comment in `demo-storyboard.md` (when written) noting the cut.
 
@@ -243,18 +239,15 @@ This story is **infra-only**; no user-visible UX changes. The "Reading the entry
 
 **As** the AI implementor, **I need** to verify that the convergence resolver emits stable tag sets on equivalent test dumps (≥80% same-tag emission across re-runs of similar inputs), **so that** Phase 3's pattern engine has reliable signal to count.
 
-**Status (2026-05-10):** `SttCTagStabilityTest` harness ships. Earlier "deferred pending GPU artifact" framing was wrong — the artifact was always GPU-capable; the manifest missed the `libOpenCL.so` / `libvndksupport.so` `<uses-native-library>` declarations LiteRT-LM needs on Android 12+ (per `https://ai.google.dev/edge/litert-lm/android`). With that fix in place, GPU runs at 8–13 s per lens call, so the 162-call sweep is ~27 min instead of ~2.5 hr. Ready to run; left unchecked until the measurement actually lands.
+**Status (2026-05-10):** `SttCTagStabilityTest` harness ships. GPU runs at 8–13 s/call → 162-call sweep ~27 min. Measurement owed.
 
 **Done when:**
-- [ ] The STT-C sample-dump set from `sample-data-scenarios.md` runs through the foreground + background pipeline at least three times each. _(Harness exists; waiting on backlog `gpu-model-artifact`.)_
-- [ ] Per-dump tag stability is measured: across the runs of the same dump, what fraction of tags are emitted on every run? _(Measurement logic ships — `VestigeSttC` logcat tag emits per-entry stable/total counts + global rate.)_
-- [ ] Across the sample set, ≥80% of tags are stable (emitted on all three runs of an equivalent dump).
-- [ ] If stability is below 80%, prompts are tightened (likely the surface modules) and the test re-runs.
-- [ ] If stability is still below 80% after one focused day of tuning, the limitation is documented in `PRD.md` §"Acceptance criteria — Tag extraction" with a noisy-pattern caveat. Pattern engine in Phase 3 has to be designed for that noise floor.
+- [ ] STT-C corpus runs through the background pipeline at least three times each (harness ships; `VestigeSttC` logcat tag emits per-entry stable/total + global rate).
+- [ ] ≥80% of (entry, tag) pairs stable across all three runs.
+- [ ] If <80%, tighten surface prompts and re-run.
+- [ ] If <80% after one focused day of tuning, document in `PRD.md` §"Acceptance criteria — Tag extraction" with the noisy-pattern caveat.
 
-**Notes / risks:** The 80% threshold is a v1 floor, not a quality bar. Phase 3's pattern engine design depends on it; if we ship at 60% stability, pattern callouts surface false positives 40% of the time. That's a demo-killer.
-
-**Deferral risk for Phase 3:** the pattern engine has to be designed against an *unverified* tag-stability assumption until the GPU artifact lands. Build Phase 3 against the 80%-floor assumption and treat any pattern false-positive surfaced during Phase 4 demo dry-runs as the deferred STT-C signal arriving late. If Phase 3 ships before a GPU artifact materializes, flag this in `PRD.md` §"Acceptance criteria — Tag extraction" so the noise floor is documented in the public-facing spec, not just here.
+**Notes / risks:** 80% is a floor, not a quality bar. Phase 3's pattern engine designs against this assumption — if measurement defers past Phase 3 kickoff, surface the noise floor in `PRD.md` so Phase 4 demo dry-runs interpret pattern false-positives correctly.
 
 ---
 
@@ -281,11 +274,7 @@ This story is **infra-only**; no user-visible UX changes. The "Reading the entry
 
 ### Story 2.11 — Inference latency UI: foreground placeholder — **MERGED INTO STORY 4.5 (2026-05-10)**
 
-Phase 2 has no capture screen — `MainActivity` is still the Phase-1 mic-permission shell — so the "user-turn slot in the entry transcript" surface that 2.11 expects to mutate doesn't exist yet. Building it in Phase 2 means writing a throwaway scaffold that Story 4.5 immediately replaces (`MistHero`, `AudioMeter`, locked muted-user / primary-model entry transcript, persona-pill chrome). That's the kind of churn AGENTS.md guardrail 20 ("Stick to the plan. Do not overbuild") tells us to skip.
-
-Story 4.5's `Done when` list already covers the placeholder display ("`Reading the entry.` placeholder shows in transcript area"). The two additional Phase-2 acceptance items — 200 ms minimum placeholder hold and explicit error-state replacement on parse-fail / timeout — landed alongside this deferral as a new `Inference placeholder lifecycle (absorbed from Story 2.11)` bullet under Story 4.5. **All five of this story's `Done when` boxes now belong to Story 4.5; track them there.**
-
-Phase-2 still benefits from this story by *not* shipping a placeholder UI on top of an absent capture screen — the build-order discipline matters more than the story-numbering bookkeeping.
+Phase 2 has no capture screen to attach a placeholder to — Story 4.5 builds the surface (`MistHero`, transcript). All five `Done when` boxes from this story (placeholder display, 200 ms minimum hold, error-state replacement on `ParseFailure` / cancellation, no streaming) landed under Story 4.5 as the `Inference placeholder lifecycle (absorbed from Story 2.11)` bullet. Track them there.
 
 ---
 

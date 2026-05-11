@@ -4,14 +4,13 @@ import java.io.File
 import java.time.ZonedDateTime
 import java.time.format.DateTimeParseException
 
-/** One row from a `docs/stt-*-manifest.example.txt` corpus. Pipes split fields. */
+/** One row from `docs/stt-*-manifest.example.txt`. */
 data class CorpusEntry(val id: String, val capturedAt: ZonedDateTime, val entryText: String)
 
 /**
- * Pipe-delimited fixture loader. `#` lines and blank lines are skipped; every other line must be
- * `id|isoZonedDateTime|entryText`. The first two pipes split out id and timestamp; any further
- * pipes are absorbed into `entryText` verbatim (no escape syntax). Sample-data transcripts never
- * contain `|` today, so this just means the loader is forgiving rather than brittle.
+ * Loader for the pipe-delimited STT-C / STT-D manifest format. `#` lines and blanks skipped; every
+ * other line is `id|isoZonedDateTime|entryText`. Extra pipes after the second collapse into
+ * `entryText`.
  */
 object CorpusManifest {
     fun load(file: File): List<CorpusEntry> {

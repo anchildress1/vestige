@@ -84,8 +84,6 @@ class SttDLensDivergenceTest {
     }
 
     private suspend fun runEntry(worker: BackgroundExtractionWorker, entry: CorpusEntry): EntryReport {
-        // Per-entry timeout backstop so a hung native call doesn't drag the suite into the
-        // instrumentation-runner ceiling.
         val result = worker.extract(
             BackgroundExtractionRequest(
                 entryText = entry.entryText,
@@ -110,8 +108,6 @@ class SttDLensDivergenceTest {
         val literal = lensResults[Lens.LITERAL]?.extraction
         val inferential = lensResults[Lens.INFERENTIAL]?.extraction
         val skeptical = lensResults[Lens.SKEPTICAL]?.extraction
-        // Filter to schema-binding kinds — entry-level flags (`time-inconsistency`, `other`) don't
-        // bind to a stored field and shouldn't count as divergence on their own.
         val skepticalFlags: List<String> = skeptical?.flags
             .orEmpty()
             .filter(SkepticalFlagKinds::isSchemaBinding)
@@ -122,8 +118,7 @@ class SttDLensDivergenceTest {
             }
             values.toSet().size >= MIN_DISTINCT_FOR_DISAGREEMENT
         }
-        // Only flag "Inferential populated, Literal refused" when Literal actually parsed — a
-        // null Literal extraction means the lens call failed, not that it deliberately refused.
+        // null literal means the lens call failed — skip the inferentialOnly channel.
         val inferentialOnly = if (literal == null) {
             emptyList()
         } else {

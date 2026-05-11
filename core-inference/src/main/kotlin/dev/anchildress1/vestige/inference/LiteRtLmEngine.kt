@@ -9,6 +9,10 @@ import com.google.ai.edge.litertlm.EngineConfig
 import com.google.ai.edge.litertlm.LogSeverity
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.flow.onCompletion
 import kotlinx.coroutines.withContext
 
 /** Backend selection. NPU needs the host's `nativeLibraryDir` — only Android `Context` has it. */
@@ -70,6 +74,45 @@ class LiteRtLmEngine(
             "generateText completed in ${elapsedMs}ms (prompt=${prompt.length}c, reply=${response.length}c)",
         )
         response
+    }
+
+    /**
+     * Streaming counterpart to [generateText]. Emits each [com.google.ai.edge.litertlm.Message]'s
+     * text payload as the SDK delivers it — incremental tokens, not cumulative — so the UI can
+     * render partial output during the 25–55 s GPU foreground latency window per Story 2.7
+     * measurements. The flow runs on [ioDispatcher] and closes the underlying conversation in a
+     * terminal `onCompletion` so cancellation or error paths can't leak the native handle.
+     *
+     * The structured-output parser (`ForegroundResponseParser`) consumes a complete response, so
+     * callers that need parsed `{transcription, follow_up}` should reduce this flow to a string
+     * via `fold(StringBuilder()) { acc, c -> acc.append(c) }.toString()` and feed the result to
+     * the existing parser. Incremental rendering and incremental parsing are independent
+     * concerns; tackle parsing-of-partial-output only after the SDK emission shape is verified
+     * on device by `LiteRtLmStreamingTextSmokeTest`.
+     */
+    fun streamText(prompt: String): Flow<String> {
+        val active = checkNotNull(engine) {
+            "LiteRtLmEngine.streamText called before initialize()."
+        }
+        val conversation = active.createConversation()
+        val started = System.nanoTime()
+        var charsEmitted = 0
+        return flow {
+            conversation.sendMessageAsync(prompt).collect { message ->
+                val chunk = message.toString()
+                charsEmitted += chunk.length
+                emit(chunk)
+            }
+        }.onCompletion { cause ->
+            conversation.close()
+            val elapsedMs = (System.nanoTime() - started) / NANOS_PER_MILLI
+            val outcome = cause?.let { "failed (${it.javaClass.simpleName})" } ?: "completed"
+            Log.d(
+                TAG,
+                "streamText $outcome in ${elapsedMs}ms (prompt=${prompt.length}c, " +
+                    "emitted=${charsEmitted}c)",
+            )
+        }.flowOn(ioDispatcher)
     }
 
     /**

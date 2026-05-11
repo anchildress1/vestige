@@ -1,0 +1,24 @@
+# STT-C corpus — tag-extraction stability fixture.
+# Source: docs/sample-data-scenarios.md §"Core Corpus" + §"Scenario X".
+# Format: id|ISO_ZONED_DATETIME|entry_text   (# comments and blank lines ignored)
+# Extra pipes inside transcript text are tolerated (absorbed into the entry_text field).
+# Push to device + run per SttCTagStabilityTest KDoc.
+
+A1|2026-04-21T11:15:00-07:00[America/Los_Angeles]|Standup ran long again. I was fine before it, then completely flattened by 11. Opened the doc and just stared at it.
+A2|2026-04-21T12:10:00-07:00[America/Los_Angeles]|Tuesday meeting. Same thing. Went in normal, came out with concrete in my limbs. Ate late because I lost the plot.
+A3|2026-04-23T15:40:00-07:00[America/Los_Angeles]|After the roadmap call I did the little post-meeting corpse routine. Three tabs open, zero movement.
+A4|2026-04-24T10:25:00-07:00[America/Los_Angeles]|Not tired exactly. More like the battery got yanked after the sync.
+A5|2026-04-27T16:20:00-07:00[America/Los_Angeles]|After the client review I went hollow. Couldn't start the next thing.
+A6|2026-04-29T14:05:00-07:00[America/Los_Angeles]|The planning call left static in my head. Technically awake, operationally not.
+B1|2026-04-22T14:00:00-07:00[America/Los_Angeles]|Invoice email is still sitting there. I opened it twice and did the sacred ritual of closing it immediately.
+B2|2026-04-23T15:30:00-07:00[America/Los_Angeles]|Said I would send the invoice today. Instead I reorganized the desktop. Bold strategy.
+B3|2026-04-24T16:45:00-07:00[America/Los_Angeles]|Invoice again. No mystery. I know what to do. The cursor just sits there like it pays rent.
+C1|2026-04-21T19:10:00-07:00[America/Los_Angeles]|Spent 40 minutes choosing between the two task apps. Same three criteria, new spreadsheet, no decision.
+C2|2026-04-22T20:10:00-07:00[America/Los_Angeles]|Task app decision still looping. I keep changing the weights and pretending that is progress.
+C3|2026-04-23T21:05:00-07:00[America/Los_Angeles]|Made another comparison table. It did not become a decision through exposure therapy.
+D1|2026-04-23T03:12:00-07:00[America/Los_Angeles]|3:12am. I am rearranging the notes app again instead of sleeping. This is not a system, it's a small administrative haunting.
+D2|2026-04-24T02:48:00-07:00[America/Los_Angeles]|2:48am and I'm deciding whether to rebuild the folder structure. No one requested this.
+D3|2026-04-25T04:07:00-07:00[America/Los_Angeles]|4:07am. I found a naming convention problem in the archive and treated it like national infrastructure.
+X1|2026-04-21T10:30:00-07:00[America/Los_Angeles]|The battery died on my keyboard during the meeting.
+X2|2026-04-22T11:45:00-07:00[America/Los_Angeles]|I crashed the test app after changing the ObjectBox entity.
+X3|2026-04-23T13:20:00-07:00[America/Los_Angeles]|Concrete shoes came up in a song lyric.

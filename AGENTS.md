@@ -1,44 +1,40 @@
 # AGENTS.md — Vestige Build Guardrails
 
-These rules apply to AI implementors working in this folder.
+Rules for AI implementors working in this folder.
 
 ## Operating Rule
 
-Vestige is a challenge build, not an infinite product garden. Before accepting any feature or polish request, ask:
-
-> Does this visibly improve the 90-second pitch or the 5-minute technical walkthrough?
-
-If no, defer it to `backlog.md` and say: "this doesn't help us win, deferring to v1.5."
+Demo-impact test before accepting any feature or polish: *Does this visibly improve the 90-second pitch or the 5-minute technical walkthrough?* If no, defer to `backlog.md` with: "this doesn't help us win, deferring to v1.5."
 
 ## P0 Guardrails
 
 1. Read `README.md` first, then follow its reading order.
 2. Treat `concept-locked.md`, `PRD.md`, and accepted ADRs as authoritative.
-3. Do not use Android `SpeechRecognizer`, cloud STT, or third-party transcription. Voice input is Gemma 4 audio input or the feature is not the feature.
-4. Do not add analytics, crash-reporting SaaS, RemoteConfig, cloud sync, or telemetry.
-5. Model download is the only planned network event. Normal operation must be network-sealed.
-6. Do not request broad storage permission for app-internal markdown/ObjectBox storage. Use system picker/share flows for export.
-7. Do not add therapy, wellness, mood scoring, gratitude prompts, streaks, badges, mascots, or clinical framing.
-8. In-app copy may use "dump"; public copy uses "voice entry," "capture," or "cognitive event" unless intentionally quoting UI.
-9. Witness, Hardass, and Editor are tone variants only. They must not fork extraction logic.
+3. Voice input is Gemma 4 audio only. No Android `SpeechRecognizer`, no cloud STT, no third-party transcription.
+4. No analytics, crash-reporting SaaS, RemoteConfig, cloud sync, or telemetry.
+5. Model download is the only planned network event. Normal operation is network-sealed.
+6. No broad storage permission for app-internal markdown / ObjectBox. Export uses system picker / share flows.
+7. No therapy, wellness, mood scoring, gratitude prompts, streaks, badges, mascots, or clinical framing.
+8. In-app copy may use "dump." Public copy uses "voice entry," "capture," or "cognitive event" unless quoting UI.
+9. Witness, Hardass, Editor are tone variants. They do not fork extraction logic.
 10. Templates are model-emitted labels, not user-selected modes.
 11. Audio is discarded after inference. Persist transcription text, not audio bytes.
-12. Pattern claims must be sourced with counts, dates, snippets, tags, or field evidence.
-13. Use one inference runtime in v1: LiteRT-LM. Any llama.cpp / MediaPipe / AICore switch requires a superseding ADR.
-14. If LiteRT-LM or Gemma 4 audio fails an existential stop-and-test (notably STT-A audio plumbing in Phase 1), stop and replan. Do not build a pretty wrapper around a broken premise. We have standards, allegedly.
-15. Tick checklist items off the active phase story file in `docs/stories/phase-{N}-*.md` as work completes. Stories are the canonical work queue; an unchecked item with shipped code is an unfinished story, not a victory lap. If a story can't ship as written, edit the story (or push it to `backlog.md`) before moving on — don't ghost the checklist.
-16. **No backwards compatibility.** Vestige is a v1 challenge submission, not a long-running product. Do not add migration shims, deprecated-but-kept APIs, feature flags for "old behavior," or compatibility wrappers. If a design changes, the old design dies — supersede the ADR and rewrite the code.
-17. **Technical excellence at all times.** This is a public submission judged against other submissions. Code quality is part of the deliverable. No quick fixes, no temp solutions, no `// TODO fix later` for things that ship. If it's not right, do not commit it.
-18. **All scans must pass at all times.** Sonar, Semgrep, and Snyk findings are blockers, not warnings. Lint, detekt, and ktlint findings are blockers, not warnings. A failing scan is a failing build. Fix at root, not at the report level.
-19. **Codex and Copilot will review every PR.** Assume an adversarial automated reviewer is reading the diff. Match documented patterns; cite the ADR/spec when deviating; do not leave unexplained idiom drift.
-20. **Stick to the plan.** Do not overbuild or over-deliver. The story file is the contract. If a story can ship as N lines, it ships as N lines — not N + a refactor + a new abstraction layer "while we're here." Scope creep is rejected at review.
-21. **Stop on manual checks — don't skip and come back.** If a story, ADR, or PRD calls for a check the agent cannot run itself (on-device install, real-keystore signing, microphone permission flow, STT-A audio round-trip, `tcpdump` privacy clip, etc.), stop *immediately* on the first one hit and surface the check to the user for validation. **Do not skip past it to keep working on other stories** — that loses signal (a failed manual check may invalidate later work), breaks atomic-commit discipline, and turns "stories in order" into "stories in convenient order." Wait until the user reports the outcome, then record it, then proceed. Do not check the box on their behalf. Do not fake it with a "looks correct" justification.
-22. **Tests and docs ship with the change, every change.** Every code change carries pos/neg/err/edge coverage at unit, integration, performance, and accessibility tiers as applicable to the surface being touched. Same commit must update relevant docs (README, ADRs, story files, architecture-brief, design-guidelines, ux-copy) and any Mermaid/architecture diagrams the change invalidates. A green test run alone is not "done"; missing scenarios or stale docs/diagrams are unfinished work, not follow-up tickets.
-23. **ADR amendments — addendum in place; new ADR for major shifts.** ADRs are historical artifacts; the prior decision sections must not be rewritten. Minor corrections, scope tightening, evidence updates, and clarifications land as a dated `### Addendum (YYYY-MM-DD) — short title` block appended to the same ADR (additive only — never edit prior sections). Major shifts — new architecture, design pivot, runtime swap, a scope decision that retires the original premise — supersede via a new ADR that depends on the prior by number. The line is judgment: if the diff refines an existing rule with a few paragraphs, addendum; if it changes what the ADR is *about*, new ADR.
+12. Pattern claims source counts, dates, snippets, tags, or field evidence.
+13. One inference runtime in v1: LiteRT-LM. llama.cpp / MediaPipe / AICore switches require a superseding ADR.
+14. If LiteRT-LM or Gemma 4 audio fails an existential stop-and-test (notably STT-A in Phase 1), stop and replan. Do not wrap a broken premise.
+15. Tick checklist items in `docs/stories/phase-{N}-*.md` as work completes. Stories are the work queue; shipped code with unchecked items is unfinished. Can't ship as written → edit the story or push to `backlog.md` before moving on.
+16. **No backwards compatibility.** No migration shims, deprecated-kept APIs, "old behavior" flags, or compat wrappers. Design change → old design dies, supersede the ADR, rewrite.
+17. **Technical excellence at all times.** No quick fixes, no temp solutions, no `// TODO fix later` in shipped code. If it's not right, don't commit.
+18. **All scans pass.** Sonar, Semgrep, Snyk, lint, detekt, ktlint — every finding is a blocker. Fix at root, not at the report.
+19. **Codex and Copilot review every PR.** Assume an adversarial automated reviewer is reading the diff. Match documented patterns; cite the ADR / spec when deviating; no unexplained idiom drift.
+20. **Stick to the plan.** Story file is the contract. No "while we're here" refactors or new abstraction layers — N lines means N lines.
+21. **Stop on manual checks.** When a spec calls for a check the agent can't run (on-device install, real-keystore signing, mic permission, STT-A round-trip, `tcpdump` privacy clip, etc.), stop on the first one and surface it. Do not skip past — a failed check may invalidate later work and breaks atomic-commit discipline. Wait for the user's outcome, record it, then proceed. Don't check the box yourself. Don't fake "looks correct."
+22. **Tests and docs ship with the change.** Every code change: pos / neg / err / edge coverage at unit / integration / perf / a11y tiers as applicable. Same commit updates relevant docs (README, ADRs, stories, architecture-brief, design-guidelines, ux-copy) and any diagrams it invalidates. Green tests alone are not "done" — missing scenarios or stale docs / diagrams are unfinished.
+23. **ADR amendments.** ADRs are historical; prior decision sections never rewritten. Minor refinement → dated `### Addendum (YYYY-MM-DD) — short title` block, additive only. Architecture pivot, runtime swap, premise change → new ADR superseding the prior by number. Judgment: refines an existing rule → addendum; changes what the ADR is *about* → new ADR.
+24. **Open PRs only on explicit instruction.** Branch, commit, push are autonomous. `gh pr create` (or equivalent) needs a direct user instruction in the current turn. Default: push, surface, wait. The user decides when a PR opens, what gets bundled, and what stays on the side.
 
 ## Build Order
 
-Build directly per `docs/PRD.md` §"Build philosophy: build first, test at failure zones." There is no upfront Phase-0 validation phase. Risk is mitigated through five stop-and-test points (STT-A–E) embedded in phases 1–3.
+Build per `docs/PRD.md` §"Build philosophy: build first, test at failure zones." No upfront Phase-0 validation — risk is mitigated via five stop-and-test points (STT-A–E) in phases 1–3.
 
-STT-A (audio plumbing, Phase 1) is the existential one — time-box hard. If the specs are intentionally rewritten, supersede via ADR.
-
+STT-A (audio plumbing, Phase 1) is existential — time-box hard. Spec rewrites supersede via ADR.

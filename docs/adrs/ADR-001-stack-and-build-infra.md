@@ -250,6 +250,20 @@ STT-A says this must work. The 30s constraint is a runtime cap — `AudioRecord`
 
 **Consequence:** `WavWriter` updated to emit PCM_S16LE (format 1, 16-bit int, 16 kHz) instead of IEEE_FLOAT. Float32 samples from `AudioCapture` are scaled to `[-32767, 32767]` on write. `Content.AudioBytes` is dead for this SDK version — the only live path is `Content.AudioFile` via a temp PCM_S16LE WAV.
 
+### Addendum (2026-05-10) — GPU backend works on the same artifact
+
+The `litert-community/gemma-4-E4B-it-litert-lm` artifact is GPU-compatible. Original "CPU" was a measurement choice, not an artifact constraint. Unblock: AndroidManifest `<uses-native-library>` for `libOpenCL.so` + `libvndksupport.so` (Android 12+ vendor-namespace isolation; per `https://ai.google.dev/edge/litert-lm/android`).
+
+| Field | GPU (S24 Ultra, 2026-05-10) | CPU baseline |
+|---|---|---|
+| Engine init (cold) | ~19,700 ms | ~11,500 ms |
+| Per-lens call (clean) | ~8–13 s | ~35–55 s |
+| Per-entry (3 lenses, clean) | ~25–37 s | ~127–161 s |
+| STT-D verdict | 4/6 meaningful | 5/6 meaningful |
+| Parse failures | C2 + D1 non-Literal × 2 retries | 0 |
+
+**Consequence:** GPU is the working backend on OpenCL-vendor-namespace devices. CPU stays as fallback via `-PinferenceBackend=cpu`. ADR-002 §"Latency budget" 1–5 s target still unmet — NPU and prompt-shrinkage are the remaining levers, unchanged on Phase 4/5.
+
 ### Q5. Distribution & signing
 
 GitHub Releases sideload means a single signing key, stored somewhere. **Not** in the repo. **Not** in plain text on the dev machine.

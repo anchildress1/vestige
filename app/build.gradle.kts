@@ -44,10 +44,18 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables.useSupportLibrary = true
 
-        // Forward `-PmodelPath=<path>` / `-PaudioPath=<path>` / `-PlatencyBudgetMs=<ms>` into
-        // instrumentation runner args (consumed by SttAAudioPlumbingTest, PersonaToneSmokeTest,
-        // LiteRtLmTextSmokeTest, PerCapturePersonaSmokeTest).
-        listOf("modelPath", "audioPath", "latencyBudgetMs").forEach { key ->
+        // Forward `-P<key>=<value>` into instrumentation runner args. Consumers:
+        //   modelPath, audioPath, latencyBudgetMs — existing smoke tests.
+        //   manifestPath, runsPerEntry — SttDLensDivergenceTest, SttCTagStabilityTest.
+        //   inferenceBackend — STT-C/STT-D harnesses (cpu | gpu).
+        listOf(
+            "modelPath",
+            "audioPath",
+            "latencyBudgetMs",
+            "manifestPath",
+            "runsPerEntry",
+            "inferenceBackend",
+        ).forEach { key ->
             project.findProperty(key)?.toString()?.let { value ->
                 testInstrumentationRunnerArguments[key] = value
             }

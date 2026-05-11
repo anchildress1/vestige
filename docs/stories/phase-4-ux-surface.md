@@ -135,8 +135,13 @@ Wrap the app in a coherent, dark, atmospheric UX that meets the 10-second judge 
   - 168px hero, five-layer composition (outer halo, conic moonstone ring, frosted-glass body, inner noise, center mark).
   - Idle: stone with subtle internal gradient, no outer halo amplitude.
   - Active recording: outer halo scales with audio `level`, `vapor` (`#2563EB`) tint on halo and ring, `AudioMeter` renders below.
-  - Post-stop / review: halo collapses to outline state with thin `vapor` rim. `Reading the entry.` placeholder shows in transcript area.
+  - Post-stop / review: halo collapses to outline state with thin `vapor` rim. `Reading the entry.` placeholder shows in transcript area (per `ux-copy.md` §"Loading States").
   - Approaching 30s chunk boundary (~25s): thin progress arc on the ring, no copy.
+- [ ] Inference placeholder lifecycle (absorbed from Story 2.11):
+  - Placeholder appears on foreground-call start; holds **≥ 200 ms** to avoid instant-replace flash; otherwise tracks call duration.
+  - On `ForegroundResult.Success`: muted/dimmed transcription per `design-guidelines.md` §"Entry transcript"; model follow-up renders below in primary weight.
+  - On `ForegroundResult.ParseFailure` or `CancellationException` (sealed pair is `Success | ParseFailure` per Story 2.2; cancellation surfaces via throw, not a third variant): error copy from `ux-copy.md` §"Error States". Not the placeholder text. Not blank.
+  - Token streaming is on-deck. Gate: parser survival under incremental LiteRT-LM token delivery (ADR-002 §Q1). Not a vibe check.
 - [ ] Hero title slot above `MistHero` renders an editorial italic line (`Newsreader`) — pulled from `ux-copy.md` §Capture Screen, never invented inline. Example from `poc/screenshots/capture.png`: `What lingered from yesterday?`
 - [ ] Mono tagline strip below `MistHero` per `poc/screenshots/capture.png`: directive (`HOLD THE STONE · SPEAK`-style) and privacy tagline (`30s chunks · audio discarded after extraction`-style). `JetBrains Mono`, eyebrow scale. Strings from `ux-copy.md`.
 - [ ] Entry transcript per `design-guidelines.md` §"Entry transcript" (single-turn-per-capture per the STT-B v1 scope choice — exactly one USER turn + one MODEL turn per entry, no scroll across multiple exchanges):

@@ -9,6 +9,9 @@ import com.google.ai.edge.litertlm.EngineConfig
 import com.google.ai.edge.litertlm.LogSeverity
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.withContext
 
 /** Backend selection. NPU needs the host's `nativeLibraryDir` — only Android `Context` has it. */
@@ -70,6 +73,43 @@ class LiteRtLmEngine(
             "generateText completed in ${elapsedMs}ms (prompt=${prompt.length}c, reply=${response.length}c)",
         )
         response
+    }
+
+    /** Streaming counterpart to [generateText]. Closes the conversation on flow completion. */
+    fun streamText(prompt: String): Flow<String> {
+        val active = checkNotNull(engine) {
+            "LiteRtLmEngine.streamText called before initialize()."
+        }
+        return flow {
+            val conversation = active.createConversation()
+            val started = System.nanoTime()
+            var charsEmitted = 0
+            try {
+                conversation.sendMessageAsync(prompt).collect { message ->
+                    val chunk = message.toString()
+                    charsEmitted += chunk.length
+                    emit(chunk)
+                }
+                val elapsedMs = (System.nanoTime() - started) / NANOS_PER_MILLI
+                Log.d(
+                    TAG,
+                    "streamText completed in ${elapsedMs}ms (prompt=${prompt.length}c, " +
+                        "emitted=${charsEmitted}c)",
+                )
+            } catch (@Suppress("TooGenericExceptionCaught") error: Throwable) {
+                // Log-and-rethrow: native SDK + coroutine cancellation share no exception
+                // hierarchy worth enumerating; partial-emission state is the only thing we own.
+                val elapsedMs = (System.nanoTime() - started) / NANOS_PER_MILLI
+                Log.d(
+                    TAG,
+                    "streamText failed (${error.javaClass.simpleName}) in ${elapsedMs}ms " +
+                        "(prompt=${prompt.length}c, emitted=${charsEmitted}c)",
+                )
+                throw error
+            } finally {
+                conversation.close()
+            }
+        }.flowOn(ioDispatcher)
     }
 
     /**

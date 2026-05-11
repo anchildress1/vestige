@@ -137,6 +137,29 @@ class PatternDetectionOrchestratorTest {
     }
 
     @Test
+    fun `dismissed pattern's latestCalloutText is frozen on silent UPDATE branch`() = runTest {
+        // Drive 10 entries → detector inserts an ACTIVE pattern with a generated callout.
+        repeat(10) { commitOne() }
+        val initial = patternStore.all().single { it.kind == PatternKind.TEMPLATE_RECURRENCE }
+        val frozenText = initial.latestCalloutText
+        assertTrue("seeded callout must be non-blank", frozenText.isNotBlank())
+
+        // User dismisses the pattern.
+        patternStore.transitionState(initial.patternId, PatternState.DISMISSED)
+
+        // Ten more matching entries → another detection run upserts the same patternId.
+        repeat(10) { commitOne() }
+        val pattern = patternStore.findByPatternId(initial.patternId)!!
+        assertEquals(PatternState.DISMISSED, pattern.state)
+        assertEquals(20, pattern.supportingEntries.size)
+        assertEquals(
+            "dismissed pattern's callout text must not drift on silent update",
+            frozenText,
+            pattern.latestCalloutText,
+        )
+    }
+
+    @Test
     fun `callout fires on matching active pattern and writes a PATTERN_CALLOUT observation`() = runTest {
         // Seed an active pattern manually so we can test the per-entry callout pathway in isolation.
         patternStore.put(

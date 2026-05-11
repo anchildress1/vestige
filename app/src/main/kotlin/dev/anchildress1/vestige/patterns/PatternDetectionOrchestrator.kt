@@ -123,8 +123,13 @@ class PatternDetectionOrchestrator(
         pattern.lastSeenTimestamp = detected.lastSeenTimestamp
         pattern.supportingEntries.clear()
         pattern.supportingEntries.addAll(supporting)
-        // Per ADR-003 step 6: `latestCalloutText` updates on UPDATE. Titles never re-render.
-        pattern.latestCalloutText = PatternCalloutText.build(detected)
+        // ADR-003 step 6: `latestCalloutText` updates on the ACTIVE branch only. The silent-update
+        // branches (snoozed within window, dismissed, resolved) accumulate supporting entries but
+        // freeze the callout the user last saw — re-surfacing in v1.5 must show that string,
+        // not arbitrary drift from later evidence.
+        if (pattern.state == PatternState.ACTIVE) {
+            pattern.latestCalloutText = PatternCalloutText.build(detected)
+        }
     }
 
     private fun selectAndRecordCallout(entry: EntryEntity): EntryObservation? {

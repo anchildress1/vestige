@@ -9,15 +9,16 @@ import org.junit.jupiter.api.Test
 import java.time.Instant
 import java.time.LocalDateTime
 import java.time.ZoneId
+import java.time.ZonedDateTime
 
 class TemplateLabelerTest {
 
     private val zone: ZoneId = ZoneId.of("America/Chicago")
-    private val noon: Instant = LocalDateTime.of(2026, 5, 9, 12, 0).atZone(zone).toInstant()
-    private val threeAm: Instant = LocalDateTime.of(2026, 5, 9, 3, 0).atZone(zone).toInstant()
-    private val fiveAm: Instant = LocalDateTime.of(2026, 5, 9, 5, 0).atZone(zone).toInstant()
+    private val noon: ZonedDateTime = LocalDateTime.of(2026, 5, 9, 12, 0).atZone(zone)
+    private val threeAm: ZonedDateTime = LocalDateTime.of(2026, 5, 9, 3, 0).atZone(zone)
+    private val fiveAm: ZonedDateTime = LocalDateTime.of(2026, 5, 9, 5, 0).atZone(zone)
 
-    private val labeler = TemplateLabeler(zoneId = zone)
+    private val labeler = TemplateLabeler()
 
     @Test
     fun `crashed plus state shift resolves to aftermath`() {
@@ -204,7 +205,7 @@ class TemplateLabelerTest {
 
     @Test
     fun `midnight local time is inside the goblin window`() {
-        val midnight = LocalDateTime.of(2026, 5, 9, 0, 0).atZone(zone).toInstant()
+        val midnight = LocalDateTime.of(2026, 5, 9, 0, 0).atZone(zone)
         val resolved = resolved("tags" to listOf("late-night").canonical())
 
         assertEquals(TemplateLabel.GOBLIN_HOURS, labeler.label(resolved, capturedAt = midnight))
@@ -212,22 +213,21 @@ class TemplateLabelerTest {
 
     @Test
     fun `0459 local time is the inclusive upper edge of the goblin window`() {
-        val justBeforeFive = LocalDateTime.of(2026, 5, 9, 4, 59).atZone(zone).toInstant()
+        val justBeforeFive = LocalDateTime.of(2026, 5, 9, 4, 59).atZone(zone)
         val resolved = resolved("tags" to listOf("late-night").canonical())
 
         assertEquals(TemplateLabel.GOBLIN_HOURS, labeler.label(resolved, capturedAt = justBeforeFive))
     }
 
     @Test
-    fun `zoneId parameter actually drives the goblin window — UTC mid-morning is local 3am Chicago`() {
-        // 08:00 UTC = 03:00 America/Chicago — in the goblin window only under the local zone.
-        val utcEightAm = Instant.parse("2026-05-09T08:00:00Z")
+    fun `capture zone drives the goblin window — same UTC instant under different zones flips the label`() {
+        // 08:00 UTC = 03:00 America/Chicago (inside) vs 08:00 UTC (outside). The labeler reads
+        // hour from the captured ZonedDateTime, not from any ambient JVM default.
+        val instant = Instant.parse("2026-05-09T08:00:00Z")
         val resolved = resolved("tags" to listOf("late-night").canonical())
 
-        val labeledLocal = TemplateLabeler(zoneId = ZoneId.of("America/Chicago"))
-            .label(resolved, capturedAt = utcEightAm)
-        val labeledUtc = TemplateLabeler(zoneId = ZoneId.of("UTC"))
-            .label(resolved, capturedAt = utcEightAm)
+        val labeledLocal = labeler.label(resolved, capturedAt = instant.atZone(ZoneId.of("America/Chicago")))
+        val labeledUtc = labeler.label(resolved, capturedAt = instant.atZone(ZoneId.of("UTC")))
 
         assertEquals(TemplateLabel.GOBLIN_HOURS, labeledLocal)
         assertEquals(TemplateLabel.AUDIT, labeledUtc)

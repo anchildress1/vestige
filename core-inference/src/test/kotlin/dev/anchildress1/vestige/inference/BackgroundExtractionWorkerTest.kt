@@ -20,11 +20,11 @@ import org.junit.jupiter.api.Assertions.assertThrows
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import java.time.Instant
-import java.util.TimeZone
+import java.time.ZoneId
 
 class BackgroundExtractionWorkerTest {
 
-    private val capturedAt: Instant = Instant.parse("2026-05-09T08:00:00Z")
+    private val capturedAt = Instant.parse("2026-05-09T08:00:00Z").atZone(ZoneId.of("America/Chicago"))
     private val request = BackgroundExtractionRequest(entryText = "user words", capturedAt = capturedAt)
     private val resolved = ResolvedExtraction(
         fields = mapOf(
@@ -257,36 +257,49 @@ class BackgroundExtractionWorkerTest {
     }
 
     @Test
-    fun `worker computes the template label from the supplied capture timestamp`() = runTest {
+    fun `worker labels using the capture timestamp's zone, not the JVM default`() = runTest {
         val engine = mockk<LiteRtLmEngine>()
         coEvery { engine.generateText(any()) } returns "raw-ok"
         val lateNightResolved = ResolvedExtraction(
             fields = mapOf("tags" to ResolvedField(listOf("late-night"), ConfidenceVerdict.CANONICAL)),
         )
         val parser: (Lens, String) -> LensExtraction? = { lens, _ -> extraction(lens) }
-        val originalZone = TimeZone.getDefault()
-        try {
-            // Pin the JVM default zone so the worker's default TemplateLabeler is deterministic:
-            // 08:00 UTC is 03:00 in Chicago, which sits inside the goblin window.
-            TimeZone.setDefault(TimeZone.getTimeZone("America/Chicago"))
+        // 08:00 UTC = 03:00 Chicago (inside goblin) but 08:00 UTC zone (outside goblin). Asserting
+        // both reads of the same instant proves the labeler reads the captured zone, not ambient.
+        val instant = Instant.parse("2026-05-09T08:00:00Z")
 
-            val result = BackgroundExtractionWorker(
-                engine = engine,
-                resolver = RecordingResolver(lateNightResolved),
-                parser = parser,
-                composer = fakeComposer(),
-            ).extract(
-                request = BackgroundExtractionRequest(
-                    entryText = "user words",
-                    capturedAt = Instant.parse("2026-05-09T08:00:00Z"),
-                ),
-            )
+        val chicagoResult = BackgroundExtractionWorker(
+            engine = engine,
+            resolver = RecordingResolver(lateNightResolved),
+            parser = parser,
+            composer = fakeComposer(),
+        ).extract(
+            request = BackgroundExtractionRequest(
+                entryText = "user words",
+                capturedAt = instant.atZone(ZoneId.of("America/Chicago")),
+            ),
+        )
 
-            val success = assertInstanceOf(BackgroundExtractionResult.Success::class.java, result)
-            assertEquals(TemplateLabel.GOBLIN_HOURS, success.templateLabel)
-        } finally {
-            TimeZone.setDefault(originalZone)
-        }
+        val utcResult = BackgroundExtractionWorker(
+            engine = engine,
+            resolver = RecordingResolver(lateNightResolved),
+            parser = parser,
+            composer = fakeComposer(),
+        ).extract(
+            request = BackgroundExtractionRequest(
+                entryText = "user words",
+                capturedAt = instant.atZone(ZoneId.of("UTC")),
+            ),
+        )
+
+        assertEquals(
+            TemplateLabel.GOBLIN_HOURS,
+            assertInstanceOf(BackgroundExtractionResult.Success::class.java, chicagoResult).templateLabel,
+        )
+        assertEquals(
+            TemplateLabel.AUDIT,
+            assertInstanceOf(BackgroundExtractionResult.Success::class.java, utcResult).templateLabel,
+        )
     }
 
     @Test

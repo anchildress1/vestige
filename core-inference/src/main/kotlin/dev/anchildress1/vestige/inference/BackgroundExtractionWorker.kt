@@ -10,11 +10,16 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
-import java.time.Instant
+import java.time.ZonedDateTime
 
+/**
+ * `capturedAt` carries the user's local zone at recording time. Pass a [ZonedDateTime] (not an
+ * [java.time.Instant]) so the eventual `template_label` can't drift when the user changes
+ * timezone or DST shifts between recording and the background extraction run.
+ */
 data class BackgroundExtractionRequest(
     val entryText: String,
-    val capturedAt: Instant,
+    val capturedAt: ZonedDateTime,
     val retrievedHistory: List<HistoryChunk> = emptyList(),
     val entryAttemptCount: Int = 0,
     val timeoutMs: Long? = null,
@@ -148,7 +153,7 @@ class BackgroundExtractionWorker(
 
     private suspend fun completeRun(
         state: RunState,
-        capturedAt: Instant,
+        capturedAt: ZonedDateTime,
         startedNanos: Long,
         listener: ExtractionStatusListener,
     ): BackgroundExtractionResult {

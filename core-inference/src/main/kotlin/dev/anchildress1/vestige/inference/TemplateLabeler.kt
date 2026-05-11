@@ -4,8 +4,7 @@ import dev.anchildress1.vestige.model.ConfidenceVerdict
 import dev.anchildress1.vestige.model.ResolvedExtraction
 import dev.anchildress1.vestige.model.ResolvedField
 import dev.anchildress1.vestige.model.TemplateLabel
-import java.time.Instant
-import java.time.ZoneId
+import java.time.ZonedDateTime
 
 /**
  * Deterministic post-convergence labeler. Reads the resolved schema fields plus the entry's local
@@ -16,10 +15,14 @@ import java.time.ZoneId
  * Only CANONICAL / CANONICAL_WITH_CONFLICT fields drive label selection: CANDIDATE values are
  * single-lens witnesses ("lower confidence, not used by pattern engine until promoted" per
  * `concept-locked.md` §"Convergence rules") and the template label feeds pattern grouping.
+ *
+ * `capturedAt` is a [ZonedDateTime] — both the instant *and* the user's local zone at capture
+ * must be persisted with the entry so a TZ change between capture and background extraction can't
+ * relabel the entry.
  */
-class TemplateLabeler(private val zoneId: ZoneId = ZoneId.systemDefault()) {
+class TemplateLabeler {
 
-    fun label(resolved: ResolvedExtraction, capturedAt: Instant): TemplateLabel {
+    fun label(resolved: ResolvedExtraction, capturedAt: ZonedDateTime): TemplateLabel {
         val energy = resolved.stringFieldOrNull(ENERGY_DESCRIPTOR_KEY)
         val stateShift = resolved.booleanFieldOrNull(STATE_SHIFT_KEY) == true
         val tags = resolved.tagSet()
@@ -37,10 +40,8 @@ class TemplateLabeler(private val zoneId: ZoneId = ZoneId.systemDefault()) {
     private fun isAftermath(energy: String?, stateShift: Boolean): Boolean =
         stateShift && energy?.trim()?.lowercase() == CRASHED
 
-    private fun isGoblinHours(capturedAt: Instant, tags: Set<String>): Boolean {
-        val localHour = capturedAt.atZone(zoneId).hour
-        return localHour in GOBLIN_HOURS_RANGE && tags.containsAny(LATE_NIGHT_TAGS)
-    }
+    private fun isGoblinHours(capturedAt: ZonedDateTime, tags: Set<String>): Boolean =
+        capturedAt.hour in GOBLIN_HOURS_RANGE && tags.containsAny(LATE_NIGHT_TAGS)
 
     private fun Set<String>.containsAny(candidates: Set<String>): Boolean = candidates.any { it in this }
 

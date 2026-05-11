@@ -19,8 +19,8 @@ class RetrievalRepo(private val boxStore: BoxStore, private val clock: Clock = C
     /**
      * Return the top-[topN] entries for [text]. Matches require non-zero keyword *or* tag overlap;
      * recency alone never surfaces an entry. Empty / blank queries and DBs with zero matches yield
-     * an empty list (never nulls). [recencyWeight] scales the recency boost — default `0.3` per
-     * ADR-002 §Q2 retrieval-budget defaults.
+     * an empty list (never nulls). [recencyWeight] scales the recency boost — default `0.3`,
+     * tunable per Phase 2 measurements (ADR-002 §Q2's general retrieval-tuning rule).
      */
     fun query(
         text: String,

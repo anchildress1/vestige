@@ -35,15 +35,15 @@ Stand up the memory layer (hybrid retrieval over saved entries) and the pattern 
 **As** the AI implementor, **I need** a `RetrievalRepo` in `:core-storage` that returns the top-N relevant entries for a query string using keyword match, tag-set overlap, and recency-weighting (no vectors yet), **so that** pattern detection (Story 3.5) and re-eval workflows have a stable retrieval path that exists regardless of how STT-E (Story 3.3) resolves.
 
 **Done when:**
-- [x] `RetrievalRepo.query(text: String, topN: Int = 3, recencyWeight: Float = 0.3): List<Entry>` returns ranked entries from ObjectBox.
+- [x] `RetrievalRepo.query(text: String, topN: Int = 3, recencyWeight: Float = 0.3): List<EntryEntity>` returns ranked entries from ObjectBox.
 - [x] Ranking combines: (a) keyword overlap with `entry_text`; (b) tag-set Jaccard overlap with extracted tags from the query; (c) recency-weighted boost so newer entries place higher when other signals are equivalent.
-- [x] Recency weight is configurable (default `0.3` per ADR-002 §Q2 retrieval-budget defaults).
+- [x] Recency weight is configurable (default `0.3`, tunable per Phase 2 measurements per `../adrs/ADR-002-multi-lens-extraction-pattern.md` §Q2's general retrieval-tuning rule).
 - [x] Query results are deterministic for the same input — no random tie-breaking.
 - [x] Unit tests cover: empty database (returns empty), single matching entry, multiple matches with deterministic ordering, no matches (returns empty list, not nulls).
 
 **Notes / risks:** No model calls in this story. `RetrievalRepo` is pure ObjectBox querying + deterministic scoring. The vector branch lands in Story 3.4 only if STT-E passes.
 
-Query-side tag extraction goes beyond exact-substring match: a free-form query bridges to kebab-case stored tags (e.g., `tuesday meeting` → `tuesday-meeting`) and folds simple English plurals (`meeting` ↔ `meetings`). This is comparison-only — stored surface forms are never rewritten. Authorized by `../adrs/ADR-002-multi-lens-extraction-pattern.md` §"Plural folding addendum" (the `news`/`series`/`bus` corruption guards from that addendum apply here too).
+Query-side tag extraction goes beyond exact-substring match: a free-form query bridges to kebab-case stored tags (e.g., `tuesday meeting` → `tuesday-meeting`) and folds simple English plurals (`meeting` ↔ `meetings`). This is comparison-only — stored surface forms are never rewritten. Authorized by `../adrs/ADR-002-multi-lens-extraction-pattern.md` §"Plural folding addendum" (the `news` / `series` corruption cases named there are preserved verbatim; short tokens like `bus` are guarded separately by the stemmer's minimum-length rule).
 
 ---
 

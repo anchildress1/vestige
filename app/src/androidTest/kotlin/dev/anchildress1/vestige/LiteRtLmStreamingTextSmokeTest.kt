@@ -13,21 +13,14 @@ import org.junit.runner.RunWith
 import java.io.File
 
 /**
- * STT-D-adjacent existential check for streaming. Runs [LiteRtLmEngine.streamText] against the
- * loaded Gemma 4 E4B model and records (a) the time-to-first-emission and (b) per-emission chunk
- * length so the operator can confirm whether the SDK delivers incremental tokens or cumulative
- * snapshots. Without this measurement, the partial-output parser story can't move past
- * speculation — see ADR-002 §Q1.
- *
- * Manual, on-device. Push the model then run:
+ * Smoke test for [LiteRtLmEngine.streamText]. Logs per-chunk length and time-to-first so the
+ * operator can confirm SDK emission shape on device.
  *
  *   adb push gemma-4-E4B-it.litertlm /data/local/tmp/
  *   ./gradlew :app:connectedDebugAndroidTest \
  *     -PmodelPath=/data/local/tmp/gemma-4-E4B-it.litertlm \
  *     -PinferenceBackend=gpu \
  *     -Pandroid.testInstrumentationRunnerArguments.class=dev.anchildress1.vestige.LiteRtLmStreamingTextSmokeTest
- *
- * Missing model → [assumeTrue] skip, CI stays green.
  */
 @RunWith(AndroidJUnit4::class)
 class LiteRtLmStreamingTextSmokeTest {

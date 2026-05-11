@@ -3,11 +3,13 @@ package dev.anchildress1.vestige.inference
 import android.util.Log
 import com.google.ai.edge.litertlm.Content
 import dev.anchildress1.vestige.model.Persona
+import dev.anchildress1.vestige.model.TemplateLabel
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.time.Clock
+import java.time.ZoneId
 import java.util.concurrent.ConcurrentHashMap
 
 /**
@@ -20,6 +22,7 @@ class ForegroundInference(
     private val engine: LiteRtLmEngine,
     private val cacheDir: File,
     private val clock: Clock = Clock.systemUTC(),
+    private val zoneId: ZoneId = ZoneId.systemDefault(),
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) {
 
@@ -31,7 +34,8 @@ class ForegroundInference(
         }
         require(cacheDir.isDirectory) { "cacheDir must be an existing directory: $cacheDir" }
 
-        val systemPrompt = composeSystemPrompt(persona)
+        val callStartedAt = clock.instant()
+        val systemPrompt = composeSystemPrompt(persona, callStartedAt)
         val temp = synchronized(tempWavLock) {
             sweepStaleTempWavs()
             File.createTempFile(TEMP_PREFIX, TEMP_SUFFIX, cacheDir).also {
@@ -88,15 +92,22 @@ class ForegroundInference(
             }
     }
 
-    private fun composeSystemPrompt(persona: Persona): String {
+    private fun composeSystemPrompt(persona: Persona, startedAt: java.time.Instant): String {
         val personaPrompt = PersonaPromptComposer.compose(persona).trimEnd()
         return buildString {
             append(personaPrompt)
             append("\n\n")
             append(OUTPUT_SCHEMA_REMINDER)
+            if (isGoblinHours(startedAt)) {
+                append("\n\n")
+                append(GOBLIN_HOURS_ADDENDUM.trimEnd())
+            }
             append('\n')
         }
     }
+
+    private fun isGoblinHours(startedAt: java.time.Instant): Boolean =
+        startedAt.atZone(zoneId).hour in GOBLIN_HOURS_RANGE
 
     companion object {
         internal const val TEMP_PREFIX = "vestige-fg-"
@@ -114,6 +125,17 @@ class ForegroundInference(
                 "echo this format description. Do not nest tags. Do not produce additional " +
                 "tagged blocks. The transcription must be exact and unaltered.",
         ).joinToString(separator = "\n")
+
+        // Shared with TemplateLabeler so the addendum window and the post-extraction label
+        // window cannot drift. Source of truth: TemplateLabel.GOBLIN_HOURS_LOCAL_HOUR_RANGE.
+        internal val GOBLIN_HOURS_RANGE: IntRange = TemplateLabel.GOBLIN_HOURS_LOCAL_HOUR_RANGE
+        internal const val GOBLIN_HOURS_RESOURCE = "/foreground/goblin-hours-addendum.txt"
+
+        private val GOBLIN_HOURS_ADDENDUM: String by lazy {
+            val stream = ForegroundInference::class.java.getResourceAsStream(GOBLIN_HOURS_RESOURCE)
+                ?: error("Goblin-hours addendum resource missing: $GOBLIN_HOURS_RESOURCE")
+            stream.bufferedReader(Charsets.UTF_8).use { it.readText() }
+        }
 
         private const val TAG = "VestigeForegroundInference"
         private const val NANOS_PER_MILLI = 1_000_000L

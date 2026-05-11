@@ -237,6 +237,41 @@ class RetrievalRepoTest {
     }
 
     @Test
+    fun `ADR-002 preserved surfaces — query 'new' must not bridge to stored 'news'`() {
+        insertEntry("unrelated body text", daysAgo = 5, tagNames = listOf("news"))
+        insertEntry("unrelated body text", daysAgo = 5, tagNames = listOf("laundry"))
+
+        // ADR-002 §"Plural folding addendum" names 'news' as a corruption case (naive stem → 'new').
+        // The PRESERVED_SURFACES exception keeps the surface form intact on both sides of the compare.
+        assertTrue(repo.query("new").isEmpty())
+    }
+
+    @Test
+    fun `ADR-002 preserved surfaces — query 'sery' must not bridge to stored 'series'`() {
+        insertEntry("unrelated body text", daysAgo = 5, tagNames = listOf("series"))
+        insertEntry("unrelated body text", daysAgo = 5, tagNames = listOf("laundry"))
+
+        // 'series' would corrupt to 'sery' under the ies→y rule; the PRESERVED_SURFACES exception
+        // exits the stemmer before any rules apply.
+        assertTrue(repo.query("sery").isEmpty())
+    }
+
+    @Test
+    fun `plural-singular tag pair scores 1_0 on comparison keys`() {
+        // Both 'meeting' and 'meetings' coexist as separate TagEntity rows — Copilot review #2.
+        // tagScore must be computed on stems, so the entry tagged only 'meeting' still gets a
+        // perfect overlap against the query 'meetings'.
+        val meeting = insertEntry("unrelated body text", daysAgo = 5, tagNames = listOf("meeting"))
+        // Seed the second stored tag on an unrelated entry so it lives in tagBox.all.
+        insertEntry("crash today", daysAgo = 5, tagNames = listOf("meetings"))
+
+        // Query "meeting" with stored vocab {meeting, meetings} — entry tagged only 'meeting'
+        // must still surface; under surface-form Jaccard it would have scored ~0.5.
+        val results = repo.query("meeting")
+        assertTrue("expected $meeting in results, got ${results.map { it.id }}", meeting in results.map { it.id })
+    }
+
+    @Test
     fun `stored tag surface forms are never mutated by query stemming`() {
         // ADR-002 §"Plural folding addendum" requires comparison-only normalization — the stored
         // tag entity must keep its original surface form even when surfaced via a stemmed query.

@@ -35,14 +35,15 @@ class RetrievalRepo(private val boxStore: BoxStore, private val clock: Clock = C
 
         val entryBox = boxStore.boxFor<EntryEntity>()
         val tagBox = boxStore.boxFor<TagEntity>()
-        val queryTagNames = QueryTagMatcher.resolve(queryTerms, tagBox.all.map { it.name })
+        val storedTagKeys = tagBox.all.mapNotNullTo(linkedSetOf()) { QueryTagMatcher.storedKey(it.name) }
+        val queryTagKeys = QueryTagMatcher.queryKeysMatching(queryTerms, storedTagKeys)
 
         val nowMs = clock.millis()
         val scored = entryBox.all.mapNotNull { entry ->
             val entryTokens = tokenizeToList(entry.entryText).toSet()
             val keywordScore = jaccardishKeyword(queryTokens, entryTokens)
-            val entryTagNames = entry.tags.map { it.name }.toSet()
-            val tagScore = jaccard(queryTagNames, entryTagNames)
+            val entryTagKeys = entry.tags.mapNotNullTo(linkedSetOf()) { QueryTagMatcher.storedKey(it.name) }
+            val tagScore = jaccard(queryTagKeys, entryTagKeys)
             if (keywordScore == 0.0 && tagScore == 0.0) return@mapNotNull null
             val recency = recencyNorm(entry.timestampEpochMs, nowMs)
             val score = keywordScore + tagScore + recencyWeight * recency
@@ -99,29 +100,33 @@ private object QueryTagMatcher {
     private const val MIN_STEM_LENGTH = 3
     private const val IES_SUFFIX = "ies"
 
-    fun resolve(queryTerms: List<String>, storedTagNames: List<String>): Set<String> {
-        if (queryTerms.isEmpty() || storedTagNames.isEmpty()) return emptySet()
-        val maxTagWords = storedTagNames.maxOf { storedTagWordCount(it) }
-        val queryTagKeys = buildQueryTagKeys(queryTerms, maxTagWords)
-        return storedTagNames.filterTo(linkedSetOf()) { storedTag ->
-            comparisonKey(storedTag) in queryTagKeys
-        }
-    }
+    // ADR-002 §"Plural folding addendum" names singular tags that naive singularizers corrupt
+    // (news → new, series → sery). Comparison-only: stored surface forms are never rewritten.
+    private val PRESERVED_SURFACES: Set<String> = setOf("news", "series", "species")
 
-    private fun buildQueryTagKeys(queryTerms: List<String>, maxTagWords: Int): Set<String> {
-        if (queryTerms.isEmpty()) return emptySet()
+    /** Comparison key for a stored tag name. Null when the tag normalizes to nothing. */
+    fun storedKey(tagName: String): String? = comparisonKey(tagName)
+
+    /**
+     * Build the set of comparison keys derived from `queryTerms` (all 1..maxStored-word windows,
+     * stemmed) that match at least one entry in `storedKeys`. Filtering against the stored
+     * vocabulary keeps spurious N-gram windows (e.g., 1-grams when only multi-word tags exist)
+     * out of the Jaccard union.
+     */
+    fun queryKeysMatching(queryTerms: List<String>, storedKeys: Set<String>): Set<String> {
+        if (queryTerms.isEmpty() || storedKeys.isEmpty()) return emptySet()
+        val maxTagWords = storedKeys.maxOf { it.count { ch -> ch == '-' } + 1 }
         val cappedMaxWords = min(maxTagWords, queryTerms.size)
         val keys = linkedSetOf<String>()
         for (windowSize in 1..cappedMaxWords) {
             for (start in 0..queryTerms.size - windowSize) {
                 val phrase = queryTerms.subList(start, start + windowSize).joinToString("-")
-                comparisonKey(phrase)?.let(keys::add)
+                val key = comparisonKey(phrase) ?: continue
+                if (key in storedKeys) keys.add(key)
             }
         }
         return keys
     }
-
-    private fun storedTagWordCount(tag: String): Int = normalizeTagPhrase(tag)?.split('-')?.size ?: 0
 
     private fun comparisonKey(text: String): String? =
         normalizeTagPhrase(text)?.split('-')?.joinToString("-") { stemForCompare(it) }
@@ -129,16 +134,12 @@ private object QueryTagMatcher {
     private fun normalizeTagPhrase(text: String): String? =
         tokenizeToList(text).takeIf { it.isNotEmpty() }?.joinToString("-")
 
-    // ADR-002 §"Plural folding addendum" authorizes comparison-only normalization when retrieval
-    // (or resolver agreement counting) needs it — never persist the stem. The ss/us/is exceptions
-    // and MIN_STEM_LENGTH guard cover the news/series/bus corruptions that motivated the addendum.
-    private fun stemForCompare(token: String): String {
-        if (token.length <= MIN_STEM_LENGTH) return token
-        return when {
-            token.endsWith(IES_SUFFIX) -> token.dropLast(IES_SUFFIX.length) + "y"
-            token.endsWith("ss") || token.endsWith("us") || token.endsWith("is") -> token
-            token.endsWith('s') -> token.dropLast(1)
-            else -> token
-        }
+    private fun stemForCompare(token: String): String = when {
+        token in PRESERVED_SURFACES -> token
+        token.length <= MIN_STEM_LENGTH -> token
+        token.endsWith("ss") || token.endsWith("us") || token.endsWith("is") -> token
+        token.endsWith(IES_SUFFIX) -> token.dropLast(IES_SUFFIX.length) + "y"
+        token.endsWith('s') -> token.dropLast(1)
+        else -> token
     }
 }

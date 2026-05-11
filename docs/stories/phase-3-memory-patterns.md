@@ -43,7 +43,7 @@ Stand up the memory layer (hybrid retrieval over saved entries) and the pattern 
 
 **Notes / risks:** No model calls in this story. `RetrievalRepo` is pure ObjectBox querying + deterministic scoring. The vector branch lands in Story 3.4 only if STT-E passes.
 
-Query-side tag extraction goes beyond exact-substring match: a free-form query bridges to kebab-case stored tags (e.g., `tuesday meeting` → `tuesday-meeting`) and folds simple English plurals (`meeting` ↔ `meetings`). This is comparison-only — stored surface forms are never rewritten. Authorized by `adrs/ADR-002-multi-lens-extraction-pattern.md` §"Plural folding addendum" (the `news`/`series`/`bus` corruption guards from that addendum apply here too).
+Query-side tag extraction goes beyond exact-substring match: a free-form query bridges to kebab-case stored tags (e.g., `tuesday meeting` → `tuesday-meeting`) and folds simple English plurals (`meeting` ↔ `meetings`). This is comparison-only — stored surface forms are never rewritten. Authorized by `../adrs/ADR-002-multi-lens-extraction-pattern.md` §"Plural folding addendum" (the `news`/`series`/`bus` corruption guards from that addendum apply here too).
 
 ---
 

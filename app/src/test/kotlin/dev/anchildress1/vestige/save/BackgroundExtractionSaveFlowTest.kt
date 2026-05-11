@@ -20,8 +20,10 @@ import io.mockk.every
 import io.mockk.mockk
 import io.mockk.slot
 import io.mockk.verify
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Assertions.fail
 import org.junit.jupiter.api.Test
 import java.time.ZoneId
@@ -240,6 +242,92 @@ class BackgroundExtractionSaveFlowTest {
             downstream.onUpdate(ExtractionStatus.FAILED, 0, "persistence-error:IllegalStateException")
         }
         coVerify(exactly = 0) { downstream.onUpdate(ExtractionStatus.COMPLETED, 0, null) }
+    }
+
+    @Test
+    fun `failed result reaches lifecycle listener only after failEntry succeeds`() = runTest {
+        val downstream: ExtractionStatusListener = mockk(relaxed = true)
+        val flowWithMockListener =
+            BackgroundExtractionSaveFlow(entryStore, worker, observationGenerator) { downstream }
+        val failEntryReturned = CompletableDeferred<Unit>()
+        every { entryStore.createPendingEntry(any(), any()) } returns ENTRY_ID
+        coEvery {
+            worker.extract(any(), capture(capturedListener))
+        } coAnswers {
+            capturedListener.captured.onUpdate(ExtractionStatus.RUNNING, 0, null)
+            capturedListener.captured.onUpdate(ExtractionStatus.FAILED, 0, "all-lenses-parse-fail")
+            BackgroundExtractionResult.Failed(
+                totalElapsedMs = 12_000L,
+                lensResults = emptyList(),
+                modelCallCount = 6,
+                lastError = "all-lenses-parse-fail",
+            )
+        }
+        every {
+            entryStore.failEntry(ENTRY_ID, ExtractionStatus.FAILED, "all-lenses-parse-fail")
+        } answers {
+            failEntryReturned.complete(Unit)
+            Unit
+        }
+        coEvery {
+            downstream.onUpdate(ExtractionStatus.FAILED, 0, "all-lenses-parse-fail")
+        } coAnswers {
+            assertTrue(failEntryReturned.isCompleted)
+            Unit
+        }
+
+        val outcome = flowWithMockListener.saveAndExtract(SAMPLE_TEXT, SAMPLE_TIMESTAMP)
+
+        val failed = outcome as SaveOutcome.Failed
+        assertEquals(ENTRY_ID, failed.entryId)
+        coVerifyOrder {
+            downstream.onUpdate(ExtractionStatus.RUNNING, 0, null)
+            entryStore.failEntry(ENTRY_ID, ExtractionStatus.FAILED, "all-lenses-parse-fail")
+            downstream.onUpdate(ExtractionStatus.FAILED, 0, "all-lenses-parse-fail")
+        }
+    }
+
+    @Test
+    fun `timed out result reaches lifecycle listener only after failEntry succeeds`() = runTest {
+        val downstream: ExtractionStatusListener = mockk(relaxed = true)
+        val flowWithMockListener =
+            BackgroundExtractionSaveFlow(entryStore, worker, observationGenerator) { downstream }
+        val failEntryReturned = CompletableDeferred<Unit>()
+        every { entryStore.createPendingEntry(any(), any()) } returns ENTRY_ID
+        coEvery {
+            worker.extract(any(), capture(capturedListener))
+        } coAnswers {
+            capturedListener.captured.onUpdate(ExtractionStatus.RUNNING, 0, null)
+            capturedListener.captured.onUpdate(ExtractionStatus.TIMED_OUT, 0, "timeout-after-90000ms")
+            BackgroundExtractionResult.TimedOut(
+                totalElapsedMs = 90_000L,
+                lensResults = emptyList(),
+                modelCallCount = 2,
+                timeoutMs = 90_000L,
+            )
+        }
+        every {
+            entryStore.failEntry(ENTRY_ID, ExtractionStatus.TIMED_OUT, "timeout-after-90000ms")
+        } answers {
+            failEntryReturned.complete(Unit)
+            Unit
+        }
+        coEvery {
+            downstream.onUpdate(ExtractionStatus.TIMED_OUT, 0, "timeout-after-90000ms")
+        } coAnswers {
+            assertTrue(failEntryReturned.isCompleted)
+            Unit
+        }
+
+        val outcome = flowWithMockListener.saveAndExtract(SAMPLE_TEXT, SAMPLE_TIMESTAMP)
+
+        val timedOut = outcome as SaveOutcome.TimedOut
+        assertEquals(ENTRY_ID, timedOut.entryId)
+        coVerifyOrder {
+            downstream.onUpdate(ExtractionStatus.RUNNING, 0, null)
+            entryStore.failEntry(ENTRY_ID, ExtractionStatus.TIMED_OUT, "timeout-after-90000ms")
+            downstream.onUpdate(ExtractionStatus.TIMED_OUT, 0, "timeout-after-90000ms")
+        }
     }
 
     @Test

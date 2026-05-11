@@ -114,11 +114,14 @@ class PatternDetector(
                 tokenToEntries.getOrPut(token) { mutableListOf() }.add(entry)
             }
         }
+        // ADR-003 §"Vocabulary-frequency context check" guards against "a single long sentence
+        // using 'tired' four times." `vocabTokensFor` returns a Set, so each entry contributes
+        // at most once per token — the ≥4 distinct-entry threshold already enforces the
+        // diversity requirement. Templated-context narrowing rejected legitimate cases (e.g.
+        // four entries with `templateLabel = null`, which is the predominant shape early in
+        // the corpus); using entry distinctness instead matches the ADR's stated intent.
         return tokenToEntries
-            .filter { (_, supporting) ->
-                supporting.size >= VOCAB_THRESHOLD &&
-                    supporting.mapNotNull { it.templateLabel }.distinct().size >= VOCAB_MIN_CONTEXTS
-            }
+            .filter { (_, supporting) -> supporting.distinctBy { it.id }.size >= VOCAB_THRESHOLD }
             .map { (token, supporting) ->
                 val sig = PatternSignature.forVocabToken(token)
                 detected(sig, supporting)
@@ -153,7 +156,6 @@ class PatternDetector(
     companion object {
         const val SUPPORTING_THRESHOLD = 3
         const val VOCAB_THRESHOLD = 4
-        const val VOCAB_MIN_CONTEXTS = 2
         const val TAG_PAIR_SIZE = 2
         const val DETECTION_INTERVAL = 10
         const val WINDOW_90D_MS: Long = 90L * 24 * 60 * 60 * 1000

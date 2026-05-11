@@ -314,3 +314,55 @@ The other significant trade-off is **mark-resolved sticky vs. auto-reopen**. Sti
 8. [ ] Phase 3 — unit-test fixture suite mirroring ADR-002 Q4: synthetic entry sets covering each primitive's threshold edge, the cooldown reset, dismiss/snooze/resolved transitions, and the snoozed-until expiry path.
 9. [ ] Phase 4 — Patterns list / Pattern Detail UI per `design-guidelines.md` and `ux-copy.md`; un-snooze affordance lands here.
 10. [ ] Update `architecture-brief.md` §"AppContainer Ownership" — `PatternStore` ownership note now references this ADR for state-machine behavior.
+
+---
+
+### Addendum (2026-05-11) — "distinct contexts" operational definition
+
+Story 3.5's implementation initially read "≥2 distinct contexts" as ≥2 distinct
+`template_label` values across the supporting set. That narrowed legitimate corpus shapes
+out of the pattern engine — entries with `templateLabel = null` (the common case before
+extraction has stabilized) were rejected wholesale, and a stretch of four `aftermath`-only
+entries with the same vocab token collapsed to a context-count of 1.
+
+The original ADR text "the diversity requirement so a single long sentence using 'tired'
+four times does not become a pattern" describes the within-entry case. `vocabTokensFor`
+returns a `Set` per entry, so each entry contributes once per token by construction — the
+≥4 distinct-entry threshold already enforces the diversity guard.
+
+**Operational definition (v1):** "≥N entries with ≥2 distinct contexts" reduces to ≥N
+distinct entries containing the stemmed token. No additional template-label diversity
+requirement. The `VOCAB_MIN_CONTEXTS` constant is removed; `VOCAB_THRESHOLD = 4` is the only
+gate.
+
+### Addendum (2026-05-11) — `latestCalloutText` is frozen on silent-update branches
+
+Step 6's UPDATE branches:
+- `active` → refreshes `supportingEntryIds`, `lastSeenTimestamp`, **and** `latestCalloutText`.
+- `snoozed` / `dismissed` / `resolved` → refreshes `supportingEntryIds` and `lastSeenTimestamp`
+  silently. `latestCalloutText` is **not** rewritten.
+
+This preserves the user-facing string from the moment the row left ACTIVE. A v1.5
+un-dismiss or un-snooze surface will show what the user last saw, not arbitrary later
+evidence.
+
+### Addendum (2026-05-11) — kebab-case normalization in signature hash
+
+The "lowercase, kebab-case, sorted" wording under §"`pattern_id` generation" is normative.
+Implementation routes all label / tag / topic inputs through a single `TagNormalize.kebab`
+helper that lowercases, replaces whitespace + underscores with hyphens, collapses repeats,
+and trims edge hyphens. The same helper is called in the signature builder, the detector's
+grouping keys, and the matcher's compare path so the hash inputs cannot drift between
+subsystems.
+
+### Addendum (2026-05-11) — callout cooldown decrements only on suppressed candidates
+
+§"Cooldown (callout-side only, global)" reads "After a callout fires on entry E, suppress
+callouts on the next 3 entries even when active patterns match." The phrase "even when
+active patterns match" qualifies the window — it counts callout-eligible entries, not every
+committed entry.
+
+Implementation: the cooldown counter decrements only when a candidate pattern existed but
+the suppression window blocked it (or its `latestCalloutText` was blank, in which case a
+warning is logged and the counter is left alone — broken row, not a real fire). Entries
+with no matching active pattern leave the counter alone.

@@ -135,13 +135,23 @@ class PatternDetectorTest {
     }
 
     @Test
-    fun `vocab pattern requires four entries and two distinct template contexts`() {
-        // 4 entries containing "tired" but all under one template label → does not pattern.
-        repeat(4) { putEntry(text = "I am tired again", templateLabel = TemplateLabel.AFTERMATH) }
+    fun `vocab pattern requires four distinct entries containing the token`() {
+        // 3 entries — below threshold.
+        repeat(3) { putEntry(text = "I am tired again", templateLabel = TemplateLabel.AFTERMATH) }
         assertNull(detector.detect().firstOrNull { it.kind == PatternKind.VOCAB_FREQUENCY })
 
-        // Mix in a second context (different template label) → now ≥2 distinct contexts → fires.
-        putEntry(text = "tired all morning", templateLabel = TemplateLabel.TUNNEL_EXIT)
+        // 4th entry crosses threshold. Template label irrelevant — vocab fires on entry count.
+        putEntry(text = "tired all morning", templateLabel = TemplateLabel.AFTERMATH)
+        val patterns = detector.detect().filter { it.kind == PatternKind.VOCAB_FREQUENCY }
+        assertTrue(patterns.any { it.signatureJson.contains("\"token\":\"tired\"") })
+    }
+
+    @Test
+    fun `vocab pattern fires even when all supporting entries lack a template label`() {
+        // ADR-003's diversity guard ("a single long sentence using 'tired' four times") is
+        // satisfied by the per-entry Set semantics — the templated-context narrowing rejected
+        // legitimate corpus shapes early in capture.
+        repeat(4) { putEntry(text = "I am tired again", templateLabel = null) }
         val patterns = detector.detect().filter { it.kind == PatternKind.VOCAB_FREQUENCY }
         assertTrue(patterns.any { it.signatureJson.contains("\"token\":\"tired\"") })
     }

@@ -84,4 +84,33 @@ class PatternTitleGeneratorTest {
         coEvery { engine.generateText(any()) } throws RuntimeException("oom")
         assertNull(newGenerator().generate(Persona.WITNESS, samplePattern()))
     }
+
+    @Test
+    fun `strips disallowed punctuation per prompt contract`() = runTest {
+        // ADR-compliant titles forbid punctuation except an optional hyphen. A model returning
+        // `Aftermath Loop!` must not persist with the trailing exclamation.
+        coEvery { engine.generateText(any()) } returns "Aftermath Loop!"
+        assertEquals("Aftermath Loop", newGenerator().generate(Persona.WITNESS, samplePattern()))
+    }
+
+    @Test
+    fun `preserves hyphen but drops periods commas semicolons`() = runTest {
+        coEvery { engine.generateText(any()) } returns "Tuesday-Loop, Again."
+        assertEquals("Tuesday-Loop Again", newGenerator().generate(Persona.WITNESS, samplePattern()))
+    }
+
+    @Test
+    fun `strips fenced block with language tag`() = runTest {
+        // The prior sanitizer only matched bare ```; a language-tagged fence
+        // (```text\nAftermath\n```) kept the language token as the first line and persisted
+        // it. Now the whole fence wrapper is dropped — inner content survives.
+        coEvery { engine.generateText(any()) } returns "```text\nAftermath Loop\n```"
+        assertEquals("Aftermath Loop", newGenerator().generate(Persona.WITNESS, samplePattern()))
+    }
+
+    @Test
+    fun `strips bare triple-backtick fence (regression of original case)`() = runTest {
+        coEvery { engine.generateText(any()) } returns "```\nGoblin Hours\n```"
+        assertEquals("Goblin Hours", newGenerator().generate(Persona.WITNESS, samplePattern()))
+    }
 }

@@ -54,17 +54,29 @@ class PatternTitleGenerator(
     }
 
     private fun sanitize(raw: String): String? {
-        val stripped = raw.trim()
+        // Drop fenced blocks WHOLE — `removePrefix("```")` only stripped bare backticks, so a
+        // `\`\`\`text\nAftermath\n\`\`\`` payload kept the language token as the first line
+        // and persisted that as the title. Strip the entire fence wrapper (any language tag)
+        // before line-splitting.
+        val unfenced = FENCED_BLOCK.replace(raw, "$1")
+        val stripped = unfenced.trim()
             .removePrefix("\"").removeSuffix("\"")
             .removePrefix("'").removeSuffix("'")
-            .removePrefix("```").removeSuffix("```")
             .trim()
             .lineSequence()
             .firstOrNull()
             ?.trim()
+            ?.let(::stripPunctuation)
             .orEmpty()
         return stripped.takeIf { it.isNotEmpty() }?.let(::truncateToCap)
     }
+
+    /**
+     * The pattern-title prompt forbids punctuation except an optional hyphen. Strip the rest
+     * so a model returning `Aftermath Loop!` doesn't persist a title that violates the format
+     * contract the UI + tests expect.
+     */
+    private fun stripPunctuation(candidate: String): String = candidate.replace(DISALLOWED_PUNCTUATION, "").trim()
 
     private fun truncateToCap(candidate: String): String {
         if (candidate.length <= MAX_TITLE_CHARS) return candidate
@@ -77,6 +89,12 @@ class PatternTitleGenerator(
         const val MAX_TITLE_CHARS = 24
 
         private const val TAG = "VestigePatternTitle"
+
+        // Matches a fenced block with optional language tag: ```[lang]\n…\n```
+        private val FENCED_BLOCK: Regex = Regex("```[A-Za-z0-9_-]*\\s*\\n?([\\s\\S]*?)```")
+
+        // Anything that isn't a letter, digit, hyphen, or ASCII space gets dropped.
+        private val DISALLOWED_PUNCTUATION: Regex = Regex("[^A-Za-z0-9\\- ]")
 
         private fun loadResource(path: String): String {
             val stream = PatternTitleGenerator::class.java.getResourceAsStream(path)

@@ -46,8 +46,11 @@ class PatternDetectionOrchestrator(
 ) {
 
     /**
-     * Run after a save completes. Returns the optional [EntryObservation] the save flow should
-     * append to the entry (caller wires it back with [dev.anchildress1.vestige.storage.EntryStore.appendObservation]).
+     * Compute the optional callout for [entry]. Decrements the cooldown when the suppression
+     * window is active (callout-eligibility consumed by the entry passing through), but does
+     * NOT record a new fire — the save flow calls [confirmCalloutFired] only after the
+     * observation has been persisted. Splitting the two halves means an `appendObservation`
+     * failure can't bump the cooldown for a callout the user never saw.
      */
     suspend fun onEntryCommitted(entry: EntryEntity): EntryObservation? {
         val entryCount = completedEntryCount(boxStore)
@@ -58,7 +61,12 @@ class PatternDetectionOrchestrator(
             cooldownStore.consumeOneEntry()
             return null
         }
-        return selectAndRecordCallout(entry)
+        return prepareCallout(entry)
+    }
+
+    /** Bump the cooldown counter after the save flow finishes persisting the callout. */
+    fun confirmCalloutFired(entry: EntryEntity) {
+        cooldownStore.recordFired(entry.id, clock.millis())
     }
 
     private suspend fun runDetection() {
@@ -136,26 +144,24 @@ class PatternDetectionOrchestrator(
         }
     }
 
-    private fun selectAndRecordCallout(entry: EntryEntity): EntryObservation? {
+    /** Pure: returns the observation if there's a callout to fire. No side effects on cooldown. */
+    private fun prepareCallout(entry: EntryEntity): EntryObservation? {
         val matched = chooseMatchingPattern(entry) ?: return null
         val text = matched.latestCalloutText
+        // ADR-003 §"Pattern primitives" guarantees every primitive ships a templated callout via
+        // PatternCalloutText.build. A blank stored value means an upstream write path skipped
+        // it — log and skip the fire, never persist an empty callout.
         return when {
-            // ADR-003 §"Pattern primitives" guarantees every primitive ships a templated
-            // callout via PatternCalloutText.build. A blank stored value means an upstream
-            // write path skipped it — surface, never silently burn a cooldown slot.
             text.isBlank() -> {
                 Log.w(TAG, "active pattern ${matched.patternId} has blank latestCalloutText (entry id=${entry.id})")
                 null
             }
 
-            else -> {
-                cooldownStore.recordFired(entry.id, clock.millis())
-                EntryObservation(
-                    text = text,
-                    evidence = ObservationEvidence.PATTERN_CALLOUT,
-                    fields = emptyList(),
-                )
-            }
+            else -> EntryObservation(
+                text = text,
+                evidence = ObservationEvidence.PATTERN_CALLOUT,
+                fields = emptyList(),
+            )
         }
     }
 
@@ -174,10 +180,6 @@ class PatternDetectionOrchestrator(
         return ids.mapNotNull { box.get(it) }
     }
 
-    private fun deterministicFallbackTitle(detected: DetectedPattern): String {
-        val source = detected.templateLabel ?: detected.kind.serial.replace('_', ' ')
-        return source.replaceFirstChar { it.titlecase() }.take(MAX_TITLE_CHARS)
-    }
     companion object {
         const val DETECTION_INTERVAL: Long = 10
         const val MAX_TITLE_CHARS: Int = 24
@@ -190,3 +192,9 @@ private fun completedEntryCount(boxStore: BoxStore): Long = boxStore.boxFor(Entr
     .all
     .count { it.extractionStatus == dev.anchildress1.vestige.model.ExtractionStatus.COMPLETED }
     .toLong()
+
+private fun deterministicFallbackTitle(detected: DetectedPattern): String {
+    val source = detected.templateLabel ?: detected.kind.serial.replace('_', ' ')
+    return source.replaceFirstChar { it.titlecase() }
+        .take(PatternDetectionOrchestrator.MAX_TITLE_CHARS)
+}

@@ -5,6 +5,7 @@ import dev.anchildress1.vestige.inference.LiteRtLmEngine
 import dev.anchildress1.vestige.inference.PatternTitleGenerator
 import dev.anchildress1.vestige.model.DetectedPattern
 import dev.anchildress1.vestige.model.ExtractionStatus
+import dev.anchildress1.vestige.model.EntryObservation
 import dev.anchildress1.vestige.model.ObservationEvidence
 import dev.anchildress1.vestige.model.PatternKind
 import dev.anchildress1.vestige.model.PatternState
@@ -112,9 +113,17 @@ class PatternDetectionOrchestratorTest {
         return entry
     }
 
-    /** Seeds + commits one entry at a time, mirroring how the save flow drives the orchestrator. */
-    private suspend fun commitOne(templateLabel: TemplateLabel? = TemplateLabel.AFTERMATH) =
-        orchestrator.onEntryCommitted(putEntry(templateLabel = templateLabel))
+    /**
+     * Seeds + commits one entry at a time, mirroring how the save flow drives the orchestrator.
+     * Calls `confirmCalloutFired` on any returned observation so the cooldown advances exactly
+     * as it would in production after `EntryStore.appendObservation` succeeds.
+     */
+    private suspend fun commitOne(templateLabel: TemplateLabel? = TemplateLabel.AFTERMATH): EntryObservation? {
+        val entry = putEntry(templateLabel = templateLabel)
+        val callout = orchestrator.onEntryCommitted(entry)
+        if (callout != null) orchestrator.confirmCalloutFired(entry)
+        return callout
+    }
 
     @Test
     fun `entries 1-9 do not trigger detection`() = runTest {
@@ -204,14 +213,14 @@ class PatternDetectionOrchestratorTest {
             ),
         )
         // Fire once.
-        orchestrator.onEntryCommitted(putEntry(templateLabel = TemplateLabel.AFTERMATH))
+        commitOne()
         // Next 3 entries: suppressed.
         repeat(3) {
-            val callout = orchestrator.onEntryCommitted(putEntry(templateLabel = TemplateLabel.AFTERMATH))
+            val callout = commitOne()
             assertNull("entry $it must be suppressed during the cooldown window", callout)
         }
         // Fourth eligible entry: callout fires again.
-        val refired = orchestrator.onEntryCommitted(putEntry(templateLabel = TemplateLabel.AFTERMATH))
+        val refired = commitOne()
         assertNotNull(refired)
     }
 
@@ -250,14 +259,40 @@ class PatternDetectionOrchestratorTest {
             ),
         )
         // Fire once → cooldown counter set to 3.
-        orchestrator.onEntryCommitted(putEntry(templateLabel = TemplateLabel.AFTERMATH))
+        commitOne()
         // Three committed entries later — matching or not — the global cooldown is spent.
-        repeat(3) {
-            orchestrator.onEntryCommitted(putEntry(templateLabel = TemplateLabel.TUNNEL_EXIT))
-        }
+        repeat(3) { commitOne(templateLabel = TemplateLabel.TUNNEL_EXIT) }
         // Fourth entry after the callout is eligible again.
-        val nextMatch = orchestrator.onEntryCommitted(putEntry(templateLabel = TemplateLabel.AFTERMATH))
+        val nextMatch = commitOne()
         assertNotNull("cooldown must burn across the next three committed entries", nextMatch)
+    }
+
+    @Test
+    fun `onEntryCommitted does not bump cooldown when confirmCalloutFired is skipped`() = runTest {
+        // Race fix: the orchestrator returns the observation but does NOT record the fire.
+        // The save flow records the fire only after `appendObservation` succeeds. If the
+        // append throws, confirmCalloutFired never runs and the cooldown stays at 0.
+        patternStore.put(
+            PatternEntity(
+                patternId = "x".repeat(64),
+                kind = PatternKind.TEMPLATE_RECURRENCE,
+                signatureJson = "{\"label\":\"aftermath\"}",
+                title = "Aftermath",
+                templateLabel = TemplateLabel.AFTERMATH.serial,
+                firstSeenTimestamp = 1L,
+                lastSeenTimestamp = 2L,
+                state = PatternState.ACTIVE,
+                latestCalloutText = "Worth noting.",
+            ),
+        )
+        val callout = orchestrator.onEntryCommitted(putEntry(templateLabel = TemplateLabel.AFTERMATH))
+        assertNotNull(callout)
+        // Save flow's append failed (simulated by not calling confirm). Next entry must still
+        // be callout-eligible because no fire was ever confirmed.
+        assertTrue(
+            "no confirmCalloutFired → cooldown stays at 0",
+            cooldownStore.isCalloutPermitted(),
+        )
     }
 
     @Test

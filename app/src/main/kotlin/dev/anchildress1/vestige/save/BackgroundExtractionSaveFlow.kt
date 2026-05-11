@@ -105,9 +105,7 @@ class BackgroundExtractionSaveFlow(
     private suspend fun runPatternOrchestration(entryId: Long): EntryObservation? {
         val orchestrator = patternOrchestrator ?: return null
         return try {
-            val entry = entryStore.readEntry(entryId)
-            val callout = entry?.let { orchestrator.onEntryCommitted(it) }
-            callout?.also { entryStore.appendObservation(entryId, it) }
+            persistOrchestratorCallout(orchestrator, entryId)
         } catch (cancellation: CancellationException) {
             throw cancellation
         } catch (@Suppress("TooGenericExceptionCaught") error: Exception) {
@@ -119,6 +117,21 @@ class BackgroundExtractionSaveFlow(
             )
             null
         }
+    }
+
+    private suspend fun persistOrchestratorCallout(
+        orchestrator: PatternDetectionOrchestrator,
+        entryId: Long,
+    ): EntryObservation? {
+        val entry = entryStore.readEntry(entryId)
+        val callout = entry?.let { orchestrator.onEntryCommitted(it) }
+        // Persist first, then record the fire. If appendObservation throws, the cooldown stays
+        // unchanged — the user never saw the callout, so the next 3 entries are still eligible.
+        if (callout != null) {
+            entryStore.appendObservation(entryId, callout)
+            orchestrator.confirmCalloutFired(entry!!)
+        }
+        return callout
     }
 
     private suspend fun handleFailure(

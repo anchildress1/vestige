@@ -78,15 +78,61 @@ class BackgroundExtractionSaveFlowTest {
         )
         coEvery { observationGenerator.generate(any(), any(), any()) } returns emptyList()
         coEvery { orchestrator.onEntryCommitted(storedEntry) } returns callout
+        every { orchestrator.confirmCalloutFired(storedEntry) } returns Unit
 
         val outcome = flowWithOrch.saveAndExtract(SAMPLE_TEXT, SAMPLE_TIMESTAMP) as SaveOutcome.Completed
 
         assertEquals(listOf(callout), outcome.observations)
+        // Order is the load-bearing fix: appendObservation MUST land before confirmCalloutFired.
+        // An exception in append leaves the cooldown unchanged.
         coVerifyOrder {
             entryStore.completeEntry(ENTRY_ID, resolved, TemplateLabel.AFTERMATH, emptyList())
             orchestrator.onEntryCommitted(storedEntry)
             entryStore.appendObservation(ENTRY_ID, callout)
+            orchestrator.confirmCalloutFired(storedEntry)
         }
+    }
+
+    @Test
+    fun `appendObservation failure prevents confirmCalloutFired so cooldown is not bumped`() = runTest {
+        val orchestrator = mockk<dev.anchildress1.vestige.patterns.PatternDetectionOrchestrator>()
+        val flowWithOrch = BackgroundExtractionSaveFlow(
+            entryStore = entryStore,
+            worker = worker,
+            observationGenerator = observationGenerator,
+            listenerFactory = listenerFactory,
+            patternOrchestrator = orchestrator,
+        )
+        val storedEntry = dev.anchildress1.vestige.storage.EntryEntity(
+            id = ENTRY_ID,
+            extractionStatus = ExtractionStatus.COMPLETED,
+        )
+        val callout = dev.anchildress1.vestige.model.EntryObservation(
+            text = "Worth noting.",
+            evidence = dev.anchildress1.vestige.model.ObservationEvidence.PATTERN_CALLOUT,
+            fields = emptyList(),
+        )
+        val resolved = canonicalSample()
+        every { entryStore.createPendingEntry(any(), any()) } returns ENTRY_ID
+        every { entryStore.readEntry(ENTRY_ID) } returns storedEntry
+        coEvery { worker.extract(any(), any()) } returns BackgroundExtractionResult.Success(
+            totalElapsedMs = 25_000L,
+            lensResults = emptyList(),
+            modelCallCount = 3,
+            resolved = resolved,
+            templateLabel = TemplateLabel.AFTERMATH,
+        )
+        coEvery { observationGenerator.generate(any(), any(), any()) } returns emptyList()
+        coEvery { orchestrator.onEntryCommitted(storedEntry) } returns callout
+        every { entryStore.appendObservation(ENTRY_ID, callout) } throws RuntimeException("markdown disk full")
+
+        val outcome = flowWithOrch.saveAndExtract(SAMPLE_TEXT, SAMPLE_TIMESTAMP)
+
+        // Save still completes; orchestrator failure swallowed.
+        assertTrue(outcome is SaveOutcome.Completed, "append failure must not abort the save")
+        // CRITICAL: confirmCalloutFired must not run when append throws — otherwise the
+        // cooldown bumps for a callout the user never saw.
+        coVerify(exactly = 0) { orchestrator.confirmCalloutFired(any()) }
     }
 
     @Test

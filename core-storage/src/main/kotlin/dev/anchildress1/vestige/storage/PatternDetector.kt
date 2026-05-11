@@ -6,6 +6,7 @@ import dev.anchildress1.vestige.model.PatternKind
 import dev.anchildress1.vestige.model.TemplateLabel
 import io.objectbox.BoxStore
 import io.objectbox.kotlin.boxFor
+import io.objectbox.query.QueryBuilder
 import org.json.JSONObject
 import java.time.Clock
 import java.time.Instant
@@ -28,10 +29,25 @@ class PatternDetector(
 
     fun detect(): List<DetectedPattern> {
         val nowMs = clock.millis()
-        val entries = boxStore.boxFor<EntryEntity>().all
-            .filter { it.extractionStatus == ExtractionStatus.COMPLETED }
-        val withinWindow = entries.filter { nowMs - it.timestampEpochMs <= WINDOW_90D_MS }
-        val withinGoblinWindow = entries.filter { nowMs - it.timestampEpochMs <= WINDOW_30D_MS }
+        // Indexed query — `EntryEntity.extractionStatus` is `@Index`-annotated, so this is an
+        // O(log n) index seek rather than the prior O(total entries) JVM filter.
+        val entries = boxStore.boxFor<EntryEntity>().query()
+            .equal(
+                EntryEntity_.extractionStatus,
+                ExtractionStatus.COMPLETED.name,
+                QueryBuilder.StringOrder.CASE_SENSITIVE,
+            )
+            .build()
+            .use { it.find() }
+        // Reject future-dated rows. A clock-skewed or manually-edited future timestamp would
+        // otherwise satisfy `nowMs - timestamp <= window` (the delta is negative) and count
+        // toward thresholds until wall clock catches up.
+        val withinWindow = entries.filter { entry ->
+            (nowMs - entry.timestampEpochMs) in 0..WINDOW_90D_MS
+        }
+        val withinGoblinWindow = entries.filter { entry ->
+            (nowMs - entry.timestampEpochMs) in 0..WINDOW_30D_MS
+        }
 
         return buildList {
             addAll(detectTemplateRecurrence(withinWindow))
@@ -159,7 +175,6 @@ class PatternDetector(
         const val SUPPORTING_THRESHOLD = 3
         const val VOCAB_THRESHOLD = 4
         const val TAG_PAIR_SIZE = 2
-        const val DETECTION_INTERVAL = 10
         const val WINDOW_90D_MS: Long = 90L * 24 * 60 * 60 * 1000
         const val WINDOW_30D_MS: Long = 30L * 24 * 60 * 60 * 1000
 

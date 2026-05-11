@@ -237,6 +237,15 @@ class PatternDetectorTest {
     }
 
     @Test
+    fun `future-dated entries are excluded from windows`() {
+        // Clock-skewed or manually-edited future timestamps would otherwise satisfy
+        // `nowMs - timestamp <= window` (negative delta) and count toward thresholds.
+        val future = now.plusSeconds(60 * 60 * 24) // tomorrow
+        repeat(5) { putEntry(templateLabel = TemplateLabel.AFTERMATH, timestamp = future) }
+        assertTrue(detector.detect().none { it.kind == PatternKind.TEMPLATE_RECURRENCE })
+    }
+
+    @Test
     fun `entries outside 90-day window do not count`() {
         val ancient = Instant.parse("2025-01-01T12:00:00Z")
         repeat(5) { putEntry(templateLabel = TemplateLabel.AFTERMATH, timestamp = ancient) }

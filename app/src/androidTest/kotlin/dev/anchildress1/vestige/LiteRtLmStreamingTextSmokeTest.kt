@@ -4,7 +4,6 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import dev.anchildress1.vestige.corpus.InferenceBackendArg
 import dev.anchildress1.vestige.inference.LiteRtLmEngine
-import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertTrue
 import org.junit.Assume.assumeTrue
@@ -48,9 +47,9 @@ class LiteRtLmStreamingTextSmokeTest {
             var firstChunkAtNs: Long? = null
             val chunks = mutableListOf<String>()
 
-            it.streamText(PROMPT).toList().also { collected ->
-                chunks += collected
-                if (collected.isNotEmpty()) firstChunkAtNs = firstChunkAtNs ?: System.nanoTime()
+            it.streamText(PROMPT).collect { chunk ->
+                if (firstChunkAtNs == null) firstChunkAtNs = System.nanoTime()
+                chunks += chunk
             }
 
             val totalElapsedMs = (System.nanoTime() - started) / NANOS_PER_MILLI

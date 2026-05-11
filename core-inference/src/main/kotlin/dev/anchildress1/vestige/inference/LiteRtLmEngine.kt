@@ -12,7 +12,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
-import kotlinx.coroutines.flow.onCompletion
 import kotlinx.coroutines.withContext
 
 /** Backend selection. NPU needs the host's `nativeLibraryDir` — only Android `Context` has it. */
@@ -81,24 +80,35 @@ class LiteRtLmEngine(
         val active = checkNotNull(engine) {
             "LiteRtLmEngine.streamText called before initialize()."
         }
-        val conversation = active.createConversation()
-        val started = System.nanoTime()
-        var charsEmitted = 0
         return flow {
-            conversation.sendMessageAsync(prompt).collect { message ->
-                val chunk = message.toString()
-                charsEmitted += chunk.length
-                emit(chunk)
+            val conversation = active.createConversation()
+            val started = System.nanoTime()
+            var charsEmitted = 0
+            try {
+                conversation.sendMessageAsync(prompt).collect { message ->
+                    val chunk = message.toString()
+                    charsEmitted += chunk.length
+                    emit(chunk)
+                }
+                val elapsedMs = (System.nanoTime() - started) / NANOS_PER_MILLI
+                Log.d(
+                    TAG,
+                    "streamText completed in ${elapsedMs}ms (prompt=${prompt.length}c, " +
+                        "emitted=${charsEmitted}c)",
+                )
+            } catch (@Suppress("TooGenericExceptionCaught") error: Throwable) {
+                // Log-and-rethrow: native SDK + coroutine cancellation share no exception
+                // hierarchy worth enumerating; partial-emission state is the only thing we own.
+                val elapsedMs = (System.nanoTime() - started) / NANOS_PER_MILLI
+                Log.d(
+                    TAG,
+                    "streamText failed (${error.javaClass.simpleName}) in ${elapsedMs}ms " +
+                        "(prompt=${prompt.length}c, emitted=${charsEmitted}c)",
+                )
+                throw error
+            } finally {
+                conversation.close()
             }
-        }.onCompletion { cause ->
-            conversation.close()
-            val elapsedMs = (System.nanoTime() - started) / NANOS_PER_MILLI
-            val outcome = cause?.let { "failed (${it.javaClass.simpleName})" } ?: "completed"
-            Log.d(
-                TAG,
-                "streamText $outcome in ${elapsedMs}ms (prompt=${prompt.length}c, " +
-                    "emitted=${charsEmitted}c)",
-            )
         }.flowOn(ioDispatcher)
     }
 

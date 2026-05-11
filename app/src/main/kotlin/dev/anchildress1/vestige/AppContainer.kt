@@ -147,6 +147,10 @@ class AppContainer(
 
     init {
         seedRecoveredExtractions()
+        // A pending callout reservation is in-flight by definition. Process death between
+        // `tryReserveCallout` and `settleReservedCallout` would otherwise survive into the next
+        // launch and wedge every future save with `BLOCKED_BY_PENDING_RESERVATION`.
+        calloutCooldownStore.clearStalePendingReservation()
     }
 
     fun reportExtractionStatus(entryId: Long, status: ExtractionStatus) {

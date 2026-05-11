@@ -120,4 +120,30 @@ class CalloutCooldownStoreTest {
         assertEquals(2, store.snapshot().remainingSuppression)
         assertNull(store.snapshot().pendingCalloutEntryId)
     }
+
+    @Test
+    fun `clearStalePendingReservation drops a survived pending across simulated restart`() {
+        // Simulate the death-between-reserve-and-settle scenario: process reserves the slot,
+        // dies, restarts. Without recovery, every future save sees BLOCKED_BY_PENDING_RESERVATION
+        // for the rest of the install.
+        store.tryReserveCallout(42L)
+        boxStore.close()
+        boxStore = VestigeBoxStore.openAt(dataDir)
+        store = CalloutCooldownStore(boxStore)
+        assertEquals(42L, store.snapshot().pendingCalloutEntryId)
+
+        store.clearStalePendingReservation()
+
+        assertNull(store.snapshot().pendingCalloutEntryId)
+        assertTrue(store.isCalloutPermitted())
+    }
+
+    @Test
+    fun `clearStalePendingReservation preserves a live suppression window`() {
+        store.recordFired(entryId = 42L, timestampMs = 1_000L)
+        store.clearStalePendingReservation()
+        // remainingSuppression untouched — startup recovery is for pending reservations only,
+        // not for the durable window that fired callouts owe their suppression.
+        assertEquals(3, store.snapshot().remainingSuppression)
+    }
 }

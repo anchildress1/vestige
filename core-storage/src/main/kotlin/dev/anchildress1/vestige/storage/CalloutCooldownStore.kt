@@ -12,8 +12,31 @@ class CalloutCooldownStore(private val boxStore: BoxStore) {
 
     private val box get() = boxStore.boxFor<CalloutCooldownEntity>()
 
-    fun snapshot(): CalloutCooldownEntity = box.all.firstOrNull()
-        ?: CalloutCooldownEntity().also { box.put(it) }
+    /**
+     * Singleton accessor. Two concurrent callers must never observe "no row" simultaneously and
+     * both insert — that would orphan one row and let subsequent reads/writes pick either at
+     * random. Wrap the check-and-create in a tx so insertion is atomic; the second caller's tx
+     * starts after the first's commit and finds the row.
+     */
+    fun snapshot(): CalloutCooldownEntity = boxStore.callInTx<CalloutCooldownEntity> {
+        box.all.firstOrNull() ?: CalloutCooldownEntity().also { box.put(it) }
+    }
+
+    /**
+     * Clear any pending reservation that never resolved. Called once at process startup —
+     * `pendingCalloutEntryId` is durable across restarts and a process death between
+     * `tryReserveCallout` and `settleReservedCallout` would otherwise wedge every future save
+     * with `BLOCKED_BY_PENDING_RESERVATION` permanently. Any in-flight reservation is
+     * definitionally stale once the process restarts.
+     */
+    fun clearStalePendingReservation() {
+        boxStore.runInTx {
+            val current = snapshot()
+            if (current.pendingCalloutEntryId == null) return@runInTx
+            current.pendingCalloutEntryId = null
+            box.put(current)
+        }
+    }
 
     /** True when a callout is permitted on the next entry (no suppression remaining). */
     fun isCalloutPermitted(): Boolean = snapshot().let { current ->

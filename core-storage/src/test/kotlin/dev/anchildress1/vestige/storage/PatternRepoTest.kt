@@ -111,11 +111,14 @@ class PatternRepoTest {
     }
 
     @Test
-    fun `markResolved with undo returns to active`() {
+    fun `markResolved is sticky — no undo path in v1`() {
         val id = seed()
         repo.markResolved(id)
-        repo.markResolved(id, undo = true)
-        assertEquals(PatternState.ACTIVE, store.findByPatternId(id)!!.state)
+        // RESOLVED is terminal per ADR-003 §"Mark-resolved is sticky." Any subsequent transition
+        // attempt throws via the validator chokepoint — there's no API surface for reopening.
+        val raised = runCatching { store.transitionState(id, PatternState.ACTIVE) }
+        assertTrue("RESOLVED→ACTIVE must throw — re-open is backlog-deferred", raised.isFailure)
+        assertEquals(PatternState.RESOLVED, store.findByPatternId(id)!!.state)
     }
 
     @Test

@@ -33,12 +33,13 @@ class PatternRepo(private val store: PatternStore, private val clock: Clock = Cl
         }
     }
 
-    fun markResolved(patternId: String, undo: Boolean = false) {
-        if (undo) {
-            forceTo(patternId, PatternState.ACTIVE)
-        } else {
-            store.transitionState(patternId, PatternState.RESOLVED)
-        }
+    /**
+     * Sticky per ADR-003 §"Mark-resolved is sticky for the demo." No undo path in v1 — the
+     * ADR is explicit that "reopening is a backlog candidate" and that mark-resolved
+     * "respects user agency … if they kill it, they killed it."
+     */
+    fun markResolved(patternId: String) {
+        store.transitionState(patternId, PatternState.RESOLVED)
     }
 
     /**

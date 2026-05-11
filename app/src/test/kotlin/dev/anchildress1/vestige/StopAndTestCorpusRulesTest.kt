@@ -21,6 +21,32 @@ class StopAndTestCorpusRulesTest {
     }
 
     @Test
+    fun `STT-D accepts the canonical 6-entry set regardless of order`() {
+        StopAndTestCorpusRules.requireCanonicalSttDCorpus(listOf("D1", "C2", "B2", "B1", "A4", "A1"))
+    }
+
+    @Test
+    fun `STT-D rejects a subset manifest`() {
+        assertThrows(IllegalArgumentException::class.java) {
+            StopAndTestCorpusRules.requireCanonicalSttDCorpus(listOf("A1", "B1"))
+        }
+    }
+
+    @Test
+    fun `STT-D rejects unexpected ids even when size matches`() {
+        assertThrows(IllegalArgumentException::class.java) {
+            StopAndTestCorpusRules.requireCanonicalSttDCorpus(listOf("A1", "A2", "A3", "A4", "A5", "A6"))
+        }
+    }
+
+    @Test
+    fun `STT-D rejects duplicates`() {
+        assertThrows(IllegalArgumentException::class.java) {
+            StopAndTestCorpusRules.requireCanonicalSttDCorpus(listOf("A1", "A1", "B1", "B2", "C2", "D1"))
+        }
+    }
+
+    @Test
     fun `STT-C accepts the canonical 18-entry corpus regardless of order`() {
         StopAndTestCorpusRules.requireCanonicalSttCCorpus(
             listOf(

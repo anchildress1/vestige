@@ -35,11 +35,13 @@ import java.io.File
  *     -PrunsPerEntry=3 \
  *     -Pandroid.testInstrumentationRunnerArguments.class=dev.anchildress1.vestige.SttCTagStabilityTest
  *
- * Missing args → [assumeTrue] skips so CI without artifacts stays green. The default 3 runs ×
- * 18 canonical corpus entries × ~3 lens calls per run is a long-running on-device suite; expect
- * tens of minutes on E4B CPU. The harness rejects cherry-picked manifests so the phase gate
- * cannot pass on a toy subset. Drop [runsPerEntry] to 2 for a faster smoke pass while tuning
- * prompts.
+ * Missing args → [assumeTrue] skips so CI without artifacts stays green. Story 2.9 defines the
+ * gate as stability across **three** runs per dump, so [runsPerEntry] must be ≥ 3 — below that
+ * the assertion would over-pass against a thinner sample. The default 3 runs × 18 canonical
+ * corpus entries × ~3 lens calls per run is a long-running on-device suite; expect tens of
+ * minutes on E4B CPU. The harness rejects cherry-picked manifests so the phase gate cannot pass
+ * on a toy subset, and entries that emit zero tags across all runs hard-fail rather than
+ * silently dropping out of the stability ratio.
  */
 @RunWith(AndroidJUnit4::class)
 class SttCTagStabilityTest {
@@ -80,6 +82,17 @@ class SttCTagStabilityTest {
             val perEntry = corpus.map { entry -> runEntry(worker, entry, runsPerEntry) }
             val stability = summarizeStability(perEntry, runsPerEntry)
             logSummary(perEntry, stability, runsPerEntry)
+
+            // Story 2.9 wants pattern-engine signal on every entry — silently dropping entries
+            // that produced no tags across all runs would let the gate pass on a subset of "easy"
+            // corpus rows while harder entries quietly fail.
+            val zeroTagEntries = perEntry.filter { it.emittedTags.isEmpty() }
+            assertTrue(
+                "STT-C failed: ${zeroTagEntries.size} entries produced zero tags across all " +
+                    "$runsPerEntry runs (${zeroTagEntries.map(EntryStability::id)}). Pattern " +
+                    "engine has no signal for these rows; tighten prompts or fix lens parsing.",
+                zeroTagEntries.isEmpty(),
+            )
 
             assertTrue(
                 "STT-C failed: tag stability ${"%.2f".format(stability.rate)} < " +
@@ -182,7 +195,7 @@ class SttCTagStabilityTest {
     private companion object {
         const val TAG = "VestigeSttC"
         const val DEFAULT_RUNS_PER_ENTRY = 3
-        const val MIN_RUNS_PER_ENTRY = 2
+        const val MIN_RUNS_PER_ENTRY = 3
         const val STABILITY_THRESHOLD = 0.80
         const val PER_ENTRY_TIMEOUT_MS = 5 * 60_000L
     }

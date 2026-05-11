@@ -9,8 +9,9 @@ import kotlin.math.ceil
  * exact same gate logic.
  */
 internal object StopAndTestCorpusRules {
-    private const val STT_D_MINIMUM_CORPUS_SIZE = 6
     private const val STT_D_DIVERGENCE_THRESHOLD = 0.30
+
+    private val sttDCanonicalIds: Set<String> = linkedSetOf("A1", "A4", "B1", "B2", "C2", "D1")
 
     private val sttCCanonicalIds: Set<String> = linkedSetOf(
         "A1",
@@ -33,21 +34,39 @@ internal object StopAndTestCorpusRules {
         "X3",
     )
 
+    /**
+     * `ceil([corpusSize] × 30 %)` per Story 2.7's divergence gate. Throws when [corpusSize] is
+     * below the canonical STT-D corpus so the gate can't be cleared on an undersized fixture.
+     */
     fun requiredDivergentEntries(corpusSize: Int): Int {
-        require(corpusSize >= STT_D_MINIMUM_CORPUS_SIZE) {
-            "STT-D manifest must include at least $STT_D_MINIMUM_CORPUS_SIZE entries; got $corpusSize"
+        require(corpusSize >= sttDCanonicalIds.size) {
+            "STT-D manifest must include at least ${sttDCanonicalIds.size} entries; got $corpusSize"
         }
         return ceil(corpusSize * STT_D_DIVERGENCE_THRESHOLD).toInt()
     }
 
+    /** Throws unless [ids] is exactly the canonical STT-D set (A1, A4, B1, B2, C2, D1). */
+    fun requireCanonicalSttDCorpus(ids: List<String>) {
+        requireExactSet(ids, sttDCanonicalIds, label = "STT-D", canonicalDescription = "A1, A4, B1, B2, C2, D1")
+    }
+
+    /** Throws unless [ids] is exactly the canonical STT-C set (A1-D3 + X1-X3). */
     fun requireCanonicalSttCCorpus(ids: List<String>) {
-        require(ids.size == sttCCanonicalIds.size) {
-            "STT-C manifest must contain exactly ${sttCCanonicalIds.size} entries " +
-                "(A1-D3 + X1-X3); got ${ids.size}"
+        requireExactSet(ids, sttCCanonicalIds, label = "STT-C", canonicalDescription = "A1-D3 + X1-X3")
+    }
+
+    private fun requireExactSet(
+        ids: List<String>,
+        canonical: Set<String>,
+        label: String,
+        canonicalDescription: String,
+    ) {
+        require(ids.size == canonical.size) {
+            "$label manifest must contain exactly ${canonical.size} entries " +
+                "($canonicalDescription); got ${ids.size}"
         }
-        val actualIds = ids.toSet()
-        require(actualIds == sttCCanonicalIds) {
-            "STT-C manifest must contain exactly A1-D3 + X1-X3; got $ids"
+        require(ids.toSet() == canonical) {
+            "$label manifest must contain exactly $canonicalDescription; got $ids"
         }
     }
 }

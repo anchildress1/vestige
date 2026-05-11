@@ -2,6 +2,7 @@ package dev.anchildress1.vestige.corpus
 
 import java.io.File
 import java.time.ZonedDateTime
+import java.time.format.DateTimeParseException
 
 /** One row from a `docs/stt-*-manifest.example.txt` corpus. Pipes split fields. */
 data class CorpusEntry(val id: String, val capturedAt: ZonedDateTime, val entryText: String)
@@ -34,11 +35,16 @@ object CorpusManifest {
         val text = parts[2].trim()
         require(id.isNotEmpty()) { "Manifest line $lineNumber missing id" }
         require(text.isNotEmpty()) { "Manifest line $lineNumber ($id) missing entry text" }
-        return CorpusEntry(
-            id = id,
-            capturedAt = ZonedDateTime.parse(captured),
-            entryText = text,
-        )
+        val capturedAt = try {
+            ZonedDateTime.parse(captured)
+        } catch (parseError: DateTimeParseException) {
+            throw IllegalArgumentException(
+                "Manifest line $lineNumber ($id) in ${source.name}: invalid ISO zoned datetime " +
+                    "\"$captured\" — ${parseError.message}",
+                parseError,
+            )
+        }
+        return CorpusEntry(id = id, capturedAt = capturedAt, entryText = text)
     }
 
     private const val ENTRY_FIELD_COUNT = 3

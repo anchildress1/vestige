@@ -11,6 +11,7 @@ import dev.anchildress1.vestige.inference.BackgroundExtractionWorker
 import dev.anchildress1.vestige.inference.DefaultConvergenceResolver
 import dev.anchildress1.vestige.inference.LensResult
 import dev.anchildress1.vestige.inference.LiteRtLmEngine
+import dev.anchildress1.vestige.inference.SkepticalFlagKinds
 import dev.anchildress1.vestige.model.Lens
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertTrue
@@ -54,6 +55,7 @@ class SttDLensDivergenceTest {
         assumeTrue("Manifest not found at $manifestPath", manifestFile.exists() && manifestFile.canRead())
 
         val corpus = CorpusManifest.load(manifestFile)
+        StopAndTestCorpusRules.requireCanonicalSttDCorpus(corpus.map(CorpusEntry::id))
         val requiredDivergentEntries = StopAndTestCorpusRules.requiredDivergentEntries(corpus.size)
 
         val cacheDir = InstrumentationRegistry.getInstrumentation().targetContext.cacheDir
@@ -108,7 +110,11 @@ class SttDLensDivergenceTest {
         val literal = lensResults[Lens.LITERAL]?.extraction
         val inferential = lensResults[Lens.INFERENTIAL]?.extraction
         val skeptical = lensResults[Lens.SKEPTICAL]?.extraction
-        val skepticalFlags: List<String> = skeptical?.flags.orEmpty()
+        // Filter to schema-binding kinds — entry-level flags (`time-inconsistency`, `other`) don't
+        // bind to a stored field and shouldn't count as divergence on their own.
+        val skepticalFlags: List<String> = skeptical?.flags
+            .orEmpty()
+            .filter(SkepticalFlagKinds::isSchemaBinding)
 
         val disagreementFields = COMPARABLE_FIELDS.filter { key ->
             val values = listOfNotNull(literal, inferential, skeptical).mapNotNull { extraction ->
@@ -116,8 +122,14 @@ class SttDLensDivergenceTest {
             }
             values.toSet().size >= MIN_DISTINCT_FOR_DISAGREEMENT
         }
-        val inferentialOnly = COMPARABLE_FIELDS.filter { key ->
-            isMeaningfulValue(inferential?.fields?.get(key)) && !isMeaningfulValue(literal?.fields?.get(key))
+        // Only flag "Inferential populated, Literal refused" when Literal actually parsed — a
+        // null Literal extraction means the lens call failed, not that it deliberately refused.
+        val inferentialOnly = if (literal == null) {
+            emptyList()
+        } else {
+            COMPARABLE_FIELDS.filter { key ->
+                isMeaningfulValue(inferential?.fields?.get(key)) && !isMeaningfulValue(literal.fields[key])
+            }
         }
 
         return Divergence(

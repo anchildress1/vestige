@@ -232,17 +232,11 @@ class DefaultConvergenceResolver : ConvergenceResolver {
         const val IES_SUFFIX = "ies"
 
         /**
-         * Skeptical flag `kind` (per `core-inference/.../resources/lenses/skeptical.txt`) → schema
-         * field the flag annotates. `time-inconsistency` and `other` are entry-level concerns
-         * with no specific field binding; they ride the entry's persisted `LensResult.flags` and
-         * surface in Phase 4's Reading view rather than flipping any field's verdict.
+         * Schema-binding Skeptical flag kinds → the field each annotates. Sourced from
+         * [SkepticalFlagKinds] so the STT-D divergence harness, the resolver, and any future
+         * Reading-view code share one definition of "this flag binds to a stored field."
          */
-        val FLAG_KIND_TO_FIELD: Map<String, String> = mapOf(
-            "vocabulary-contradiction" to ENERGY_DESCRIPTOR_KEY,
-            "state-behavior-mismatch" to ENERGY_DESCRIPTOR_KEY,
-            "commitment-without-anchor" to STATED_COMMITMENT_KEY,
-            "unsupported-recurrence" to "recurrence_link",
-        )
+        val FLAG_KIND_TO_FIELD: Map<String, String> = SkepticalFlagKinds.SCHEMA_BINDING
     }
 }
 

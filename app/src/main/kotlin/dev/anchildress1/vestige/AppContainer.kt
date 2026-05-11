@@ -8,17 +8,25 @@ import dev.anchildress1.vestige.lifecycle.BackgroundExtractionLifecycleStateMach
 import dev.anchildress1.vestige.lifecycle.BackgroundExtractionService
 import dev.anchildress1.vestige.lifecycle.BackgroundExtractionStatusBus
 import dev.anchildress1.vestige.model.ExtractionStatus
+import dev.anchildress1.vestige.storage.EntryStore
+import dev.anchildress1.vestige.storage.MarkdownEntryStore
+import dev.anchildress1.vestige.storage.VestigeBoxStore
+import io.objectbox.BoxStore
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 
 /** Process-singleton hub for Phase-2 cross-cutting concerns. */
+@Suppress("LongParameterList") // Constructor-injection seams: factories + lifecycle + scope.
 class AppContainer(
     private val applicationContext: Context,
-    // Default no-ops the cold-start sweep until EntryStore (architecture-brief §"AppContainer
-    // Ownership") owns the BoxStore — see `VestigeBoxStore.findNonTerminalEntryIds`.
-    private val recoveredEntryIdsLoader: () -> Collection<Long> = { emptyList() },
+    boxStoreFactory: (Context) -> BoxStore = { ctx -> VestigeBoxStore.open(ctx) },
+    markdownStoreFactory: (Context) -> MarkdownEntryStore = { ctx -> MarkdownEntryStore(ctx.filesDir) },
+    // Cold-start sweep — `null` means the live `VestigeBoxStore.findNonTerminalEntryIds(boxStore)`
+    // query (production default per ADR-006 §"Action Item #4"). Tests inject a fixed seed to keep
+    // them BoxStore-free.
+    private val recoveredEntryIdsLoader: (() -> Collection<Long>)? = null,
     private val foregroundServiceIntentFactory: () -> Intent = {
         Intent(applicationContext, BackgroundExtractionService::class.java)
     },
@@ -27,6 +35,11 @@ class AppContainer(
     },
     private val scope: CoroutineScope = defaultScope(),
 ) {
+
+    /** Shared ObjectBox handle. Closed when the process dies; tests use [close]. */
+    val boxStore: BoxStore = boxStoreFactory(applicationContext)
+
+    val entryStore: EntryStore = EntryStore(boxStore, markdownStoreFactory(applicationContext))
 
     private val statusBus: BackgroundExtractionStatusBus = BackgroundExtractionStatusBus()
 
@@ -50,8 +63,15 @@ class AppContainer(
     }
 
     private fun seedRecoveredExtractions() {
-        statusBus.seedFromColdStart(recoveredEntryIdsLoader().toList())
+        val ids = recoveredEntryIdsLoader?.invoke()
+            ?: VestigeBoxStore.findNonTerminalEntryIds(boxStore)
+        statusBus.seedFromColdStart(ids.toList())
         lifecycleStateMachine.onInFlightCountChange(statusBus.inFlightCount.value)
+    }
+
+    /** Tests own the lifecycle and close the container when done. Production rides the process. */
+    fun close() {
+        boxStore.close()
     }
 
     private fun dispatchStartForegroundService() {

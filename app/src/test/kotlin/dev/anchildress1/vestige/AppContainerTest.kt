@@ -4,7 +4,9 @@ import android.content.Context
 import android.content.Intent
 import dev.anchildress1.vestige.lifecycle.BackgroundExtractionLifecycleState
 import dev.anchildress1.vestige.model.ExtractionStatus
+import dev.anchildress1.vestige.storage.MarkdownEntryStore
 import io.mockk.mockk
+import io.objectbox.BoxStore
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.advanceUntilIdle
@@ -20,6 +22,8 @@ class AppContainerTest {
         var serviceStarts = 0
         val container = AppContainer(
             applicationContext = mockk<Context>(relaxed = true),
+            boxStoreFactory = { mockk<BoxStore>(relaxed = true) },
+            markdownStoreFactory = { mockk<MarkdownEntryStore>(relaxed = true) },
             recoveredEntryIdsLoader = { listOf(11L, 12L) },
             foregroundServiceIntentFactory = { Intent("dev.anchildress1.vestige.TEST_START") },
             foregroundServiceStarter = { serviceStarts += 1 },
@@ -37,6 +41,8 @@ class AppContainerTest {
         var serviceStarts = 0
         val container = AppContainer(
             applicationContext = mockk<Context>(relaxed = true),
+            boxStoreFactory = { mockk<BoxStore>(relaxed = true) },
+            markdownStoreFactory = { mockk<MarkdownEntryStore>(relaxed = true) },
             recoveredEntryIdsLoader = { emptyList() },
             foregroundServiceIntentFactory = { Intent("dev.anchildress1.vestige.TEST_START") },
             foregroundServiceStarter = {
@@ -61,6 +67,8 @@ class AppContainerTest {
         var serviceStarts = 0
         val container = AppContainer(
             applicationContext = mockk<Context>(relaxed = true),
+            boxStoreFactory = { mockk<BoxStore>(relaxed = true) },
+            markdownStoreFactory = { mockk<MarkdownEntryStore>(relaxed = true) },
             recoveredEntryIdsLoader = { emptyList() },
             foregroundServiceIntentFactory = { Intent("dev.anchildress1.vestige.TEST_START") },
             foregroundServiceStarter = { serviceStarts += 1 },
@@ -87,6 +95,8 @@ class AppContainerTest {
     fun `extractionStatusListener forwards worker updates into the lifecycle machine`() = runTest {
         val container = AppContainer(
             applicationContext = mockk<Context>(relaxed = true),
+            boxStoreFactory = { mockk<BoxStore>(relaxed = true) },
+            markdownStoreFactory = { mockk<MarkdownEntryStore>(relaxed = true) },
             recoveredEntryIdsLoader = { emptyList() },
             foregroundServiceIntentFactory = { Intent("dev.anchildress1.vestige.TEST_START") },
             foregroundServiceStarter = {},

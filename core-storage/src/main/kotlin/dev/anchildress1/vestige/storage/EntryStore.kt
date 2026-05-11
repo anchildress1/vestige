@@ -26,10 +26,7 @@ import java.time.Instant
  * Markdown is the source of truth: write order is markdown first, ObjectBox second. If the
  * markdown write fails, no row is committed.
  */
-class EntryStore(
-    private val boxStore: BoxStore,
-    private val markdownStore: MarkdownEntryStore,
-) {
+class EntryStore(private val boxStore: BoxStore, private val markdownStore: MarkdownEntryStore) {
 
     /**
      * Persist the user transcription before extraction begins. The returned id is stable for the
@@ -105,11 +102,7 @@ class EntryStore(
         }
     }
 
-    private fun applyResolved(
-        entry: EntryEntity,
-        resolved: ResolvedExtraction,
-        templateLabel: TemplateLabel?,
-    ) {
+    private fun applyResolved(entry: EntryEntity, resolved: ResolvedExtraction, templateLabel: TemplateLabel?) {
         entry.templateLabel = templateLabel
         entry.energyDescriptor = stringField(resolved, KEY_ENERGY)
         entry.recurrenceLink = stringField(resolved, KEY_RECURRENCE)
@@ -141,8 +134,14 @@ class EntryStore(
         // entryCount maintenance: increment new links, decrement orphaned ones.
         val added = resolvedEntities.filter { tag -> previous.none { it.id == tag.id } }
         val removed = previous.filter { tag -> resolvedEntities.none { it.id == tag.id } }
-        added.forEach { tag -> tag.entryCount += 1; tagBox.put(tag) }
-        removed.forEach { tag -> tag.entryCount = (tag.entryCount - 1).coerceAtLeast(0); tagBox.put(tag) }
+        added.forEach { tag ->
+            tag.entryCount += 1
+            tagBox.put(tag)
+        }
+        removed.forEach { tag ->
+            tag.entryCount = (tag.entryCount - 1).coerceAtLeast(0)
+            tagBox.put(tag)
+        }
     }
 
     private fun stringField(resolved: ResolvedExtraction, key: String): String? {

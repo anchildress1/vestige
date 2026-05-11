@@ -40,7 +40,9 @@ android {
 dependencies {
     api(project(":core-model"))
 
-    implementation(libs.objectbox.android)
+    // ObjectBox types (BoxStore, etc.) leak into AppContainer's public surface; promote to `api`
+    // so `:app` can wire and observe lifecycle without a separate dependency declaration.
+    api(libs.objectbox.android)
     implementation(libs.objectbox.kotlin)
 
     testImplementation(libs.junit) // Robolectric runner is JUnit 4

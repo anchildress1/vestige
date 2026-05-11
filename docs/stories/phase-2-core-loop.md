@@ -19,7 +19,7 @@ Build the end-to-end capture loop: user records or types → foreground call ret
 - [ ] Capture session can run record → transcription + follow-up → save end-to-end on the reference device.
 - [ ] **STT-B passes** (or has an explicit fallback recorded): multi-turn conversation maintains context across 3+ exchanges on E4B. If broken, single-turn fallback is implemented and the spec is updated.
 - [x] **STT-D passes** (or the architecture is dropped): the 3-lens pipeline produces meaningfully different outputs on at least 30% of the prepared sample transcripts. If lenses always agree, multi-lens drops to single-pass and the Reading section is removed from the entry detail spec. _(2026-05-10 — 5/6 entries (83%) on E4B CPU. See Story 2.7.)_
-- [ ] **STT-C passes**: tag extraction is stable (≥80% same-tag emission on equivalent test dumps). If unstable, prompts have been tightened until stable, or the limitation is documented.
+- [ ] **STT-C passes**: tag extraction is stable (≥80% same-tag emission on equivalent test dumps). If unstable, prompts have been tightened until stable, or the limitation is documented. _(2026-05-10 — **deferred** pending backlog `gpu-model-artifact`; harness ships, measurement is impractical on CPU baseline.)_
 - [ ] Convergence resolver implementation lands into Story 1.12's test scaffolding and all happy-path tests pass.
 - [ ] Agent-emitted template labels work for all six archetypes on representative sample transcripts.
 - [ ] Background extraction populates the canonical schema on the reference device within 30–90 seconds per entry as specified.
@@ -200,20 +200,24 @@ Don't conflate this story with Story 2.6 (worker logic). Story 2.6 is *what* run
 
 ---
 
-### Story 2.9 — STT-C: tag extraction consistency
+### Story 2.9 — STT-C: tag extraction consistency — **DEFERRED 2026-05-10 (gated on `gpu-model-artifact`)**
 
 🛑 **Stop-and-test point.** If tag extraction is unstable across equivalent dumps, downstream pattern detection is noisy. Tighten prompts; if still bad, document as known limitation.
 
 **As** the AI implementor, **I need** to verify that the convergence resolver emits stable tag sets on equivalent test dumps (≥80% same-tag emission across re-runs of similar inputs), **so that** Phase 3's pattern engine has reliable signal to count.
 
+**Status (2026-05-10):** `SttCTagStabilityTest` harness ships and runs end-to-end against the 18-entry corpus (see Phase-2 commit history). **Measurement is deferred** because the CPU-compiled `.litertlm` artifact takes ~30–55 s per lens call → ~2.5 hr for the spec's 162-call sweep. GPU init fails native LiteRT-LM (`llm_litert_compiled_model_executor.cc:1928`) because the model file ships CPU-only per ADR-001 §Q3. Backlog row `gpu-model-artifact` tracks the unblock; when a GPU-compiled E4B variant lands, run `SttCTagStabilityTest -PinferenceBackend=gpu` and fill in the result + flip the boxes below.
+
 **Done when:**
-- [ ] The STT-C sample-dump set from `sample-data-scenarios.md` runs through the foreground + background pipeline at least three times each.
-- [ ] Per-dump tag stability is measured: across the runs of the same dump, what fraction of tags are emitted on every run?
+- [ ] The STT-C sample-dump set from `sample-data-scenarios.md` runs through the foreground + background pipeline at least three times each. _(Harness exists; waiting on backlog `gpu-model-artifact`.)_
+- [ ] Per-dump tag stability is measured: across the runs of the same dump, what fraction of tags are emitted on every run? _(Measurement logic ships — `VestigeSttC` logcat tag emits per-entry stable/total counts + global rate.)_
 - [ ] Across the sample set, ≥80% of tags are stable (emitted on all three runs of an equivalent dump).
 - [ ] If stability is below 80%, prompts are tightened (likely the surface modules) and the test re-runs.
 - [ ] If stability is still below 80% after one focused day of tuning, the limitation is documented in `PRD.md` §"Acceptance criteria — Tag extraction" with a noisy-pattern caveat. Pattern engine in Phase 3 has to be designed for that noise floor.
 
 **Notes / risks:** The 80% threshold is a v1 floor, not a quality bar. Phase 3's pattern engine design depends on it; if we ship at 60% stability, pattern callouts surface false positives 40% of the time. That's a demo-killer.
+
+**Deferral risk for Phase 3:** the pattern engine has to be designed against an *unverified* tag-stability assumption until the GPU artifact lands. Build Phase 3 against the 80%-floor assumption and treat any pattern false-positive surfaced during Phase 4 demo dry-runs as the deferred STT-C signal arriving late. If Phase 3 ships before a GPU artifact materializes, flag this in `PRD.md` §"Acceptance criteria — Tag extraction" so the noise floor is documented in the public-facing spec, not just here.
 
 ---
 
@@ -307,7 +311,7 @@ Phase 3 starts when all the following are true:
 - [ ] All fourteen stories above are Done or have an explicit, recorded fallback.
 - [ ] **STT-B resolved** — multi-turn works on E4B *or* the single-turn fallback is implemented and the spec updated.
 - [x] **STT-D resolved** — 3-lens divergence is validated *or* multi-lens has been replaced with single-pass and ADR-002 has been superseded. _(2026-05-10 — validated at 83%.)_
-- [ ] **STT-C resolved** — tag stability is ≥80% *or* the limitation is documented and Phase 3's pattern engine is designed around the noise floor.
+- [ ] **STT-C resolved** — tag stability is ≥80% *or* the limitation is documented and Phase 3's pattern engine is designed around the noise floor. _(2026-05-10 — deferred; backlog `gpu-model-artifact`. Phase 3 designs against the 80% assumption until the artifact lands.)_
 - [ ] Convergence resolver tests from Story 1.12 all pass.
 - [ ] `BackgroundExtractionService` state machine tests pass; service is wired into `AppContainer` per ADR-004.
 - [ ] Latency budget on the reference device is recorded (foreground per turn, background per entry).

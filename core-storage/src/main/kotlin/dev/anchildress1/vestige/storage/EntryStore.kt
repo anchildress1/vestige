@@ -94,15 +94,6 @@ class EntryStore(private val boxStore: BoxStore, private val markdownStore: Mark
         }
     }
 
-    /**
-     * Terminal failure path — [status] is one of [ExtractionStatus.FAILED] or
-     * [ExtractionStatus.TIMED_OUT]. Leaves the structured fields untouched; the row keeps the
-     * `entry_text` already persisted by [createPendingEntry]. Markdown stays in PENDING shape.
-     *
-     * `attemptCount` is the cold-start sweep's counter per ADR-001 §Q3 — it is owned by the
-     * recovery path, not by this terminal call. The sweep increments before re-invoking the
-     * worker; a single terminal failure does not advance the counter on its own.
-     */
     /** Read-only lookup. Returns `null` for missing rows so callers can act without throwing. */
     fun readEntry(entryId: Long): EntryEntity? = boxStore.boxFor<EntryEntity>().get(entryId)
 
@@ -130,6 +121,11 @@ class EntryStore(private val boxStore: BoxStore, private val markdownStore: Mark
         }
     }
 
+    /**
+     * Terminal failure path — [status] is one of [ExtractionStatus.FAILED] or
+     * [ExtractionStatus.TIMED_OUT]. Leaves the structured fields untouched; the row keeps the
+     * `entry_text` already persisted by [createPendingEntry]. Markdown stays in PENDING shape.
+     */
     fun failEntry(entryId: Long, status: ExtractionStatus, lastError: String?) {
         require(status == ExtractionStatus.FAILED || status == ExtractionStatus.TIMED_OUT) {
             "EntryStore.failEntry requires terminal-fail status (got $status)"
@@ -229,10 +225,25 @@ private fun observationsJson(observations: List<EntryObservation>): String {
     return array.toString()
 }
 
+// Cap on the malformed-payload preview included in `Log.w` lines so logcat doesn't get
+// flooded by a single corrupt row. 80 chars is enough to identify the shape (object vs
+// array, leading keys) without paying for the long tail.
+private const val LOG_PREVIEW_CHARS = 80
+
 private fun decodeObservations(json: String): List<EntryObservation> {
-    val array = json.takeIf { it.isNotBlank() }?.let { runCatching { JSONArray(it) }.getOrNull() }
-    return array?.let { (0 until it.length()).mapNotNull { idx -> decodeOne(it.optJSONObject(idx)) } }
-        ?: emptyList()
+    val raw = json.takeIf { it.isNotBlank() } ?: return emptyList()
+    val array = runCatching { JSONArray(raw) }.getOrNull()
+    // `appendObservation` rewrites this field — if we cannot read the existing list, the next
+    // write would silently overwrite real persisted observations. Surface it then fall back to
+    // empty so the rewrite path can still make progress.
+    return when (array) {
+        null -> {
+            android.util.Log.w("VestigeEntryStore", "malformed entryObservationsJson: ${raw.take(LOG_PREVIEW_CHARS)}")
+            emptyList()
+        }
+
+        else -> (0 until array.length()).mapNotNull { idx -> decodeOne(array.optJSONObject(idx)) }
+    }
 }
 
 private fun decodeOne(obj: JSONObject?): EntryObservation? {

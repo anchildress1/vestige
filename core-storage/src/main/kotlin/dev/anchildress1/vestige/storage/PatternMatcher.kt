@@ -18,7 +18,15 @@ import java.util.Locale
 object PatternMatcher {
 
     fun matches(entry: EntryEntity, pattern: PatternEntity, zoneId: ZoneId): Boolean {
-        val signature = runCatching { JSONObject(pattern.signatureJson) }.getOrNull() ?: return false
+        val signature = runCatching { JSONObject(pattern.signatureJson) }.getOrNull()
+        if (signature == null) {
+            android.util.Log.w(
+                "VestigePatternMatcher",
+                "malformed signatureJson for patternId=${pattern.patternId}: " +
+                    pattern.signatureJson.take(LOG_PREVIEW_CHARS),
+            )
+            return false
+        }
         return when (pattern.kind) {
             PatternKind.TEMPLATE_RECURRENCE -> matchesTemplate(entry, signature)
             PatternKind.TAG_PAIR_CO_OCCURRENCE -> matchesTagPair(entry, signature)
@@ -52,8 +60,14 @@ object PatternMatcher {
 
     private fun matchesCommitment(entry: EntryEntity, signature: JSONObject): Boolean {
         val target = TagNormalize.kebab(signature.optString("topic_or_person"))
-        val commitment = entry.statedCommitmentJson?.takeIf { it.isNotBlank() }
-            ?.let { runCatching { JSONObject(it) }.getOrNull() }
+        val raw = entry.statedCommitmentJson?.takeIf { it.isNotBlank() }
+        val commitment = raw?.let { runCatching { JSONObject(it) }.getOrNull() }
+        if (raw != null && commitment == null) {
+            android.util.Log.w(
+                "VestigePatternMatcher",
+                "malformed statedCommitmentJson on entry id=${entry.id}: ${raw.take(LOG_PREVIEW_CHARS)}",
+            )
+        }
         val topic = commitment?.optString("topic_or_person")?.trim()?.let(TagNormalize::kebab)
         return target.isNotEmpty() && topic == target
     }
@@ -72,4 +86,5 @@ object PatternMatcher {
     }
 
     private val VOCAB_SPLIT: Regex = Regex("[^a-z0-9]+")
+    private const val LOG_PREVIEW_CHARS = 80
 }

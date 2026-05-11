@@ -167,8 +167,22 @@ class PatternDetector(
 }
 
 // Top-level helper — kept off the class to satisfy the function-count budget.
+private const val LOG_PREVIEW_CHARS = 80
+
 private fun parseCommitmentTopic(json: String?): String? {
     val text = json?.takeIf { it.isNotBlank() } ?: return null
     val obj = runCatching { JSONObject(text) }.getOrNull()
-    return obj?.optString("topic_or_person")?.trim()?.takeIf { it.isNotEmpty() }
+    // Upstream wrote the commitment JSON; a parse failure means the contract broke. Don't
+    // crash detection over it, but don't hide it either — Phase 4 re-eval will see the same
+    // corruption.
+    return when (obj) {
+        null -> {
+            android.util.Log.w(
+                "VestigePatternDetector",
+                "malformed statedCommitmentJson: ${text.take(LOG_PREVIEW_CHARS)}",
+            )
+            null
+        }
+        else -> obj.optString("topic_or_person").trim().takeIf { it.isNotEmpty() }
+    }
 }

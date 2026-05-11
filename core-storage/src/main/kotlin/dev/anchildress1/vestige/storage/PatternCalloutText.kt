@@ -19,6 +19,13 @@ object PatternCalloutText {
     fun build(detected: DetectedPattern): String {
         val count = detected.supportingEntryCount
         val signature = runCatching { JSONObject(detected.signatureJson) }.getOrNull()
+        if (signature == null && detected.signatureJson.isNotBlank()) {
+            android.util.Log.w(
+                "VestigeCalloutText",
+                "malformed signatureJson for ${detected.kind.serial}: " +
+                    detected.signatureJson.take(LOG_PREVIEW_CHARS),
+            )
+        }
         return when (detected.kind) {
             PatternKind.TEMPLATE_RECURRENCE -> templateRecurrence(signature, count)
             PatternKind.TAG_PAIR_CO_OCCURRENCE -> tagPair(signature, count)
@@ -58,4 +65,6 @@ object PatternCalloutText {
         if (isEmpty()) return ""
         return split('-').joinToString(" ") { it.replaceFirstChar { ch -> ch.titlecase(Locale.ROOT) } }
     }
+
+    private const val LOG_PREVIEW_CHARS = 80
 }

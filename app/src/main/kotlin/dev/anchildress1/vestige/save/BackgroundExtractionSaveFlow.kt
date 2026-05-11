@@ -9,6 +9,7 @@ import dev.anchildress1.vestige.inference.HistoryChunk
 import dev.anchildress1.vestige.inference.ObservationGenerator
 import dev.anchildress1.vestige.model.EntryObservation
 import dev.anchildress1.vestige.model.ExtractionStatus
+import dev.anchildress1.vestige.model.Persona
 import dev.anchildress1.vestige.patterns.PatternDetectionOrchestrator
 import dev.anchildress1.vestige.storage.EntryStore
 import kotlinx.coroutines.CancellationException
@@ -41,6 +42,7 @@ class BackgroundExtractionSaveFlow(
         capturedAt: ZonedDateTime,
         retrievedHistory: List<HistoryChunk> = emptyList(),
         timeoutMs: Long? = null,
+        persona: Persona = Persona.WITNESS,
     ): SaveOutcome {
         val entryId = entryStore.createPendingEntry(entryText, capturedAt.toInstant())
         val terminalRelay = DeferredTerminalRelay(listenerFactory(entryId))
@@ -60,6 +62,7 @@ class BackgroundExtractionSaveFlow(
                 entryAttemptCount = request.entryAttemptCount,
                 result = result,
                 terminalRelay = terminalRelay,
+                persona = persona,
             )
 
             is BackgroundExtractionResult.Failed -> handleFailure(
@@ -86,6 +89,7 @@ class BackgroundExtractionSaveFlow(
         entryAttemptCount: Int,
         result: BackgroundExtractionResult.Success,
         terminalRelay: DeferredTerminalRelay,
+        persona: Persona,
     ): SaveOutcome.Completed {
         val observations = runObservations(entryText, result, capturedAt)
         persistTerminalState(
@@ -97,15 +101,15 @@ class BackgroundExtractionSaveFlow(
         ) {
             entryStore.completeEntry(entryId, result.resolved, result.templateLabel, observations)
         }
-        val calloutObservation = runPatternOrchestration(entryId)
+        val calloutObservation = runPatternOrchestration(entryId, persona)
         val finalObservations = if (calloutObservation != null) observations + calloutObservation else observations
         return SaveOutcome.Completed(entryId, result, finalObservations)
     }
 
-    private suspend fun runPatternOrchestration(entryId: Long): EntryObservation? {
+    private suspend fun runPatternOrchestration(entryId: Long, persona: Persona): EntryObservation? {
         val orchestrator = patternOrchestrator ?: return null
         return try {
-            persistOrchestratorCallout(orchestrator, entryId)
+            persistOrchestratorCallout(orchestrator, entryId, persona)
         } catch (cancellation: CancellationException) {
             throw cancellation
         } catch (@Suppress("TooGenericExceptionCaught") error: Exception) {
@@ -122,9 +126,10 @@ class BackgroundExtractionSaveFlow(
     private suspend fun persistOrchestratorCallout(
         orchestrator: PatternDetectionOrchestrator,
         entryId: Long,
+        persona: Persona,
     ): EntryObservation? {
         val entry = entryStore.readEntry(entryId)
-        val callout = entry?.let { orchestrator.onEntryCommitted(it) }
+        val callout = entry?.let { orchestrator.onEntryCommitted(it, persona) }
         // Persist first, then record the fire. If appendObservation throws, the cooldown stays
         // unchanged — the user never saw the callout, so the next 3 entries are still eligible.
         if (callout != null) {

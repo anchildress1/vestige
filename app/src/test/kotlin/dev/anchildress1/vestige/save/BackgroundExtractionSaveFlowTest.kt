@@ -77,7 +77,9 @@ class BackgroundExtractionSaveFlowTest {
             templateLabel = TemplateLabel.AFTERMATH,
         )
         coEvery { observationGenerator.generate(any(), any(), any()) } returns emptyList()
-        coEvery { orchestrator.onEntryCommitted(storedEntry) } returns callout
+        coEvery {
+            orchestrator.onEntryCommitted(storedEntry, dev.anchildress1.vestige.model.Persona.WITNESS)
+        } returns callout
         every { orchestrator.confirmCalloutFired(storedEntry) } returns Unit
 
         val outcome = flowWithOrch.saveAndExtract(SAMPLE_TEXT, SAMPLE_TIMESTAMP) as SaveOutcome.Completed
@@ -87,7 +89,7 @@ class BackgroundExtractionSaveFlowTest {
         // An exception in append leaves the cooldown unchanged.
         coVerifyOrder {
             entryStore.completeEntry(ENTRY_ID, resolved, TemplateLabel.AFTERMATH, emptyList())
-            orchestrator.onEntryCommitted(storedEntry)
+            orchestrator.onEntryCommitted(storedEntry, dev.anchildress1.vestige.model.Persona.WITNESS)
             entryStore.appendObservation(ENTRY_ID, callout)
             orchestrator.confirmCalloutFired(storedEntry)
         }
@@ -123,7 +125,9 @@ class BackgroundExtractionSaveFlowTest {
             templateLabel = TemplateLabel.AFTERMATH,
         )
         coEvery { observationGenerator.generate(any(), any(), any()) } returns emptyList()
-        coEvery { orchestrator.onEntryCommitted(storedEntry) } returns callout
+        coEvery {
+            orchestrator.onEntryCommitted(storedEntry, dev.anchildress1.vestige.model.Persona.WITNESS)
+        } returns callout
         every { entryStore.appendObservation(ENTRY_ID, callout) } throws RuntimeException("markdown disk full")
 
         val outcome = flowWithOrch.saveAndExtract(SAMPLE_TEXT, SAMPLE_TIMESTAMP)
@@ -156,7 +160,7 @@ class BackgroundExtractionSaveFlowTest {
             templateLabel = TemplateLabel.AFTERMATH,
         )
         coEvery { observationGenerator.generate(any(), any(), any()) } returns emptyList()
-        coEvery { orchestrator.onEntryCommitted(any()) } throws RuntimeException("native crash")
+        coEvery { orchestrator.onEntryCommitted(any(), any()) } throws RuntimeException("native crash")
 
         val outcome = flowWithOrch.saveAndExtract(SAMPLE_TEXT, SAMPLE_TIMESTAMP)
 

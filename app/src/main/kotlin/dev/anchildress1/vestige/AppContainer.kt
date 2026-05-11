@@ -15,6 +15,7 @@ import dev.anchildress1.vestige.lifecycle.BackgroundExtractionService
 import dev.anchildress1.vestige.lifecycle.BackgroundExtractionStatusBus
 import dev.anchildress1.vestige.model.ExtractionStatus
 import dev.anchildress1.vestige.model.ModelManifest
+import dev.anchildress1.vestige.model.Persona
 import dev.anchildress1.vestige.patterns.PatternDetectionOrchestrator
 import dev.anchildress1.vestige.save.BackgroundExtractionSaveFlow
 import dev.anchildress1.vestige.save.SaveOutcome
@@ -162,6 +163,7 @@ class AppContainer(
         capturedAt: ZonedDateTime,
         retrievedHistory: List<HistoryChunk> = emptyList(),
         timeoutMs: Long? = null,
+        persona: Persona = Persona.WITNESS,
     ): SaveOutcome {
         ensureBackgroundEngineInitialized()
         return backgroundExtractionSaveFlow.saveAndExtract(
@@ -169,6 +171,7 @@ class AppContainer(
             capturedAt = capturedAt,
             retrievedHistory = retrievedHistory,
             timeoutMs = timeoutMs,
+            persona = persona,
         )
     }
 

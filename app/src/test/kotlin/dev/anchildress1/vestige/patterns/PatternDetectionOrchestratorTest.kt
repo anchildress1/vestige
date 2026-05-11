@@ -75,7 +75,6 @@ class PatternDetectionOrchestratorTest {
             patternStore = patternStore,
             titleGenerator = titleGenerator,
             cooldownStore = cooldownStore,
-            activePersonaProvider = { Persona.WITNESS },
             clock = clock,
             zoneId = ZoneOffset.UTC,
         )
@@ -118,9 +117,12 @@ class PatternDetectionOrchestratorTest {
      * Calls `confirmCalloutFired` on any returned observation so the cooldown advances exactly
      * as it would in production after `EntryStore.appendObservation` succeeds.
      */
-    private suspend fun commitOne(templateLabel: TemplateLabel? = TemplateLabel.AFTERMATH): EntryObservation? {
+    private suspend fun commitOne(
+        templateLabel: TemplateLabel? = TemplateLabel.AFTERMATH,
+        persona: Persona = Persona.WITNESS,
+    ): EntryObservation? {
         val entry = putEntry(templateLabel = templateLabel)
-        val callout = orchestrator.onEntryCommitted(entry)
+        val callout = orchestrator.onEntryCommitted(entry, persona)
         if (callout != null) orchestrator.confirmCalloutFired(entry)
         return callout
     }
@@ -191,7 +193,7 @@ class PatternDetectionOrchestratorTest {
             ),
         )
         val entry = putEntry(templateLabel = TemplateLabel.AFTERMATH)
-        val callout = orchestrator.onEntryCommitted(entry)
+        val callout = orchestrator.onEntryCommitted(entry, Persona.WITNESS)
         assertNotNull(callout)
         assertEquals(ObservationEvidence.PATTERN_CALLOUT, callout!!.evidence)
         assertEquals("Worth noting.", callout.text)
@@ -240,7 +242,7 @@ class PatternDetectionOrchestratorTest {
             ),
         )
         val unrelated = putEntry(templateLabel = TemplateLabel.TUNNEL_EXIT)
-        assertNull(orchestrator.onEntryCommitted(unrelated))
+        assertNull(orchestrator.onEntryCommitted(unrelated, Persona.WITNESS))
     }
 
     @Test
@@ -285,7 +287,7 @@ class PatternDetectionOrchestratorTest {
                 latestCalloutText = "Worth noting.",
             ),
         )
-        val callout = orchestrator.onEntryCommitted(putEntry(templateLabel = TemplateLabel.AFTERMATH))
+        val callout = orchestrator.onEntryCommitted(putEntry(templateLabel = TemplateLabel.AFTERMATH), Persona.WITNESS)
         assertNotNull(callout)
         // Save flow's append failed (simulated by not calling confirm). Next entry must still
         // be callout-eligible because no fire was ever confirmed.
@@ -310,7 +312,7 @@ class PatternDetectionOrchestratorTest {
                 latestCalloutText = "", // data-integrity smell — broken write path upstream
             ),
         )
-        val first = orchestrator.onEntryCommitted(putEntry(templateLabel = TemplateLabel.AFTERMATH))
+        val first = orchestrator.onEntryCommitted(putEntry(templateLabel = TemplateLabel.AFTERMATH), Persona.WITNESS)
         assertNull(first)
         // Cooldown was never started, so a follow-up entry with valid pattern would fire normally.
         assertTrue(cooldownStore.isCalloutPermitted())
@@ -332,7 +334,7 @@ class PatternDetectionOrchestratorTest {
             ),
         )
         val entry = putEntry(templateLabel = TemplateLabel.AFTERMATH)
-        assertNull(orchestrator.onEntryCommitted(entry))
+        assertNull(orchestrator.onEntryCommitted(entry, Persona.WITNESS))
     }
 
     @Test
@@ -373,7 +375,7 @@ class PatternDetectionOrchestratorTest {
         saved.supportingEntries.addAll(dummies)
         patternStore.put(saved)
 
-        val callout = orchestrator.onEntryCommitted(putEntry(templateLabel = TemplateLabel.AFTERMATH))
+        val callout = orchestrator.onEntryCommitted(putEntry(templateLabel = TemplateLabel.AFTERMATH), Persona.WITNESS)
         assertEquals("Higher-support text.", callout?.text)
     }
 
@@ -407,7 +409,7 @@ class PatternDetectionOrchestratorTest {
                 latestCalloutText = "newer-text",
             ),
         )
-        val callout = orchestrator.onEntryCommitted(putEntry(templateLabel = TemplateLabel.AFTERMATH))
+        val callout = orchestrator.onEntryCommitted(putEntry(templateLabel = TemplateLabel.AFTERMATH), Persona.WITNESS)
         assertEquals("newer-text", callout?.text)
     }
 
@@ -440,7 +442,9 @@ class PatternDetectionOrchestratorTest {
             zoneId = ZoneOffset.UTC,
         )
         // Ten more matching entries → detection upserts and promotes the row to ACTIVE.
-        repeat(10) { laterOrchestrator.onEntryCommitted(putEntry(templateLabel = TemplateLabel.AFTERMATH)) }
+        repeat(10) {
+            laterOrchestrator.onEntryCommitted(putEntry(templateLabel = TemplateLabel.AFTERMATH), Persona.WITNESS)
+        }
         val promoted = patternStore.findByPatternId(original.patternId)!!
         assertEquals(PatternState.ACTIVE, promoted.state)
         assertNull("snoozedUntil cleared on auto-promote", promoted.snoozedUntil)
@@ -503,12 +507,11 @@ class PatternDetectionOrchestratorTest {
                 forbiddenPhraseDetector = { false },
             ),
             cooldownStore = cooldownStore,
-            activePersonaProvider = { Persona.WITNESS },
             clock = clock,
             zoneId = ZoneOffset.UTC,
         )
 
-        fallbackOrchestrator.onEntryCommitted(putEntry(templateLabel = TemplateLabel.AFTERMATH))
+        fallbackOrchestrator.onEntryCommitted(putEntry(templateLabel = TemplateLabel.AFTERMATH), Persona.WITNESS)
 
         val pattern = patternStore.findByPatternId("z".repeat(64))!!
         assertEquals("Commitment recurrence", pattern.title)
@@ -525,6 +528,7 @@ class PatternDetectionOrchestratorTest {
                     templateLabel = TemplateLabel.AFTERMATH,
                     extractionStatus = ExtractionStatus.FAILED,
                 ),
+                Persona.WITNESS,
             )
         }
 
@@ -558,6 +562,7 @@ class PatternDetectionOrchestratorTest {
                 templateLabel = TemplateLabel.AFTERMATH,
                 extractionStatus = ExtractionStatus.FAILED,
             ),
+            Persona.WITNESS,
         )
 
         assertTrue(patternStore.all().isEmpty())
@@ -594,7 +599,7 @@ class PatternDetectionOrchestratorTest {
             zoneId = ZoneOffset.UTC,
         )
 
-        cancelOrchestrator.onEntryCommitted(putEntry(templateLabel = TemplateLabel.AFTERMATH))
+        cancelOrchestrator.onEntryCommitted(putEntry(templateLabel = TemplateLabel.AFTERMATH), Persona.WITNESS)
     }
 
     @Test

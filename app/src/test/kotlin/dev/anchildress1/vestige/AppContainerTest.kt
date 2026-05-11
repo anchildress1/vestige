@@ -181,6 +181,7 @@ class AppContainerTest {
                 capturedAt = capturedAt,
                 retrievedHistory = emptyList(),
                 timeoutMs = null,
+                persona = dev.anchildress1.vestige.model.Persona.WITNESS,
             )
         } returns expected
         val container = AppContainer(
@@ -205,6 +206,7 @@ class AppContainerTest {
                 capturedAt = capturedAt,
                 retrievedHistory = emptyList(),
                 timeoutMs = null,
+                persona = dev.anchildress1.vestige.model.Persona.WITNESS,
             )
         }
     }
@@ -229,6 +231,7 @@ class AppContainerTest {
                 capturedAt = capturedAt,
                 retrievedHistory = any<List<HistoryChunk>>(),
                 timeoutMs = any(),
+                persona = any(),
             )
         } returns outcome
         val container = AppContainer(
@@ -247,7 +250,7 @@ class AppContainerTest {
         container.saveAndExtract("second", capturedAt, timeoutMs = 90_000L)
 
         coVerify(exactly = 1) { engine.initialize() }
-        coVerify(exactly = 2) { saveFlow.saveAndExtract(any(), capturedAt, any(), any()) }
+        coVerify(exactly = 2) { saveFlow.saveAndExtract(any(), capturedAt, any(), any(), any()) }
     }
 
     @Test

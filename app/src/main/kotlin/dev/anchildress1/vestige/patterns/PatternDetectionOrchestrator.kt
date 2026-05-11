@@ -43,22 +43,25 @@ class PatternDetectionOrchestrator(
     private val patternStore: PatternStore,
     private val titleGenerator: PatternTitleGenerator,
     private val cooldownStore: CalloutCooldownStore,
-    private val activePersonaProvider: () -> Persona = { Persona.WITNESS },
     private val clock: Clock = Clock.systemUTC(),
     private val zoneId: ZoneId = ZoneId.systemDefault(),
 ) {
 
     /**
-     * Compute the optional callout for [entry]. Decrements the cooldown when the suppression
-     * window is active (callout-eligibility consumed by the entry passing through), but does
-     * NOT record a new fire — the save flow calls [confirmCalloutFired] only after the
-     * observation has been persisted. Splitting the two halves means an `appendObservation`
-     * failure can't bump the cooldown for a callout the user never saw.
+     * Compute the optional callout for [entry] under the given [persona]. Decrements the
+     * cooldown when the suppression window is active (callout-eligibility consumed by the
+     * entry passing through), but does NOT record a new fire — the save flow calls
+     * [confirmCalloutFired] only after the observation has been persisted. Splitting the two
+     * halves means an `appendObservation` failure can't bump the cooldown for a callout the
+     * user never saw.
+     *
+     * [persona] is per-call (not constructor-pinned) so the same orchestrator instance can
+     * serve every session — capture sessions own persona, the orchestrator is process-scoped.
      */
-    suspend fun onEntryCommitted(entry: EntryEntity): EntryObservation? {
+    suspend fun onEntryCommitted(entry: EntryEntity, persona: Persona): EntryObservation? {
         val entryCount = completedEntryCount(boxStore)
         if (entryCount > 0 && entryCount % DETECTION_INTERVAL == 0L) {
-            runDetection()
+            runDetection(persona)
         }
         if (!cooldownStore.isCalloutPermitted()) {
             cooldownStore.consumeOneEntry()
@@ -72,18 +75,18 @@ class PatternDetectionOrchestrator(
         cooldownStore.recordFired(entry.id, clock.millis())
     }
 
-    private suspend fun runDetection() {
+    private suspend fun runDetection(persona: Persona) {
         val detected = detector.detect()
         for (pattern in detected) {
-            upsert(pattern)
+            upsert(pattern, persona)
         }
     }
 
-    private suspend fun upsert(detected: DetectedPattern) {
+    private suspend fun upsert(detected: DetectedPattern, persona: Persona) {
         val existing = patternStore.findByPatternId(detected.patternId)
         val supportingEntries = loadSupporting(detected.supportingEntryIds)
         if (existing == null) {
-            insertNewActive(detected, supportingEntries)
+            insertNewActive(detected, supportingEntries, persona)
             return
         }
         val current = promoteSnoozedIfExpired(existing) ?: existing
@@ -95,9 +98,13 @@ class PatternDetectionOrchestrator(
         }
     }
 
-    private suspend fun insertNewActive(detected: DetectedPattern, supporting: List<EntryEntity>) {
+    private suspend fun insertNewActive(
+        detected: DetectedPattern,
+        supporting: List<EntryEntity>,
+        persona: Persona,
+    ) {
         val title = titleGenerator
-            .runCatching { generate(activePersonaProvider(), detected) }
+            .runCatching { generate(persona, detected) }
             .getOrElse {
                 if (it is CancellationException) throw it
                 Log.w(TAG, "title generator threw ${it.javaClass.simpleName}: ${it.message}")

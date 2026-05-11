@@ -23,7 +23,7 @@ import java.io.File
  * STT-D — lens-divergence verification per `docs/stories/phase-2-core-loop.md` §Story 2.7 and
  * `docs/sample-data-scenarios.md` §STT-D. Runs the manifest entries through
  * [BackgroundExtractionWorker], records per-lens output, and asserts at least
- * [MIN_DIVERGENT_ENTRIES] of [MIN_CORPUS_SIZE] entries (30%) show meaningful field-level
+ * [StopAndTestCorpusRules.requiredDivergentEntries] entries (30%) show meaningful field-level
  * divergence — Skeptical flags, lens disagreement on a non-empty value, or Literal refusing an
  * inference that Inferential populated.
  *
@@ -54,9 +54,7 @@ class SttDLensDivergenceTest {
         assumeTrue("Manifest not found at $manifestPath", manifestFile.exists() && manifestFile.canRead())
 
         val corpus = CorpusManifest.load(manifestFile)
-        require(corpus.size >= MIN_CORPUS_SIZE) {
-            "STT-D manifest must include at least $MIN_CORPUS_SIZE entries (A1, A4, B1, B2, C2, D1); got ${corpus.size}"
-        }
+        val requiredDivergentEntries = StopAndTestCorpusRules.requiredDivergentEntries(corpus.size)
 
         val cacheDir = InstrumentationRegistry.getInstrumentation().targetContext.cacheDir
         val backend = InferenceBackendArg.resolve(args)
@@ -77,8 +75,8 @@ class SttDLensDivergenceTest {
             val divergent = reports.count { it.isMeaningful }
             assertTrue(
                 "STT-D failed: only $divergent/${reports.size} entries showed meaningful lens " +
-                    "divergence (need >= $MIN_DIVERGENT_ENTRIES). Inspect logcat tag '$TAG'.",
-                divergent >= MIN_DIVERGENT_ENTRIES,
+                    "divergence (need >= $requiredDivergentEntries). Inspect logcat tag '$TAG'.",
+                divergent >= requiredDivergentEntries,
             )
         }
     }
@@ -207,8 +205,6 @@ class SttDLensDivergenceTest {
 
     private companion object {
         const val TAG = "VestigeSttD"
-        const val MIN_CORPUS_SIZE = 6
-        const val MIN_DIVERGENT_ENTRIES = 2
         const val MIN_DISTINCT_FOR_DISAGREEMENT = 2
         const val PER_ENTRY_TIMEOUT_MS = 5 * 60_000L
 

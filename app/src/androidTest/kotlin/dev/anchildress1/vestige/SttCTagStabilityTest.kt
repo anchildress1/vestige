@@ -36,8 +36,10 @@ import java.io.File
  *     -Pandroid.testInstrumentationRunnerArguments.class=dev.anchildress1.vestige.SttCTagStabilityTest
  *
  * Missing args → [assumeTrue] skips so CI without artifacts stays green. The default 3 runs ×
- * 18 corpus entries × ~3 lens calls per run is a long-running on-device suite; expect tens of
- * minutes on E4B CPU. Drop [runsPerEntry] to 2 for a faster smoke pass while tuning prompts.
+ * 18 canonical corpus entries × ~3 lens calls per run is a long-running on-device suite; expect
+ * tens of minutes on E4B CPU. The harness rejects cherry-picked manifests so the phase gate
+ * cannot pass on a toy subset. Drop [runsPerEntry] to 2 for a faster smoke pass while tuning
+ * prompts.
  */
 @RunWith(AndroidJUnit4::class)
 class SttCTagStabilityTest {
@@ -60,7 +62,7 @@ class SttCTagStabilityTest {
         assumeTrue("Manifest not found at $manifestPath", manifestFile.exists() && manifestFile.canRead())
 
         val corpus = CorpusManifest.load(manifestFile)
-        require(corpus.isNotEmpty()) { "STT-C manifest is empty" }
+        StopAndTestCorpusRules.requireCanonicalSttCCorpus(corpus.map(CorpusEntry::id))
 
         val cacheDir = InstrumentationRegistry.getInstrumentation().targetContext.cacheDir
         val backend = InferenceBackendArg.resolve(args)

@@ -18,7 +18,7 @@ Build the end-to-end capture loop: user records or types → foreground call ret
 
 - [ ] Capture session can run record → transcription + follow-up → save end-to-end on the reference device.
 - [ ] **STT-B passes** (or has an explicit fallback recorded): multi-turn conversation maintains context across 3+ exchanges on E4B. If broken, single-turn fallback is implemented and the spec is updated.
-- [ ] **STT-D passes** (or the architecture is dropped): the 3-lens pipeline produces meaningfully different outputs on at least 30% of the prepared sample transcripts. If lenses always agree, multi-lens drops to single-pass and the Reading section is removed from the entry detail spec.
+- [x] **STT-D passes** (or the architecture is dropped): the 3-lens pipeline produces meaningfully different outputs on at least 30% of the prepared sample transcripts. If lenses always agree, multi-lens drops to single-pass and the Reading section is removed from the entry detail spec. _(2026-05-10 — 5/6 entries (83%) on E4B CPU. See Story 2.7.)_
 - [ ] **STT-C passes**: tag extraction is stable (≥80% same-tag emission on equivalent test dumps). If unstable, prompts have been tightened until stable, or the limitation is documented.
 - [ ] Convergence resolver implementation lands into Story 1.12's test scaffolding and all happy-path tests pass.
 - [ ] Agent-emitted template labels work for all six archetypes on representative sample transcripts.
@@ -160,18 +160,23 @@ Don't conflate this story with Story 2.6 (worker logic). Story 2.6 is *what* run
 
 ---
 
-### Story 2.7 — STT-D: 3-lens divergence verification (existential)
+### Story 2.7 — STT-D: 3-lens divergence verification (existential) — **PASSED 2026-05-10**
 
 🛑 **Stop-and-test point.** If lenses always return identical outputs, the architecture earns nothing visible. Drop multi-lens to single-pass and remove the Reading screen from the entry detail spec.
 
 **As** the AI implementor, **I need** to verify that the three lens passes produce *meaningfully different* outputs on at least 30% of the prepared sample transcripts (per `sample-data-scenarios.md`), **so that** the multi-lens architecture earns its 3× inference cost.
 
 **Done when:**
-- [ ] The full STT-D sample-transcript set from `sample-data-scenarios.md` runs through the background worker (Story 2.6).
-- [ ] For each transcript, the three lens results are compared field-by-field. Difference count per field is logged.
-- [ ] Across the sample set, at least 30% of transcripts produce at least one field-level disagreement among lenses.
-- [ ] If the threshold is met, this story closes — the multi-lens architecture is validated.
-- [ ] If the threshold is not met after one focused day of prompt tuning, the architecture is dropped: replace the 3-lens worker with a single-pass extraction call, remove the convergence resolver, drop "candidate" and "ambiguous" confidence values from the schema, and remove the Reading section spec from `design-guidelines.md`. Update `concept-locked.md` and `PRD.md` to match. ADR-002 gets superseded by a new ADR documenting single-pass extraction.
+- [x] The full STT-D sample-transcript set from `sample-data-scenarios.md` runs through the background worker (Story 2.6). _(`SttDLensDivergenceTest` ran A1, A4, B1, B2, C2, D1 on S24 Ultra 2026-05-10 — all 6 entries × 3 lenses parsed cleanly at 1 attempt each, no retries; per-entry latency 127–161s on E4B CPU.)_
+- [x] For each transcript, the three lens results are compared field-by-field. Difference count per field is logged. _(`VestigeSttD` logcat tag emits per-lens tags / energy / commitment / flags plus a `disagree_fields=… inferential_only=… skeptical_flags=… meaningful=…` line per entry. Divergence indicators: value disagreement on a populated field, Literal-empty-but-Inferential-populated, or any Skeptical flag.)_
+- [x] Across the sample set, at least 30% of transcripts produce at least one field-level disagreement among lenses. _(**5/6 entries (83%)** flagged `meaningful=true`. Divergence was tag-set differences on A1/A4/B1/D1, plus Skeptical flags on A1 and B2. Only C2 was unanimous — all three lenses converged on `[task-app, decision-loop]`.)_
+- [x] If the threshold is met, this story closes — the multi-lens architecture is validated.
+- [ ] If the threshold is not met after one focused day of prompt tuning, the architecture is dropped: replace the 3-lens worker with a single-pass extraction call, remove the convergence resolver, drop "candidate" and "ambiguous" confidence values from the schema, and remove the Reading section spec from `design-guidelines.md`. Update `concept-locked.md` and `PRD.md` to match. ADR-002 gets superseded by a new ADR documenting single-pass extraction. _(Not triggered — threshold met on first run.)_
+
+**Notes from the device run (2026-05-10):**
+- Energy descriptor came back null on 5/6 entries even when transcripts described state shifts ("flattened by 11," "battery got yanked"). A1 was the exception — all three lenses agreed on `flattened`. STT-C will surface whether this is a prompt-tightening opportunity or stable noise.
+- Skeptical surfaced 1 flag on A1 (likely `vocabulary-contradiction` between `fine before` and `flattened`) and 1 on B2 (likely `commitment-without-anchor` on "send the invoice today" — no entry id yet). Both align with ADR-002's expected pressure points.
+- Inferential never refused what Literal made; the "Literal-refuses-vs-Inferential-makes" divergence channel didn't fire on any of the six entries. Field-level disagreement is real but channelled through tag-set drift rather than refusal/inference asymmetry. Update ADR-002 §"Why three calls" if Phase 3 evidence keeps pointing the same way.
 
 **Fallback if STT-D fails:** the demo's "intentional model use" story shifts. Native audio multimodal stays the headline (it always was). The agentic-as-product layer is no longer present, so the technical walkthrough loses the "Reading" beat. The 5-min walkthrough script changes — add a comment in `demo-storyboard.md` (when written) noting the cut.
 
@@ -301,7 +306,7 @@ Phase 3 starts when all the following are true:
 
 - [ ] All fourteen stories above are Done or have an explicit, recorded fallback.
 - [ ] **STT-B resolved** — multi-turn works on E4B *or* the single-turn fallback is implemented and the spec updated.
-- [ ] **STT-D resolved** — 3-lens divergence is validated *or* multi-lens has been replaced with single-pass and ADR-002 has been superseded.
+- [x] **STT-D resolved** — 3-lens divergence is validated *or* multi-lens has been replaced with single-pass and ADR-002 has been superseded. _(2026-05-10 — validated at 83%.)_
 - [ ] **STT-C resolved** — tag stability is ≥80% *or* the limitation is documented and Phase 3's pattern engine is designed around the noise floor.
 - [ ] Convergence resolver tests from Story 1.12 all pass.
 - [ ] `BackgroundExtractionService` state machine tests pass; service is wired into `AppContainer` per ADR-004.

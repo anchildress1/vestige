@@ -124,12 +124,12 @@ Query-side tag extraction goes beyond exact-substring match: a free-form query b
 **As** the AI implementor, **I need** ObjectBox `Pattern` entities that persist across app restarts with explicit lifecycle states per ADR-003, **so that** patterns survive backgrounding, the user can return to them later, and the cooldown / threshold logic from Story 3.5 has a durable state to query.
 
 **Done when:**
-- [ ] `Pattern` ObjectBox entity matches `adrs/ADR-003-pattern-detection-and-persistence.md` §"ObjectBox `Pattern` entity" verbatim: `id` (PK), `patternId` (`@Index @Unique` SHA-256 hex), `kind`, `signatureJson`, `title`, `templateLabel` (nullable), `firstSeenTimestamp`, `lastSeenTimestamp`, `supportingEntryIds: ToMany<Entry>`, `state`, `snoozedUntil` (nullable), `stateChangedTimestamp`, `latestCalloutText`.
-- [ ] `state` is the string enum from ADR-003 §"Lifecycle & state transitions": `active`, `dismissed`, `snoozed`, `resolved`, `below_threshold` (internal-only, not user-facing — set by Re-eval recompute when supporting count drops <3).
-- [ ] State transitions implement ADR-003 §"Lifecycle" exactly: `NEW → active`, `active → dismissed | snoozed | resolved | below_threshold`, `below_threshold → active` (idempotent re-emerge when count restored), `snoozed → active` (auto on `snoozedUntil` expiry **and** still meeting threshold, or via user un-snooze), `snoozed → dismissed`, with `dismissed` and `resolved` terminal in v1.
-- [ ] A singleton settings row holds `lastCalloutEntryId` and `lastCalloutTimestamp` for the **global** callout cooldown per ADR-003 §"Cooldown (callout-side only, global)".
-- [ ] A unit test exercises every legal transition. Out-of-spec transitions (e.g., `dismissed → active`) are explicitly rejected with an assertion failure.
-- [ ] Patterns persist across simulated app restart (write, kill process, restart, read).
+- [x] `Pattern` ObjectBox entity matches `adrs/ADR-003-pattern-detection-and-persistence.md` §"ObjectBox `Pattern` entity" verbatim: `id` (PK), `patternId` (`@Index @Unique` SHA-256 hex), `kind`, `signatureJson`, `title`, `templateLabel` (nullable), `firstSeenTimestamp`, `lastSeenTimestamp`, `supportingEntryIds: ToMany<Entry>`, `state`, `snoozedUntil` (nullable), `stateChangedTimestamp`, `latestCalloutText`.
+- [x] `state` is the string enum from ADR-003 §"Lifecycle & state transitions": `active`, `dismissed`, `snoozed`, `resolved`, `below_threshold` (internal-only, not user-facing — set by Re-eval recompute when supporting count drops <3).
+- [x] State transitions implement ADR-003 §"Lifecycle" exactly: `NEW → active`, `active → dismissed | snoozed | resolved | below_threshold`, `below_threshold → active` (idempotent re-emerge when count restored), `snoozed → active` (auto on `snoozedUntil` expiry **and** still meeting threshold, or via user un-snooze), `snoozed → dismissed`, with `dismissed` and `resolved` terminal in v1.
+- [x] A singleton settings row holds `lastCalloutEntryId` and `lastCalloutTimestamp` for the **global** callout cooldown per ADR-003 §"Cooldown (callout-side only, global)".
+- [x] A unit test exercises every legal transition. Out-of-spec transitions (e.g., `dismissed → active`) are explicitly rejected with an assertion failure.
+- [x] Patterns persist across simulated app restart (write, kill process, restart, read).
 
 **Notes / risks:** ADR-003 §"`pattern_id` generation" is content-addressable SHA-256 over the signature — *not* an autoincrement primary key. Re-running detection over the same data produces the same IDs. `below_threshold` is a hidden state used only by Re-eval recompute (Story 3.10 / Phase 4); it is not the initial state for new patterns — those go directly to `active` when threshold is first crossed.
 

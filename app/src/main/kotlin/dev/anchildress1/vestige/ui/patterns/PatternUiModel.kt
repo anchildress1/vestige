@@ -15,11 +15,7 @@ data class PatternCardUi(
  * Source row for the Pattern detail. [snippet] is the leading slice of the supporting entry's
  * text so the user can match the date to the moment without leaving the screen.
  */
-data class PatternSourceUi(
-    val entryId: Long,
-    val dateLabel: String,
-    val snippet: String,
-)
+data class PatternSourceUi(val entryId: Long, val dateLabel: String, val snippet: String)
 
 sealed interface PatternsListUiState {
     data object Loading : PatternsListUiState
@@ -55,11 +51,8 @@ sealed interface PatternDetailUiState {
  */
 sealed interface PatternsListEvent {
     /** [action] feeds the snackbar copy; [undo] is null when the action is terminal. */
-    data class ActionTaken(
-        val patternId: String,
-        val action: PatternAction,
-        val undo: PatternUndo?,
-    ) : PatternsListEvent
+    data class ActionTaken(val patternId: String, val action: PatternAction, val undo: PatternUndo?) :
+        PatternsListEvent
 }
 
 enum class PatternAction { DISMISSED, SNOOZED, MARKED_RESOLVED }
@@ -72,7 +65,4 @@ data class PatternActionCallbacks<T>(
 )
 
 /** Inverse-action payload the snackbar reissues if the user taps `Undo` while it's alive. */
-data class PatternUndo(
-    val patternId: String,
-    val action: PatternAction,
-)
+data class PatternUndo(val patternId: String, val action: PatternAction)

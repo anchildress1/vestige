@@ -188,7 +188,7 @@ interface HttpResponse : AutoCloseable {
  * `HttpURLConnection`-backed client. Fails fast on hosts not in [allowedHosts]; consults
  * [networkGate] before each connect so a sealed gate prevents dial-out regardless of allowlist.
  */
-class DefaultHttpClient(private val allowedHosts: List<String>, private val networkGate: NetworkGate) : HttpClient {
+class ArtifactHttpClient(private val allowedHosts: List<String>, private val networkGate: NetworkGate) : HttpClient {
     override fun open(url: String, resumeFromByte: Long): HttpResponse {
         var currentUrl = URI.create(url).toURL()
         repeat(MAX_REDIRECTS + 1) { redirectCount ->

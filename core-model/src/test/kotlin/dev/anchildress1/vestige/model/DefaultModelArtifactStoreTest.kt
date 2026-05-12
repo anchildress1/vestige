@@ -179,8 +179,8 @@ class DefaultModelArtifactStoreTest {
     }
 
     @Test
-    fun `DefaultHttpClient rejects hosts not in the allowlist`() {
-        val client = DefaultHttpClient(
+    fun `ArtifactHttpClient rejects hosts not in the allowlist`() {
+        val client = ArtifactHttpClient(
             allowedHosts = listOf("huggingface.co"),
             networkGate = DefaultNetworkGate.ALWAYS_OPEN_FOR_TESTS,
         )
@@ -190,8 +190,8 @@ class DefaultModelArtifactStoreTest {
     }
 
     @Test
-    fun `DefaultHttpClient rejects lookalike hostnames that only share a suffix`() {
-        val client = DefaultHttpClient(
+    fun `ArtifactHttpClient rejects lookalike hostnames that only share a suffix`() {
+        val client = ArtifactHttpClient(
             allowedHosts = listOf("huggingface.co"),
             networkGate = DefaultNetworkGate.ALWAYS_OPEN_FOR_TESTS,
         )
@@ -201,7 +201,7 @@ class DefaultModelArtifactStoreTest {
     }
 
     @Test
-    fun `DefaultHttpClient follows redirects only when each hop stays on the allowlist`() {
+    fun `ArtifactHttpClient follows redirects only when each hop stays on the allowlist`() {
         val server = HttpServer.create(InetSocketAddress("127.0.0.1", 0), 0)
         server.createContext("/start") { exchange ->
             exchange.redirectTo("http://127.0.0.1:${server.address.port}/final")
@@ -213,7 +213,7 @@ class DefaultModelArtifactStoreTest {
         server.start()
 
         try {
-            val client = DefaultHttpClient(
+            val client = ArtifactHttpClient(
                 allowedHosts = listOf("127.0.0.1"),
                 networkGate = DefaultNetworkGate.ALWAYS_OPEN_FOR_TESTS,
             )
@@ -227,7 +227,7 @@ class DefaultModelArtifactStoreTest {
     }
 
     @Test
-    fun `DefaultHttpClient rejects redirects that leave the allowlist`() {
+    fun `ArtifactHttpClient rejects redirects that leave the allowlist`() {
         val server = HttpServer.create(InetSocketAddress("127.0.0.1", 0), 0)
         server.createContext("/start") { exchange ->
             exchange.redirectTo("http://localhost:${server.address.port}/final")
@@ -235,7 +235,7 @@ class DefaultModelArtifactStoreTest {
         server.start()
 
         try {
-            val client = DefaultHttpClient(
+            val client = ArtifactHttpClient(
                 allowedHosts = listOf("127.0.0.1"),
                 networkGate = DefaultNetworkGate.ALWAYS_OPEN_FOR_TESTS,
             )
@@ -311,7 +311,7 @@ class DefaultModelArtifactStoreTest {
     }
 
     @Test
-    fun `DefaultHttpClient accepts subdomains of an allowed host`() {
+    fun `ArtifactHttpClient accepts subdomains of an allowed host`() {
         val server = HttpServer.create(InetSocketAddress("127.0.0.1", 0), 0)
         server.createContext("/file") { exchange ->
             exchange.sendResponseHeaders(200, SHORT_BYTES.size.toLong())
@@ -323,7 +323,7 @@ class DefaultModelArtifactStoreTest {
             // `cdn.localhost-allowed.test` — Java's URL won't actually resolve it, so we go the
             // other direction: allow `localhost` and let the loopback alias `localhost.` (with
             // trailing dot stripped) match via endsWith.
-            val client = DefaultHttpClient(
+            val client = ArtifactHttpClient(
                 allowedHosts = listOf("localhost"),
                 networkGate = DefaultNetworkGate.ALWAYS_OPEN_FOR_TESTS,
             )
@@ -336,7 +336,7 @@ class DefaultModelArtifactStoreTest {
     }
 
     @Test
-    fun `DefaultHttpClient matches allowed host case-insensitively`() {
+    fun `ArtifactHttpClient matches allowed host case-insensitively`() {
         val server = HttpServer.create(InetSocketAddress("127.0.0.1", 0), 0)
         server.createContext("/file") { exchange ->
             exchange.sendResponseHeaders(200, SHORT_BYTES.size.toLong())
@@ -344,7 +344,7 @@ class DefaultModelArtifactStoreTest {
         }
         server.start()
         try {
-            val client = DefaultHttpClient(
+            val client = ArtifactHttpClient(
                 // Allowlist deliberately uppercase — `host.matchesAllowedHost(allowedHost)` lowercases both.
                 allowedHosts = listOf("LOCALHOST"),
                 networkGate = DefaultNetworkGate.ALWAYS_OPEN_FOR_TESTS,
@@ -358,7 +358,7 @@ class DefaultModelArtifactStoreTest {
     }
 
     @Test
-    fun `DefaultHttpClient rejects a redirect missing the Location header`() {
+    fun `ArtifactHttpClient rejects a redirect missing the Location header`() {
         val server = HttpServer.create(InetSocketAddress("127.0.0.1", 0), 0)
         server.createContext("/start") { exchange ->
             // Send 302 with no Location at all — the require() guard must surface this.
@@ -367,7 +367,7 @@ class DefaultModelArtifactStoreTest {
         }
         server.start()
         try {
-            val client = DefaultHttpClient(
+            val client = ArtifactHttpClient(
                 allowedHosts = listOf("127.0.0.1"),
                 networkGate = DefaultNetworkGate.ALWAYS_OPEN_FOR_TESTS,
             )
@@ -383,7 +383,7 @@ class DefaultModelArtifactStoreTest {
     }
 
     @Test
-    fun `DefaultHttpClient rejects redirect chains longer than MAX_REDIRECTS`() {
+    fun `ArtifactHttpClient rejects redirect chains longer than MAX_REDIRECTS`() {
         val server = HttpServer.create(InetSocketAddress("127.0.0.1", 0), 0)
         // Six hops: /h0 → /h1 → /h2 → /h3 → /h4 → /h5 → /h6. The client allows MAX_REDIRECTS=5
         // and must throw on the seventh dial-out, not loop indefinitely.
@@ -396,7 +396,7 @@ class DefaultModelArtifactStoreTest {
         }
         server.start()
         try {
-            val client = DefaultHttpClient(
+            val client = ArtifactHttpClient(
                 allowedHosts = listOf("127.0.0.1"),
                 networkGate = DefaultNetworkGate.ALWAYS_OPEN_FOR_TESTS,
             )
@@ -412,7 +412,7 @@ class DefaultModelArtifactStoreTest {
     }
 
     @Test
-    fun `DefaultHttpClient follows a 308 permanent redirect (not just 302)`() {
+    fun `ArtifactHttpClient follows a 308 permanent redirect (not just 302)`() {
         val server = HttpServer.create(InetSocketAddress("127.0.0.1", 0), 0)
         server.createContext("/start") { exchange ->
             exchange.responseHeaders.add("Location", "http://127.0.0.1:${server.address.port}/final")
@@ -425,7 +425,7 @@ class DefaultModelArtifactStoreTest {
         }
         server.start()
         try {
-            val client = DefaultHttpClient(
+            val client = ArtifactHttpClient(
                 allowedHosts = listOf("127.0.0.1"),
                 networkGate = DefaultNetworkGate.ALWAYS_OPEN_FOR_TESTS,
             )

@@ -57,9 +57,9 @@ class NetworkGateTest {
     }
 
     @Test
-    fun `DefaultHttpClient asks the gate before opening a connection`() {
+    fun `ArtifactHttpClient asks the gate before opening a connection`() {
         val sealedGate = DefaultNetworkGate() // starts Sealed
-        val client = DefaultHttpClient(allowedHosts = listOf("huggingface.co"), networkGate = sealedGate)
+        val client = ArtifactHttpClient(allowedHosts = listOf("huggingface.co"), networkGate = sealedGate)
         assertThrows(NetworkSealedException::class.java) {
             client.open("https://huggingface.co/x", resumeFromByte = 0)
         }

@@ -70,8 +70,28 @@ The implementation branch verifies via Story 3.2's smoke test (cosine similarity
 
 ### Action Items
 
-1. [ ] `:core-inference/build.gradle.kts` — add `com.google.ai.edge.litert:litert` direct dependency, pinned via `libs.versions.toml`. Resolve the `libLiteRt.so` collision via `packagingOptions { jniLibs { pickFirst("**/libLiteRt.so") } }`.
-2. [ ] Story 3.2 done-when bullet 1 — rewrite from "loads via LiteRT-LM in `:core-inference`" to "loads via LiteRT (`com.google.ai.edge.litert:litert`) in `:core-inference`."
-3. [ ] `manifest.properties` — add `embedding_artifact_*` keys (filename, download_url, expected_byte_size, sha256, allowed_hosts) when the implementation branch runs the Phase 3 download probe.
-4. [ ] `architecture-brief.md` §"AppContainer Ownership" / `:core-inference` row — note the two-runtime arrangement once Story 3.2 lands.
+1. [x] `:core-inference/build.gradle.kts` — add Google AI Edge embedding runtime as a direct dependency. Resolution superseded by the 2026-05-11 addendum below: the `com.google.ai.edge.localagents:localagents-rag` AAR is the active Google-supported path for loading EmbeddingGemma on Android. It bundles `libgemma_embedding_model_jni.so` (LiteRT TFLite + SentencePiece) as a self-contained native lib that does not collide with `libLiteRt.so` from `litertlm-android`.
+2. [x] Story 3.2 done-when bullet 1 — rewritten to "loads via `GemmaEmbeddingModel` from `com.google.ai.edge.localagents:localagents-rag` in `:core-inference`." The SDK wraps LiteRT internally; ADR-010 intent (encoder runtime distinct from LiteRT-LM) is preserved.
+3. [x] `manifest.properties` — `embedding_artifact_*` and `embedding_tokenizer_*` keys added; SHA-256s and byte sizes pinned by the Phase 3 download probe (2026-05-11, authenticated HF pull). `EmbeddingArtifactManifest.isResolved` flips true on the bundled file.
+4. [x] `architecture-brief.md` §"AppContainer Ownership" / `:core-inference` row — notes the two-runtime arrangement (LiteRT-LM for Gemma 4 chat/audio, localagents-rag for EmbeddingGemma).
 5. [ ] ADR-001 §"Locked Stack" Embeddings row — superseded by this ADR. Do not edit ADR-001 historically; this ADR carries the new wording.
+
+---
+
+### Addendum (2026-05-11) — load EmbeddingGemma via `localagents-rag`, not raw LiteRT
+
+The decision above named `com.google.ai.edge.litert:litert` as a direct dependency, with an implicit assumption that the consumer would also pull in a SentencePiece tokenizer. Inspection of the EmbeddingGemma artifact (`huggingface.co/litert-community/embeddinggemma-300m`) confirmed the tokenizer is a separate `sentencepiece.model` protobuf — not embedded in the `.tflite` flatbuffer, not exposed through any signature.
+
+There is no first-party Google SentencePiece library for Android. The `tensorflow-lite-support` tokenizers are deprecated; `mediapipe:tasks-text:TextEmbedder` requires TFLite Model Metadata that EmbeddingGemma does not ship; `ai.djl.sentencepiece` ships only x86/desktop natives.
+
+`com.google.ai.edge.localagents:localagents-rag:0.3.0` is the **active Google-supported path**. The AAR bundles `libgemma_embedding_model_jni.so` (~23 MB native lib that statically links both the LiteRT TFLite runtime and `sentencepiece::SentencePieceProcessor`) and exposes `GemmaEmbeddingModel(modelPath, tokenizerPath, useGpu)` returning a `ListenableFuture<ImmutableList<Float>>` per call via the `Embedder<String>` interface.
+
+**Net effect for v1:**
+- ADR-010's premise (use a runtime distinct from LiteRT-LM for the encoder) holds — the bundled JNI library is self-contained LiteRT.
+- The collision risk this ADR worried about (`libLiteRt.so` in two AARs) does not apply: `libgemma_embedding_model_jni.so` is a single combined `.so`, statically linked, with no shared symbol with `libLiteRt.so` from `litertlm-android`.
+- `EmbedderBackend` (CPU/GPU) is configured via the SDK's `useGpu` constructor flag, not via a per-runtime `BackendChoice` enum.
+- The SDK pulls in `okhttp` and `guava` transitively. OkHttp is unused on Vestige's code path (NetworkGate already owns the only HTTP primitive); the dependency sits on the classpath but the seal-by-default `NetworkGate` posture from ADR-001 §Q7 is unaffected.
+
+**Revisit when:**
+- Google publishes a standalone Android-native SentencePiece library that pairs cleanly with raw LiteRT — at that point the direct-LiteRT path from this ADR's main body becomes viable again without the AAR size cost.
+- `localagents-rag` adds Gemini-cloud surfaces that NetworkGate cannot audit by classpath grep. If that happens, fall back to a fork or excludes-only build.

@@ -22,4 +22,7 @@ regexTarget = "match"
 regexes = [
   '''sonar\.projectKey", "anchildress1_vestige"''',
   '''sonar\.projectKey=anchildress1_vestige''',
+  # Model artifact SHA-256s in manifest.properties — public Hugging Face download checksums,
+  # not secrets. High entropy trips the default generic-api-key rule otherwise.
+  '''^[A-Za-z_]*sha256=[0-9a-f]{64}$''',
 ]

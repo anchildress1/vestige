@@ -55,7 +55,7 @@ data class EmbeddingArtifactManifest(
 
         internal fun loadFromResource(path: String): EmbeddingArtifactManifest {
             val stream = EmbeddingArtifactManifest::class.java.getResourceAsStream(path)
-                ?: error("Model manifest resource missing: $path")
+                ?: error("Embedding manifest resource missing: $path")
             val props = Properties()
             stream.bufferedReader(Charsets.UTF_8).use { props.load(it) }
             return fromProperties(props)
@@ -64,7 +64,8 @@ data class EmbeddingArtifactManifest(
         internal fun fromProperties(props: Properties): EmbeddingArtifactManifest {
             val schema = props.requireInt("schema_version")
             require(schema == SUPPORTED_SCHEMA_VERSION) {
-                "Unsupported model manifest schema_version: $schema (this build understands $SUPPORTED_SCHEMA_VERSION)"
+                "Unsupported embedding manifest schema_version: $schema " +
+                    "(this build understands $SUPPORTED_SCHEMA_VERSION)"
             }
             return EmbeddingArtifactManifest(
                 schemaVersion = schema,
@@ -89,16 +90,16 @@ data class EmbeddingArtifactManifest(
         }
 
         private fun Properties.requireString(key: String): String = getProperty(key)?.takeIf { it.isNotBlank() }
-            ?: error("Model manifest missing required key: $key")
+            ?: error("Embedding manifest missing required key: $key")
 
         private fun Properties.requireInt(key: String): Int = requireString(key).toIntOrNull()
-            ?: error("Model manifest key '$key' is not an integer: '${getProperty(key)}'")
+            ?: error("Embedding manifest key '$key' is not an integer: '${getProperty(key)}'")
 
         private fun Properties.optionalLong(key: String): Long? {
             val raw = requireString(key)
             if (raw == PENDING_PROBE_TOKEN) return null
             return raw.toLongOrNull()
-                ?: error("Model manifest key '$key' is not a long or the pending-probe token: '$raw'")
+                ?: error("Embedding manifest key '$key' is not a long or the pending-probe token: '$raw'")
         }
 
         private fun ArtifactSpec.toModelManifest(

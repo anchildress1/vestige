@@ -72,7 +72,7 @@ The implementation branch verifies via Story 3.2's smoke test (cosine similarity
 
 1. [x] `:core-inference/build.gradle.kts` — add Google AI Edge embedding runtime as a direct dependency. Resolution superseded by the 2026-05-11 addendum below: the `com.google.ai.edge.localagents:localagents-rag` AAR is the active Google-supported path for loading EmbeddingGemma on Android. It bundles `libgemma_embedding_model_jni.so` (LiteRT TFLite + SentencePiece) as a self-contained native lib that does not collide with `libLiteRt.so` from `litertlm-android`.
 2. [x] Story 3.2 done-when bullet 1 — rewritten to "loads via `GemmaEmbeddingModel` from `com.google.ai.edge.localagents:localagents-rag` in `:core-inference`." The SDK wraps LiteRT internally; ADR-010 intent (encoder runtime distinct from LiteRT-LM) is preserved.
-3. [ ] `manifest.properties` — add `embedding_artifact_*` and `embedding_tokenizer_*` keys (filename, download_url, expected_byte_size, sha256, allowed_hosts). SHA-256 and exact byte size stay `PENDING_PHASE_3_DOWNLOAD_PROBE` until the on-device download probe completes (mirrors the STT-A pattern in ADR-001 §Q6).
+3. [x] `manifest.properties` — `embedding_artifact_*` and `embedding_tokenizer_*` keys added; SHA-256s and byte sizes pinned by the Phase 3 download probe (2026-05-11, authenticated HF pull). `EmbeddingArtifactManifest.isResolved` flips true on the bundled file.
 4. [x] `architecture-brief.md` §"AppContainer Ownership" / `:core-inference` row — notes the two-runtime arrangement (LiteRT-LM for Gemma 4 chat/audio, localagents-rag for EmbeddingGemma).
 5. [ ] ADR-001 §"Locked Stack" Embeddings row — superseded by this ADR. Do not edit ADR-001 historically; this ADR carries the new wording.
 

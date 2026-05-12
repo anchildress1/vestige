@@ -1,0 +1,293 @@
+05-12 13:23:48.741 15706 15724 D VestigeLiteRtLm: generateText completed in 55947ms (prompt=8116c, reply=556c)
+05-12 13:23:48.742 15706 15724 D VestigeBackgroundExtraction: lens=SKEPTICAL done parsed=true attempts=1 elapsed=55950ms
+05-12 13:23:48.743 15706 15724 D VestigeBackgroundExtraction: extract completed: lenses=3/3 model_calls=3 elapsed=150797ms
+05-12 13:23:48.746 15706 15720 I VestigeSttC: entry=A4 run=1/3 elapsed=150797ms lenses_parsed=3/3 tags=sync,battery-drain
+05-12 13:23:48.755 15706 15724 D VestigePromptComposer: compose lens=LITERAL chars=7625 tokens~=1907 history=0
+05-12 13:24:38.694 15706 15724 D VestigeLiteRtLm: generateText completed in 49937ms (prompt=7625c, reply=212c)
+05-12 13:24:38.698 15706 15724 D VestigeBackgroundExtraction: lens=LITERAL done parsed=true attempts=1 elapsed=49947ms
+05-12 13:24:38.706 15706 15724 D VestigePromptComposer: compose lens=INFERENTIAL chars=8170 tokens~=2043 history=0
+05-12 13:25:27.398 15706 15724 D VestigeLiteRtLm: generateText completed in 48691ms (prompt=8170c, reply=199c)
+05-12 13:25:27.400 15706 15724 D VestigeBackgroundExtraction: lens=INFERENTIAL done parsed=true attempts=1 elapsed=48701ms
+05-12 13:25:27.406 15706 15724 D VestigePromptComposer: compose lens=SKEPTICAL chars=8116 tokens~=2029 history=0
+05-12 13:26:23.087 15706 15724 D VestigeLiteRtLm: generateText completed in 55680ms (prompt=8116c, reply=556c)
+05-12 13:26:23.091 15706 15724 D VestigeBackgroundExtraction: lens=SKEPTICAL done parsed=true attempts=1 elapsed=55690ms
+05-12 13:26:23.093 15706 15724 D VestigeBackgroundExtraction: extract completed: lenses=3/3 model_calls=3 elapsed=154343ms
+05-12 13:26:23.094 15706 15720 I VestigeSttC: entry=A4 run=2/3 elapsed=154343ms lenses_parsed=3/3 tags=sync,battery-drain
+05-12 13:26:23.107 15706 15724 D VestigePromptComposer: compose lens=LITERAL chars=7625 tokens~=1907 history=0
+05-12 13:27:13.240 15706 15724 D VestigeLiteRtLm: generateText completed in 50132ms (prompt=7625c, reply=212c)
+05-12 13:27:13.241 15706 15724 D VestigeBackgroundExtraction: lens=LITERAL done parsed=true attempts=1 elapsed=50144ms
+05-12 13:27:13.243 15706 15724 D VestigePromptComposer: compose lens=INFERENTIAL chars=8170 tokens~=2043 history=0
+05-12 13:27:59.610 15706 15724 D VestigeLiteRtLm: generateText completed in 46366ms (prompt=8170c, reply=199c)
+05-12 13:27:59.615 15706 15724 D VestigeBackgroundExtraction: lens=INFERENTIAL done parsed=true attempts=1 elapsed=46374ms
+05-12 13:27:59.628 15706 15724 D VestigePromptComposer: compose lens=SKEPTICAL chars=8116 tokens~=2029 history=0
+05-12 13:28:57.208 15706 15724 D VestigeLiteRtLm: generateText completed in 57579ms (prompt=8116c, reply=556c)
+05-12 13:28:57.214 15706 15724 D VestigeBackgroundExtraction: lens=SKEPTICAL done parsed=true attempts=1 elapsed=57597ms
+05-12 13:28:57.216 15706 15724 D VestigeBackgroundExtraction: extract completed: lenses=3/3 model_calls=3 elapsed=154120ms
+05-12 13:28:57.219 15706 15720 I VestigeSttC: entry=A4 run=3/3 elapsed=154120ms lenses_parsed=3/3 tags=sync,battery-drain
+05-12 13:28:57.222 15706 15724 D VestigePromptComposer: compose lens=LITERAL chars=7627 tokens~=1907 history=0
+05-12 13:29:48.865 15706 15724 D VestigeLiteRtLm: generateText completed in 51642ms (prompt=7627c, reply=217c)
+05-12 13:29:48.866 15706 15724 D VestigeBackgroundExtraction: lens=LITERAL done parsed=true attempts=1 elapsed=51645ms
+05-12 13:29:48.868 15706 15724 D VestigePromptComposer: compose lens=INFERENTIAL chars=8172 tokens~=2043 history=0
+05-12 13:30:37.436 15706 15724 D VestigeLiteRtLm: generateText completed in 48567ms (prompt=8172c, reply=213c)
+05-12 13:30:37.438 15706 15724 D VestigeBackgroundExtraction: lens=INFERENTIAL done parsed=true attempts=1 elapsed=48571ms
+05-12 13:30:37.442 15706 15724 D VestigePromptComposer: compose lens=SKEPTICAL chars=8118 tokens~=2030 history=0
+05-12 13:31:26.560 15706 15724 D VestigeLiteRtLm: generateText completed in 49117ms (prompt=8118c, reply=212c)
+05-12 13:31:26.561 15706 15724 D VestigeBackgroundExtraction: lens=SKEPTICAL done parsed=true attempts=1 elapsed=49123ms
+05-12 13:31:26.562 15706 15724 D VestigeBackgroundExtraction: extract completed: lenses=3/3 model_calls=3 elapsed=149341ms
+05-12 13:31:26.563 15706 15720 I VestigeSttC: entry=A5 run=1/3 elapsed=149341ms lenses_parsed=3/3 tags=client-review,hollow
+05-12 13:31:26.567 15706 15724 D VestigePromptComposer: compose lens=LITERAL chars=7627 tokens~=1907 history=0
+05-12 13:32:16.162 15706 15724 D VestigeLiteRtLm: generateText completed in 49594ms (prompt=7627c, reply=217c)
+05-12 13:32:16.163 15706 15724 D VestigeBackgroundExtraction: lens=LITERAL done parsed=true attempts=1 elapsed=49597ms
+05-12 13:32:16.165 15706 15724 D VestigePromptComposer: compose lens=INFERENTIAL chars=8172 tokens~=2043 history=0
+05-12 13:33:04.506 15706 15724 D VestigeLiteRtLm: generateText completed in 48341ms (prompt=8172c, reply=213c)
+05-12 13:33:04.507 15706 15724 D VestigeBackgroundExtraction: lens=INFERENTIAL done parsed=true attempts=1 elapsed=48344ms
+05-12 13:33:04.509 15706 15724 D VestigePromptComposer: compose lens=SKEPTICAL chars=8118 tokens~=2030 history=0
+05-12 13:33:52.187 15706 15724 D VestigeLiteRtLm: generateText completed in 47677ms (prompt=8118c, reply=212c)
+05-12 13:33:52.188 15706 15724 D VestigeBackgroundExtraction: lens=SKEPTICAL done parsed=true attempts=1 elapsed=47680ms
+05-12 13:33:52.188 15706 15724 D VestigeBackgroundExtraction: extract completed: lenses=3/3 model_calls=3 elapsed=145623ms
+05-12 13:33:52.190 15706 15720 I VestigeSttC: entry=A5 run=2/3 elapsed=145623ms lenses_parsed=3/3 tags=client-review,hollow
+05-12 13:33:52.192 15706 15724 D VestigePromptComposer: compose lens=LITERAL chars=7627 tokens~=1907 history=0
+05-12 13:34:41.871 15706 15724 D VestigeLiteRtLm: generateText completed in 49679ms (prompt=7627c, reply=217c)
+05-12 13:34:41.872 15706 15724 D VestigeBackgroundExtraction: lens=LITERAL done parsed=true attempts=1 elapsed=49681ms
+05-12 13:34:41.874 15706 15724 D VestigePromptComposer: compose lens=INFERENTIAL chars=8172 tokens~=2043 history=0
+05-12 13:35:29.537 15706 15724 D VestigeLiteRtLm: generateText completed in 47662ms (prompt=8172c, reply=213c)
+05-12 13:35:29.539 15706 15724 D VestigeBackgroundExtraction: lens=INFERENTIAL done parsed=true attempts=1 elapsed=47666ms
+05-12 13:35:29.543 15706 15724 D VestigePromptComposer: compose lens=SKEPTICAL chars=8118 tokens~=2030 history=0
+05-12 13:36:18.224 15706 15724 D VestigeLiteRtLm: generateText completed in 48680ms (prompt=8118c, reply=212c)
+05-12 13:36:18.229 15706 15724 D VestigeBackgroundExtraction: lens=SKEPTICAL done parsed=true attempts=1 elapsed=48690ms
+05-12 13:36:18.235 15706 15724 D VestigeBackgroundExtraction: extract completed: lenses=3/3 model_calls=3 elapsed=146044ms
+05-12 13:36:18.238 15706 15720 I VestigeSttC: entry=A5 run=3/3 elapsed=146044ms lenses_parsed=3/3 tags=client-review,hollow
+05-12 13:36:18.251 15706 15724 D VestigePromptComposer: compose lens=LITERAL chars=7637 tokens~=1910 history=0
+05-12 13:37:10.368 15706 15724 D VestigeLiteRtLm: generateText completed in 52114ms (prompt=7637c, reply=235c)
+05-12 13:37:10.370 15706 15724 D VestigeBackgroundExtraction: lens=LITERAL done parsed=true attempts=1 elapsed=52128ms
+05-12 13:37:10.374 15706 15724 D VestigePromptComposer: compose lens=INFERENTIAL chars=8182 tokens~=2046 history=0
+05-12 13:38:01.876 15706 15724 D VestigeLiteRtLm: generateText completed in 51500ms (prompt=8182c, reply=235c)
+05-12 13:38:01.878 15706 15724 D VestigeBackgroundExtraction: lens=INFERENTIAL done parsed=true attempts=1 elapsed=51508ms
+05-12 13:38:01.885 15706 15724 D VestigePromptComposer: compose lens=SKEPTICAL chars=8128 tokens~=2032 history=0
+05-12 13:38:51.790 15706 15724 D VestigeLiteRtLm: generateText completed in 49904ms (prompt=8128c, reply=234c)
+05-12 13:38:51.791 15706 15724 D VestigeBackgroundExtraction: lens=SKEPTICAL done parsed=true attempts=1 elapsed=49912ms
+05-12 13:38:51.791 15706 15724 D VestigeBackgroundExtraction: extract completed: lenses=3/3 model_calls=3 elapsed=153550ms
+05-12 13:38:51.792 15706 15720 I VestigeSttC: entry=A6 run=1/3 elapsed=153550ms lenses_parsed=3/3 tags=planning-call,static,awake,not-awake
+05-12 13:38:51.795 15706 15724 D VestigePromptComposer: compose lens=LITERAL chars=7637 tokens~=1910 history=0
+05-12 13:39:42.865 15706 15724 D VestigeLiteRtLm: generateText completed in 51069ms (prompt=7637c, reply=235c)
+05-12 13:39:42.867 15706 15724 D VestigeBackgroundExtraction: lens=LITERAL done parsed=true attempts=1 elapsed=51074ms
+05-12 13:39:42.872 15706 15724 D VestigePromptComposer: compose lens=INFERENTIAL chars=8182 tokens~=2046 history=0
+05-12 13:40:34.884 15706 15724 D VestigeLiteRtLm: generateText completed in 52010ms (prompt=8182c, reply=235c)
+05-12 13:40:34.886 15706 15724 D VestigeBackgroundExtraction: lens=INFERENTIAL done parsed=true attempts=1 elapsed=52018ms
+05-12 13:40:34.895 15706 15724 D VestigePromptComposer: compose lens=SKEPTICAL chars=8128 tokens~=2032 history=0
+05-12 13:41:24.131 15706 15724 D VestigeLiteRtLm: generateText completed in 49235ms (prompt=8128c, reply=234c)
+05-12 13:41:24.133 15706 15724 D VestigeBackgroundExtraction: lens=SKEPTICAL done parsed=true attempts=1 elapsed=49246ms
+05-12 13:41:24.134 15706 15724 D VestigeBackgroundExtraction: extract completed: lenses=3/3 model_calls=3 elapsed=152340ms
+05-12 13:41:24.135 15706 15720 I VestigeSttC: entry=A6 run=2/3 elapsed=152340ms lenses_parsed=3/3 tags=planning-call,static,awake,not-awake
+05-12 13:41:24.143 15706 15724 D VestigePromptComposer: compose lens=LITERAL chars=7637 tokens~=1910 history=0
+05-12 13:42:14.816 15706 15724 D VestigeLiteRtLm: generateText completed in 50672ms (prompt=7637c, reply=235c)
+05-12 13:42:14.819 15706 15724 D VestigeBackgroundExtraction: lens=LITERAL done parsed=true attempts=1 elapsed=50680ms
+05-12 13:42:14.830 15706 15724 D VestigePromptComposer: compose lens=INFERENTIAL chars=8182 tokens~=2046 history=0
+05-12 13:43:05.746 15706 15724 D VestigeLiteRtLm: generateText completed in 50915ms (prompt=8182c, reply=235c)
+05-12 13:43:05.747 15706 15724 D VestigeBackgroundExtraction: lens=INFERENTIAL done parsed=true attempts=1 elapsed=50927ms
+05-12 13:43:05.749 15706 15724 D VestigePromptComposer: compose lens=SKEPTICAL chars=8128 tokens~=2032 history=0
+05-12 13:43:54.824 15706 15724 D VestigeLiteRtLm: generateText completed in 49074ms (prompt=8128c, reply=234c)
+05-12 13:43:54.825 15706 15724 D VestigeBackgroundExtraction: lens=SKEPTICAL done parsed=true attempts=1 elapsed=49077ms
+05-12 13:43:54.825 15706 15724 D VestigeBackgroundExtraction: extract completed: lenses=3/3 model_calls=3 elapsed=150687ms
+05-12 13:43:54.827 15706 15720 I VestigeSttC: entry=A6 run=3/3 elapsed=150687ms lenses_parsed=3/3 tags=planning-call,static,awake,not-awake
+05-12 13:43:54.839 15706 15724 D VestigePromptComposer: compose lens=LITERAL chars=7666 tokens~=1917 history=0
+05-12 13:44:44.984 15706 15724 D VestigeLiteRtLm: generateText completed in 50143ms (prompt=7666c, reply=219c)
+05-12 13:44:44.986 15706 15724 D VestigeBackgroundExtraction: lens=LITERAL done parsed=true attempts=1 elapsed=50153ms
+05-12 13:44:44.993 15706 15724 D VestigePromptComposer: compose lens=INFERENTIAL chars=8211 tokens~=2053 history=0
+05-12 13:45:33.792 15706 15724 D VestigeLiteRtLm: generateText completed in 48798ms (prompt=8211c, reply=215c)
+05-12 13:45:33.795 15706 15724 D VestigeBackgroundExtraction: lens=INFERENTIAL done parsed=true attempts=1 elapsed=48808ms
+05-12 13:45:33.801 15706 15724 D VestigePromptComposer: compose lens=SKEPTICAL chars=8157 tokens~=2040 history=0
+05-12 13:46:22.435 15706 15724 D VestigeLiteRtLm: generateText completed in 48633ms (prompt=8157c, reply=215c)
+05-12 13:46:22.441 15706 15724 D VestigeBackgroundExtraction: lens=SKEPTICAL done parsed=true attempts=1 elapsed=48645ms
+05-12 13:46:22.447 15706 15724 D VestigeBackgroundExtraction: extract completed: lenses=3/3 model_calls=3 elapsed=147615ms
+05-12 13:46:22.451 15706 15720 I VestigeSttC: entry=B1 run=1/3 elapsed=147615ms lenses_parsed=3/3 tags=invoice-email,closing-task
+05-12 13:46:22.462 15706 15724 D VestigePromptComposer: compose lens=LITERAL chars=7666 tokens~=1917 history=0
+05-12 13:47:12.721 15706 15724 D VestigeLiteRtLm: generateText completed in 50257ms (prompt=7666c, reply=219c)
+05-12 13:47:12.726 15706 15724 D VestigeBackgroundExtraction: lens=LITERAL done parsed=true attempts=1 elapsed=50270ms
+05-12 13:47:12.736 15706 15724 D VestigePromptComposer: compose lens=INFERENTIAL chars=8211 tokens~=2053 history=0
+05-12 13:48:00.839 15706 15724 D VestigeLiteRtLm: generateText completed in 48101ms (prompt=8211c, reply=215c)
+05-12 13:48:00.842 15706 15724 D VestigeBackgroundExtraction: lens=INFERENTIAL done parsed=true attempts=1 elapsed=48115ms
+05-12 13:48:00.846 15706 15724 D VestigePromptComposer: compose lens=SKEPTICAL chars=8157 tokens~=2040 history=0
+05-12 13:48:48.484 15706 15724 D VestigeLiteRtLm: generateText completed in 47636ms (prompt=8157c, reply=215c)
+05-12 13:48:48.487 15706 15724 D VestigeBackgroundExtraction: lens=SKEPTICAL done parsed=true attempts=1 elapsed=47644ms
+05-12 13:48:48.490 15706 15724 D VestigeBackgroundExtraction: extract completed: lenses=3/3 model_calls=3 elapsed=146035ms
+05-12 13:48:48.493 15706 15720 I VestigeSttC: entry=B1 run=2/3 elapsed=146035ms lenses_parsed=3/3 tags=invoice-email,closing-task
+05-12 13:48:48.506 15706 15724 D VestigePromptComposer: compose lens=LITERAL chars=7666 tokens~=1917 history=0
+05-12 13:49:37.755 15706 15724 D VestigeLiteRtLm: generateText completed in 49248ms (prompt=7666c, reply=219c)
+05-12 13:49:37.758 15706 15724 D VestigeBackgroundExtraction: lens=LITERAL done parsed=true attempts=1 elapsed=49261ms
+05-12 13:49:37.765 15706 15724 D VestigePromptComposer: compose lens=INFERENTIAL chars=8211 tokens~=2053 history=0
+05-12 13:50:23.218 15706 15724 D VestigeLiteRtLm: generateText completed in 45451ms (prompt=8211c, reply=215c)
+05-12 13:50:23.220 15706 15724 D VestigeBackgroundExtraction: lens=INFERENTIAL done parsed=true attempts=1 elapsed=45461ms
+05-12 13:50:23.224 15706 15724 D VestigePromptComposer: compose lens=SKEPTICAL chars=8157 tokens~=2040 history=0
+05-12 13:51:08.145 15706 15724 D VestigeLiteRtLm: generateText completed in 44920ms (prompt=8157c, reply=215c)
+05-12 13:51:08.147 15706 15724 D VestigeBackgroundExtraction: lens=SKEPTICAL done parsed=true attempts=1 elapsed=44926ms
+05-12 13:51:08.149 15706 15724 D VestigeBackgroundExtraction: extract completed: lenses=3/3 model_calls=3 elapsed=139653ms
+05-12 13:51:08.150 15706 15720 I VestigeSttC: entry=B1 run=3/3 elapsed=139653ms lenses_parsed=3/3 tags=invoice-email,closing-task
+05-12 13:51:08.156 15706 15724 D VestigePromptComposer: compose lens=LITERAL chars=7644 tokens~=1911 history=0
+05-12 13:51:56.062 15706 15724 D VestigeLiteRtLm: generateText completed in 47904ms (prompt=7644c, reply=293c)
+05-12 13:51:56.063 15706 15724 D VestigeBackgroundExtraction: lens=LITERAL done parsed=true attempts=1 elapsed=47911ms
+05-12 13:51:56.065 15706 15724 D VestigePromptComposer: compose lens=INFERENTIAL chars=8189 tokens~=2048 history=0
+05-12 13:52:44.969 15706 15724 D VestigeLiteRtLm: generateText completed in 48904ms (prompt=8189c, reply=288c)
+05-12 13:52:44.970 15706 15724 D VestigeBackgroundExtraction: lens=INFERENTIAL done parsed=true attempts=1 elapsed=48907ms
+05-12 13:52:44.972 15706 15724 D VestigePromptComposer: compose lens=SKEPTICAL chars=8135 tokens~=2034 history=0
+05-12 13:53:38.255 15706 15724 D VestigeLiteRtLm: generateText completed in 53282ms (prompt=8135c, reply=493c)
+05-12 13:53:38.256 15706 15724 D VestigeBackgroundExtraction: lens=SKEPTICAL done parsed=true attempts=1 elapsed=53285ms
+05-12 13:53:38.257 15706 15724 D VestigeBackgroundExtraction: extract completed: lenses=3/3 model_calls=3 elapsed=150106ms
+05-12 13:53:38.259 15706 15720 I VestigeSttC: entry=B2 run=1/3 elapsed=150106ms lenses_parsed=3/3 tags=invoice,desktop-reorganization
+05-12 13:53:38.263 15706 15724 D VestigePromptComposer: compose lens=LITERAL chars=7644 tokens~=1911 history=0
+05-12 13:54:28.321 15706 15724 D VestigeLiteRtLm: generateText completed in 50057ms (prompt=7644c, reply=293c)
+05-12 13:54:28.322 15706 15724 D VestigeBackgroundExtraction: lens=LITERAL done parsed=true attempts=1 elapsed=50060ms
+05-12 13:54:28.324 15706 15724 D VestigePromptComposer: compose lens=INFERENTIAL chars=8189 tokens~=2048 history=0
+05-12 13:55:19.070 15706 15724 D VestigeLiteRtLm: generateText completed in 50745ms (prompt=8189c, reply=288c)
+05-12 13:55:19.071 15706 15724 D VestigeBackgroundExtraction: lens=INFERENTIAL done parsed=true attempts=1 elapsed=50748ms
+05-12 13:55:19.073 15706 15724 D VestigePromptComposer: compose lens=SKEPTICAL chars=8135 tokens~=2034 history=0
+05-12 13:56:17.995 15706 15724 D VestigeLiteRtLm: generateText completed in 58921ms (prompt=8135c, reply=493c)
+05-12 13:56:17.996 15706 15724 D VestigeBackgroundExtraction: lens=SKEPTICAL done parsed=true attempts=1 elapsed=58925ms
+05-12 13:56:17.997 15706 15724 D VestigeBackgroundExtraction: extract completed: lenses=3/3 model_calls=3 elapsed=159735ms
+05-12 13:56:18.000 15706 15720 I VestigeSttC: entry=B2 run=2/3 elapsed=159735ms lenses_parsed=3/3 tags=invoice,desktop-reorganization
+05-12 13:56:18.005 15706 15724 D VestigePromptComposer: compose lens=LITERAL chars=7644 tokens~=1911 history=0
+05-12 13:57:13.826 15706 15724 D VestigeLiteRtLm: generateText completed in 55820ms (prompt=7644c, reply=293c)
+05-12 13:57:13.827 15706 15724 D VestigeBackgroundExtraction: lens=LITERAL done parsed=true attempts=1 elapsed=55824ms
+05-12 13:57:13.829 15706 15724 D VestigePromptComposer: compose lens=INFERENTIAL chars=8189 tokens~=2048 history=0
+05-12 13:58:06.981 15706 15724 D VestigeLiteRtLm: generateText completed in 53152ms (prompt=8189c, reply=288c)
+05-12 13:58:06.982 15706 15724 D VestigeBackgroundExtraction: lens=INFERENTIAL done parsed=true attempts=1 elapsed=53155ms
+05-12 13:58:06.984 15706 15724 D VestigePromptComposer: compose lens=SKEPTICAL chars=8135 tokens~=2034 history=0
+05-12 13:59:03.752 15706 15724 D VestigeLiteRtLm: generateText completed in 56767ms (prompt=8135c, reply=493c)
+05-12 13:59:03.753 15706 15724 D VestigeBackgroundExtraction: lens=SKEPTICAL done parsed=true attempts=1 elapsed=56770ms
+05-12 13:59:03.754 15706 15724 D VestigeBackgroundExtraction: extract completed: lenses=3/3 model_calls=3 elapsed=165751ms
+05-12 13:59:03.756 15706 15720 I VestigeSttC: entry=B2 run=3/3 elapsed=165751ms lenses_parsed=3/3 tags=invoice,desktop-reorganization
+05-12 13:59:03.767 15706 15724 D VestigePromptComposer: compose lens=LITERAL chars=7649 tokens~=1913 history=0
+05-12 13:59:55.473 15706 15724 D VestigeLiteRtLm: generateText completed in 51704ms (prompt=7649c, reply=207c)
+05-12 13:59:55.475 15706 15724 D VestigeBackgroundExtraction: lens=LITERAL done parsed=true attempts=1 elapsed=51714ms
+05-12 13:59:55.480 15706 15724 D VestigePromptComposer: compose lens=INFERENTIAL chars=8194 tokens~=2049 history=0
+05-12 14:00:45.809 15706 15724 D VestigeLiteRtLm: generateText completed in 50328ms (prompt=8194c, reply=207c)
+05-12 14:00:45.810 15706 15724 D VestigeBackgroundExtraction: lens=INFERENTIAL done parsed=true attempts=1 elapsed=50335ms
+05-12 14:00:45.815 15706 15724 D VestigePromptComposer: compose lens=SKEPTICAL chars=8140 tokens~=2035 history=0
+05-12 14:01:34.451 15706 15724 D VestigeLiteRtLm: generateText completed in 48635ms (prompt=8140c, reply=203c)
+05-12 14:01:34.452 15706 15724 D VestigeBackgroundExtraction: lens=SKEPTICAL done parsed=true attempts=1 elapsed=48641ms
+05-12 14:01:34.453 15706 15724 D VestigeBackgroundExtraction: extract completed: lenses=3/3 model_calls=3 elapsed=150693ms
+05-12 14:01:34.454 15706 15720 I VestigeSttC: entry=B3 run=1/3 elapsed=150693ms lenses_parsed=3/3 tags=invoice,cursor
+05-12 14:01:34.460 15706 15724 D VestigePromptComposer: compose lens=LITERAL chars=7649 tokens~=1913 history=0
+05-12 14:02:24.575 15706 15724 D VestigeLiteRtLm: generateText completed in 50114ms (prompt=7649c, reply=207c)
+05-12 14:02:24.577 15706 15724 D VestigeBackgroundExtraction: lens=LITERAL done parsed=true attempts=1 elapsed=50122ms
+05-12 14:02:24.582 15706 15724 D VestigePromptComposer: compose lens=INFERENTIAL chars=8194 tokens~=2049 history=0
+05-12 14:03:13.642 15706 15724 D VestigeLiteRtLm: generateText completed in 49059ms (prompt=8194c, reply=207c)
+05-12 14:03:13.648 15706 15724 D VestigeBackgroundExtraction: lens=INFERENTIAL done parsed=true attempts=1 elapsed=49070ms
+05-12 14:03:13.662 15706 15724 D VestigePromptComposer: compose lens=SKEPTICAL chars=8140 tokens~=2035 history=0
+05-12 14:04:01.781 15706 15724 D VestigeLiteRtLm: generateText completed in 48118ms (prompt=8140c, reply=203c)
+05-12 14:04:01.787 15706 15724 D VestigeBackgroundExtraction: lens=SKEPTICAL done parsed=true attempts=1 elapsed=48138ms
+05-12 14:04:01.792 15706 15724 D VestigeBackgroundExtraction: extract completed: lenses=3/3 model_calls=3 elapsed=147337ms
+05-12 14:04:01.795 15706 15720 I VestigeSttC: entry=B3 run=2/3 elapsed=147337ms lenses_parsed=3/3 tags=invoice,cursor
+05-12 14:04:01.810 15706 15724 D VestigePromptComposer: compose lens=LITERAL chars=7649 tokens~=1913 history=0
+05-12 14:04:51.318 15706 15724 D VestigeLiteRtLm: generateText completed in 49507ms (prompt=7649c, reply=207c)
+05-12 14:04:51.320 15706 15724 D VestigeBackgroundExtraction: lens=LITERAL done parsed=true attempts=1 elapsed=49520ms
+05-12 14:04:51.328 15706 15724 D VestigePromptComposer: compose lens=INFERENTIAL chars=8194 tokens~=2049 history=0
+05-12 14:05:43.060 15706 15724 D VestigeLiteRtLm: generateText completed in 51730ms (prompt=8194c, reply=207c)
+05-12 14:05:43.062 15706 15724 D VestigeBackgroundExtraction: lens=INFERENTIAL done parsed=true attempts=1 elapsed=51741ms
+05-12 14:05:43.066 15706 15724 D VestigePromptComposer: compose lens=SKEPTICAL chars=8140 tokens~=2035 history=0
+05-12 14:06:31.450 15706 15724 D VestigeLiteRtLm: generateText completed in 48382ms (prompt=8140c, reply=203c)
+05-12 14:06:31.456 15706 15724 D VestigeBackgroundExtraction: lens=SKEPTICAL done parsed=true attempts=1 elapsed=48393ms
+05-12 14:06:31.461 15706 15724 D VestigeBackgroundExtraction: extract completed: lenses=3/3 model_calls=3 elapsed=149662ms
+05-12 14:06:31.463 15706 15720 I VestigeSttC: entry=B3 run=3/3 elapsed=149662ms lenses_parsed=3/3 tags=invoice,cursor
+05-12 14:06:31.473 15706 15725 D VestigePromptComposer: compose lens=LITERAL chars=7661 tokens~=1916 history=0
+05-12 14:07:21.406 15706 15725 D VestigeLiteRtLm: generateText completed in 49931ms (prompt=7661c, reply=215c)
+05-12 14:07:21.409 15706 15725 D VestigeBackgroundExtraction: lens=LITERAL done parsed=true attempts=1 elapsed=49941ms
+05-12 14:07:21.414 15706 15725 D VestigePromptComposer: compose lens=INFERENTIAL chars=8206 tokens~=2052 history=0
+05-12 14:08:09.696 15706 15725 D VestigeLiteRtLm: generateText completed in 48280ms (prompt=8206c, reply=211c)
+05-12 14:08:09.698 15706 15725 D VestigeBackgroundExtraction: lens=INFERENTIAL done parsed=true attempts=1 elapsed=48288ms
+05-12 14:08:09.702 15706 15725 D VestigePromptComposer: compose lens=SKEPTICAL chars=8152 tokens~=2038 history=0
+05-12 14:09:06.324 15706 15725 D VestigeLiteRtLm: generateText completed in 56620ms (prompt=8152c, reply=404c)
+05-12 14:09:06.327 15706 15725 D VestigeBackgroundExtraction: lens=SKEPTICAL done parsed=true attempts=1 elapsed=56629ms
+05-12 14:09:06.330 15706 15725 D VestigeBackgroundExtraction: extract completed: lenses=3/3 model_calls=3 elapsed=154862ms
+05-12 14:09:06.332 15706 15720 I VestigeSttC: entry=C1 run=1/3 elapsed=154862ms lenses_parsed=3/3 tags=task-app,decision-loop
+05-12 14:09:06.341 15706 23020 D VestigePromptComposer: compose lens=LITERAL chars=7661 tokens~=1916 history=0
+05-12 14:09:58.218 15706 23020 D VestigeLiteRtLm: generateText completed in 51876ms (prompt=7661c, reply=215c)
+05-12 14:09:58.223 15706 23020 D VestigeBackgroundExtraction: lens=LITERAL done parsed=true attempts=1 elapsed=51888ms
+05-12 14:09:58.234 15706 23020 D VestigePromptComposer: compose lens=INFERENTIAL chars=8206 tokens~=2052 history=0
+05-12 14:10:47.085 15706 23020 D VestigeLiteRtLm: generateText completed in 48850ms (prompt=8206c, reply=211c)
+05-12 14:10:47.086 15706 23020 D VestigeBackgroundExtraction: lens=INFERENTIAL done parsed=true attempts=1 elapsed=48862ms
+05-12 14:10:47.088 15706 23020 D VestigePromptComposer: compose lens=SKEPTICAL chars=8152 tokens~=2038 history=0
+05-12 14:11:45.083 15706 23020 D VestigeLiteRtLm: generateText completed in 57994ms (prompt=8152c, reply=404c)
+05-12 14:11:45.088 15706 23020 D VestigeBackgroundExtraction: lens=SKEPTICAL done parsed=true attempts=1 elapsed=58001ms
+05-12 14:11:45.091 15706 23020 D VestigeBackgroundExtraction: extract completed: lenses=3/3 model_calls=3 elapsed=158757ms
+05-12 14:11:45.093 15706 15720 I VestigeSttC: entry=C1 run=2/3 elapsed=158757ms lenses_parsed=3/3 tags=task-app,decision-loop
+05-12 14:11:45.101 15706 23020 D VestigePromptComposer: compose lens=LITERAL chars=7661 tokens~=1916 history=0
+05-12 14:12:34.011 15706 23020 D VestigeLiteRtLm: generateText completed in 48909ms (prompt=7661c, reply=215c)
+05-12 14:12:34.013 15706 23020 D VestigeBackgroundExtraction: lens=LITERAL done parsed=true attempts=1 elapsed=48918ms
+05-12 14:12:34.026 15706 23020 D VestigePromptComposer: compose lens=INFERENTIAL chars=8206 tokens~=2052 history=0
+05-12 14:13:19.291 15706 23020 D VestigeLiteRtLm: generateText completed in 45263ms (prompt=8206c, reply=211c)
+05-12 14:13:19.293 15706 23020 D VestigeBackgroundExtraction: lens=INFERENTIAL done parsed=true attempts=1 elapsed=45278ms
+05-12 14:13:19.298 15706 23020 D VestigePromptComposer: compose lens=SKEPTICAL chars=8152 tokens~=2038 history=0
+05-12 14:14:12.021 15706 23020 D VestigeLiteRtLm: generateText completed in 52722ms (prompt=8152c, reply=404c)
+05-12 14:14:12.030 15706 23020 D VestigeBackgroundExtraction: lens=SKEPTICAL done parsed=true attempts=1 elapsed=52737ms
+05-12 14:14:12.035 15706 23020 D VestigeBackgroundExtraction: extract completed: lenses=3/3 model_calls=3 elapsed=146940ms
+05-12 14:14:12.037 15706 15720 I VestigeSttC: entry=C1 run=3/3 elapsed=146940ms lenses_parsed=3/3 tags=task-app,decision-loop
+05-12 14:14:12.046 15706 23020 D VestigePromptComposer: compose lens=LITERAL chars=7651 tokens~=1913 history=0
+05-12 14:14:58.785 15706 23020 D VestigeLiteRtLm: generateText completed in 46738ms (prompt=7651c, reply=215c)
+05-12 14:14:58.787 15706 23020 D VestigeBackgroundExtraction: lens=LITERAL done parsed=true attempts=1 elapsed=46746ms
+05-12 14:14:58.796 15706 23020 D VestigePromptComposer: compose lens=INFERENTIAL chars=8196 tokens~=2049 history=0
+05-12 14:15:43.903 15706 23020 D VestigeLiteRtLm: generateText completed in 45105ms (prompt=8196c, reply=211c)
+05-12 14:15:43.905 15706 23020 D VestigeBackgroundExtraction: lens=INFERENTIAL done parsed=true attempts=1 elapsed=45117ms
+05-12 14:15:43.915 15706 23020 D VestigePromptComposer: compose lens=SKEPTICAL chars=8142 tokens~=2036 history=0
+05-12 14:16:29.088 15706 23020 D VestigeLiteRtLm: generateText completed in 45170ms (prompt=8142c, reply=211c)
+05-12 14:16:29.092 15706 23020 D VestigeBackgroundExtraction: lens=SKEPTICAL done parsed=true attempts=1 elapsed=45186ms
+05-12 14:16:29.096 15706 23020 D VestigeBackgroundExtraction: extract completed: lenses=3/3 model_calls=3 elapsed=137055ms
+05-12 14:16:29.099 15706 15720 I VestigeSttC: entry=C2 run=1/3 elapsed=137055ms lenses_parsed=3/3 tags=task-app,decision-loop
+05-12 14:16:29.110 15706 23020 D VestigePromptComposer: compose lens=LITERAL chars=7651 tokens~=1913 history=0
+05-12 14:17:16.102 15706 23020 D VestigeLiteRtLm: generateText completed in 46991ms (prompt=7651c, reply=215c)
+05-12 14:17:16.107 15706 23020 D VestigeBackgroundExtraction: lens=LITERAL done parsed=true attempts=1 elapsed=47004ms
+05-12 14:17:16.116 15706 23020 D VestigePromptComposer: compose lens=INFERENTIAL chars=8196 tokens~=2049 history=0
+05-12 14:18:01.377 15706 23020 D VestigeLiteRtLm: generateText completed in 45259ms (prompt=8196c, reply=211c)
+05-12 14:18:01.382 15706 23020 D VestigeBackgroundExtraction: lens=INFERENTIAL done parsed=true attempts=1 elapsed=45273ms
+05-12 14:18:01.392 15706 23020 D VestigePromptComposer: compose lens=SKEPTICAL chars=8142 tokens~=2036 history=0
+05-12 14:18:46.783 15706 23020 D VestigeLiteRtLm: generateText completed in 45390ms (prompt=8142c, reply=211c)
+05-12 14:18:46.784 15706 23020 D VestigeBackgroundExtraction: lens=SKEPTICAL done parsed=true attempts=1 elapsed=45401ms
+05-12 14:18:46.784 15706 23020 D VestigeBackgroundExtraction: extract completed: lenses=3/3 model_calls=3 elapsed=137682ms
+05-12 14:18:46.785 15706 15720 I VestigeSttC: entry=C2 run=2/3 elapsed=137682ms lenses_parsed=3/3 tags=task-app,decision-loop
+05-12 14:18:46.787 15706 23020 D VestigePromptComposer: compose lens=LITERAL chars=7651 tokens~=1913 history=0
+05-12 14:19:33.737 15706 23020 D VestigeLiteRtLm: generateText completed in 46949ms (prompt=7651c, reply=215c)
+05-12 14:19:33.738 15706 23020 D VestigeBackgroundExtraction: lens=LITERAL done parsed=true attempts=1 elapsed=46952ms
+05-12 14:19:33.739 15706 23020 D VestigePromptComposer: compose lens=INFERENTIAL chars=8196 tokens~=2049 history=0
+05-12 14:20:18.822 15706 23020 D VestigeLiteRtLm: generateText completed in 45082ms (prompt=8196c, reply=211c)
+05-12 14:20:18.823 15706 23020 D VestigeBackgroundExtraction: lens=INFERENTIAL done parsed=true attempts=1 elapsed=45085ms
+05-12 14:20:18.825 15706 23020 D VestigePromptComposer: compose lens=SKEPTICAL chars=8142 tokens~=2036 history=0
+05-12 14:21:04.034 15706 23020 D VestigeLiteRtLm: generateText completed in 45208ms (prompt=8142c, reply=211c)
+05-12 14:21:04.035 15706 23020 D VestigeBackgroundExtraction: lens=SKEPTICAL done parsed=true attempts=1 elapsed=45211ms
+05-12 14:21:04.035 15706 23020 D VestigeBackgroundExtraction: extract completed: lenses=3/3 model_calls=3 elapsed=137249ms
+05-12 14:21:04.037 15706 15720 I VestigeSttC: entry=C2 run=3/3 elapsed=137249ms lenses_parsed=3/3 tags=task-app,decision-loop
+05-12 14:21:04.048 15706 23020 D VestigePromptComposer: compose lens=LITERAL chars=7643 tokens~=1911 history=0
+05-12 14:21:50.444 15706 23020 D VestigeLiteRtLm: generateText completed in 46395ms (prompt=7643c, reply=206c)
+05-12 14:21:50.447 15706 23020 D VestigeBackgroundExtraction: lens=LITERAL done parsed=true attempts=1 elapsed=46405ms
+05-12 14:21:50.453 15706 23020 D VestigePromptComposer: compose lens=INFERENTIAL chars=8188 tokens~=2047 history=0
+05-12 14:22:34.954 15706 23020 D VestigeLiteRtLm: generateText completed in 44498ms (prompt=8188c, reply=202c)
+05-12 14:22:34.957 15706 23020 D VestigeBackgroundExtraction: lens=INFERENTIAL done parsed=true attempts=1 elapsed=44509ms
+05-12 14:22:34.962 15706 23020 D VestigePromptComposer: compose lens=SKEPTICAL chars=8134 tokens~=2034 history=0
+05-12 14:23:19.966 15706 23020 D VestigeLiteRtLm: generateText completed in 45003ms (prompt=8134c, reply=202c)
+05-12 14:23:19.971 15706 23020 D VestigeBackgroundExtraction: lens=SKEPTICAL done parsed=true attempts=1 elapsed=45014ms
+05-12 14:23:19.976 15706 23020 D VestigeBackgroundExtraction: extract completed: lenses=3/3 model_calls=3 elapsed=135934ms
+05-12 14:23:19.979 15706 15720 I VestigeSttC: entry=C3 run=1/3 elapsed=135934ms lenses_parsed=3/3 tags=comparison-table
+05-12 14:23:19.991 15706 23020 D VestigePromptComposer: compose lens=LITERAL chars=7643 tokens~=1911 history=0
+05-12 14:24:06.601 15706 23020 D VestigeLiteRtLm: generateText completed in 46608ms (prompt=7643c, reply=206c)
+05-12 14:24:06.603 15706 23020 D VestigeBackgroundExtraction: lens=LITERAL done parsed=true attempts=1 elapsed=46621ms
+05-12 14:24:06.608 15706 23020 D VestigePromptComposer: compose lens=INFERENTIAL chars=8188 tokens~=2047 history=0
+05-12 14:24:51.462 15706 23020 D VestigeLiteRtLm: generateText completed in 44853ms (prompt=8188c, reply=202c)
+05-12 14:24:51.463 15706 23020 D VestigeBackgroundExtraction: lens=INFERENTIAL done parsed=true attempts=1 elapsed=44860ms
+05-12 14:24:51.468 15706 23020 D VestigePromptComposer: compose lens=SKEPTICAL chars=8134 tokens~=2034 history=0
+05-12 14:25:35.913 15706 23020 D VestigeLiteRtLm: generateText completed in 44443ms (prompt=8134c, reply=202c)
+05-12 14:25:35.915 15706 23020 D VestigeBackgroundExtraction: lens=SKEPTICAL done parsed=true attempts=1 elapsed=44451ms
+05-12 14:25:35.917 15706 23020 D VestigeBackgroundExtraction: extract completed: lenses=3/3 model_calls=3 elapsed=135935ms
+05-12 14:25:35.919 15706 15720 I VestigeSttC: entry=C3 run=2/3 elapsed=135935ms lenses_parsed=3/3 tags=comparison-table
+05-12 14:25:35.926 15706 23020 D VestigePromptComposer: compose lens=LITERAL chars=7643 tokens~=1911 history=0
+05-12 14:26:22.171 15706 23020 D VestigeLiteRtLm: generateText completed in 46244ms (prompt=7643c, reply=206c)
+05-12 14:26:22.177 15706 23020 D VestigeBackgroundExtraction: lens=LITERAL done parsed=true attempts=1 elapsed=46256ms
+05-12 14:26:22.191 15706 23020 D VestigePromptComposer: compose lens=INFERENTIAL chars=8188 tokens~=2047 history=0
+05-12 14:27:07.260 15706 23020 D VestigeLiteRtLm: generateText completed in 45066ms (prompt=8188c, reply=202c)
+05-12 14:27:07.261 15706 23020 D VestigeBackgroundExtraction: lens=INFERENTIAL done parsed=true attempts=1 elapsed=45083ms
+05-12 14:27:07.278 15706 23020 D VestigePromptComposer: compose lens=SKEPTICAL chars=8134 tokens~=2034 history=0
+05-12 14:27:58.247 15706 23020 D VestigeLiteRtLm: generateText completed in 50968ms (prompt=8134c, reply=202c)
+05-12 14:27:58.251 15706 23020 D VestigeBackgroundExtraction: lens=SKEPTICAL done parsed=true attempts=1 elapsed=50990ms
+05-12 14:27:58.254 15706 23020 D VestigeBackgroundExtraction: extract completed: lenses=3/3 model_calls=3 elapsed=142334ms
+05-12 14:27:58.256 15706 15720 I VestigeSttC: entry=C3 run=3/3 elapsed=142334ms lenses_parsed=3/3 tags=comparison-table
+05-12 14:27:58.274 15706 23020 D VestigePromptComposer: compose lens=LITERAL chars=7683 tokens~=1921 history=0
+05-12 14:28:41.473  4296  4296 I HoneySpace.DataCache: deleteItem : id=52607, title=Vestige, type=APP, containerType=ITEM_GROUP, containerId=21, x=-1, y=-1, rank=28, spanX=-1, spanY=-1, scale=1.0, component=dev.anchildress1.vestige/.MainActivity, profileId=0, intent=null, restored=0, hidden=UNHIDDEN, appWidgetId=-1, options=0, refPackageName=null (vertical appList) package removed
+05-12 14:28:41.475  4296  7331 I HoneySpace.DataCache: delete item : (vertical appList) package removed - APP / 52607 / 21 / Vestige / dev.anchildress1.vestige/.MainActivity / -1 / 0

@@ -1,0 +1,322 @@
+05-12 14:28:49.424  2619  2808 W NativeLibraryHelper: Failed to punch uncompressed elf file :libgemma_embedding_model_jni.so inside apk : /data/app/vmdl102123520.tmp/base.apk at offset: 62685184
+05-12 14:28:49.425  2619  2808 W NativeLibraryHelper: Failed to punch uncompressed elf file :libgecko_embedding_model_jni.so inside apk : /data/app/vmdl102123520.tmp/base.apk at offset: 45711360
+05-12 14:28:49.694  4296 28347 I HoneySpace.IconCache: add icon DB: [dev.anchildress1.vestige/.MainActivity#UserHandle{0}] - IconAndLabel(icon=android.graphics.Bitmap@a74c902, label=Vestige) | false | 640 | false |false | -15050404
+05-12 14:28:49.695  4296  4296 I HoneySpace.DataCache: insertItem : id=52624, title=Vestige, type=APP, containerType=ITEM_GROUP, containerId=21, x=-1, y=-1, rank=28, spanX=-1, spanY=-1, scale=1.0, component=dev.anchildress1.vestige/.MainActivity, profileId=0, intent=null, restored=0, hidden=UNHIDDEN, appWidgetId=-1, options=0, refPackageName=null
+05-12 14:28:52.002 28914 28914 I AndroidJUnitRunner: newApplication dev.anchildress1.vestige.VestigeApplication
+05-12 14:28:52.076 28914 28914 D StrictMode: 	at dev.anchildress1.vestige.storage.VestigeBoxStore.open(VestigeBoxStore.kt:15)
+05-12 14:28:52.076 28914 28914 D StrictMode: 	at dev.anchildress1.vestige.VestigeApplication.onCreate(VestigeApplication.kt:18)
+05-12 14:28:52.078 28914 28914 D StrictMode: 	at dev.anchildress1.vestige.storage.VestigeBoxStore.open(VestigeBoxStore.kt:15)
+05-12 14:28:52.078 28914 28914 D StrictMode: 	at dev.anchildress1.vestige.VestigeApplication.onCreate(VestigeApplication.kt:18)
+05-12 14:28:52.079 28914 28914 D StrictMode: 	at dev.anchildress1.vestige.storage.VestigeBoxStore.open(VestigeBoxStore.kt:15)
+05-12 14:28:52.079 28914 28914 D StrictMode: 	at dev.anchildress1.vestige.VestigeApplication.onCreate(VestigeApplication.kt:18)
+05-12 14:28:52.080 28914 28914 D StrictMode: 	at dev.anchildress1.vestige.storage.VestigeBoxStore.open(VestigeBoxStore.kt:15)
+05-12 14:28:52.080 28914 28914 D StrictMode: 	at dev.anchildress1.vestige.VestigeApplication.onCreate(VestigeApplication.kt:18)
+05-12 14:28:52.081 28914 28914 D StrictMode: 	at dev.anchildress1.vestige.storage.VestigeBoxStore.open(VestigeBoxStore.kt:15)
+05-12 14:28:52.081 28914 28914 D StrictMode: 	at dev.anchildress1.vestige.VestigeApplication.onCreate(VestigeApplication.kt:18)
+05-12 14:28:52.082 28914 28914 D StrictMode: 	at dev.anchildress1.vestige.storage.VestigeBoxStore.open(VestigeBoxStore.kt:15)
+05-12 14:28:52.082 28914 28914 D StrictMode: 	at dev.anchildress1.vestige.VestigeApplication.onCreate(VestigeApplication.kt:18)
+05-12 14:28:52.083 28914 28914 D StrictMode: 	at dev.anchildress1.vestige.storage.VestigeBoxStore.open(VestigeBoxStore.kt:15)
+05-12 14:28:52.083 28914 28914 D StrictMode: 	at dev.anchildress1.vestige.VestigeApplication.onCreate(VestigeApplication.kt:18)
+05-12 14:28:52.084 28914 28914 D StrictMode: 	at dev.anchildress1.vestige.storage.VestigeBoxStore.open(VestigeBoxStore.kt:15)
+05-12 14:28:52.084 28914 28914 D StrictMode: 	at dev.anchildress1.vestige.VestigeApplication.onCreate(VestigeApplication.kt:18)
+05-12 14:28:52.084 28914 28914 D StrictMode: 	at dev.anchildress1.vestige.storage.VestigeBoxStore.open(VestigeBoxStore.kt:15)
+05-12 14:28:52.084 28914 28914 D StrictMode: 	at dev.anchildress1.vestige.VestigeApplication.onCreate(VestigeApplication.kt:18)
+05-12 14:28:52.085 28914 28914 D StrictMode: 	at dev.anchildress1.vestige.storage.VestigeBoxStore.open(VestigeBoxStore.kt:15)
+05-12 14:28:52.085 28914 28914 D StrictMode: 	at dev.anchildress1.vestige.VestigeApplication.onCreate(VestigeApplication.kt:18)
+05-12 14:28:52.108 28914 28928 I TestRunner: run started: 1 tests
+05-12 14:28:52.109 28914 28928 I TestRunner: started: threeLensesDivergeOnAtLeastTwoOfSixEntries(dev.anchildress1.vestige.SttDLensDivergenceTest)
+05-12 14:28:52.138 28914 28928 I VestigeSttD: STT-D using backend=Gpu
+05-12 14:28:52.141 28914 28930 D VestigeLiteRtLm: Loading /data/local/tmp/gemma-4-E4B-it.litertlm backend=GPU audio=off vision=off maxTokens=4096 sampler=topK=1,topP=1.0,temp=0.0,seed=42
+05-12 14:29:19.684 28914 28930 D VestigeLiteRtLm: Engine initialized in 27527ms
+05-12 14:29:19.720 28914 28930 D VestigePromptComposer: compose lens=LITERAL chars=7674 tokens~=1919 history=0
+05-12 14:29:33.294 28914 28930 D VestigeLiteRtLm: generateText completed in 13572ms (prompt=7674c, reply=210c)
+05-12 14:29:33.297 28914 28930 D VestigeBackgroundExtraction: lens=LITERAL done parsed=true attempts=1 elapsed=13586ms
+05-12 14:29:33.302 28914 28930 D VestigePromptComposer: compose lens=INFERENTIAL chars=8219 tokens~=2055 history=0
+05-12 14:29:43.258 28914 28930 D VestigeLiteRtLm: generateText completed in 9955ms (prompt=8219c, reply=212c)
+05-12 14:29:43.259 28914 28930 D VestigeBackgroundExtraction: lens=INFERENTIAL done parsed=true attempts=1 elapsed=9961ms
+05-12 14:29:43.264 28914 28930 D VestigePromptComposer: compose lens=SKEPTICAL chars=8165 tokens~=2042 history=0
+05-12 14:29:59.219 28914 28930 D VestigeLiteRtLm: generateText completed in 15954ms (prompt=8165c, reply=394c)
+05-12 14:29:59.224 28914 28930 D VestigeBackgroundExtraction: lens=SKEPTICAL done parsed=true attempts=1 elapsed=15964ms
+05-12 14:29:59.231 28914 28930 D VestigeBackgroundExtraction: extract completed: lenses=3/3 model_calls=3 elapsed=39521ms
+05-12 14:29:59.236 28914 28928 I VestigeSttD: ENTRY id=A1 elapsed=39521ms lenses_parsed=3/3 model_calls=3
+05-12 14:29:59.236 28914 28928 I VestigeSttD:   LITERAL tags=[standup,doc] energy=flattened commitment=null flags=0 attempts=1 err=-
+05-12 14:29:59.236 28914 28928 I VestigeSttD:   INFERENTIAL tags=[standup,flattened] energy=flattened commitment=null flags=0 attempts=1 err=-
+05-12 14:29:59.236 28914 28928 I VestigeSttD:   SKEPTICAL tags=[standup,flattened] energy=flattened commitment=null flags=1 attempts=1 err=-
+05-12 14:29:59.236 28914 28928 I VestigeSttD:   RAW id=A1 lens=LITERAL attempts=1 err=- fields={tags=[standup, doc], energy_descriptor=flattened, state_shift=true, vocabulary_contradictions=[], stated_commitment=null, recurrence_link=null, recurrence_kind=null} flags=[]
+05-12 14:29:59.236 28914 28928 I VestigeSttD:   RAW id=A1 lens=INFERENTIAL attempts=1 err=- fields={tags=[standup, flattened], energy_descriptor=flattened, state_shift=true, vocabulary_contradictions=[], stated_commitment=null, recurrence_link=null, recurrence_kind=null} flags=[]
+05-12 14:29:59.237 28914 28928 I VestigeSttD:   RAW id=A1 lens=SKEPTICAL attempts=1 err=- fields={tags=[standup, flattened], energy_descriptor=flattened, state_shift=true, vocabulary_contradictions=[], stated_commitment=null, recurrence_link=null, recurrence_kind=null} flags=[state-behavior-mismatch:I was fine before it, then completely flattened by 111:The state change from fine to flattened lacks a triggering event.]
+05-12 14:29:59.237 28914 28928 I VestigeSttD:   DIVERGENCE id=A1 disagree_fields=[tags] inferential_only=[] skeptical_flags_kept=[state-behavior-mismatch:I was fine before it, then completely flattened by 111:The state change from fine to flattened lacks a triggering event.] meaningful=true
+05-12 14:29:59.247 28914 28930 D VestigePromptComposer: compose lens=LITERAL chars=7672 tokens~=1918 history=0
+05-12 14:30:10.670 28914 28930 D VestigeLiteRtLm: generateText completed in 11421ms (prompt=7672c, reply=209c)
+05-12 14:30:10.671 28914 28930 D VestigeBackgroundExtraction: lens=LITERAL done parsed=true attempts=1 elapsed=11432ms
+05-12 14:30:10.675 28914 28930 D VestigePromptComposer: compose lens=INFERENTIAL chars=8217 tokens~=2055 history=0
+05-12 14:30:21.292 28914 28930 D VestigeLiteRtLm: generateText completed in 10616ms (prompt=8217c, reply=207c)
+05-12 14:30:21.293 28914 28930 D VestigeBackgroundExtraction: lens=INFERENTIAL done parsed=true attempts=1 elapsed=10621ms
+05-12 14:30:21.298 28914 28930 D VestigePromptComposer: compose lens=SKEPTICAL chars=8163 tokens~=2041 history=0
+05-12 14:30:31.817 28914 28930 D VestigeLiteRtLm: generateText completed in 10518ms (prompt=8163c, reply=202c)
+05-12 14:30:31.818 28914 28930 D VestigeBackgroundExtraction: lens=SKEPTICAL done parsed=true attempts=1 elapsed=10524ms
+05-12 14:30:31.819 28914 28930 D VestigeBackgroundExtraction: extract completed: lenses=3/3 model_calls=3 elapsed=32580ms
+05-12 14:30:31.820 28914 28928 I VestigeSttD: ENTRY id=A2 elapsed=32580ms lenses_parsed=3/3 model_calls=3
+05-12 14:30:31.821 28914 28928 I VestigeSttD:   LITERAL tags=[meeting,late-night] energy=null commitment=null flags=0 attempts=1 err=-
+05-12 14:30:31.822 28914 28928 I VestigeSttD:   INFERENTIAL tags=[meeting,late-night] energy=null commitment=null flags=0 attempts=1 err=-
+05-12 14:30:31.823 28914 28928 I VestigeSttD:   SKEPTICAL tags=[meeting,late-night] energy=null commitment=null flags=0 attempts=1 err=-
+05-12 14:30:31.823 28914 28928 I VestigeSttD:   RAW id=A2 lens=LITERAL attempts=1 err=- fields={tags=[meeting, late-night], energy_descriptor=null, state_shift=false, vocabulary_contradictions=[], stated_commitment=null, recurrence_link=null, recurrence_kind=null} flags=[]
+05-12 14:30:31.823 28914 28928 I VestigeSttD:   RAW id=A2 lens=INFERENTIAL attempts=1 err=- fields={tags=[meeting, late-night], energy_descriptor=null, state_shift=false, vocabulary_contradictions=[], stated_commitment=null, recurrence_link=null, recurrence_kind=null} flags=[]
+05-12 14:30:31.823 28914 28928 I VestigeSttD:   RAW id=A2 lens=SKEPTICAL attempts=1 err=- fields={tags=[meeting, late-night], energy_descriptor=null, state_shift=false, vocabulary_contradictions=[], stated_commitment=null, recurrence_link=null, recurrence_kind=null} flags=[]
+05-12 14:30:31.823 28914 28928 I VestigeSttD:   DIVERGENCE id=A2 disagree_fields=[] inferential_only=[] skeptical_flags_kept=[] meaningful=false
+05-12 14:30:31.829 28914 28930 D VestigePromptComposer: compose lens=LITERAL chars=7658 tokens~=1915 history=0
+05-12 14:30:44.891 28914 28930 D VestigeLiteRtLm: generateText completed in 13061ms (prompt=7658c, reply=256c)
+05-12 14:30:44.893 28914 28930 D VestigeBackgroundExtraction: lens=LITERAL done parsed=true attempts=1 elapsed=13067ms
+05-12 14:30:44.898 28914 28930 D VestigePromptComposer: compose lens=INFERENTIAL chars=8203 tokens~=2051 history=0
+05-12 14:30:58.321 28914 28930 D VestigeLiteRtLm: generateText completed in 13422ms (prompt=8203c, reply=238c)
+05-12 14:30:58.325 28914 28930 D VestigeBackgroundExtraction: lens=INFERENTIAL done parsed=true attempts=1 elapsed=13431ms
+05-12 14:30:58.329 28914 28930 D VestigePromptComposer: compose lens=SKEPTICAL chars=8149 tokens~=2038 history=0
+05-12 14:31:13.616 28914 28930 D VestigeLiteRtLm: generateText completed in 15286ms (prompt=8149c, reply=253c)
+05-12 14:31:13.618 28914 28930 D VestigeBackgroundExtraction: lens=SKEPTICAL done parsed=true attempts=1 elapsed=15293ms
+05-12 14:31:13.627 28914 28930 D VestigeBackgroundExtraction: extract completed: lenses=3/3 model_calls=3 elapsed=41801ms
+05-12 14:31:13.629 28914 28928 I VestigeSttD: ENTRY id=A3 elapsed=41801ms lenses_parsed=3/3 model_calls=3
+05-12 14:31:13.630 28914 28928 I VestigeSttD:   LITERAL tags=[roadmap-call,post-meeting-routine,tabs-open,zero-movement] energy=null commitment=null flags=0 attempts=1 err=-
+05-12 14:31:13.630 28914 28928 I VestigeSttD:   INFERENTIAL tags=[post-meeting,corpse-routine,tabs-open] energy=crashed commitment=null flags=0 attempts=1 err=-
+05-12 14:31:13.630 28914 28928 I VestigeSttD:   SKEPTICAL tags=[roadmap-call,post-meeting-routine,tabs,zero-movement] energy=null commitment=null flags=0 attempts=1 err=-
+05-12 14:31:13.630 28914 28928 I VestigeSttD:   RAW id=A3 lens=LITERAL attempts=1 err=- fields={tags=[roadmap-call, post-meeting-routine, tabs-open, zero-movement], energy_descriptor=null, state_shift=false, vocabulary_contradictions=[], stated_commitment=null, recurrence_link=null, recurrence_kind=null} flags=[]
+05-12 14:31:13.630 28914 28928 I VestigeSttD:   RAW id=A3 lens=INFERENTIAL attempts=1 err=- fields={tags=[post-meeting, corpse-routine, tabs-open], energy_descriptor=crashed, state_shift=false, vocabulary_contradictions=[], stated_commitment=null, recurrence_link=null, recurrence_kind=null} flags=[]
+05-12 14:31:13.630 28914 28928 I VestigeSttD:   RAW id=A3 lens=SKEPTICAL attempts=1 err=- fields={tags=[roadmap-call, post-meeting-routine, tabs, zero-movement], energy_descriptor=null, state_shift=false, vocabulary_contradictions=[], stated_commitment=null, recurrence_link=null, recurrence_kind=null} flags=[]
+05-12 14:31:13.631 28914 28928 I VestigeSttD:   DIVERGENCE id=A3 disagree_fields=[tags, energy_descriptor] inferential_only=[energy_descriptor] skeptical_flags_kept=[] meaningful=true
+05-12 14:31:13.635 28914 28930 D VestigePromptComposer: compose lens=LITERAL chars=7625 tokens~=1907 history=0
+05-12 14:31:24.511 28914 28930 D VestigeLiteRtLm: generateText completed in 10875ms (prompt=7625c, reply=204c)
+05-12 14:31:24.512 28914 28930 D VestigeBackgroundExtraction: lens=LITERAL done parsed=true attempts=1 elapsed=10879ms
+05-12 14:31:24.514 28914 28930 D VestigePromptComposer: compose lens=INFERENTIAL chars=8170 tokens~=2043 history=0
+05-12 14:31:35.080 28914 28930 D VestigeLiteRtLm: generateText completed in 10565ms (prompt=8170c, reply=200c)
+05-12 14:31:35.081 28914 28930 D VestigeBackgroundExtraction: lens=INFERENTIAL done parsed=true attempts=1 elapsed=10568ms
+05-12 14:31:35.085 28914 28930 D VestigePromptComposer: compose lens=SKEPTICAL chars=8116 tokens~=2029 history=0
+05-12 14:31:54.674 28914 28930 D VestigeLiteRtLm: generateText completed in 19588ms (prompt=8116c, reply=527c)
+05-12 14:31:54.681 28914 28930 D VestigeBackgroundExtraction: lens=SKEPTICAL done parsed=true attempts=1 elapsed=19600ms
+05-12 14:31:54.686 28914 28930 D VestigeBackgroundExtraction: extract completed: lenses=3/3 model_calls=3 elapsed=41054ms
+05-12 14:31:54.690 28914 28928 I VestigeSttD: ENTRY id=A4 elapsed=41054ms lenses_parsed=3/3 model_calls=3
+05-12 14:31:54.691 28914 28928 I VestigeSttD:   LITERAL tags=[battery-yanked] energy=null commitment=null flags=0 attempts=1 err=-
+05-12 14:31:54.691 28914 28928 I VestigeSttD:   INFERENTIAL tags=[battery-yanked] energy=null commitment=null flags=0 attempts=1 err=-
+05-12 14:31:54.692 28914 28928 I VestigeSttD:   SKEPTICAL tags=[battery-yanked] energy=null commitment=null flags=1 attempts=1 err=-
+05-12 14:31:54.693 28914 28928 I VestigeSttD:   RAW id=A4 lens=LITERAL attempts=1 err=- fields={tags=[battery-yanked], energy_descriptor=null, state_shift=false, vocabulary_contradictions=[], stated_commitment=null, recurrence_link=null, recurrence_kind=null} flags=[]
+05-12 14:31:54.693 28914 28928 I VestigeSttD:   RAW id=A4 lens=INFERENTIAL attempts=1 err=- fields={tags=[battery-yanked], energy_descriptor=null, state_shift=false, vocabulary_contradictions=[], stated_commitment=null, recurrence_link=null, recurrence_kind=null} flags=[]
+05-12 14:31:54.694 28914 28928 I VestigeSttD:   RAW id=A4 lens=SKEPTICAL attempts=1 err=- fields={tags=[battery-yanked], energy_descriptor=null, state_shift=false, vocabulary_contradictions=[{term_a=Not tired exactly, term_b=battery got yanked, snippet=Not tired exactly. More like the battery got yanked after the sync.}], stated_commitment=null, recurrence_link=null, recurrence_kind=null} flags=[vocabulary-contradiction:Not tired exactly. More like the battery got yanked after the sync.:The user negated tiredness then reasserted energy.]
+05-12 14:31:54.694 28914 28928 I VestigeSttD:   DIVERGENCE id=A4 disagree_fields=[] inferential_only=[] skeptical_flags_kept=[vocabulary-contradiction:Not tired exactly. More like the battery got yanked after the sync.:The user negated tiredness then reasserted energy.] meaningful=true
+05-12 14:31:54.705 28914 28930 D VestigePromptComposer: compose lens=LITERAL chars=7627 tokens~=1907 history=0
+05-12 14:32:06.547 28914 28930 D VestigeLiteRtLm: generateText completed in 11840ms (prompt=7627c, reply=217c)
+05-12 14:32:06.552 28914 28930 D VestigeBackgroundExtraction: lens=LITERAL done parsed=true attempts=1 elapsed=11856ms
+05-12 14:32:06.564 28914 28930 D VestigePromptComposer: compose lens=INFERENTIAL chars=8172 tokens~=2043 history=0
+05-12 14:32:19.438 28914 28930 D VestigeLiteRtLm: generateText completed in 12872ms (prompt=8172c, reply=217c)
+05-12 14:32:19.439 28914 28930 D VestigeBackgroundExtraction: lens=INFERENTIAL done parsed=true attempts=1 elapsed=12886ms
+05-12 14:32:19.443 28914 28930 D VestigePromptComposer: compose lens=SKEPTICAL chars=8118 tokens~=2030 history=0
+05-12 14:32:30.674 28914 28930 D VestigeLiteRtLm: generateText completed in 11229ms (prompt=8118c, reply=213c)
+05-12 14:32:30.675 28914 28930 D VestigeBackgroundExtraction: lens=SKEPTICAL done parsed=true attempts=1 elapsed=11235ms
+05-12 14:32:30.677 28914 28930 D VestigeBackgroundExtraction: extract completed: lenses=3/3 model_calls=3 elapsed=35981ms
+05-12 14:32:30.679 28914 28928 I VestigeSttD: ENTRY id=A5 elapsed=35981ms lenses_parsed=3/3 model_calls=3
+05-12 14:32:30.679 28914 28928 I VestigeSttD:   LITERAL tags=[client-review,hollow] energy=hollow commitment=null flags=0 attempts=1 err=-
+05-12 14:32:30.680 28914 28928 I VestigeSttD:   INFERENTIAL tags=[client-review,hollow] energy=hollow commitment=null flags=0 attempts=1 err=-
+05-12 14:32:30.680 28914 28928 I VestigeSttD:   SKEPTICAL tags=[client-review,hollow] energy=hollow commitment=null flags=0 attempts=1 err=-
+05-12 14:32:30.680 28914 28928 I VestigeSttD:   RAW id=A5 lens=LITERAL attempts=1 err=- fields={tags=[client-review, hollow], energy_descriptor=hollow, state_shift=false, vocabulary_contradictions=[], stated_commitment=null, recurrence_link=null, recurrence_kind=null} flags=[]
+05-12 14:32:30.681 28914 28928 I VestigeSttD:   RAW id=A5 lens=INFERENTIAL attempts=1 err=- fields={tags=[client-review, hollow], energy_descriptor=hollow, state_shift=false, vocabulary_contradictions=[], stated_commitment=null, recurrence_link=null, recurrence_kind=null} flags=[]
+05-12 14:32:30.681 28914 28928 I VestigeSttD:   RAW id=A5 lens=SKEPTICAL attempts=1 err=- fields={tags=[client-review, hollow], energy_descriptor=hollow, state_shift=false, vocabulary_contradictions=[], stated_commitment=null, recurrence_link=null, recurrence_kind=null} flags=[]
+05-12 14:32:30.681 28914 28928 I VestigeSttD:   DIVERGENCE id=A5 disagree_fields=[] inferential_only=[] skeptical_flags_kept=[] meaningful=false
+05-12 14:32:30.688 28914 28930 D VestigePromptComposer: compose lens=LITERAL chars=7637 tokens~=1910 history=0
+05-12 14:32:41.134 28914 28930 D VestigeLiteRtLm: generateText completed in 10445ms (prompt=7637c, reply=199c)
+05-12 14:32:41.136 28914 28930 D VestigeBackgroundExtraction: lens=LITERAL done parsed=true attempts=1 elapsed=10453ms
+05-12 14:32:41.140 28914 28930 D VestigePromptComposer: compose lens=INFERENTIAL chars=8182 tokens~=2046 history=0
+05-12 14:32:52.877 28914 28930 D VestigeLiteRtLm: generateText completed in 11736ms (prompt=8182c, reply=231c)
+05-12 14:32:52.878 28914 28930 D VestigeBackgroundExtraction: lens=INFERENTIAL done parsed=true attempts=1 elapsed=11741ms
+05-12 14:32:52.880 28914 28930 D VestigePromptComposer: compose lens=SKEPTICAL chars=8128 tokens~=2032 history=0
+05-12 14:33:04.801 28914 28930 D VestigeLiteRtLm: generateText completed in 11921ms (prompt=8128c, reply=253c)
+05-12 14:33:04.803 28914 28930 D VestigeBackgroundExtraction: lens=SKEPTICAL done parsed=true attempts=1 elapsed=11924ms
+05-12 14:33:04.805 28914 28930 D VestigeBackgroundExtraction: extract completed: lenses=3/3 model_calls=3 elapsed=34121ms
+05-12 14:33:04.806 28914 28928 I VestigeSttD: ENTRY id=A6 elapsed=34121ms lenses_parsed=3/3 model_calls=3
+05-12 14:33:04.807 28914 28928 I VestigeSttD:   LITERAL tags=[planning-call] energy=null commitment=null flags=0 attempts=1 err=-
+05-12 14:33:04.807 28914 28928 I VestigeSttD:   INFERENTIAL tags=[planning-call,static,awake,not-awake] energy=null commitment=null flags=0 attempts=1 err=-
+05-12 14:33:04.807 28914 28928 I VestigeSttD:   SKEPTICAL tags=[planning-call,static,awake,operationally-not] energy=operationally not commitment=null flags=0 attempts=1 err=-
+05-12 14:33:04.807 28914 28928 I VestigeSttD:   RAW id=A6 lens=LITERAL attempts=1 err=- fields={tags=[planning-call], energy_descriptor=null, state_shift=false, vocabulary_contradictions=[], stated_commitment=null, recurrence_link=null, recurrence_kind=null} flags=[]
+05-12 14:33:04.808 28914 28928 I VestigeSttD:   RAW id=A6 lens=INFERENTIAL attempts=1 err=- fields={tags=[planning-call, static, awake, not-awake], energy_descriptor=null, state_shift=false, vocabulary_contradictions=[], stated_commitment=null, recurrence_link=null, recurrence_kind=null} flags=[]
+05-12 14:33:04.808 28914 28928 I VestigeSttD:   RAW id=A6 lens=SKEPTICAL attempts=1 err=- fields={tags=[planning-call, static, awake, operationally-not], energy_descriptor=operationally not, state_shift=true, vocabulary_contradictions=[], stated_commitment=null, recurrence_link=null, recurrence_kind=null} flags=[]
+05-12 14:33:04.808 28914 28928 I VestigeSttD:   DIVERGENCE id=A6 disagree_fields=[tags, state_shift] inferential_only=[] skeptical_flags_kept=[] meaningful=true
+05-12 14:33:04.813 28914 28930 D VestigePromptComposer: compose lens=LITERAL chars=7666 tokens~=1917 history=0
+05-12 14:33:17.630 28914 28930 D VestigeLiteRtLm: generateText completed in 12816ms (prompt=7666c, reply=217c)
+05-12 14:33:17.631 28914 28930 D VestigeBackgroundExtraction: lens=LITERAL done parsed=true attempts=1 elapsed=12821ms
+05-12 14:33:17.633 28914 28930 D VestigePromptComposer: compose lens=INFERENTIAL chars=8211 tokens~=2053 history=0
+05-12 14:33:30.190 28914 28930 D VestigeLiteRtLm: generateText completed in 12556ms (prompt=8211c, reply=219c)
+05-12 14:33:30.191 28914 28930 D VestigeBackgroundExtraction: lens=INFERENTIAL done parsed=true attempts=1 elapsed=12560ms
+05-12 14:33:30.196 28914 28930 D VestigePromptComposer: compose lens=SKEPTICAL chars=8157 tokens~=2040 history=0
+05-12 14:33:42.892 28914 28930 D VestigeLiteRtLm: generateText completed in 12695ms (prompt=8157c, reply=220c)
+05-12 14:33:42.893 28914 28930 D VestigeBackgroundExtraction: lens=SKEPTICAL done parsed=true attempts=1 elapsed=12701ms
+05-12 14:33:42.894 28914 28930 D VestigeBackgroundExtraction: extract completed: lenses=3/3 model_calls=3 elapsed=38085ms
+05-12 14:33:42.895 28914 28928 I VestigeSttD: ENTRY id=B1 elapsed=38085ms lenses_parsed=3/3 model_calls=3
+05-12 14:33:42.896 28914 28928 I VestigeSttD:   LITERAL tags=[invoice-email,closing-it] energy=null commitment=null flags=0 attempts=1 err=-
+05-12 14:33:42.897 28914 28928 I VestigeSttD:   INFERENTIAL tags=[invoice-email,closing-task] energy=null commitment=null flags=0 attempts=1 err=-
+05-12 14:33:42.897 28914 28928 I VestigeSttD:   SKEPTICAL tags=[invoice-email,closing-it-it] energy=null commitment=null flags=0 attempts=1 err=-
+05-12 14:33:42.897 28914 28928 I VestigeSttD:   RAW id=B1 lens=LITERAL attempts=1 err=- fields={tags=[invoice-email, closing-it], energy_descriptor=null, state_shift=false, vocabulary_contradictions=[], stated_commitment=null, recurrence_link=null, recurrence_kind=null} flags=[]
+05-12 14:33:42.897 28914 28928 I VestigeSttD:   RAW id=B1 lens=INFERENTIAL attempts=1 err=- fields={tags=[invoice-email, closing-task], energy_descriptor=null, state_shift=false, vocabulary_contradictions=[], stated_commitment=null, recurrence_link=null, recurrence_kind=null} flags=[]
+05-12 14:33:42.897 28914 28928 I VestigeSttD:   RAW id=B1 lens=SKEPTICAL attempts=1 err=- fields={tags=[invoice-email, closing-it-it], energy_descriptor=null, state_shift=false, vocabulary_contradictions=[], stated_commitment=null, recurrence_link=null, recurrence_kind=null} flags=[]
+05-12 14:33:42.897 28914 28928 I VestigeSttD:   DIVERGENCE id=B1 disagree_fields=[tags] inferential_only=[] skeptical_flags_kept=[] meaningful=true
+05-12 14:33:42.903 28914 28930 D VestigePromptComposer: compose lens=LITERAL chars=7644 tokens~=1911 history=0
+05-12 14:33:58.158 28914 28930 D VestigeLiteRtLm: generateText completed in 15254ms (prompt=7644c, reply=293c)
+05-12 14:33:58.159 28914 28930 D VestigeBackgroundExtraction: lens=LITERAL done parsed=true attempts=1 elapsed=15260ms
+05-12 14:33:58.163 28914 28930 D VestigePromptComposer: compose lens=INFERENTIAL chars=8189 tokens~=2048 history=0
+05-12 14:34:13.732 28914 28930 D VestigeLiteRtLm: generateText completed in 15568ms (prompt=8189c, reply=294c)
+05-12 14:34:13.734 28914 28930 D VestigeBackgroundExtraction: lens=INFERENTIAL done parsed=true attempts=1 elapsed=15575ms
+05-12 14:34:13.739 28914 28930 D VestigePromptComposer: compose lens=SKEPTICAL chars=8135 tokens~=2034 history=0
+05-12 14:34:31.853 28914 28930 D VestigeLiteRtLm: generateText completed in 18112ms (prompt=8135c, reply=488c)
+05-12 14:34:31.854 28914 28930 D VestigeBackgroundExtraction: lens=SKEPTICAL done parsed=true attempts=1 elapsed=18119ms
+05-12 14:34:31.855 28914 28930 D VestigeBackgroundExtraction: extract completed: lenses=3/3 model_calls=3 elapsed=48956ms
+05-12 14:34:31.856 28914 28928 I VestigeSttD: ENTRY id=B2 elapsed=48956ms lenses_parsed=3/3 model_calls=3
+05-12 14:34:31.857 28914 28928 I VestigeSttD:   LITERAL tags=[invoice,desktop-reorganization] energy=null commitment=present flags=0 attempts=1 err=-
+05-12 14:34:31.857 28914 28928 I VestigeSttD:   INFERENTIAL tags=[<no-parse>] energy=null commitment=null flags=0 attempts=1 err=-
+05-12 14:34:31.857 28914 28928 I VestigeSttD:   SKEPTICAL tags=[invoice,desktop-reorganization] energy=null commitment=present flags=1 attempts=1 err=-
+05-12 14:34:31.857 28914 28928 I VestigeSttD:   RAW id=B2 lens=LITERAL attempts=1 err=- fields={tags=[invoice, desktop-reorganization], energy_descriptor=null, state_shift=false, vocabulary_contradictions=[], stated_commitment={text=I would send the invoice today, topic_or_person=invoice}, recurrence_link=null, recurrence_kind=null} flags=[]
+05-12 14:34:31.857 28914 28928 I VestigeSttD:   RAW id=B2 lens=INFERENTIAL attempts=1 err=- fields={tags=null, energy_descriptor=null, state_shift=null, vocabulary_contradictions=null, stated_commitment=null, recurrence_link=null, recurrence_kind=null} flags=[]
+05-12 14:34:31.857 28914 28928 I VestigeSttD:   RAW id=B2 lens=SKEPTICAL attempts=1 err=- fields={tags=[invoice, desktop-reorganization], energy_descriptor=null, state_shift=false, vocabulary_contradictions=[], stated_commitment={text=I would send the invoice today, topic_or_person=invoice}, recurrence_link=null, recurrence_kind=null} flags=[commitment-without-anchor:Said I would send the invoice today. Instead I reorganized the desktop.:The commitment to send the invoice was not followed by the action.]
+05-12 14:34:31.857 28914 28928 I VestigeSttD:   DIVERGENCE id=B2 disagree_fields=[] inferential_only=[] skeptical_flags_kept=[commitment-without-anchor:Said I would send the invoice today. Instead I reorganized the desktop.:The commitment to send the invoice was not followed by the action.] meaningful=true
+05-12 14:34:31.861 28914 28930 D VestigePromptComposer: compose lens=LITERAL chars=7649 tokens~=1913 history=0
+05-12 14:34:45.714 28914 28930 D VestigeLiteRtLm: generateText completed in 13852ms (prompt=7649c, reply=207c)
+05-12 14:34:45.714 28914 28930 D VestigeBackgroundExtraction: lens=LITERAL done parsed=true attempts=1 elapsed=13856ms
+05-12 14:34:45.716 28914 28930 D VestigePromptComposer: compose lens=INFERENTIAL chars=8194 tokens~=2049 history=0
+05-12 14:34:55.361 28914 28930 D VestigeLiteRtLm: generateText completed in 9644ms (prompt=8194c, reply=203c)
+05-12 14:34:55.362 28914 28930 D VestigeBackgroundExtraction: lens=INFERENTIAL done parsed=true attempts=1 elapsed=9647ms
+05-12 14:34:55.367 28914 28930 D VestigePromptComposer: compose lens=SKEPTICAL chars=8140 tokens~=2035 history=0
+05-12 14:35:08.479 28914 28930 D VestigeLiteRtLm: generateText completed in 13112ms (prompt=8140c, reply=201c)
+05-12 14:35:08.480 28914 28930 W VestigeBackgroundExtraction: lens=SKEPTICAL attempt=1 parse-fail
+05-12 14:35:08.484 28914 28930 D VestigePromptComposer: compose lens=SKEPTICAL chars=8140 tokens~=2035 history=0
+05-12 14:35:21.061 28914 28930 D VestigeLiteRtLm: generateText completed in 12576ms (prompt=8140c, reply=201c)
+05-12 14:35:21.065 28914 28930 W VestigeBackgroundExtraction: lens=SKEPTICAL attempt=2 parse-fail
+05-12 14:35:21.065 28914 28930 D VestigeBackgroundExtraction: lens=SKEPTICAL done parsed=false attempts=2 elapsed=25702ms
+05-12 14:35:21.070 28914 28930 D VestigeBackgroundExtraction: extract completed: lenses=2/3 model_calls=4 elapsed=49211ms
+05-12 14:35:21.073 28914 28928 I VestigeSttD: ENTRY id=B3 elapsed=49211ms lenses_parsed=2/3 model_calls=4
+05-12 14:35:21.074 28914 28928 I VestigeSttD:   LITERAL tags=[invoice,cursor] energy=null commitment=null flags=0 attempts=1 err=-
+05-12 14:35:21.074 28914 28928 I VestigeSttD:   INFERENTIAL tags=[invoice,cursor] energy=null commitment=null flags=0 attempts=1 err=-
+05-12 14:35:21.074 28914 28928 I VestigeSttD:   SKEPTICAL tags=[<no-parse>] energy=null commitment=null flags=0 attempts=2 err=parse-fail
+05-12 14:35:21.074 28914 28928 I VestigeSttD:   RAW id=B3 lens=LITERAL attempts=1 err=- fields={tags=[invoice, cursor], energy_descriptor=null, state_shift=false, vocabulary_contradictions=[], stated_commitment=null, recurrence_link=null, recurrence_kind=null} flags=[]
+05-12 14:35:21.075 28914 28928 I VestigeSttD:   RAW id=B3 lens=INFERENTIAL attempts=1 err=- fields={tags=[invoice, cursor], energy_descriptor=null, state_shift=false, vocabulary_contradictions=[], stated_commitment=null, recurrence_link=null, recurrence_kind=null} flags=[]
+05-12 14:35:21.075 28914 28928 I VestigeSttD:   RAW id=B3 lens=SKEPTICAL attempts=2 err=parse-fail fields=<no-parse> flags=[]
+05-12 14:35:21.075 28914 28928 I VestigeSttD:   DIVERGENCE id=B3 disagree_fields=[] inferential_only=[] skeptical_flags_kept=[] meaningful=false
+05-12 14:35:21.087 28914 28930 D VestigePromptComposer: compose lens=LITERAL chars=7661 tokens~=1916 history=0
+05-12 14:35:34.253 28914 28930 D VestigeLiteRtLm: generateText completed in 13165ms (prompt=7661c, reply=213c)
+05-12 14:35:34.256 28914 28930 D VestigeBackgroundExtraction: lens=LITERAL done parsed=true attempts=1 elapsed=13177ms
+05-12 14:35:34.260 28914 28930 D VestigePromptComposer: compose lens=INFERENTIAL chars=8206 tokens~=2052 history=0
+05-12 14:35:44.954 28914 28930 D VestigeLiteRtLm: generateText completed in 10693ms (prompt=8206c, reply=219c)
+05-12 14:35:44.956 28914 28930 D VestigeBackgroundExtraction: lens=INFERENTIAL done parsed=true attempts=1 elapsed=10699ms
+05-12 14:35:44.960 28914 28930 D VestigePromptComposer: compose lens=SKEPTICAL chars=8152 tokens~=2038 history=0
+05-12 14:36:03.792 28914 28930 D VestigeLiteRtLm: generateText completed in 18831ms (prompt=8152c, reply=372c)
+05-12 14:36:03.795 28914 28930 D VestigeBackgroundExtraction: lens=SKEPTICAL done parsed=true attempts=1 elapsed=18838ms
+05-12 14:36:03.797 28914 28930 D VestigeBackgroundExtraction: extract completed: lenses=3/3 model_calls=3 elapsed=42719ms
+05-12 14:36:03.799 28914 28928 I VestigeSttD: ENTRY id=C1 elapsed=42719ms lenses_parsed=3/3 model_calls=3
+05-12 14:36:03.799 28914 28928 I VestigeSttD:   LITERAL tags=[task-app,spreadsheet] energy=null commitment=null flags=0 attempts=1 err=-
+05-12 14:36:03.800 28914 28928 I VestigeSttD:   INFERENTIAL tags=[task-app-selection,spreadsheet] energy=null commitment=null flags=0 attempts=1 err=-
+05-12 14:36:03.800 28914 28928 I VestigeSttD:   SKEPTICAL tags=[task-app-selection,spreadsheet] energy=null commitment=null flags=1 attempts=1 err=-
+05-12 14:36:03.800 28914 28928 I VestigeSttD:   RAW id=C1 lens=LITERAL attempts=1 err=- fields={tags=[task-app, spreadsheet], energy_descriptor=null, state_shift=false, vocabulary_contradictions=[], stated_commitment=null, recurrence_link=null, recurrence_kind=null} flags=[]
+05-12 14:36:03.801 28914 28928 I VestigeSttD:   RAW id=C1 lens=INFERENTIAL attempts=1 err=- fields={tags=[task-app-selection, spreadsheet], energy_descriptor=null, state_shift=false, vocabulary_contradictions=[], stated_commitment=null, recurrence_link=null, recurrence_kind=null} flags=[]
+05-12 14:36:03.801 28914 28928 I VestigeSttD:   RAW id=C1 lens=SKEPTICAL attempts=1 err=- fields={tags=[task-app-selection, spreadsheet], energy_descriptor=null, state_shift=false, vocabulary_contradictions=[], stated_commitment=null, recurrence_link=null, recurrence_kind=null} flags=[unsupported-recurrence:Same three criteria:The claim of using the same criteria lacks supporting history.]
+05-12 14:36:03.802 28914 28928 I VestigeSttD:   DIVERGENCE id=C1 disagree_fields=[tags] inferential_only=[] skeptical_flags_kept=[unsupported-recurrence:Same three criteria:The claim of using the same criteria lacks supporting history.] meaningful=true
+05-12 14:36:03.813 28914 28930 D VestigePromptComposer: compose lens=LITERAL chars=7651 tokens~=1913 history=0
+05-12 14:36:17.087 28914 28930 D VestigeLiteRtLm: generateText completed in 13273ms (prompt=7651c, reply=215c)
+05-12 14:36:17.090 28914 28930 D VestigeBackgroundExtraction: lens=LITERAL done parsed=true attempts=1 elapsed=13286ms
+05-12 14:36:17.094 28914 28930 D VestigePromptComposer: compose lens=INFERENTIAL chars=8196 tokens~=2049 history=0
+05-12 14:36:32.931 28914 28930 D VestigeLiteRtLm: generateText completed in 15835ms (prompt=8196c, reply=218c)
+05-12 14:36:32.932 28914 28930 D VestigeBackgroundExtraction: lens=INFERENTIAL done parsed=true attempts=1 elapsed=15841ms
+05-12 14:36:32.935 28914 28930 D VestigePromptComposer: compose lens=SKEPTICAL chars=8142 tokens~=2036 history=0
+05-12 14:36:45.935 28914 28930 D VestigeLiteRtLm: generateText completed in 12999ms (prompt=8142c, reply=215c)
+05-12 14:36:45.936 28914 28930 D VestigeBackgroundExtraction: lens=SKEPTICAL done parsed=true attempts=1 elapsed=13004ms
+05-12 14:36:45.937 28914 28930 D VestigeBackgroundExtraction: extract completed: lenses=3/3 model_calls=3 elapsed=42134ms
+05-12 14:36:45.939 28914 28928 I VestigeSttD: ENTRY id=C2 elapsed=42134ms lenses_parsed=3/3 model_calls=3
+05-12 14:36:45.939 28914 28928 I VestigeSttD:   LITERAL tags=[task-app,decision-loop] energy=null commitment=null flags=0 attempts=1 err=-
+05-12 14:36:45.940 28914 28928 I VestigeSttD:   INFERENTIAL tags=[decision-looping,task-app] energy=null commitment=null flags=0 attempts=1 err=-
+05-12 14:36:45.940 28914 28928 I VestigeSttD:   SKEPTICAL tags=[task-app,decision-loop] energy=null commitment=null flags=0 attempts=1 err=-
+05-12 14:36:45.941 28914 28928 I VestigeSttD:   RAW id=C2 lens=LITERAL attempts=1 err=- fields={tags=[task-app, decision-loop], energy_descriptor=null, state_shift=false, vocabulary_contradictions=[], stated_commitment=null, recurrence_link=null, recurrence_kind=null} flags=[]
+05-12 14:36:45.941 28914 28928 I VestigeSttD:   RAW id=C2 lens=INFERENTIAL attempts=1 err=- fields={tags=[decision-looping, task-app], energy_descriptor=null, state_shift=false, vocabulary_contradictions=[], stated_commitment=null, recurrence_link=null, recurrence_kind=null} flags=[]
+05-12 14:36:45.941 28914 28928 I VestigeSttD:   RAW id=C2 lens=SKEPTICAL attempts=1 err=- fields={tags=[task-app, decision-loop], energy_descriptor=null, state_shift=false, vocabulary_contradictions=[], stated_commitment=null, recurrence_link=null, recurrence_kind=null} flags=[]
+05-12 14:36:45.942 28914 28928 I VestigeSttD:   DIVERGENCE id=C2 disagree_fields=[tags] inferential_only=[] skeptical_flags_kept=[] meaningful=true
+05-12 14:36:45.947 28914 28930 D VestigePromptComposer: compose lens=LITERAL chars=7643 tokens~=1911 history=0
+05-12 14:36:57.789 28914 28930 D VestigeLiteRtLm: generateText completed in 11841ms (prompt=7643c, reply=206c)
+05-12 14:36:57.790 28914 28930 D VestigeBackgroundExtraction: lens=LITERAL done parsed=true attempts=1 elapsed=11847ms
+05-12 14:36:57.793 28914 28930 D VestigePromptComposer: compose lens=INFERENTIAL chars=8188 tokens~=2047 history=0
+05-12 14:37:08.271 28914 28930 D VestigeLiteRtLm: generateText completed in 10477ms (prompt=8188c, reply=202c)
+05-12 14:37:08.272 28914 28930 D VestigeBackgroundExtraction: lens=INFERENTIAL done parsed=true attempts=1 elapsed=10481ms
+05-12 14:37:08.274 28914 28930 D VestigePromptComposer: compose lens=SKEPTICAL chars=8134 tokens~=2034 history=0
+05-12 14:37:21.705 28914 28930 D VestigeLiteRtLm: generateText completed in 13430ms (prompt=8134c, reply=206c)
+05-12 14:37:21.706 28914 28930 D VestigeBackgroundExtraction: lens=SKEPTICAL done parsed=true attempts=1 elapsed=13433ms
+05-12 14:37:21.707 28914 28930 D VestigeBackgroundExtraction: extract completed: lenses=3/3 model_calls=3 elapsed=35764ms
+05-12 14:37:21.710 28914 28928 I VestigeSttD: ENTRY id=C3 elapsed=35764ms lenses_parsed=3/3 model_calls=3
+05-12 14:37:21.711 28914 28928 I VestigeSttD:   LITERAL tags=[comparison-table] energy=null commitment=null flags=0 attempts=1 err=-
+05-12 14:37:21.711 28914 28928 I VestigeSttD:   INFERENTIAL tags=[comparison-table] energy=null commitment=null flags=0 attempts=1 err=-
+05-12 14:37:21.712 28914 28928 I VestigeSttD:   SKEPTICAL tags=[comparison-table] energy=null commitment=null flags=0 attempts=1 err=-
+05-12 14:37:21.713 28914 28928 I VestigeSttD:   RAW id=C3 lens=LITERAL attempts=1 err=- fields={tags=[comparison-table], energy_descriptor=null, state_shift=false, vocabulary_contradictions=[], stated_commitment=null, recurrence_link=null, recurrence_kind=null} flags=[]
+05-12 14:37:21.713 28914 28928 I VestigeSttD:   RAW id=C3 lens=INFERENTIAL attempts=1 err=- fields={tags=[comparison-table], energy_descriptor=null, state_shift=false, vocabulary_contradictions=[], stated_commitment=null, recurrence_link=null, recurrence_kind=null} flags=[]
+05-12 14:37:21.713 28914 28928 I VestigeSttD:   RAW id=C3 lens=SKEPTICAL attempts=1 err=- fields={tags=[comparison-table], energy_descriptor=null, state_shift=false, vocabulary_contradictions=[], stated_commitment=null, recurrence_link=null, recurrence_kind=null} flags=[]
+05-12 14:37:21.713 28914 28928 I VestigeSttD:   DIVERGENCE id=C3 disagree_fields=[] inferential_only=[] skeptical_flags_kept=[] meaningful=false
+05-12 14:37:21.718 28914 28930 D VestigePromptComposer: compose lens=LITERAL chars=7683 tokens~=1921 history=0
+05-12 14:37:34.988 28914 28930 D VestigeLiteRtLm: generateText completed in 13268ms (prompt=7683c, reply=213c)
+05-12 14:37:34.990 28914 28930 D VestigeBackgroundExtraction: lens=LITERAL done parsed=true attempts=1 elapsed=13275ms
+05-12 14:37:34.994 28914 28930 D VestigePromptComposer: compose lens=INFERENTIAL chars=8228 tokens~=2057 history=0
+05-12 14:37:45.280 28914 28930 D VestigeLiteRtLm: generateText completed in 10285ms (prompt=8228c, reply=204c)
+05-12 14:37:45.282 28914 28930 D VestigeBackgroundExtraction: lens=INFERENTIAL done parsed=true attempts=1 elapsed=10291ms
+05-12 14:37:45.286 28914 28930 D VestigePromptComposer: compose lens=SKEPTICAL chars=8174 tokens~=2044 history=0
+05-12 14:37:57.135 28914 28930 D VestigeLiteRtLm: generateText completed in 11847ms (prompt=8174c, reply=219c)
+05-12 14:37:57.136 28914 28930 D VestigeBackgroundExtraction: lens=SKEPTICAL done parsed=true attempts=1 elapsed=11854ms
+05-12 14:37:57.137 28914 28930 D VestigeBackgroundExtraction: extract completed: lenses=3/3 model_calls=3 elapsed=35422ms
+05-12 14:37:57.138 28914 28928 I VestigeSttD: ENTRY id=D1 elapsed=35422ms lenses_parsed=3/3 model_calls=3
+05-12 14:37:57.138 28914 28928 I VestigeSttD:   LITERAL tags=[late-night,notes-app] energy=null commitment=null flags=0 attempts=1 err=-
+05-12 14:37:57.139 28914 28928 I VestigeSttD:   INFERENTIAL tags=[late-night,notes-app] energy=null commitment=null flags=0 attempts=1 err=-
+05-12 14:37:57.139 28914 28928 I VestigeSttD:   SKEPTICAL tags=[late-night,notes-app,rearranging] energy=null commitment=null flags=0 attempts=1 err=-
+05-12 14:37:57.139 28914 28928 I VestigeSttD:   RAW id=D1 lens=LITERAL attempts=1 err=- fields={tags=[late-night, notes-app], energy_descriptor=null, state_shift=false, vocabulary_contradictions=[], stated_commitment=null, recurrence_link=null, recurrence_kind=null} flags=[]
+05-12 14:37:57.139 28914 28928 I VestigeSttD:   RAW id=D1 lens=INFERENTIAL attempts=1 err=- fields={tags=[late-night, notes-app], energy_descriptor=null, state_shift=false, vocabulary_contradictions=[], stated_commitment=null, recurrence_link=null, recurrence_kind=null} flags=[]
+05-12 14:37:57.139 28914 28928 I VestigeSttD:   RAW id=D1 lens=SKEPTICAL attempts=1 err=- fields={tags=[late-night, notes-app, rearranging], energy_descriptor=null, state_shift=false, vocabulary_contradictions=[], stated_commitment=null, recurrence_link=null, recurrence_kind=null} flags=[]
+05-12 14:37:57.139 28914 28928 I VestigeSttD:   DIVERGENCE id=D1 disagree_fields=[tags] inferential_only=[] skeptical_flags_kept=[] meaningful=true
+05-12 14:37:57.143 28914 28930 D VestigePromptComposer: compose lens=LITERAL chars=7645 tokens~=1912 history=0
+05-12 14:38:11.229 28914 28930 D VestigeLiteRtLm: generateText completed in 14085ms (prompt=7645c, reply=217c)
+05-12 14:38:11.231 28914 28930 D VestigeBackgroundExtraction: lens=LITERAL done parsed=true attempts=1 elapsed=14090ms
+05-12 14:38:11.235 28914 28930 D VestigePromptComposer: compose lens=INFERENTIAL chars=8190 tokens~=2048 history=0
+05-12 14:38:26.477 28914 28930 D VestigeLiteRtLm: generateText completed in 15241ms (prompt=8190c, reply=217c)
+05-12 14:38:26.479 28914 28930 D VestigeBackgroundExtraction: lens=INFERENTIAL done parsed=true attempts=1 elapsed=15247ms
+05-12 14:38:26.483 28914 28930 D VestigePromptComposer: compose lens=SKEPTICAL chars=8136 tokens~=2034 history=0
+05-12 14:38:37.861 28914 28930 D VestigeLiteRtLm: generateText completed in 11377ms (prompt=8136c, reply=216c)
+05-12 14:38:37.863 28914 28930 D VestigeBackgroundExtraction: lens=SKEPTICAL done parsed=true attempts=1 elapsed=11384ms
+05-12 14:38:37.865 28914 28930 D VestigeBackgroundExtraction: extract completed: lenses=3/3 model_calls=3 elapsed=40724ms
+05-12 14:38:37.866 28914 28928 I VestigeSttD: ENTRY id=D2 elapsed=40724ms lenses_parsed=3/3 model_calls=3
+05-12 14:38:37.867 28914 28928 I VestigeSttD:   LITERAL tags=[late-night,decision-loop] energy=null commitment=null flags=0 attempts=1 err=-
+05-12 14:38:37.867 28914 28928 I VestigeSttD:   INFERENTIAL tags=[late-night,decision-loop] energy=null commitment=null flags=0 attempts=1 err=-
+05-12 14:38:37.867 28914 28928 I VestigeSttD:   SKEPTICAL tags=[late-night,folder-structure] energy=null commitment=null flags=0 attempts=1 err=-
+05-12 14:38:37.868 28914 28928 I VestigeSttD:   RAW id=D2 lens=LITERAL attempts=1 err=- fields={tags=[late-night, decision-loop], energy_descriptor=null, state_shift=false, vocabulary_contradictions=[], stated_commitment=null, recurrence_link=null, recurrence_kind=null} flags=[]
+05-12 14:38:37.868 28914 28928 I VestigeSttD:   RAW id=D2 lens=INFERENTIAL attempts=1 err=- fields={tags=[late-night, decision-loop], energy_descriptor=null, state_shift=false, vocabulary_contradictions=[], stated_commitment=null, recurrence_link=null, recurrence_kind=null} flags=[]
+05-12 14:38:37.868 28914 28928 I VestigeSttD:   RAW id=D2 lens=SKEPTICAL attempts=1 err=- fields={tags=[late-night, folder-structure], energy_descriptor=null, state_shift=false, vocabulary_contradictions=[], stated_commitment=null, recurrence_link=null, recurrence_kind=null} flags=[]
+05-12 14:38:37.868 28914 28928 I VestigeSttD:   DIVERGENCE id=D2 disagree_fields=[tags] inferential_only=[] skeptical_flags_kept=[] meaningful=true
+05-12 14:38:37.875 28914 28930 D VestigePromptComposer: compose lens=LITERAL chars=7661 tokens~=1916 history=0
+05-12 14:38:52.686 28914 28930 D VestigeLiteRtLm: generateText completed in 14810ms (prompt=7661c, reply=228c)
+05-12 14:38:52.688 28914 28930 D VestigeBackgroundExtraction: lens=LITERAL done parsed=true attempts=1 elapsed=14817ms
+05-12 14:38:52.695 28914 28930 D VestigePromptComposer: compose lens=INFERENTIAL chars=8206 tokens~=2052 history=0
+05-12 14:39:05.362 28914 28930 D VestigeLiteRtLm: generateText completed in 12666ms (prompt=8206c, reply=214c)
+05-12 14:39:05.365 28914 28930 D VestigeBackgroundExtraction: lens=INFERENTIAL done parsed=true attempts=1 elapsed=12676ms
+05-12 14:39:05.370 28914 28930 D VestigePromptComposer: compose lens=SKEPTICAL chars=8152 tokens~=2038 history=0
+05-12 14:39:16.628 28914 28930 D VestigeLiteRtLm: generateText completed in 11257ms (prompt=8152c, reply=221c)
+05-12 14:39:16.629 28914 28930 D VestigeBackgroundExtraction: lens=SKEPTICAL done parsed=true attempts=1 elapsed=11264ms
+05-12 14:39:16.631 28914 28930 D VestigeBackgroundExtraction: extract completed: lenses=3/3 model_calls=3 elapsed=38761ms
+05-12 14:39:16.634 28914 28928 I VestigeSttD: ENTRY id=D3 elapsed=38761ms lenses_parsed=3/3 model_calls=3
+05-12 14:39:16.635 28914 28928 I VestigeSttD:   LITERAL tags=[4:07am,archive,naming-convention] energy=null commitment=null flags=0 attempts=1 err=-
+05-12 14:39:16.635 28914 28928 I VestigeSttD:   INFERENTIAL tags=[archive,naming-convention] energy=null commitment=null flags=0 attempts=1 err=-
+05-12 14:39:16.636 28914 28928 I VestigeSttD:   SKEPTICAL tags=[4:07am,archive-naming-convention] energy=null commitment=null flags=0 attempts=1 err=-
+05-12 14:39:16.637 28914 28928 I VestigeSttD:   RAW id=D3 lens=LITERAL attempts=1 err=- fields={tags=[4:07am, archive, naming-convention], energy_descriptor=null, state_shift=false, vocabulary_contradictions=[], stated_commitment=null, recurrence_link=null, recurrence_kind=null} flags=[]
+05-12 14:39:16.638 28914 28928 I VestigeSttD:   RAW id=D3 lens=INFERENTIAL attempts=1 err=- fields={tags=[archive, naming-convention], energy_descriptor=null, state_shift=false, vocabulary_contradictions=[], stated_commitment=null, recurrence_link=null, recurrence_kind=null} flags=[]
+05-12 14:39:16.638 28914 28928 I VestigeSttD:   RAW id=D3 lens=SKEPTICAL attempts=1 err=- fields={tags=[4:07am, archive-naming-convention], energy_descriptor=null, state_shift=false, vocabulary_contradictions=[], stated_commitment=null, recurrence_link=null, recurrence_kind=null} flags=[]
+05-12 14:39:16.639 28914 28928 I VestigeSttD:   DIVERGENCE id=D3 disagree_fields=[tags] inferential_only=[] skeptical_flags_kept=[] meaningful=true
+05-12 14:39:16.640 28914 28928 I VestigeSttD: === STT-D summary: 11/15 divergent ===
+05-12 14:39:16.640 28914 28928 I VestigeSttD:   A1: meaningful=true fields=[tags] skeptical_flags=1 inferential_only=[] elapsed=39521ms
+05-12 14:39:16.641 28914 28928 I VestigeSttD:   A2: meaningful=false fields=[] skeptical_flags=0 inferential_only=[] elapsed=32580ms
+05-12 14:39:16.641 28914 28928 I VestigeSttD:   A3: meaningful=true fields=[tags, energy_descriptor] skeptical_flags=0 inferential_only=[energy_descriptor] elapsed=41801ms
+05-12 14:39:16.642 28914 28928 I VestigeSttD:   A4: meaningful=true fields=[] skeptical_flags=1 inferential_only=[] elapsed=41054ms
+05-12 14:39:16.642 28914 28928 I VestigeSttD:   A5: meaningful=false fields=[] skeptical_flags=0 inferential_only=[] elapsed=35981ms
+05-12 14:39:16.643 28914 28928 I VestigeSttD:   A6: meaningful=true fields=[tags, state_shift] skeptical_flags=0 inferential_only=[] elapsed=34121ms
+05-12 14:39:16.643 28914 28928 I VestigeSttD:   B1: meaningful=true fields=[tags] skeptical_flags=0 inferential_only=[] elapsed=38085ms
+05-12 14:39:16.644 28914 28928 I VestigeSttD:   B2: meaningful=true fields=[] skeptical_flags=1 inferential_only=[] elapsed=48956ms
+05-12 14:39:16.644 28914 28928 I VestigeSttD:   B3: meaningful=false fields=[] skeptical_flags=0 inferential_only=[] elapsed=49211ms
+05-12 14:39:16.644 28914 28928 I VestigeSttD:   C1: meaningful=true fields=[tags] skeptical_flags=1 inferential_only=[] elapsed=42719ms
+05-12 14:39:16.644 28914 28928 I VestigeSttD:   C2: meaningful=true fields=[tags] skeptical_flags=0 inferential_only=[] elapsed=42134ms
+05-12 14:39:16.644 28914 28928 I VestigeSttD:   C3: meaningful=false fields=[] skeptical_flags=0 inferential_only=[] elapsed=35764ms
+05-12 14:39:16.644 28914 28928 I VestigeSttD:   D1: meaningful=true fields=[tags] skeptical_flags=0 inferential_only=[] elapsed=35422ms
+05-12 14:39:16.644 28914 28928 I VestigeSttD:   D2: meaningful=true fields=[tags] skeptical_flags=0 inferential_only=[] elapsed=40724ms
+05-12 14:39:16.644 28914 28928 I VestigeSttD:   D3: meaningful=true fields=[tags] skeptical_flags=0 inferential_only=[] elapsed=38761ms
+05-12 14:39:17.542 28914 28928 I TestRunner: finished: threeLensesDivergeOnAtLeastTwoOfSixEntries(dev.anchildress1.vestige.SttDLensDivergenceTest)
+05-12 14:39:17.550 28914 28928 I TestRunner: run finished: 1 tests, 0 failed, 0 ignored

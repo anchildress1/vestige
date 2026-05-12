@@ -1,0 +1,42 @@
+05-12 12:42:10.884  4296  4296 I HoneySpace.DataCache: deleteItem : id=52556, title=Vestige, type=APP, containerType=ITEM_GROUP, containerId=21, x=-1, y=-1, rank=28, spanX=-1, spanY=-1, scale=1.0, component=dev.anchildress1.vestige/.MainActivity, profileId=0, intent=null, restored=0, hidden=UNHIDDEN, appWidgetId=-1, options=0, refPackageName=null (vertical appList) package removed
+05-12 12:42:10.886  4296  7331 I HoneySpace.DataCache: delete item : (vertical appList) package removed - APP / 52556 / 21 / Vestige / dev.anchildress1.vestige/.MainActivity / -1 / 0
+05-12 12:42:14.417  2619  2808 W NativeLibraryHelper: Failed to punch uncompressed elf file :libgemma_embedding_model_jni.so inside apk : /data/app/vmdl698094925.tmp/base.apk at offset: 62685184
+05-12 12:42:14.423  2619  2808 W NativeLibraryHelper: Failed to punch uncompressed elf file :libgecko_embedding_model_jni.so inside apk : /data/app/vmdl698094925.tmp/base.apk at offset: 45711360
+05-12 12:42:15.090  4296  4296 I HoneySpace.DataCache: insertItem : id=52573, title=Vestige, type=APP, containerType=ITEM_GROUP, containerId=21, x=-1, y=-1, rank=28, spanX=-1, spanY=-1, scale=1.0, component=dev.anchildress1.vestige/.MainActivity, profileId=0, intent=null, restored=0, hidden=UNHIDDEN, appWidgetId=-1, options=0, refPackageName=null
+05-12 12:42:15.092  4296 11508 I HoneySpace.IconCache: add icon DB: [dev.anchildress1.vestige/.MainActivity#UserHandle{0}] - IconAndLabel(icon=android.graphics.Bitmap@e67d049, label=Vestige) | false | 640 | false |false | -15050404
+05-12 12:42:16.372 11742 11742 I AndroidJUnitRunner: newApplication dev.anchildress1.vestige.VestigeApplication
+05-12 12:42:16.461 11742 11742 D StrictMode: 	at dev.anchildress1.vestige.storage.VestigeBoxStore.open(VestigeBoxStore.kt:15)
+05-12 12:42:16.461 11742 11742 D StrictMode: 	at dev.anchildress1.vestige.VestigeApplication.onCreate(VestigeApplication.kt:18)
+05-12 12:42:16.462 11742 11742 D StrictMode: 	at dev.anchildress1.vestige.storage.VestigeBoxStore.open(VestigeBoxStore.kt:15)
+05-12 12:42:16.462 11742 11742 D StrictMode: 	at dev.anchildress1.vestige.VestigeApplication.onCreate(VestigeApplication.kt:18)
+05-12 12:42:16.463 11742 11742 D StrictMode: 	at dev.anchildress1.vestige.storage.VestigeBoxStore.open(VestigeBoxStore.kt:15)
+05-12 12:42:16.463 11742 11742 D StrictMode: 	at dev.anchildress1.vestige.VestigeApplication.onCreate(VestigeApplication.kt:18)
+05-12 12:42:16.464 11742 11742 D StrictMode: 	at dev.anchildress1.vestige.storage.VestigeBoxStore.open(VestigeBoxStore.kt:15)
+05-12 12:42:16.464 11742 11742 D StrictMode: 	at dev.anchildress1.vestige.VestigeApplication.onCreate(VestigeApplication.kt:18)
+05-12 12:42:16.465 11742 11742 D StrictMode: 	at dev.anchildress1.vestige.storage.VestigeBoxStore.open(VestigeBoxStore.kt:15)
+05-12 12:42:16.465 11742 11742 D StrictMode: 	at dev.anchildress1.vestige.VestigeApplication.onCreate(VestigeApplication.kt:18)
+05-12 12:42:16.466 11742 11742 D StrictMode: 	at dev.anchildress1.vestige.storage.VestigeBoxStore.open(VestigeBoxStore.kt:15)
+05-12 12:42:16.466 11742 11742 D StrictMode: 	at dev.anchildress1.vestige.VestigeApplication.onCreate(VestigeApplication.kt:18)
+05-12 12:42:16.467 11742 11742 D StrictMode: 	at dev.anchildress1.vestige.storage.VestigeBoxStore.open(VestigeBoxStore.kt:15)
+05-12 12:42:16.467 11742 11742 D StrictMode: 	at dev.anchildress1.vestige.VestigeApplication.onCreate(VestigeApplication.kt:18)
+05-12 12:42:16.468 11742 11742 D StrictMode: 	at dev.anchildress1.vestige.storage.VestigeBoxStore.open(VestigeBoxStore.kt:15)
+05-12 12:42:16.468 11742 11742 D StrictMode: 	at dev.anchildress1.vestige.VestigeApplication.onCreate(VestigeApplication.kt:18)
+05-12 12:42:16.468 11742 11742 D StrictMode: 	at dev.anchildress1.vestige.storage.VestigeBoxStore.open(VestigeBoxStore.kt:15)
+05-12 12:42:16.468 11742 11742 D StrictMode: 	at dev.anchildress1.vestige.VestigeApplication.onCreate(VestigeApplication.kt:18)
+05-12 12:42:16.469 11742 11742 D StrictMode: 	at dev.anchildress1.vestige.storage.VestigeBoxStore.open(VestigeBoxStore.kt:15)
+05-12 12:42:16.469 11742 11742 D StrictMode: 	at dev.anchildress1.vestige.VestigeApplication.onCreate(VestigeApplication.kt:18)
+05-12 12:42:16.502 11742 11767 I TestRunner: run started: 1 tests
+05-12 12:42:16.504 11742 11767 I TestRunner: started: goblinHoursClock_yieldsShorterFollowUpThanDaytimeClock(dev.anchildress1.vestige.GoblinHoursAddendumSmokeTest)
+05-12 12:42:16.566 11742 11769 D VestigeLiteRtLm: Loading /data/local/tmp/gemma-4-E4B-it.litertlm backend=CPU audio=CPU vision=off maxTokens=4096 sampler=topK=1,topP=1.0,temp=0.0,seed=42
+05-12 12:42:33.433 11742 11769 D VestigeLiteRtLm: Engine initialized in 16838ms
+05-12 12:43:17.984 11742 11769 D VestigeLiteRtLm: sendMessageContents completed in 44489ms (parts=2, reply=274c)
+05-12 12:43:17.985 11742 11769 D VestigeForegroundInference: runForegroundCall persona=WITNESS elapsed=44543ms raw=274c
+05-12 12:43:17.990 11742 11767 I VestigeGoblinHoursAddendum: === night follow-up (44543ms) ===
+05-12 12:43:17.990 11742 11767 I VestigeGoblinHoursAddendum: You said completely flattened by eleven in the launch doc. What was on the launch doc you stared at?
+05-12 12:44:00.778 11742 11769 D VestigeLiteRtLm: sendMessageContents completed in 42780ms (parts=2, reply=266c)
+05-12 12:44:00.779 11742 11769 D VestigeForegroundInference: runForegroundCall persona=WITNESS elapsed=42786ms raw=266c
+05-12 12:44:00.779 11742 11767 I VestigeGoblinHoursAddendum: === day follow-up (42786ms) ===
+05-12 12:44:00.779 11742 11767 I VestigeGoblinHoursAddendum: You said completely flattened by 11 in the launch doc. What was on the launch doc you stared at?
+05-12 12:44:00.779 11742 11767 I VestigeGoblinHoursAddendum: === chars: night=100 day=96 delta=-4 ===
+05-12 12:44:01.268 11742 11767 I TestRunner: finished: goblinHoursClock_yieldsShorterFollowUpThanDaytimeClock(dev.anchildress1.vestige.GoblinHoursAddendumSmokeTest)
+05-12 12:44:01.274 11742 11767 I TestRunner: run finished: 1 tests, 0 failed, 0 ignored

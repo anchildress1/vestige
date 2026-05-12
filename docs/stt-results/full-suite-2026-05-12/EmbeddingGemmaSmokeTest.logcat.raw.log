@@ -1,0 +1,42 @@
+05-12 14:39:20.248  4296  4296 I HoneySpace.DataCache: deleteItem : id=52624, title=Vestige, type=APP, containerType=ITEM_GROUP, containerId=21, x=-1, y=-1, rank=28, spanX=-1, spanY=-1, scale=1.0, component=dev.anchildress1.vestige/.MainActivity, profileId=0, intent=null, restored=0, hidden=UNHIDDEN, appWidgetId=-1, options=0, refPackageName=null (vertical appList) package removed
+05-12 14:39:20.257  4296  7331 I HoneySpace.DataCache: delete item : (vertical appList) package removed - APP / 52624 / 21 / Vestige / dev.anchildress1.vestige/.MainActivity / -1 / 0
+05-12 14:39:24.107  2619  2808 W NativeLibraryHelper: Failed to punch uncompressed elf file :libgemma_embedding_model_jni.so inside apk : /data/app/vmdl288157831.tmp/base.apk at offset: 62685184
+05-12 14:39:24.120  2619  2808 W NativeLibraryHelper: Failed to punch uncompressed elf file :libgecko_embedding_model_jni.so inside apk : /data/app/vmdl288157831.tmp/base.apk at offset: 45711360
+05-12 14:39:24.380  4296 30258 I HoneySpace.IconCache: add icon DB: [dev.anchildress1.vestige/.MainActivity#UserHandle{0}] - IconAndLabel(icon=android.graphics.Bitmap@966756a, label=Vestige) | false | 640 | false |false | -15050404
+05-12 14:39:24.384  4296  4296 I HoneySpace.DataCache: insertItem : id=52641, title=Vestige, type=APP, containerType=ITEM_GROUP, containerId=21, x=-1, y=-1, rank=28, spanX=-1, spanY=-1, scale=1.0, component=dev.anchildress1.vestige/.MainActivity, profileId=0, intent=null, restored=0, hidden=UNHIDDEN, appWidgetId=-1, options=0, refPackageName=null
+05-12 14:39:26.313 30453 30453 I AndroidJUnitRunner: newApplication dev.anchildress1.vestige.VestigeApplication
+05-12 14:39:26.367 30453 30453 D StrictMode: 	at dev.anchildress1.vestige.storage.VestigeBoxStore.open(VestigeBoxStore.kt:15)
+05-12 14:39:26.367 30453 30453 D StrictMode: 	at dev.anchildress1.vestige.VestigeApplication.onCreate(VestigeApplication.kt:18)
+05-12 14:39:26.368 30453 30453 D StrictMode: 	at dev.anchildress1.vestige.storage.VestigeBoxStore.open(VestigeBoxStore.kt:15)
+05-12 14:39:26.368 30453 30453 D StrictMode: 	at dev.anchildress1.vestige.VestigeApplication.onCreate(VestigeApplication.kt:18)
+05-12 14:39:26.368 30453 30453 D StrictMode: 	at dev.anchildress1.vestige.storage.VestigeBoxStore.open(VestigeBoxStore.kt:15)
+05-12 14:39:26.368 30453 30453 D StrictMode: 	at dev.anchildress1.vestige.VestigeApplication.onCreate(VestigeApplication.kt:18)
+05-12 14:39:26.369 30453 30453 D StrictMode: 	at dev.anchildress1.vestige.storage.VestigeBoxStore.open(VestigeBoxStore.kt:15)
+05-12 14:39:26.369 30453 30453 D StrictMode: 	at dev.anchildress1.vestige.VestigeApplication.onCreate(VestigeApplication.kt:18)
+05-12 14:39:26.369 30453 30453 D StrictMode: 	at dev.anchildress1.vestige.storage.VestigeBoxStore.open(VestigeBoxStore.kt:15)
+05-12 14:39:26.369 30453 30453 D StrictMode: 	at dev.anchildress1.vestige.VestigeApplication.onCreate(VestigeApplication.kt:18)
+05-12 14:39:26.370 30453 30453 D StrictMode: 	at dev.anchildress1.vestige.storage.VestigeBoxStore.open(VestigeBoxStore.kt:15)
+05-12 14:39:26.370 30453 30453 D StrictMode: 	at dev.anchildress1.vestige.VestigeApplication.onCreate(VestigeApplication.kt:18)
+05-12 14:39:26.370 30453 30453 D StrictMode: 	at dev.anchildress1.vestige.storage.VestigeBoxStore.open(VestigeBoxStore.kt:15)
+05-12 14:39:26.370 30453 30453 D StrictMode: 	at dev.anchildress1.vestige.VestigeApplication.onCreate(VestigeApplication.kt:18)
+05-12 14:39:26.371 30453 30453 D StrictMode: 	at dev.anchildress1.vestige.storage.VestigeBoxStore.open(VestigeBoxStore.kt:15)
+05-12 14:39:26.371 30453 30453 D StrictMode: 	at dev.anchildress1.vestige.VestigeApplication.onCreate(VestigeApplication.kt:18)
+05-12 14:39:26.372 30453 30453 D StrictMode: 	at dev.anchildress1.vestige.storage.VestigeBoxStore.open(VestigeBoxStore.kt:15)
+05-12 14:39:26.372 30453 30453 D StrictMode: 	at dev.anchildress1.vestige.VestigeApplication.onCreate(VestigeApplication.kt:18)
+05-12 14:39:26.372 30453 30453 D StrictMode: 	at dev.anchildress1.vestige.storage.VestigeBoxStore.open(VestigeBoxStore.kt:15)
+05-12 14:39:26.372 30453 30453 D StrictMode: 	at dev.anchildress1.vestige.VestigeApplication.onCreate(VestigeApplication.kt:18)
+05-12 14:39:26.392 30453 30467 I TestRunner: run started: 1 tests
+05-12 14:39:26.393 30453 30467 I TestRunner: started: semanticallyRelatedEntries_haveCosineSimilarityAboveSixTenths(dev.anchildress1.vestige.EmbeddingGemmaSmokeTest)
+05-12 14:39:26.405 30453 30467 D nativeloader: Load /data/app/~~77oe-PPjgSzOMcb3kz0g7w==/dev.anchildress1.vestige-cqFV0s7mDQEiJi8TV6tyVg==/base.apk!/lib/arm64-v8a/libgemma_embedding_model_jni.so using class loader ns clns-9 (caller=/data/app/~~77oe-PPjgSzOMcb3kz0g7w==/dev.anchildress1.vestige-cqFV0s7mDQEiJi8TV6tyVg==/base.apk!classes11.dex): ok
+05-12 14:39:26.409 30453 30472 I TfliteEmbeddingModelJni: Initializing embedder.
+05-12 14:39:26.857 30453 30472 I TfliteEmbeddingModelJni: Finished initializing embedder.
+05-12 14:39:26.866 30453 30472 I TfliteEmbeddingModelJni: Getting embeddings.
+05-12 14:39:26.866 30453 30472 I TfliteEmbeddingModelJni: Decoding request proto.
+05-12 14:39:27.786 30453 30472 I TfliteEmbeddingModelJni: Finished getting embeddings.
+05-12 14:39:27.789 30453 30472 I TfliteEmbeddingModelJni: Getting embeddings.
+05-12 14:39:27.789 30453 30472 I TfliteEmbeddingModelJni: Decoding request proto.
+05-12 14:39:28.711 30453 30472 I TfliteEmbeddingModelJni: Finished getting embeddings.
+05-12 14:39:28.713 30453 30467 I TestRunner: finished: semanticallyRelatedEntries_haveCosineSimilarityAboveSixTenths(dev.anchildress1.vestige.EmbeddingGemmaSmokeTest)
+05-12 14:39:28.715 30453 30467 I TestRunner: run finished: 1 tests, 0 failed, 0 ignored
+05-12 14:39:29.554  4296  4296 I HoneySpace.DataCache: deleteItem : id=52641, title=Vestige, type=APP, containerType=ITEM_GROUP, containerId=21, x=-1, y=-1, rank=28, spanX=-1, spanY=-1, scale=1.0, component=dev.anchildress1.vestige/.MainActivity, profileId=0, intent=null, restored=0, hidden=UNHIDDEN, appWidgetId=-1, options=0, refPackageName=null (vertical appList) package removed
+05-12 14:39:29.554  4296  7331 I HoneySpace.DataCache: delete item : (vertical appList) package removed - APP / 52641 / 21 / Vestige / dev.anchildress1.vestige/.MainActivity / -1 / 0

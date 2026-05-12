@@ -439,7 +439,7 @@ rubric, not narrative justification appended after a missed integer gate.
 Evidence:
 - `docs/stt-results/stt-d-2026-05-12-gpu-skep-rerun1.md` + raw logcat
 - `docs/stt-results/stt-d-2026-05-12-gpu-skep-rerun2.md` + raw logcat
-- `docs/stt-results/full-suite-2026-05-12/SttDLensDivergenceTest.{gradle,logcat}.log` (the 3rd run, captured as part of the full instrumented suite-run)
+- `docs/stt-results/full-suite-2026-05-12/SttDLensDivergenceTest.{gradle,logcat}.raw.log` (the 3rd run, captured as part of the full instrumented suite-run)
 - `docs/stories/phase-2-core-loop.md` §Story 2.7 — acceptance criteria updated to the new rubric
 
 STT-D as a stop-and-test gate is closed under the revised rubric — reproducibly, not

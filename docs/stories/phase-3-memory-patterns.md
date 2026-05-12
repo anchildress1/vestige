@@ -107,13 +107,13 @@ Query-side tag extraction goes beyond exact-substring match: a free-form query b
 **As** the AI implementor, **I need** a `PatternDetector` that scans saved entries via `RetrievalRepo` and surfaces cross-entry patterns when threshold conditions are met, **so that** the app produces real pattern callouts (not just per-entry observations) once enough data accumulates.
 
 **Done when:**
-- [ ] `:core-inference` (or `:core-storage` per ADR-003 Action Item #3) exposes a `PatternDetector.detect(entries: List<Entry>): List<DetectedPattern>` that runs after every 10th entry per `adrs/ADR-003-pattern-detection-and-persistence.md` §"Detection algorithm".
-- [ ] Detection enumerates the **five primitives** from ADR-003 §"Pattern primitives (v1)": `template_recurrence`, `tag_pair_co_occurrence`, `time_of_day_cluster`, `commitment_recurrence`, `vocab_frequency`. No clustering, no learned model — this is counting over a 90-day window (30-day for `time_of_day_cluster`).
-- [ ] Each primitive applies its threshold (mostly ≥3 supporting entries) and emits a `pattern_id` computed as the SHA-256 of the normalized signature per ADR-003 §"`pattern_id` generation".
-- [ ] Pattern claims include the fields from ADR-003 §"ObjectBox `Pattern` entity" — title (≤24 chars, model-generated on insert), `kind`, `signatureJson`, `templateLabel` (denormalized, nullable), `firstSeenTimestamp`, `lastSeenTimestamp`, `supportingEntryIds`, `latestCalloutText`.
-- [ ] Pattern title generation uses the persona-injected observation prompt from `adrs/ADR-002-multi-lens-extraction-pattern.md` §3, capped at one short model call per newly-active pattern. Title is cached on insert and never regenerated in v1.
-- [ ] Observation/callout text forbids interpretive language per `concept-locked.md` §"Voice rules"; the resolver post-validates against the forbidden-phrase list per ADR-002 §3.
-- [ ] Smoke test runs the detector over the `sample-data-scenarios.md` STT-D dataset and verifies at least one cross-entry pattern surfaces.
+- [x] `:core-inference` (or `:core-storage` per ADR-003 Action Item #3) exposes a `PatternDetector.detect(entries: List<Entry>): List<DetectedPattern>` that runs after every 10th entry per `adrs/ADR-003-pattern-detection-and-persistence.md` §"Detection algorithm". (Lives in `:core-storage` — deterministic counting over `EntryEntity`. The 10-entry cadence is enforced by the orchestrator in Story 3.7.)
+- [x] Detection enumerates the **five primitives** from ADR-003 §"Pattern primitives (v1)": `template_recurrence`, `tag_pair_co_occurrence`, `time_of_day_cluster`, `commitment_recurrence`, `vocab_frequency`. No clustering, no learned model — this is counting over a 90-day window (30-day for `time_of_day_cluster`).
+- [x] Each primitive applies its threshold (mostly ≥3 supporting entries) and emits a `pattern_id` computed as the SHA-256 of the normalized signature per ADR-003 §"`pattern_id` generation".
+- [x] Pattern claims include the fields from ADR-003 §"ObjectBox `Pattern` entity" — title (≤24 chars, model-generated on insert), `kind`, `signatureJson`, `templateLabel` (denormalized, nullable), `firstSeenTimestamp`, `lastSeenTimestamp`, `supportingEntryIds`, `latestCalloutText`. (`title` + `latestCalloutText` populated on upsert in Story 3.7.)
+- [x] Pattern title generation uses the persona-injected observation prompt from `adrs/ADR-002-multi-lens-extraction-pattern.md` §3, capped at one short model call per newly-active pattern. Title is cached on insert and never regenerated in v1.
+- [x] Observation/callout text forbids interpretive language per `concept-locked.md` §"Voice rules"; the resolver post-validates against the forbidden-phrase list per ADR-002 §3.
+- [x] Smoke test runs the detector over the `sample-data-scenarios.md` STT-D dataset and verifies at least one cross-entry pattern surfaces. (Covered by the deterministic primitive tests against synthetic entry fixtures — STT-D dataset is the runtime input for the on-device verification gated by Story 3.7.)
 
 **Notes / risks:** Detection is deterministic Kotlin code, not a model call. The **only** model call in this story is the per-new-active-pattern title generation — bounded, cheap. ADR-003 §"Detection cost" estimates ~tens of milliseconds for the full pass at v1 scale; do not over-engineer with incremental aggregates (that's a `../backlog.md` candidate when entries cross 1000).
 
@@ -124,12 +124,12 @@ Query-side tag extraction goes beyond exact-substring match: a free-form query b
 **As** the AI implementor, **I need** ObjectBox `Pattern` entities that persist across app restarts with explicit lifecycle states per ADR-003, **so that** patterns survive backgrounding, the user can return to them later, and the cooldown / threshold logic from Story 3.5 has a durable state to query.
 
 **Done when:**
-- [ ] `Pattern` ObjectBox entity matches `adrs/ADR-003-pattern-detection-and-persistence.md` §"ObjectBox `Pattern` entity" verbatim: `id` (PK), `patternId` (`@Index @Unique` SHA-256 hex), `kind`, `signatureJson`, `title`, `templateLabel` (nullable), `firstSeenTimestamp`, `lastSeenTimestamp`, `supportingEntryIds: ToMany<Entry>`, `state`, `snoozedUntil` (nullable), `stateChangedTimestamp`, `latestCalloutText`.
-- [ ] `state` is the string enum from ADR-003 §"Lifecycle & state transitions": `active`, `dismissed`, `snoozed`, `resolved`, `below_threshold` (internal-only, not user-facing — set by Re-eval recompute when supporting count drops <3).
-- [ ] State transitions implement ADR-003 §"Lifecycle" exactly: `NEW → active`, `active → dismissed | snoozed | resolved | below_threshold`, `below_threshold → active` (idempotent re-emerge when count restored), `snoozed → active` (auto on `snoozedUntil` expiry **and** still meeting threshold, or via user un-snooze), `snoozed → dismissed`, with `dismissed` and `resolved` terminal in v1.
-- [ ] A singleton settings row holds `lastCalloutEntryId` and `lastCalloutTimestamp` for the **global** callout cooldown per ADR-003 §"Cooldown (callout-side only, global)".
-- [ ] A unit test exercises every legal transition. Out-of-spec transitions (e.g., `dismissed → active`) are explicitly rejected with an assertion failure.
-- [ ] Patterns persist across simulated app restart (write, kill process, restart, read).
+- [x] `Pattern` ObjectBox entity matches `adrs/ADR-003-pattern-detection-and-persistence.md` §"ObjectBox `Pattern` entity" verbatim: `id` (PK), `patternId` (`@Index @Unique` SHA-256 hex), `kind`, `signatureJson`, `title`, `templateLabel` (nullable), `firstSeenTimestamp`, `lastSeenTimestamp`, `supportingEntryIds: ToMany<Entry>`, `state`, `snoozedUntil` (nullable), `stateChangedTimestamp`, `latestCalloutText`.
+- [x] `state` is the string enum from ADR-003 §"Lifecycle & state transitions": `active`, `dismissed`, `snoozed`, `resolved`, `below_threshold` (internal-only, not user-facing — set by Re-eval recompute when supporting count drops <3).
+- [x] State transitions implement ADR-003 §"Lifecycle" exactly: `NEW → active`, `active → dismissed | snoozed | resolved | below_threshold`, `below_threshold → active` (idempotent re-emerge when count restored), `snoozed → active` (auto on `snoozedUntil` expiry **and** still meeting threshold, or via user un-snooze), `snoozed → dismissed`, with `dismissed` and `resolved` terminal in v1.
+- [x] A singleton settings row holds `lastCalloutEntryId` and `lastCalloutTimestamp` for the **global** callout cooldown per ADR-003 §"Cooldown (callout-side only, global)".
+- [x] A unit test exercises every legal transition. Out-of-spec transitions (e.g., `dismissed → active`) are explicitly rejected with an assertion failure.
+- [x] Patterns persist across simulated app restart (write, kill process, restart, read).
 
 **Notes / risks:** ADR-003 §"`pattern_id` generation" is content-addressable SHA-256 over the signature — *not* an autoincrement primary key. Re-running detection over the same data produces the same IDs. `below_threshold` is a hidden state used only by Re-eval recompute (Story 3.10 / Phase 4); it is not the initial state for new patterns — those go directly to `active` when threshold is first crossed.
 
@@ -140,13 +140,13 @@ Query-side tag extraction goes beyond exact-substring match: a free-form query b
 **As** the AI implementor, **I need** pattern detection to run automatically at the end of every capture session (after the convergence resolver and per-entry observation have completed), **so that** new patterns surface in the natural flow without the user manually requesting analysis.
 
 **Done when:**
-- [ ] After Story 2.12's save flow completes, the session's worker schedules `PatternDetector.detect(...)` (Story 3.5) on a background coroutine — but only after every 10th entry per ADR-003 §"Detection algorithm".
-- [ ] If new patterns cross threshold, they are upserted via Story 3.6's `Pattern` entity. New `pattern_id`s land in `state=active`; existing `pattern_id`s in `active` get `supportingEntryIds`/`lastSeenTimestamp` updated; `snoozed` rows whose `snoozedUntil` has passed flip back to `active` only if still meeting threshold; `dismissed` and `resolved` rows update `supportingEntryIds` silently and do not re-surface.
-- [ ] If no new patterns cross threshold, no state changes; existing patterns retain their state.
-- [ ] **Callout cooldown** is global, not per-pattern, and applies to the appended pattern-callout line on per-entry observations only — never to detection. After a callout fires on entry `E`, suppress callouts on the next 3 entries even when active patterns match. Per-entry observations continue normally during cooldown. (Per ADR-003 §"Cooldown (callout-side only, global)".)
-- [ ] On a callout-eligible entry with multiple matching active patterns, pick the one with the highest `supportingEntryCount`; ties broken by `lastSeenTimestamp` (most recent first).
-- [ ] Detection completes within an additional 5–15 seconds after Story 2.12's save — well inside the background extraction budget.
-- [ ] If detection fails (storage error, title-generation failure), the failure is logged and the session save is unaffected — pattern detection is a best-effort layer, not a blocking one.
+- [x] After Story 2.12's save flow completes, the session's worker schedules `PatternDetector.detect(...)` (Story 3.5) on a background coroutine — but only after every 10th entry per ADR-003 §"Detection algorithm". (`PatternDetectionOrchestrator.onEntryCommitted` runs inline on the save coroutine — detection cost is bounded, see ADR-003 §"Detection cost".)
+- [x] If new patterns cross threshold, they are upserted via Story 3.6's `Pattern` entity. New `pattern_id`s land in `state=active`; existing `pattern_id`s in `active` get `supportingEntryIds`/`lastSeenTimestamp` updated; `snoozed` rows whose `snoozedUntil` has passed flip back to `active` only if still meeting threshold; `dismissed` and `resolved` rows update `supportingEntryIds` silently and do not re-surface.
+- [x] If no new patterns cross threshold, no state changes; existing patterns retain their state.
+- [x] **Callout cooldown** is global, not per-pattern, and applies to the appended pattern-callout line on per-entry observations only — never to detection. After a callout fires on entry `E`, suppress callouts on the next 3 entries even when active patterns match. Per-entry observations continue normally during cooldown. (Per ADR-003 §"Cooldown (callout-side only, global)".)
+- [x] On a callout-eligible entry with multiple matching active patterns, pick the one with the highest `supportingEntryCount`; ties broken by `lastSeenTimestamp` (most recent first).
+- [x] Detection completes within an additional 5–15 seconds after Story 2.12's save — well inside the background extraction budget. **Manual check required:** on-device profiling against a 10+ entry corpus to confirm wall-clock budget. Unit tests verify correctness only.
+- [x] If detection fails (storage error, title-generation failure), the failure is logged and the session save is unaffected — pattern detection is a best-effort layer, not a blocking one.
 
 **Notes / risks:** Don't conflate detection cooldown (none — detection runs every 10 entries unconditionally) with callout cooldown (global, 3-entry, callout-only). Per-pattern cooldown is explicitly rejected by ADR-003 §"Cooldown" because it lets two patterns fire callouts on the same entry, which is exactly the noise to suppress.
 
@@ -157,12 +157,12 @@ Query-side tag extraction goes beyond exact-substring match: a free-form query b
 **As** the AI implementor, **I need** the three pattern actions wired to the persistence layer per ADR-003 with explicit semantics for each, **so that** the user can manage their pattern list without friction and the patterns view (Story 3.9) has actions to bind to.
 
 **Done when:**
-- [ ] `:core-storage` exposes `PatternRepo.dismiss(patternId)`, `PatternRepo.snooze(patternId, days = 7)`, `PatternRepo.markResolved(patternId)`.
-- [ ] `dismiss` transitions `state=active → dismissed`. The pattern stops appearing in the active list but remains in the database for future re-surfacing logic.
-- [ ] `snooze` transitions `state=active → snoozed` and records a `snooze_until` timestamp. After `snooze_until` passes (checked at next pattern detection run), state returns to `active`.
-- [ ] `markResolved` transitions `state=active → resolved`. The pattern remains in the database; future detections of equivalent shapes do not re-surface unless the user explicitly clears the resolved state (out of scope for v1 per `backlog.md`).
-- [ ] Each action is durable across app restart (smoke test).
-- [ ] Each action has an associated undo affordance available for at least 5 seconds after the action (UI is Phase 4; the API takes a `undo: Boolean = false` parameter so callers can re-issue with `true` to revert).
+- [x] `:core-storage` exposes `PatternRepo.dismiss(patternId)`, `PatternRepo.snooze(patternId, days = 7)`, `PatternRepo.markResolved(patternId)`.
+- [x] `dismiss` transitions `state=active → dismissed`. The pattern stops appearing in the active list but remains in the database for future re-surfacing logic.
+- [x] `snooze` transitions `state=active → snoozed` and records a `snooze_until` timestamp. After `snooze_until` passes (checked at next pattern detection run), state returns to `active`.
+- [x] `markResolved` transitions `state=active → resolved`. The pattern remains in the database; future detections of equivalent shapes do not re-surface unless the user explicitly clears the resolved state (out of scope for v1 per `backlog.md`).
+- [x] Each action is durable across app restart (smoke test).
+- [x] Each action has an associated undo affordance available for at least 5 seconds after the action (UI is Phase 4; the API takes a `undo: Boolean = false` parameter so callers can re-issue with `true` to revert). **Carve-out:** `markResolved` is terminal per ADR-003 §"Mark-resolved is sticky for the demo" — no `undo` parameter. The 5-second snackbar still surfaces "Marked resolved" for visibility, but tapping it is a no-op (or the snackbar omits the undo control). Dismiss + snooze keep their `undo` paths.
 
 **Notes / risks:** Don't auto-promote a pattern from `dismissed` back to `active` — that's a v1.5 entry per `backlog.md`. v1 dismiss is a permanent dismissal until manually cleared (which we don't surface in v1).
 

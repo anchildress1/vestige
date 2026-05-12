@@ -64,7 +64,9 @@
         {
           "id": "11:6655032420221738462",
           "name": "extractionStatus",
-          "type": 9
+          "indexId": "5:3161855565347674017",
+          "type": 9,
+          "flags": 2048
         },
         {
           "id": "12:1976415790413423979",
@@ -87,7 +89,7 @@
     },
     {
       "id": "2:4677060229249736497",
-      "lastPropertyId": "6:6002941357885825737",
+      "lastPropertyId": "17:1617683440192912261",
       "name": "PatternEntity",
       "properties": [
         {
@@ -97,34 +99,72 @@
           "flags": 1
         },
         {
-          "id": "2:8698818706334475088",
-          "name": "stableId",
-          "indexId": "2:3992624674876859483",
+          "id": "7:4446387716166412296",
+          "name": "patternId",
+          "indexId": "4:3337471139653774296",
+          "type": 9,
+          "flags": 2080
+        },
+        {
+          "id": "8:2378408132485340278",
+          "name": "kind",
+          "type": 9
+        },
+        {
+          "id": "9:1857464943521769543",
+          "name": "signatureJson",
+          "type": 9
+        },
+        {
+          "id": "10:5077329867608375636",
+          "name": "title",
+          "type": 9
+        },
+        {
+          "id": "11:5517327638220817543",
+          "name": "templateLabel",
+          "type": 9
+        },
+        {
+          "id": "12:6444409374784790136",
+          "name": "firstSeenTimestamp",
+          "type": 6
+        },
+        {
+          "id": "13:3270466185634619742",
+          "name": "lastSeenTimestamp",
+          "type": 6
+        },
+        {
+          "id": "14:4274136760904957817",
+          "name": "state",
+          "indexId": "6:431702098580436197",
           "type": 9,
           "flags": 2048
         },
         {
-          "id": "3:4604130542972569887",
-          "name": "type",
-          "type": 9
-        },
-        {
-          "id": "4:7626472666879732483",
-          "name": "entryCount",
-          "type": 5
-        },
-        {
-          "id": "5:1012377897072890243",
-          "name": "lifecycleState",
-          "type": 9
-        },
-        {
-          "id": "6:6002941357885825737",
-          "name": "lastObservedEpochMs",
+          "id": "15:7141759783758970388",
+          "name": "snoozedUntil",
           "type": 6
+        },
+        {
+          "id": "16:4900558429302153217",
+          "name": "stateChangedTimestamp",
+          "type": 6
+        },
+        {
+          "id": "17:1617683440192912261",
+          "name": "latestCalloutText",
+          "type": 9
         }
       ],
-      "relations": []
+      "relations": [
+        {
+          "id": "2:6675457034848876041",
+          "name": "supportingEntries",
+          "targetId": "1:8495295597095795304"
+        }
+      ]
     },
     {
       "id": "3:430272669255310156",
@@ -151,17 +191,59 @@
         }
       ],
       "relations": []
+    },
+    {
+      "id": "4:1734609473925323709",
+      "lastPropertyId": "5:4610561580918816659",
+      "name": "CalloutCooldownEntity",
+      "properties": [
+        {
+          "id": "1:370438929270561526",
+          "name": "id",
+          "type": 6,
+          "flags": 1
+        },
+        {
+          "id": "2:6106969147513227934",
+          "name": "lastCalloutEntryId",
+          "type": 6
+        },
+        {
+          "id": "3:932605360092615595",
+          "name": "lastCalloutTimestamp",
+          "type": 6
+        },
+        {
+          "id": "4:7215131885737073624",
+          "name": "remainingSuppression",
+          "type": 5
+        },
+        {
+          "id": "5:4610561580918816659",
+          "name": "pendingCalloutEntryId",
+          "type": 6
+        }
+      ],
+      "relations": []
     }
   ],
-  "lastEntityId": "3:430272669255310156",
-  "lastIndexId": "3:8599132434491255052",
-  "lastRelationId": "1:1893507337631124940",
+  "lastEntityId": "4:1734609473925323709",
+  "lastIndexId": "6:431702098580436197",
+  "lastRelationId": "2:6675457034848876041",
   "lastSequenceId": "0:0",
   "modelVersion": 5,
   "modelVersionParserMinimum": 5,
   "retiredEntityUids": [],
-  "retiredIndexUids": [],
-  "retiredPropertyUids": [],
+  "retiredIndexUids": [
+    3992624674876859483
+  ],
+  "retiredPropertyUids": [
+    8698818706334475088,
+    4604130542972569887,
+    7626472666879732483,
+    1012377897072890243,
+    6002941357885825737
+  ],
   "retiredRelationUids": [],
   "version": 1
 }

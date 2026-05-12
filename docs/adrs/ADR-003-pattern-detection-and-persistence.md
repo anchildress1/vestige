@@ -314,3 +314,63 @@ The other significant trade-off is **mark-resolved sticky vs. auto-reopen**. Sti
 8. [ ] Phase 3 — unit-test fixture suite mirroring ADR-002 Q4: synthetic entry sets covering each primitive's threshold edge, the cooldown reset, dismiss/snooze/resolved transitions, and the snoozed-until expiry path.
 9. [ ] Phase 4 — Patterns list / Pattern Detail UI per `design-guidelines.md` and `ux-copy.md`; un-snooze affordance lands here.
 10. [ ] Update `architecture-brief.md` §"AppContainer Ownership" — `PatternStore` ownership note now references this ADR for state-machine behavior.
+
+---
+
+### Addendum (2026-05-11) — "distinct contexts" operational definition
+
+Story 3.5's implementation initially read "≥2 distinct contexts" as ≥2 distinct
+`template_label` values across the supporting set. That narrowed legitimate corpus shapes
+out of the pattern engine — entries with `templateLabel = null` (the common case before
+extraction has stabilized) were rejected wholesale, and a stretch of four `aftermath`-only
+entries with the same vocab token collapsed to a context-count of 1.
+
+The original ADR text "the diversity requirement so a single long sentence using 'tired'
+four times does not become a pattern" describes the within-entry case. `vocabTokensFor`
+returns a `Set` per entry, so each entry contributes once per token by construction — the
+≥4 distinct-entry threshold already enforces the diversity guard.
+
+**Operational definition (v1):** "≥N entries with ≥2 distinct contexts" reduces to ≥N
+distinct entries containing the stemmed token. No additional template-label diversity
+requirement. The `VOCAB_MIN_CONTEXTS` constant is removed; `VOCAB_THRESHOLD = 4` is the only
+gate.
+
+### Addendum (2026-05-11) — `latestCalloutText` is frozen on silent-update branches
+
+Step 6's UPDATE branches:
+- `active` → refreshes `supportingEntryIds`, `lastSeenTimestamp`, **and** `latestCalloutText`.
+- `snoozed` / `dismissed` / `resolved` → refreshes `supportingEntryIds` and `lastSeenTimestamp`
+  silently. `latestCalloutText` is **not** rewritten.
+
+This preserves the user-facing string from the moment the row left ACTIVE. A v1.5
+un-dismiss or un-snooze surface will show what the user last saw, not arbitrary later
+evidence.
+
+### Addendum (2026-05-11) — kebab-case normalization in signature hash
+
+The "lowercase, kebab-case, sorted" wording under §"`pattern_id` generation" is normative.
+Implementation routes all label / tag / topic inputs through a single `TagNormalize.kebab`
+helper that lowercases, replaces whitespace + underscores with hyphens, collapses repeats,
+and trims edge hyphens. The same helper is called in the signature builder, the detector's
+grouping keys, and the matcher's compare path so the hash inputs cannot drift between
+subsystems.
+
+### Addendum (2026-05-11) — callout cooldown is counted per committed entry, globally
+
+§"Cooldown (callout-side only, global)" reads "After a callout fires on entry E, suppress
+callouts on the next 3 entries even when active patterns match." Operational reading: the
+window is wall-clock-by-entry — every entry committed during the window decrements the
+counter, regardless of whether that entry would have matched a pattern.
+
+Implementation: `PatternDetectionOrchestrator.onEntryCommitted` consumes one slot at the
+top of every call when the cooldown is active, then short-circuits. Only when the cooldown
+is permitted does callout selection run. A blank `latestCalloutText` on a matched pattern
+logs a warning and returns null without firing — it does not start a fresh window.
+
+Trade-off rationale: a streak of unrelated entries between two matches can expire the
+window invisibly, which means two semantically-adjacent callouts can land back-to-back if
+the user logged unrelated entries between them. To the user that reads as appropriate
+spacing (other entries did go by); to the engine it's the simpler invariant — one rule,
+no carve-out, deterministic wall-clock pacing. The "anti-pushy brand" rule is satisfied
+either way because the perceived nag-rate is what the user types between, not what the
+counter says internally.

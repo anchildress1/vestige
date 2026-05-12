@@ -9,15 +9,22 @@ import dev.anchildress1.vestige.inference.ExtractionStatusListener
 import dev.anchildress1.vestige.inference.HistoryChunk
 import dev.anchildress1.vestige.inference.LiteRtLmEngine
 import dev.anchildress1.vestige.inference.ObservationGenerator
+import dev.anchildress1.vestige.inference.PatternTitleGenerator
 import dev.anchildress1.vestige.lifecycle.BackgroundExtractionLifecycleStateMachine
 import dev.anchildress1.vestige.lifecycle.BackgroundExtractionService
 import dev.anchildress1.vestige.lifecycle.BackgroundExtractionStatusBus
 import dev.anchildress1.vestige.model.ExtractionStatus
 import dev.anchildress1.vestige.model.ModelManifest
+import dev.anchildress1.vestige.model.Persona
+import dev.anchildress1.vestige.patterns.PatternDetectionOrchestrator
 import dev.anchildress1.vestige.save.BackgroundExtractionSaveFlow
 import dev.anchildress1.vestige.save.SaveOutcome
+import dev.anchildress1.vestige.storage.CalloutCooldownStore
 import dev.anchildress1.vestige.storage.EntryStore
 import dev.anchildress1.vestige.storage.MarkdownEntryStore
+import dev.anchildress1.vestige.storage.PatternDetector
+import dev.anchildress1.vestige.storage.PatternRepo
+import dev.anchildress1.vestige.storage.PatternStore
 import dev.anchildress1.vestige.storage.VestigeBoxStore
 import io.objectbox.BoxStore
 import kotlinx.coroutines.CoroutineExceptionHandler
@@ -47,13 +54,15 @@ class AppContainer(
         BackgroundExtractionWorker,
         ObservationGenerator,
         (Long) -> ExtractionStatusListener,
+        PatternDetectionOrchestrator?,
     ) -> BackgroundExtractionSaveFlow =
-        { entryStore, worker, observationGenerator, listenerFactory ->
+        { entryStore, worker, observationGenerator, listenerFactory, orchestrator ->
             BackgroundExtractionSaveFlow(
                 entryStore = entryStore,
                 worker = worker,
                 observationGenerator = observationGenerator,
                 listenerFactory = listenerFactory,
+                patternOrchestrator = orchestrator,
             )
         },
     // Cold-start sweep — `null` means the live `VestigeBoxStore.findNonTerminalEntryIds(boxStore)`
@@ -99,12 +108,32 @@ class AppContainer(
         ObservationGenerator(engine = backgroundEngine)
     }
 
+    val patternStore: PatternStore by lazy { PatternStore(boxStore) }
+    val patternRepo: PatternRepo by lazy { PatternRepo(patternStore) }
+    val calloutCooldownStore: CalloutCooldownStore by lazy { CalloutCooldownStore(boxStore) }
+
+    private val patternDetector: PatternDetector by lazy { PatternDetector(boxStore) }
+    private val patternTitleGenerator: PatternTitleGenerator by lazy {
+        PatternTitleGenerator(engine = backgroundEngine)
+    }
+
+    val patternDetectionOrchestrator: PatternDetectionOrchestrator by lazy {
+        PatternDetectionOrchestrator(
+            boxStore = boxStore,
+            detector = patternDetector,
+            patternStore = patternStore,
+            titleGenerator = patternTitleGenerator,
+            cooldownStore = calloutCooldownStore,
+        )
+    }
+
     val backgroundExtractionSaveFlow: BackgroundExtractionSaveFlow by lazy {
         backgroundExtractionSaveFlowFactory(
             entryStore,
             backgroundExtractionWorker,
             observationGenerator,
             ::extractionStatusListener,
+            patternDetectionOrchestrator,
         )
     }
 
@@ -118,6 +147,10 @@ class AppContainer(
 
     init {
         seedRecoveredExtractions()
+        // A pending callout reservation is in-flight by definition. Process death between
+        // `tryReserveCallout` and `settleReservedCallout` would otherwise survive into the next
+        // launch and wedge every future save with `BLOCKED_BY_PENDING_RESERVATION`.
+        calloutCooldownStore.clearStalePendingReservation()
     }
 
     fun reportExtractionStatus(entryId: Long, status: ExtractionStatus) {
@@ -134,6 +167,7 @@ class AppContainer(
         capturedAt: ZonedDateTime,
         retrievedHistory: List<HistoryChunk> = emptyList(),
         timeoutMs: Long? = null,
+        persona: Persona = Persona.WITNESS,
     ): SaveOutcome {
         ensureBackgroundEngineInitialized()
         return backgroundExtractionSaveFlow.saveAndExtract(
@@ -141,6 +175,7 @@ class AppContainer(
             capturedAt = capturedAt,
             retrievedHistory = retrievedHistory,
             timeoutMs = timeoutMs,
+            persona = persona,
         )
     }
 

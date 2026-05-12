@@ -9,6 +9,8 @@ import dev.anchildress1.vestige.inference.HistoryChunk
 import dev.anchildress1.vestige.inference.ObservationGenerator
 import dev.anchildress1.vestige.model.EntryObservation
 import dev.anchildress1.vestige.model.ExtractionStatus
+import dev.anchildress1.vestige.model.Persona
+import dev.anchildress1.vestige.patterns.PatternDetectionOrchestrator
 import dev.anchildress1.vestige.storage.EntryStore
 import kotlinx.coroutines.CancellationException
 import java.time.ZonedDateTime
@@ -32,6 +34,7 @@ class BackgroundExtractionSaveFlow(
     private val worker: BackgroundExtractionWorker,
     private val observationGenerator: ObservationGenerator,
     private val listenerFactory: (Long) -> ExtractionStatusListener,
+    private val patternOrchestrator: PatternDetectionOrchestrator? = null,
 ) {
 
     suspend fun saveAndExtract(
@@ -39,6 +42,7 @@ class BackgroundExtractionSaveFlow(
         capturedAt: ZonedDateTime,
         retrievedHistory: List<HistoryChunk> = emptyList(),
         timeoutMs: Long? = null,
+        persona: Persona = Persona.WITNESS,
     ): SaveOutcome {
         val entryId = entryStore.createPendingEntry(entryText, capturedAt.toInstant())
         val terminalRelay = DeferredTerminalRelay(listenerFactory(entryId))
@@ -58,6 +62,7 @@ class BackgroundExtractionSaveFlow(
                 entryAttemptCount = request.entryAttemptCount,
                 result = result,
                 terminalRelay = terminalRelay,
+                persona = persona,
             )
 
             is BackgroundExtractionResult.Failed -> handleFailure(
@@ -84,6 +89,7 @@ class BackgroundExtractionSaveFlow(
         entryAttemptCount: Int,
         result: BackgroundExtractionResult.Success,
         terminalRelay: DeferredTerminalRelay,
+        persona: Persona,
     ): SaveOutcome.Completed {
         val observations = runObservations(entryText, result, capturedAt)
         persistTerminalState(
@@ -95,7 +101,63 @@ class BackgroundExtractionSaveFlow(
         ) {
             entryStore.completeEntry(entryId, result.resolved, result.templateLabel, observations)
         }
-        return SaveOutcome.Completed(entryId, result, observations)
+        val calloutObservation = runPatternOrchestration(entryId, persona)
+        val finalObservations = if (calloutObservation != null) observations + calloutObservation else observations
+        return SaveOutcome.Completed(entryId, result, finalObservations)
+    }
+
+    private suspend fun runPatternOrchestration(entryId: Long, persona: Persona): EntryObservation? {
+        val orchestrator = patternOrchestrator ?: return null
+        return try {
+            persistOrchestratorCallout(orchestrator, entryId, persona)
+        } catch (cancellation: CancellationException) {
+            throw cancellation
+        } catch (@Suppress("TooGenericExceptionCaught") error: Exception) {
+            // ADR-003: pattern detection is a best-effort layer, not blocking. Swallow + log.
+            Log.w(
+                TAG,
+                "Pattern orchestration failed for entryId=$entryId: " +
+                    "${error.javaClass.simpleName} ${error.message}",
+            )
+            null
+        }
+    }
+
+    private suspend fun persistOrchestratorCallout(
+        orchestrator: PatternDetectionOrchestrator,
+        entryId: Long,
+        persona: Persona,
+    ): EntryObservation? {
+        // Elvis-return locks `entry` as non-null without relying on `val`-flow inference. A
+        // future refactor that splits the method or hoists `entry` to a `var` would otherwise
+        // silently surface NPE risk through the settle calls below.
+        val entry = entryStore.readEntry(entryId) ?: return null
+        val callout = orchestrator.onEntryCommitted(entry, persona)
+        if (callout != null) {
+            appendAndConfirmCallout(orchestrator, entry, entryId, callout)
+        }
+        return callout
+    }
+
+    private suspend fun appendAndConfirmCallout(
+        orchestrator: PatternDetectionOrchestrator,
+        entry: dev.anchildress1.vestige.storage.EntryEntity,
+        entryId: Long,
+        callout: EntryObservation,
+    ) {
+        try {
+            // Confirm inside the same write transaction as the markdown/ObjectBox append so
+            // either both land or neither does.
+            entryStore.appendObservation(entryId, callout) {
+                orchestrator.settleReservedCallout(entry, fired = true)
+            }
+        } catch (cancellation: CancellationException) {
+            orchestrator.settleReservedCallout(entry, fired = false)
+            throw cancellation
+        } catch (@Suppress("TooGenericExceptionCaught") error: Exception) {
+            orchestrator.settleReservedCallout(entry, fired = false)
+            throw error
+        }
     }
 
     private suspend fun handleFailure(

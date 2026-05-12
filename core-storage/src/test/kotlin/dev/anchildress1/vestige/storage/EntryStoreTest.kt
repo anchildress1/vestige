@@ -260,6 +260,47 @@ class EntryStoreTest {
     }
 
     @Test
+    fun `appendObservation aborts when existing observations JSON is malformed`() {
+        val id = entryStore.createPendingEntry(SAMPLE_TEXT, SAMPLE_INSTANT)
+        entryStore.completeEntry(id, resolvedSample(), TemplateLabel.AFTERMATH)
+        // Simulate upstream corruption — overwrite the field with malformed JSON. A subsequent
+        // append must refuse, not silently overwrite real persisted state with `[newObs]`.
+        val box = boxStore.boxFor<EntryEntity>()
+        val row = box.get(id)
+        row.entryObservationsJson = "{not-json"
+        box.put(row)
+
+        val callout = EntryObservation(
+            text = "Worth noting.",
+            evidence = ObservationEvidence.PATTERN_CALLOUT,
+            fields = emptyList(),
+        )
+        val raised = runCatching { entryStore.appendObservation(id, callout) }
+        assertTrue(
+            "appendObservation must reject malformed existing JSON",
+            raised.exceptionOrNull() is EntryPersistenceException,
+        )
+        // Row stays corrupt — but we did not destroy whatever observations were there.
+        assertEquals("{not-json", box.get(id).entryObservationsJson)
+    }
+
+    @Test
+    fun `appendObservation succeeds on empty array (legit empty)`() {
+        val id = entryStore.createPendingEntry(SAMPLE_TEXT, SAMPLE_INSTANT)
+        entryStore.completeEntry(id, resolvedSample(), TemplateLabel.AFTERMATH)
+        val callout = EntryObservation(
+            text = "Worth noting.",
+            evidence = ObservationEvidence.PATTERN_CALLOUT,
+            fields = emptyList(),
+        )
+        entryStore.appendObservation(id, callout)
+        val row = boxStore.boxFor<EntryEntity>().get(id)
+        val observations = JSONArray(row.entryObservationsJson)
+        assertEquals(1, observations.length())
+        assertEquals("Worth noting.", observations.getJSONObject(0).getString("text"))
+    }
+
+    @Test
     fun `markdownFilename remains stable across complete after create`() {
         val id = entryStore.createPendingEntry(SAMPLE_TEXT, SAMPLE_INSTANT)
         val firstName = boxStore.boxFor<EntryEntity>().get(id).markdownFilename

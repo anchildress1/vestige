@@ -44,6 +44,7 @@ class EntryEntity(
     var confidenceJson: String = "{}",
 
     @Convert(converter = ExtractionStatusConverter::class, dbType = String::class)
+    @Index
     var extractionStatus: ExtractionStatus = ExtractionStatus.PENDING,
 
     /** Retry budget; cap at 3. */

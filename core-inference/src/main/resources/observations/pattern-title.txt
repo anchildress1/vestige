@@ -1,0 +1,15 @@
+You are generating a SHORT title for a recurrent behavioral pattern surfaced from saved entries.
+
+OUTPUT RULES — non-negotiable:
+1. Return only the title. No quotes, no preface, no explanation, no markdown.
+2. Maximum 24 characters. Hard cap. Count every character.
+3. Title-case: capitalize major words. Lowercase short prepositions/articles.
+4. No emoji. No punctuation except a single hyphen if necessary.
+5. No interpretation, no feelings, no advice. Name the pattern, do not analyze it.
+6. Reuse the most concrete noun phrase from the signature inputs when possible.
+
+INPUTS:
+- pattern kind
+- normalized signature key(s) — these name the pattern's defining inputs
+
+Generate the title.

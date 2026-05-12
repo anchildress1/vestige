@@ -116,22 +116,55 @@ class EntryEntitySmokeTest {
     }
 
     @Test
-    fun `Pattern entity persists lifecycle state and observation timestamp`() {
+    fun `Pattern entity round-trips ADR-003 fields and persists state via converter`() {
         val patternBox = boxStore.boxFor<PatternEntity>()
         val pattern = PatternEntity(
-            stableId = "aftermath-post-meeting",
-            type = "aftermath-post-meeting",
-            entryCount = 4,
-            lifecycleState = "ACTIVE",
-            lastObservedEpochMs = 1_715_252_335_000L,
+            patternId = "f".repeat(64),
+            kind = dev.anchildress1.vestige.model.PatternKind.TEMPLATE_RECURRENCE,
+            signatureJson = "{\"kind\":\"template_recurrence\",\"key\":\"aftermath\"}",
+            title = "Aftermath Loop",
+            templateLabel = TemplateLabel.AFTERMATH.serial,
+            firstSeenTimestamp = 1_715_000_000_000L,
+            lastSeenTimestamp = 1_715_252_335_000L,
+            state = dev.anchildress1.vestige.model.PatternState.ACTIVE,
+            stateChangedTimestamp = 0L,
+            latestCalloutText = "Fourth Aftermath in twelve. Worth noting.",
         )
         val newId = patternBox.put(pattern)
         val readBack = patternBox.get(newId)
 
-        assertEquals("aftermath-post-meeting", readBack.stableId)
-        assertEquals(4, readBack.entryCount)
-        assertEquals("ACTIVE", readBack.lifecycleState)
-        assertEquals(1_715_252_335_000L, readBack.lastObservedEpochMs)
+        assertEquals("f".repeat(64), readBack.patternId)
+        assertEquals(dev.anchildress1.vestige.model.PatternKind.TEMPLATE_RECURRENCE, readBack.kind)
+        assertEquals(dev.anchildress1.vestige.model.PatternState.ACTIVE, readBack.state)
+        assertEquals(TemplateLabel.AFTERMATH.serial, readBack.templateLabel)
+        assertEquals("Aftermath Loop", readBack.title)
+        assertNull(readBack.snoozedUntil)
+    }
+
+    @Test
+    fun `Pattern patternId is unique`() {
+        val patternBox = boxStore.boxFor<PatternEntity>()
+        patternBox.put(
+            PatternEntity(
+                patternId = "a".repeat(64),
+                signatureJson = "{}",
+                title = "x",
+                firstSeenTimestamp = 1L,
+                lastSeenTimestamp = 1L,
+            ),
+        )
+        val raised = runCatching {
+            patternBox.put(
+                PatternEntity(
+                    patternId = "a".repeat(64),
+                    signatureJson = "{}",
+                    title = "y",
+                    firstSeenTimestamp = 2L,
+                    lastSeenTimestamp = 2L,
+                ),
+            )
+        }
+        assertFalse("Second insert with the same patternId must fail unique-index check", raised.isSuccess)
     }
 
     @Test

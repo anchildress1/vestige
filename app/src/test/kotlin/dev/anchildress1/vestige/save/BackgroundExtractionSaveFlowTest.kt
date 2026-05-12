@@ -48,6 +48,133 @@ class BackgroundExtractionSaveFlowTest {
     private val flow = BackgroundExtractionSaveFlow(entryStore, worker, observationGenerator, listenerFactory)
 
     @Test
+    fun `pattern orchestrator callout is appended to the persisted observations`() = runTest {
+        val orchestrator = mockk<dev.anchildress1.vestige.patterns.PatternDetectionOrchestrator>()
+        val flowWithOrch = BackgroundExtractionSaveFlow(
+            entryStore = entryStore,
+            worker = worker,
+            observationGenerator = observationGenerator,
+            listenerFactory = listenerFactory,
+            patternOrchestrator = orchestrator,
+        )
+        val storedEntry = dev.anchildress1.vestige.storage.EntryEntity(
+            id = ENTRY_ID,
+            extractionStatus = ExtractionStatus.COMPLETED,
+        )
+        val callout = dev.anchildress1.vestige.model.EntryObservation(
+            text = "Worth noting.",
+            evidence = dev.anchildress1.vestige.model.ObservationEvidence.PATTERN_CALLOUT,
+            fields = emptyList(),
+        )
+        val resolved = canonicalSample()
+        every { entryStore.createPendingEntry(any(), any()) } returns ENTRY_ID
+        every { entryStore.readEntry(ENTRY_ID) } returns storedEntry
+        coEvery { worker.extract(any(), any()) } returns BackgroundExtractionResult.Success(
+            totalElapsedMs = 25_000L,
+            lensResults = emptyList(),
+            modelCallCount = 3,
+            resolved = resolved,
+            templateLabel = TemplateLabel.AFTERMATH,
+        )
+        coEvery { observationGenerator.generate(any(), any(), any()) } returns emptyList()
+        coEvery {
+            orchestrator.onEntryCommitted(storedEntry, dev.anchildress1.vestige.model.Persona.WITNESS)
+        } returns callout
+        every { orchestrator.settleReservedCallout(storedEntry, fired = true) } returns Unit
+        every { entryStore.appendObservation(ENTRY_ID, callout, any()) } answers {
+            @Suppress("UNCHECKED_CAST")
+            (args[2] as () -> Unit).invoke()
+        }
+
+        val outcome = flowWithOrch.saveAndExtract(SAMPLE_TEXT, SAMPLE_TIMESTAMP) as SaveOutcome.Completed
+
+        assertEquals(listOf(callout), outcome.observations)
+        // Order is the load-bearing fix: appendObservation MUST invoke the settlement callback
+        // inside the same persistence transaction.
+        coVerifyOrder {
+            entryStore.completeEntry(ENTRY_ID, resolved, TemplateLabel.AFTERMATH, emptyList())
+            orchestrator.onEntryCommitted(storedEntry, dev.anchildress1.vestige.model.Persona.WITNESS)
+            entryStore.appendObservation(ENTRY_ID, callout, any())
+            orchestrator.settleReservedCallout(storedEntry, fired = true)
+        }
+    }
+
+    @Test
+    fun `appendObservation failure releases the reservation and skips confirm`() = runTest {
+        val orchestrator = mockk<dev.anchildress1.vestige.patterns.PatternDetectionOrchestrator>()
+        val flowWithOrch = BackgroundExtractionSaveFlow(
+            entryStore = entryStore,
+            worker = worker,
+            observationGenerator = observationGenerator,
+            listenerFactory = listenerFactory,
+            patternOrchestrator = orchestrator,
+        )
+        val storedEntry = dev.anchildress1.vestige.storage.EntryEntity(
+            id = ENTRY_ID,
+            extractionStatus = ExtractionStatus.COMPLETED,
+        )
+        val callout = dev.anchildress1.vestige.model.EntryObservation(
+            text = "Worth noting.",
+            evidence = dev.anchildress1.vestige.model.ObservationEvidence.PATTERN_CALLOUT,
+            fields = emptyList(),
+        )
+        val resolved = canonicalSample()
+        every { entryStore.createPendingEntry(any(), any()) } returns ENTRY_ID
+        every { entryStore.readEntry(ENTRY_ID) } returns storedEntry
+        coEvery { worker.extract(any(), any()) } returns BackgroundExtractionResult.Success(
+            totalElapsedMs = 25_000L,
+            lensResults = emptyList(),
+            modelCallCount = 3,
+            resolved = resolved,
+            templateLabel = TemplateLabel.AFTERMATH,
+        )
+        coEvery { observationGenerator.generate(any(), any(), any()) } returns emptyList()
+        coEvery {
+            orchestrator.onEntryCommitted(storedEntry, dev.anchildress1.vestige.model.Persona.WITNESS)
+        } returns callout
+        every { entryStore.appendObservation(ENTRY_ID, callout, any()) } throws RuntimeException("markdown disk full")
+
+        val outcome = flowWithOrch.saveAndExtract(SAMPLE_TEXT, SAMPLE_TIMESTAMP)
+
+        // Save still completes; orchestrator failure swallowed.
+        assertTrue(outcome is SaveOutcome.Completed, "append failure must not abort the save")
+        // CRITICAL: confirm must not run when append throws — the reservation gets released
+        // instead because the user never saw the callout.
+        verify(exactly = 0) { orchestrator.settleReservedCallout(any(), fired = true) }
+        verify(exactly = 1) { orchestrator.settleReservedCallout(storedEntry, fired = false) }
+    }
+
+    @Test
+    fun `pattern orchestrator throwing is swallowed and does not block save`() = runTest {
+        val orchestrator = mockk<dev.anchildress1.vestige.patterns.PatternDetectionOrchestrator>()
+        val flowWithOrch = BackgroundExtractionSaveFlow(
+            entryStore = entryStore,
+            worker = worker,
+            observationGenerator = observationGenerator,
+            listenerFactory = listenerFactory,
+            patternOrchestrator = orchestrator,
+        )
+        val resolved = canonicalSample()
+        every { entryStore.createPendingEntry(any(), any()) } returns ENTRY_ID
+        every { entryStore.readEntry(ENTRY_ID) } returns dev.anchildress1.vestige.storage.EntryEntity(id = ENTRY_ID)
+        coEvery { worker.extract(any(), any()) } returns BackgroundExtractionResult.Success(
+            totalElapsedMs = 25_000L,
+            lensResults = emptyList(),
+            modelCallCount = 3,
+            resolved = resolved,
+            templateLabel = TemplateLabel.AFTERMATH,
+        )
+        coEvery { observationGenerator.generate(any(), any(), any()) } returns emptyList()
+        coEvery { orchestrator.onEntryCommitted(any(), any()) } throws RuntimeException("native crash")
+
+        val outcome = flowWithOrch.saveAndExtract(SAMPLE_TEXT, SAMPLE_TIMESTAMP)
+
+        // ADR-003 §"Detection algorithm" step-8 fail mode: log + continue. Save succeeds.
+        assertTrue(outcome is SaveOutcome.Completed, "orchestrator failure must not abort the save")
+        verify(exactly = 0) { entryStore.appendObservation(any(), any(), any()) }
+    }
+
+    @Test
     fun `success routes to completeEntry with resolver output, template label, and observations`() = runTest {
         every { entryStore.createPendingEntry(any(), any()) } returns ENTRY_ID
         val resolved = canonicalSample()
@@ -175,7 +302,7 @@ class BackgroundExtractionSaveFlowTest {
     fun `terminal completion reaches the lifecycle listener only after completeEntry succeeds`() = runTest {
         val downstream: ExtractionStatusListener = mockk(relaxed = true)
         val flowWithMockListener =
-            BackgroundExtractionSaveFlow(entryStore, worker, observationGenerator) { downstream }
+            BackgroundExtractionSaveFlow(entryStore, worker, observationGenerator, listenerFactory = { downstream })
         every { entryStore.createPendingEntry(any(), any()) } returns ENTRY_ID
         coEvery {
             worker.extract(any(), capture(capturedListener))
@@ -207,7 +334,7 @@ class BackgroundExtractionSaveFlowTest {
     fun `persistence failure after worker success emits FAILED instead of leaking worker COMPLETED`() = runTest {
         val downstream: ExtractionStatusListener = mockk(relaxed = true)
         val flowWithMockListener =
-            BackgroundExtractionSaveFlow(entryStore, worker, observationGenerator) { downstream }
+            BackgroundExtractionSaveFlow(entryStore, worker, observationGenerator, listenerFactory = { downstream })
         val resolved = canonicalSample()
         every { entryStore.createPendingEntry(any(), any()) } returns ENTRY_ID
         coEvery {
@@ -248,7 +375,7 @@ class BackgroundExtractionSaveFlowTest {
     fun `failed result reaches lifecycle listener only after failEntry succeeds`() = runTest {
         val downstream: ExtractionStatusListener = mockk(relaxed = true)
         val flowWithMockListener =
-            BackgroundExtractionSaveFlow(entryStore, worker, observationGenerator) { downstream }
+            BackgroundExtractionSaveFlow(entryStore, worker, observationGenerator, listenerFactory = { downstream })
         val failEntryReturned = CompletableDeferred<Unit>()
         every { entryStore.createPendingEntry(any(), any()) } returns ENTRY_ID
         coEvery {
@@ -291,7 +418,7 @@ class BackgroundExtractionSaveFlowTest {
     fun `timed out result reaches lifecycle listener only after failEntry succeeds`() = runTest {
         val downstream: ExtractionStatusListener = mockk(relaxed = true)
         val flowWithMockListener =
-            BackgroundExtractionSaveFlow(entryStore, worker, observationGenerator) { downstream }
+            BackgroundExtractionSaveFlow(entryStore, worker, observationGenerator, listenerFactory = { downstream })
         val failEntryReturned = CompletableDeferred<Unit>()
         every { entryStore.createPendingEntry(any(), any()) } returns ENTRY_ID
         coEvery {
@@ -334,7 +461,7 @@ class BackgroundExtractionSaveFlowTest {
     fun `persistence failure on Failed path routes through compensation`() = runTest {
         val downstream: ExtractionStatusListener = mockk(relaxed = true)
         val flowWithMockListener =
-            BackgroundExtractionSaveFlow(entryStore, worker, observationGenerator) { downstream }
+            BackgroundExtractionSaveFlow(entryStore, worker, observationGenerator, listenerFactory = { downstream })
         every { entryStore.createPendingEntry(any(), any()) } returns ENTRY_ID
         coEvery { worker.extract(any(), any()) } returns BackgroundExtractionResult.Failed(
             totalElapsedMs = 12_000L,
@@ -369,7 +496,7 @@ class BackgroundExtractionSaveFlowTest {
     fun `persistence failure on TimedOut path routes through compensation`() = runTest {
         val downstream: ExtractionStatusListener = mockk(relaxed = true)
         val flowWithMockListener =
-            BackgroundExtractionSaveFlow(entryStore, worker, observationGenerator) { downstream }
+            BackgroundExtractionSaveFlow(entryStore, worker, observationGenerator, listenerFactory = { downstream })
         every { entryStore.createPendingEntry(any(), any()) } returns ENTRY_ID
         coEvery { worker.extract(any(), any()) } returns BackgroundExtractionResult.TimedOut(
             totalElapsedMs = 90_000L,
@@ -402,7 +529,7 @@ class BackgroundExtractionSaveFlowTest {
     fun `compensation that itself throws is swallowed so the original error escapes`() = runTest {
         val downstream: ExtractionStatusListener = mockk(relaxed = true)
         val flowWithMockListener =
-            BackgroundExtractionSaveFlow(entryStore, worker, observationGenerator) { downstream }
+            BackgroundExtractionSaveFlow(entryStore, worker, observationGenerator, listenerFactory = { downstream })
         val resolved = canonicalSample()
         every { entryStore.createPendingEntry(any(), any()) } returns ENTRY_ID
         coEvery { worker.extract(any(), any()) } returns BackgroundExtractionResult.Success(

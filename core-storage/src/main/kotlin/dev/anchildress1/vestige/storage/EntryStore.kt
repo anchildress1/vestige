@@ -3,6 +3,7 @@ package dev.anchildress1.vestige.storage
 import dev.anchildress1.vestige.model.ConfidenceVerdict
 import dev.anchildress1.vestige.model.EntryObservation
 import dev.anchildress1.vestige.model.ExtractionStatus
+import dev.anchildress1.vestige.model.ObservationEvidence
 import dev.anchildress1.vestige.model.ResolvedExtraction
 import dev.anchildress1.vestige.model.TemplateLabel
 import io.objectbox.BoxStore
@@ -93,14 +94,45 @@ class EntryStore(private val boxStore: BoxStore, private val markdownStore: Mark
         }
     }
 
+    /** Read-only lookup. Returns `null` for missing rows so callers can act without throwing. */
+    fun readEntry(entryId: Long): EntryEntity? = boxStore.boxFor<EntryEntity>().get(entryId)
+
+    /**
+     * Append one observation to an already-completed entry's persisted list. Used by the
+     * pattern-detection orchestrator when a callout fires after `completeEntry` has already
+     * landed. [afterPersist] runs inside the same ObjectBox write transaction so the caller can
+     * atomically update adjacent structured state (for example, the global callout cooldown row).
+     * Throws when the entry is missing — callers must hold a valid id.
+     */
+    fun appendObservation(entryId: Long, observation: EntryObservation, afterPersist: (() -> Unit)? = null) {
+        boxStore.runInTx {
+            val box = boxStore.boxFor<EntryEntity>()
+            val entry = box.get(entryId)
+                ?: throw EntryPersistenceException("No entry row id=$entryId to append observation")
+            // Refuse to overwrite a malformed observations array. `decodeObservations` returns an
+            // empty list on parse failure (with a logged warning); appending in that branch would
+            // silently destroy every previously persisted observation for this entry. Aborting
+            // here surfaces the corruption via `EntryPersistenceException`, which the save flow's
+            // orchestrator-wrapper catches → callout is dropped, cooldown reservation released.
+            val existing = parseObservationsForAppend(entry.entryObservationsJson, entryId)
+            entry.entryObservationsJson = observationsJson(existing + observation)
+            try {
+                markdownStore.write(entry)
+            } catch (@Suppress("TooGenericExceptionCaught") writeFail: Exception) {
+                throw EntryPersistenceException(
+                    "Markdown rewrite failed appending observation to id=$entryId",
+                    writeFail,
+                )
+            }
+            box.put(entry)
+            afterPersist?.invoke()
+        }
+    }
+
     /**
      * Terminal failure path — [status] is one of [ExtractionStatus.FAILED] or
      * [ExtractionStatus.TIMED_OUT]. Leaves the structured fields untouched; the row keeps the
      * `entry_text` already persisted by [createPendingEntry]. Markdown stays in PENDING shape.
-     *
-     * `attemptCount` is the cold-start sweep's counter per ADR-001 §Q3 — it is owned by the
-     * recovery path, not by this terminal call. The sweep increments before re-invoking the
-     * worker; a single terminal failure does not advance the counter on its own.
      */
     fun failEntry(entryId: Long, status: ExtractionStatus, lastError: String?) {
         require(status == ExtractionStatus.FAILED || status == ExtractionStatus.TIMED_OUT) {
@@ -172,19 +204,6 @@ class EntryStore(private val boxStore: BoxStore, private val markdownStore: Mark
         return payload.toString()
     }
 
-    private fun observationsJson(observations: List<EntryObservation>): String {
-        if (observations.isEmpty()) return "[]"
-        val array = JSONArray()
-        observations.forEach { observation ->
-            val obj = JSONObject()
-                .put("text", observation.text)
-                .put("evidence", observation.evidence.serial)
-                .put("fields", JSONArray(observation.fields))
-            array.put(obj)
-        }
-        return array.toString()
-    }
-
     private companion object {
         private const val KEY_TAGS = "tags"
         private const val KEY_ENERGY = "energy_descriptor"
@@ -199,3 +218,60 @@ class EntryStore(private val boxStore: BoxStore, private val markdownStore: Mark
 
 /** Failure on the markdown/ObjectBox join. The transaction the throw escapes from rolls back. */
 class EntryPersistenceException(message: String, cause: Throwable? = null) : IOException(message, cause)
+
+// Top-level helpers — kept off `EntryStore` to stay under detekt's function budget.
+private fun observationsJson(observations: List<EntryObservation>): String {
+    if (observations.isEmpty()) return "[]"
+    val array = JSONArray()
+    observations.forEach { observation ->
+        val obj = JSONObject()
+            .put("text", observation.text)
+            .put("evidence", observation.evidence.serial)
+            .put("fields", JSONArray(observation.fields))
+        array.put(obj)
+    }
+    return array.toString()
+}
+
+// Cap on the malformed-payload preview included in `Log.w` lines so logcat doesn't get
+// flooded by a single corrupt row. 80 chars is enough to identify the shape (object vs
+// array, leading keys) without paying for the long tail.
+private const val LOG_PREVIEW_CHARS = 80
+
+// Used by `appendObservation` only — distinguishes legit empty from malformed-and-fell-back.
+// Throws so the malformed-existing case can't silently overwrite real persisted observations.
+private fun parseObservationsForAppend(json: String, entryId: Long): List<EntryObservation> {
+    if (json.isBlank() || json.trim() == "[]") return emptyList()
+    val parsed = decodeObservations(json)
+    if (parsed.isEmpty()) {
+        throw EntryPersistenceException(
+            "Refusing to append observation to entry id=$entryId — existing JSON is malformed",
+        )
+    }
+    return parsed
+}
+
+private fun decodeObservations(json: String): List<EntryObservation> {
+    val raw = json.takeIf { it.isNotBlank() } ?: return emptyList()
+    val array = runCatching { JSONArray(raw) }.getOrNull()
+    // `appendObservation` rewrites this field — if we cannot read the existing list, the next
+    // write would silently overwrite real persisted observations. Surface it then fall back to
+    // empty so the rewrite path can still make progress.
+    return when (array) {
+        null -> {
+            android.util.Log.w("VestigeEntryStore", "malformed entryObservationsJson: ${raw.take(LOG_PREVIEW_CHARS)}")
+            emptyList()
+        }
+
+        else -> (0 until array.length()).mapNotNull { idx -> decodeOne(array.optJSONObject(idx)) }
+    }
+}
+
+private fun decodeOne(obj: JSONObject?): EntryObservation? {
+    val text = obj?.optString("text")?.takeIf { it.isNotBlank() }
+    val evidence = obj?.optString("evidence")?.let { ObservationEvidence.fromSerial(it) }
+    val fields = obj?.optJSONArray("fields")?.let { arr ->
+        (0 until arr.length()).mapNotNull { (arr.opt(it) as? String)?.takeIf { s -> s.isNotEmpty() } }
+    } ?: emptyList()
+    return if (text != null && evidence != null) EntryObservation(text, evidence, fields) else null
+}

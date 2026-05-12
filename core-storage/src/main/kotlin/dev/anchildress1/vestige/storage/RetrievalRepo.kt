@@ -49,7 +49,7 @@ class RetrievalRepo(
         val storedTagKeys = tagBox.all.mapNotNullTo(linkedSetOf()) { QueryTagMatcher.storedKey(it.name) }
         val queryTagKeys = QueryTagMatcher.queryKeysMatching(queryTerms, storedTagKeys)
 
-        val entries = entryBox.all
+        val entries: List<EntryEntity> = entryBox.all
         // Defer embedding the query string until we know vector scoring will actually fire —
         // skips the ~880 ms CPU embed cost on empty databases and during the backfill window
         // when no entry has a stored vector yet.

@@ -25,7 +25,7 @@ class VectorBackfillWorker(private val boxStore: BoxStore, private val embedder:
 
     suspend fun backfill(): BackfillStats = coroutineScope {
         val entryBox = boxStore.boxFor<EntryEntity>()
-        val pending = entryBox.query().isNull(EntryEntity_.vector).build().use { it.find() }
+        val pending: List<EntryEntity> = entryBox.query().isNull(EntryEntity_.vector).build().use { it.find() }
         if (pending.isEmpty()) {
             return@coroutineScope BackfillStats.empty()
         }

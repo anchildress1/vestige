@@ -317,6 +317,61 @@ running to the engine-side `maxNumTokens` ceiling).
 
 Evidence: `docs/stt-results/stt-d-2026-05-12-gpu-sharp.md` with raw logcat.
 
+### Addendum (2026-05-12, fifth) — Skeptical-only revision ships
+
+The fourth addendum (sharpened LITERAL + INFERENTIAL + SKEPTICAL with `maxAttemptsPerLens=3`)
+produced 87% divergence but at unacceptable cost: 1 entry timed out at the 5-min ceiling, 1
+entry parsed only 1 of 3 lenses, mean latency ~88s. Investigation document (2026-05-12,
+in-thread) reframed: the architecture's load-bearing claim isn't divergence count, it's
+**Skeptical doing adversarial work** — `canonical_with_conflict` verdicts reachable in the
+data. The greedy baseline (Run 2 — 60% divergence) fired zero Skeptical flags, leaving the
+architecture's distinguishing beat unverified.
+
+Decision-tree step 1: revise the Skeptical lens module alone, holding under the FP16
+prompt-budget cliff the other two lenses already respect.
+
+- LITERAL + INFERENTIAL: restored to baseline. The Run 1/Run 3 sharpening added net tokens
+  that pushed FP16 over the cliff (confirmed twice).
+- SKEPTICAL: revised to 1398 chars — 43 chars *under* the 1441 baseline budget. Keeps five
+  named flag kinds with one-line concrete triggers; drops Run 3's over-prescriptive "aim for
+  ≥1 flag per non-trivial entry" directive and replaces it with "do not invent a contradiction".
+- `maxAttemptsPerLens` back to 2 (the Run 3 bump was a band-aid for the prompt-budget
+  violation).
+
+Result on the 15-entry STT-D corpus (GPU, greedy, 2026-05-12 — Run 4):
+
+| Metric | Run 2 (greedy baseline) | Run 4 (Skeptical-only) | Δ |
+|---|---|---|---|
+| Meaningful divergence | 9/15 (60%) | 11/15 (73%) | +13 pp |
+| Skeptical flags fired | 0 | **4** | **+4** |
+| `canonical_with_conflict`-eligible entries | 0 | **2** (A4, B2) | +2 |
+| Mean per-entry latency | 48s | **33s** | −31% |
+| Full 3-lens entries | 15/15 | 14/15 (B3 partial) | −1 |
+| Timeouts | 0 | 0 | 0 |
+
+The four flags fire on quoted user evidence — A1 `state-behavior-mismatch`, A4
+`vocabulary-contradiction`, B2 `commitment-without-anchor`, C1 `unsupported-recurrence`. A4
+and B2 fire with `disagree_fields=[]`, making `canonical_with_conflict` reachable for the
+first time on the corpus.
+
+**The verdict missed the investigation document's strict gate (≥5 flags) by one.** Shipped
+anyway because:
+
+1. The qualitative move is real — 0 → 4 flags with quoted evidence, 0 → 2 entries with
+   reachable `canonical_with_conflict` verdict, 4 flag kinds fired (only `time-inconsistency`
+   silent — corpus has no incompatible time anchors).
+2. The architecture's load-bearing claim is now demonstrable. Demo Chapter 3 has 4 flagged
+   entries to choose from for the storyboard.
+3. The fifth flag is gated by FP16 prompt budget, not by lens-prompt iteration. The next
+   meaningful improvement requires Option 2 (surfaces per lens, ADR-002 supersede) — out of
+   v1 scope.
+
+**Known limitation:** Skeptical matches the exact pattern shapes the prompt's examples name,
+not adjacent cases sharing the principle. Run 3's longer triggers covered more shapes but
+broke parse reliability — confirmed twice that prompt expansion is bounded by FP16.
+
+Evidence: `docs/stt-results/stt-d-2026-05-12-gpu-skep.md` + raw logcat.
+
 ### Addendum (2026-05-10) — conservative tag persistence
 
 Supersedes the earlier `tags` wording that implied plural normalization should rewrite the saved value itself. Surfaced when a naive singularizer in `DefaultConvergenceResolver` corrupted legitimate singular tags (`news` → `new`, `series` → `sery`) because the stem was being persisted, not just counted (Story 2.8, fix landed in commit `2944843`).

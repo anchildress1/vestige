@@ -23,6 +23,13 @@ objectbox = "5.4.2"
 # on libLiteRt.so at :app:mergeDebugNativeLibs.
 litert-lm = "0.11.0"
 
+# Embedding — EmbeddingGemma 300M via Google AI Edge LocalAgents RAG. The AAR ships
+# libgemma_embedding_model_jni.so (statically links LiteRT TFLite + SentencePiece) as a
+# self-contained native lib that does not collide with libLiteRt.so from litertlm-android.
+# Authorized by `adrs/ADR-010-embeddinggemma-runtime-switch-to-litert.md` §"Addendum
+# (2026-05-11)".
+localagents-rag = "0.3.0"
+
 # Quality
 kover = "0.9.8"
 ktlint-cli = "1.8.0"
@@ -71,6 +78,11 @@ objectbox-kotlin = { module = "io.objectbox:objectbox-kotlin", version.ref = "ob
 
 # Inference (Gemma 4 via LiteRT-LM)
 litert-lm = { module = "com.google.ai.edge.litertlm:litertlm-android", version.ref = "litert-lm" }
+
+# Embedding (EmbeddingGemma via Google AI Edge LocalAgents RAG)
+localagents-rag = { module = "com.google.ai.edge.localagents:localagents-rag", version.ref = "localagents-rag" }
+# Bridge ListenableFuture (returned by the localagents-rag SDK) to suspend functions.
+kotlinx-coroutines-guava = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-guava", version.ref = "kotlinx-coroutines" }
 
 # Testing — JVM
 junit = { module = "junit:junit", version.ref = "junit" }

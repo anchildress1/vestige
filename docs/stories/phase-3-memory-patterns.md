@@ -173,7 +173,7 @@ Query-side tag extraction goes beyond exact-substring match: a free-form query b
 **As** the AI implementor, **I need** a basic pattern list screen in `:app` that shows active patterns with their name, observation, source count, and last-seen date per `concept-locked.md` §"Pattern persistence" and `design-guidelines.md` §"Pattern card", **so that** patterns are user-visible and actionable before Phase 4 polishes the UX.
 
 **Done when:**
-- [x] Pattern list is reachable from the app shell (rough navigation; polish is Phase 4). (Rough toggle from `MainActivity` opens `PatternsHost`; Phase 4 swaps in a real nav graph.)
+- [x] Pattern list is reachable from the app shell (rough navigation; polish is Phase 4). (Rough toggle from `MainActivity` opens `PatternsHost`; `BackHandler` unwinds detail→list→shell so the system back gesture doesn't kill the activity. Phase 4 swaps in a real nav graph.)
 - [x] Each pattern card shows: name, agent-emitted template label, one-line observation, "{N} of {M} entries · Last seen {date}", and a `glow` left-rule per `design-guidelines.md` §"Pattern card". (Purple `#A855F7` left-rule on the card; observation = `latestCalloutText`; denominator = `EntryStore.count()`.)
 - [x] Cards are sorted by `last_seen` descending. (`PatternStore.findActiveSortedByLastSeen()` sorts in the store; VM passes the ordered list through.)
 - [x] Empty state displays per `ux-copy.md` §"Pattern List / Empty states" (`Insufficient data.` / `Nothing repeating yet.`). (`PatternsListUiState.Empty` distinguishes the two via `EmptyReason`; All-dismissed and filter-empty land with Phase 4's chips.)
@@ -222,11 +222,11 @@ If a Phase 3 story starts pulling Phase 4 polish or a backlog entry, stop. Refer
 
 Phase 4 starts when all the following are true:
 
-- [ ] All ten stories above are Done. Story 3.4 is either Done (STT-E passed) or explicitly skipped (STT-E failed, recorded in ADR-001 + `backlog.md`).
-- [ ] **STT-E resolved.** Embeddings either ship in v1 or defer to v1.5 with the cut recorded in the right places.
-- [ ] At least 10 saved entries exist on the reference device. Pattern detection has run at end-of-session at least once with real data.
-- [ ] At least one cross-entry pattern is surfaced and persisted in `state=active`. The user can dismiss / snooze / mark-resolve it and the change survives app restart.
-- [ ] Pattern list and pattern detail screens render correctly on the reference S24 Ultra. Source entries are clickable; navigation back to the pattern list works.
-- [ ] No new entries logged to `backlog.md` from Phase 3 work that change the v1 contract beyond STT-E's outcome.
+- [x] All ten stories above are Done. Story 3.4 is either Done (STT-E passed) or explicitly skipped (STT-E failed, recorded in ADR-001 + `backlog.md`). (STT-E passed; Story 3.4 Done.)
+- [x] **STT-E resolved.** Embeddings either ship in v1 or defer to v1.5 with the cut recorded in the right places. (Passed; ADR-001 Addendum 2026-05-12.)
+- [x] At least 10 saved entries exist on the reference device. Pattern detection has run at end-of-session at least once with real data. (12 entries seeded via the FLAG_DEBUGGABLE-gated `DebugPatternSeeder` on the reference S24 Ultra 2026-05-12; capture-UI-driven entries blocked on Phase 4 P1, fixture exercises the same `EntryStore` / `PatternStore` paths.)
+- [x] At least one cross-entry pattern is surfaced and persisted in `state=active`. The user can dismiss / snooze / mark-resolve it and the change survives app restart. (Verified 2026-05-12: two ACTIVE patterns rendered; snooze + dismiss applied via overflow menu + detail action row; force-stop + relaunch confirmed both states persisted — list went to `Nothing repeating yet.` post-restart as expected.)
+- [x] Pattern list and pattern detail screens render correctly on the reference S24 Ultra. Source entries are clickable; navigation back to the pattern list works. (Verified 2026-05-12: cards render with full-height purple left-rule, detail's "Seen in:" section shows 3 dated source rows with snippets, system back unwinds detail→list→shell via `BackHandler`. Source-row taps fire `onOpenEntry` cleanly — no-op landing for v1 since Phase 4 owns the history detail screen.)
+- [x] No new entries logged to `backlog.md` from Phase 3 work that change the v1 contract beyond STT-E's outcome.
 
 If STT-E failed: confirm `concept-locked.md`, `PRD.md`, ADR-001, and `backlog.md` all reflect the cut consistently before starting Phase 4. The Phase 4 stories will need a small adjustment — no vocabulary chip cloud on pattern detail, no model artifact for embeddings in onboarding flow.

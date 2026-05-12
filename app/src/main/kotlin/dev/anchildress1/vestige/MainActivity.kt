@@ -5,6 +5,7 @@ import android.content.pm.ApplicationInfo
 import android.content.pm.PackageManager
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -46,10 +47,14 @@ class MainActivity : ComponentActivity() {
             VestigeTheme {
                 var showPatterns by rememberSaveable { mutableStateOf(false) }
                 if (showPatterns) {
+                    // Back unwinds patterns→shell; without this the activity exits and the user
+                    // loses their place in the rough Phase-3 nav.
+                    BackHandler { showPatterns = false }
                     PatternsHost(
                         patternStore = container.patternStore,
                         patternRepo = container.patternRepo,
                         entryStore = container.entryStore,
+                        onExit = { showPatterns = false },
                         modifier = Modifier.fillMaxSize(),
                     )
                 } else {

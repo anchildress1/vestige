@@ -55,7 +55,7 @@ class SttDLensDivergenceTest {
         assumeTrue("Manifest not found at $manifestPath", manifestFile.exists() && manifestFile.canRead())
 
         val corpus = CorpusManifest.load(manifestFile)
-        StopAndTestCorpusRules.requireCanonicalSttDCorpus(corpus.map(CorpusEntry::id))
+        StopAndTestCorpusRules.requireSttDCorpusCoversPressurePoints(corpus.map(CorpusEntry::id))
         val requiredDivergentEntries = StopAndTestCorpusRules.requiredDivergentEntries(corpus.size)
 
         val cacheDir = InstrumentationRegistry.getInstrumentation().targetContext.cacheDir
@@ -155,7 +155,7 @@ class SttDLensDivergenceTest {
     private fun logEntry(entry: CorpusEntry, result: BackgroundExtractionResult, divergence: Divergence) {
         android.util.Log.i(
             TAG,
-            "entry=${entry.id} elapsed=${result.totalElapsedMs}ms " +
+            "ENTRY id=${entry.id} elapsed=${result.totalElapsedMs}ms " +
                 "lenses_parsed=${result.lensResults.count { it.extraction != null }}/3 " +
                 "model_calls=${result.modelCallCount}",
         )
@@ -172,10 +172,26 @@ class SttDLensDivergenceTest {
                     "attempts=${lensResult?.attemptCount ?: 0} err=${lensResult?.lastError ?: "-"}",
             )
         }
+        // RAW lines carry the full per-lens evidence for archival into `docs/stt-results/` —
+        // `adb logcat -s VestigeSttD | grep ^.*VestigeSttD.*RAW` yields one JSON-ish row per
+        // entry × lens. Format: `RAW id=<id> lens=<LENS> attempts=N err=<msg> fields=<map> flags=<list>`.
+        Lens.entries.forEach { lens ->
+            val lensResult = result.lensResults.firstOrNull { it.lens == lens }
+            val extraction = lensResult?.extraction
+            android.util.Log.i(
+                TAG,
+                "  RAW id=${entry.id} lens=$lens attempts=${lensResult?.attemptCount ?: 0} " +
+                    "err=${lensResult?.lastError ?: "-"} " +
+                    "fields=${extraction?.fields ?: "<no-parse>"} " +
+                    "flags=${extraction?.flags ?: emptyList<String>()}",
+            )
+        }
         android.util.Log.i(
             TAG,
-            "  -> disagree_fields=${divergence.fieldNames} inferential_only=${divergence.inferentialOnly} " +
-                "skeptical_flags=${divergence.skepticalFlags.size} meaningful=${divergence.isMeaningful}",
+            "  DIVERGENCE id=${entry.id} disagree_fields=${divergence.fieldNames} " +
+                "inferential_only=${divergence.inferentialOnly} " +
+                "skeptical_flags_kept=${divergence.skepticalFlags} " +
+                "meaningful=${divergence.isMeaningful}",
         )
     }
 

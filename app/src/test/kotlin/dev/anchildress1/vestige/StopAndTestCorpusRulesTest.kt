@@ -21,28 +21,51 @@ class StopAndTestCorpusRulesTest {
     }
 
     @Test
-    fun `STT-D accepts the canonical 6-entry set regardless of order`() {
-        StopAndTestCorpusRules.requireCanonicalSttDCorpus(listOf("D1", "C2", "B2", "B1", "A4", "A1"))
+    fun `STT-D accepts the canonical 6 pressure points regardless of order`() {
+        StopAndTestCorpusRules.requireSttDCorpusCoversPressurePoints(
+            listOf("D1", "C2", "B2", "B1", "A4", "A1"),
+        )
     }
 
     @Test
-    fun `STT-D rejects a subset manifest`() {
+    fun `STT-D accepts the canonical 6 plus extra A-D scenario entries`() {
+        StopAndTestCorpusRules.requireSttDCorpusCoversPressurePoints(
+            listOf("A1", "A2", "A3", "A4", "A5", "A6", "B1", "B2", "B3", "C1", "C2", "C3", "D1", "D2", "D3"),
+        )
+    }
+
+    @Test
+    fun `STT-D rejects a subset manifest missing pressure points`() {
         assertThrows(IllegalArgumentException::class.java) {
-            StopAndTestCorpusRules.requireCanonicalSttDCorpus(listOf("A1", "B1"))
+            StopAndTestCorpusRules.requireSttDCorpusCoversPressurePoints(listOf("A1", "B1"))
         }
     }
 
     @Test
-    fun `STT-D rejects unexpected ids even when size matches`() {
+    fun `STT-D rejects a manifest that swaps a pressure point for a non-canonical id`() {
+        // Has A1-A6 but no B1, B2, C2 → missing pressure points despite the right count.
         assertThrows(IllegalArgumentException::class.java) {
-            StopAndTestCorpusRules.requireCanonicalSttDCorpus(listOf("A1", "A2", "A3", "A4", "A5", "A6"))
+            StopAndTestCorpusRules.requireSttDCorpusCoversPressurePoints(
+                listOf("A1", "A2", "A3", "A4", "A5", "A6"),
+            )
+        }
+    }
+
+    @Test
+    fun `STT-D rejects X distractor ids — only A-D scenarios allowed`() {
+        assertThrows(IllegalArgumentException::class.java) {
+            StopAndTestCorpusRules.requireSttDCorpusCoversPressurePoints(
+                listOf("A1", "A4", "B1", "B2", "C2", "D1", "X1"),
+            )
         }
     }
 
     @Test
     fun `STT-D rejects duplicates`() {
         assertThrows(IllegalArgumentException::class.java) {
-            StopAndTestCorpusRules.requireCanonicalSttDCorpus(listOf("A1", "A1", "B1", "B2", "C2", "D1"))
+            StopAndTestCorpusRules.requireSttDCorpusCoversPressurePoints(
+                listOf("A1", "A1", "B1", "B2", "C2", "D1"),
+            )
         }
     }
 

@@ -4,9 +4,11 @@ import android.util.Log
 import com.google.ai.edge.litertlm.Backend
 import com.google.ai.edge.litertlm.Content
 import com.google.ai.edge.litertlm.Contents
+import com.google.ai.edge.litertlm.ConversationConfig
 import com.google.ai.edge.litertlm.Engine
 import com.google.ai.edge.litertlm.EngineConfig
 import com.google.ai.edge.litertlm.LogSeverity
+import com.google.ai.edge.litertlm.SamplerConfig
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
@@ -26,12 +28,15 @@ sealed interface BackendChoice {
  * [sendMessageContents] per call. Each call opens and closes a fresh conversation — the SDK's
  * stateful KV-cache Conversation handle is not exposed in v1.
  */
+@Suppress("LongParameterList") // Mirrors the SDK's EngineConfig + ConversationConfig surfaces.
 class LiteRtLmEngine(
     private val modelPath: String,
     private val backend: BackendChoice = BackendChoice.Cpu,
     private val audioBackend: BackendChoice? = null,
     private val visionBackend: BackendChoice? = null,
     private val cacheDir: String? = null,
+    private val samplerConfig: SamplerConfig = DETERMINISTIC_SAMPLER,
+    private val maxNumTokens: Int? = DEFAULT_MAX_NUM_TOKENS,
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) : AutoCloseable {
 
@@ -42,7 +47,9 @@ class LiteRtLmEngine(
         Log.d(
             TAG,
             "Loading $modelPath backend=${backend.label} " +
-                "audio=${audioBackend?.label ?: "off"} vision=${visionBackend?.label ?: "off"}",
+                "audio=${audioBackend?.label ?: "off"} vision=${visionBackend?.label ?: "off"} " +
+                "maxTokens=$maxNumTokens sampler=topK=${samplerConfig.topK}," +
+                "topP=${samplerConfig.topP},temp=${samplerConfig.temperature},seed=${samplerConfig.seed}",
         )
         Engine.setNativeMinLogSeverity(LogSeverity.WARNING)
         val started = System.nanoTime()
@@ -50,8 +57,10 @@ class LiteRtLmEngine(
             EngineConfig(
                 modelPath = modelPath,
                 backend = backend.toSdkBackend(),
-                audioBackend = audioBackend?.toSdkBackend(),
                 visionBackend = visionBackend?.toSdkBackend(),
+                audioBackend = audioBackend?.toSdkBackend(),
+                maxNumTokens = maxNumTokens,
+                maxNumImages = null,
                 cacheDir = cacheDir,
             ),
         ).also { it.initialize() }
@@ -59,12 +68,26 @@ class LiteRtLmEngine(
         Log.d(TAG, "Engine initialized in ${elapsedMs}ms")
     }
 
+    /**
+     * Pinned `ConversationConfig` for every `createConversation()` — empty system instruction
+     * (callers stack system text into the message body for now), no initial history, no tools,
+     * and the engine's deterministic sampler. Without this the SDK falls back to non-greedy
+     * defaults that produce different output across CPU vs GPU on the same prompt — measured
+     * 2026-05-12 on the STT-D corpus, CPU 80% / GPU 53% divergence on identical prompts.
+     */
+    private fun conversationConfig(): ConversationConfig = ConversationConfig(
+        Contents.of(""),
+        emptyList(),
+        emptyList(),
+        samplerConfig,
+    )
+
     suspend fun generateText(prompt: String): String = withContext(ioDispatcher) {
         val active = checkNotNull(engine) {
             "LiteRtLmEngine.generateText called before initialize()."
         }
         val started = System.nanoTime()
-        val response = active.createConversation().use { conversation ->
+        val response = active.createConversation(conversationConfig()).use { conversation ->
             conversation.sendMessage(prompt).toString()
         }
         val elapsedMs = (System.nanoTime() - started) / NANOS_PER_MILLI
@@ -81,7 +104,7 @@ class LiteRtLmEngine(
             "LiteRtLmEngine.streamText called before initialize()."
         }
         return flow {
-            val conversation = active.createConversation()
+            val conversation = active.createConversation(conversationConfig())
             val started = System.nanoTime()
             var charsEmitted = 0
             try {
@@ -124,7 +147,7 @@ class LiteRtLmEngine(
         val started = System.nanoTime()
 
         @Suppress("SpreadOperator") // Contents.of is a vararg factory; no List-accepting overload.
-        val response = active.createConversation().use { conversation ->
+        val response = active.createConversation(conversationConfig()).use { conversation ->
             conversation.sendMessage(Contents.of(*parts.toTypedArray())).toString()
         }
         val elapsedMs = (System.nanoTime() - started) / NANOS_PER_MILLI
@@ -156,5 +179,28 @@ class LiteRtLmEngine(
     companion object {
         private const val TAG = "VestigeLiteRtLm"
         private const val NANOS_PER_MILLI = 1_000_000L
+
+        /**
+         * Engine-side token budget. Caps KV-cache reservation per call. 4096 comfortably covers
+         * the largest composed multi-lens prompt (~2500-3000 tokens prefill + ≤1024 decode);
+         * leaving the SDK default uncapped reserves the model's full ~8192 context, allocating
+         * roughly double the KV memory we actually use. Tunable per harness.
+         */
+        const val DEFAULT_MAX_NUM_TOKENS: Int = 4096
+
+        /**
+         * Pinned greedy decode. `topK=1` makes generation deterministic regardless of `seed`
+         * or `temperature`, but we set the rest explicitly so a future SDK change to defaults
+         * doesn't quietly bring back sampling noise. Backend parity (CPU vs GPU producing
+         * identical output for the same prompt) is the contract this constant defends —
+         * measured before this knob existed: CPU 80% / GPU 53% STT-D divergence on identical
+         * prompts (2026-05-12), with backend-conditional parse failures on C2 + D1.
+         */
+        val DETERMINISTIC_SAMPLER: SamplerConfig = SamplerConfig(
+            topK = 1,
+            topP = 1.0,
+            temperature = 0.0,
+            seed = 42,
+        )
     }
 }

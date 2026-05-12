@@ -9,11 +9,8 @@ import kotlin.math.min
 import kotlin.math.sqrt
 
 /**
- * Deterministic, model-free retrieval over saved entries. Ranks candidates by keyword overlap on
- * `entry_text` + tag-set Jaccard + recency boost. The vector branch lands in Story 3.4 only if
- * STT-E (Story 3.3) passes.
- *
- * Ranking is stable for identical inputs: ties on score break by entry id ascending.
+ * Deterministic retrieval over saved entries: keyword overlap + tag-set Jaccard + recency boost,
+ * with optional weighted cosine via [queryHybrid]. Ties break by entry id ascending.
  */
 class RetrievalRepo(private val boxStore: BoxStore, private val clock: Clock = Clock.systemUTC()) {
 
@@ -77,10 +74,9 @@ class RetrievalRepo(private val boxStore: BoxStore, private val clock: Clock = C
     }
 
     /**
-     * STT-E (Story 3.3) comparison path. Same scoring as [query] plus cosine similarity between
-     * the query vector and each entry's vector, weighted by [embeddingWeight]. The embedder is
-     * called once per candidate entry; callers eat the latency. No vector field is stored on
-     * [EntryEntity] yet — Story 3.4 adds it iff this gate passes.
+     * Hybrid retrieval: keyword + tag + recency baseline plus weighted cosine on the supplied
+     * embedder. Embedder is invoked once for the query and once per candidate entry — callers
+     * eat the latency.
      */
     suspend fun queryHybrid(
         text: String,
@@ -151,9 +147,8 @@ class RetrievalRepo(private val boxStore: BoxStore, private val clock: Clock = C
         const val DEFAULT_TOP_N = 3
         const val DEFAULT_RECENCY_WEIGHT = 0.3f
 
-        // Cosine on SEMANTIC_SIMILARITY embeddings clusters in ~[0.3, 0.95] for natural text, so a
-        // weight of 1.0 puts the embedding score on the same magnitude as keyword/tag Jaccard.
-        // STT-E (Story 3.3) is the gate that earns or rejects this default.
+        // Cosine on SEMANTIC_SIMILARITY embeddings clusters in ~[0.3, 0.95] for natural text, so
+        // weight 1.0 puts it on the same magnitude as keyword/tag Jaccard.
         const val DEFAULT_EMBEDDING_WEIGHT = 1.0f
         const val MILLIS_PER_DAY = 86_400_000.0
         const val RECENCY_WINDOW_DAYS = 90.0

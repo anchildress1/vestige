@@ -20,31 +20,10 @@ import java.time.Clock
 import java.time.ZoneOffset
 
 /**
- * STT-E — EmbeddingGemma vs tag-only retrieval per `docs/stories/phase-3-memory-patterns.md`
- * §Story 3.3 and `docs/sample-data-scenarios.md` §"STT-E / Scenario E". Loads A1-A6 + X1-X3 with
- * pre-baked tags, runs [RetrievalRepo.query] (baseline) and [RetrievalRepo.queryHybrid] (with
- * real EmbeddingGemma cosine), logs both top-5 rankings, and asserts the objective half of the
- * pass conditions:
- *
- *   - hybrid top-5 contains ≥4 of A1-A6
- *   - which transitively bounds X-distractors before the 4th A-entry to ≤1
- *
- * The "visibly better for the 90-sec pitch" judgment stays with the human reviewer. Logcat tag
- * `VestigeSttE` carries both top-5 listings + the per-entry score breakdown for the verdict
- * write-up in ADR-001 §"Locked Stack" Storage row + `backlog.md`.
- *
- * Push artifacts then run:
- *
- *   adb push embeddinggemma-300M_seq512_mixed-precision.tflite /data/local/tmp/
- *   adb push sentencepiece.model /data/local/tmp/
- *   adb push docs/stt-e-manifest.example.txt /data/local/tmp/stt-e-manifest.txt
- *   ./gradlew :app:connectedDebugAndroidTest \
- *     -PembeddingModelPath=/data/local/tmp/embeddinggemma-300M_seq512_mixed-precision.tflite \
- *     -PembeddingTokenizerPath=/data/local/tmp/sentencepiece.model \
- *     -PmanifestPath=/data/local/tmp/stt-e-manifest.txt \
- *     -Pandroid.testInstrumentationRunnerArguments.class=dev.anchildress1.vestige.SttEEmbeddingComparisonTest
- *
- * Missing args → [assumeTrue] skips so CI without artifacts stays green.
+ * STT-E gate: compares tag-only baseline vs embedding-augmented retrieval on the A/X fixture and
+ * asserts the hybrid top-5 surfaces ≥4 aftermath entries. Runbook in
+ * `docs/stt-e-manifest.example.txt`. Missing instrumentation args → [assumeTrue] skips so CI
+ * without artifacts stays green.
  */
 @RunWith(AndroidJUnit4::class)
 class SttEEmbeddingComparisonTest {
@@ -113,12 +92,9 @@ class SttEEmbeddingComparisonTest {
     }
 
     private fun seedCorpus(boxStore: BoxStore, corpus: List<SttEEntry>) {
-        // Use the Java-side Box<T> accessor — io.objectbox.kotlin is `implementation` in
-        // :core-storage, so the reified `boxFor<T>` extension isn't on app's classpath.
+        // io.objectbox.kotlin is implementation-scoped in :core-storage; use the Java accessor.
         val entryBox = boxStore.boxFor(EntryEntity::class.java)
         val tagBox = boxStore.boxFor(TagEntity::class.java)
-        // De-dup tags across the corpus so each TagEntity exists once — mirrors production
-        // EntryStore behavior (one row per surface form).
         val tagEntities: Map<String, TagEntity> = corpus.flatMap { it.tags }.toSet().associateWith { name ->
             TagEntity(name = name, entryCount = 0).also { tagBox.put(it) }
         }

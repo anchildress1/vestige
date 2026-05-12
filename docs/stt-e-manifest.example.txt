@@ -4,8 +4,21 @@
 # `#` comments and blank lines ignored.
 #
 # Tags model what BackgroundExtractionWorker (Phase 2) would emit on each entry. They are
-# pre-baked here so STT-E measures retrieval — not tag extraction (covered by STT-C). Push to
-# device + run per SttEEmbeddingComparisonTest KDoc.
+# pre-baked here so STT-E measures retrieval — not tag extraction (covered by STT-C).
+#
+# Run on the reference S24 Ultra:
+#
+#   adb push embeddinggemma-300M_seq512_mixed-precision.tflite /data/local/tmp/
+#   adb push sentencepiece.model /data/local/tmp/
+#   adb push docs/stt-e-manifest.example.txt /data/local/tmp/stt-e-manifest.txt
+#   ./gradlew :app:connectedDebugAndroidTest \
+#     -PembeddingModelPath=/data/local/tmp/embeddinggemma-300M_seq512_mixed-precision.tflite \
+#     -PembeddingTokenizerPath=/data/local/tmp/sentencepiece.model \
+#     -PmanifestPath=/data/local/tmp/stt-e-manifest.txt \
+#     -Pandroid.testInstrumentationRunnerArguments.class=dev.anchildress1.vestige.SttEEmbeddingComparisonTest
+#
+# Verdict evidence lives under logcat tag `VestigeSttE` — both top-5 listings plus per-entry
+# cohort labels. Record the outcome in ADR-001 §"Locked Stack" Storage row + backlog.md.
 
 A1|2026-04-21T11:15:00-07:00[America/Los_Angeles]|standup,meeting,aftermath,flattened,doc|Standup ran long again. I was fine before it, then completely flattened by 11. Opened the doc and just stared at it.
 A2|2026-04-21T12:10:00-07:00[America/Los_Angeles]|tuesday-meeting,meeting,aftermath,concrete|Tuesday meeting. Same thing. Went in normal, came out with concrete in my limbs. Ate late because I lost the plot.

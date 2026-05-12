@@ -216,7 +216,6 @@ class BackgroundExtractionSaveFlowTest {
 
         val outcome = flowWithOrch.saveAndExtract(SAMPLE_TEXT, SAMPLE_TIMESTAMP)
 
-        // ADR-003 §"Detection algorithm" step-8 fail mode: log + continue. Save succeeds.
         assertEquals(ENTRY_ID, outcome.entryId, "orchestrator failure must not abort the save")
         verify(exactly = 0) { entryStore.appendObservation(any(), any(), any()) }
     }
@@ -244,8 +243,6 @@ class BackgroundExtractionSaveFlowTest {
         assertEquals(0, capturedRequest.captured.entryAttemptCount)
 
         assertEquals(ENTRY_ID, outcome.entryId)
-        // Observations are no longer returned on the SaveOutcome — they're an argument to
-        // `completeEntry` instead. coVerifyOrder below pins them.
         coVerifyOrder {
             entryStore.createPendingEntry(SAMPLE_TEXT, SAMPLE_TIMESTAMP.toInstant())
             worker.extract(any(), any())
@@ -271,8 +268,7 @@ class BackgroundExtractionSaveFlowTest {
         val outcome = flow.saveAndExtract(SAMPLE_TEXT, SAMPLE_TIMESTAMP)
 
         assertEquals(ENTRY_ID, outcome.entryId)
-        // Generator threw → empty list persisted (verified via the completeEntry argument
-        // captor; SaveOutcome no longer carries observations).
+        // Generator threw → empty observation list persisted instead of aborting the save.
         coVerify(exactly = 1) {
             entryStore.completeEntry(ENTRY_ID, resolved, TemplateLabel.AFTERMATH, emptyList())
         }
@@ -405,9 +401,8 @@ class BackgroundExtractionSaveFlowTest {
             entryStore.completeEntry(ENTRY_ID, resolved, TemplateLabel.AFTERMATH, emptyList())
         } throws IllegalStateException("disk blew up")
 
-        // Two-tier contract: the detached extraction catches persistence failures, routes them
-        // through compensatePersistenceFailure, and emits FAILED. The caller-facing
-        // `saveAndExtract` returns Pending and never throws.
+        // Persistence failure is caught inside the detached extraction, routed through
+        // compensatePersistenceFailure, and surfaced as FAILED. saveAndExtract itself never throws.
         flowWithMockListener.saveAndExtract(SAMPLE_TEXT, SAMPLE_TIMESTAMP)
 
         coVerifyOrder {
@@ -534,9 +529,8 @@ class BackgroundExtractionSaveFlowTest {
             entryStore.failEntry(ENTRY_ID, ExtractionStatus.FAILED, "persistence-error:IllegalStateException")
         } answers { Unit }
 
-        // Two-tier contract: the original failEntry throws inside the detached extraction;
-        // compensatePersistenceFailure catches + re-writes a terminal FAILED row. Caller never
-        // sees the exception.
+        // First failEntry throws; compensatePersistenceFailure catches it and re-writes the
+        // terminal FAILED row. Caller never sees either exception.
         flowWithMockListener.saveAndExtract(SAMPLE_TEXT, SAMPLE_TIMESTAMP)
 
         coVerifyOrder {
@@ -571,7 +565,7 @@ class BackgroundExtractionSaveFlowTest {
             entryStore.failEntry(ENTRY_ID, ExtractionStatus.FAILED, "persistence-error:IllegalStateException")
         } answers { Unit }
 
-        // Two-tier contract: detached catches; caller sees Pending only.
+        // Compensation handles the timeout's secondary persistence failure; caller only sees Pending.
         flowWithMockListener.saveAndExtract(SAMPLE_TEXT, SAMPLE_TIMESTAMP)
 
         coVerifyOrder {
@@ -610,12 +604,11 @@ class BackgroundExtractionSaveFlowTest {
             entryStore.failEntry(ENTRY_ID, ExtractionStatus.FAILED, "persistence-error:IllegalStateException")
         } throws RuntimeException("secondary fs error")
 
-        // Two-tier contract: the detached extraction catches the primary IllegalStateException
-        // and the secondary compensation RuntimeException; saveAndExtract returns Pending and
-        // never throws. Both writes still fire; the lifecycle listener still gets FAILED.
+        // Both the primary IllegalStateException and the secondary compensation
+        // RuntimeException are caught inside the detached extraction; saveAndExtract returns
+        // Pending. Both write attempts still fire and the lifecycle listener still gets FAILED.
         flowWithMockListener.saveAndExtract(SAMPLE_TEXT, SAMPLE_TIMESTAMP)
 
-        // The compensation write still fired, the lifecycle was still notified.
         coVerifyOrder {
             entryStore.completeEntry(ENTRY_ID, resolved, TemplateLabel.AFTERMATH, emptyList())
             entryStore.failEntry(ENTRY_ID, ExtractionStatus.FAILED, "persistence-error:IllegalStateException")

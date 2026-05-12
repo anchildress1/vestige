@@ -119,9 +119,8 @@ class AppContainer(
                 patternOrchestrator = orchestrator,
             )
         },
-    // Cold-start sweep — `null` means the live `VestigeBoxStore.findNonTerminalEntryIds(boxStore)`
-    // query (production default per ADR-006 §"Action Item #4"). Tests inject a fixed seed to keep
-    // them BoxStore-free.
+    // `null` triggers the live `VestigeBoxStore.findNonTerminalEntryIds(boxStore)` cold-start
+    // sweep; tests inject a fixed seed to stay BoxStore-free.
     private val recoveredEntryIdsLoader: (() -> Collection<Long>)? = null,
     private val foregroundServiceIntentFactory: () -> Intent = {
         Intent(applicationContext, BackgroundExtractionService::class.java)
@@ -155,8 +154,6 @@ class AppContainer(
     private val embeddingArtifactsDir: File by lazy { File(applicationContext.filesDir, MODEL_ARTIFACTS_SUBDIR) }
     private val embeddingArtifactManifest: EmbeddingArtifactManifest by lazy(embeddingArtifactManifestLoader)
 
-    // Story 2.12's production DI surface. `saveAndExtract(...)` below is the app-owned entrypoint
-    // that closes the loop; capture/UI code calls AppContainer, not the save flow directly.
     private val backgroundEngineDelegate = lazy {
         backgroundEngineFactory(
             modelPathLoader(applicationContext),

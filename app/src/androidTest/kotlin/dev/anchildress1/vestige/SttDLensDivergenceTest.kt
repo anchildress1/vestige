@@ -21,7 +21,7 @@ import org.junit.runner.RunWith
 import java.io.File
 
 /**
- * STT-D — lens-divergence verification per `docs/stories/phase-2-core-loop.md` §Story 2.7 and
+ * STT-D — lens-divergence verification against the canonical corpus in
  * `docs/sample-data-scenarios.md` §STT-D. Runs the manifest entries through
  * [BackgroundExtractionWorker], records per-lens output, and asserts at least
  * [StopAndTestCorpusRules.requiredDivergentEntries] entries (30%) show meaningful field-level

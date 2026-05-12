@@ -115,9 +115,8 @@ class BackgroundExtractionSaveFlow(
                 )
             }
         } catch (cancellation: CancellationException) {
-            // Scope cancellation (process death, app shutdown) lands the entry in PENDING/RUNNING
-            // for the cold-start sweep to resume per ADR-001 Q3. Re-throw so structured
-            // concurrency propagates.
+            // Leave the entry in PENDING/RUNNING for the cold-start sweep; rethrow so
+            // structured concurrency propagates the cancellation upward.
             throw cancellation
         } catch (compensated: PersistenceCompensatedException) {
             Log.w(
@@ -152,8 +151,8 @@ class BackgroundExtractionSaveFlow(
         ) {
             entryStore.completeEntry(entryId, result.resolved, result.templateLabel, observations)
         }
-        // Pattern callout best-effort per ADR-003 — runs after the terminal commit so a
-        // post-persistence failure can't unwind the resolved entry. Failure swallowed below.
+        // Runs after the terminal commit so a callout failure can't unwind the resolved
+        // entry. Best-effort — failures are swallowed in runPatternOrchestration.
         runPatternOrchestration(entryId, persona)
     }
 
@@ -164,7 +163,7 @@ class BackgroundExtractionSaveFlow(
         } catch (cancellation: CancellationException) {
             throw cancellation
         } catch (@Suppress("TooGenericExceptionCaught") error: Exception) {
-            // ADR-003: pattern detection is a best-effort layer, not blocking. Swallow + log.
+            // Best-effort layer; swallow so a pattern-detection failure doesn't fail the save.
             Log.w(
                 TAG,
                 "Pattern orchestration failed for entryId=$entryId: " +

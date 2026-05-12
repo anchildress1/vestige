@@ -345,7 +345,10 @@ class RetrievalRepoTest {
     fun `queryHybrid blank text returns empty without invoking the embedder`() = runBlocking {
         insertEntry("standup crashed", daysAgo = 1)
         var calls = 0
-        val embedder: suspend (String) -> FloatArray = { calls++; floatArrayOf(1f) }
+        val embedder: suspend (String) -> FloatArray = {
+            calls++
+            floatArrayOf(1f)
+        }
 
         assertTrue(repo.queryHybrid("   ", embedder).isEmpty())
         assertEquals(0, calls)
@@ -367,7 +370,7 @@ class RetrievalRepoTest {
         val embedder = fixedEmbedder(
             "standup" to floatArrayOf(1f, 0f),
             "standup crashed me" to floatArrayOf(0f, 1f), // far from query
-            "standup wired me" to floatArrayOf(1f, 0f),   // identical to query — would dominate
+            "standup wired me" to floatArrayOf(1f, 0f), // identical to query — would dominate
         )
 
         val classic = repo.query("standup").map { it.id }

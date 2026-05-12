@@ -1,0 +1,18 @@
+# STT-E corpus — embeddings vs tag-only comparison fixture.
+# Source: docs/sample-data-scenarios.md §STT-E (A1-A6 aftermath drift + X1-X3 literal distractors).
+# Format: id|ISO_ZONED_DATETIME|comma_separated_tags|entry_text
+# `#` comments and blank lines ignored.
+#
+# Tags model what BackgroundExtractionWorker (Phase 2) would emit on each entry. They are
+# pre-baked here so STT-E measures retrieval — not tag extraction (covered by STT-C). Push to
+# device + run per SttEEmbeddingComparisonTest KDoc.
+
+A1|2026-04-21T11:15:00-07:00[America/Los_Angeles]|standup,meeting,aftermath,flattened,doc|Standup ran long again. I was fine before it, then completely flattened by 11. Opened the doc and just stared at it.
+A2|2026-04-21T12:10:00-07:00[America/Los_Angeles]|tuesday-meeting,meeting,aftermath,concrete|Tuesday meeting. Same thing. Went in normal, came out with concrete in my limbs. Ate late because I lost the plot.
+A3|2026-04-23T15:40:00-07:00[America/Los_Angeles]|roadmap-call,post-meeting,aftermath,corpse-routine|After the roadmap call I did the little post-meeting corpse routine. Three tabs open, zero movement.
+A4|2026-04-24T10:25:00-07:00[America/Los_Angeles]|sync,aftermath,battery,meeting|Not tired exactly. More like the battery got yanked after the sync.
+A5|2026-04-27T16:20:00-07:00[America/Los_Angeles]|client-review,aftermath,hollow,meeting|After the client review I went hollow. Couldn't start the next thing.
+A6|2026-04-29T14:05:00-07:00[America/Los_Angeles]|planning-call,aftermath,static,meeting|The planning call left static in my head. Technically awake, operationally not.
+X1|2026-04-21T10:30:00-07:00[America/Los_Angeles]|battery,keyboard,meeting|The battery died on my keyboard during the meeting.
+X2|2026-04-22T11:45:00-07:00[America/Los_Angeles]|crash,test-app,objectbox|I crashed the test app after changing the ObjectBox entity.
+X3|2026-04-23T13:20:00-07:00[America/Los_Angeles]|concrete-shoes,song,lyric|Concrete shoes came up in a song lyric.

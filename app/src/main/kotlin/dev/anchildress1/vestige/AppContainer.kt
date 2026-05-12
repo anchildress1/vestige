@@ -92,6 +92,12 @@ class AppContainer(
     private val embedderFactory: (String, String) -> Embedder = { modelPath, tokenizerPath ->
         GemmaTextEmbedder(modelPath = modelPath, tokenizerPath = tokenizerPath)
     },
+    private val vectorBackfillWorkerFactory: (
+        BoxStore,
+        suspend (String) -> FloatArray,
+    ) -> VectorBackfillWorker = { store, embedEntryText ->
+        VectorBackfillWorker(store, embedEntryText)
+    },
     private val backgroundExtractionSaveFlowFactory: (
         EntryStore,
         BackgroundExtractionWorker,
@@ -119,7 +125,7 @@ class AppContainer(
         applicationContext.startForegroundService(intent)
     },
     private val vectorBackfillRetryDelayMs: Long = VECTOR_BACKFILL_RETRY_DELAY_MS,
-    private val vectorBackfillPassOverride: (suspend AppContainer.() -> Boolean)? = null,
+    private val vectorBackfillMaxRetries: Int = VECTOR_BACKFILL_MAX_RETRIES,
     private val vectorBackfillScheduleListener: (() -> Unit)? = null,
     private val scope: CoroutineScope = defaultScope(),
 ) {
@@ -286,38 +292,36 @@ class AppContainer(
      * tag `VectorBackfill`.
      */
     fun launchVectorBackfillIfReady() {
-        vectorBackfillScheduleListener?.invoke()
         vectorBackfillRequested.set(true)
         if (!vectorBackfillRunning.compareAndSet(false, true)) return
+        vectorBackfillScheduleListener?.invoke()
         launchVectorBackfillRunner()
     }
 
     private fun launchVectorBackfillRunner() {
-        suspend fun runVectorBackfillCycle(): Boolean {
-            vectorBackfillRequested.set(false)
-            val shouldRetry = vectorBackfillPassOverride?.invoke(this@AppContainer)
-                ?: vectorBackfillMutex.withLock {
-                    val worker = VectorBackfillWorker(boxStore) { text -> requireEmbedder().embed(text) }
-                    // Cheap presence-only check before paying for SHA-256 artifact verification —
-                    // most cold starts and steady-state save completions have nothing to backfill.
-                    if (!worker.hasPendingWork()) return@withLock false
+        require(vectorBackfillMaxRetries >= 0) {
+            "vectorBackfillMaxRetries must be >= 0 (got $vectorBackfillMaxRetries)"
+        }
 
-                    val modelState = embeddingModelArtifactStore.currentState()
-                    val tokenizerState = embeddingTokenizerArtifactStore.currentState()
-                    if (modelState !is ModelArtifactState.Complete ||
-                        tokenizerState !is ModelArtifactState.Complete
-                    ) {
-                        Log.i(TAG, "Vector backfill delayed — embedding artifacts not yet complete")
-                        return@withLock true
-                    }
-                    worker.backfill()
-                    false
+        suspend fun runVectorBackfillCycle(): VectorBackfillOutcome {
+            vectorBackfillRequested.set(false)
+            return vectorBackfillMutex.withLock {
+                val worker = vectorBackfillWorkerFactory(boxStore) { text -> requireEmbedder().embed(text) }
+                // Cheap presence-only check before paying for SHA-256 artifact verification —
+                // most cold starts and steady-state save completions have nothing to backfill.
+                if (!worker.hasPendingWork()) return@withLock VectorBackfillOutcome.IDLE
+
+                val modelState = embeddingModelArtifactStore.currentState()
+                val tokenizerState = embeddingTokenizerArtifactStore.currentState()
+                if (modelState !is ModelArtifactState.Complete ||
+                    tokenizerState !is ModelArtifactState.Complete
+                ) {
+                    Log.i(TAG, "Vector backfill delayed — embedding artifacts not yet complete")
+                    return@withLock VectorBackfillOutcome.RETRY_LATER
                 }
-            if (shouldRetry) {
-                delay(vectorBackfillRetryDelayMs)
-                vectorBackfillRequested.set(true)
+                worker.backfill()
+                VectorBackfillOutcome.COMPLETE
             }
-            return vectorBackfillRequested.get()
         }
 
         fun relaunchVectorBackfillIfRequested() {
@@ -330,8 +334,30 @@ class AppContainer(
         }
 
         scope.launch {
+            var retryCount = 0
             try {
-                while (runVectorBackfillCycle()) Unit
+                while (true) {
+                    when (runVectorBackfillCycle()) {
+                        VectorBackfillOutcome.IDLE,
+                        VectorBackfillOutcome.COMPLETE,
+                        -> retryCount = 0
+
+                        VectorBackfillOutcome.RETRY_LATER -> {
+                            if (retryCount >= vectorBackfillMaxRetries) {
+                                Log.e(
+                                    TAG,
+                                    "Vector backfill abandoned after $vectorBackfillMaxRetries retries; " +
+                                        "a future save or cold start will retrigger it.",
+                                )
+                            } else {
+                                retryCount += 1
+                                delay(vectorBackfillRetryDelayMs)
+                                vectorBackfillRequested.set(true)
+                            }
+                        }
+                    }
+                    if (!vectorBackfillRequested.get()) break
+                }
             } finally {
                 relaunchVectorBackfillIfRequested()
             }
@@ -370,6 +396,7 @@ class AppContainer(
         const val TAG = "VestigeAppContainer"
         const val MODEL_ARTIFACTS_SUBDIR = "models"
         const val VECTOR_BACKFILL_RETRY_DELAY_MS = 5_000L
+        const val VECTOR_BACKFILL_MAX_RETRIES = 12
 
         fun defaultScope(): CoroutineScope {
             val exceptionHandler = CoroutineExceptionHandler { _, error ->
@@ -377,5 +404,11 @@ class AppContainer(
             }
             return CoroutineScope(SupervisorJob() + Dispatchers.Default + exceptionHandler)
         }
+    }
+
+    private enum class VectorBackfillOutcome {
+        IDLE,
+        COMPLETE,
+        RETRY_LATER,
     }
 }

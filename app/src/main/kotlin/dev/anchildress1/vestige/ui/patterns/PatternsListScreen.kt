@@ -5,9 +5,11 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -21,6 +23,7 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SnackbarResult
@@ -67,7 +70,12 @@ fun PatternsListScreen(
                         PatternAction.MARKED_RESOLVED -> "Marked resolved."
                     }
                     val undoLabel = if (event.undo == null) null else "Undo"
-                    val result = snackbarHostState.showSnackbar(message = message, actionLabel = undoLabel)
+                    // Long ≈ 10s — Story 3.8 wants the undo affordance alive for ≥5s.
+                    val result = snackbarHostState.showSnackbar(
+                        message = message,
+                        actionLabel = undoLabel,
+                        duration = SnackbarDuration.Long,
+                    )
                     if (result == SnackbarResult.ActionPerformed && event.undo != null) {
                         viewModel.undo(event.undo)
                     }
@@ -160,11 +168,12 @@ private fun PatternCard(
         color = MaterialTheme.colorScheme.surfaceContainer,
         shape = RoundedCornerShape(12.dp),
     ) {
-        Row(modifier = Modifier.fillMaxWidth()) {
+        Row(modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min)) {
+            // Rule must stretch the full card height so observation wrapping doesn't strand it.
             Box(
                 modifier = Modifier
                     .width(3.dp)
-                    .height(80.dp)
+                    .fillMaxHeight()
                     .background(PatternAccent),
             )
             Column(
@@ -200,11 +209,7 @@ private fun PatternCard(
 }
 
 @Composable
-private fun OverflowMenu(
-    onDismiss: () -> Unit,
-    onSnooze: () -> Unit,
-    onMarkResolved: () -> Unit,
-) {
+private fun OverflowMenu(onDismiss: () -> Unit, onSnooze: () -> Unit, onMarkResolved: () -> Unit) {
     var expanded by remember { mutableStateOf(false) }
     Box {
         IconButton(

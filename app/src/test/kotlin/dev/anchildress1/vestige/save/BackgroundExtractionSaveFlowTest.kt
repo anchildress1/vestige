@@ -21,6 +21,9 @@ import io.mockk.mockk
 import io.mockk.slot
 import io.mockk.verify
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertTrue
@@ -45,7 +48,21 @@ class BackgroundExtractionSaveFlowTest {
     private val listenerFactory: (Long) -> ExtractionStatusListener = {
         ExtractionStatusListener { status, _, _ -> listenerEvents += status }
     }
-    private val flow = BackgroundExtractionSaveFlow(entryStore, worker, observationGenerator, listenerFactory)
+
+    // Unconfined scope makes `scope.launch { ... }` run the detached extraction body on the
+    // caller's thread up to the first real suspension point. Mocked dependencies don't suspend,
+    // so the entire pipeline completes synchronously before `saveAndExtract` returns —
+    // assertions on entryStore / listener side effects see the terminal state immediately.
+    // `flowScope` is a fresh Job per test class so a CancellationException in one test doesn't
+    // poison the next.
+    private val flowScope: CoroutineScope = CoroutineScope(Dispatchers.Unconfined + Job())
+    private val flow = BackgroundExtractionSaveFlow(
+        entryStore = entryStore,
+        worker = worker,
+        observationGenerator = observationGenerator,
+        listenerFactory = listenerFactory,
+        scope = flowScope,
+    )
 
     @Test
     fun `pattern orchestrator callout is appended to the persisted observations`() = runTest {
@@ -55,6 +72,7 @@ class BackgroundExtractionSaveFlowTest {
             worker = worker,
             observationGenerator = observationGenerator,
             listenerFactory = listenerFactory,
+            scope = flowScope,
             patternOrchestrator = orchestrator,
         )
         val storedEntry = dev.anchildress1.vestige.storage.EntryEntity(
@@ -86,11 +104,12 @@ class BackgroundExtractionSaveFlowTest {
             (args[2] as () -> Unit).invoke()
         }
 
-        val outcome = flowWithOrch.saveAndExtract(SAMPLE_TEXT, SAMPLE_TIMESTAMP) as SaveOutcome.Completed
+        val outcome = flowWithOrch.saveAndExtract(SAMPLE_TEXT, SAMPLE_TIMESTAMP)
 
-        assertEquals(listOf(callout), outcome.observations)
+        assertEquals(ENTRY_ID, outcome.entryId)
         // Order is the load-bearing fix: appendObservation MUST invoke the settlement callback
-        // inside the same persistence transaction.
+        // inside the same persistence transaction. With the two-tier refactor, the callout flows
+        // through `appendObservation` instead of being returned on the save outcome.
         coVerifyOrder {
             entryStore.completeEntry(ENTRY_ID, resolved, TemplateLabel.AFTERMATH, emptyList())
             orchestrator.onEntryCommitted(storedEntry, dev.anchildress1.vestige.model.Persona.WITNESS)
@@ -107,6 +126,7 @@ class BackgroundExtractionSaveFlowTest {
             worker = worker,
             observationGenerator = observationGenerator,
             listenerFactory = listenerFactory,
+            scope = flowScope,
             patternOrchestrator = orchestrator,
         )
         val storedEntry = dev.anchildress1.vestige.storage.EntryEntity(
@@ -137,7 +157,7 @@ class BackgroundExtractionSaveFlowTest {
         val outcome = flowWithOrch.saveAndExtract(SAMPLE_TEXT, SAMPLE_TIMESTAMP)
 
         // Save still completes; orchestrator failure swallowed.
-        assertTrue(outcome is SaveOutcome.Completed, "append failure must not abort the save")
+        assertTrue(outcome is SaveOutcome.Pending, "append failure must not abort the save")
         // CRITICAL: confirm must not run when append throws — the reservation gets released
         // instead because the user never saw the callout.
         verify(exactly = 0) { orchestrator.settleReservedCallout(any(), fired = true) }
@@ -152,6 +172,7 @@ class BackgroundExtractionSaveFlowTest {
             worker = worker,
             observationGenerator = observationGenerator,
             listenerFactory = listenerFactory,
+            scope = flowScope,
             patternOrchestrator = orchestrator,
         )
         val resolved = canonicalSample()
@@ -170,7 +191,7 @@ class BackgroundExtractionSaveFlowTest {
         val outcome = flowWithOrch.saveAndExtract(SAMPLE_TEXT, SAMPLE_TIMESTAMP)
 
         // ADR-003 §"Detection algorithm" step-8 fail mode: log + continue. Save succeeds.
-        assertTrue(outcome is SaveOutcome.Completed, "orchestrator failure must not abort the save")
+        assertTrue(outcome is SaveOutcome.Pending, "orchestrator failure must not abort the save")
         verify(exactly = 0) { entryStore.appendObservation(any(), any(), any()) }
     }
 
@@ -196,9 +217,9 @@ class BackgroundExtractionSaveFlowTest {
         assertEquals(SAMPLE_TIMESTAMP, capturedRequest.captured.capturedAt)
         assertEquals(0, capturedRequest.captured.entryAttemptCount)
 
-        val completed = outcome as SaveOutcome.Completed
-        assertEquals(ENTRY_ID, completed.entryId)
-        assertEquals(observations, completed.observations)
+        assertEquals(ENTRY_ID, outcome.entryId)
+        // Observations are no longer returned on the SaveOutcome — they're an argument to
+        // `completeEntry` instead. coVerifyOrder below pins them.
         coVerifyOrder {
             entryStore.createPendingEntry(SAMPLE_TEXT, SAMPLE_TIMESTAMP.toInstant())
             worker.extract(any(), any())
@@ -223,8 +244,9 @@ class BackgroundExtractionSaveFlowTest {
 
         val outcome = flow.saveAndExtract(SAMPLE_TEXT, SAMPLE_TIMESTAMP)
 
-        val completed = outcome as SaveOutcome.Completed
-        assertEquals(emptyList<EntryObservation>(), completed.observations)
+        assertEquals(ENTRY_ID, outcome.entryId)
+        // Generator threw → empty list persisted (verified via the completeEntry argument
+        // captor; SaveOutcome no longer carries observations).
         coVerify(exactly = 1) {
             entryStore.completeEntry(ENTRY_ID, resolved, TemplateLabel.AFTERMATH, emptyList())
         }
@@ -242,7 +264,7 @@ class BackgroundExtractionSaveFlowTest {
 
         val outcome = flow.saveAndExtract(SAMPLE_TEXT, SAMPLE_TIMESTAMP)
 
-        val failed = outcome as SaveOutcome.Failed
+        val failed = outcome as SaveOutcome.Pending
         assertEquals(ENTRY_ID, failed.entryId)
         coVerify(exactly = 1) {
             entryStore.failEntry(ENTRY_ID, ExtractionStatus.FAILED, "all-lenses-parse-fail")
@@ -265,7 +287,7 @@ class BackgroundExtractionSaveFlowTest {
 
         val outcome = flow.saveAndExtract(SAMPLE_TEXT, SAMPLE_TIMESTAMP)
 
-        val timedOut = outcome as SaveOutcome.TimedOut
+        val timedOut = outcome as SaveOutcome.Pending
         assertEquals(ENTRY_ID, timedOut.entryId)
         coVerify(exactly = 1) {
             entryStore.failEntry(ENTRY_ID, ExtractionStatus.TIMED_OUT, "timeout-after-90000ms")
@@ -281,7 +303,7 @@ class BackgroundExtractionSaveFlowTest {
             ExtractionStatusListener { _, _, _ -> }
         }
         val flowWithCapture =
-            BackgroundExtractionSaveFlow(entryStore, worker, observationGenerator, capturingFactory)
+            BackgroundExtractionSaveFlow(entryStore, worker, observationGenerator, capturingFactory, flowScope)
         every { entryStore.createPendingEntry(any(), any()) } returns ENTRY_ID
         coEvery { worker.extract(any(), any()) } returns BackgroundExtractionResult.Success(
             totalElapsedMs = 10L,
@@ -302,7 +324,9 @@ class BackgroundExtractionSaveFlowTest {
     fun `terminal completion reaches the lifecycle listener only after completeEntry succeeds`() = runTest {
         val downstream: ExtractionStatusListener = mockk(relaxed = true)
         val flowWithMockListener =
-            BackgroundExtractionSaveFlow(entryStore, worker, observationGenerator, listenerFactory = { downstream })
+            BackgroundExtractionSaveFlow(entryStore, worker, observationGenerator, listenerFactory = {
+                downstream
+            }, scope = flowScope)
         every { entryStore.createPendingEntry(any(), any()) } returns ENTRY_ID
         coEvery {
             worker.extract(any(), capture(capturedListener))
@@ -334,7 +358,9 @@ class BackgroundExtractionSaveFlowTest {
     fun `persistence failure after worker success emits FAILED instead of leaking worker COMPLETED`() = runTest {
         val downstream: ExtractionStatusListener = mockk(relaxed = true)
         val flowWithMockListener =
-            BackgroundExtractionSaveFlow(entryStore, worker, observationGenerator, listenerFactory = { downstream })
+            BackgroundExtractionSaveFlow(entryStore, worker, observationGenerator, listenerFactory = {
+                downstream
+            }, scope = flowScope)
         val resolved = canonicalSample()
         every { entryStore.createPendingEntry(any(), any()) } returns ENTRY_ID
         coEvery {
@@ -355,12 +381,10 @@ class BackgroundExtractionSaveFlowTest {
             entryStore.completeEntry(ENTRY_ID, resolved, TemplateLabel.AFTERMATH, emptyList())
         } throws IllegalStateException("disk blew up")
 
-        try {
-            flowWithMockListener.saveAndExtract(SAMPLE_TEXT, SAMPLE_TIMESTAMP)
-            fail("expected persistence failure to escape")
-        } catch (expected: IllegalStateException) {
-            assertEquals("disk blew up", expected.message)
-        }
+        // Two-tier contract: the detached extraction catches persistence failures, routes them
+        // through compensatePersistenceFailure, and emits FAILED. The caller-facing
+        // `saveAndExtract` returns Pending and never throws.
+        flowWithMockListener.saveAndExtract(SAMPLE_TEXT, SAMPLE_TIMESTAMP)
 
         coVerifyOrder {
             downstream.onUpdate(ExtractionStatus.RUNNING, 0, null)
@@ -375,7 +399,9 @@ class BackgroundExtractionSaveFlowTest {
     fun `failed result reaches lifecycle listener only after failEntry succeeds`() = runTest {
         val downstream: ExtractionStatusListener = mockk(relaxed = true)
         val flowWithMockListener =
-            BackgroundExtractionSaveFlow(entryStore, worker, observationGenerator, listenerFactory = { downstream })
+            BackgroundExtractionSaveFlow(entryStore, worker, observationGenerator, listenerFactory = {
+                downstream
+            }, scope = flowScope)
         val failEntryReturned = CompletableDeferred<Unit>()
         every { entryStore.createPendingEntry(any(), any()) } returns ENTRY_ID
         coEvery {
@@ -405,7 +431,7 @@ class BackgroundExtractionSaveFlowTest {
 
         val outcome = flowWithMockListener.saveAndExtract(SAMPLE_TEXT, SAMPLE_TIMESTAMP)
 
-        val failed = outcome as SaveOutcome.Failed
+        val failed = outcome as SaveOutcome.Pending
         assertEquals(ENTRY_ID, failed.entryId)
         coVerifyOrder {
             downstream.onUpdate(ExtractionStatus.RUNNING, 0, null)
@@ -418,7 +444,9 @@ class BackgroundExtractionSaveFlowTest {
     fun `timed out result reaches lifecycle listener only after failEntry succeeds`() = runTest {
         val downstream: ExtractionStatusListener = mockk(relaxed = true)
         val flowWithMockListener =
-            BackgroundExtractionSaveFlow(entryStore, worker, observationGenerator, listenerFactory = { downstream })
+            BackgroundExtractionSaveFlow(entryStore, worker, observationGenerator, listenerFactory = {
+                downstream
+            }, scope = flowScope)
         val failEntryReturned = CompletableDeferred<Unit>()
         every { entryStore.createPendingEntry(any(), any()) } returns ENTRY_ID
         coEvery {
@@ -448,7 +476,7 @@ class BackgroundExtractionSaveFlowTest {
 
         val outcome = flowWithMockListener.saveAndExtract(SAMPLE_TEXT, SAMPLE_TIMESTAMP)
 
-        val timedOut = outcome as SaveOutcome.TimedOut
+        val timedOut = outcome as SaveOutcome.Pending
         assertEquals(ENTRY_ID, timedOut.entryId)
         coVerifyOrder {
             downstream.onUpdate(ExtractionStatus.RUNNING, 0, null)
@@ -461,7 +489,9 @@ class BackgroundExtractionSaveFlowTest {
     fun `persistence failure on Failed path routes through compensation`() = runTest {
         val downstream: ExtractionStatusListener = mockk(relaxed = true)
         val flowWithMockListener =
-            BackgroundExtractionSaveFlow(entryStore, worker, observationGenerator, listenerFactory = { downstream })
+            BackgroundExtractionSaveFlow(entryStore, worker, observationGenerator, listenerFactory = {
+                downstream
+            }, scope = flowScope)
         every { entryStore.createPendingEntry(any(), any()) } returns ENTRY_ID
         coEvery { worker.extract(any(), any()) } returns BackgroundExtractionResult.Failed(
             totalElapsedMs = 12_000L,
@@ -478,12 +508,10 @@ class BackgroundExtractionSaveFlowTest {
             entryStore.failEntry(ENTRY_ID, ExtractionStatus.FAILED, "persistence-error:IllegalStateException")
         } answers { Unit }
 
-        try {
-            flowWithMockListener.saveAndExtract(SAMPLE_TEXT, SAMPLE_TIMESTAMP)
-            fail("expected persistence failure to escape")
-        } catch (expected: IllegalStateException) {
-            assertEquals("disk blew up", expected.message)
-        }
+        // Two-tier contract: the original failEntry throws inside the detached extraction;
+        // compensatePersistenceFailure catches + re-writes a terminal FAILED row. Caller never
+        // sees the exception.
+        flowWithMockListener.saveAndExtract(SAMPLE_TEXT, SAMPLE_TIMESTAMP)
 
         coVerifyOrder {
             entryStore.failEntry(ENTRY_ID, ExtractionStatus.FAILED, "all-lenses-parse-fail")
@@ -496,7 +524,9 @@ class BackgroundExtractionSaveFlowTest {
     fun `persistence failure on TimedOut path routes through compensation`() = runTest {
         val downstream: ExtractionStatusListener = mockk(relaxed = true)
         val flowWithMockListener =
-            BackgroundExtractionSaveFlow(entryStore, worker, observationGenerator, listenerFactory = { downstream })
+            BackgroundExtractionSaveFlow(entryStore, worker, observationGenerator, listenerFactory = {
+                downstream
+            }, scope = flowScope)
         every { entryStore.createPendingEntry(any(), any()) } returns ENTRY_ID
         coEvery { worker.extract(any(), any()) } returns BackgroundExtractionResult.TimedOut(
             totalElapsedMs = 90_000L,
@@ -511,12 +541,8 @@ class BackgroundExtractionSaveFlowTest {
             entryStore.failEntry(ENTRY_ID, ExtractionStatus.FAILED, "persistence-error:IllegalStateException")
         } answers { Unit }
 
-        try {
-            flowWithMockListener.saveAndExtract(SAMPLE_TEXT, SAMPLE_TIMESTAMP)
-            fail("expected persistence failure to escape")
-        } catch (expected: IllegalStateException) {
-            assertEquals("fs read-only", expected.message)
-        }
+        // Two-tier contract: detached catches; caller sees Pending only.
+        flowWithMockListener.saveAndExtract(SAMPLE_TEXT, SAMPLE_TIMESTAMP)
 
         coVerifyOrder {
             entryStore.failEntry(ENTRY_ID, ExtractionStatus.TIMED_OUT, "timeout-after-90000ms")
@@ -529,7 +555,9 @@ class BackgroundExtractionSaveFlowTest {
     fun `compensation that itself throws is swallowed so the original error escapes`() = runTest {
         val downstream: ExtractionStatusListener = mockk(relaxed = true)
         val flowWithMockListener =
-            BackgroundExtractionSaveFlow(entryStore, worker, observationGenerator, listenerFactory = { downstream })
+            BackgroundExtractionSaveFlow(entryStore, worker, observationGenerator, listenerFactory = {
+                downstream
+            }, scope = flowScope)
         val resolved = canonicalSample()
         every { entryStore.createPendingEntry(any(), any()) } returns ENTRY_ID
         coEvery { worker.extract(any(), any()) } returns BackgroundExtractionResult.Success(
@@ -548,12 +576,10 @@ class BackgroundExtractionSaveFlowTest {
             entryStore.failEntry(ENTRY_ID, ExtractionStatus.FAILED, "persistence-error:IllegalStateException")
         } throws RuntimeException("secondary fs error")
 
-        try {
-            flowWithMockListener.saveAndExtract(SAMPLE_TEXT, SAMPLE_TIMESTAMP)
-            fail("expected the original persistence error to escape")
-        } catch (expected: IllegalStateException) {
-            assertEquals("primary disk error", expected.message)
-        }
+        // Two-tier contract: the detached extraction catches the primary IllegalStateException
+        // and the secondary compensation RuntimeException; saveAndExtract returns Pending and
+        // never throws. Both writes still fire; the lifecycle listener still gets FAILED.
+        flowWithMockListener.saveAndExtract(SAMPLE_TEXT, SAMPLE_TIMESTAMP)
 
         // The compensation write still fired, the lifecycle was still notified.
         coVerifyOrder {

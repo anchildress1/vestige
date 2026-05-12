@@ -106,14 +106,16 @@ class AppContainer(
         BackgroundExtractionWorker,
         ObservationGenerator,
         (Long) -> ExtractionStatusListener,
+        CoroutineScope,
         PatternDetectionOrchestrator?,
     ) -> BackgroundExtractionSaveFlow =
-        { entryStore, worker, observationGenerator, listenerFactory, orchestrator ->
+        { entryStore, worker, observationGenerator, listenerFactory, extractionScope, orchestrator ->
             BackgroundExtractionSaveFlow(
                 entryStore = entryStore,
                 worker = worker,
                 observationGenerator = observationGenerator,
                 listenerFactory = listenerFactory,
+                scope = extractionScope,
                 patternOrchestrator = orchestrator,
             )
         },
@@ -215,6 +217,7 @@ class AppContainer(
             backgroundExtractionWorker,
             observationGenerator,
             ::extractionStatusListener,
+            scope,
             patternDetectionOrchestrator,
         )
     }
@@ -244,13 +247,19 @@ class AppContainer(
         reportExtractionStatus(entryId, status)
     }
 
+    /**
+     * Two-tier per ADR-002: persists the pending entry, returns [SaveOutcome.Pending] immediately,
+     * and dispatches the detached 3-lens extraction on the container scope. UI callers must not
+     * await the embedded `extractionJob` on the main thread — subscribe to
+     * `BackgroundExtractionStatusBus` for terminal status instead.
+     */
     suspend fun saveAndExtract(
         entryText: String,
         capturedAt: ZonedDateTime,
         retrievedHistory: List<HistoryChunk> = emptyList(),
         timeoutMs: Long? = null,
         persona: Persona = Persona.WITNESS,
-    ): SaveOutcome {
+    ): SaveOutcome.Pending {
         ensureBackgroundEngineInitialized()
         val outcome = backgroundExtractionSaveFlow.saveAndExtract(
             entryText = entryText,

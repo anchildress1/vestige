@@ -216,15 +216,7 @@ class AppContainerTest {
     fun `saveAndExtract initializes the engine before delegating to the save flow`() = runTest {
         val engine = mockk<LiteRtLmEngine>(relaxed = true)
         val saveFlow = mockk<BackgroundExtractionSaveFlow>()
-        val expected = SaveOutcome.Failed(
-            entryId = 42L,
-            result = BackgroundExtractionResult.Failed(
-                totalElapsedMs = 0L,
-                lensResults = emptyList(),
-                modelCallCount = 0,
-                lastError = "boom",
-            ),
-        )
+        val expected = SaveOutcome.Pending(entryId = 42L, extractionJob = kotlinx.coroutines.Job())
         val capturedAt = ZonedDateTime.of(2026, 5, 11, 7, 21, 24, 0, ZoneId.of("America/New_York"))
         coEvery {
             saveFlow.saveAndExtract(
@@ -241,7 +233,7 @@ class AppContainerTest {
             markdownStoreFactory = { mockk<MarkdownEntryStore>(relaxed = true) },
             modelPathLoader = { "/tmp/fake-model.litertlm" },
             backgroundEngineFactory = { _, _ -> engine },
-            backgroundExtractionSaveFlowFactory = { _, _, _, _, _ -> saveFlow },
+            backgroundExtractionSaveFlowFactory = { _, _, _, _, _, _ -> saveFlow },
             recoveredEntryIdsLoader = { emptyList() },
             foregroundServiceIntentFactory = { Intent("dev.anchildress1.vestige.TEST_START") },
             foregroundServiceStarter = {},
@@ -267,15 +259,6 @@ class AppContainerTest {
         val engine = mockk<LiteRtLmEngine>(relaxed = true)
         val saveFlow = mockk<BackgroundExtractionSaveFlow>()
         val capturedAt = ZonedDateTime.of(2026, 5, 11, 7, 21, 24, 0, ZoneId.of("America/New_York"))
-        val outcome = SaveOutcome.TimedOut(
-            entryId = 7L,
-            result = BackgroundExtractionResult.TimedOut(
-                totalElapsedMs = 90_000L,
-                lensResults = emptyList(),
-                modelCallCount = 0,
-                timeoutMs = 90_000L,
-            ),
-        )
         coEvery {
             saveFlow.saveAndExtract(
                 entryText = any(),
@@ -284,14 +267,14 @@ class AppContainerTest {
                 timeoutMs = any(),
                 persona = any(),
             )
-        } returns outcome
+        } answers { SaveOutcome.Pending(entryId = 7L, extractionJob = kotlinx.coroutines.Job()) }
         val container = AppContainer(
             applicationContext = mockk<Context>(relaxed = true),
             boxStoreFactory = { mockk<BoxStore>(relaxed = true) },
             markdownStoreFactory = { mockk<MarkdownEntryStore>(relaxed = true) },
             modelPathLoader = { "/tmp/fake-model.litertlm" },
             backgroundEngineFactory = { _, _ -> engine },
-            backgroundExtractionSaveFlowFactory = { _, _, _, _, _ -> saveFlow },
+            backgroundExtractionSaveFlowFactory = { _, _, _, _, _, _ -> saveFlow },
             recoveredEntryIdsLoader = { emptyList() },
             foregroundServiceIntentFactory = { Intent("dev.anchildress1.vestige.TEST_START") },
             foregroundServiceStarter = {},
@@ -309,15 +292,7 @@ class AppContainerTest {
         val saveFlow = mockk<BackgroundExtractionSaveFlow>()
         val engine = mockk<LiteRtLmEngine>(relaxed = true)
         val capturedAt = ZonedDateTime.of(2026, 5, 12, 8, 15, 0, 0, ZoneId.of("America/New_York"))
-        val expected = SaveOutcome.Failed(
-            entryId = 42L,
-            result = BackgroundExtractionResult.Failed(
-                totalElapsedMs = 0L,
-                lensResults = emptyList(),
-                modelCallCount = 0,
-                lastError = "boom",
-            ),
-        )
+        val expected = SaveOutcome.Pending(entryId = 42L, extractionJob = kotlinx.coroutines.Job())
         var scheduled = 0
         coEvery { saveFlow.saveAndExtract(any(), any(), any(), any(), any()) } returns expected
 
@@ -327,7 +302,7 @@ class AppContainerTest {
             markdownStoreFactory = { mockk<MarkdownEntryStore>(relaxed = true) },
             modelPathLoader = { "/tmp/fake-model.litertlm" },
             backgroundEngineFactory = { _, _ -> engine },
-            backgroundExtractionSaveFlowFactory = { _, _, _, _, _ -> saveFlow },
+            backgroundExtractionSaveFlowFactory = { _, _, _, _, _, _ -> saveFlow },
             recoveredEntryIdsLoader = { emptyList() },
             foregroundServiceIntentFactory = { Intent("dev.anchildress1.vestige.TEST_START") },
             foregroundServiceStarter = {},

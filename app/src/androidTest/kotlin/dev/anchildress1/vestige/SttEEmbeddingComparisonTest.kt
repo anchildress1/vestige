@@ -21,108 +21,56 @@ import java.time.Clock
 import java.time.ZoneOffset
 
 /**
- * STT-E gate: runs the four scenario queries (aftermath / invoice / decision-spiral / late-night)
- * through both retrieval paths against the 18-entry fixture, scores per-query wins, and asserts
- * hybrid wins on ≥50% of queries. Per-query "win" = hybrid surfaces more cohort-relevant entries
- * in the top-N than baseline (ties don't count as wins).
- *
- * Runbook in `docs/stt-e-manifest.example.txt`. Missing instrumentation args → [assumeTrue]
- * skips so CI without artifacts stays green.
+ * End-to-end smoke for hybrid retrieval — seeds the 18-entry STT-E corpus with real
+ * EmbeddingGemma vectors and asserts the hybrid `query()` path surfaces ≥2 cohort-relevant
+ * entries in the top-5 for each of the four scenario queries. Captures the full retrieval stack
+ * on the reference S24 Ultra and guards against regressions in the schema + scorer + embedder
+ * wiring. Runbook in `docs/stt-e-manifest.example.txt`. Missing instrumentation args →
+ * [assumeTrue] skips so CI without artifacts stays green.
  */
 @RunWith(AndroidJUnit4::class)
 class SttEEmbeddingComparisonTest {
 
     @Test
-    fun hybridSurfacesMoreCohortEntriesThanTagOnly() = runBlocking {
+    fun hybridRetrieval_surfacesCohortRelevantEntriesPerQuery() = runBlocking {
         val inputs = loadInputs()
         val corpus = loadCorpus(inputs.manifestFile)
-        val seededRepo = openSeededRepo(corpus)
+        val rawEmbedder = GemmaTextEmbedder(
+            modelPath = inputs.modelFile.path,
+            tokenizerPath = inputs.tokenizerFile.path,
+        )
+        // Memoize so each unique text is embedded once across seeding + queries.
+        val cache = mutableMapOf<String, FloatArray>()
+        val embedder: suspend (String) -> FloatArray = { text ->
+            cache.getOrPut(text) { rawEmbedder.embed(text) }
+        }
+
+        val seeded = openSeededRepo(corpus, embedder)
         try {
-            val rawEmbedder = GemmaTextEmbedder(
-                modelPath = inputs.modelFile.path,
-                tokenizerPath = inputs.tokenizerFile.path,
-            )
-            // Memoize so each unique text is embedded once across all queries — 18 entries +
-            // 4 query strings instead of 4 × (18 entries + 1 query) per-call hits.
-            val cache = mutableMapOf<String, FloatArray>()
-            val embedder: suspend (String) -> FloatArray = { text ->
-                cache.getOrPut(text) { rawEmbedder.embed(text) }
+            QUERIES.forEach { query ->
+                val results = seeded.repo.query(query.text, topN = TOP_N)
+                val ids = results.map { entryIdToCorpusId(it, corpus) }
+                val relevant = ids.count { it in query.relevantIds }
+                android.util.Log.i(
+                    TAG,
+                    "${query.id} hybrid top-$TOP_N: $ids (relevant=$relevant/${query.relevantIds.size})",
+                )
+                assertTrue(
+                    "${query.id} surfaced $relevant relevant entries in top $TOP_N; need ≥$MIN_RELEVANT. " +
+                        "Got $ids.",
+                    relevant >= MIN_RELEVANT,
+                )
             }
-            val scoreboard = runQueries(seededRepo.repo, corpus, embedder)
-            logScoreboard(scoreboard)
-            assertWinRate(scoreboard)
         } finally {
-            seededRepo.close()
+            seeded.close()
         }
     }
 
-    private suspend fun runQueries(
-        repo: RetrievalRepo,
+    private suspend fun seedCorpus(
+        boxStore: BoxStore,
         corpus: List<SttEEntry>,
         embedder: suspend (String) -> FloatArray,
-    ): List<QueryOutcome> = QUERIES.map { query ->
-        val baseline = repo.query(query.text, topN = TOP_N)
-        val hybrid = repo.queryHybrid(query.text, embedder, topN = TOP_N)
-        val baselineIds = baseline.map { entryIdToCorpusId(it, corpus) }
-        val hybridIds = hybrid.map { entryIdToCorpusId(it, corpus) }
-        val baselineRelevant = baselineIds.count { it in query.relevantIds }
-        val hybridRelevant = hybridIds.count { it in query.relevantIds }
-        logRanking(query, "baseline", baselineIds)
-        logRanking(query, "hybrid", hybridIds)
-        QueryOutcome(
-            query = query,
-            baselineIds = baselineIds,
-            hybridIds = hybridIds,
-            baselineRelevant = baselineRelevant,
-            hybridRelevant = hybridRelevant,
-        )
-    }
-
-    private fun logRanking(query: SttEQuery, label: String, ids: List<String>) {
-        val annotated = ids.joinToString(", ") { id ->
-            val cohort = if (id in query.relevantIds) "✓$id" else id
-            cohort
-        }
-        android.util.Log.i(TAG, "${query.id} $label top-${ids.size}: $annotated")
-    }
-
-    private fun logScoreboard(scoreboard: List<QueryOutcome>) {
-        android.util.Log.i(TAG, "=== STT-E scoreboard (relevant in top-$TOP_N) ===")
-        scoreboard.forEach { outcome ->
-            val verdict = when {
-                outcome.hybridRelevant > outcome.baselineRelevant -> "HYBRID WIN"
-                outcome.hybridRelevant < outcome.baselineRelevant -> "BASELINE WIN"
-                else -> "TIE"
-            }
-            android.util.Log.i(
-                TAG,
-                "  ${outcome.query.id}: baseline=${outcome.baselineRelevant}/${outcome.query.relevantIds.size} " +
-                    "hybrid=${outcome.hybridRelevant}/${outcome.query.relevantIds.size} — $verdict",
-            )
-        }
-        val wins = scoreboard.count { it.hybridRelevant > it.baselineRelevant }
-        val losses = scoreboard.count { it.hybridRelevant < it.baselineRelevant }
-        val ties = scoreboard.count { it.hybridRelevant == it.baselineRelevant }
-        android.util.Log.i(
-            TAG,
-            "=== aggregate: hybrid wins=$wins losses=$losses ties=$ties of ${scoreboard.size} queries ===",
-        )
-    }
-
-    private fun assertWinRate(scoreboard: List<QueryOutcome>) {
-        val wins = scoreboard.count { it.hybridRelevant > it.baselineRelevant }
-        val required = (scoreboard.size + 1) / 2 // ceil(half) — 4 queries → 2 wins; 5 → 3
-        assertTrue(
-            "STT-E failed: hybrid won only $wins of ${scoreboard.size} queries (need ≥$required). " +
-                "Per-query relevant counts: " +
-                scoreboard.joinToString("; ") {
-                    "${it.query.id} base=${it.baselineRelevant} hyb=${it.hybridRelevant}"
-                } + ". Inspect logcat tag '$TAG' for full top-$TOP_N listings.",
-            wins >= required,
-        )
-    }
-
-    private fun seedCorpus(boxStore: BoxStore, corpus: List<SttEEntry>) {
+    ) {
         // io.objectbox.kotlin is implementation-scoped in :core-storage; use the Java accessor.
         val entryBox = boxStore.boxFor(EntryEntity::class.java)
         val tagBox = boxStore.boxFor(TagEntity::class.java)
@@ -134,6 +82,7 @@ class SttEEmbeddingComparisonTest {
                 entryText = source.entryText,
                 timestampEpochMs = source.capturedAt.toInstant().toEpochMilli(),
                 markdownFilename = "${source.id}.md",
+                vector = embedder(source.entryText),
             )
             entryBox.put(entry)
             entry.tags.addAll(source.tags.map { tagEntities.getValue(it) })
@@ -173,16 +122,16 @@ class SttEEmbeddingComparisonTest {
         return corpus
     }
 
-    private fun openSeededRepo(corpus: List<SttEEntry>): SeededRepo {
+    private suspend fun openSeededRepo(corpus: List<SttEEntry>, embedder: suspend (String) -> FloatArray): SeededRepo {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         val dataDir = File(context.cacheDir, "objectbox-stt-e-${System.nanoTime()}")
         val boxStore = VestigeBoxStore.openAt(dataDir)
-        seedCorpus(boxStore, corpus)
+        seedCorpus(boxStore, corpus, embedder)
 
         // Pin clock to the most recent fixture timestamp so the 90-day recency window includes
         // every seeded entry deterministically — same convention as RetrievalRepoTest fixtures.
         val newest = corpus.maxOf { it.capturedAt.toInstant() }
-        val repo = RetrievalRepo(boxStore, Clock.fixed(newest, ZoneOffset.UTC))
+        val repo = RetrievalRepo(boxStore, embedder, Clock.fixed(newest, ZoneOffset.UTC))
         return SeededRepo(boxStore = boxStore, dataDir = dataDir, repo = repo)
     }
 
@@ -198,17 +147,13 @@ class SttEEmbeddingComparisonTest {
 
     private data class SttEQuery(val id: String, val text: String, val relevantIds: Set<String>)
 
-    private data class QueryOutcome(
-        val query: SttEQuery,
-        val baselineIds: List<String>,
-        val hybridIds: List<String>,
-        val baselineRelevant: Int,
-        val hybridRelevant: Int,
-    )
-
     private companion object {
         const val TAG = "VestigeSttE"
         const val TOP_N = 5
+
+        // Per-query relevance floor — A cohort has 6 entries (room for 4/5); B/C/D have 3 (most
+        // a query can surface in top-5 is 3). 2/5 is a real-but-imperfect retrieval signal.
+        const val MIN_RELEVANT = 2
 
         val AFTERMATH_IDS = setOf("A1", "A2", "A3", "A4", "A5", "A6")
         val INVOICE_IDS = setOf("B1", "B2", "B3")

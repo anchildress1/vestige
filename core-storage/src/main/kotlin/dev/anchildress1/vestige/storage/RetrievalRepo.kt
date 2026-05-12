@@ -9,28 +9,43 @@ import kotlin.math.min
 import kotlin.math.sqrt
 
 /**
- * Deterministic retrieval over saved entries: keyword overlap + tag-set Jaccard + recency boost,
- * with optional weighted cosine via [queryHybrid]. Ties break by entry id ascending.
+ * Hybrid retrieval over saved entries: keyword overlap + tag-set Jaccard + recency boost +
+ * EmbeddingGemma cosine on the stored [EntryEntity.vector]. Ties break by entry id ascending.
+ * Entries with null vectors contribute 0 cosine — they still rank on the other signals so the
+ * backfill window doesn't drop them from results.
  */
-class RetrievalRepo(private val boxStore: BoxStore, private val clock: Clock = Clock.systemUTC()) {
+class RetrievalRepo(
+    private val boxStore: BoxStore,
+    private val embedder: suspend (String) -> FloatArray,
+    private val clock: Clock = Clock.systemUTC(),
+) {
 
     /**
-     * Return the top-[topN] entries for [text]. Matches require non-zero keyword *or* tag overlap;
-     * recency alone never surfaces an entry. Empty / blank queries and DBs with zero matches yield
-     * an empty list (never nulls). [recencyWeight] scales the recency boost — default `0.3`,
-     * tunable per Phase 2 measurements (ADR-002 §Q2's general retrieval-tuning rule).
+     * Return the top-[topN] entries for [text]. Matches require non-zero keyword, tag, or vector
+     * cosine; recency alone never surfaces an entry. Empty / blank queries yield an empty list.
+     * [recencyWeight] and [embeddingWeight] tune their respective signals (defaults per ADR-002
+     * §Q2 — tunable).
      */
-    fun query(
+    suspend fun query(
         text: String,
         topN: Int = DEFAULT_TOP_N,
         recencyWeight: Float = DEFAULT_RECENCY_WEIGHT,
+        embeddingWeight: Float = DEFAULT_EMBEDDING_WEIGHT,
     ): List<EntryEntity> {
         require(topN > 0) { "RetrievalRepo.query requires topN > 0 (got $topN)" }
-        require(recencyWeight in 0f..1f) { "RetrievalRepo.query requires recencyWeight in [0,1] (got $recencyWeight)" }
+        require(recencyWeight in 0f..1f) {
+            "RetrievalRepo.query requires recencyWeight in [0,1] (got $recencyWeight)"
+        }
+        require(embeddingWeight >= 0f) {
+            "RetrievalRepo.query requires embeddingWeight >= 0 (got $embeddingWeight)"
+        }
 
         val queryTerms = tokenizeToList(text)
         if (queryTerms.isEmpty()) return emptyList()
         val queryTokens = queryTerms.toSet()
+        // Embedding contribution short-circuits when its weight is 0 — avoids both the embedder
+        // call and any dimension mismatch against null-or-different-shape stored vectors.
+        val queryVector: FloatArray? = if (embeddingWeight > 0f) embedder(text) else null
 
         val entryBox = boxStore.boxFor<EntryEntity>()
         val tagBox = boxStore.boxFor<TagEntity>()
@@ -43,9 +58,14 @@ class RetrievalRepo(private val boxStore: BoxStore, private val clock: Clock = C
             val keywordScore = jaccardishKeyword(queryTokens, entryTokens)
             val entryTagKeys = entry.tags.mapNotNullTo(linkedSetOf()) { QueryTagMatcher.storedKey(it.name) }
             val tagScore = jaccard(queryTagKeys, entryTagKeys)
-            if (keywordScore == 0.0 && tagScore == 0.0) return@mapNotNull null
+            val cosine: Double = if (queryVector != null && entry.vector != null) {
+                cosineSimilarity(queryVector, entry.vector!!)
+            } else {
+                0.0
+            }
+            if (keywordScore == 0.0 && tagScore == 0.0 && cosine == 0.0) return@mapNotNull null
             val recency = recencyNorm(entry.timestampEpochMs, nowMs)
-            val score = keywordScore + tagScore + recencyWeight * recency
+            val score = keywordScore + tagScore + recencyWeight * recency + embeddingWeight * cosine
             Scored(entry, score)
         }
 
@@ -71,55 +91,6 @@ class RetrievalRepo(private val boxStore: BoxStore, private val clock: Clock = C
     private fun recencyNorm(timestampMs: Long, nowMs: Long): Double {
         val ageDays = (nowMs - timestampMs).toDouble() / MILLIS_PER_DAY
         return max(0.0, min(1.0, 1.0 - ageDays / RECENCY_WINDOW_DAYS))
-    }
-
-    /**
-     * Hybrid retrieval: keyword + tag + recency baseline plus weighted cosine on the supplied
-     * embedder. Embedder is invoked once for the query and once per candidate entry — callers
-     * eat the latency.
-     */
-    suspend fun queryHybrid(
-        text: String,
-        embedder: suspend (String) -> FloatArray,
-        topN: Int = DEFAULT_TOP_N,
-        recencyWeight: Float = DEFAULT_RECENCY_WEIGHT,
-        embeddingWeight: Float = DEFAULT_EMBEDDING_WEIGHT,
-    ): List<EntryEntity> {
-        require(topN > 0) { "RetrievalRepo.queryHybrid requires topN > 0 (got $topN)" }
-        require(recencyWeight in 0f..1f) {
-            "RetrievalRepo.queryHybrid requires recencyWeight in [0,1] (got $recencyWeight)"
-        }
-        require(embeddingWeight >= 0f) {
-            "RetrievalRepo.queryHybrid requires embeddingWeight >= 0 (got $embeddingWeight)"
-        }
-
-        val queryTerms = tokenizeToList(text)
-        if (queryTerms.isEmpty()) return emptyList()
-        val queryTokens = queryTerms.toSet()
-        val queryVector = embedder(text)
-
-        val entryBox = boxStore.boxFor<EntryEntity>()
-        val tagBox = boxStore.boxFor<TagEntity>()
-        val storedTagKeys = tagBox.all.mapNotNullTo(linkedSetOf()) { QueryTagMatcher.storedKey(it.name) }
-        val queryTagKeys = QueryTagMatcher.queryKeysMatching(queryTerms, storedTagKeys)
-
-        val nowMs = clock.millis()
-        val scored = entryBox.all.map { entry ->
-            val entryTokens = tokenizeToList(entry.entryText).toSet()
-            val keywordScore = jaccardishKeyword(queryTokens, entryTokens)
-            val entryTagKeys = entry.tags.mapNotNullTo(linkedSetOf()) { QueryTagMatcher.storedKey(it.name) }
-            val tagScore = jaccard(queryTagKeys, entryTagKeys)
-            val recency = recencyNorm(entry.timestampEpochMs, nowMs)
-            val entryVector = embedder(entry.entryText)
-            val cosine = cosineSimilarity(queryVector, entryVector)
-            val score = keywordScore + tagScore + recencyWeight * recency + embeddingWeight * cosine
-            Scored(entry, score)
-        }
-
-        return scored
-            .sortedWith(compareByDescending<Scored> { it.score }.thenBy { it.entry.id })
-            .take(topN)
-            .map { it.entry }
     }
 
     private fun cosineSimilarity(a: FloatArray, b: FloatArray): Double {

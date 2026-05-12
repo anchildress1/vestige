@@ -4,13 +4,15 @@ import dev.anchildress1.vestige.model.ExtractionStatus
 import dev.anchildress1.vestige.model.TemplateLabel
 import io.objectbox.annotation.Convert
 import io.objectbox.annotation.Entity
+import io.objectbox.annotation.HnswIndex
 import io.objectbox.annotation.Id
 import io.objectbox.annotation.Index
+import io.objectbox.annotation.VectorDistanceType
 import io.objectbox.relation.ToMany
 
 /**
  * Structured cache of one entry. Markdown is the source of truth — if this row is wiped the app
- * rebuilds from markdown. Vector field is intentionally absent until STT-E passes.
+ * rebuilds from markdown.
  */
 @Suppress("LongParameterList") // Persistence shape mirrors the 12-field markdown frontmatter.
 @Entity
@@ -52,6 +54,18 @@ class EntryEntity(
 
     /** Compact failure reason (timeout / parse-fail / OOM / lens-error). */
     var lastError: String? = null,
+
+    /**
+     * EmbeddingGemma 300M cosine-space vector over [entryText]. Null until the backfill worker
+     * (or save-time embedding) populates it. The HNSW index skips null entries, so cold-start
+     * vector search ignores un-embedded rows without breaking.
+     */
+    @HnswIndex(dimensions = EMBEDDING_DIMENSIONS, distanceType = VectorDistanceType.COSINE)
+    var vector: FloatArray? = null,
 ) {
     lateinit var tags: ToMany<TagEntity>
+
+    companion object {
+        const val EMBEDDING_DIMENSIONS = 768L
+    }
 }

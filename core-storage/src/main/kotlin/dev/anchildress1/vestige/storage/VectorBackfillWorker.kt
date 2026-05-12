@@ -37,7 +37,7 @@ class VectorBackfillWorker(private val boxStore: BoxStore, private val embedder:
             ensureActive()
             try {
                 val vector = embedder(entry.entryText)
-                check(vector.size == EntryEntity.EMBEDDING_DIMENSIONS.toInt()) {
+                check(vector.size.toLong() == EntryEntity.EMBEDDING_DIMENSIONS) {
                     "Embedder returned ${vector.size}-d vector; expected ${EntryEntity.EMBEDDING_DIMENSIONS}"
                 }
                 entry.vector = vector

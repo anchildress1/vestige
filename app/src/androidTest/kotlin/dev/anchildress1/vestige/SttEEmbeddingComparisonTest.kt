@@ -15,6 +15,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Assume.assumeTrue
 import org.junit.Test
 import org.junit.runner.RunWith
+import java.io.Closeable
 import java.io.File
 import java.time.Clock
 import java.time.ZoneOffset
@@ -30,64 +31,17 @@ class SttEEmbeddingComparisonTest {
 
     @Test
     fun hybridSurfacesMoreAftermathEntriesThanTagOnly() = runBlocking {
-        val args = InstrumentationRegistry.getArguments()
-        val modelPath = args.getString("embeddingModelPath")
-        val tokenizerPath = args.getString("embeddingTokenizerPath")
-        val manifestPath = args.getString("manifestPath")
-        assumeTrue("embeddingModelPath instrumentation argument not provided", modelPath != null)
-        assumeTrue("embeddingTokenizerPath instrumentation argument not provided", tokenizerPath != null)
-        assumeTrue("manifestPath instrumentation argument not provided", manifestPath != null)
-        val modelFile = File(modelPath!!)
-        val tokenizerFile = File(tokenizerPath!!)
-        val manifestFile = File(manifestPath!!)
-        assumeTrue("Model file not found at $modelPath", modelFile.exists() && modelFile.canRead())
-        assumeTrue(
-            "Tokenizer file not found at $tokenizerPath",
-            tokenizerFile.exists() && tokenizerFile.canRead(),
-        )
-        assumeTrue("Manifest not found at $manifestPath", manifestFile.exists() && manifestFile.canRead())
-
-        val corpus = SttEManifest.load(manifestFile)
-        require(corpus.map(SttEEntry::id).toSet() == EXPECTED_IDS) {
-            "STT-E manifest must contain exactly $EXPECTED_IDS — got ${corpus.map(SttEEntry::id)}"
-        }
-
-        val context = InstrumentationRegistry.getInstrumentation().targetContext
-        val dataDir = File(context.cacheDir, "objectbox-stt-e-${System.nanoTime()}")
-        val boxStore: BoxStore = VestigeBoxStore.openAt(dataDir)
+        val inputs = loadInputs()
+        val corpus = loadCorpus(inputs.manifestFile)
+        val seededRepo = openSeededRepo(corpus)
         try {
-            seedCorpus(boxStore, corpus)
-
-            // Pin clock to the most recent fixture timestamp so the 90-day recency window includes
-            // every seeded entry deterministically — same convention as RetrievalRepoTest fixtures.
-            val newest = corpus.maxOf { it.capturedAt.toInstant() }
-            val clock = Clock.fixed(newest, ZoneOffset.UTC)
-            val repo = RetrievalRepo(boxStore, clock)
-
-            val embedder = GemmaTextEmbedder(modelPath = modelPath, tokenizerPath = tokenizerPath)
-
-            val baseline = repo.query(QUERY, topN = TOP_N)
-            val hybrid = repo.queryHybrid(QUERY, { embedder.embed(it) }, topN = TOP_N)
-
-            logRanking("baseline (keyword+tag+recency)", baseline, corpus)
-            logRanking("hybrid (+ EmbeddingGemma cosine)", hybrid, corpus)
-
-            val hybridIds = hybrid.map { entryIdToCorpusId(it, corpus) }
-            val aftermathCount = hybridIds.count { it in AFTERMATH_IDS }
-            android.util.Log.i(
-                TAG,
-                "=== STT-E hybrid coverage: $aftermathCount/${AFTERMATH_IDS.size} A-entries in top $TOP_N ===",
+            val embedder = GemmaTextEmbedder(
+                modelPath = inputs.modelFile.path,
+                tokenizerPath = inputs.tokenizerFile.path,
             )
-
-            assertTrue(
-                "STT-E failed: hybrid surfaced only $aftermathCount/${AFTERMATH_IDS.size} A-entries " +
-                    "in top $TOP_N ($hybridIds). Threshold = $MIN_AFTERMATH_IN_TOP_N. " +
-                    "Inspect logcat tag '$TAG' for the per-entry ranking + score breakdown.",
-                aftermathCount >= MIN_AFTERMATH_IN_TOP_N,
-            )
+            assertHybridBeatsBaseline(seededRepo.repo, corpus, embedder)
         } finally {
-            boxStore.close()
-            BoxStore.deleteAllFiles(dataDir)
+            seededRepo.close()
         }
     }
 
@@ -125,11 +79,143 @@ class SttEEmbeddingComparisonTest {
     private fun entryIdToCorpusId(entry: EntryEntity, corpus: List<SttEEntry>): String =
         corpus.firstOrNull { it.entryText == entry.entryText }?.id ?: "?"
 
+    private fun loadInputs(): SttEInputs {
+        val args = InstrumentationRegistry.getArguments()
+        val modelPath = args.getString("embeddingModelPath")
+        val tokenizerPath = args.getString("embeddingTokenizerPath")
+        val manifestPath = args.getString("manifestPath")
+        assumeTrue("embeddingModelPath instrumentation argument not provided", modelPath != null)
+        assumeTrue("embeddingTokenizerPath instrumentation argument not provided", tokenizerPath != null)
+        assumeTrue("manifestPath instrumentation argument not provided", manifestPath != null)
+
+        val modelFile = File(modelPath!!)
+        val tokenizerFile = File(tokenizerPath!!)
+        val manifestFile = File(manifestPath!!)
+        assumeTrue("Model file not found at $modelPath", modelFile.exists() && modelFile.canRead())
+        assumeTrue(
+            "Tokenizer file not found at $tokenizerPath",
+            tokenizerFile.exists() && tokenizerFile.canRead(),
+        )
+        assumeTrue("Manifest not found at $manifestPath", manifestFile.exists() && manifestFile.canRead())
+        return SttEInputs(modelFile = modelFile, tokenizerFile = tokenizerFile, manifestFile = manifestFile)
+    }
+
+    private fun loadCorpus(manifestFile: File): List<SttEEntry> {
+        val corpus = SttEManifest.load(manifestFile)
+        require(corpus.map(SttEEntry::id).toSet() == EXPECTED_IDS) {
+            "STT-E manifest must contain exactly $EXPECTED_IDS — got ${corpus.map(SttEEntry::id)}"
+        }
+        return corpus
+    }
+
+    private fun openSeededRepo(corpus: List<SttEEntry>): SeededRepo {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val dataDir = File(context.cacheDir, "objectbox-stt-e-${System.nanoTime()}")
+        val boxStore = VestigeBoxStore.openAt(dataDir)
+        seedCorpus(boxStore, corpus)
+
+        // Pin clock to the most recent fixture timestamp so the 90-day recency window includes
+        // every seeded entry deterministically — same convention as RetrievalRepoTest fixtures.
+        val newest = corpus.maxOf { it.capturedAt.toInstant() }
+        val repo = RetrievalRepo(boxStore, Clock.fixed(newest, ZoneOffset.UTC))
+        return SeededRepo(boxStore = boxStore, dataDir = dataDir, repo = repo)
+    }
+
+    private suspend fun assertHybridBeatsBaseline(
+        repo: RetrievalRepo,
+        corpus: List<SttEEntry>,
+        embedder: GemmaTextEmbedder,
+    ) {
+        val baseline = repo.query(QUERY, topN = TOP_N)
+        val hybrid = repo.queryHybrid(QUERY, { embedder.embed(it) }, topN = TOP_N)
+
+        logRanking("baseline (keyword+tag+recency)", baseline, corpus)
+        logRanking("hybrid (+ EmbeddingGemma cosine)", hybrid, corpus)
+
+        val baselineIds = baseline.map { entryIdToCorpusId(it, corpus) }
+        val hybridIds = hybrid.map { entryIdToCorpusId(it, corpus) }
+        val baselineStats = summarizeRanking(baselineIds)
+        val hybridStats = summarizeRanking(hybridIds)
+
+        logCoverage("baseline", baselineStats)
+        logCoverage("hybrid", hybridStats)
+        assertHybridCoverage(hybridIds, hybridStats)
+        assertTrue(
+            "STT-E failed: hybrid did not visibly outperform baseline. Baseline=$baselineIds " +
+                "(relevant=${baselineStats.relevantCount}, distractorsBefore4th=" +
+                "${baselineStats.distractorsBeforeFourthRelevant}), hybrid=$hybridIds " +
+                "(relevant=${hybridStats.relevantCount}, distractorsBefore4th=" +
+                "${hybridStats.distractorsBeforeFourthRelevant}).",
+            hybridStats.relevantCount > baselineStats.relevantCount ||
+                (
+                    hybridStats.relevantCount == baselineStats.relevantCount &&
+                        hybridStats.distractorsBeforeFourthRelevant <
+                        baselineStats.distractorsBeforeFourthRelevant
+                    ),
+        )
+    }
+
+    private fun logCoverage(label: String, stats: RankingStats) {
+        android.util.Log.i(
+            TAG,
+            "=== STT-E $label coverage: ${stats.relevantCount}/${AFTERMATH_IDS.size} " +
+                "A-entries in top $TOP_N; distractors before 4th relevant = " +
+                "${stats.distractorsBeforeFourthRelevant} ===",
+        )
+    }
+
+    private fun assertHybridCoverage(hybridIds: List<String>, hybridStats: RankingStats) {
+        assertTrue(
+            "STT-E failed: hybrid surfaced only ${hybridStats.relevantCount}/${AFTERMATH_IDS.size} " +
+                "A-entries in top $TOP_N ($hybridIds). Threshold = $MIN_AFTERMATH_IN_TOP_N. " +
+                "Inspect logcat tag '$TAG' for the per-entry ranking + score breakdown.",
+            hybridStats.relevantCount >= MIN_AFTERMATH_IN_TOP_N,
+        )
+        assertTrue(
+            "STT-E failed: hybrid ranked ${hybridStats.distractorsBeforeFourthRelevant} distractor(s) " +
+                "before the fourth relevant entry ($hybridIds). Max allowed = " +
+                "$MAX_DISTRACTORS_BEFORE_FOURTH_RELEVANT.",
+            hybridStats.distractorsBeforeFourthRelevant <= MAX_DISTRACTORS_BEFORE_FOURTH_RELEVANT,
+        )
+    }
+
+    private fun summarizeRanking(ids: List<String>): RankingStats {
+        var relevantCount = 0
+        var distractorsBeforeFourthRelevant = 0
+        for (id in ids) {
+            when {
+                id in AFTERMATH_IDS -> {
+                    relevantCount += 1
+                    if (relevantCount == MIN_AFTERMATH_IN_TOP_N) break
+                }
+
+                id in DISTRACTOR_IDS -> distractorsBeforeFourthRelevant += 1
+            }
+        }
+        return RankingStats(
+            relevantCount = relevantCount,
+            distractorsBeforeFourthRelevant = distractorsBeforeFourthRelevant,
+        )
+    }
+
+    private data class SttEInputs(val modelFile: File, val tokenizerFile: File, val manifestFile: File)
+
+    private class SeededRepo(private val boxStore: BoxStore, private val dataDir: File, val repo: RetrievalRepo) :
+        Closeable {
+        override fun close() {
+            boxStore.close()
+            BoxStore.deleteAllFiles(dataDir)
+        }
+    }
+
+    private data class RankingStats(val relevantCount: Int, val distractorsBeforeFourthRelevant: Int)
+
     private companion object {
         const val TAG = "VestigeSttE"
         const val QUERY = "Show entries like the post-meeting crash even when I used different words."
         const val TOP_N = 5
         const val MIN_AFTERMATH_IN_TOP_N = 4
+        const val MAX_DISTRACTORS_BEFORE_FOURTH_RELEVANT = 1
         const val SNIPPET_CHARS = 80
         val AFTERMATH_IDS = setOf("A1", "A2", "A3", "A4", "A5", "A6")
         val DISTRACTOR_IDS = setOf("X1", "X2", "X3")

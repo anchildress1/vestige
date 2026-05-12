@@ -8,13 +8,17 @@
 #
 # Run on the reference S24 Ultra:
 #
-#   adb push embeddinggemma-300M_seq512_mixed-precision.tflite /data/local/tmp/
-#   adb push sentencepiece.model /data/local/tmp/
-#   adb push docs/stt-e-manifest.example.txt /data/local/tmp/stt-e-manifest.txt
+#   adb shell mkdir -p /sdcard/Android/data/dev.anchildress1.vestige/files/models
+#   adb push embeddinggemma-300M_seq512_mixed-precision.tflite \
+#     /sdcard/Android/data/dev.anchildress1.vestige/files/models/
+#   adb push sentencepiece.model \
+#     /sdcard/Android/data/dev.anchildress1.vestige/files/models/
+#   adb push docs/stt-e-manifest.example.txt \
+#     /sdcard/Android/data/dev.anchildress1.vestige/files/stt-e-manifest.txt
 #   ./gradlew :app:connectedDebugAndroidTest \
-#     -PembeddingModelPath=/data/local/tmp/embeddinggemma-300M_seq512_mixed-precision.tflite \
-#     -PembeddingTokenizerPath=/data/local/tmp/sentencepiece.model \
-#     -PmanifestPath=/data/local/tmp/stt-e-manifest.txt \
+#     -PembeddingModelPath=/sdcard/Android/data/dev.anchildress1.vestige/files/models/embeddinggemma-300M_seq512_mixed-precision.tflite \
+#     -PembeddingTokenizerPath=/sdcard/Android/data/dev.anchildress1.vestige/files/models/sentencepiece.model \
+#     -PmanifestPath=/sdcard/Android/data/dev.anchildress1.vestige/files/stt-e-manifest.txt \
 #     -Pandroid.testInstrumentationRunnerArguments.class=dev.anchildress1.vestige.SttEEmbeddingComparisonTest
 #
 # Verdict evidence lives under logcat tag `VestigeSttE` — both top-5 listings plus per-entry

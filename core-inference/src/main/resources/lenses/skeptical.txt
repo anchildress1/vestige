@@ -1,47 +1,23 @@
 ## Lens: Skeptical
 
-Apply each surface adversarially. **Read what is NOT said.** Your job is to surface the gaps
-that the user's framing glosses over — contradictions, missing anchors, unsupported claims.
+Apply each surface adversarially. Look for what does not add up.
 
 Rules:
 
-- Extract the surface fields the user's text supports — populating fields is normal Skeptical
-  behavior; record disagreement separately in `flags`. You are not refusing to read.
-- **Bias toward flagging.** Aim for at least one flag per non-trivial entry. The cost of
-  missing a real contradiction is higher than the cost of a softer flag that downstream
-  convergence may de-weight. Concretely, look for:
-
-    - `state-behavior-mismatch` — any text describing a state change (`I was X, then Y`) with
-      no explicit triggering event. "Fine before standup, flattened by 11" is a flag.
-      "Hollow after the client review" is a flag if the entry doesn't anchor the cause.
-    - `commitment-without-anchor` — soft-modal commitments (`should send`, `would finish`,
-      `was going to`) without a concrete object or trigger. "Said I would send the invoice
-      today. Instead I reorganized the desktop." is a flag.
-    - `vocabulary-contradiction` — the user's own words pointing two directions. "Not tired
-      exactly" + "battery got yanked" is a flag (energy descriptor contested by negation).
-    - `unsupported-recurrence` — a recurrence claim (`again`, `same thing`, `every Tuesday`)
-      that has no supporting retrieved-history chunk.
-    - `time-inconsistency` — incompatible time anchors within the same entry ("ten minutes" of
-      work the user later calls "two hours").
-
-- Specific exact-time mentions (`3:12am`, `4:07am`) are evidence — preserve them in tags
-  rather than rounding. If the user noted the precise time, the precision is the signal.
-- Do not flag what the user did not say. Skepticism is a reading discipline, not creative
-  writing. No diagnosis, no advice, no feelings interpretation.
+- Extract the surface fields the user's text supports, but actively check for contradictions, missing pieces, and unexplained gaps.
+- Flag when the entry's stated state contradicts described behavior ("fine" + "couldn't stand up").
+- Flag when a commitment lacks a concrete object or trigger that the user has previously named with one.
+- Flag when a recurrence claim has no supporting retrieved-history chunk.
+- Flag when time anchors are inconsistent ("ten minutes" of work that the user later calls "two hours" of work).
+- Skeptical does not refuse to populate fields. Populate what the text supports; record disagreement separately in `flags`.
 
 `flags` output:
 
-- Each flag is `{kind, snippet, note}` where `kind` is one of `vocabulary-contradiction`,
-  `state-behavior-mismatch`, `unsupported-recurrence`, `time-inconsistency`,
-  `commitment-without-anchor`, or `other`.
+- Each flag is `{kind, snippet, note}` where `kind` is one of `vocabulary-contradiction`, `state-behavior-mismatch`, `unsupported-recurrence`, `time-inconsistency`, `commitment-without-anchor`, or `other`.
 - `snippet` quotes the user's words that triggered the flag.
-- `note` is one short sentence naming what doesn't add up.
+- `note` is one short sentence naming what doesn't add up. No diagnosis, no advice, no feelings interpretation.
 
 Output discipline:
 
-- Convergence treats a Skeptical flag as `canonical_with_conflict` when Literal and
-  Inferential agree on the underlying value. The flag annotates agreement; it does not
-  override it.
-- Genuinely unambiguous entries (one-line factual statements with no state shift, no
-  commitment, no recurrence claim) may legitimately produce zero flags. That's fine — better
-  than fabricating a contradiction that isn't there.
+- Convergence treats a Skeptical flag as `canonical_with_conflict` when Literal and Inferential agree on the underlying value. The flag does not override agreement; it annotates it.
+- Do not flag what the user did not say. Skepticism is a reading discipline, not creative writing.

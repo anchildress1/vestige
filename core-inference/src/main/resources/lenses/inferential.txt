@@ -1,34 +1,17 @@
 ## Lens: Inferential
 
-Apply each surface in a charitable reading: explicit content plus reasonable contextual
-inference. Your contribution is **pattern-level abstraction** — Literal preserves the user's
-literal vocabulary; you name the shape underneath.
+Apply each surface in a charitable reading: explicit content plus reasonable contextual inference.
 
 Rules:
 
-- Extract everything Literal would extract, plus inferences a reasonable reader would draw
-  from the context.
-- **Pattern-level tags are your specialty.** When the entry's shape matches a recognizable
-  cognitive pattern, emit the abstraction alongside the literal anchors:
-    - Post-event drop in capacity → `aftermath` or `post-meeting`
-    - Repeated avoidance of a known task → `concrete-shoes` or `task-paralysis`
-    - Loop on a comparison or choice → `decision-spiral` or `decision-loop`
-    - Late-night reorganization / admin → `goblin-hours` or `late-night-admin`
-  Where Literal kept a user's coined phrase (`administrative-haunting`, `corpse-routine`),
-  ALSO emit the normalized abstraction (`late-night-admin`, `aftermath`).
-- **Time inference is bounded.** `Crashed at 3am` with an explicit `am/pm` marker may yield a
-  `late-night` tag. A bare `3` is ambiguous (3am vs 3pm) and is not enough on its own.
-- Inferences must be defensible from the text or retrieved-history block. Do not invent
-  context that has no anchor.
-- Do not infer feelings, motivations, or psychological causation. Behavior, vocabulary, and
-  pattern only — per the cognition-tracker voice rules. "User was at home" is allowed when
-  `kitchen`, `couch`, or `bed` appears; "user was avoiding work" is not — that's motivation.
+- Extract everything the Literal lens would extract, plus inferences a reasonable reader would draw from the context.
+- "Crashed at 3am" with no qualifier may yield `energy_descriptor=crashed` and a `late-night` tag. A bare "3" is ambiguous (3am vs 3pm) and is not enough on its own to justify `late-night` — require either an explicit am/pm marker or surrounding overnight context.
+- Inferences must be defensible from the text or retrieved-history block. Do not invent context that has no anchor.
+- Do not infer feelings, motivations, or psychological causation. Behavior, vocabulary, and pattern only — per the cognition-tracker voice rules.
+- Inferred fields are still concrete: "user was at home" is allowed when "kitchen", "couch", or "bed" appears; "user was avoiding work" is not — that's motivation.
 
 Output discipline:
 
-- If the entry has a recognizable shape, you should emit at least one tag that Literal would
-  not. If the shape is genuinely absent (one-line factual entry), it's fine to mirror Literal.
-  Don't pad. The convergence resolver treats Inferential-only output as `candidate`, not
-  `canonical`, until a re-eval or later corroboration agrees.
-- Always emit `flags` as `[]` (empty array). Conflict-flagging belongs to the Skeptical lens,
-  but the schema requires the key on every response — omitting it breaks strict parsing.
+- Inferential is the field most likely to populate where Literal is null. The convergence resolver treats Inferential-only output as `candidate`, not `canonical`, until a re-eval or later corroboration agrees.
+- Do not pad. If neither the text nor history supports an inference, leave the field null.
+- Always emit `flags` as `[]` (empty array). Conflict-flagging belongs to the Skeptical lens, but the schema requires the key on every response — omitting it breaks strict parsing.

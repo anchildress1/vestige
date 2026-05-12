@@ -1,7 +1,9 @@
 package dev.anchildress1.vestige.ui.patterns
 
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -99,6 +101,22 @@ class PatternsListScreenTest {
         composeRule.onNodeWithText("Fourth entry mentions Tuesday meetings.").assertIsDisplayed()
         // Substring match avoids brittleness on the bullet glyph and trailing date format.
         composeRule.onNodeWithText("1 of 1 entries", substring = true).assertIsDisplayed()
+    }
+
+    @Test
+    fun `section headers render only for sections that have cards`() {
+        val supporting = listOf(seedEntry("crashed", ExtractionStatus.COMPLETED))
+        seedActivePattern("p-active", "Tuesday Meetings", "Aftermath", "Callout.", supporting)
+        seedActivePattern("p-dismissed", "Migration Rewrites", "Decision spiral", "Callout.", supporting)
+        patternRepo.dismiss("p-dismissed")
+
+        composeRule.setContent { PatternsListScreen(viewModel = newViewModel(), onOpenPattern = {}) }
+
+        composeRule.onNodeWithText("ACTIVE").assertIsDisplayed()
+        composeRule.onNodeWithText("DISMISSED").assertIsDisplayed()
+        // No snoozed or resolved cards in this seed, so those headers must stay hidden.
+        composeRule.onAllNodesWithText("SNOOZED · STILL DRIFTING").assertCountEquals(0)
+        composeRule.onAllNodesWithText("RESOLVED · FADED").assertCountEquals(0)
     }
 
     @Test

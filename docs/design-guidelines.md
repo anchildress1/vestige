@@ -323,20 +323,24 @@ Default is highlighted. Selection changes the active persona for the next captur
 
 Cards present pattern observations on dark surfaces. Restrained, atmospheric, sourced. No clinical or procedural-drama styling.
 
+**Status sections.** Patterns group into four sections per `poc/screens-patterns.jsx` — Active / Snoozed · still drifting / Resolved · faded / Dismissed. Each section header appears only when that section has cards; the headers themselves come from `ux-copy.md` §"Pattern List · Section headers". Filter chips that scope which sections render are Phase 4 polish on top of this base.
+
 **Card structure:**
 - Short title (the pattern name, e.g., `Tuesday Meetings`)
 - Category (agent-emitted label: `Aftermath`, `Tunnel exit`, `Concrete shoes`, `Decision spiral`, `Goblin hours`, `Audit`)
 - Observation (one short sentence)
+- **TraceBar — 30-day recurrence glyph** per `poc/tokens.jsx` §TraceBar. 30 thin columns; days the pattern landed render full-height in the glow purple (`#A855F7`); empty days render at 34% height in the muted hair tone. Newest day on the right. The bar is the visual answer to "how often does this come back."
 - Source count (e.g., `4 of 12 entries`)
 - Last seen (date)
 - Actions (`Dismiss`, `Snooze`, `Mark resolved`)
 
-**Purple left-rule** (`#A855F7`) on cards with active patterns. Resolved/snoozed cards lose the rule.
+**Active-state rule** (`#A855F7`) — Phase 3 ships as a 3dp left-rule on every card for legibility. Phase 4 swaps it for the POC's glow-soft border + radial-glow corner treatment on active cards only.
 
 **Example card:**
 > **Tuesday Meetings**
 > Aftermath
 > Fourth entry mentions Tuesday meetings. State before: cruising. State after: crashed.
+> ▮▯▯▮▯▯▮▯▯▮▯▯▯▮▯▯▮▯▯▮▯▯▮▯▯▮▯▯▮▯  ← 30-day TraceBar
 > 4 of 12 entries · Last seen May 7
 
 **Avoid copy:** `Explore deeper`, `Celebrate progress`, `Good news`, `Concern`.
@@ -351,9 +355,10 @@ Tap a card → detail screen. Make the pattern claim visually sourceable.
 - Header: pattern title + category
 - Summary observation (the same one-line claim from the card)
 - Count + recurrence timing ("4 of 12 entries, all on Tuesdays in the last 6 weeks")
-- Source snippets (dated, short, clickable to the full entry)
-- Related vocabulary (the actual words the user used across these entries)
-- Action controls (`Dismiss`, `Snooze`, `Mark resolved`)
+- **Intensity strip — 30-day TraceBar at hero size** under an `INTENSITY · 30 DAYS` eyebrow. Same glyph as the card, taller (~28dp) so the cadence reads at a glance.
+- Source snippets (dated, short, clickable to the full entry — placeholder entry screen in Phase 3, full history detail in Phase 4)
+- Related vocabulary (the actual words the user used across these entries — Phase 4 polish)
+- Action controls (`Dismiss`, `Snooze`, `Mark resolved`). Terminal-state patterns hide the action row and surface the terminal label instead (`Dismissed May 12.` / `Marked resolved May 12.`).
 
 **Source section example:**
 > **Seen in:**

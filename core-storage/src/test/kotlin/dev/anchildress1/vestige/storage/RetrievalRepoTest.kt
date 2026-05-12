@@ -410,6 +410,21 @@ class RetrievalRepoTest {
     }
 
     @Test
+    fun `query skips embedder call when no entry has a stored vector`() = runBlocking {
+        insertEntry("standup crashed", daysAgo = 1, vector = null)
+        var calls = 0
+        val embedder: suspend (String) -> FloatArray = {
+            calls++
+            FloatArray(EMBEDDING_DIMENSIONS)
+        }
+
+        val results = repoWithEmbedder(embedder).query("standup")
+
+        assertEquals(1, results.size)
+        assertEquals(0, calls)
+    }
+
+    @Test
     fun `negative cosine entries do not surface on cosine signal alone`() = runBlocking {
         // Query vector points one way; the only stored entry's vector points the OPPOSITE way →
         // cosine = -1. Without keyword/tag overlap, the entry must NOT surface (clamp at 0).

@@ -43,17 +43,21 @@ class RetrievalRepo(
         val queryTerms = tokenizeToList(text)
         if (queryTerms.isEmpty()) return emptyList()
         val queryTokens = queryTerms.toSet()
-        // Embedding contribution short-circuits when its weight is 0 — avoids both the embedder
-        // call and any dimension mismatch against null-or-different-shape stored vectors.
-        val queryVector: FloatArray? = if (embeddingWeight > 0f) embedder(text) else null
 
         val entryBox = boxStore.boxFor<EntryEntity>()
         val tagBox = boxStore.boxFor<TagEntity>()
         val storedTagKeys = tagBox.all.mapNotNullTo(linkedSetOf()) { QueryTagMatcher.storedKey(it.name) }
         val queryTagKeys = QueryTagMatcher.queryKeysMatching(queryTerms, storedTagKeys)
 
+        val entries = entryBox.all
+        // Defer embedding the query string until we know vector scoring will actually fire —
+        // skips the ~880 ms CPU embed cost on empty databases and during the backfill window
+        // when no entry has a stored vector yet.
+        val vectorScoringEnabled = embeddingWeight > 0f && entries.any { it.vector != null }
+        val queryVector: FloatArray? = if (vectorScoringEnabled) embedder(text) else null
+
         val nowMs = clock.millis()
-        val scored = entryBox.all.mapNotNull { entry ->
+        val scored = entries.mapNotNull { entry ->
             val entryTokens = tokenizeToList(entry.entryText).toSet()
             val keywordScore = jaccardishKeyword(queryTokens, entryTokens)
             val entryTagKeys = entry.tags.mapNotNullTo(linkedSetOf()) { QueryTagMatcher.storedKey(it.name) }

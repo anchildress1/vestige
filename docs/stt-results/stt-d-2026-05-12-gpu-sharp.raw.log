@@ -1,0 +1,138 @@
+--------- beginning of main
+05-12 05:22:05.458 28435 28449 I VestigeSttD: STT-D using backend=Gpu
+05-12 05:24:09.695 28435 28449 I VestigeSttD: ENTRY id=A1 elapsed=105236ms lenses_parsed=2/3 model_calls=5
+05-12 05:24:09.695 28435 28449 I VestigeSttD:   LITERAL tags=[<no-parse>] energy=null commitment=null flags=0 attempts=3 err=parse-fail
+05-12 05:24:09.695 28435 28449 I VestigeSttD:   INFERENTIAL tags=[standup,flattened,doc] energy=flattened commitment=null flags=0 attempts=1 err=-
+05-12 05:24:09.695 28435 28449 I VestigeSttD:   SKEPTICAL tags=[standup,doc] energy=flattened commitment=null flags=1 attempts=1 err=-
+05-12 05:24:09.695 28435 28449 I VestigeSttD:   RAW id=A1 lens=LITERAL attempts=3 err=parse-fail fields=<no-parse> flags=[]
+05-12 05:24:09.695 28435 28449 I VestigeSttD:   RAW id=A1 lens=INFERENTIAL attempts=1 err=- fields={tags=[standup, flattened, doc], energy_descriptor=flattened, state_shift=true, vocabulary_contradictions=[], stated_commitment=null, recurrence_link=null, recurrence_kind=null} flags=[]
+05-12 05:24:09.695 28435 28449 I VestigeSttD:   RAW id=A1 lens=SKEPTICAL attempts=1 err=- fields={tags=[standup, doc], energy_descriptor=flattened, state_shift=true, vocabulary_contradictions=[], stated_commitment=null, recurrence_link=null, recurrence_kind=null} flags=[state-behavior-mismatch:I was fine before it, then completely flattened by 1:The state change from fine to flattened is not explicitly anchored to a specific event other than the standup.]
+05-12 05:24:09.695 28435 28449 I VestigeSttD:   DIVERGENCE id=A1 disagree_fields=[tags] inferential_only=[] skeptical_flags_kept=[state-behavior-mismatch:I was fine before it, then completely flattened by 1:The state change from fine to flattened is not explicitly anchored to a specific event other than the standup.] meaningful=true
+05-12 05:25:03.658 28435 28449 I VestigeSttD: ENTRY id=A2 elapsed=53961ms lenses_parsed=3/3 model_calls=3
+05-12 05:25:03.659 28435 28449 I VestigeSttD:   LITERAL tags=[tuesday-meeting,concrete-in-my-limbs,late-night] energy=null commitment=null flags=0 attempts=1 err=-
+05-12 05:25:03.659 28435 28449 I VestigeSttD:   INFERENTIAL tags=[meeting,concrete-shoes] energy=null commitment=null flags=0 attempts=1 err=-
+05-12 05:25:03.659 28435 28449 I VestigeSttD:   SKEPTICAL tags=[tuesday,meeting,same-thing,normal,concrete,limbs,late-night,lost-plot] energy=null commitment=null flags=1 attempts=1 err=-
+05-12 05:25:03.659 28435 28449 I VestigeSttD:   RAW id=A2 lens=LITERAL attempts=1 err=- fields={tags=[tuesday-meeting, concrete-in-my-limbs, late-night], energy_descriptor=null, state_shift=false, vocabulary_contradictions=[], stated_commitment=null, recurrence_link=null, recurrence_kind=null} flags=[]
+05-12 05:25:03.659 28435 28449 I VestigeSttD:   RAW id=A2 lens=INFERENTIAL attempts=1 err=- fields={tags=[meeting, concrete-shoes], energy_descriptor=null, state_shift=false, vocabulary_contradictions=[], stated_commitment=null, recurrence_link=null, recurrence_kind=null} flags=[]
+05-12 05:25:03.659 28435 28449 I VestigeSttD:   RAW id=A2 lens=SKEPTICAL attempts=1 err=- fields={tags=[tuesday, meeting, same-thing, normal, concrete, limbs, late-night, lost-plot], energy_descriptor=null, state_shift=true, vocabulary_contradictions=[], stated_commitment=null, recurrence_link=null, recurrence_kind=null} flags=[unsupported-recurrence:Same thing.:The recurrence claim lacks supporting history.]
+05-12 05:25:03.659 28435 28449 I VestigeSttD:   DIVERGENCE id=A2 disagree_fields=[tags, state_shift] inferential_only=[] skeptical_flags_kept=[unsupported-recurrence:Same thing.:The recurrence claim lacks supporting history.] meaningful=true
+05-12 05:26:41.352 28435 28449 I VestigeSttD: ENTRY id=A3 elapsed=97690ms lenses_parsed=2/3 model_calls=5
+05-12 05:26:41.353 28435 28449 I VestigeSttD:   LITERAL tags=[roadmap-call,corpse-routine,three-tabs,zero-movement] energy=null commitment=null flags=0 attempts=1 err=-
+05-12 05:26:41.353 28435 28449 I VestigeSttD:   INFERENTIAL tags=[<no-parse>] energy=null commitment=null flags=0 attempts=3 err=parse-fail
+05-12 05:26:41.353 28435 28449 I VestigeSttD:   SKEPTICAL tags=[roadmap-call,post-meeting,tabs-open,zero-movement] energy=null commitment=null flags=1 attempts=1 err=-
+05-12 05:26:41.353 28435 28449 I VestigeSttD:   RAW id=A3 lens=LITERAL attempts=1 err=- fields={tags=[roadmap-call, corpse-routine, three-tabs, zero-movement], energy_descriptor=null, state_shift=false, vocabulary_contradictions=[], stated_commitment=null, recurrence_link=null, recurrence_kind=null} flags=[]
+05-12 05:26:41.354 28435 28449 I VestigeSttD:   RAW id=A3 lens=INFERENTIAL attempts=3 err=parse-fail fields=<no-parse> flags=[]
+05-12 05:26:41.354 28435 28449 I VestigeSttD:   RAW id=A3 lens=SKEPTICAL attempts=1 err=- fields={tags=[roadmap-call, post-meeting, tabs-open, zero-movement], energy_descriptor=null, state_shift=false, vocabulary_contradictions=[], stated_commitment=null, recurrence_link=null, recurrence_kind=null} flags=[state-behavior-mismatch:Three tabs open, zero movement.:The state of having tabs open is not explicitly linked to a triggering event or state change.]
+05-12 05:26:41.354 28435 28449 I VestigeSttD:   DIVERGENCE id=A3 disagree_fields=[tags] inferential_only=[] skeptical_flags_kept=[state-behavior-mismatch:Three tabs open, zero movement.:The state of having tabs open is not explicitly linked to a triggering event or state change.] meaningful=true
+05-12 05:27:38.255 28435 28449 I VestigeSttD: ENTRY id=A4 elapsed=56898ms lenses_parsed=3/3 model_calls=3
+05-12 05:27:38.255 28435 28449 I VestigeSttD:   LITERAL tags=[battery-yanked,sync] energy=null commitment=null flags=0 attempts=1 err=-
+05-12 05:27:38.256 28435 28449 I VestigeSttD:   INFERENTIAL tags=[tired,battery-yanked,sync] energy=tired commitment=null flags=0 attempts=1 err=-
+05-12 05:27:38.256 28435 28449 I VestigeSttD:   SKEPTICAL tags=[battery-yanked,sync] energy=null commitment=null flags=1 attempts=1 err=-
+05-12 05:27:38.256 28435 28449 I VestigeSttD:   RAW id=A4 lens=LITERAL attempts=1 err=- fields={tags=[battery-yanked, sync], energy_descriptor=null, state_shift=false, vocabulary_contradictions=[], stated_commitment=null, recurrence_link=null, recurrence_kind=null} flags=[]
+05-12 05:27:38.257 28435 28449 I VestigeSttD:   RAW id=A4 lens=INFERENTIAL attempts=1 err=- fields={tags=[tired, battery-yanked, sync], energy_descriptor=tired, state_shift=false, vocabulary_contradictions=[], stated_commitment=null, recurrence_link=null, recurrence_kind=null} flags=[]
+05-12 05:27:38.257 28435 28449 I VestigeSttD:   RAW id=A4 lens=SKEPTICAL attempts=1 err=- fields={tags=[battery-yanked, sync], energy_descriptor=null, state_shift=true, vocabulary_contradictions=[], stated_commitment=null, recurrence_link=null, recurrence_kind=null} flags=[vocabulary-contradiction:Not tired exactly:The user's energy state is immediately contradicted by the phrase 'battery got yanked'.]
+05-12 05:27:38.257 28435 28449 I VestigeSttD:   DIVERGENCE id=A4 disagree_fields=[tags, energy_descriptor, state_shift] inferential_only=[energy_descriptor] skeptical_flags_kept=[vocabulary-contradiction:Not tired exactly:The user's energy state is immediately contradicted by the phrase 'battery got yanked'.] meaningful=true
+05-12 05:29:46.225 28435 28449 I VestigeSttD: ENTRY id=A5 elapsed=127966ms lenses_parsed=2/3 model_calls=5
+05-12 05:29:46.226 28435 28449 I VestigeSttD:   LITERAL tags=[client-review,hollow,couldn't-start,next-thing] energy=hollow commitment=null flags=0 attempts=1 err=-
+05-12 05:29:46.226 28435 28449 I VestigeSttD:   INFERENTIAL tags=[client-review,hollow,post-event-drop-in-capacity] energy=hollow commitment=null flags=0 attempts=1 err=-
+05-12 05:29:46.226 28435 28449 I VestigeSttD:   SKEPTICAL tags=[<no-parse>] energy=null commitment=null flags=0 attempts=3 err=parse-fail
+05-12 05:29:46.226 28435 28449 I VestigeSttD:   RAW id=A5 lens=LITERAL attempts=1 err=- fields={tags=[client-review, hollow, couldn't-start, next-thing], energy_descriptor=hollow, state_shift=false, vocabulary_contradictions=[], stated_commitment=null, recurrence_link=null, recurrence_kind=null} flags=[]
+05-12 05:29:46.227 28435 28449 I VestigeSttD:   RAW id=A5 lens=INFERENTIAL attempts=1 err=- fields={tags=[client-review, hollow, post-event-drop-in-capacity], energy_descriptor=hollow, state_shift=false, vocabulary_contradictions=[], stated_commitment=null, recurrence_link=null, recurrence_kind=null} flags=[]
+05-12 05:29:46.227 28435 28449 I VestigeSttD:   RAW id=A5 lens=SKEPTICAL attempts=3 err=parse-fail fields=<no-parse> flags=[]
+05-12 05:29:46.227 28435 28449 I VestigeSttD:   DIVERGENCE id=A5 disagree_fields=[tags] inferential_only=[] skeptical_flags_kept=[] meaningful=true
+05-12 05:30:49.119 28435 28449 I VestigeSttD: ENTRY id=A6 elapsed=62888ms lenses_parsed=3/3 model_calls=3
+05-12 05:30:49.119 28435 28449 I VestigeSttD:   LITERAL tags=[planning-call,static,awake,operationally-not] energy=null commitment=null flags=0 attempts=1 err=-
+05-12 05:30:49.119 28435 28449 I VestigeSttD:   INFERENTIAL tags=[planning-call,static,awakeally-not] energy=null commitment=null flags=0 attempts=1 err=-
+05-12 05:30:49.119 28435 28449 I VestigeSttD:   SKEPTICAL tags=[static,awake,operationally-not] energy=awake commitment=null flags=1 attempts=1 err=-
+05-12 05:30:49.119 28435 28449 I VestigeSttD:   RAW id=A6 lens=LITERAL attempts=1 err=- fields={tags=[planning-call, static, awake, operationally-not], energy_descriptor=null, state_shift=false, vocabulary_contradictions=[], stated_commitment=null, recurrence_link=null, recurrence_kind=null} flags=[]
+05-12 05:30:49.119 28435 28449 I VestigeSttD:   RAW id=A6 lens=INFERENTIAL attempts=1 err=- fields={tags=[planning-call, static, awakeally-not], energy_descriptor=null, state_shift=false, vocabulary_contradictions=[], stated_commitment=null, recurrence_link=null, recurrence_kind=null} flags=[]
+05-12 05:30:49.119 28435 28449 I VestigeSttD:   RAW id=A6 lens=SKEPTICAL attempts=1 err=- fields={tags=[static, awake, operationally-not], energy_descriptor=awake, state_shift=true, vocabulary_contradictions=[], stated_commitment=null, recurrence_link=null, recurrence_kind=null} flags=[state-behavior-mismatch:The planning left static in my head. Technically, awake, operationally not.:The entry describes a state change from 'planning' to 'static' without an explicit trigger.]
+05-12 05:30:49.119 28435 28449 I VestigeSttD:   DIVERGENCE id=A6 disagree_fields=[tags, state_shift] inferential_only=[] skeptical_flags_kept=[state-behavior-mismatch:The planning left static in my head. Technically, awake, operationally not.:The entry describes a state change from 'planning' to 'static' without an explicit trigger.] meaningful=true
+05-12 05:31:51.801 28435 28449 I VestigeSttD: ENTRY id=B1 elapsed=62678ms lenses_parsed=3/3 model_calls=3
+05-12 05:31:51.801 28435 28449 I VestigeSttD:   LITERAL tags=[invoice-email,sacred-ritual] energy=null commitment=null flags=0 attempts=1 err=-
+05-12 05:31:51.801 28435 28449 I VestigeSttD:   INFERENTIAL tags=[task-paralysis,email] energy=null commitment=null flags=0 attempts=1 err=-
+05-12 05:31:51.801 28435 28449 I VestigeSttD:   SKEPTICAL tags=[invoice,email,ritual,closing] energy=null commitment=null flags=1 attempts=1 err=-
+05-12 05:31:51.801 28435 28449 I VestigeSttD:   RAW id=B1 lens=LITERAL attempts=1 err=- fields={tags=[invoice-email, sacred-ritual], energy_descriptor=null, state_shift=false, vocabulary_contradictions=[], stated_commitment=null, recurrence_link=null, recurrence_kind=null} flags=[]
+05-12 05:31:51.801 28435 28449 I VestigeSttD:   RAW id=B1 lens=INFERENTIAL attempts=1 err=- fields={tags=[task-paralysis, email], energy_descriptor=null, state_shift=false, vocabulary_contradictions=[], stated_commitment=null, recurrence_link=null, recurrence_kind=null} flags=[]
+05-12 05:31:51.801 28435 28449 I VestigeSttD:   RAW id=B1 lens=SKEPTICAL attempts=1 err=- fields={tags=[invoice, email, ritual, closing], energy_descriptor=null, state_shift=false, vocabulary_contradictions=[], stated_commitment=null, recurrence_link=null, recurrence_kind=null} flags=[state-behavior-mismatch:I opened it twice and did the sacred ritual of closing it immediately:The state of having opened the invoice is immediately followed by closing it is not anchored to a clear trigger.]
+05-12 05:31:51.801 28435 28449 I VestigeSttD:   DIVERGENCE id=B1 disagree_fields=[tags] inferential_only=[] skeptical_flags_kept=[state-behavior-mismatch:I opened it twice and did the sacred ritual of closing it immediately:The state of having opened the invoice is immediately followed by closing it is not anchored to a clear trigger.] meaningful=true
+05-12 05:33:00.969 28435 28449 I VestigeSttD: ENTRY id=B2 elapsed=69165ms lenses_parsed=3/3 model_calls=3
+05-12 05:33:00.970 28435 28449 I VestigeSttD:   LITERAL tags=[invoice,desktop,reorganized,bold-strategy] energy=null commitment=present flags=0 attempts=1 err=-
+05-12 05:33:00.970 28435 28449 I VestigeSttD:   INFERENTIAL tags=[late-night-admin,desktop-reorganization] energy=null commitment=present flags=0 attempts=1 err=-
+05-12 05:33:00.971 28435 28449 I VestigeSttD:   SKEPTICAL tags=[invoice,desktop,strategy] energy=null commitment=present flags=1 attempts=1 err=-
+05-12 05:33:00.971 28435 28449 I VestigeSttD:   RAW id=B2 lens=LITERAL attempts=1 err=- fields={tags=[invoice, desktop, reorganized, bold-strategy], energy_descriptor=null, state_shift=false, vocabulary_contradictions=[], stated_commitment={text=Said I would send the invoice today., topic_or_person=invoice}, recurrence_link=null, recurrence_kind=null} flags=[]
+05-12 05:33:00.972 28435 28449 I VestigeSttD:   RAW id=B2 lens=INFERENTIAL attempts=1 err=- fields={tags=[late-night-admin, desktop-reorganization], energy_descriptor=null, state_shift=false, vocabulary_contradictions=[], stated_commitment={text=I would send the invoice today, topic_or_person=null}, recurrence_link=null, recurrence_kind=null} flags=[]
+05-12 05:33:00.972 28435 28449 I VestigeSttD:   RAW id=B2 lens=SKEPTICAL attempts=1 err=- fields={tags=[invoice, desktop, strategy], energy_descriptor=null, state_shift=false, vocabulary_contradictions=[], stated_commitment={text=I would send the invoice today, topic_or_person=null}, recurrence_link=null, recurrence_kind=null} flags=[commitment-without-anchor:Said I would send the invoice today. Instead I reorganized the desktop.:The commitment to send the invoice lacks a concrete trigger or object.]
+05-12 05:33:00.972 28435 28449 I VestigeSttD:   DIVERGENCE id=B2 disagree_fields=[tags, stated_commitment] inferential_only=[] skeptical_flags_kept=[commitment-without-anchor:Said I would send the invoice today. Instead I reorganized the desktop.:The commitment to send the invoice lacks a concrete trigger or object.] meaningful=true
+05-12 05:33:50.408 28435 28449 I VestigeSttD: ENTRY id=B3 elapsed=49433ms lenses_parsed=3/3 model_calls=3
+05-12 05:33:50.408 28435 28449 I VestigeSttD:   LITERAL tags=[] energy=null commitment=null flags=0 attempts=1 err=-
+05-12 05:33:50.408 28435 28449 I VestigeSttD:   INFERENTIAL tags=[invoice,task-paralysis] energy=null commitment=null flags=0 attempts=1 err=-
+05-12 05:33:50.408 28435 28449 I VestigeSttD:   SKEPTICAL tags=[invoice,again,cursor] energy=null commitment=null flags=0 attempts=1 err=-
+05-12 05:33:50.408 28435 28449 I VestigeSttD:   RAW id=B3 lens=LITERAL attempts=1 err=- fields={tags=[], energy_descriptor=null, state_shift=false, vocabulary_contradictions=[], stated_commitment=null, recurrence_link=null, recurrence_kind=null} flags=[]
+05-12 05:33:50.409 28435 28449 I VestigeSttD:   RAW id=B3 lens=INFERENTIAL attempts=1 err=- fields={tags=[invoice, task-paralysis], energy_descriptor=null, state_shift=false, vocabulary_contradictions=[], stated_commitment=null, recurrence_link=null, recurrence_kind=null} flags=[]
+05-12 05:33:50.409 28435 28449 I VestigeSttD:   RAW id=B3 lens=SKEPTICAL attempts=1 err=- fields={tags=[invoice, again, cursor], energy_descriptor=null, state_shift=false, vocabulary_contradictions=[], stated_commitment=null, recurrence_link=null, recurrence_kind=null} flags=[]
+05-12 05:33:50.409 28435 28449 I VestigeSttD:   DIVERGENCE id=B3 disagree_fields=[tags] inferential_only=[tags] skeptical_flags_kept=[] meaningful=true
+05-12 05:38:59.091 28435 28449 I VestigeSttD: ENTRY id=C1 elapsed=308679ms lenses_parsed=0/3 model_calls=1
+05-12 05:38:59.091 28435 28449 I VestigeSttD:   LITERAL tags=[<no-parse>] energy=null commitment=null flags=0 attempts=0 err=-
+05-12 05:38:59.092 28435 28449 I VestigeSttD:   INFERENTIAL tags=[<no-parse>] energy=null commitment=null flags=0 attempts=0 err=-
+05-12 05:38:59.092 28435 28449 I VestigeSttD:   SKEPTICAL tags=[<no-parse>] energy=null commitment=null flags=0 attempts=0 err=-
+05-12 05:38:59.092 28435 28449 I VestigeSttD:   RAW id=C1 lens=LITERAL attempts=0 err=- fields=<no-parse> flags=[]
+05-12 05:38:59.093 28435 28449 I VestigeSttD:   RAW id=C1 lens=INFERENTIAL attempts=0 err=- fields=<no-parse> flags=[]
+05-12 05:38:59.093 28435 28449 I VestigeSttD:   RAW id=C1 lens=SKEPTICAL attempts=0 err=- fields=<no-parse> flags=[]
+05-12 05:38:59.093 28435 28449 I VestigeSttD:   DIVERGENCE id=C1 disagree_fields=[] inferential_only=[] skeptical_flags_kept=[] meaningful=false
+05-12 05:40:30.046 28435 28449 I VestigeSttD: ENTRY id=C2 elapsed=90950ms lenses_parsed=2/3 model_calls=5
+05-12 05:40:30.046 28435 28449 I VestigeSttD:   LITERAL tags=[<no-parse>] energy=null commitment=null flags=0 attempts=3 err=parse-fail
+05-12 05:40:30.047 28435 28449 I VestigeSttD:   INFERENTIAL tags=[decision-loop,task-paralysis] energy=null commitment=null flags=0 attempts=1 err=-
+05-12 05:40:30.047 28435 28449 I VestigeSttD:   SKEPTICAL tags=[task-decision-loop] energy=null commitment=null flags=1 attempts=1 err=-
+05-12 05:40:30.047 28435 28449 I VestigeSttD:   RAW id=C2 lens=LITERAL attempts=3 err=parse-fail fields=<no-parse> flags=[]
+05-12 05:40:30.047 28435 28449 I VestigeSttD:   RAW id=C2 lens=INFERENTIAL attempts=1 err=- fields={tags=[decision-loop, task-paralysis], energy_descriptor=null, state_shift=false, vocabulary_contradictions=null, stated_commitment=null, recurrence_link=null, recurrence_kind=null} flags=[]
+05-12 05:40:30.047 28435 28449 I VestigeSttD:   RAW id=C2 lens=SKEPTICAL attempts=1 err=- fields={tags=[task-decision-loop], energy_descriptor=null, state_shift=false, vocabulary_contradictions=[], stated_commitment=null, recurrence_link=null, recurrence_kind=null} flags=[state-behavior-mismatch:Task decision still looping. I keep changing the weights and pretending that is progress.:The entry describes a state of looping and pretending without an explicit trigger or cause.]
+05-12 05:40:30.047 28435 28449 I VestigeSttD:   DIVERGENCE id=C2 disagree_fields=[tags] inferential_only=[] skeptical_flags_kept=[state-behavior-mismatch:Task decision still looping. I keep changing the weights and pretending that is progress.:The entry describes a state of looping and pretending without an explicit trigger or cause.] meaningful=true
+05-12 05:41:21.772 28435 28449 I VestigeSttD: ENTRY id=C3 elapsed=51722ms lenses_parsed=3/3 model_calls=3
+05-12 05:41:21.773 28435 28449 I VestigeSttD:   LITERAL tags=[comparison-table,exposure-therapy] energy=null commitment=null flags=0 attempts=1 err=-
+05-12 05:41:21.774 28435 28449 I VestigeSttD:   INFERENTIAL tags=[comparison-table,decision-therapy] energy=null commitment=null flags=0 attempts=1 err=-
+05-12 05:41:21.774 28435 28449 I VestigeSttD:   SKEPTICAL tags=[comparison-table,therapy] energy=null commitment=null flags=0 attempts=1 err=-
+05-12 05:41:21.774 28435 28449 I VestigeSttD:   RAW id=C3 lens=LITERAL attempts=1 err=- fields={tags=[comparison-table, exposure-therapy], energy_descriptor=null, state_shift=false, vocabulary_contradictions=[], stated_commitment=null, recurrence_link=null, recurrence_kind=null} flags=[]
+05-12 05:41:21.775 28435 28449 I VestigeSttD:   RAW id=C3 lens=INFERENTIAL attempts=1 err=- fields={tags=[comparison-table, decision-therapy], energy_descriptor=null, state_shift=false, vocabulary_contradictions=null, stated_commitment=null, recurrence_link=null, recurrence_kind=null} flags=[]
+05-12 05:41:21.775 28435 28449 I VestigeSttD:   RAW id=C3 lens=SKEPTICAL attempts=1 err=- fields={tags=[comparison-table, therapy], energy_descriptor=null, state_shift=false, vocabulary_contradictions=[], stated_commitment=null, recurrence_link=null, recurrence_kind=null} flags=[]
+05-12 05:41:21.775 28435 28449 I VestigeSttD:   DIVERGENCE id=C3 disagree_fields=[tags] inferential_only=[] skeptical_flags_kept=[] meaningful=true
+05-12 05:42:24.253 28435 28449 I VestigeSttD: ENTRY id=D1 elapsed=62475ms lenses_parsed=3/3 model_calls=3
+05-12 05:42:24.253 28435 28449 I VestigeSttD:   LITERAL tags=[late-night,notes-app,administrative-haunting] energy=null commitment=null flags=0 attempts=1 err=-
+05-12 05:42:24.254 28435 28449 I VestigeSttD:   INFERENTIAL tags=[late-night-admin,rearranging-notes] energy=null commitment=null flags=0 attempts=1 err=-
+05-12 05:42:24.254 28435 28449 I VestigeSttD:   SKEPTICAL tags=[late-night,rearranging-notes-app,administrative-haunting] energy=null commitment=null flags=1 attempts=1 err=-
+05-12 05:42:24.254 28435 28449 I VestigeSttD:   RAW id=D1 lens=LITERAL attempts=1 err=- fields={tags=[late-night, notes-app, administrative-haunting], energy_descriptor=null, state_shift=false, vocabulary_contradictions=[], stated_commitment=null, recurrence_link=null, recurrence_kind=null} flags=[]
+05-12 05:42:24.255 28435 28449 I VestigeSttD:   RAW id=D1 lens=INFERENTIAL attempts=1 err=- fields={tags=[late-night-admin, rearranging-notes], energy_descriptor=null, state_shift=false, vocabulary_contradictions=null, stated_commitment=null, recurrence_link=null, recurrence_kind=null} flags=[]
+05-12 05:42:24.255 28435 28449 I VestigeSttD:   RAW id=D1 lens=SKEPTICAL attempts=1 err=- fields={tags=[late-night, rearranging-notes-app, administrative-haunting], energy_descriptor=null, state_shift=false, vocabulary_contradictions=[], stated_commitment=null, recurrence_link=null, recurrence_kind=null} flags=[other:rearranging the notes app again instead of sleeping:The user claims to be rearranging the app 'again' but provides no historical context for this recurrence.]
+05-12 05:42:24.255 28435 28449 I VestigeSttD:   DIVERGENCE id=D1 disagree_fields=[tags] inferential_only=[] skeptical_flags_kept=[] meaningful=true
+05-12 05:44:32.325 28435 28449 I VestigeSttD: ENTRY id=D2 elapsed=128067ms lenses_parsed=1/3 model_calls=7
+05-12 05:44:32.326 28435 28449 I VestigeSttD:   LITERAL tags=[<no-parse>] energy=null commitment=null flags=0 attempts=3 err=parse-fail
+05-12 05:44:32.326 28435 28449 I VestigeSttD:   INFERENTIAL tags=[decision-spiral,folder-structure] energy=null commitment=null flags=0 attempts=1 err=-
+05-12 05:44:32.326 28435 28449 I VestigeSttD:   SKEPTICAL tags=[<no-parse>] energy=null commitment=null flags=0 attempts=3 err=parse-fail
+05-12 05:44:32.326 28435 28449 I VestigeSttD:   RAW id=D2 lens=LITERAL attempts=3 err=parse-fail fields=<no-parse> flags=[]
+05-12 05:44:32.326 28435 28449 I VestigeSttD:   RAW id=D2 lens=INFERENTIAL attempts=1 err=- fields={tags=[decision-spiral, folder-structure], energy_descriptor=null, state_shift=false, vocabulary_contradictions=[], stated_commitment=null, recurrence_link=null, recurrence_kind=null} flags=[]
+05-12 05:44:32.326 28435 28449 I VestigeSttD:   RAW id=D2 lens=SKEPTICAL attempts=3 err=parse-fail fields=<no-parse> flags=[]
+05-12 05:44:32.326 28435 28449 I VestigeSttD:   DIVERGENCE id=D2 disagree_fields=[] inferential_only=[] skeptical_flags_kept=[] meaningful=false
+05-12 05:46:06.603 28435 28449 I VestigeSttD: ENTRY id=D3 elapsed=94274ms lenses_parsed=2/3 model_calls=5
+05-12 05:46:06.603 28435 28449 I VestigeSttD:   LITERAL tags=[4:07am,archive,naming-convention,national-infrastructure] energy=null commitment=null flags=0 attempts=1 err=-
+05-12 05:46:06.603 28435 28449 I VestigeSttD:   INFERENTIAL tags=[<no-parse>] energy=null commitment=null flags=0 attempts=3 err=parse-fail
+05-12 05:46:06.603 28435 28449 I VestigeSttD:   SKEPTICAL tags=[4:07am,naming-convention-problem,archive,national-infrastructure] energy=null commitment=null flags=0 attempts=1 err=-
+05-12 05:46:06.603 28435 28449 I VestigeSttD:   RAW id=D3 lens=LITERAL attempts=1 err=- fields={tags=[4:07am, archive, naming-convention, national-infrastructure], energy_descriptor=null, state_shift=false, vocabulary_contradictions=[], stated_commitment=null, recurrence_link=null, recurrence_kind=null} flags=[]
+05-12 05:46:06.603 28435 28449 I VestigeSttD:   RAW id=D3 lens=INFERENTIAL attempts=3 err=parse-fail fields=<no-parse> flags=[]
+05-12 05:46:06.603 28435 28449 I VestigeSttD:   RAW id=D3 lens=SKEPTICAL attempts=1 err=- fields={tags=[4:07am, naming-convention-problem, archive, national-infrastructure], energy_descriptor=null, state_shift=false, vocabulary_contradictions=[], stated_commitment=null, recurrence_link=null, recurrence_kind=null} flags=[]
+05-12 05:46:06.603 28435 28449 I VestigeSttD:   DIVERGENCE id=D3 disagree_fields=[tags] inferential_only=[] skeptical_flags_kept=[] meaningful=true
+05-12 05:46:06.604 28435 28449 I VestigeSttD: === STT-D summary: 13/15 divergent ===
+05-12 05:46:06.604 28435 28449 I VestigeSttD:   A1: meaningful=true fields=[tags] skeptical_flags=1 inferential_only=[] elapsed=105236ms
+05-12 05:46:06.604 28435 28449 I VestigeSttD:   A2: meaningful=true fields=[tags, state_shift] skeptical_flags=1 inferential_only=[] elapsed=53961ms
+05-12 05:46:06.604 28435 28449 I VestigeSttD:   A3: meaningful=true fields=[tags] skeptical_flags=1 inferential_only=[] elapsed=97690ms
+05-12 05:46:06.604 28435 28449 I VestigeSttD:   A4: meaningful=true fields=[tags, energy_descriptor, state_shift] skeptical_flags=1 inferential_only=[energy_descriptor] elapsed=56898ms
+05-12 05:46:06.604 28435 28449 I VestigeSttD:   A5: meaningful=true fields=[tags] skeptical_flags=0 inferential_only=[] elapsed=127966ms
+05-12 05:46:06.604 28435 28449 I VestigeSttD:   A6: meaningful=true fields=[tags, state_shift] skeptical_flags=1 inferential_only=[] elapsed=62888ms
+05-12 05:46:06.604 28435 28449 I VestigeSttD:   B1: meaningful=true fields=[tags] skeptical_flags=1 inferential_only=[] elapsed=62678ms
+05-12 05:46:06.604 28435 28449 I VestigeSttD:   B2: meaningful=true fields=[tags, stated_commitment] skeptical_flags=1 inferential_only=[] elapsed=69165ms
+05-12 05:46:06.604 28435 28449 I VestigeSttD:   B3: meaningful=true fields=[tags] skeptical_flags=0 inferential_only=[tags] elapsed=49433ms
+05-12 05:46:06.604 28435 28449 I VestigeSttD:   C1: meaningful=false fields=[] skeptical_flags=0 inferential_only=[] elapsed=308679ms
+05-12 05:46:06.604 28435 28449 I VestigeSttD:   C2: meaningful=true fields=[tags] skeptical_flags=1 inferential_only=[] elapsed=90950ms
+05-12 05:46:06.604 28435 28449 I VestigeSttD:   C3: meaningful=true fields=[tags] skeptical_flags=0 inferential_only=[] elapsed=51722ms
+05-12 05:46:06.604 28435 28449 I VestigeSttD:   D1: meaningful=true fields=[tags] skeptical_flags=0 inferential_only=[] elapsed=62475ms
+05-12 05:46:06.604 28435 28449 I VestigeSttD:   D2: meaningful=false fields=[] skeptical_flags=0 inferential_only=[] elapsed=128067ms
+05-12 05:46:06.605 28435 28449 I VestigeSttD:   D3: meaningful=true fields=[tags] skeptical_flags=0 inferential_only=[] elapsed=94274ms

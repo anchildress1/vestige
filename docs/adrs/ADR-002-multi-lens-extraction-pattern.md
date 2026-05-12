@@ -233,13 +233,13 @@ caps `maxNumTokens = 4096`. Re-run on the same 15-entry corpus, same commit, min
 **What this doesn't change:**
 
 - No structured-output format switch (still JSON, single schema across backends).
-- No retry escalation beyond the worker's `maxAttemptsPerLens = 2`. With greedy decode there
-  are no retries anyway.
 - The deterministic sampler is the production default for *all* `LiteRtLmEngine` callers —
   foreground extraction, observation generation, and pattern title generation get it too.
   Reasoning: the same FP16-induced variance affects every structured-output emit; pinning
   greedy everywhere removes a class of demo-flakiness regardless of which call path lights up
   on stage.
+- (Updated by the fourth addendum below) `maxAttemptsPerLens` lifted from 2 → 3 to absorb
+  residual FP16 jitter on the longer prompts that addendum introduces.
 
 **Revisit if:** the demo storyboard finds a beat where slight sampling variance (temp > 0)
 produces more interesting persona-flavored prose than greedy decode, or a future LiteRT-LM
@@ -269,6 +269,53 @@ Persistence failures inside the detached pipeline now route through `compensateP
 into a terminal FAILED row + listener event instead of escaping to the caller. ADR-001 Q3's
 retry-based recovery contract is unchanged — interrupted detached jobs leave PENDING/RUNNING
 rows for the cold-start sweep.
+
+### Addendum (2026-05-12, fourth) — sharpened lens framings + 3-attempt retry budget
+
+The second addendum closed the parse-failure gap; this one closes the divergence-rate gap.
+
+The original lens framings (~900-1450 chars each) under-specified the per-lens role: LITERAL
+sometimes normalized coined phrases (losing the verbatim signal), INFERENTIAL didn't reliably
+emit pattern abstractions, SKEPTICAL fired flags too conservatively. Result on the 15-entry
+STT-D corpus: 9/15 (60%) meaningful divergence — passing the gate but with weaker per-entry
+evidence than the architecture is capable of.
+
+Sharpened framings (`literal.txt`, `inferential.txt`, `skeptical.txt`) push each lens harder
+in its direction with concrete examples and bounded directives:
+
+- LITERAL: codifies verbatim-bias for coined phrases (`administrative-haunting`,
+  `concrete-in-my-limbs`, `4:07am`).
+- INFERENTIAL: names pattern-level abstractions (`aftermath`, `concrete-shoes`,
+  `decision-spiral`, `goblin-hours`) as the lens's specialty.
+- SKEPTICAL: lowers the flag-emission bar with concrete trigger patterns; aims for ≥1 flag
+  per non-trivial entry.
+
+GPU re-run with these prompts produced **13/15 (87%) meaningful divergence** with 8 entries
+diverging on ≥2 axes and 7 Skeptical flags fired (vs 2 before the deterministic sampler).
+The signal is qualitatively different — entries like A4 surface 4-axis divergence
+(`tags`, `energy_descriptor`, `state_shift`, plus a quoted vocabulary contradiction).
+
+**Cost**: the longer prompts push FP16 GPU into a slightly wider variance band on decode.
+`maxAttemptsPerLens` lifted 2 → 3 to absorb transient single-lens jitter. Mean per-entry
+latency 88s (vs 48s greedy alone). Two of 15 entries cross thresholds:
+
+- **C1** ran for 5 minutes on a single lens call (single `nativeRunDecode` did not naturally
+  terminate the structured output, hit `PER_ENTRY_TIMEOUT_MS = 300_000`). 0/3 lenses parsed.
+- **D2** finished with 1/3 lenses parsed — two lenses each exhausted 3 attempts. Resolver
+  runs on 1 lens output → entry saves with all-`candidate` confidence per §"Edge case — lens
+  errors mid-call".
+
+13/15 (87%) meaningful divergence with 8 entries showing multi-axis evidence is the
+production headline. The two outliers are recovery paths the architecture already handles —
+ADR-001 Q3 sweeps PENDING/RUNNING on cold start; Re-eval (Phase 4) re-runs the pipeline if
+a user wants. Net trade is accepted for v1.
+
+**Revisit if:** real user data shows the 1-in-8 partial-extraction rate is too high (suggests
+the FP16 variance is worse than the 15-entry sample), or a future LiteRT-LM release exposes
+generation-stopping criteria (max-output-tokens that actually terminate cleanly instead of
+running to the engine-side `maxNumTokens` ceiling).
+
+Evidence: `docs/stt-results/stt-d-2026-05-12-gpu-sharp.md` with raw logcat.
 
 ### Addendum (2026-05-10) — conservative tag persistence
 

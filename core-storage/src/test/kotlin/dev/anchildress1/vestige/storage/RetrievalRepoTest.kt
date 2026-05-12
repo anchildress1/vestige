@@ -3,6 +3,7 @@ package dev.anchildress1.vestige.storage
 import androidx.test.core.app.ApplicationProvider
 import io.objectbox.BoxStore
 import io.objectbox.kotlin.boxFor
+import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertThrows
@@ -317,6 +318,81 @@ class RetrievalRepoTest {
         val seriesEntry = boxStore.boxFor<EntryEntity>().get(seriesId)
         assertEquals(listOf("news"), newsEntry.tags.map { it.name })
         assertEquals(listOf("series"), seriesEntry.tags.map { it.name })
+    }
+
+    @Test
+    fun `queryHybrid surfaces vocabulary-drift match the keyword-only path misses`() = runBlocking {
+        // The aftermath entry shares only stop-words with the query but its vector is far closer
+        // than the literal-keyword distractor. queryHybrid should rank it first.
+        val aftermath = insertEntry("battery got yanked after the sync", daysAgo = 3)
+        val distractor = insertEntry("battery died on my keyboard", daysAgo = 1)
+
+        val embedder = fixedEmbedder(
+            "post-meeting crash" to floatArrayOf(1f, 0f, 0f),
+            "battery got yanked after the sync" to floatArrayOf(0.95f, 0.1f, 0f),
+            "battery died on my keyboard" to floatArrayOf(0.1f, 0.99f, 0f),
+        )
+
+        val baseline = repo.query("post-meeting crash")
+        assertTrue("tag-only baseline misses vocabulary-drift entries", baseline.isEmpty())
+
+        val hybrid = repo.queryHybrid("post-meeting crash", embedder, topN = 5)
+
+        assertEquals(listOf(aftermath, distractor), hybrid.map { it.id })
+    }
+
+    @Test
+    fun `queryHybrid blank text returns empty without invoking the embedder`() = runBlocking {
+        insertEntry("standup crashed", daysAgo = 1)
+        var calls = 0
+        val embedder: suspend (String) -> FloatArray = { calls++; floatArrayOf(1f) }
+
+        assertTrue(repo.queryHybrid("   ", embedder).isEmpty())
+        assertEquals(0, calls)
+    }
+
+    @Test
+    fun `queryHybrid rejects negative embeddingWeight`() {
+        val embedder: suspend (String) -> FloatArray = { floatArrayOf(1f) }
+        assertThrows(IllegalArgumentException::class.java) {
+            runBlocking { repo.queryHybrid("x", embedder, embeddingWeight = -0.1f) }
+        }
+    }
+
+    @Test
+    fun `queryHybrid zero-weight collapses to keyword+tag+recency`() = runBlocking {
+        // With embeddingWeight=0 the cosine term contributes nothing — ordering must match query().
+        insertEntry("standup crashed me", daysAgo = 2)
+        insertEntry("standup wired me", daysAgo = 1)
+        val embedder = fixedEmbedder(
+            "standup" to floatArrayOf(1f, 0f),
+            "standup crashed me" to floatArrayOf(0f, 1f), // far from query
+            "standup wired me" to floatArrayOf(1f, 0f),   // identical to query — would dominate
+        )
+
+        val classic = repo.query("standup").map { it.id }
+        val hybrid = repo.queryHybrid("standup", embedder, embeddingWeight = 0f).map { it.id }
+
+        assertEquals(classic, hybrid)
+    }
+
+    private fun fixedEmbedder(vararg pairs: Pair<String, FloatArray>): suspend (String) -> FloatArray {
+        val table = pairs.toMap()
+        return { text ->
+            table[text]
+                ?: error("test fixture missing embedding for \"$text\" (have ${table.keys})")
+        }
+    }
+
+    @Test
+    fun `queryHybrid rejects vectors with mismatched dimensions`() {
+        insertEntry("standup crashed", daysAgo = 1)
+        val embedder: suspend (String) -> FloatArray = { text ->
+            if (text == "standup") floatArrayOf(1f, 0f) else floatArrayOf(1f, 0f, 0f)
+        }
+        assertThrows(IllegalArgumentException::class.java) {
+            runBlocking { repo.queryHybrid("standup", embedder) }
+        }
     }
 
     private fun insertEntry(text: String, daysAgo: Int, tagNames: List<String> = emptyList()): Long {

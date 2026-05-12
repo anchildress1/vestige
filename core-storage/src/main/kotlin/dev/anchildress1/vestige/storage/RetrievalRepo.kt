@@ -6,6 +6,7 @@ import java.time.Clock
 import java.util.Locale
 import kotlin.math.max
 import kotlin.math.min
+import kotlin.math.sqrt
 
 /**
  * Deterministic, model-free retrieval over saved entries. Ranks candidates by keyword overlap on
@@ -75,11 +76,85 @@ class RetrievalRepo(private val boxStore: BoxStore, private val clock: Clock = C
         return max(0.0, min(1.0, 1.0 - ageDays / RECENCY_WINDOW_DAYS))
     }
 
+    /**
+     * STT-E (Story 3.3) comparison path. Same scoring as [query] plus cosine similarity between
+     * the query vector and each entry's vector, weighted by [embeddingWeight]. The embedder is
+     * called once per candidate entry; callers eat the latency. No vector field is stored on
+     * [EntryEntity] yet — Story 3.4 adds it iff this gate passes.
+     */
+    suspend fun queryHybrid(
+        text: String,
+        embedder: suspend (String) -> FloatArray,
+        topN: Int = DEFAULT_TOP_N,
+        recencyWeight: Float = DEFAULT_RECENCY_WEIGHT,
+        embeddingWeight: Float = DEFAULT_EMBEDDING_WEIGHT,
+    ): List<EntryEntity> {
+        require(topN > 0) { "RetrievalRepo.queryHybrid requires topN > 0 (got $topN)" }
+        require(recencyWeight in 0f..1f) {
+            "RetrievalRepo.queryHybrid requires recencyWeight in [0,1] (got $recencyWeight)"
+        }
+        require(embeddingWeight >= 0f) {
+            "RetrievalRepo.queryHybrid requires embeddingWeight >= 0 (got $embeddingWeight)"
+        }
+
+        val queryTerms = tokenizeToList(text)
+        if (queryTerms.isEmpty()) return emptyList()
+        val queryTokens = queryTerms.toSet()
+        val queryVector = embedder(text)
+
+        val entryBox = boxStore.boxFor<EntryEntity>()
+        val tagBox = boxStore.boxFor<TagEntity>()
+        val storedTagKeys = tagBox.all.mapNotNullTo(linkedSetOf()) { QueryTagMatcher.storedKey(it.name) }
+        val queryTagKeys = QueryTagMatcher.queryKeysMatching(queryTerms, storedTagKeys)
+
+        val nowMs = clock.millis()
+        val scored = entryBox.all.map { entry ->
+            val entryTokens = tokenizeToList(entry.entryText).toSet()
+            val keywordScore = jaccardishKeyword(queryTokens, entryTokens)
+            val entryTagKeys = entry.tags.mapNotNullTo(linkedSetOf()) { QueryTagMatcher.storedKey(it.name) }
+            val tagScore = jaccard(queryTagKeys, entryTagKeys)
+            val recency = recencyNorm(entry.timestampEpochMs, nowMs)
+            val entryVector = embedder(entry.entryText)
+            val cosine = cosineSimilarity(queryVector, entryVector)
+            val score = keywordScore + tagScore + recencyWeight * recency + embeddingWeight * cosine
+            Scored(entry, score)
+        }
+
+        return scored
+            .sortedWith(compareByDescending<Scored> { it.score }.thenBy { it.entry.id })
+            .take(topN)
+            .map { it.entry }
+    }
+
+    private fun cosineSimilarity(a: FloatArray, b: FloatArray): Double {
+        require(a.size == b.size) {
+            "cosineSimilarity requires equal-dimensional vectors (got ${a.size} vs ${b.size})"
+        }
+        if (a.isEmpty()) return 0.0
+        var dot = 0.0
+        var magA = 0.0
+        var magB = 0.0
+        for (i in a.indices) {
+            val ai = a[i].toDouble()
+            val bi = b[i].toDouble()
+            dot += ai * bi
+            magA += ai * ai
+            magB += bi * bi
+        }
+        val denom = sqrt(magA) * sqrt(magB)
+        return if (denom == 0.0) 0.0 else dot / denom
+    }
+
     private data class Scored(val entry: EntryEntity, val score: Double)
 
     private companion object {
         const val DEFAULT_TOP_N = 3
         const val DEFAULT_RECENCY_WEIGHT = 0.3f
+
+        // Cosine on SEMANTIC_SIMILARITY embeddings clusters in ~[0.3, 0.95] for natural text, so a
+        // weight of 1.0 puts the embedding score on the same magnitude as keyword/tag Jaccard.
+        // STT-E (Story 3.3) is the gate that earns or rejects this default.
+        const val DEFAULT_EMBEDDING_WEIGHT = 1.0f
         const val MILLIS_PER_DAY = 86_400_000.0
         const val RECENCY_WINDOW_DAYS = 90.0
     }

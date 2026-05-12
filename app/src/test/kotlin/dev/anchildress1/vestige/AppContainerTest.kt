@@ -340,6 +340,55 @@ class AppContainerTest {
     }
 
     @Test
+    fun `launchVectorBackfillIfReady retries after artifacts become complete mid-session`() = runTest {
+        var passCalls = 0
+        val container = AppContainer(
+            applicationContext = mockk<Context>(relaxed = true),
+            boxStoreFactory = { mockk(relaxed = true) },
+            markdownStoreFactory = { mockk<MarkdownEntryStore>(relaxed = true) },
+            vectorBackfillRetryDelayMs = 1L,
+            vectorBackfillPassOverride = {
+                passCalls += 1
+                passCalls == 1
+            },
+            recoveredEntryIdsLoader = { emptyList() },
+            foregroundServiceIntentFactory = { Intent("dev.anchildress1.vestige.TEST_START") },
+            foregroundServiceStarter = {},
+            scope = this,
+        )
+
+        container.launchVectorBackfillIfReady()
+        advanceUntilIdle()
+
+        assertEquals(2, passCalls)
+    }
+
+    @Test
+    fun `launchVectorBackfillIfReady reruns after a save-time trigger lands mid-pass`() = runTest {
+        var backfillCalls = 0
+        val container = AppContainer(
+            applicationContext = mockk<Context>(relaxed = true),
+            boxStoreFactory = { mockk(relaxed = true) },
+            markdownStoreFactory = { mockk<MarkdownEntryStore>(relaxed = true) },
+            vectorBackfillPassOverride = {
+                if (backfillCalls++ == 0) {
+                    launchVectorBackfillIfReady()
+                }
+                false
+            },
+            recoveredEntryIdsLoader = { emptyList() },
+            foregroundServiceIntentFactory = { Intent("dev.anchildress1.vestige.TEST_START") },
+            foregroundServiceStarter = {},
+            scope = this,
+        )
+
+        container.launchVectorBackfillIfReady()
+        advanceUntilIdle()
+
+        assertEquals(2, backfillCalls)
+    }
+
+    @Test
     fun `backgroundEngine is built from the injected factory exactly once`() {
         val engine = mockk<LiteRtLmEngine>(relaxed = true)
         var modelPathCalls = 0

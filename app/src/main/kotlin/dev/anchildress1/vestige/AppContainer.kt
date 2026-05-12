@@ -41,11 +41,13 @@ import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import java.io.File
 import java.time.ZonedDateTime
+import java.util.concurrent.atomic.AtomicBoolean
 
 /** Process-singleton hub for Phase-2 cross-cutting concerns. */
 @Suppress("LongParameterList") // Constructor-injection seams: factories + lifecycle + scope.
@@ -116,6 +118,8 @@ class AppContainer(
     private val foregroundServiceStarter: (Intent) -> Unit = { intent ->
         applicationContext.startForegroundService(intent)
     },
+    private val vectorBackfillRetryDelayMs: Long = VECTOR_BACKFILL_RETRY_DELAY_MS,
+    private val vectorBackfillPassOverride: (suspend AppContainer.() -> Boolean)? = null,
     private val vectorBackfillScheduleListener: (() -> Unit)? = null,
     private val scope: CoroutineScope = defaultScope(),
 ) {
@@ -127,7 +131,8 @@ class AppContainer(
     private val backgroundEngineInitMutex = Mutex()
     private val embedderInitMutex = Mutex()
     private val vectorBackfillMutex = Mutex()
-    private val vectorBackfillInflight = java.util.concurrent.atomic.AtomicBoolean(false)
+    private val vectorBackfillRunning = AtomicBoolean(false)
+    private val vectorBackfillRequested = AtomicBoolean(false)
 
     @Volatile
     private var backgroundEngineInitialized = false
@@ -275,35 +280,60 @@ class AppContainer(
     }
 
     /**
-     * Launch the one-time vector backfill on the container scope. No-op if either embedding
-     * artifact is still pending download — the next cold start retries. Caller doesn't await;
-     * results land in logcat under tag `VectorBackfill`.
+     * Launch or re-request vector backfill on the container scope. If backlog exists before the
+     * embedding artifacts finish downloading, the runner sleeps briefly and retries in-process
+     * instead of waiting for a cold restart. Caller doesn't await; results land in logcat under
+     * tag `VectorBackfill`.
      */
     fun launchVectorBackfillIfReady() {
-        // CAS guard: if another launch already scheduled / running, drop this one. Prevents the
-        // save-time trigger from queueing N coroutines on the mutex when N saves arrive fast.
-        if (!vectorBackfillInflight.compareAndSet(false, true)) return
         vectorBackfillScheduleListener?.invoke()
-        scope.launch {
-            try {
-                vectorBackfillMutex.withLock {
+        vectorBackfillRequested.set(true)
+        if (!vectorBackfillRunning.compareAndSet(false, true)) return
+        launchVectorBackfillRunner()
+    }
+
+    private fun launchVectorBackfillRunner() {
+        suspend fun runVectorBackfillCycle(): Boolean {
+            vectorBackfillRequested.set(false)
+            val shouldRetry = vectorBackfillPassOverride?.invoke(this@AppContainer)
+                ?: vectorBackfillMutex.withLock {
                     val worker = VectorBackfillWorker(boxStore) { text -> requireEmbedder().embed(text) }
                     // Cheap presence-only check before paying for SHA-256 artifact verification —
-                    // most cold starts and save completions have nothing to backfill.
-                    if (!worker.hasPendingWork()) return@withLock
+                    // most cold starts and steady-state save completions have nothing to backfill.
+                    if (!worker.hasPendingWork()) return@withLock false
 
                     val modelState = embeddingModelArtifactStore.currentState()
                     val tokenizerState = embeddingTokenizerArtifactStore.currentState()
                     if (modelState !is ModelArtifactState.Complete ||
                         tokenizerState !is ModelArtifactState.Complete
                     ) {
-                        Log.i(TAG, "Vector backfill skipped — embedding artifacts not yet complete")
-                        return@withLock
+                        Log.i(TAG, "Vector backfill delayed — embedding artifacts not yet complete")
+                        return@withLock true
                     }
                     worker.backfill()
+                    false
                 }
+            if (shouldRetry) {
+                delay(vectorBackfillRetryDelayMs)
+                vectorBackfillRequested.set(true)
+            }
+            return vectorBackfillRequested.get()
+        }
+
+        fun relaunchVectorBackfillIfRequested() {
+            vectorBackfillRunning.set(false)
+            // A trigger can land after the loop decides it's done but before `running` flips
+            // false. Re-check and relaunch here so that wakeup is not lost.
+            if (vectorBackfillRequested.get() && vectorBackfillRunning.compareAndSet(false, true)) {
+                launchVectorBackfillRunner()
+            }
+        }
+
+        scope.launch {
+            try {
+                while (runVectorBackfillCycle()) Unit
             } finally {
-                vectorBackfillInflight.set(false)
+                relaunchVectorBackfillIfRequested()
             }
         }
     }
@@ -339,6 +369,7 @@ class AppContainer(
     private companion object {
         const val TAG = "VestigeAppContainer"
         const val MODEL_ARTIFACTS_SUBDIR = "models"
+        const val VECTOR_BACKFILL_RETRY_DELAY_MS = 5_000L
 
         fun defaultScope(): CoroutineScope {
             val exceptionHandler = CoroutineExceptionHandler { _, error ->

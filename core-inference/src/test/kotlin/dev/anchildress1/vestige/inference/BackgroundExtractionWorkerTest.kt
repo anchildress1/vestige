@@ -185,11 +185,11 @@ class BackgroundExtractionWorkerTest {
         val inferentialResult = success.lensResults.first { it.lens == Lens.INFERENTIAL }
         assertAll(
             { assertNull(inferentialResult.extraction) },
-            { assertEquals(3, inferentialResult.attemptCount) },
+            { assertEquals(2, inferentialResult.attemptCount) },
             { assertEquals("parse-fail", inferentialResult.lastError) },
         )
-        // 1 (LITERAL ok) + 3 (INFERENTIAL exhausted at the new default) + 1 (SKEPTICAL ok) = 5
-        assertEquals(5, success.modelCallCount)
+        // 1 (LITERAL ok) + 2 (INFERENTIAL exhausted) + 1 (SKEPTICAL ok) = 4
+        assertEquals(4, success.modelCallCount)
     }
 
     @Test
@@ -209,7 +209,7 @@ class BackgroundExtractionWorkerTest {
 
         val failed = assertInstanceOf(BackgroundExtractionResult.Failed::class.java, result)
         assertAll(
-            { assertEquals(9, failed.modelCallCount, "3 lenses × 3 attempts each = 9") },
+            { assertEquals(6, failed.modelCallCount, "3 lenses × 2 attempts each = 6") },
             { assertEquals(3, failed.lensResults.size) },
             { assertTrue(failed.lensResults.all { it.extraction == null }) },
             { assertEquals("parse-fail", failed.lastError) },
@@ -247,7 +247,7 @@ class BackgroundExtractionWorkerTest {
         val literalResult = success.lensResults.first { it.lens == Lens.LITERAL }
         assertAll(
             { assertNull(literalResult.extraction) },
-            { assertEquals(3, literalResult.attemptCount) },
+            { assertEquals(2, literalResult.attemptCount) },
             { assertNotNull(literalResult.lastError) },
             { assertTrue(literalResult.lastError!!.startsWith("engine-error:")) },
         )

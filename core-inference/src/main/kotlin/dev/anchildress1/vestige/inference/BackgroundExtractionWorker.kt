@@ -245,16 +245,7 @@ class BackgroundExtractionWorker(
     private data class AttemptOutcome(val raw: String, val error: String?)
 
     companion object {
-        /**
-         * Per-lens attempt budget. Bumped 2 → 3 on 2026-05-12 after the sharpened lens
-         * framings (commit `7a4b929`) pushed GPU FP16 decode into a wider variance band on the
-         * longer structured output. Empirical cancelled-run data showed parse failures
-         * distributed across LITERAL / INFERENTIAL / SKEPTICAL — one lens per entry, different
-         * each time. Two attempts gave up too early on transient FP16 jitter; three absorbs
-         * the noise without papering over real schema breakage (a genuinely malformed prompt
-         * would fail all three).
-         */
-        const val DEFAULT_MAX_ATTEMPTS_PER_LENS = 3
+        const val DEFAULT_MAX_ATTEMPTS_PER_LENS = 2
 
         private val LENSES: List<Lens> = listOf(Lens.LITERAL, Lens.INFERENTIAL, Lens.SKEPTICAL)
         private val NO_OP_LISTENER = ExtractionStatusListener { _, _, _ -> }

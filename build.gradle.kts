@@ -36,10 +36,12 @@ kover {
                         "dev.anchildress1.vestige.VestigeApplication",
                         "dev.anchildress1.vestige.VestigeApplication*",
                         "dev.anchildress1.vestige.ui.theme.*",
-                        // Compose screen + nav-host functions. Pure UI wiring; the testable
-                        // mapping logic was lifted into PatternFormatting.kt and is covered.
-                        // Composable bodies retain `$changed`/`$default` plugin branches that
-                        // no JVM test framework can reach — same precedent as MainActivity above.
+                        // Compose screen files. JVM Compose UI tests under Robolectric cover the
+                        // user-visible behaviour (see *ScreenTest.kt), but branch coverage on
+                        // @Composable functions caps at ~50% because the Compose compiler injects
+                        // `Composer` + `$changed` Int args that produce uncoverable
+                        // `if ($changed != 0 || !composer.skipping)` branches.
+                        // Reference: kotlinx-kover #756 — "Wrong branch coverage for composables".
                         "dev.anchildress1.vestige.ui.patterns.PatternsListScreenKt",
                         "dev.anchildress1.vestige.ui.patterns.PatternsListScreenKt*",
                         "dev.anchildress1.vestige.ui.patterns.*PatternsListScreenKt*",
@@ -49,6 +51,9 @@ kover {
                         "dev.anchildress1.vestige.ui.patterns.PatternsHostKt",
                         "dev.anchildress1.vestige.ui.patterns.PatternsHostKt*",
                         "dev.anchildress1.vestige.ui.patterns.*PatternsHostKt*",
+                        "dev.anchildress1.vestige.ui.patterns.EntryDetailPlaceholderScreenKt",
+                        "dev.anchildress1.vestige.ui.patterns.EntryDetailPlaceholderScreenKt*",
+                        "dev.anchildress1.vestige.ui.patterns.*EntryDetailPlaceholderScreenKt*",
                         // Debug-only fixture seeder for on-device manual verification.
                         // FLAG_DEBUGGABLE-gated at the call site; not on any release path.
                         "dev.anchildress1.vestige.debug.*",

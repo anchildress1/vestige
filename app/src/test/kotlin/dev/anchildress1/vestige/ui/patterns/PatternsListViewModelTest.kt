@@ -147,6 +147,18 @@ class PatternsListViewModelTest {
     }
 
     @Test
+    fun `undo on MARKED_RESOLVED is a no-op since the state is sticky-terminal`() = runTest(testDispatcher) {
+        val entries = seedEntries(1)
+        seedActivePattern("p-noop", lastSeenMs = 100L, supporting = entries)
+        val vm = newViewModel()
+        vm.markResolved("p-noop")
+        assertEquals(PatternState.RESOLVED, patternStore.findByPatternId("p-noop")?.state)
+        // Issuing the MARKED_RESOLVED undo path hits the `Unit` branch — state must not change.
+        vm.undo(PatternUndo("p-noop", PatternAction.MARKED_RESOLVED))
+        assertEquals(PatternState.RESOLVED, patternStore.findByPatternId("p-noop")?.state)
+    }
+
+    @Test
     fun `undo restores a dismissed pattern back to ACTIVE`() = runTest(testDispatcher) {
         val entries = seedEntries(1)
         seedActivePattern("p3", lastSeenMs = 100L, supporting = entries)

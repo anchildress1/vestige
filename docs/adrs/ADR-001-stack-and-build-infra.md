@@ -37,8 +37,8 @@ Adopt the locked stack from `concept-locked.md` and `runtime-research.md` verbat
 | UI | Jetpack Compose + Material 3 (expressive features off) | `concept-locked.md` |
 | LLM runtime | LiteRT-LM SDK (`litertlm-android`) — single runtime per `AGENTS.md` guardrail 13 | `runtime-research.md` |
 | Model artifact | `litert-community/gemma-4-E4B-it-litert-lm` | `runtime-research.md` |
-| Embeddings | EmbeddingGemma 300M via LiteRT — **contingent on STT-E** (`PRD.md` §"Build philosophy: build first, test at failure zones") | `concept-locked.md`, `PRD.md` §P0 |
-| Storage | ObjectBox (structured) + markdown source-of-truth. Vector index added **only if STT-E passes** — see Q6. | `concept-locked.md` |
+| Embeddings | EmbeddingGemma 300M via LiteRT — **STT-E passed 2026-05-12, ships in v1.** See addendum below. | `concept-locked.md`, `PRD.md` §P0 |
+| Storage | ObjectBox (structured) + markdown source-of-truth + HNSW vector index on `EntryEntity.vector`. | `concept-locked.md` |
 | Audio | `AudioRecord` → Gemma 4 native audio modality (no third-party STT) | `concept-locked.md` |
 | Distribution | APK via GitHub Releases. No Play Store for v1. | `PRD.md` §Submission |
 
@@ -289,6 +289,19 @@ The 3.66 GB E4B model is the largest single asset in the build. How it ships aff
     - Checksum mismatch on a completed download → `Model file unreadable. Re-download from settings.`
     The error catalog stays simple in copy; the retry state machine lives in `ModelArtifactStore`.
 - **Embedding model (STT-E contingent):** if EmbeddingGemma ships, it follows the same storage and integrity contract — separate file, separate checksum, separate retry budget. The submitted APK has exactly one schema shape: if STT-E passes before implementation, vector fields/entities are included; if STT-E fails, they are absent until v1.5. No runtime-conditional ObjectBox schema games. We are building an app, not a migration haunted house.
+
+### Addendum (2026-05-12) — STT-E passed, EmbeddingGemma ships
+
+`SttEEmbeddingComparisonTest` ran four cohort queries (aftermath / invoice / decision-spiral / late-night) against the 18-entry corpus on the reference S24 Ultra. Hybrid (tag + keyword + recency + EmbeddingGemma cosine) beat the tag-only baseline on 3 of 4 queries; tied on 1; lost on 0. The 50% pass-rate threshold is cleared.
+
+| Query | Baseline relevant in top-5 | Hybrid relevant in top-5 |
+|---|---|---|
+| Q_aftermath | 2/6 | 3/6 |
+| Q_invoice | 3/3 | 3/3 |
+| Q_decision | 1/3 | 2/3 |
+| Q_lateNight | 1/3 | 2/3 |
+
+Storage row in §"Locked Stack" now records a ships-in-v1 schema with the HNSW vector index on `EntryEntity.vector`. The minimum-free-storage requirement bumps from 6 GB to 7 GB (model 3.66 GB + EmbeddingGemma artifact ~180 MB + tokenizer ~5 MB + headroom). `backlog.md` `embeddings-fallback` closes out — there is no v1.5 fallback to keep open.
 
 ### Q7. Privacy / network enforcement (the P0 marketing claim has to be code, not vibes)
 

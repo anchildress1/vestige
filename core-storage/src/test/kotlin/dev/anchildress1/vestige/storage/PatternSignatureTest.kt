@@ -69,4 +69,27 @@ class PatternSignatureTest {
         val sig = PatternSignature.forTemplateRecurrence("Tunnel Exit")
         assertEquals("tunnel-exit", sig.templateLabel)
     }
+
+    @Test
+    fun `canonical JSON has fixed key order independent of any underlying map implementation`() {
+        // Locks the load-bearing property the doc comment commits to: the serialized form is
+        // hand-built so HashMap-vs-LinkedHashMap drift in `org.json.JSONObject` can't change
+        // the hash. The exact byte sequence is the contract.
+        val sig = PatternSignature.forTagPair("aftermath", setOf("standup", "crashed"))
+        assertEquals(
+            "{\"kind\":\"tag_pair_co_occurrence\",\"label\":\"aftermath\",\"tags\":[\"crashed\",\"standup\"]}",
+            sig.json,
+        )
+    }
+
+    @Test
+    fun `forVocabToken stems input defensively`() {
+        // Matcher stems entry tokens before comparing. Signature must stem too — otherwise an
+        // out-of-band caller passing the plural form ("meetings") writes a signature that the
+        // singular-stemmed entry tokens never hit.
+        val plural = PatternSignature.forVocabToken("meetings")
+        val singular = PatternSignature.forVocabToken("meeting")
+        assertEquals(plural.patternId, singular.patternId)
+        assertEquals(plural.json, "{\"kind\":\"vocab_frequency\",\"token\":\"meeting\"}")
+    }
 }

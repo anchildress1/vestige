@@ -45,12 +45,24 @@ object PatternMatcher {
         val label = TagNormalize.kebab(signature.optString("label"))
         val tagsArray = signature.optJSONArray("tags")
         val labelMatches = entry.templateLabel?.serial == label
-        if (!labelMatches || tagsArray == null) return false
+        // `tag_pair_co_occurrence` is, by definition, exactly two tags. A 1-tag signature would
+        // match any entry containing that tag (collapsing to a template_recurrence-ish match);
+        // a 3+ tag signature would over-constrain. Either shape indicates upstream corruption
+        // and should not silently match.
+        if (!labelMatches || tagsArray == null || tagsArray.length() != TAG_PAIR_SIZE) {
+            if (labelMatches && tagsArray != null && tagsArray.length() != TAG_PAIR_SIZE) {
+                android.util.Log.w(
+                    "VestigePatternMatcher",
+                    "tag_pair signature has ${tagsArray.length()} tags (expected $TAG_PAIR_SIZE) — rejecting match",
+                )
+            }
+            return false
+        }
         val pair = (0 until tagsArray.length()).mapTo(linkedSetOf()) {
             TagNormalize.kebab(tagsArray.optString(it))
         }
         val entryTags = entry.tags.map { TagNormalize.kebab(it.name) }.toSet()
-        return pair.isNotEmpty() && entryTags.containsAll(pair)
+        return pair.size == TAG_PAIR_SIZE && entryTags.containsAll(pair)
     }
 
     private fun matchesGoblin(entry: EntryEntity, zoneId: ZoneId): Boolean {
@@ -87,4 +99,5 @@ object PatternMatcher {
 
     private val VOCAB_SPLIT: Regex = Regex("[^a-z0-9]+")
     private const val LOG_PREVIEW_CHARS = 80
+    private const val TAG_PAIR_SIZE = 2
 }

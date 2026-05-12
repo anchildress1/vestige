@@ -106,6 +106,23 @@ class PatternMatcherTest {
     }
 
     @Test
+    fun `tag_pair rejects signatures with wrong number of tags`() {
+        val entry = putEntry(templateLabel = TemplateLabel.AFTERMATH, tags = listOf("standup", "crashed", "tuesday"))
+        val oneTag = pattern(
+            PatternKind.TAG_PAIR_CO_OCCURRENCE,
+            "{\"label\":\"aftermath\",\"tags\":[\"standup\"]}",
+        )
+        val threeTags = pattern(
+            PatternKind.TAG_PAIR_CO_OCCURRENCE,
+            "{\"label\":\"aftermath\",\"tags\":[\"standup\",\"crashed\",\"tuesday\"]}",
+        )
+        // A 1-tag signature would collapse to template_recurrence-ish behavior; a 3-tag
+        // signature would over-constrain. Both indicate upstream corruption; matcher rejects.
+        assertFalse(PatternMatcher.matches(entry, oneTag, ZoneOffset.UTC))
+        assertFalse(PatternMatcher.matches(entry, threeTags, ZoneOffset.UTC))
+    }
+
+    @Test
     fun `tag_pair rejects malformed or incomplete signatures`() {
         val entry = putEntry(templateLabel = TemplateLabel.AFTERMATH, tags = listOf("standup", "crashed"))
         val malformed = pattern(PatternKind.TAG_PAIR_CO_OCCURRENCE, "{bad-json")

@@ -1,6 +1,7 @@
 package dev.anchildress1.vestige
 
 import android.Manifest
+import android.content.pm.ApplicationInfo
 import android.content.pm.PackageManager
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -32,6 +33,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
+import dev.anchildress1.vestige.debug.DebugPatternSeeder
 import dev.anchildress1.vestige.ui.patterns.PatternsHost
 import dev.anchildress1.vestige.ui.theme.VestigeTheme
 
@@ -51,9 +53,15 @@ class MainActivity : ComponentActivity() {
                         modifier = Modifier.fillMaxSize(),
                     )
                 } else {
+                    val isDebuggable = (applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE) != 0
                     Scaffold(modifier = Modifier.fillMaxSize()) { padding ->
                         PhaseOneShell(
                             onOpenPatterns = { showPatterns = true },
+                            onDebugSeed = if (isDebuggable) {
+                                { DebugPatternSeeder.seed(container.boxStore, container.patternStore) }
+                            } else {
+                                null
+                            },
                             modifier = Modifier.padding(padding),
                         )
                     }
@@ -70,7 +78,11 @@ class MainActivity : ComponentActivity() {
  * dev runs (Story 1.4). Polished onboarding copy and surfaces ship in Phase 4.
  */
 @Composable
-private fun PhaseOneShell(onOpenPatterns: () -> Unit = {}, modifier: Modifier = Modifier) {
+private fun PhaseOneShell(
+    onOpenPatterns: () -> Unit = {},
+    onDebugSeed: (() -> Unit)? = null,
+    modifier: Modifier = Modifier,
+) {
     val context = LocalContext.current
     var permissionGranted by rememberSaveable {
         mutableStateOf(
@@ -120,6 +132,15 @@ private fun PhaseOneShell(onOpenPatterns: () -> Unit = {}, modifier: Modifier = 
             modifier = Modifier.semantics { role = Role.Button },
         ) {
             Text(text = stringResource(id = R.string.open_patterns))
+        }
+
+        onDebugSeed?.let { seed ->
+            Button(
+                onClick = seed,
+                modifier = Modifier.semantics { role = Role.Button },
+            ) {
+                Text(text = stringResource(id = R.string.debug_seed_patterns))
+            }
         }
     }
 }

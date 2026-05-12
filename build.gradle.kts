@@ -49,6 +49,9 @@ kover {
                         "dev.anchildress1.vestige.ui.patterns.PatternsHostKt",
                         "dev.anchildress1.vestige.ui.patterns.PatternsHostKt*",
                         "dev.anchildress1.vestige.ui.patterns.*PatternsHostKt*",
+                        // Debug-only fixture seeder for on-device manual verification.
+                        // FLAG_DEBUGGABLE-gated at the call site; not on any release path.
+                        "dev.anchildress1.vestige.debug.*",
                         // Model loading and audio recording require on-device hardware/model;
                         // exercised by androidTest, not JVM unit tests.
                         "dev.anchildress1.vestige.inference.LiteRtLmEngine",

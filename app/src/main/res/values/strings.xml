@@ -16,4 +16,7 @@
 
     <!-- Phase 3 rough nav: in-app entry point into the Patterns surface. Phase 4 replaces with a real nav graph. -->
     <string name="open_patterns">View patterns</string>
+
+    <!-- Debug-only fixture seeder for Stories 3.9 / 3.10 manual verification. Hidden in release per FLAG_DEBUGGABLE gate. -->
+    <string name="debug_seed_patterns">[DEBUG] Seed sample patterns</string>
 </resources>

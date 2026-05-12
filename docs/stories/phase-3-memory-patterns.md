@@ -52,14 +52,14 @@ Query-side tag extraction goes beyond exact-substring match: a free-form query b
 **As** the AI implementor, **I need** EmbeddingGemma 300M loaded via LiteRT-LM and exposed as a `Embedder.embed(text: String): FloatArray` API, **so that** Story 3.3 (STT-E) can run real embeddings against the prepared sample data and we can decide whether vectors ship in v1.
 
 **Done when:**
-- [ ] EmbeddingGemma artifact (`litert-community/embeddinggemma-300m`) loads via LiteRT-LM in `:core-inference`.
-- [ ] `Embedder.embed(text)` returns a `FloatArray` of the model's documented dimensionality (~768d) within the documented sub-15ms latency on the reference device.
-- [ ] The model artifact uses the same `ModelArtifactStore` contract from Story 1.9 (SHA-256 verification, retry policy). It is a separate file with separate manifest entry per ADR-001 Q6.
-- [ ] No vector field is added to the `Entry` schema yet — that's contingent on STT-E.
-- [ ] `Embedder` is process-scoped (per `architecture-brief.md` ownership) — not a singleton tied to the main inference runtime, but reuses the LiteRT-LM runtime per `AGENTS.md` guardrail 13.
-- [ ] Smoke test: embedding "I crashed at 3pm" and "I felt overwhelmed at 3pm" produces vectors with cosine similarity > 0.6 (rough sanity check, not a tuning target).
+- [x] EmbeddingGemma artifact (`litert-community/embeddinggemma-300m`) loads via `GemmaEmbeddingModel` from `com.google.ai.edge.localagents:localagents-rag` in `:core-inference` per `../adrs/ADR-010-embeddinggemma-runtime-switch-to-litert.md` §"Addendum (2026-05-11)".
+- [x] `Embedder.embed(text)` returns a `FloatArray` of the model's documented dimensionality (768d) via the SDK's `Embedder<String>` interface. **Manual check required:** sub-15ms per-call latency on the reference S24 Ultra is a device measurement — verify with the on-device androidTest `EmbeddingGemmaSmokeTest`.
+- [x] The model + tokenizer artifacts use the same `ModelArtifactStore` contract from Story 1.9 (SHA-256 verification, retry policy). Two separate files (`.tflite` + `sentencepiece.model`) with separate manifest entries per ADR-001 Q6 / ADR-010 Action Item #3.
+- [x] No vector field is added to the `Entry` schema yet — that's contingent on STT-E.
+- [x] `Embedder` is process-scoped (per `architecture-brief.md` ownership). The `GemmaEmbeddingModel` JNI delegate is a distinct runtime from `LiteRtLmEngine` per ADR-010 — the original "reuses the LiteRT-LM runtime" wording from this bullet is dead under ADR-010.
+- [ ] Smoke test: embedding "I crashed at 3pm" and "I felt overwhelmed at 3pm" produces vectors with cosine similarity > 0.6. **Manual check required:** on-device run of `EmbeddingGemmaSmokeTest` against adb-pushed `.tflite` + `sentencepiece.model` artifacts. The instrumented test is wired; the cosine-sim assertion is its first assert.
 
-**Notes / risks:** This story does not change the schema. EmbeddingGemma is loaded into memory for the STT-E test. If STT-E fails, this loading code stays in the codebase but is gated off and the artifact is removed from the manifest. The cleanest exit on STT-E failure is to remove the `Embedder` API entirely; in practice we keep the code commented or feature-flagged off so re-enabling it in v1.5 is one flag flip.
+**Notes / risks:** This story does not change the schema. EmbeddingGemma is loaded into memory for the STT-E test. If STT-E fails, `LocalAgentsEmbedder` and its manifest entries are removed in Story 3.3's close-out; the SDK dependency goes with them so the v1 APK does not carry ~23 MB of unused native lib. There is no feature flag — ADR-001 §Q6 forbids runtime-conditional schema games; absence is the cut path.
 
 ---
 

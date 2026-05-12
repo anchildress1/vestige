@@ -43,13 +43,14 @@ stt-N : conditional on stop-and-test outcome (see PRD §"Build philosophy: build
 | `light-theme` | v2 | design | dark mode is on-brand; visual system designed dark-only | user base explicitly requesting it |
 | `calendar-health-correlation` | v2 | data | adds perms + integrations + new analytical surface; breaks v1 simplicity | v2 "data sources" expansion release |
 | `pattern-charts` | v1.5 | patterns | pure polish; needs charting infrastructure; v1 patterns are textual | post-submission v2 polish window |
-| `embeddings-fallback` | stt-E | memory | conditional: tag-only covers ~365-1000 entry scale | STT-E fails OR user data scale where tag-only weakens visibly |
+| ~~`embeddings-fallback`~~ | — | — | **Resolved 2026-05-12 — STT-E passed.** Hybrid (tag + keyword + recency + EmbeddingGemma cosine) beat tag-only on 3 of 4 cohort queries against the 18-entry STT-E corpus on the reference S24 Ultra. EmbeddingGemma ships in v1 per ADR-001 §"Addendum (2026-05-12)". No v1.5 fallback remains. | n/a — closed |
 | `mic-perm-resume-recheck` | v1.5 | permissions | Phase 1 shell checks mic permission once at startup via `rememberSaveable`; revoking in Settings and returning leaves UI showing stale "granted" state. Fix is a `LifecycleEventEffect(ON_RESUME)` re-check, but Phase 4 replaces the shell entirely | Phase 4 onboarding UX ships — wire into the real permission gate there |
 | ~~`gpu-model-artifact`~~ | — | — | **Resolved 2026-05-10 — wrong premise.** Artifact was GPU-capable; manifest missed `<uses-native-library>` for `libOpenCL.so` + `libvndksupport.so` (Android 12+ namespace). Fix in `AndroidManifest.xml`. Latency record in ADR-001 §Q3 addendum. | n/a — closed |
 | `multi-chunk-foreground` | stt-A | inference | v1 `AudioCapture` is hard-capped at 30 s and emits one `isFinal=true` chunk; `ForegroundInference.runForegroundCall` rejects non-final chunks. The >30 s orchestration (stripped-down transcription-only call per intermediate chunk + concatenated transcript-so-far injected on the final chunk per ADR-002 §"For >30s captures") is unwritten. Single-narrative recordings cover the demo's 90 s pitch + 5 min walkthrough; long-dump pathway is not on the critical path | user gives a >30 s entry attempt and it fails / `docs/sample-data-scenarios.md` §STT-A chunk-boundary script gets exercised end-to-end. To reproduce the chunk-boundary fixture, record the §STT-A "Read as one long capture" script forcing a 30 s split at `[CUT]` (or pre-split into two halves), transcode to PCM_S16LE 16 kHz mono per the STT-A §Q4 device-test record, then drive both halves through whatever multi-chunk orchestration ships at that point |
 | ~~`smart-turn-boundaries`~~ | — | — | **Collapsed 2026-05-09** when v1 scoped to single-turn-per-capture (after the STT-B prompt-stuffing pattern produced retention=0.0; the SDK's stateful Conversation path was not measured — see `adrs/ADR-005-stt-b-scope-and-v1-single-turn.md` (amends `adrs/ADR-002-multi-lens-extraction-pattern.md` §"Multi-turn behavior")). With each tap of record producing a fresh `CaptureSession` and no prior-turn context threaded into the prompt, there is no session boundary to be smart about under v1. | A future revival of multi-turn (post-v1, exercising the SDK stateful path) would re-open this row before Phase 4 history UI lands |
 | `parallel-lens-execution-via-clone` | v1.5 | inference | **Deferred 2026-05-11** after the ADR-008 feasibility probe confirmed `litertlm-android:0.11.0` does not expose `Session.clone()` or any parent-Session API. JNI bridge inspected — `nativeCreateSession(engineHandle, samplerConfig)` has no parent reference. Upstream PR #1515 (Kotlin clone surface) was closed unmerged 2026-03-09; upstream Issue #1226 ("Session Advanced" Android support) is open with no shipped timeline. Story 2.6.6 superseded; v1 ships ADR-002's original sequential 3-lens rule. Full evidence in `adrs/ADR-009-litertlm-kotlin-session-clone-unavailable.md`. | One of: a new `com.google.ai.edge.litertlm:litertlm-android` artifact >0.11.0 publishes; upstream `main` HEAD adds `Session.clone()` or parent-Session `SessionConfig`; Issue #1226 closes "shipped"; a Google-authored Kotlin clone PR merges. See ADR-009 §"Revival triggers" |
 | `retrieval-indexed-prefilter` | v1.5 | memory | **Deferred 2026-05-11.** Story 3.1 `RetrievalRepo.query` loads `entryBox.all` + `tagBox.all` per call. At v1 scale (ADR-003 sizes Phase 3 to ≤1000 entries with detection cost in tens of ms) the in-memory scan is fast and trivially deterministic. ObjectBox prefilter (keyword `contains` + tag join) + stem-key index trades complexity for a future scale problem. PR #19 Copilot review flagged. | Measured retrieval latency degrades on the reference S24U beyond the foreground budget, *or* entry count crosses ~1000 in real usage |
+| ~~`backfill-on-artifact-complete`~~ | — | — | **Resolved 2026-05-12.** `AppContainer.launchVectorBackfillIfReady()` now keeps one bounded in-process drain loop alive: if backlog exists before artifacts are complete, it retries for up to 12 delayed passes (60 s budget at 5 s intervals), then exits cleanly. A later save or cold start retriggers the worker. No Phase 4 download-complete event hook is required for correctness. | n/a — closed |
 
 ## Detail blocks
 
@@ -68,13 +69,13 @@ extraction-strategy: re-extract on demand from entry_text in v2; no schema migra
 spec-ref: concept-locked.md §Schema; PRD.md §"Future Considerations"
 ```
 
-### `embeddings-fallback`
+### ~~`embeddings-fallback`~~ — resolved 2026-05-12
 
 ```
-trigger: STT-E outcome
-if-pass: ship EmbeddingGemma 300M + ObjectBox vector index in v1 P0 (memory)
-if-fail: ship keyword + tags + recency only; this entry activates and embeddings move to v1.5
-spec-ref: PRD.md §"Build philosophy: build first, test at failure zones" STT-E; adrs/ADR-001-stack-and-build-infra.md §"Locked Stack" Storage row; concept-locked.md §"Memory architecture"
+outcome: STT-E PASSED on 2026-05-12 (3 of 4 cohort queries, threshold 50%)
+ships-in-v1: EmbeddingGemma 300M + ObjectBox HNSW vector index on EntryEntity.vector
+spec-ref: adrs/ADR-001-stack-and-build-infra.md §"Addendum (2026-05-12) — STT-E passed";
+          docs/stories/phase-3-memory-patterns.md §Story 3.4
 ```
 
 ### `tts-voice-output`

@@ -5,7 +5,7 @@
   "entities": [
     {
       "id": "1:8495295597095795304",
-      "lastPropertyId": "13:3421602807125172125",
+      "lastPropertyId": "14:224998442655798524",
       "name": "EntryEntity",
       "properties": [
         {
@@ -77,6 +77,13 @@
           "id": "13:3421602807125172125",
           "name": "lastError",
           "type": 9
+        },
+        {
+          "id": "14:224998442655798524",
+          "name": "vector",
+          "indexId": "7:6029983261360149208",
+          "type": 28,
+          "flags": 8
         }
       ],
       "relations": [
@@ -228,7 +235,7 @@
     }
   ],
   "lastEntityId": "4:1734609473925323709",
-  "lastIndexId": "6:431702098580436197",
+  "lastIndexId": "7:6029983261360149208",
   "lastRelationId": "2:6675457034848876041",
   "lastSequenceId": "0:0",
   "modelVersion": 5,

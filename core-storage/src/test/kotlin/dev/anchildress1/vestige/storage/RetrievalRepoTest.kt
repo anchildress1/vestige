@@ -3,6 +3,7 @@ package dev.anchildress1.vestige.storage
 import androidx.test.core.app.ApplicationProvider
 import io.objectbox.BoxStore
 import io.objectbox.kotlin.boxFor
+import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertThrows
@@ -27,12 +28,32 @@ class RetrievalRepoTest {
     private val now: Instant = Instant.parse("2026-05-11T12:00:00Z")
     private val clock: Clock = Clock.fixed(now, ZoneOffset.UTC)
 
+    // Default fixture returns zero-magnitude vectors so cosine contributes nothing — existing
+    // keyword + tag + recency assertions remain stable. Tests that exercise vector behavior
+    // override per-call via `repoWithEmbedder(...)` and seed entries with their own vectors.
+    private val zeroEmbedder: suspend (String) -> FloatArray = { FloatArray(EMBEDDING_DIMENSIONS) }
+
     @Before
     fun setUp() {
         val context = ApplicationProvider.getApplicationContext<android.content.Context>()
         dataDir = File(context.filesDir, "objectbox-retrieval-${System.nanoTime()}")
         boxStore = VestigeBoxStore.openAt(dataDir)
-        repo = RetrievalRepo(boxStore, clock)
+        repo = RetrievalRepo(boxStore, zeroEmbedder, clock)
+    }
+
+    private fun repoWithEmbedder(embedder: suspend (String) -> FloatArray): RetrievalRepo =
+        RetrievalRepo(boxStore, embedder, clock)
+
+    // Helper to keep the 30+ existing non-vector tests as `assertX(repo.queryBlocking(...))`
+    // without rewriting every body into `runBlocking { ... }`. New vector tests use
+    // `runBlocking { repo.queryBlocking(...) }` directly because they care about suspending behavior.
+    private fun RetrievalRepo.queryBlocking(
+        text: String,
+        topN: Int = 3,
+        recencyWeight: Float = 0.3f,
+        embeddingWeight: Float = 1.0f,
+    ): List<EntryEntity> = kotlinx.coroutines.runBlocking {
+        query(text, topN = topN, recencyWeight = recencyWeight, embeddingWeight = embeddingWeight)
     }
 
     @After
@@ -43,7 +64,7 @@ class RetrievalRepoTest {
 
     @Test
     fun `empty database returns empty list`() {
-        assertTrue(repo.query("anything").isEmpty())
+        assertTrue(repo.queryBlocking("anything").isEmpty())
     }
 
     @Test
@@ -51,7 +72,7 @@ class RetrievalRepoTest {
         insertEntry("standup crashed me again", daysAgo = 1)
         insertEntry("groceries and laundry", daysAgo = 1)
 
-        val results = repo.query("crashed standup")
+        val results = repo.queryBlocking("crashed standup")
 
         assertEquals(1, results.size)
         assertEquals("standup crashed me again", results.single().entryText)
@@ -61,8 +82,8 @@ class RetrievalRepoTest {
     fun `blank query returns empty list`() {
         insertEntry("standup crashed me again", daysAgo = 1)
 
-        assertTrue(repo.query("").isEmpty())
-        assertTrue(repo.query("   ").isEmpty())
+        assertTrue(repo.queryBlocking("").isEmpty())
+        assertTrue(repo.queryBlocking("   ").isEmpty())
     }
 
     @Test
@@ -70,7 +91,7 @@ class RetrievalRepoTest {
         insertEntry("groceries", daysAgo = 1)
         insertEntry("laundry", daysAgo = 2)
 
-        val results = repo.query("racquetball")
+        val results = repo.queryBlocking("racquetball")
 
         assertEquals(0, results.size)
     }
@@ -80,7 +101,7 @@ class RetrievalRepoTest {
         val better = insertEntry("standup crashed me", daysAgo = 5)
         val worse = insertEntry("crashed in traffic", daysAgo = 5)
 
-        val results = repo.query("standup crashed")
+        val results = repo.queryBlocking("standup crashed")
 
         assertEquals(listOf(better, worse), results.map { it.id })
     }
@@ -90,7 +111,7 @@ class RetrievalRepoTest {
         val tagged = insertEntry("unrelated body text", daysAgo = 10, tagNames = listOf("standup"))
         insertEntry("unrelated body text", daysAgo = 10)
 
-        val results = repo.query("standup")
+        val results = repo.queryBlocking("standup")
 
         assertEquals(listOf(tagged), results.map { it.id })
     }
@@ -101,7 +122,7 @@ class RetrievalRepoTest {
         val tagOnly = insertEntry("nothing matches here", daysAgo = 5, tagNames = listOf("standup"))
         val bodyOnly = insertEntry("standup wrecked me", daysAgo = 5)
 
-        val results = repo.query("standup")
+        val results = repo.queryBlocking("standup")
 
         assertEquals(2, results.size)
         // tag-only: keyword=0, tagJaccard=1.0 → score 1.0 + recency
@@ -115,7 +136,7 @@ class RetrievalRepoTest {
         val tagged = insertEntry("unrelated body text", daysAgo = 5, tagNames = listOf("tuesday-meeting"))
         insertEntry("unrelated body text", daysAgo = 5, tagNames = listOf("laundry"))
 
-        val results = repo.query("tuesday meeting")
+        val results = repo.queryBlocking("tuesday meeting")
 
         assertEquals(listOf(tagged), results.map { it.id })
     }
@@ -125,7 +146,7 @@ class RetrievalRepoTest {
         val tagged = insertEntry("unrelated body text", daysAgo = 5, tagNames = listOf("meetings"))
         insertEntry("unrelated body text", daysAgo = 5, tagNames = listOf("laundry"))
 
-        val results = repo.query("meeting")
+        val results = repo.queryBlocking("meeting")
 
         assertEquals(listOf(tagged), results.map { it.id })
     }
@@ -135,7 +156,7 @@ class RetrievalRepoTest {
         val recent = insertEntry("crashed after standup", daysAgo = 1)
         val older = insertEntry("crashed after standup", daysAgo = 60)
 
-        val results = repo.query("standup")
+        val results = repo.queryBlocking("standup")
 
         assertEquals(listOf(recent, older), results.map { it.id })
     }
@@ -144,14 +165,14 @@ class RetrievalRepoTest {
     fun `recency alone never surfaces an unmatched entry`() {
         insertEntry("brand new entry text", daysAgo = 0)
 
-        assertTrue(repo.query("totally-unrelated-token").isEmpty())
+        assertTrue(repo.queryBlocking("totally-unrelated-token").isEmpty())
     }
 
     @Test
     fun `topN caps the result size`() {
         repeat(5) { i -> insertEntry("standup crashed ${'a' + i}", daysAgo = i) }
 
-        val results = repo.query("standup", topN = 2)
+        val results = repo.queryBlocking("standup", topN = 2)
 
         assertEquals(2, results.size)
     }
@@ -162,7 +183,7 @@ class RetrievalRepoTest {
         val first = insertEntry("standup again", daysAgo = 5)
         val second = insertEntry("standup again", daysAgo = 5)
 
-        val results = repo.query("standup")
+        val results = repo.queryBlocking("standup")
 
         assertEquals(listOf(first, second), results.map { it.id })
     }
@@ -173,11 +194,11 @@ class RetrievalRepoTest {
         val recent = insertEntry("standup crashed", daysAgo = 1)
 
         // With recency disabled, scores tie → id-asc → older first (inserted first).
-        val noRecency = repo.query("standup", recencyWeight = 0f)
+        val noRecency = repo.queryBlocking("standup", recencyWeight = 0f)
         assertEquals(listOf(older, recent), noRecency.map { it.id })
 
         // With the default 0.3 weight, recent's recency boost flips ordering.
-        val withRecency = repo.query("standup")
+        val withRecency = repo.queryBlocking("standup")
         assertEquals(listOf(recent, older), withRecency.map { it.id })
     }
 
@@ -187,22 +208,22 @@ class RetrievalRepoTest {
         insertEntry("standup wired", daysAgo = 3)
         insertEntry("crashed traffic", daysAgo = 1)
 
-        val first = repo.query("standup crashed")
-        val second = repo.query("standup crashed")
+        val first = repo.queryBlocking("standup crashed")
+        val second = repo.queryBlocking("standup crashed")
 
         assertEquals(first.map { it.id }, second.map { it.id })
     }
 
     @Test
     fun `query rejects non-positive topN`() {
-        assertThrows(IllegalArgumentException::class.java) { repo.query("x", topN = 0) }
-        assertThrows(IllegalArgumentException::class.java) { repo.query("x", topN = -1) }
+        assertThrows(IllegalArgumentException::class.java) { repo.queryBlocking("x", topN = 0) }
+        assertThrows(IllegalArgumentException::class.java) { repo.queryBlocking("x", topN = -1) }
     }
 
     @Test
     fun `query rejects out-of-range recencyWeight`() {
-        assertThrows(IllegalArgumentException::class.java) { repo.query("x", recencyWeight = -0.1f) }
-        assertThrows(IllegalArgumentException::class.java) { repo.query("x", recencyWeight = 1.1f) }
+        assertThrows(IllegalArgumentException::class.java) { repo.queryBlocking("x", recencyWeight = -0.1f) }
+        assertThrows(IllegalArgumentException::class.java) { repo.queryBlocking("x", recencyWeight = 1.1f) }
     }
 
     @Test
@@ -211,8 +232,8 @@ class RetrievalRepoTest {
         insertEntry("unrelated body text", daysAgo = 5, tagNames = listOf("laundry"))
 
         // 'kiss' (len > MIN_STEM_LENGTH, ends with 'ss') exits the stemmer unchanged.
-        assertEquals(listOf(kiss), repo.query("kiss").map { it.id })
-        assertTrue(repo.query("kis").isEmpty())
+        assertEquals(listOf(kiss), repo.queryBlocking("kiss").map { it.id })
+        assertTrue(repo.queryBlocking("kis").isEmpty())
     }
 
     @Test
@@ -221,8 +242,8 @@ class RetrievalRepoTest {
         insertEntry("unrelated body text", daysAgo = 5, tagNames = listOf("laundry"))
 
         // 'this' (len > MIN_STEM_LENGTH, ends with 'is') exits the stemmer unchanged.
-        assertEquals(listOf(thisTag), repo.query("this").map { it.id })
-        assertTrue(repo.query("thi").isEmpty())
+        assertEquals(listOf(thisTag), repo.queryBlocking("this").map { it.id })
+        assertTrue(repo.queryBlocking("thi").isEmpty())
     }
 
     @Test
@@ -232,8 +253,8 @@ class RetrievalRepoTest {
         val bus = insertEntry("unrelated body text", daysAgo = 5, tagNames = listOf("bus"))
         insertEntry("unrelated body text", daysAgo = 5, tagNames = listOf("laundry"))
 
-        assertEquals(listOf(bus), repo.query("bus").map { it.id })
-        assertTrue(repo.query("bu").isEmpty())
+        assertEquals(listOf(bus), repo.queryBlocking("bus").map { it.id })
+        assertTrue(repo.queryBlocking("bu").isEmpty())
     }
 
     @Test
@@ -243,7 +264,7 @@ class RetrievalRepoTest {
 
         // ADR-002 §"Plural folding addendum" names 'news' as a corruption case (naive stem → 'new').
         // The PRESERVED_SURFACES exception keeps the surface form intact on both sides of the compare.
-        assertTrue(repo.query("new").isEmpty())
+        assertTrue(repo.queryBlocking("new").isEmpty())
     }
 
     @Test
@@ -253,7 +274,7 @@ class RetrievalRepoTest {
 
         // 'series' would corrupt to 'sery' under the ies→y rule; the PRESERVED_SURFACES exception
         // exits the stemmer before any rules apply.
-        assertTrue(repo.query("sery").isEmpty())
+        assertTrue(repo.queryBlocking("sery").isEmpty())
     }
 
     @Test
@@ -264,8 +285,8 @@ class RetrievalRepoTest {
         val movieTag = insertEntry("unrelated body text", daysAgo = 5, tagNames = listOf("movie"))
 
         // Query in either direction surfaces both entries (same stem 'movie').
-        val plural = repo.query("movies").map { it.id }
-        val singular = repo.query("movie").map { it.id }
+        val plural = repo.queryBlocking("movies").map { it.id }
+        val singular = repo.queryBlocking("movie").map { it.id }
         assertTrue("expected $movieTag in $plural", movieTag in plural)
         assertTrue("expected $moviesTag in $plural", moviesTag in plural)
         assertTrue("expected $movieTag in $singular", movieTag in singular)
@@ -280,7 +301,7 @@ class RetrievalRepoTest {
         insertEntry("plain body", daysAgo = 5)
 
         // Query with uppercase 'I' must match the lowercased body token 'important'.
-        val results = repo.query("IMPORTANT")
+        val results = repo.queryBlocking("IMPORTANT")
         assertEquals(listOf(tagged), results.map { it.id })
     }
 
@@ -295,7 +316,7 @@ class RetrievalRepoTest {
 
         // Query "meeting" with stored vocab {meeting, meetings} — entry tagged only 'meeting'
         // must still surface; under surface-form Jaccard it would have scored ~0.5.
-        val results = repo.query("meeting")
+        val results = repo.queryBlocking("meeting")
         assertTrue("expected $meeting in results, got ${results.map { it.id }}", meeting in results.map { it.id })
     }
 
@@ -306,8 +327,8 @@ class RetrievalRepoTest {
         val newsId = insertEntry("unrelated body text", daysAgo = 5, tagNames = listOf("news"))
         val seriesId = insertEntry("unrelated body text", daysAgo = 5, tagNames = listOf("series"))
 
-        repo.query("news") // stems internally; must not write back
-        repo.query("series")
+        repo.queryBlocking("news") // stems internally; must not write back
+        repo.queryBlocking("series")
 
         val storedTags = boxStore.boxFor<TagEntity>().all.map { it.name }.toSet()
         assertTrue("'news' must survive stemming intact", "news" in storedTags)
@@ -319,7 +340,128 @@ class RetrievalRepoTest {
         assertEquals(listOf("series"), seriesEntry.tags.map { it.name })
     }
 
-    private fun insertEntry(text: String, daysAgo: Int, tagNames: List<String> = emptyList()): Long {
+    @Test
+    fun `stored vector cosine surfaces vocabulary-drift match the keyword-only signal misses`() = runBlocking {
+        // The aftermath entry shares only stop-words with the query but its stored vector is far
+        // closer than the literal-keyword distractor's. Hybrid query() should rank it first.
+        val aftermath = insertEntry(
+            text = "battery got yanked after the sync",
+            daysAgo = 3,
+            vector = floatArrayOf(0.95f, 0.1f, 0f),
+        )
+        val distractor = insertEntry(
+            text = "battery died on my keyboard",
+            daysAgo = 1,
+            vector = floatArrayOf(0.1f, 0.99f, 0f),
+        )
+
+        val embedder = fixedEmbedder("post-meeting crash" to floatArrayOf(1f, 0f, 0f))
+        val results = repoWithEmbedder(embedder).query("post-meeting crash", topN = 5)
+
+        assertEquals(listOf(aftermath, distractor), results.map { it.id })
+    }
+
+    @Test
+    fun `blank query returns empty without invoking the embedder`() = runBlocking {
+        insertEntry("standup crashed", daysAgo = 1)
+        var calls = 0
+        val embedder: suspend (String) -> FloatArray = {
+            calls++
+            FloatArray(EMBEDDING_DIMENSIONS)
+        }
+
+        assertTrue(repoWithEmbedder(embedder).query("   ").isEmpty())
+        assertEquals(0, calls)
+    }
+
+    @Test
+    fun `query rejects negative embeddingWeight`() {
+        assertThrows(IllegalArgumentException::class.java) {
+            runBlocking { repo.query("x", embeddingWeight = -0.1f) }
+        }
+    }
+
+    @Test
+    fun `embeddingWeight = 0 collapses to keyword + tag + recency`() = runBlocking {
+        // With embeddingWeight=0 the cosine term contributes nothing — ordering must match the
+        // baseline regardless of stored vectors or query embedding.
+        val firstId = insertEntry("standup crashed me", daysAgo = 2, vector = floatArrayOf(0f, 1f))
+        val secondId = insertEntry("standup wired me", daysAgo = 1, vector = floatArrayOf(1f, 0f))
+        val embedder = fixedEmbedder("standup" to floatArrayOf(1f, 0f))
+
+        val hybrid = repoWithEmbedder(embedder).query("standup", embeddingWeight = 0f).map { it.id }
+
+        // recency: secondId is newer → wins on the +0.3 boost; firstId follows.
+        assertEquals(listOf(secondId, firstId), hybrid)
+    }
+
+    @Test
+    fun `query rejects entries whose stored vector dimension diverges from the query`() {
+        insertEntry(
+            text = "standup crashed",
+            daysAgo = 1,
+            vector = floatArrayOf(1f, 0f, 0f), // 3-d stored
+        )
+        val embedder: suspend (String) -> FloatArray = { floatArrayOf(1f, 0f) } // 2-d query
+
+        assertThrows(IllegalArgumentException::class.java) {
+            runBlocking { repoWithEmbedder(embedder).query("standup") }
+        }
+    }
+
+    @Test
+    fun `query skips embedder call when no entry has a stored vector`() = runBlocking {
+        insertEntry("standup crashed", daysAgo = 1, vector = null)
+        var calls = 0
+        val embedder: suspend (String) -> FloatArray = {
+            calls++
+            FloatArray(EMBEDDING_DIMENSIONS)
+        }
+
+        val results = repoWithEmbedder(embedder).query("standup")
+
+        assertEquals(1, results.size)
+        assertEquals(0, calls)
+    }
+
+    @Test
+    fun `negative cosine entries do not surface on cosine signal alone`() = runBlocking {
+        // Query vector points one way; the only stored entry's vector points the OPPOSITE way →
+        // cosine = -1. Without keyword/tag overlap, the entry must NOT surface (clamp at 0).
+        insertEntry("anti-aligned", daysAgo = 5, vector = floatArrayOf(-1f, 0f))
+        val embedder = fixedEmbedder("totally-unrelated-token" to floatArrayOf(1f, 0f))
+
+        val results = repoWithEmbedder(embedder).query("totally-unrelated-token")
+
+        assertTrue("Negative cosine must not count as a match", results.isEmpty())
+    }
+
+    @Test
+    fun `null-vector entries still rank via keyword + tag + recency`() = runBlocking {
+        // Backfill window: a brand-new entry without a vector yet must still surface via the
+        // other signals. Cosine contributes 0 for null vectors but does not exclude the entry.
+        val nullVector = insertEntry(text = "standup crashed me", daysAgo = 1, vector = null)
+        val embedder = fixedEmbedder("standup" to floatArrayOf(1f, 0f))
+
+        val results = repoWithEmbedder(embedder).query("standup")
+
+        assertEquals(listOf(nullVector), results.map { it.id })
+    }
+
+    private fun fixedEmbedder(vararg pairs: Pair<String, FloatArray>): suspend (String) -> FloatArray {
+        val table = pairs.toMap()
+        return { text ->
+            table[text]
+                ?: error("test fixture missing embedding for \"$text\" (have ${table.keys})")
+        }
+    }
+
+    private fun insertEntry(
+        text: String,
+        daysAgo: Int,
+        tagNames: List<String> = emptyList(),
+        vector: FloatArray? = null,
+    ): Long {
         val ts = now.minusSeconds(daysAgo * SECONDS_PER_DAY).toEpochMilli()
         val entryBox = boxStore.boxFor<EntryEntity>()
         val tagBox = boxStore.boxFor<TagEntity>()
@@ -330,6 +472,7 @@ class RetrievalRepoTest {
             entryText = text,
             timestampEpochMs = ts,
             markdownFilename = "test-${System.nanoTime()}.md",
+            vector = vector,
         )
         val id = entryBox.put(entry)
         if (tagEntities.isNotEmpty()) {
@@ -341,5 +484,6 @@ class RetrievalRepoTest {
 
     private companion object {
         const val SECONDS_PER_DAY = 86_400L
+        const val EMBEDDING_DIMENSIONS = 768
     }
 }

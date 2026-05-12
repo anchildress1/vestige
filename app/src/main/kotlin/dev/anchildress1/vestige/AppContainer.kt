@@ -20,6 +20,7 @@ import dev.anchildress1.vestige.model.DefaultModelArtifactStore
 import dev.anchildress1.vestige.model.DefaultNetworkGate
 import dev.anchildress1.vestige.model.EmbeddingArtifactManifest
 import dev.anchildress1.vestige.model.ExtractionStatus
+import dev.anchildress1.vestige.model.ModelArtifactState
 import dev.anchildress1.vestige.model.ModelArtifactStore
 import dev.anchildress1.vestige.model.ModelManifest
 import dev.anchildress1.vestige.model.NetworkGate
@@ -33,19 +34,26 @@ import dev.anchildress1.vestige.storage.MarkdownEntryStore
 import dev.anchildress1.vestige.storage.PatternDetector
 import dev.anchildress1.vestige.storage.PatternRepo
 import dev.anchildress1.vestige.storage.PatternStore
+import dev.anchildress1.vestige.storage.VectorBackfillWorker
 import dev.anchildress1.vestige.storage.VestigeBoxStore
 import io.objectbox.BoxStore
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import java.io.File
 import java.time.ZonedDateTime
+import java.util.concurrent.atomic.AtomicBoolean
 
 /** Process-singleton hub for Phase-2 cross-cutting concerns. */
-@Suppress("LongParameterList") // Constructor-injection seams: factories + lifecycle + scope.
+@Suppress(
+    "LongParameterList", // Constructor-injection seams: factories + lifecycle + scope.
+    "TooManyFunctions", // DI hub aggregates capture, save, lifecycle, and backfill orchestration.
+)
 class AppContainer(
     private val applicationContext: Context,
     boxStoreFactory: (Context) -> BoxStore = { ctx -> VestigeBoxStore.open(ctx) },
@@ -87,6 +95,12 @@ class AppContainer(
     private val embedderFactory: (String, String) -> Embedder = { modelPath, tokenizerPath ->
         GemmaTextEmbedder(modelPath = modelPath, tokenizerPath = tokenizerPath)
     },
+    private val vectorBackfillWorkerFactory: (
+        BoxStore,
+        suspend (String) -> FloatArray,
+    ) -> VectorBackfillWorker = { store, embedEntryText ->
+        VectorBackfillWorker(store, embedEntryText)
+    },
     private val backgroundExtractionSaveFlowFactory: (
         EntryStore,
         BackgroundExtractionWorker,
@@ -113,6 +127,9 @@ class AppContainer(
     private val foregroundServiceStarter: (Intent) -> Unit = { intent ->
         applicationContext.startForegroundService(intent)
     },
+    private val vectorBackfillRetryDelayMs: Long = VECTOR_BACKFILL_RETRY_DELAY_MS,
+    private val vectorBackfillMaxRetries: Int = VECTOR_BACKFILL_MAX_RETRIES,
+    private val vectorBackfillScheduleListener: (() -> Unit)? = null,
     private val scope: CoroutineScope = defaultScope(),
 ) {
 
@@ -122,6 +139,9 @@ class AppContainer(
     val entryStore: EntryStore = EntryStore(boxStore, markdownStoreFactory(applicationContext))
     private val backgroundEngineInitMutex = Mutex()
     private val embedderInitMutex = Mutex()
+    private val vectorBackfillMutex = Mutex()
+    private val vectorBackfillRunning = AtomicBoolean(false)
+    private val vectorBackfillRequested = AtomicBoolean(false)
 
     @Volatile
     private var backgroundEngineInitialized = false
@@ -232,13 +252,15 @@ class AppContainer(
         persona: Persona = Persona.WITNESS,
     ): SaveOutcome {
         ensureBackgroundEngineInitialized()
-        return backgroundExtractionSaveFlow.saveAndExtract(
+        val outcome = backgroundExtractionSaveFlow.saveAndExtract(
             entryText = entryText,
             capturedAt = capturedAt,
             retrievedHistory = retrievedHistory,
             timeoutMs = timeoutMs,
             persona = persona,
         )
+        launchVectorBackfillIfReady()
+        return outcome
     }
 
     internal suspend fun ensureBackgroundEngineInitialized() {
@@ -263,6 +285,86 @@ class AppContainer(
                 embedderInstance = embedder
                 embedder
             }
+        }
+    }
+
+    /**
+     * Launch or re-request vector backfill on the container scope. If backlog exists before the
+     * embedding artifacts finish downloading, the runner sleeps briefly and retries in-process
+     * instead of waiting for a cold restart. Caller doesn't await; results land in logcat under
+     * tag `VectorBackfill`.
+     */
+    fun launchVectorBackfillIfReady() {
+        vectorBackfillRequested.set(true)
+        if (!vectorBackfillRunning.compareAndSet(false, true)) return
+        vectorBackfillScheduleListener?.invoke()
+        launchVectorBackfillRunner()
+    }
+
+    private fun launchVectorBackfillRunner() {
+        require(vectorBackfillMaxRetries >= 0) {
+            "vectorBackfillMaxRetries must be >= 0 (got $vectorBackfillMaxRetries)"
+        }
+        scope.launch {
+            try {
+                drainVectorBackfillCycles()
+            } finally {
+                relaunchVectorBackfillIfRequested()
+            }
+        }
+    }
+
+    private suspend fun drainVectorBackfillCycles() {
+        var retryCount = 0
+        while (true) {
+            when (runVectorBackfillCycle()) {
+                VectorBackfillOutcome.IDLE, VectorBackfillOutcome.COMPLETE -> retryCount = 0
+
+                VectorBackfillOutcome.RETRY_LATER -> {
+                    if (retryCount >= vectorBackfillMaxRetries) {
+                        Log.e(
+                            TAG,
+                            "Vector backfill abandoned after $vectorBackfillMaxRetries retries; " +
+                                "a future save or cold start will retrigger it.",
+                        )
+                        return
+                    }
+                    retryCount += 1
+                    delay(vectorBackfillRetryDelayMs)
+                    vectorBackfillRequested.set(true)
+                }
+            }
+            if (!vectorBackfillRequested.get()) return
+        }
+    }
+
+    private suspend fun runVectorBackfillCycle(): VectorBackfillOutcome {
+        vectorBackfillRequested.set(false)
+        return vectorBackfillMutex.withLock {
+            val worker = vectorBackfillWorkerFactory(boxStore) { text -> requireEmbedder().embed(text) }
+            // Cheap presence-only check before paying for SHA-256 artifact verification —
+            // most cold starts and steady-state save completions have nothing to backfill.
+            if (!worker.hasPendingWork()) return@withLock VectorBackfillOutcome.IDLE
+
+            val modelState = embeddingModelArtifactStore.currentState()
+            val tokenizerState = embeddingTokenizerArtifactStore.currentState()
+            if (modelState !is ModelArtifactState.Complete ||
+                tokenizerState !is ModelArtifactState.Complete
+            ) {
+                Log.i(TAG, "Vector backfill delayed — embedding artifacts not yet complete")
+                return@withLock VectorBackfillOutcome.RETRY_LATER
+            }
+            worker.backfill()
+            VectorBackfillOutcome.COMPLETE
+        }
+    }
+
+    // A trigger can land after `drain` decides it's done but before `running` flips false.
+    // Re-check + CAS-relaunch here so the wakeup is not lost.
+    private fun relaunchVectorBackfillIfRequested() {
+        vectorBackfillRunning.set(false)
+        if (vectorBackfillRequested.get() && vectorBackfillRunning.compareAndSet(false, true)) {
+            launchVectorBackfillRunner()
         }
     }
 
@@ -297,6 +399,8 @@ class AppContainer(
     private companion object {
         const val TAG = "VestigeAppContainer"
         const val MODEL_ARTIFACTS_SUBDIR = "models"
+        const val VECTOR_BACKFILL_RETRY_DELAY_MS = 5_000L
+        const val VECTOR_BACKFILL_MAX_RETRIES = 12
 
         fun defaultScope(): CoroutineScope {
             val exceptionHandler = CoroutineExceptionHandler { _, error ->
@@ -304,5 +408,11 @@ class AppContainer(
             }
             return CoroutineScope(SupervisorJob() + Dispatchers.Default + exceptionHandler)
         }
+    }
+
+    private enum class VectorBackfillOutcome {
+        IDLE,
+        COMPLETE,
+        RETRY_LATER,
     }
 }

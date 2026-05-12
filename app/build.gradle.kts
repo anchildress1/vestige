@@ -52,6 +52,7 @@ android {
         //   modelPath, audioPath, latencyBudgetMs — existing smoke tests.
         //   manifestPath, runsPerEntry — SttDLensDivergenceTest, SttCTagStabilityTest.
         //   inferenceBackend — STT-C/STT-D harnesses (cpu | gpu).
+        //   embeddingModelPath, embeddingTokenizerPath — SttEEmbeddingComparisonTest + EmbeddingGemmaSmokeTest.
         listOf(
             "modelPath",
             "audioPath",
@@ -59,6 +60,8 @@ android {
             "manifestPath",
             "runsPerEntry",
             "inferenceBackend",
+            "embeddingModelPath",
+            "embeddingTokenizerPath",
         ).forEach { key ->
             project.findProperty(key)?.toString()?.let { value ->
                 testInstrumentationRunnerArguments[key] = value

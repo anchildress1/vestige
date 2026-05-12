@@ -44,6 +44,7 @@ dependencies {
     // so `:app` can wire and observe lifecycle without a separate dependency declaration.
     api(libs.objectbox.android)
     implementation(libs.objectbox.kotlin)
+    implementation(libs.kotlinx.coroutines.core)
 
     testImplementation(libs.junit) // Robolectric runner is JUnit 4
     testImplementation(libs.junit.jupiter.api)

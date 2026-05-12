@@ -70,13 +70,13 @@ Query-side tag extraction goes beyond exact-substring match: a free-form query b
 **As** the AI implementor, **I need** to verify that adding embedding-based retrieval to the keyword + tag + recency baseline produces visibly better recall on the STT-E sample data from `sample-data-scenarios.md`, **so that** the v1 ship/cut decision on EmbeddingGemma is grounded in measured demo impact, not optimism.
 
 **Done when:**
-- [ ] The full STT-E sample-transcript set from `sample-data-scenarios.md` is loaded into a test database. The set includes vocabulary-drift scenarios — entries that describe the same underlying state with different words across time.
-- [ ] Two retrieval paths run against representative queries: (a) `RetrievalRepo` from Story 3.1 (tag-only baseline); (b) the same `RetrievalRepo` augmented with embedding similarity scoring using `Embedder` from Story 3.2.
-- [ ] For each query in the test set, both paths return their top-3 entries. Per-query, the embedding path is judged "visibly better" if it surfaces at least one entry the tag-only path missed *and* that entry is genuinely relevant per the vocabulary-drift narrative in `sample-data-scenarios.md`.
-- [ ] Across the test set, embeddings are visibly better on ≥50% of queries → STT-E passes.
-- [ ] Result is recorded in ADR-001 §"Locked Stack" Storage row and the `embeddings-fallback` entry in `backlog.md` is updated (passed → close out; failed → activate as v1.5).
-- [ ] If STT-E passes, proceed to Story 3.4 (schema migration + vector integration).
-- [ ] If STT-E fails, this story closes the embedding work for v1. Story 3.4 is skipped. Update `concept-locked.md` §"Memory architecture" to remove the vector layer reference, update `PRD.md` §"Embedding contingent ship" acceptance criterion to record the cut, and remove `Embedder` from any wired code paths.
+- [x] The full STT-E sample-transcript set from `sample-data-scenarios.md` is loaded into a test database. The set includes vocabulary-drift scenarios — entries that describe the same underlying state with different words across time. (18-entry fixture: A1-A6 + B1-B3 + C1-C3 + D1-D3 + X1-X3 in `docs/stt-e-manifest.example.txt`, loaded by `SttEEmbeddingComparisonTest`.)
+- [x] Two retrieval paths run against representative queries: (a) `RetrievalRepo` from Story 3.1 (tag-only baseline); (b) the same `RetrievalRepo` augmented with embedding similarity scoring using `Embedder` from Story 3.2. (Four cohort queries — aftermath / invoice / decision-spiral / late-night.)
+- [x] For each query in the test set, both paths return their top-3 entries. Per-query, the embedding path is judged "visibly better" if it surfaces at least one entry the tag-only path missed *and* that entry is genuinely relevant per the vocabulary-drift narrative in `sample-data-scenarios.md`. (Harness uses top-5 to keep enough room for the 6-entry A cohort; relevance = entry id in the query's cohort set.)
+- [x] Across the test set, embeddings are visibly better on ≥50% of queries → STT-E passes. (3 of 4 wins — 75% — on the reference S24 Ultra 2026-05-12.)
+- [x] Result is recorded in ADR-001 §"Locked Stack" Storage row and the `embeddings-fallback` entry in `backlog.md` is updated (passed → close out; failed → activate as v1.5). (ADR-001 §"Addendum (2026-05-12)" + backlog row marked Resolved.)
+- [x] If STT-E passes, proceed to Story 3.4 (schema migration + vector integration).
+- [ ] If STT-E fails, this story closes the embedding work for v1. Story 3.4 is skipped. Update `concept-locked.md` §"Memory architecture" to remove the vector layer reference, update `PRD.md` §"Embedding contingent ship" acceptance criterion to record the cut, and remove `Embedder` from any wired code paths. (Not applicable — STT-E passed.)
 
 **Fallback if STT-E fails:** the demo's "intentional model use" story keeps EmbeddingGemma out. The v1 retrieval path is keyword + tags + recency only. Pattern detection (Story 3.5) was already designed to work over this baseline, so no Phase 3 work changes. The blog post mentions EmbeddingGemma as a v1.5 path with the empirical justification ("it didn't visibly outperform on our sample at our scale").
 
@@ -91,12 +91,12 @@ Query-side tag extraction goes beyond exact-substring match: a free-form query b
 **As** the AI implementor, **I need** to add a vector field to the `Entry` ObjectBox schema, backfill embeddings for existing entries, and wire vector similarity into `RetrievalRepo`'s ranking, **so that** pattern detection and re-eval queries get the semantic-similarity signal STT-E proved was worth the engineering cost.
 
 **Done when:**
-- [ ] `Entry` ObjectBox entity gains a `vector: FloatArray` field with the appropriate `@HnswIndex` annotation per ObjectBox vector-search docs.
-- [ ] A one-time backfill task computes vectors for all existing entries on first launch after the schema migration.
-- [ ] `RetrievalRepo.query(...)` from Story 3.1 augments its ranking with cosine similarity from the vector index, weighted per ADR-002 §Q2 (default settings, tunable).
-- [ ] Hybrid retrieval (keyword + tags + recency + vector) is the new default. Pure-tag-only mode is removed; the test path from Story 3.3 was a one-time comparison.
-- [ ] The model manifest (per Story 1.9) includes the EmbeddingGemma artifact alongside the main model.
-- [ ] APK builds, installs, and runs on the reference S24 Ultra with the new schema.
+- [x] `Entry` ObjectBox entity gains a `vector: FloatArray` field with the appropriate `@HnswIndex` annotation per ObjectBox vector-search docs. (Nullable `FloatArray?` with `@HnswIndex(dimensions = 768, distanceType = COSINE)` — null until backfill / save-time embedding populates it.)
+- [x] A one-time backfill task computes vectors for all existing entries on first launch after the schema migration. (`VectorBackfillWorker` in `:core-storage`; `AppContainer.launchVectorBackfillIfReady()` triggers from `VestigeApplication.onCreate`. Idempotent across cold starts; if artifacts are still incomplete, one in-process runner retries for up to 12 delayed passes before yielding and letting the next save / cold start retrigger.)
+- [x] `RetrievalRepo.query(...)` from Story 3.1 augments its ranking with cosine similarity from the vector index, weighted per ADR-002 §Q2 (default settings, tunable). (`embeddingWeight` default 1.0, tunable.)
+- [x] Hybrid retrieval (keyword + tags + recency + vector) is the new default. Pure-tag-only mode is removed; the test path from Story 3.3 was a one-time comparison. (`queryHybrid()` deleted; single suspending `query()` is the hybrid path.)
+- [x] The model manifest (per Story 1.9) includes the EmbeddingGemma artifact alongside the main model. (`embeddingModelArtifactStore` + `embeddingTokenizerArtifactStore` already wired into `AppContainer` from Story 3.2.)
+- [x] APK builds, installs, and runs on the reference S24 Ultra with the new schema. (Installed + launched cleanly 2026-05-12 — schema migration adds the vector index with no crash; backfill correctly skips when artifacts are not yet downloaded. `SttEEmbeddingComparisonTest` regression run on-device confirms hybrid `query()` surfaces ≥2 cohort-relevant in top-5 across all four queries.)
 
 **Notes / risks:** Per ADR-001 Q6, the submitted APK has exactly one schema shape. After this story lands, that shape includes the vector field permanently for v1. Do not introduce a feature flag that toggles the vector field at runtime.
 

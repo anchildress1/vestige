@@ -400,22 +400,26 @@ rubric moves.
 ignored (Factors 2 + 4), tightens divergence floor (30% → 50%), and adds an explicit
 parse-stability factor. It is more demanding than the old gate, not less.
 
-**Verdict against fresh evidence.** Two back-to-back GPU reruns of the shipped Skeptical-only
-config against the canonical 15-entry corpus (manifest md5 `2380b8c4091eac2c73281de3261e14c9`):
+**Verdict against fresh evidence.** Three runs of the shipped Skeptical-only config against
+the canonical 15-entry corpus (manifest md5 `2380b8c4091eac2c73281de3261e14c9`) — two
+back-to-back reruns plus a third invocation as part of the full instrumented suite-run later
+the same day:
 
-| Factor | Cut | Rerun #1 | Rerun #2 |
-|---|---|---|---|
-| 1. Meaningful divergence | ≥ 50% | 11/15 = 73% ✅ | 11/15 = 73% ✅ |
-| 2. `canonical_with_conflict` reachable | ≥ 2 entries | A4 + B2 ✅ | A4 + B2 ✅ |
-| 3. Parse stability | ≥ 90%, 0 timeouts | 44/45 = 97.8%, 0 ✅ | 44/45 = 97.8%, 0 ✅ |
-| 4a. Meaningful-set Jaccard (rerun #1 vs #2) | ≥ 0.75 | **1.0** ✅ | |
-| 4b. Skeptical flag count delta (rerun #1 vs #2) | ≤ 1 | **0** ✅ | |
+| Factor | Cut | Rerun #1 | Rerun #2 | Suite-run (3rd) |
+|---|---|---|---|---|
+| 1. Meaningful divergence | ≥ 50% | 11/15 = 73% ✅ | 11/15 = 73% ✅ | 11/15 = 73% ✅ |
+| 2. `canonical_with_conflict` reachable | ≥ 2 entries | A4 + B2 ✅ | A4 + B2 ✅ | A4 + B2 ✅ |
+| 3. Parse stability | ≥ 90%, 0 timeouts | 44/45 = 97.8%, 0 ✅ | 44/45 = 97.8%, 0 ✅ | 44/45 = 97.8%, 0 ✅ |
+| 4a. Meaningful-set Jaccard (pairwise across runs) | ≥ 0.75 | **1.0** ✅ | **1.0** ✅ | **1.0** ✅ |
+| 4b. Skeptical flag count delta (pairwise across runs) | ≤ 1 | **0** ✅ | **0** ✅ | **0** ✅ |
 
-**All four rubric factors satisfied. Multi-lens architecture validated.** The verdict is
-byte-identical entry-by-entry across the two runs: same 11 meaningful entries, same 4
-Skeptical flags with the same evidence quotes and the same `note` strings, same A4 + B2
-`canonical_with_conflict` reachability, same B3 partial-parse miss. Greedy decoding with
-`seed=42` is genuinely deterministic on this engine + this corpus.
+**All four rubric factors satisfied across three runs. Multi-lens architecture validated.**
+The verdict is byte-identical entry-by-entry across all three runs: same 11 meaningful
+entries, same 4 Skeptical flags with the same evidence quotes and the same `note` strings,
+same A4 + B2 `canonical_with_conflict` reachability, same B3 partial-parse miss. Greedy
+decoding with `seed=42` is genuinely deterministic on this engine + this corpus —
+reproduced three times in one session, including across a different gradle invocation
+(individual rerun vs full-suite runner).
 
 Two corollaries to record:
 
@@ -435,6 +439,7 @@ rubric, not narrative justification appended after a missed integer gate.
 Evidence:
 - `docs/stt-results/stt-d-2026-05-12-gpu-skep-rerun1.md` + raw logcat
 - `docs/stt-results/stt-d-2026-05-12-gpu-skep-rerun2.md` + raw logcat
+- `docs/stt-results/full-suite-2026-05-12/SttDLensDivergenceTest.{gradle,logcat}.log` (the 3rd run, captured as part of the full instrumented suite-run)
 - `docs/stories/phase-2-core-loop.md` §Story 2.7 — acceptance criteria updated to the new rubric
 
 STT-D as a stop-and-test gate is closed under the revised rubric — reproducibly, not

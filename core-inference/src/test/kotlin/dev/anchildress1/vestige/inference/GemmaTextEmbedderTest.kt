@@ -8,6 +8,7 @@ import com.google.common.util.concurrent.ListenableFuture
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNotSame
@@ -70,8 +71,10 @@ class GemmaTextEmbedderTest {
             tokenizerPath = ANY_PATH,
             delegateFactory = { _, _, _ -> sdk },
         )
+        // Eager require(...) on the caller's thread — synchronous throw, no coroutine harness
+        // needed. If this stops working, the guard has been dropped behind a withContext.
         assertThrows(IllegalArgumentException::class.java) {
-            runTest { embedder.embed("   ") }
+            runBlocking { embedder.embed("   ") }
         }
         verify(exactly = 0) { sdk.getEmbeddings(any()) }
     }

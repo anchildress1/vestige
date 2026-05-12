@@ -18,7 +18,7 @@ data class ModelManifest(
     val sha256IsResolved: Boolean get() = sha256 != PENDING_HASH_TOKEN
 
     companion object {
-        const val SUPPORTED_SCHEMA_VERSION = 1
+        const val SUPPORTED_SCHEMA_VERSION = 2
         const val PENDING_HASH_TOKEN = "PENDING_STT_A_DOWNLOAD_PROBE"
 
         private const val DEFAULT_RESOURCE = "/model/manifest.properties"

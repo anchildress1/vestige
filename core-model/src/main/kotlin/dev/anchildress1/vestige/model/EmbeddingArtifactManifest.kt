@@ -3,15 +3,10 @@ package dev.anchildress1.vestige.model
 import java.util.Properties
 
 /**
- * Pinned descriptor for the EmbeddingGemma model + SentencePiece tokenizer artifacts. Two
- * files share one repo, one allowed-hosts allowlist, and one retry budget per ADR-001 §Q6 /
- * ADR-010 Action Item #3. Loaded from `resources/model/manifest.properties` — the same file
- * `ModelManifest` reads; the two loaders namespace by key prefix (`embedding_artifact_*`,
- * `embedding_tokenizer_*`, `embedding_allowed_hosts`).
- *
- * STT-E-contingent: instantiate only when the embedding entries resolve. Until the on-device
- * Phase 3 download probe pins the SHA-256s and byte sizes, [isResolved] returns false and the
- * `Embedder` does not initialize.
+ * Pinned descriptor for the EmbeddingGemma model + paired SentencePiece tokenizer. Loaders for
+ * the two artifacts namespace by key prefix (`embedding_artifact_*`, `embedding_tokenizer_*`)
+ * inside `resources/model/manifest.properties`. [isResolved] gates `Embedder` instantiation —
+ * absent on-device probe values mean the SDK can't be safely loaded yet.
  */
 data class EmbeddingArtifactManifest(
     val schemaVersion: Int,
@@ -36,7 +31,7 @@ data class EmbeddingArtifactManifest(
     val isResolved: Boolean get() = model.isResolved && tokenizer.isResolved
 
     companion object {
-        const val SUPPORTED_SCHEMA_VERSION = 1
+        const val SUPPORTED_SCHEMA_VERSION = 2
         const val PENDING_PROBE_TOKEN = "PENDING_PHASE_3_DOWNLOAD_PROBE"
 
         private const val DEFAULT_RESOURCE = "/model/manifest.properties"

@@ -23,11 +23,9 @@ objectbox = "5.4.2"
 # on libLiteRt.so at :app:mergeDebugNativeLibs.
 litert-lm = "0.11.0"
 
-# Embedding — EmbeddingGemma 300M via Google AI Edge LocalAgents RAG. The AAR ships
-# libgemma_embedding_model_jni.so (statically links LiteRT TFLite + SentencePiece) as a
-# self-contained native lib that does not collide with libLiteRt.so from litertlm-android.
-# Authorized by `adrs/ADR-010-embeddinggemma-runtime-switch-to-litert.md` §"Addendum
-# (2026-05-11)".
+# Embedding — EmbeddingGemma 300M via Google AI Edge LocalAgents RAG. The bundled
+# libgemma_embedding_model_jni.so statically links LiteRT TFLite + SentencePiece, so it
+# doesn't share libLiteRt.so with litert-lm.
 localagents-rag = "0.3.0"
 
 # Quality

@@ -95,7 +95,7 @@ class EmbeddingArtifactManifestTest {
     private fun baseProps(): Properties = Properties().apply {
         val repoBase = "https://huggingface.co/litert-community/embeddinggemma-300m/resolve/main"
         val pending = EmbeddingArtifactManifest.PENDING_PROBE_TOKEN
-        setProperty("schema_version", "1")
+        setProperty("schema_version", "2")
         setProperty("embedding_artifact_repo", "litert-community/embeddinggemma-300m")
         setProperty("embedding_artifact_filename", "embeddinggemma-300M_seq512_mixed-precision.tflite")
         setProperty(

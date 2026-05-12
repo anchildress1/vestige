@@ -32,6 +32,12 @@ class ModelManifestTest {
     }
 
     @Test
+    fun `fromProperties accepts the supported schema version`() {
+        val manifest = ModelManifest.loadDefault()
+        assertEquals(2, manifest.schemaVersion)
+    }
+
+    @Test
     fun `fromProperties rejects an unsupported schema version`() {
         val props = Properties().apply {
             setProperty("schema_version", "999")
@@ -48,7 +54,7 @@ class ModelManifestTest {
 
     @Test
     fun `fromProperties rejects missing required keys`() {
-        val props = Properties().apply { setProperty("schema_version", "1") }
+        val props = Properties().apply { setProperty("schema_version", "2") }
         // requireString uses error(...) which throws IllegalStateException for missing keys.
         assertThrows(IllegalStateException::class.java) { ModelManifest.fromProperties(props) }
     }
@@ -56,7 +62,7 @@ class ModelManifestTest {
     @Test
     fun `fromProperties rejects non-numeric size or schema`() {
         val props = Properties().apply {
-            setProperty("schema_version", "1")
+            setProperty("schema_version", "2")
             setProperty("artifact_repo", "x")
             setProperty("filename", "x.bin")
             setProperty("download_url", "https://example.com/x.bin")
@@ -72,7 +78,7 @@ class ModelManifestTest {
         // requireString uses isNotBlank — `   ` reads as present-but-empty and must surface as
         // a missing-key error, not a silent default.
         val props = Properties().apply {
-            setProperty("schema_version", "1")
+            setProperty("schema_version", "2")
             setProperty("artifact_repo", "   ")
             setProperty("filename", "x.bin")
             setProperty("download_url", "https://example.com/x.bin")
@@ -113,7 +119,7 @@ class ModelManifestTest {
     @Test
     fun `allowed_hosts splits and trims comma-separated entries`() {
         val props = Properties().apply {
-            setProperty("schema_version", "1")
+            setProperty("schema_version", "2")
             setProperty("artifact_repo", "x")
             setProperty("filename", "x.bin")
             setProperty("download_url", "https://example.com/x.bin")

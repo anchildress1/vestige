@@ -47,13 +47,10 @@ dependencies {
     // collide at :app:mergeDebugNativeLibs.
     implementation(libs.litert.lm)
 
-    // Embedding — Google AI Edge LocalAgents RAG provides `GemmaEmbeddingModel`, the active
-    // Google path for loading EmbeddingGemma 300M on Android. The AAR's
-    // libgemma_embedding_model_jni.so statically links LiteRT TFLite + SentencePiece, so it
-    // does not collide with litert-lm's libLiteRt.so at :app:mergeDebugNativeLibs. See
-    // `adrs/ADR-010-embeddinggemma-runtime-switch-to-litert.md` §"Addendum (2026-05-11)".
+    // Embedding — bundled libgemma_embedding_model_jni.so statically links LiteRT TFLite +
+    // SentencePiece, so it doesn't collide with litert-lm's libLiteRt.so.
     implementation(libs.localagents.rag)
-    // Bridge the SDK's ListenableFuture return type to suspend.
+    // Bridge the SDK's ListenableFuture return to suspend.
     implementation(libs.kotlinx.coroutines.guava)
 
     testImplementation(libs.junit.jupiter.api)

@@ -196,30 +196,79 @@ worth pinning down in this ADR rather than under STT-C.
   determinism quirks on the structured-emit path. Verifying requires per-lens repeat runs +
   logit inspection — out of scope for v1.
 
-**Decision for v1:**
+**Decision superseded by Addendum (2026-05-12, second) below.** Retained for history: the
+initial decision routed multi-lens to CPU and kept GPU opt-in. Investigation since then
+identified the root cause (SDK default sampler — non-greedy — driving FP16 sampling variance
+on GPU). Fix moved to `LiteRtLmEngine.DETERMINISTIC_SAMPLER`, restoring GPU as the multi-lens
+default.
 
-- **Multi-lens extraction defaults to CPU backend.** Per ADR-001 §Q1's general perf rule, the
-  default backend stays whatever ships the demo without regression. STT-D divergence rate
-  matters for the technical-walkthrough beat ("three lenses, real disagreement") — losing
-  27 pp of divergence is a demo-quality regression even when the gate still passes.
-- **GPU stays opt-in for non-multi-lens paths.** Foreground single-call extraction (Story 2.3)
-  and embedding (Story 3.2) have their own latency budgets and don't share the structured-emit
-  reliability concern; they can ride the GPU delegate where it earns its place.
-- **No retry escalation beyond the worker's existing budget.** The resolver already absorbs
-  partial-lens success cleanly. Adding a third or fourth retry on `parse-fail` papers over a
-  signal we want to keep visible.
-- **No structured-output format switch (JSON → markdown-with-headers) for GPU only.** Forking
-  the output format by backend introduces two parser code paths and a backend-conditional
-  schema-shape risk that ADR-001 §Q6 calls out. Either the JSON path is good enough for the
-  whole APK or it's not — and on the 80% / 53% data above, it is.
+### Addendum (2026-05-12, second) — deterministic sampler restores GPU multi-lens
 
-**Revisit if:** the demo storyboard requires the GPU's 2.8× latency advantage for the multi-lens
-beat (currently it does not — multi-lens runs in the background, not the 90-second pitch), or
-the parse-fail rate trends higher on additional reference-device runs, or a future Gemma 4 patch
-changes the GPU sampling determinism in a way that affects structured emit.
+Root cause for the GPU regression in the prior addendum: `LiteRtLmEngine` left
+`EngineConfig.maxNumTokens` and (more importantly) `ConversationConfig.samplerConfig` unset.
+The SDK fell back to non-greedy defaults that produced different output across CPU and GPU
+backends — most visibly as INFERENTIAL parse-fail × 2 retries on C2 + D1 (deterministic across
+two GPU runs two days apart).
 
-Evidence: `docs/stt-results/stt-d-2026-05-12-cpu.md` + `docs/stt-results/stt-d-2026-05-12-gpu.md`
-(both with raw logcat archives).
+`LiteRtLmEngine` now pins
+`SamplerConfig(topK = 1, topP = 1.0, temperature = 0.0, seed = 42)` on every conversation and
+caps `maxNumTokens = 4096`. Re-run on the same 15-entry corpus, same commit, minutes apart:
+
+| Metric | GPU (sdk defaults) | GPU (greedy) | CPU (greedy) |
+|---|---|---|---|
+| Meaningful divergence | 8/15 (53%) | **9/15 (60%)** | 12/15 (80%) |
+| `parse-fail` lens calls | 4 | **0** | 0 |
+| Total retries | 4 | **0** | 0 |
+| Mean per-entry latency | 51.3s | 48.4s | 144.5s |
+
+**What this changes:**
+
+- **GPU is the multi-lens production default.** Both backends produce deterministic, valid
+  structured output. Demo runs on GPU at ~48s/entry — 2.8× faster than CPU and well inside
+  the multi-lens background budget.
+- **Residual CPU vs GPU divergence gap (20 pp)** is FP16-vs-FP32 logit precision producing
+  different greedy picks at narrow-margin tokens. Untestable / unfixable at the SDK layer in
+  0.11.0; the GPU side still clears the STT-D 30% gate by a wide margin (60% vs 30%).
+
+**What this doesn't change:**
+
+- No structured-output format switch (still JSON, single schema across backends).
+- No retry escalation beyond the worker's `maxAttemptsPerLens = 2`. With greedy decode there
+  are no retries anyway.
+- The deterministic sampler is the production default for *all* `LiteRtLmEngine` callers —
+  foreground extraction, observation generation, and pattern title generation get it too.
+  Reasoning: the same FP16-induced variance affects every structured-output emit; pinning
+  greedy everywhere removes a class of demo-flakiness regardless of which call path lights up
+  on stage.
+
+**Revisit if:** the demo storyboard finds a beat where slight sampling variance (temp > 0)
+produces more interesting persona-flavored prose than greedy decode, or a future LiteRT-LM
+release exposes a GPU FP32-mode toggle that closes the residual divergence gap.
+
+Evidence: `docs/stt-results/stt-d-2026-05-12-cpu.md` + `stt-d-2026-05-12-gpu.md` (pre-fix)
++ `stt-d-2026-05-12-gpu-greedy.md` (post-fix), all with raw logcat archives.
+
+### Addendum (2026-05-12, third) — two-tier decoupling landed
+
+ADR-002 §"Two-Tier Processing Contract" specified the foreground/background split since
+Phase 1. Production code (`BackgroundExtractionSaveFlow.saveAndExtract`) shipped the worker
+call as a `suspend` that awaited the full 3-lens pipeline — the contract was documented but
+not wired. Caller blocked for ~30-90s per save.
+
+Refactor: `saveAndExtract` now commits the pending entry, returns
+`SaveOutcome.Pending(entryId, extractionJob)` immediately, and dispatches the worker +
+resolver + observation generator + pattern callout pipeline detached onto the injected
+container scope. Terminal status flows through the per-entry `ExtractionStatusListener`
+(typically `BackgroundExtractionStatusBus`); UI subscribes to that.
+
+`SaveOutcome` collapses to a single `Pending` variant — the previous `Completed` / `Failed`
+/ `TimedOut` subtypes carried terminal extraction state that was always an internal concern;
+exposing them on the save return type was an artifact of the synchronous shape.
+
+Persistence failures inside the detached pipeline now route through `compensatePersistenceFailure`
+into a terminal FAILED row + listener event instead of escaping to the caller. ADR-001 Q3's
+retry-based recovery contract is unchanged — interrupted detached jobs leave PENDING/RUNNING
+rows for the cold-start sweep.
 
 ### Addendum (2026-05-10) — conservative tag persistence
 

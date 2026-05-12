@@ -20,6 +20,7 @@ import dev.anchildress1.vestige.model.DefaultModelArtifactStore
 import dev.anchildress1.vestige.model.DefaultNetworkGate
 import dev.anchildress1.vestige.model.EmbeddingArtifactManifest
 import dev.anchildress1.vestige.model.ExtractionStatus
+import dev.anchildress1.vestige.model.ModelArtifactState
 import dev.anchildress1.vestige.model.ModelArtifactStore
 import dev.anchildress1.vestige.model.ModelManifest
 import dev.anchildress1.vestige.model.NetworkGate
@@ -33,12 +34,14 @@ import dev.anchildress1.vestige.storage.MarkdownEntryStore
 import dev.anchildress1.vestige.storage.PatternDetector
 import dev.anchildress1.vestige.storage.PatternRepo
 import dev.anchildress1.vestige.storage.PatternStore
+import dev.anchildress1.vestige.storage.VectorBackfillWorker
 import dev.anchildress1.vestige.storage.VestigeBoxStore
 import io.objectbox.BoxStore
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import java.io.File
@@ -263,6 +266,26 @@ class AppContainer(
                 embedderInstance = embedder
                 embedder
             }
+        }
+    }
+
+    /**
+     * Launch the one-time vector backfill on the container scope. No-op if either embedding
+     * artifact is still pending download — the next cold start retries. Caller doesn't await;
+     * results land in logcat under tag `VectorBackfill`.
+     */
+    fun launchVectorBackfillIfReady() {
+        scope.launch {
+            val modelState = embeddingModelArtifactStore.currentState()
+            val tokenizerState = embeddingTokenizerArtifactStore.currentState()
+            if (modelState !is ModelArtifactState.Complete ||
+                tokenizerState !is ModelArtifactState.Complete
+            ) {
+                Log.i(TAG, "Vector backfill skipped — embedding artifacts not yet complete")
+                return@launch
+            }
+            val embedder = requireEmbedder()
+            VectorBackfillWorker(boxStore) { text -> embedder.embed(text) }.backfill()
         }
     }
 

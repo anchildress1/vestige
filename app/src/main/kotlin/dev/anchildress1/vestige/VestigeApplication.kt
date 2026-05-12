@@ -16,6 +16,7 @@ class VestigeApplication : Application() {
         installStrictModeOnDebugBuilds()
         LocalProcessingNotification.registerChannel(this)
         appContainer = AppContainer(this)
+        appContainer.launchVectorBackfillIfReady()
     }
 
     private fun installStrictModeOnDebugBuilds() {

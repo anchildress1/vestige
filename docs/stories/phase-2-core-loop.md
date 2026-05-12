@@ -213,14 +213,16 @@ This story is **infra-only**; no user-visible UX changes. The "Reading the entry
 - [x] If the threshold is met, this story closes — the multi-lens architecture is validated.
 - [ ] If the threshold is not met after one focused day of prompt tuning, the architecture is dropped: replace the 3-lens worker with a single-pass extraction call, remove the convergence resolver, drop "candidate" and "ambiguous" confidence values from the schema, and remove the Reading section spec from `design-guidelines.md`. Update `concept-locked.md` and `PRD.md` to match. ADR-002 gets superseded by a new ADR documenting single-pass extraction. _(Not triggered — threshold met on first run.)_
 
-**Device-run record (2026-05-10):**
+**Device-run record:**
 
-| Run | Backend | Engine init | Per-lens | Per-entry | Verdict | Notes |
-|---|---|---|---|---|---|---|
-| CPU initial | CPU | 11.5 s | 35–55 s | 127–161 s | 5/6 meaningful | Skeptical flags on A1 + B2; only C2 unanimous. `energy_descriptor` null on 5/6. |
-| GPU re-run | GPU (post-`libOpenCL.so` fix) | 19.7 s | 8–13 s | 25–55 s | 4/6 meaningful | C2 + D1 hit INFERENTIAL parse-fail × 2 retries (1/3 and 2/3 lenses survived). B2's `stated_commitment` reported as `disagree_fields` not Skeptical flag. |
+| Run | Date | Backend | Corpus | Engine init | Per-entry | Verdict | Notes |
+|---|---|---|---|---|---|---|---|
+| CPU initial | 2026-05-10 | CPU | 6 (canonical) | 11.5 s | 127–161 s | 5/6 meaningful | Skeptical flags on A1 + B2; only C2 unanimous. `energy_descriptor` null on 5/6. |
+| GPU re-run | 2026-05-10 | GPU (post-`libOpenCL.so` fix) | 6 (canonical) | 19.7 s | 25–55 s | 4/6 meaningful | C2 + D1 hit INFERENTIAL parse-fail × 2 retries (1/3 and 2/3 lenses survived). B2's `stated_commitment` reported as `disagree_fields` not Skeptical flag. |
+| CPU expanded | 2026-05-12 | CPU | 15 (canonical + extras) | — | 134–157 s | **12/15 (80%) meaningful** | No retries; no parse failures across 45 lens calls. Skeptical flags on A1 + B2 (same as 2026-05-10). Full archive: `docs/stt-results/stt-d-2026-05-12-cpu.md`. |
+| GPU expanded | 2026-05-12 | GPU | 15 (canonical + extras) | — | 40–78 s | **8/15 (53%) meaningful** | C2 + D1 INFERENTIAL parse-fail × 2 reproduced from 2026-05-10. 4 soft regressions (A6, C3, D3, D1 → not meaningful on GPU but were meaningful on CPU same day). Full archive: `docs/stt-results/stt-d-2026-05-12-gpu.md`. |
 
-**GPU regressions to track:** parse-failure rate higher than CPU under identical prompts; Skeptical-flag emission appears backend-sensitive. ADR-002 §"Structured-output reliability" addendum if pattern holds.
+**GPU regression characterized + decided:** ADR-002 §"Addendum (2026-05-12) — backend-sensitive structured-output reliability" records the v1 decision — multi-lens extraction defaults to CPU; GPU stays opt-in for single-call paths (foreground extraction, embedding). The 27 pp drop in divergence rate on GPU is a demo-quality regression worth avoiding even when the gate still passes.
 
 **Fallback if STT-D fails:** the demo's "intentional model use" story shifts. Native audio multimodal stays the headline (it always was). The agentic-as-product layer is no longer present, so the technical walkthrough loses the "Reading" beat. The 5-min walkthrough script changes — add a comment in `demo-storyboard.md` (when written) noting the cut.
 

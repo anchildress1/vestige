@@ -160,6 +160,67 @@ After the resolver finishes, generate 1-2 `entry_observations` from the transcri
 
 Each lens call returns JSON conforming to the extracted-field schema. Parsing failure on a lens output = lens error (see edge case above). E4B's structured-output reliability is STT-C territory; if JSON returns are flaky, switch to a markdown-with-headers format and parse with a deterministic Kotlin parser. Do not retry the call inside the resolver — that hides a real signal.
 
+### Addendum (2026-05-12) — backend-sensitive structured-output reliability
+
+Two STT-D runs on the 15-entry corpus (`docs/stt-d-manifest.example.txt`), CPU and GPU, on the
+reference S24 Ultra, same commit, minutes apart:
+
+| Metric | CPU | GPU | Δ |
+|---|---|---|---|
+| Meaningful divergence | 12/15 (80%) | 8/15 (53%) | −27 pp |
+| `parse-fail` lens calls | 0 | 4 (on C2 + D1, INFERENTIAL each × 2 retries; C2 SKEPTICAL × 2) | +4 |
+| Mean per-entry latency | 144.5s | 51.3s | −64% |
+
+Both runs cleared the 30% gate, so the multi-lens architecture stays validated. But GPU's
+parse-failure profile is real, reproducible (matches the 2026-05-10 GPU re-run pattern), and
+worth pinning down in this ADR rather than under STT-C.
+
+**What we know:**
+
+- `INFERENTIAL` is the predominant failure path. On C2 it failed twice and gave up; on D1 it
+  failed twice and gave up. `LITERAL` never failed on either backend.
+- Both failing entries share a reflective second clause ("I keep changing the weights and
+  pretending that is progress", "This is not a system, it's a small administrative haunting").
+  Hypothesis: the INFERENTIAL prompt's structured emit interacts badly with that text shape
+  under GPU sampling. Untested; characterization-only.
+- The resolver's "edge case — lens errors mid-call" path absorbs this: with 1 or 2 lenses
+  surviving, the entry saves with the surviving fields (all marked `ambiguous` if only 1
+  survives). Observations on C2 / D1 fall through to deterministic assembly.
+- The resolver does not retry the lens call internally (per the §"Output format" rule). The
+  retries here happen inside `BackgroundExtractionWorker`'s budgeted retry path before the
+  result reaches the resolver. Two attempts is the worker's budget; it does not escalate.
+
+**What we don't know:**
+
+- Whether the failure is GPU FP16 precision, OpenCL delegate kernel selection, or sampling-
+  determinism quirks on the structured-emit path. Verifying requires per-lens repeat runs +
+  logit inspection — out of scope for v1.
+
+**Decision for v1:**
+
+- **Multi-lens extraction defaults to CPU backend.** Per ADR-001 §Q1's general perf rule, the
+  default backend stays whatever ships the demo without regression. STT-D divergence rate
+  matters for the technical-walkthrough beat ("three lenses, real disagreement") — losing
+  27 pp of divergence is a demo-quality regression even when the gate still passes.
+- **GPU stays opt-in for non-multi-lens paths.** Foreground single-call extraction (Story 2.3)
+  and embedding (Story 3.2) have their own latency budgets and don't share the structured-emit
+  reliability concern; they can ride the GPU delegate where it earns its place.
+- **No retry escalation beyond the worker's existing budget.** The resolver already absorbs
+  partial-lens success cleanly. Adding a third or fourth retry on `parse-fail` papers over a
+  signal we want to keep visible.
+- **No structured-output format switch (JSON → markdown-with-headers) for GPU only.** Forking
+  the output format by backend introduces two parser code paths and a backend-conditional
+  schema-shape risk that ADR-001 §Q6 calls out. Either the JSON path is good enough for the
+  whole APK or it's not — and on the 80% / 53% data above, it is.
+
+**Revisit if:** the demo storyboard requires the GPU's 2.8× latency advantage for the multi-lens
+beat (currently it does not — multi-lens runs in the background, not the 90-second pitch), or
+the parse-fail rate trends higher on additional reference-device runs, or a future Gemma 4 patch
+changes the GPU sampling determinism in a way that affects structured emit.
+
+Evidence: `docs/stt-results/stt-d-2026-05-12-cpu.md` + `docs/stt-results/stt-d-2026-05-12-gpu.md`
+(both with raw logcat archives).
+
 ### Addendum (2026-05-10) — conservative tag persistence
 
 Supersedes the earlier `tags` wording that implied plural normalization should rewrite the saved value itself. Surfaced when a naive singularizer in `DefaultConvergenceResolver` corrupted legitimate singular tags (`news` → `new`, `series` → `sery`) because the stem was being persisted, not just counted (Story 2.8, fix landed in commit `2944843`).

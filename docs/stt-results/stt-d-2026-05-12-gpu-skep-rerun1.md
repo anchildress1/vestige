@@ -1,7 +1,7 @@
 # STT-D run — 2026-05-12 (GPU, Skeptical-only revision, rerun #1)
 
 First of two back-to-back runs validating Factor 4 (run-to-run consistency) of the multi-factor
-rubric introduced in ADR-002 §"Addendum (2026-05-12, sixth)". Configuration is byte-identical
+rubric defined in ADR-002 §"Addendum (2026-05-12, sixth)". Configuration is byte-identical
 to the shipped gpu-skep run (`docs/stt-results/stt-d-2026-05-12-gpu-skep.md`).
 
 ## Setup

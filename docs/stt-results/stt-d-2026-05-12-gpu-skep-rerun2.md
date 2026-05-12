@@ -1,7 +1,7 @@
 # STT-D run — 2026-05-12 (GPU, Skeptical-only revision, rerun #2)
 
 Second of two back-to-back runs validating Factor 4 (run-to-run consistency) of the multi-factor
-rubric introduced in ADR-002 §"Addendum (2026-05-12, sixth)". Identical configuration and
+rubric defined in ADR-002 §"Addendum (2026-05-12, sixth)". Identical configuration and
 identical device session to rerun #1; this run was started immediately after rerun #1 finished
 (adb logcat cleared, no process restart in between).
 
@@ -74,8 +74,8 @@ overlap, zero flag-count delta).
 | 3. Parse stability ≥ 90% lens-calls, 0 timeouts | 90% / 0 | 97.8% (44/45), 0 ✅ |
 | 4. Run-to-run consistency Jaccard ≥ 0.75, flag delta ≤ 1 | 0.75 / 1 | 1.0 / 0 ✅ |
 
-Architecture validated. ADR-002 §"Addendum (2026-05-12, seventh)" records the verdict and
-ties off the rubric revision started in the sixth addendum.
+Architecture validated. ADR-002 §"Addendum (2026-05-12, sixth)" records both the rubric
+revision and the verdict against this run + rerun #1.
 
 ## Pipeline
 

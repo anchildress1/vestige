@@ -13,4 +13,7 @@
     <string name="notification_channel_local_processing_name">Local processing</string>
     <string name="notification_channel_local_processing_description">Status notification while Vestige reads an entry locally.</string>
     <string name="notification_local_processing_text">Reading the entry.</string>
+
+    <!-- Phase 3 rough nav: in-app entry point into the Patterns surface. Phase 4 replaces with a real nav graph. -->
+    <string name="open_patterns">View patterns</string>
 </resources>

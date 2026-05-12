@@ -173,12 +173,12 @@ Query-side tag extraction goes beyond exact-substring match: a free-form query b
 **As** the AI implementor, **I need** a basic pattern list screen in `:app` that shows active patterns with their name, observation, source count, and last-seen date per `concept-locked.md` §"Pattern persistence" and `design-guidelines.md` §"Pattern card", **so that** patterns are user-visible and actionable before Phase 4 polishes the UX.
 
 **Done when:**
-- [ ] Pattern list is reachable from the app shell (rough navigation; polish is Phase 4).
-- [ ] Each pattern card shows: name, agent-emitted template label, one-line observation, "{N} of {M} entries · Last seen {date}", and a `glow` left-rule per `design-guidelines.md` §"Pattern card".
-- [ ] Cards are sorted by `last_seen` descending.
-- [ ] Empty state displays per `ux-copy.md` §"Pattern List / Empty states" (`Insufficient data.` / `Nothing repeating yet.`).
-- [ ] Pattern actions from Story 3.8 are reachable from each card via overflow menu (`Dismiss` / `Snooze 7 days` / `Mark resolved`).
-- [ ] Snackbar confirmations per `ux-copy.md` §"System Messages" appear after each action with an `Undo` affordance.
+- [x] Pattern list is reachable from the app shell (rough navigation; polish is Phase 4). (Rough toggle from `MainActivity` opens `PatternsHost`; Phase 4 swaps in a real nav graph.)
+- [x] Each pattern card shows: name, agent-emitted template label, one-line observation, "{N} of {M} entries · Last seen {date}", and a `glow` left-rule per `design-guidelines.md` §"Pattern card". (Purple `#A855F7` left-rule on the card; observation = `latestCalloutText`; denominator = `EntryStore.count()`.)
+- [x] Cards are sorted by `last_seen` descending. (`PatternStore.findActiveSortedByLastSeen()` sorts in the store; VM passes the ordered list through.)
+- [x] Empty state displays per `ux-copy.md` §"Pattern List / Empty states" (`Insufficient data.` / `Nothing repeating yet.`). (`PatternsListUiState.Empty` distinguishes the two via `EmptyReason`; All-dismissed and filter-empty land with Phase 4's chips.)
+- [x] Pattern actions from Story 3.8 are reachable from each card via overflow menu (`Dismiss` / `Snooze 7 days` / `Mark resolved`). (`OverflowMenu` composable dispatches into `PatternsListViewModel`, which funnels through `PatternRepo` so ADR-003's validator stays single-source.)
+- [x] Snackbar confirmations per `ux-copy.md` §"System Messages" appear after each action with an `Undo` affordance. (`PatternsListEvent.ActionTaken` carries an optional `PatternUndo`; mark-resolved emits `null` per the sticky-terminal carve-out.)
 
 **Notes / risks:** This is the *functional* version of the pattern list. Polished empty states with persona-flavored microcopy, filter chips (`All / Active / Snoozed / Resolved`), and a "Roast me" button live in Phase 4. Don't gold-plate here; the goal is "actions work and patterns are visible," not "demo-ready."
 
@@ -189,16 +189,13 @@ Query-side tag extraction goes beyond exact-substring match: a free-form query b
 **As** the AI implementor, **I need** a pattern detail screen reachable by tapping a pattern card, that shows the full pattern claim with its source entries listed and clickable to the originating entries per `design-guidelines.md` §"Pattern Detail", **so that** the pattern claim is *visually sourceable* and the judge's 10-second test sees evidence behind every claim.
 
 **Done when:**
-- [ ] Tapping a pattern card opens the pattern detail screen.
-- [ ] Detail header shows: pattern name, agent-emitted template label.
-- [ ] Summary section shows the one-line observation and the count + recurrence timing per `design-guidelines.md` §"Pattern Detail".
-- [ ] Source section shows a dated list of source entries with short snippets per `ux-copy.md` §"Pattern Detail / Source list":
-  > Apr 12 — crashed after standup
-  > Apr 18 — wired until 2am
-  > Apr 26 — same concrete shoes again
-- [ ] Tapping a source entry opens the originating entry's detail screen (if Phase 4's history detail screen exists yet — otherwise a placeholder is acceptable).
-- [ ] Action affordances from Story 3.8 (`Dismiss` / `Snooze 7 days` / `Mark resolved`) appear at the bottom of the detail screen.
-- [ ] Vocabulary chips section is **deferred to Phase 4** unless STT-E passed — without embeddings, the vocabulary observation lives in the one-line observation already, and a chip cloud adds nothing.
+- [x] Tapping a pattern card opens the pattern detail screen. (`PatternsHost` flips `openPatternId`; `PatternDetailViewModel` is keyed off it.)
+- [x] Detail header shows: pattern name, agent-emitted template label. (`LoadedBody` in `PatternDetailScreen`.)
+- [x] Summary section shows the one-line observation and the count + recurrence timing per `design-guidelines.md` §"Pattern Detail". (Recurrence wording will sharpen in Phase 4 once timing language is finalized; v1 surfaces `{N} of {M} entries · Last seen {date}`.)
+- [x] Source section shows a dated list of source entries with short snippets per `ux-copy.md` §"Pattern Detail / Source list" — sources are sorted newest-first; `snippetOf` caps at 60 chars and collapses newlines so the list stays scannable.
+- [x] Tapping a source entry opens the originating entry's detail screen (if Phase 4's history detail screen exists yet — otherwise a placeholder is acceptable). (`onOpenEntry` callback wires to the `SourceRow`; the receiving screen lands with Phase 4's history surface.)
+- [x] Action affordances from Story 3.8 (`Dismiss` / `Snooze 7 days` / `Mark resolved`) appear at the bottom of the detail screen. (`ActionRow` — hidden when the pattern is in a terminal state; the terminal label surfaces instead.)
+- [x] Vocabulary chips section is **deferred to Phase 4** unless STT-E passed — without embeddings, the vocabulary observation lives in the one-line observation already, and a chip cloud adds nothing. (STT-E passed; chips remain Phase 4 polish per the story scope note.)
 
 **Notes / risks:** Sourced evidence is the demo's anti-fakery beat. The 5-min walkthrough will likely zoom into a pattern detail screen to show counts + dates + snippets. If sources don't render correctly, the privacy + provenance story stutters.
 

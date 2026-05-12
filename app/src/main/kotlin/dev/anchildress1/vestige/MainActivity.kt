@@ -32,16 +32,31 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
+import dev.anchildress1.vestige.ui.patterns.PatternsHost
 import dev.anchildress1.vestige.ui.theme.VestigeTheme
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        val container = (application as VestigeApplication).appContainer
         setContent {
             VestigeTheme {
-                Scaffold(modifier = Modifier.fillMaxSize()) { padding ->
-                    PhaseOneShell(modifier = Modifier.padding(padding))
+                var showPatterns by rememberSaveable { mutableStateOf(false) }
+                if (showPatterns) {
+                    PatternsHost(
+                        patternStore = container.patternStore,
+                        patternRepo = container.patternRepo,
+                        entryStore = container.entryStore,
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                } else {
+                    Scaffold(modifier = Modifier.fillMaxSize()) { padding ->
+                        PhaseOneShell(
+                            onOpenPatterns = { showPatterns = true },
+                            modifier = Modifier.padding(padding),
+                        )
+                    }
                 }
             }
         }
@@ -55,7 +70,7 @@ class MainActivity : ComponentActivity() {
  * dev runs (Story 1.4). Polished onboarding copy and surfaces ship in Phase 4.
  */
 @Composable
-private fun PhaseOneShell(modifier: Modifier = Modifier) {
+private fun PhaseOneShell(onOpenPatterns: () -> Unit = {}, modifier: Modifier = Modifier) {
     val context = LocalContext.current
     var permissionGranted by rememberSaveable {
         mutableStateOf(
@@ -98,6 +113,13 @@ private fun PhaseOneShell(modifier: Modifier = Modifier) {
             modifier = Modifier.semantics { role = Role.Button },
         ) {
             Text(text = stringResource(id = R.string.mic_permission_request))
+        }
+
+        Button(
+            onClick = onOpenPatterns,
+            modifier = Modifier.semantics { role = Role.Button },
+        ) {
+            Text(text = stringResource(id = R.string.open_patterns))
         }
     }
 }

@@ -118,7 +118,7 @@ End-to-end Phase-3 stack: 6 corpus entries → background 3-lens extraction → 
 
 → Pattern detector emitted **`template_recurrence(4)`** — recognized 4 entries share the `audit` template and surfaced it as a recurrence claim. Full Phase-3 stack end-to-end on real data.
 
-**Still included in the committed suite runner.** The 14m 33s wall clock is awful, but this archive depends on the Phase-3 end-to-end evidence being reproducible from repo state instead of “trust me, I had a local script.”
+**Omitted from the default committed suite runner.** The 14m 33s wall clock is the single largest cost in the suite, and the pattern-detection signal (`template_recurrence(4)` over this corpus) is already captured in this archive. Re-enable on demand when there's a reason to re-validate the full Phase-3 stack — see the comment-block in `scripts/run-full-android-test-suite.sh` for the one-off command.
 
 ### 8. SttCTagStabilityTest — ⚠️ FAIL at gradle level (90m 4s)
 

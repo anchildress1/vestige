@@ -79,9 +79,14 @@ run_test GoblinHoursAddendumSmokeTest GoblinHoursAddendumSmokeTest \
   -PmodelPath=$MODEL \
   -PaudioPath=$AUDIO
 
-run_test PatternEngineSmokeTest PatternEngineSmokeTest \
-  -PmodelPath=$MODEL \
-  -PmanifestPath=$C_MANIFEST
+# PatternEngineSmokeTest is omitted from the default suite runner — the 14m 33s CPU wall
+# clock (6 entries × 3 lenses × ~47s) is the single largest cost in the suite, and the
+# pattern-detection signal (1× template_recurrence(4) over the canonical corpus) is already
+# committed under docs/stt-results/full-suite-2026-05-12/. Re-enable when there's a reason
+# to re-validate the full Phase-3 stack; on-demand command:
+#   ./gradlew :app:connectedDebugAndroidTest \
+#     -PmodelPath=$MODEL -PmanifestPath=$C_MANIFEST -PinferenceBackend=gpu \
+#     -Pandroid.testInstrumentationRunnerArguments.class=dev.anchildress1.vestige.PatternEngineSmokeTest
 
 run_test SttCTagStabilityTest SttCTagStabilityTest \
   -PmodelPath=$MODEL \

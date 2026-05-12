@@ -26,6 +26,7 @@ fun PatternsHost(
     modifier: Modifier = Modifier,
 ) {
     var openPatternId by rememberSaveable { mutableStateOf<String?>(null) }
+    var openEntryId by rememberSaveable { mutableStateOf<Long?>(null) }
     val listViewModel = remember(patternStore, patternRepo, entryStore) {
         PatternsListViewModel(patternStore, patternRepo, entryStore)
     }
@@ -33,25 +34,40 @@ fun PatternsHost(
         openPatternId?.let { PatternDetailViewModel(it, patternStore, patternRepo, entryStore) }
     }
 
-    if (detailViewModel == null) {
-        BackHandler(onBack = onExit)
-        PatternsListScreen(
-            viewModel = listViewModel,
-            onOpenPattern = { openPatternId = it },
-            modifier = modifier,
-        )
-    } else {
-        BackHandler {
-            openPatternId = null
-            listViewModel.refresh()
+    when {
+        openEntryId != null -> {
+            BackHandler { openEntryId = null }
+            EntryDetailPlaceholderScreen(
+                entryId = openEntryId!!,
+                entryStore = entryStore,
+                onBack = { openEntryId = null },
+                modifier = modifier,
+            )
         }
-        PatternDetailScreen(
-            viewModel = detailViewModel,
-            onBack = {
+
+        detailViewModel == null -> {
+            BackHandler(onBack = onExit)
+            PatternsListScreen(
+                viewModel = listViewModel,
+                onOpenPattern = { openPatternId = it },
+                modifier = modifier,
+            )
+        }
+
+        else -> {
+            BackHandler {
                 openPatternId = null
                 listViewModel.refresh()
-            },
-            modifier = modifier,
-        )
+            }
+            PatternDetailScreen(
+                viewModel = detailViewModel,
+                onBack = {
+                    openPatternId = null
+                    listViewModel.refresh()
+                },
+                onOpenEntry = { openEntryId = it },
+                modifier = modifier,
+            )
+        }
     }
 }

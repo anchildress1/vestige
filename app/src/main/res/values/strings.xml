@@ -19,4 +19,9 @@
 
     <!-- Debug-only fixture seeder for Stories 3.9 / 3.10 manual verification. Hidden in release per FLAG_DEBUGGABLE gate. -->
     <string name="debug_seed_patterns">[DEBUG] Seed sample patterns</string>
+
+    <!-- Phase 3 placeholder source-entry surface. Phase 4 replaces this with the real history detail screen. -->
+    <string name="entry_detail_placeholder_title">Entry</string>
+    <string name="entry_detail_placeholder_notice">History detail ships in Phase 4. For now, this proves the source link is live.</string>
+    <string name="entry_detail_placeholder_not_found">Entry not found.</string>
 </resources>

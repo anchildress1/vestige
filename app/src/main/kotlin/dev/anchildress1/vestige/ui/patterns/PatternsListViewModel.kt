@@ -35,11 +35,11 @@ class PatternsListViewModel(
     private val _state = MutableStateFlow<PatternsListUiState>(PatternsListUiState.Loading)
     val state: StateFlow<PatternsListUiState> = _state.asStateFlow()
 
-    private val _events = MutableSharedFlow<PatternsListEvent>(
+    private val _events = MutableSharedFlow<PatternActionEvent>(
         extraBufferCapacity = 1,
         onBufferOverflow = BufferOverflow.DROP_OLDEST,
     )
-    val events: SharedFlow<PatternsListEvent> = _events.asSharedFlow()
+    val events: SharedFlow<PatternActionEvent> = _events.asSharedFlow()
 
     init {
         refresh()
@@ -52,7 +52,7 @@ class PatternsListViewModel(
     }
 
     private suspend fun loadState(): PatternsListUiState = withContext(ioDispatcher) {
-        val totalEntries = entryStore.count()
+        val totalEntries = entryStore.countCompleted()
         val active = patternStore.findActiveSortedByLastSeen()
         when {
             active.isNotEmpty() -> PatternsListUiState.Loaded(active.map { it.toCard(totalEntries) })
@@ -92,7 +92,7 @@ class PatternsListViewModel(
             _state.value = loadState()
             // markResolved is sticky-terminal per ADR-003; the snackbar surfaces visibility only.
             val undo = if (action == PatternAction.MARKED_RESOLVED) null else PatternUndo(patternId, action)
-            _events.emit(PatternsListEvent.ActionTaken(patternId, action, undo))
+            _events.emit(PatternActionEvent(patternId, action, undo))
         }
     }
 

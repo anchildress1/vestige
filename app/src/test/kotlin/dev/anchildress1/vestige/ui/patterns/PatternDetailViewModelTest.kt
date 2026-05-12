@@ -2,6 +2,7 @@ package dev.anchildress1.vestige.ui.patterns
 
 import androidx.test.core.app.ApplicationProvider
 import app.cash.turbine.test
+import dev.anchildress1.vestige.model.ExtractionStatus
 import dev.anchildress1.vestige.model.PatternKind
 import dev.anchildress1.vestige.model.PatternState
 import dev.anchildress1.vestige.storage.EntryEntity
@@ -93,6 +94,18 @@ class PatternDetailViewModelTest {
     }
 
     @Test
+    fun `totalEntryCount excludes pending entries`() = runTest(testDispatcher) {
+        val entries = seedEntries(2)
+        seedEntries(1, extractionStatus = ExtractionStatus.PENDING)
+        seedActivePattern("p-count", lastSeenMs = 500L, supporting = entries)
+        val vm = newViewModel("p-count")
+        vm.state.test {
+            val loaded = expectMostRecentItem() as PatternDetailUiState.Loaded
+            assertEquals(2L, loaded.totalEntryCount)
+        }
+    }
+
+    @Test
     fun `markResolved updates state to terminal Loaded`() = runTest(testDispatcher) {
         val entries = seedEntries(1)
         seedActivePattern("p-resolve", lastSeenMs = 100L, supporting = entries)
@@ -105,6 +118,22 @@ class PatternDetailViewModelTest {
             assertTrue(loaded.terminalLabel!!.startsWith("Marked resolved"))
         }
         assertEquals(PatternState.RESOLVED, patternStore.findByPatternId("p-resolve")?.state)
+    }
+
+    @Test
+    fun `dismiss emits undo event and undo restores ACTIVE state`() = runTest(testDispatcher) {
+        val entries = seedEntries(1)
+        seedActivePattern("p-dismiss-undo", lastSeenMs = 100L, supporting = entries)
+        val vm = newViewModel("p-dismiss-undo")
+        vm.events.test {
+            vm.dismiss()
+            val event = awaitItem()
+            assertEquals(PatternAction.DISMISSED, event.action)
+            assertEquals("p-dismiss-undo", event.patternId)
+            assertNotNull(event.undo)
+            vm.undo(event.undo!!)
+        }
+        assertEquals(PatternState.ACTIVE, patternStore.findByPatternId("p-dismiss-undo")?.state)
     }
 
     @Test
@@ -143,13 +172,17 @@ class PatternDetailViewModelTest {
         ioDispatcher = testDispatcher,
     )
 
-    private fun seedEntries(count: Int): List<EntryEntity> {
+    private fun seedEntries(
+        count: Int,
+        extractionStatus: ExtractionStatus = ExtractionStatus.COMPLETED,
+    ): List<EntryEntity> {
         val box = boxStore.boxFor(EntryEntity::class.java)
         val rows = (0 until count).map { idx ->
             EntryEntity(
                 entryText = "entry $idx",
                 timestampEpochMs = 1_700_000_000_000L + idx * 60_000L,
                 markdownFilename = "${1_700_000_000_000L + idx}--entry-$idx.md",
+                extractionStatus = extractionStatus,
             )
         }
         rows.forEach { box.put(it) }

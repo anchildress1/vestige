@@ -62,18 +62,14 @@ fun PatternsListScreen(
 
     LaunchedEffect(viewModel) {
         viewModel.events.collect { event ->
-            when (event) {
-                is PatternsListEvent.ActionTaken -> {
-                    // Long ≈ 10s — Story 3.8 wants the undo affordance alive for ≥5s.
-                    val result = snackbarHostState.showSnackbar(
-                        message = actionSnackbarMessage(event.action),
-                        actionLabel = undoLabelFor(event.undo),
-                        duration = SnackbarDuration.Long,
-                    )
-                    if (result == SnackbarResult.ActionPerformed && event.undo != null) {
-                        viewModel.undo(event.undo)
-                    }
-                }
+            // Long ≈ 10s — Story 3.8 wants the undo affordance alive for ≥5s.
+            val result = snackbarHostState.showSnackbar(
+                message = actionSnackbarMessage(event.action),
+                actionLabel = undoLabelFor(event.undo),
+                duration = SnackbarDuration.Long,
+            )
+            if (result == SnackbarResult.ActionPerformed && event.undo != null) {
+                viewModel.undo(event.undo)
             }
         }
     }

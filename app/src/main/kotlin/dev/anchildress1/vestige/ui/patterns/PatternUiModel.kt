@@ -45,17 +45,10 @@ sealed interface PatternDetailUiState {
     ) : PatternDetailUiState
 }
 
-/**
- * One-shot UI signals (snackbars, navigation). Emitted as events rather than state so undo windows
- * close on dismissal rather than re-firing on configuration change.
- */
-sealed interface PatternsListEvent {
-    /** [action] feeds the snackbar copy; [undo] is null when the action is terminal. */
-    data class ActionTaken(val patternId: String, val action: PatternAction, val undo: PatternUndo?) :
-        PatternsListEvent
-}
-
 enum class PatternAction { DISMISSED, SNOOZED, MARKED_RESOLVED }
+
+/** One-shot snackbar payload shared by the list and detail surfaces. */
+data class PatternActionEvent(val patternId: String, val action: PatternAction, val undo: PatternUndo?)
 
 /** Card-action callbacks bundled so composables stay within detekt's parameter ceiling. */
 data class PatternActionCallbacks<T>(

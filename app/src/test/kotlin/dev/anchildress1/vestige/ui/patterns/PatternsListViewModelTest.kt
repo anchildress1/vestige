@@ -2,6 +2,7 @@ package dev.anchildress1.vestige.ui.patterns
 
 import androidx.test.core.app.ApplicationProvider
 import app.cash.turbine.test
+import dev.anchildress1.vestige.model.ExtractionStatus
 import dev.anchildress1.vestige.model.PatternKind
 import dev.anchildress1.vestige.model.PatternState
 import dev.anchildress1.vestige.storage.EntryEntity
@@ -91,6 +92,19 @@ class PatternsListViewModelTest {
     }
 
     @Test
+    fun `pending entries do not count toward the empty-state denominator`() = runTest(testDispatcher) {
+        seedEntries(1, extractionStatus = ExtractionStatus.PENDING)
+        val vm = newViewModel()
+        vm.state.test {
+            val terminal = expectMostRecentItem()
+            assertEquals(
+                PatternsListUiState.Empty(PatternsListUiState.EmptyReason.NO_ENTRIES),
+                terminal,
+            )
+        }
+    }
+
+    @Test
     fun `loaded list sorts by last-seen descending`() = runTest(testDispatcher) {
         val entries = seedEntries(3)
         seedActivePattern("older", lastSeenMs = 100L, supporting = listOf(entries[0]))
@@ -111,7 +125,7 @@ class PatternsListViewModelTest {
         val vm = newViewModel()
         vm.events.test {
             vm.dismiss("p1")
-            val event = awaitItem() as PatternsListEvent.ActionTaken
+            val event = awaitItem()
             assertEquals(PatternAction.DISMISSED, event.action)
             assertNotNull(event.undo)
         }
@@ -125,7 +139,7 @@ class PatternsListViewModelTest {
         val vm = newViewModel()
         vm.events.test {
             vm.markResolved("p2")
-            val event = awaitItem() as PatternsListEvent.ActionTaken
+            val event = awaitItem()
             assertEquals(PatternAction.MARKED_RESOLVED, event.action)
             assertNull(event.undo)
         }
@@ -154,13 +168,17 @@ class PatternsListViewModelTest {
         ioDispatcher = testDispatcher,
     )
 
-    private fun seedEntries(count: Int): List<EntryEntity> {
+    private fun seedEntries(
+        count: Int,
+        extractionStatus: ExtractionStatus = ExtractionStatus.COMPLETED,
+    ): List<EntryEntity> {
         val box = boxStore.boxFor(EntryEntity::class.java)
         val rows = (0 until count).map { idx ->
             EntryEntity(
                 entryText = "entry $idx",
                 timestampEpochMs = 1_700_000_000_000L + idx * 60_000L,
                 markdownFilename = "${1_700_000_000_000L + idx}--entry-$idx.md",
+                extractionStatus = extractionStatus,
             )
         }
         rows.forEach { box.put(it) }

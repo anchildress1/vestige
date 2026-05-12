@@ -115,6 +115,12 @@ class BackgroundExtractionSaveFlow(
             // for the cold-start sweep to resume per ADR-001 Q3. Re-throw so structured
             // concurrency propagates.
             throw cancellation
+        } catch (compensated: PersistenceCompensatedException) {
+            Log.w(
+                TAG,
+                "Detached extraction persistence already compensated for entryId=$entryId",
+                compensated.cause,
+            )
         } catch (@Suppress("TooGenericExceptionCaught") error: Exception) {
             // Detached path has no caller to throw to — log + persist a terminal failure.
             Log.e(TAG, "Detached extraction failed for entryId=$entryId", error)
@@ -313,9 +319,11 @@ class BackgroundExtractionSaveFlow(
             throw cancellation
         } catch (@Suppress("TooGenericExceptionCaught") error: Exception) {
             compensatePersistenceFailure(entryId, entryAttemptCount, terminalRelay, error)
-            throw error
+            throw PersistenceCompensatedException(error)
         }
     }
+
+    private class PersistenceCompensatedException(cause: Exception) : Exception(cause)
 
     private companion object {
         private const val TAG = "VestigeSaveFlow"

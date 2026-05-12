@@ -157,7 +157,7 @@ class BackgroundExtractionSaveFlowTest {
         val outcome = flowWithOrch.saveAndExtract(SAMPLE_TEXT, SAMPLE_TIMESTAMP)
 
         // Save still completes; orchestrator failure swallowed.
-        assertTrue(outcome is SaveOutcome.Pending, "append failure must not abort the save")
+        assertEquals(ENTRY_ID, outcome.entryId, "append failure must not abort the save")
         // CRITICAL: confirm must not run when append throws — the reservation gets released
         // instead because the user never saw the callout.
         verify(exactly = 0) { orchestrator.settleReservedCallout(any(), fired = true) }
@@ -191,7 +191,7 @@ class BackgroundExtractionSaveFlowTest {
         val outcome = flowWithOrch.saveAndExtract(SAMPLE_TEXT, SAMPLE_TIMESTAMP)
 
         // ADR-003 §"Detection algorithm" step-8 fail mode: log + continue. Save succeeds.
-        assertTrue(outcome is SaveOutcome.Pending, "orchestrator failure must not abort the save")
+        assertEquals(ENTRY_ID, outcome.entryId, "orchestrator failure must not abort the save")
         verify(exactly = 0) { entryStore.appendObservation(any(), any(), any()) }
     }
 
@@ -264,8 +264,7 @@ class BackgroundExtractionSaveFlowTest {
 
         val outcome = flow.saveAndExtract(SAMPLE_TEXT, SAMPLE_TIMESTAMP)
 
-        val failed = outcome as SaveOutcome.Pending
-        assertEquals(ENTRY_ID, failed.entryId)
+        assertEquals(ENTRY_ID, outcome.entryId)
         coVerify(exactly = 1) {
             entryStore.failEntry(ENTRY_ID, ExtractionStatus.FAILED, "all-lenses-parse-fail")
         }
@@ -287,8 +286,7 @@ class BackgroundExtractionSaveFlowTest {
 
         val outcome = flow.saveAndExtract(SAMPLE_TEXT, SAMPLE_TIMESTAMP)
 
-        val timedOut = outcome as SaveOutcome.Pending
-        assertEquals(ENTRY_ID, timedOut.entryId)
+        assertEquals(ENTRY_ID, outcome.entryId)
         coVerify(exactly = 1) {
             entryStore.failEntry(ENTRY_ID, ExtractionStatus.TIMED_OUT, "timeout-after-90000ms")
         }
@@ -393,6 +391,10 @@ class BackgroundExtractionSaveFlowTest {
             downstream.onUpdate(ExtractionStatus.FAILED, 0, "persistence-error:IllegalStateException")
         }
         coVerify(exactly = 0) { downstream.onUpdate(ExtractionStatus.COMPLETED, 0, null) }
+        coVerify(exactly = 1) {
+            entryStore.failEntry(ENTRY_ID, ExtractionStatus.FAILED, "persistence-error:IllegalStateException")
+            downstream.onUpdate(ExtractionStatus.FAILED, 0, "persistence-error:IllegalStateException")
+        }
     }
 
     @Test
@@ -431,8 +433,7 @@ class BackgroundExtractionSaveFlowTest {
 
         val outcome = flowWithMockListener.saveAndExtract(SAMPLE_TEXT, SAMPLE_TIMESTAMP)
 
-        val failed = outcome as SaveOutcome.Pending
-        assertEquals(ENTRY_ID, failed.entryId)
+        assertEquals(ENTRY_ID, outcome.entryId)
         coVerifyOrder {
             downstream.onUpdate(ExtractionStatus.RUNNING, 0, null)
             entryStore.failEntry(ENTRY_ID, ExtractionStatus.FAILED, "all-lenses-parse-fail")
@@ -476,8 +477,7 @@ class BackgroundExtractionSaveFlowTest {
 
         val outcome = flowWithMockListener.saveAndExtract(SAMPLE_TEXT, SAMPLE_TIMESTAMP)
 
-        val timedOut = outcome as SaveOutcome.Pending
-        assertEquals(ENTRY_ID, timedOut.entryId)
+        assertEquals(ENTRY_ID, outcome.entryId)
         coVerifyOrder {
             downstream.onUpdate(ExtractionStatus.RUNNING, 0, null)
             entryStore.failEntry(ENTRY_ID, ExtractionStatus.TIMED_OUT, "timeout-after-90000ms")
@@ -518,6 +518,10 @@ class BackgroundExtractionSaveFlowTest {
             entryStore.failEntry(ENTRY_ID, ExtractionStatus.FAILED, "persistence-error:IllegalStateException")
             downstream.onUpdate(ExtractionStatus.FAILED, 0, "persistence-error:IllegalStateException")
         }
+        coVerify(exactly = 1) {
+            entryStore.failEntry(ENTRY_ID, ExtractionStatus.FAILED, "persistence-error:IllegalStateException")
+            downstream.onUpdate(ExtractionStatus.FAILED, 0, "persistence-error:IllegalStateException")
+        }
     }
 
     @Test
@@ -546,6 +550,10 @@ class BackgroundExtractionSaveFlowTest {
 
         coVerifyOrder {
             entryStore.failEntry(ENTRY_ID, ExtractionStatus.TIMED_OUT, "timeout-after-90000ms")
+            entryStore.failEntry(ENTRY_ID, ExtractionStatus.FAILED, "persistence-error:IllegalStateException")
+            downstream.onUpdate(ExtractionStatus.FAILED, 0, "persistence-error:IllegalStateException")
+        }
+        coVerify(exactly = 1) {
             entryStore.failEntry(ENTRY_ID, ExtractionStatus.FAILED, "persistence-error:IllegalStateException")
             downstream.onUpdate(ExtractionStatus.FAILED, 0, "persistence-error:IllegalStateException")
         }

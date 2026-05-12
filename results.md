@@ -2,7 +2,7 @@
 
 **Device:** Galaxy S24 Ultra (SM-S928U, Android 16)
 **Branch:** `phase-2/stt-d-evidence` @ `a1156b9` (HEAD after the addendum-collapse commit; STT-D implementation byte-identical to `b621a8d`)
-**Runner:** `scripts/run-full-android-test-suite.sh` (not committed)
+**Runner:** committed `scripts/run-full-android-test-suite.sh`
 **Logs:** `docs/stt-results/full-suite-2026-05-12/<class>.{gradle,logcat}.raw.log` (logcat filtered to `Vestige*` + `TfliteEmbedding` + `TestRunner` tags)
 
 > **Status: complete.** All 11 classes ran + STT-C re-ran on GPU.
@@ -118,7 +118,7 @@ End-to-end Phase-3 stack: 6 corpus entries → background 3-lens extraction → 
 
 → Pattern detector emitted **`template_recurrence(4)`** — recognized 4 entries share the `audit` template and surfaced it as a recurrence claim. Full Phase-3 stack end-to-end on real data.
 
-**Omitted from future suite runs** (`scripts/run-full-android-test-suite.sh` patched). The 14m 33s wall clock is the single largest cost in the suite, and these stats are the captured demo evidence — re-enable on demand when there's a reason to re-validate the full Phase-3 stack.
+**Still included in the committed suite runner.** The 14m 33s wall clock is awful, but this archive depends on the Phase-3 end-to-end evidence being reproducible from repo state instead of “trust me, I had a local script.”
 
 ### 8. SttCTagStabilityTest — ⚠️ FAIL at gradle level (90m 4s)
 
@@ -260,9 +260,8 @@ Per-query timing: 17.3s (Q_aftermath seeding + retrieval), 0.9s (Q_invoice), 0.9
 
 ## Notes on the runner script
 
-`scripts/run-full-android-test-suite.sh` is currently untracked. It's the methodology
-artifact that produced this evidence; deciding whether it should be committed is a
-follow-up — explicitly NOT done in this current capture per your instruction.
+`scripts/run-full-android-test-suite.sh` is now committed so the checked-in archive can
+be reproduced without reconstructing some mystery local runner later.
 
 **SUMMARY.tsv `notes` column is unreliable for this suite-run.** The original regex
 matched the literal `skipped` substring against gradle's streaming line
@@ -563,4 +562,3 @@ Conventions for the table values column:
 | extract_done | 05-12 12:58:33.181 · 3 · 3 · 140296 |
 | entry_done | 05-12 12:58:33.194 · D3 · audit · 140296 |
 | pattern | 05-12 12:58:33.217 · 1 · 6 · template_recurrence(4) |
-

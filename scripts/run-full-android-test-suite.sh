@@ -2,7 +2,7 @@
 # Sequential runner for every instrumented test class on the connected device.
 # Each test class needs different instrumentation args; gradle can't run them all in
 # one invocation without arg conflicts (manifestPath, modelPath, audioPath collide).
-# Logs land under docs/stt-results/full-suite-<YYYY-MM-DD>/<class>.{log,verdict}.
+# Logs land under docs/stt-results/full-suite-<YYYY-MM-DD>/<label>.{gradle,logcat}.raw.log.
 set -uo pipefail
 
 DATE="$(date -u +%Y-%m-%d)"
@@ -20,14 +20,16 @@ EMB_MODEL=/data/local/tmp/vestige-emb/embeddinggemma-300M_seq512_mixed-precision
 EMB_TOKENIZER=/data/local/tmp/vestige-emb/sentencepiece.model
 
 run_test() {
-  local class="$1"
+  local label="$1"
+  local class="$2"
+  shift
   shift
   local args=("$@")
-  local log="$RESULTS_DIR/${class}.gradle.raw.log"
-  local logcat="$RESULTS_DIR/${class}.logcat.raw.log"
+  local log="$RESULTS_DIR/${label}.gradle.raw.log"
+  local logcat="$RESULTS_DIR/${label}.logcat.raw.log"
   local start=$(date +%s)
   echo "================================================================"
-  echo "[$(date -u +%H:%M:%S)] $class"
+  echo "[$(date -u +%H:%M:%S)] $label ($class)"
   echo "================================================================"
   adb logcat -c
   if ./gradlew :app:connectedDebugAndroidTest \
@@ -53,53 +55,53 @@ run_test() {
   if /usr/bin/grep -q "AssumptionViolatedException" "$log" 2>/dev/null; then
     notes="${notes}assumeTrue-violated;"
   fi
-  printf "%s\t%s\t%ds\t%s\n" "$class" "$verdict" "$wall" "$notes" | tee -a "$SUMMARY"
+  printf "%s\t%s\t%ds\t%s\n" "$label" "$verdict" "$wall" "$notes" | tee -a "$SUMMARY"
 }
 
-run_test SttAAudioPlumbingTest \
+run_test SttAAudioPlumbingTest SttAAudioPlumbingTest \
   -PmodelPath=$MODEL \
   -PaudioPath=$AUDIO
 
-run_test LiteRtLmTextSmokeTest \
+run_test LiteRtLmTextSmokeTest LiteRtLmTextSmokeTest \
   -PmodelPath=$MODEL
 
-run_test LiteRtLmStreamingTextSmokeTest \
+run_test LiteRtLmStreamingTextSmokeTest LiteRtLmStreamingTextSmokeTest \
   -PmodelPath=$MODEL
 
-run_test PersonaToneSmokeTest \
+run_test PersonaToneSmokeTest PersonaToneSmokeTest \
   -PmodelPath=$MODEL
 
-run_test PerCapturePersonaSmokeTest \
+run_test PerCapturePersonaSmokeTest PerCapturePersonaSmokeTest \
   -PmodelPath=$MODEL \
   -PaudioPath=$AUDIO
 
-run_test GoblinHoursAddendumSmokeTest \
+run_test GoblinHoursAddendumSmokeTest GoblinHoursAddendumSmokeTest \
   -PmodelPath=$MODEL \
   -PaudioPath=$AUDIO
 
-# PatternEngineSmokeTest omitted from future suite runs — the 14m 33s CPU wall clock
-# (6 entries × 3 lenses × ~47s) is the single largest cost in the suite and the test's
-# pattern-detection signal (1× template_recurrence(4) over the corpus) is captured in the
-# 2026-05-12 archive. Re-enable when there's a reason to re-validate the full Phase-3 stack.
-# To run on demand:
-#   ./gradlew :app:connectedDebugAndroidTest \
-#     -PmodelPath=$MODEL -PmanifestPath=$C_MANIFEST -PinferenceBackend=gpu \
-#     -Pandroid.testInstrumentationRunnerArguments.class=dev.anchildress1.vestige.PatternEngineSmokeTest
-
-run_test SttCTagStabilityTest \
+run_test PatternEngineSmokeTest PatternEngineSmokeTest \
   -PmodelPath=$MODEL \
   -PmanifestPath=$C_MANIFEST
 
-run_test SttDLensDivergenceTest \
+run_test SttCTagStabilityTest SttCTagStabilityTest \
+  -PmodelPath=$MODEL \
+  -PmanifestPath=$C_MANIFEST
+
+run_test SttCTagStabilityTest-gpu SttCTagStabilityTest \
+  -PmodelPath=$MODEL \
+  -PmanifestPath=$C_MANIFEST \
+  -PinferenceBackend=gpu
+
+run_test SttDLensDivergenceTest SttDLensDivergenceTest \
   -PmodelPath=$MODEL \
   -PmanifestPath=$D_MANIFEST \
   -PinferenceBackend=gpu
 
-run_test EmbeddingGemmaSmokeTest \
+run_test EmbeddingGemmaSmokeTest EmbeddingGemmaSmokeTest \
   -PembeddingModelPath=$EMB_MODEL \
   -PembeddingTokenizerPath=$EMB_TOKENIZER
 
-run_test SttEEmbeddingComparisonTest \
+run_test SttEEmbeddingComparisonTest SttEEmbeddingComparisonTest \
   -PembeddingModelPath=$EMB_MODEL \
   -PembeddingTokenizerPath=$EMB_TOKENIZER \
   -PmanifestPath=$E_MANIFEST

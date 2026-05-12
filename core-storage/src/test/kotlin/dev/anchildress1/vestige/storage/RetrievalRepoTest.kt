@@ -410,6 +410,18 @@ class RetrievalRepoTest {
     }
 
     @Test
+    fun `negative cosine entries do not surface on cosine signal alone`() = runBlocking {
+        // Query vector points one way; the only stored entry's vector points the OPPOSITE way →
+        // cosine = -1. Without keyword/tag overlap, the entry must NOT surface (clamp at 0).
+        insertEntry("anti-aligned", daysAgo = 5, vector = floatArrayOf(-1f, 0f))
+        val embedder = fixedEmbedder("totally-unrelated-token" to floatArrayOf(1f, 0f))
+
+        val results = repoWithEmbedder(embedder).query("totally-unrelated-token")
+
+        assertTrue("Negative cosine must not count as a match", results.isEmpty())
+    }
+
+    @Test
     fun `null-vector entries still rank via keyword + tag + recency`() = runBlocking {
         // Backfill window: a brand-new entry without a vector yet must still surface via the
         // other signals. Cosine contributes 0 for null vectors but does not exclude the entry.

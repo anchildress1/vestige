@@ -3,6 +3,7 @@ package dev.anchildress1.vestige.storage
 import android.util.Log
 import io.objectbox.BoxStore
 import io.objectbox.kotlin.boxFor
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.ensureActive
 
@@ -19,11 +20,12 @@ class VectorBackfillWorker(private val boxStore: BoxStore, private val embedder:
      * use this to gate expensive setup (artifact SHA-256 verification, embedder construction)
      * so a cold start with no pending work pays no IO.
      */
-    fun hasPendingWork(): Boolean = boxStore.boxFor<EntryEntity>().all.any { it.vector == null }
+    fun hasPendingWork(): Boolean =
+        boxStore.boxFor<EntryEntity>().query().isNull(EntryEntity_.vector).build().use { it.count() > 0 }
 
     suspend fun backfill(): BackfillStats = coroutineScope {
         val entryBox = boxStore.boxFor<EntryEntity>()
-        val pending = entryBox.all.filter { it.vector == null }
+        val pending = entryBox.query().isNull(EntryEntity_.vector).build().use { it.find() }
         if (pending.isEmpty()) {
             return@coroutineScope BackfillStats.empty()
         }
@@ -34,9 +36,17 @@ class VectorBackfillWorker(private val boxStore: BoxStore, private val embedder:
         for (entry in pending) {
             ensureActive()
             try {
-                entry.vector = embedder(entry.entryText)
+                val vector = embedder(entry.entryText)
+                check(vector.size == EntryEntity.EMBEDDING_DIMENSIONS.toInt()) {
+                    "Embedder returned ${vector.size}-d vector; expected ${EntryEntity.EMBEDDING_DIMENSIONS}"
+                }
+                entry.vector = vector
                 entryBox.put(entry)
                 processed++
+            } catch (cancel: CancellationException) {
+                // Coroutine cancellation must not look like an embedder failure — rethrow so the
+                // outer scope unwinds cleanly and partial progress already committed stays intact.
+                throw cancel
             } catch (@Suppress("TooGenericExceptionCaught") error: Exception) {
                 failed++
                 Log.w(TAG, "Vector backfill failed for entry ${entry.id}", error)

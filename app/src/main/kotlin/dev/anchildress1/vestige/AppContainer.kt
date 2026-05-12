@@ -127,6 +127,7 @@ class AppContainer(
     private val backgroundEngineInitMutex = Mutex()
     private val embedderInitMutex = Mutex()
     private val vectorBackfillMutex = Mutex()
+    private val vectorBackfillInflight = java.util.concurrent.atomic.AtomicBoolean(false)
 
     @Volatile
     private var backgroundEngineInitialized = false
@@ -279,23 +280,30 @@ class AppContainer(
      * results land in logcat under tag `VectorBackfill`.
      */
     fun launchVectorBackfillIfReady() {
+        // CAS guard: if another launch already scheduled / running, drop this one. Prevents the
+        // save-time trigger from queueing N coroutines on the mutex when N saves arrive fast.
+        if (!vectorBackfillInflight.compareAndSet(false, true)) return
         vectorBackfillScheduleListener?.invoke()
         scope.launch {
-            vectorBackfillMutex.withLock {
-                val worker = VectorBackfillWorker(boxStore) { text -> requireEmbedder().embed(text) }
-                // Cheap presence-only check before paying for SHA-256 artifact verification —
-                // most cold starts and save completions have nothing to backfill.
-                if (!worker.hasPendingWork()) return@withLock
+            try {
+                vectorBackfillMutex.withLock {
+                    val worker = VectorBackfillWorker(boxStore) { text -> requireEmbedder().embed(text) }
+                    // Cheap presence-only check before paying for SHA-256 artifact verification —
+                    // most cold starts and save completions have nothing to backfill.
+                    if (!worker.hasPendingWork()) return@withLock
 
-                val modelState = embeddingModelArtifactStore.currentState()
-                val tokenizerState = embeddingTokenizerArtifactStore.currentState()
-                if (modelState !is ModelArtifactState.Complete ||
-                    tokenizerState !is ModelArtifactState.Complete
-                ) {
-                    Log.i(TAG, "Vector backfill skipped — embedding artifacts not yet complete")
-                    return@withLock
+                    val modelState = embeddingModelArtifactStore.currentState()
+                    val tokenizerState = embeddingTokenizerArtifactStore.currentState()
+                    if (modelState !is ModelArtifactState.Complete ||
+                        tokenizerState !is ModelArtifactState.Complete
+                    ) {
+                        Log.i(TAG, "Vector backfill skipped — embedding artifacts not yet complete")
+                        return@withLock
+                    }
+                    worker.backfill()
                 }
-                worker.backfill()
+            } finally {
+                vectorBackfillInflight.set(false)
             }
         }
     }

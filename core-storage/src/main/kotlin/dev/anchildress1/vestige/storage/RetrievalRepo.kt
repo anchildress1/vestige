@@ -58,8 +58,10 @@ class RetrievalRepo(
             val keywordScore = jaccardishKeyword(queryTokens, entryTokens)
             val entryTagKeys = entry.tags.mapNotNullTo(linkedSetOf()) { QueryTagMatcher.storedKey(it.name) }
             val tagScore = jaccard(queryTagKeys, entryTagKeys)
+            // Clamp cosine at 0 — negative similarity means "explicitly dissimilar" on COSINE
+            // distance, which should not contribute a match signal nor a positive score.
             val cosine: Double = if (queryVector != null && entry.vector != null) {
-                cosineSimilarity(queryVector, entry.vector!!)
+                cosineSimilarity(queryVector, entry.vector!!).coerceAtLeast(0.0)
             } else {
                 0.0
             }

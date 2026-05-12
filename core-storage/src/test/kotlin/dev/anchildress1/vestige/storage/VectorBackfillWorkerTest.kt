@@ -137,6 +137,19 @@ class VectorBackfillWorkerTest {
     }
 
     @Test
+    fun `wrong-dimension embedder output is counted as failure and not persisted`() = runTest {
+        val target = insertEntry("dimension drift", vector = null)
+        val embedder: suspend (String) -> FloatArray = { FloatArray(64) { 1f } } // expected 768
+
+        val stats = VectorBackfillWorker(boxStore, embedder).backfill()
+
+        assertEquals(1, stats.total)
+        assertEquals(0, stats.processed)
+        assertEquals(1, stats.failed)
+        assertNull(boxStore.boxFor<EntryEntity>()[target].vector)
+    }
+
+    @Test
     fun `cancellation mid-pass stops cleanly without losing prior progress`() = runBlocking {
         repeat(5) { insertEntry("entry $it", vector = null) }
         val processedCount = AtomicInteger(0)

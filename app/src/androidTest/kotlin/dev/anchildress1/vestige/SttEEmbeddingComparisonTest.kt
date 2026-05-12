@@ -21,18 +21,18 @@ import java.time.Clock
 import java.time.ZoneOffset
 
 /**
- * End-to-end smoke for hybrid retrieval — seeds the 18-entry STT-E corpus with real
- * EmbeddingGemma vectors and asserts the hybrid `query()` path surfaces ≥2 cohort-relevant
- * entries in the top-5 for each of the four scenario queries. Captures the full retrieval stack
- * on the reference S24 Ultra and guards against regressions in the schema + scorer + embedder
- * wiring. Runbook in `docs/stt-e-manifest.example.txt`. Missing instrumentation args →
- * [assumeTrue] skips so CI without artifacts stays green.
+ * End-to-end STT-E gate — seeds the 18-entry corpus with real EmbeddingGemma vectors, compares
+ * tag-only baseline vs hybrid retrieval across four scenario queries, and requires the hybrid path
+ * to win at least half of them while still clearing a minimum relevance floor. Captures the full
+ * retrieval stack on the reference S24 Ultra and guards against regressions in the schema +
+ * scorer + embedder wiring. Runbook in `docs/stt-e-manifest.example.txt`. Missing
+ * instrumentation args → [assumeTrue] skips so CI without artifacts stays green.
  */
 @RunWith(AndroidJUnit4::class)
 class SttEEmbeddingComparisonTest {
 
     @Test
-    fun hybridRetrieval_surfacesCohortRelevantEntriesPerQuery() = runBlocking {
+    fun hybridRetrieval_beatsTagOnlyBaselineAcrossTheCorpus() = runBlocking {
         val inputs = loadInputs()
         val corpus = loadCorpus(inputs.manifestFile)
         val rawEmbedder = GemmaTextEmbedder(
@@ -47,20 +47,14 @@ class SttEEmbeddingComparisonTest {
 
         val seeded = openSeededRepo(corpus, embedder)
         try {
-            QUERIES.forEach { query ->
-                val results = seeded.repo.query(query.text, topN = TOP_N)
-                val ids = results.map { entryIdToCorpusId(it, corpus) }
-                val relevant = ids.count { it in query.relevantIds }
-                android.util.Log.i(
-                    TAG,
-                    "${query.id} hybrid top-$TOP_N: $ids (relevant=$relevant/${query.relevantIds.size})",
-                )
-                assertTrue(
-                    "${query.id} surfaced $relevant relevant entries in top $TOP_N; need ≥$MIN_RELEVANT. " +
-                        "Got $ids.",
-                    relevant >= MIN_RELEVANT,
-                )
-            }
+            val comparisons = QUERIES.map { query -> compareAgainstBaseline(seeded.repo, corpus, query) }
+            val wins = comparisons.count { it.isHybridWin }
+            android.util.Log.i(TAG, "STT-E win-rate: $wins/${QUERIES.size} queries")
+            assertTrue(
+                "STT-E failed: hybrid won only $wins/${QUERIES.size} queries. " +
+                    comparisons.joinToString(prefix = "Comparisons=[", postfix = "]") { it.summary() },
+                wins >= MIN_QUERY_WINS,
+            )
         } finally {
             seeded.close()
         }
@@ -92,6 +86,44 @@ class SttEEmbeddingComparisonTest {
 
     private fun entryIdToCorpusId(entry: EntryEntity, corpus: List<SttEEntry>): String =
         corpus.firstOrNull { it.entryText == entry.entryText }?.id ?: "?"
+
+    private suspend fun compareAgainstBaseline(
+        repo: RetrievalRepo,
+        corpus: List<SttEEntry>,
+        query: SttEQuery,
+    ): QueryComparison {
+        val baseline = repo.query(query.text, topN = TOP_N, embeddingWeight = 0f)
+        val hybrid = repo.query(query.text, topN = TOP_N)
+        val baselineIds = baseline.map { entryIdToCorpusId(it, corpus) }
+        val hybridIds = hybrid.map { entryIdToCorpusId(it, corpus) }
+        val baselineRelevantCount = baselineIds.count { it in query.relevantIds }
+        val hybridRelevantCount = hybridIds.count { it in query.relevantIds }
+        val hybridNovelRelevantIds = hybridIds.filterTo(linkedSetOf()) { id ->
+            id in query.relevantIds && id !in baselineIds
+        }
+        android.util.Log.i(
+            TAG,
+            "${query.id} baseline top-$TOP_N: $baselineIds (relevant=$baselineRelevantCount/${query.relevantIds.size})",
+        )
+        android.util.Log.i(
+            TAG,
+            "${query.id} hybrid top-$TOP_N: $hybridIds (relevant=$hybridRelevantCount/${query.relevantIds.size}, " +
+                "novelRelevant=$hybridNovelRelevantIds)",
+        )
+        assertTrue(
+            "${query.id} surfaced $hybridRelevantCount relevant entries in top $TOP_N; need ≥$MIN_RELEVANT. " +
+                "Got $hybridIds.",
+            hybridRelevantCount >= MIN_RELEVANT,
+        )
+        return QueryComparison(
+            queryId = query.id,
+            baselineIds = baselineIds,
+            hybridIds = hybridIds,
+            baselineRelevantCount = baselineRelevantCount,
+            hybridRelevantCount = hybridRelevantCount,
+            hybridNovelRelevantIds = hybridNovelRelevantIds,
+        )
+    }
 
     private fun loadInputs(): SttEInputs {
         val args = InstrumentationRegistry.getArguments()
@@ -147,6 +179,21 @@ class SttEEmbeddingComparisonTest {
 
     private data class SttEQuery(val id: String, val text: String, val relevantIds: Set<String>)
 
+    private data class QueryComparison(
+        val queryId: String,
+        val baselineIds: List<String>,
+        val hybridIds: List<String>,
+        val baselineRelevantCount: Int,
+        val hybridRelevantCount: Int,
+        val hybridNovelRelevantIds: Set<String>,
+    ) {
+        val isHybridWin: Boolean
+            get() = hybridRelevantCount >= baselineRelevantCount && hybridNovelRelevantIds.isNotEmpty()
+
+        fun summary(): String = "$queryId{baseline=$baselineIds,relevant=$baselineRelevantCount," +
+            "hybrid=$hybridIds,hybridRelevant=$hybridRelevantCount,novel=$hybridNovelRelevantIds}"
+    }
+
     private companion object {
         const val TAG = "VestigeSttE"
         const val TOP_N = 5
@@ -154,6 +201,7 @@ class SttEEmbeddingComparisonTest {
         // Per-query relevance floor — A cohort has 6 entries (room for 4/5); B/C/D have 3 (most
         // a query can surface in top-5 is 3). 2/5 is a real-but-imperfect retrieval signal.
         const val MIN_RELEVANT = 2
+        const val MIN_QUERY_WINS = 2
 
         val AFTERMATH_IDS = setOf("A1", "A2", "A3", "A4", "A5", "A6")
         val INVOICE_IDS = setOf("B1", "B2", "B3")

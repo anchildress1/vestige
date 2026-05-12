@@ -116,6 +116,7 @@ class AppContainer(
     private val foregroundServiceStarter: (Intent) -> Unit = { intent ->
         applicationContext.startForegroundService(intent)
     },
+    private val vectorBackfillScheduleListener: (() -> Unit)? = null,
     private val scope: CoroutineScope = defaultScope(),
 ) {
 
@@ -125,6 +126,7 @@ class AppContainer(
     val entryStore: EntryStore = EntryStore(boxStore, markdownStoreFactory(applicationContext))
     private val backgroundEngineInitMutex = Mutex()
     private val embedderInitMutex = Mutex()
+    private val vectorBackfillMutex = Mutex()
 
     @Volatile
     private var backgroundEngineInitialized = false
@@ -235,13 +237,15 @@ class AppContainer(
         persona: Persona = Persona.WITNESS,
     ): SaveOutcome {
         ensureBackgroundEngineInitialized()
-        return backgroundExtractionSaveFlow.saveAndExtract(
+        val outcome = backgroundExtractionSaveFlow.saveAndExtract(
             entryText = entryText,
             capturedAt = capturedAt,
             retrievedHistory = retrievedHistory,
             timeoutMs = timeoutMs,
             persona = persona,
         )
+        launchVectorBackfillIfReady()
+        return outcome
     }
 
     internal suspend fun ensureBackgroundEngineInitialized() {
@@ -275,22 +279,24 @@ class AppContainer(
      * results land in logcat under tag `VectorBackfill`.
      */
     fun launchVectorBackfillIfReady() {
+        vectorBackfillScheduleListener?.invoke()
         scope.launch {
-            val worker = VectorBackfillWorker(boxStore) { text -> requireEmbedder().embed(text) }
-            // Cheap presence-only check before paying for SHA-256 artifact verification — most
-            // cold starts have nothing to backfill and shouldn't read ~185 MB of model file just
-            // to discover that.
-            if (!worker.hasPendingWork()) return@launch
+            vectorBackfillMutex.withLock {
+                val worker = VectorBackfillWorker(boxStore) { text -> requireEmbedder().embed(text) }
+                // Cheap presence-only check before paying for SHA-256 artifact verification —
+                // most cold starts and save completions have nothing to backfill.
+                if (!worker.hasPendingWork()) return@withLock
 
-            val modelState = embeddingModelArtifactStore.currentState()
-            val tokenizerState = embeddingTokenizerArtifactStore.currentState()
-            if (modelState !is ModelArtifactState.Complete ||
-                tokenizerState !is ModelArtifactState.Complete
-            ) {
-                Log.i(TAG, "Vector backfill skipped — embedding artifacts not yet complete")
-                return@launch
+                val modelState = embeddingModelArtifactStore.currentState()
+                val tokenizerState = embeddingTokenizerArtifactStore.currentState()
+                if (modelState !is ModelArtifactState.Complete ||
+                    tokenizerState !is ModelArtifactState.Complete
+                ) {
+                    Log.i(TAG, "Vector backfill skipped — embedding artifacts not yet complete")
+                    return@withLock
+                }
+                worker.backfill()
             }
-            worker.backfill()
         }
     }
 

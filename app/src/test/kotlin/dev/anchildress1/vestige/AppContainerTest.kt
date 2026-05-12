@@ -303,6 +303,43 @@ class AppContainerTest {
     }
 
     @Test
+    fun `saveAndExtract schedules vector backfill after the entry is persisted`() = runTest {
+        val saveFlow = mockk<BackgroundExtractionSaveFlow>()
+        val engine = mockk<LiteRtLmEngine>(relaxed = true)
+        val capturedAt = ZonedDateTime.of(2026, 5, 12, 8, 15, 0, 0, ZoneId.of("America/New_York"))
+        val expected = SaveOutcome.Failed(
+            entryId = 42L,
+            result = BackgroundExtractionResult.Failed(
+                totalElapsedMs = 0L,
+                lensResults = emptyList(),
+                modelCallCount = 0,
+                lastError = "boom",
+            ),
+        )
+        var scheduled = 0
+        coEvery { saveFlow.saveAndExtract(any(), any(), any(), any(), any()) } returns expected
+
+        val container = AppContainer(
+            applicationContext = mockk<Context>(relaxed = true),
+            boxStoreFactory = { mockk(relaxed = true) },
+            markdownStoreFactory = { mockk<MarkdownEntryStore>(relaxed = true) },
+            modelPathLoader = { "/tmp/fake-model.litertlm" },
+            backgroundEngineFactory = { _, _ -> engine },
+            backgroundExtractionSaveFlowFactory = { _, _, _, _, _ -> saveFlow },
+            recoveredEntryIdsLoader = { emptyList() },
+            foregroundServiceIntentFactory = { Intent("dev.anchildress1.vestige.TEST_START") },
+            foregroundServiceStarter = {},
+            vectorBackfillScheduleListener = { scheduled += 1 },
+            scope = backgroundScope,
+        )
+
+        val actual = container.saveAndExtract("persist me", capturedAt)
+
+        assertEquals(expected, actual)
+        assertEquals(1, scheduled)
+    }
+
+    @Test
     fun `backgroundEngine is built from the injected factory exactly once`() {
         val engine = mockk<LiteRtLmEngine>(relaxed = true)
         var modelPathCalls = 0

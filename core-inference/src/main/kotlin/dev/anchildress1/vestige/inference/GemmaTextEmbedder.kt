@@ -29,11 +29,16 @@ class GemmaTextEmbedder(
                 listOf(EmbedData.create(text, taskType)),
             )
             val response = delegate.getEmbeddings(request).await()
+            check(response.size == EMBEDDING_DIMENSIONS) {
+                "EmbeddingGemma contract violation: expected $EMBEDDING_DIMENSIONS floats, got ${response.size}."
+            }
             FloatArray(response.size) { i -> response[i] }
         }
     }
 
     private companion object {
+        const val EMBEDDING_DIMENSIONS = 768
+
         fun defaultDelegate(modelPath: String, tokenizerPath: String, useGpu: Boolean): SdkEmbedder<String> =
             GemmaEmbeddingModel(modelPath, tokenizerPath, useGpu)
     }

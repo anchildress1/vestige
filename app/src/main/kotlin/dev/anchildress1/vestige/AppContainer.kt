@@ -5,7 +5,9 @@ import android.content.Intent
 import android.util.Log
 import dev.anchildress1.vestige.inference.BackgroundExtractionWorker
 import dev.anchildress1.vestige.inference.DefaultConvergenceResolver
+import dev.anchildress1.vestige.inference.Embedder
 import dev.anchildress1.vestige.inference.ExtractionStatusListener
+import dev.anchildress1.vestige.inference.GemmaTextEmbedder
 import dev.anchildress1.vestige.inference.HistoryChunk
 import dev.anchildress1.vestige.inference.LiteRtLmEngine
 import dev.anchildress1.vestige.inference.ObservationGenerator
@@ -13,8 +15,14 @@ import dev.anchildress1.vestige.inference.PatternTitleGenerator
 import dev.anchildress1.vestige.lifecycle.BackgroundExtractionLifecycleStateMachine
 import dev.anchildress1.vestige.lifecycle.BackgroundExtractionService
 import dev.anchildress1.vestige.lifecycle.BackgroundExtractionStatusBus
+import dev.anchildress1.vestige.model.ArtifactHttpClient
+import dev.anchildress1.vestige.model.DefaultModelArtifactStore
+import dev.anchildress1.vestige.model.DefaultNetworkGate
+import dev.anchildress1.vestige.model.EmbeddingArtifactManifest
 import dev.anchildress1.vestige.model.ExtractionStatus
+import dev.anchildress1.vestige.model.ModelArtifactStore
 import dev.anchildress1.vestige.model.ModelManifest
+import dev.anchildress1.vestige.model.NetworkGate
 import dev.anchildress1.vestige.model.Persona
 import dev.anchildress1.vestige.patterns.PatternDetectionOrchestrator
 import dev.anchildress1.vestige.save.BackgroundExtractionSaveFlow
@@ -46,8 +54,38 @@ class AppContainer(
         val manifest = ModelManifest.loadDefault()
         File(File(ctx.filesDir, MODEL_ARTIFACTS_SUBDIR), manifest.filename).absolutePath
     },
+    private val embeddingArtifactManifestLoader: () -> EmbeddingArtifactManifest =
+        EmbeddingArtifactManifest::loadDefault,
     private val backgroundEngineFactory: (String, String) -> LiteRtLmEngine = { modelPath, cacheDir ->
         LiteRtLmEngine(modelPath = modelPath, cacheDir = cacheDir)
+    },
+    private val networkGateFactory: () -> NetworkGate = { DefaultNetworkGate() },
+    private val embeddingModelArtifactStoreFactory: (
+        EmbeddingArtifactManifest,
+        File,
+        NetworkGate,
+    ) -> ModelArtifactStore =
+        { manifest, baseDir, networkGate ->
+            DefaultModelArtifactStore(
+                manifest = manifest.modelArtifactManifest(),
+                baseDir = baseDir,
+                httpClient = ArtifactHttpClient(manifest.allowedHosts, networkGate),
+            )
+        },
+    private val embeddingTokenizerArtifactStoreFactory: (
+        EmbeddingArtifactManifest,
+        File,
+        NetworkGate,
+    ) -> ModelArtifactStore =
+        { manifest, baseDir, networkGate ->
+            DefaultModelArtifactStore(
+                manifest = manifest.tokenizerArtifactManifest(),
+                baseDir = baseDir,
+                httpClient = ArtifactHttpClient(manifest.allowedHosts, networkGate),
+            )
+        },
+    private val embedderFactory: (String, String) -> Embedder = { modelPath, tokenizerPath ->
+        GemmaTextEmbedder(modelPath = modelPath, tokenizerPath = tokenizerPath)
     },
     private val backgroundExtractionSaveFlowFactory: (
         EntryStore,
@@ -83,9 +121,17 @@ class AppContainer(
 
     val entryStore: EntryStore = EntryStore(boxStore, markdownStoreFactory(applicationContext))
     private val backgroundEngineInitMutex = Mutex()
+    private val embedderInitMutex = Mutex()
 
     @Volatile
     private var backgroundEngineInitialized = false
+
+    @Volatile
+    private var embedderInstance: Embedder? = null
+
+    private val networkGate: NetworkGate = networkGateFactory()
+    private val embeddingArtifactsDir: File by lazy { File(applicationContext.filesDir, MODEL_ARTIFACTS_SUBDIR) }
+    private val embeddingArtifactManifest: EmbeddingArtifactManifest by lazy(embeddingArtifactManifestLoader)
 
     // Story 2.12's production DI surface. `saveAndExtract(...)` below is the app-owned entrypoint
     // that closes the loop; capture/UI code calls AppContainer, not the save flow directly.
@@ -96,6 +142,22 @@ class AppContainer(
         )
     }
     val backgroundEngine: LiteRtLmEngine by backgroundEngineDelegate
+
+    val embeddingModelArtifactStore: ModelArtifactStore by lazy {
+        embeddingModelArtifactStoreFactory(
+            embeddingArtifactManifest,
+            embeddingArtifactsDir,
+            networkGate,
+        )
+    }
+
+    val embeddingTokenizerArtifactStore: ModelArtifactStore by lazy {
+        embeddingTokenizerArtifactStoreFactory(
+            embeddingArtifactManifest,
+            embeddingArtifactsDir,
+            networkGate,
+        )
+    }
 
     val backgroundExtractionWorker: BackgroundExtractionWorker by lazy {
         BackgroundExtractionWorker(
@@ -185,6 +247,22 @@ class AppContainer(
             if (backgroundEngineInitialized) return
             backgroundEngine.initialize()
             backgroundEngineInitialized = true
+        }
+    }
+
+    suspend fun requireEmbedder(): Embedder {
+        embedderInstance?.let { return it }
+        return embedderInitMutex.withLock {
+            val cached = embedderInstance
+            if (cached != null) {
+                cached
+            } else {
+                val modelFile = embeddingModelArtifactStore.requireComplete()
+                val tokenizerFile = embeddingTokenizerArtifactStore.requireComplete()
+                val embedder = embedderFactory(modelFile.absolutePath, tokenizerFile.absolutePath)
+                embedderInstance = embedder
+                embedder
+            }
         }
     }
 

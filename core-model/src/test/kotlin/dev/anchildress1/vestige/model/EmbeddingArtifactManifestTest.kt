@@ -71,6 +71,34 @@ class EmbeddingArtifactManifestTest {
     }
 
     @Test
+    fun `resolved rows adapt to the single-file ModelArtifactStore contract`() {
+        val manifest = EmbeddingArtifactManifest.loadDefault()
+
+        val modelManifest = manifest.modelArtifactManifest()
+        val tokenizerManifest = manifest.tokenizerArtifactManifest()
+
+        assertEquals(manifest.schemaVersion, modelManifest.schemaVersion)
+        assertEquals(manifest.artifactRepo, modelManifest.artifactRepo)
+        assertEquals(manifest.model.filename, modelManifest.filename)
+        assertEquals(manifest.model.expectedByteSize, modelManifest.expectedByteSize)
+        assertEquals(manifest.model.sha256, modelManifest.sha256)
+        assertEquals(manifest.allowedHosts, modelManifest.allowedHosts)
+
+        assertEquals(manifest.tokenizer.filename, tokenizerManifest.filename)
+        assertEquals(manifest.tokenizer.expectedByteSize, tokenizerManifest.expectedByteSize)
+        assertEquals(manifest.tokenizer.sha256, tokenizerManifest.sha256)
+        assertEquals(manifest.allowedHosts, tokenizerManifest.allowedHosts)
+    }
+
+    @Test
+    fun `unresolved rows cannot be adapted to ModelArtifactStore manifests`() {
+        val manifest = EmbeddingArtifactManifest.fromProperties(baseProps())
+
+        assertThrows(IllegalStateException::class.java) { manifest.modelArtifactManifest() }
+        assertThrows(IllegalStateException::class.java) { manifest.tokenizerArtifactManifest() }
+    }
+
+    @Test
     fun `fromProperties rejects unsupported schema`() {
         val props = baseProps().apply { setProperty("schema_version", "999") }
         assertThrows(IllegalArgumentException::class.java) {

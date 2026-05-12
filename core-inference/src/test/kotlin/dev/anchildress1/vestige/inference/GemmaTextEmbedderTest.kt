@@ -26,7 +26,8 @@ class GemmaTextEmbedderTest {
     @Test
     fun `embed forwards text and SEMANTIC_SIMILARITY task to the SDK and returns the vector`() = runTest {
         val captured = mutableListOf<EmbeddingRequest<String>>()
-        val sdk = stubEmbedder(captureInto = captured, returns = listOf(0.1f, 0.2f, 0.3f))
+        val expected = List(768) { index -> index.toFloat() }
+        val sdk = stubEmbedder(captureInto = captured, returns = expected)
 
         val embedder = GemmaTextEmbedder(
             modelPath = ANY_PATH,
@@ -36,8 +37,8 @@ class GemmaTextEmbedderTest {
 
         val result = embedder.embed("I crashed at 3pm")
 
-        assertEquals(3, result.size)
-        assertEquals(listOf(0.1f, 0.2f, 0.3f), result.toList())
+        assertEquals(768, result.size)
+        assertEquals(expected, result.toList())
         val embedData = captured.single().embedData.single()
         assertEquals("I crashed at 3pm", embedData.data)
         assertEquals(EmbedData.TaskType.SEMANTIC_SIMILARITY, embedData.task)
@@ -46,7 +47,7 @@ class GemmaTextEmbedderTest {
     @Test
     fun `task type override flows through to the SDK request`() = runTest {
         val captured = mutableListOf<EmbeddingRequest<String>>()
-        val sdk = stubEmbedder(captureInto = captured, returns = listOf(0.5f))
+        val sdk = stubEmbedder(captureInto = captured, returns = List(768) { 0.5f })
 
         val embedder = GemmaTextEmbedder(
             modelPath = ANY_PATH,
@@ -81,7 +82,10 @@ class GemmaTextEmbedderTest {
 
     @Test
     fun `each embed call returns a fresh FloatArray (no shared state)`() = runTest {
-        val sdk = stubEmbedder(captureInto = mutableListOf(), returns = listOf(1f, 2f))
+        val sdk = stubEmbedder(
+            captureInto = mutableListOf(),
+            returns = List(768) { index -> index.toFloat() },
+        )
         val embedder = GemmaTextEmbedder(
             modelPath = ANY_PATH,
             tokenizerPath = ANY_PATH,
@@ -94,6 +98,24 @@ class GemmaTextEmbedderTest {
         // FloatArray identity must not be shared — callers may mutate or stash the result.
         assertNotSame(first, second)
         assertEquals(first.toList(), second.toList())
+    }
+
+    @Test
+    fun `unexpected embedding dimensions fail loudly`() = runTest {
+        val sdk = stubEmbedder(captureInto = mutableListOf(), returns = listOf(1f, 2f, 3f))
+        val embedder = GemmaTextEmbedder(
+            modelPath = ANY_PATH,
+            tokenizerPath = ANY_PATH,
+            delegateFactory = { _, _, _ -> sdk },
+        )
+
+        val ex = assertThrows(IllegalStateException::class.java) {
+            runBlocking { embedder.embed("dimension drift") }
+        }
+        assertEquals(
+            "EmbeddingGemma contract violation: expected 768 floats, got 3.",
+            ex.message,
+        )
     }
 
     @Test

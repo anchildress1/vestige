@@ -24,11 +24,9 @@ import kotlin.math.sqrt
  * where `<BASE>` is `/sdcard/Android/data/dev.anchildress1.vestige/files`. Then run:
  *
  *   ./gradlew :app:connectedDebugAndroidTest \
- *     -Pandroid.testInstrumentationRunnerArguments.embeddingModelPath=<BASE>/models/embedding.tflite \
+ *     -Pandroid.testInstrumentationRunnerArguments.embeddingModelPath=\
+ *<BASE>/models/embeddinggemma-300M_seq512_mixed-precision.tflite \
  *     -Pandroid.testInstrumentationRunnerArguments.embeddingTokenizerPath=<BASE>/models/sentencepiece.model
- *
- * (Where `embedding.tflite` resolves to `embeddinggemma-300M_seq512_mixed-precision.tflite`
- * per `core-model/src/main/resources/model/manifest.properties`.)
  *
  * If either argument is missing the test is skipped via [assumeTrue] so CI without the
  * artifacts stays green.

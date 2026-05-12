@@ -3,10 +3,13 @@ package dev.anchildress1.vestige
 import android.content.Context
 import android.content.Intent
 import dev.anchildress1.vestige.inference.BackgroundExtractionResult
+import dev.anchildress1.vestige.inference.Embedder
 import dev.anchildress1.vestige.inference.HistoryChunk
 import dev.anchildress1.vestige.inference.LiteRtLmEngine
 import dev.anchildress1.vestige.lifecycle.BackgroundExtractionLifecycleState
+import dev.anchildress1.vestige.model.EmbeddingArtifactManifest
 import dev.anchildress1.vestige.model.ExtractionStatus
+import dev.anchildress1.vestige.model.ModelArtifactStore
 import dev.anchildress1.vestige.save.BackgroundExtractionSaveFlow
 import dev.anchildress1.vestige.save.SaveOutcome
 import dev.anchildress1.vestige.storage.MarkdownEntryStore
@@ -139,6 +142,52 @@ class AppContainerTest {
         )
 
         assertNotNull(container.backgroundExtractionSaveFlow)
+    }
+
+    @Test
+    fun `requireEmbedder builds the process-scoped embedder from complete embedding artifacts once`() = runTest {
+        val embedder = mockk<Embedder>(relaxed = true)
+        val modelStore = mockk<ModelArtifactStore>()
+        val tokenizerStore = mockk<ModelArtifactStore>()
+        val modelFile = java.io.File("/tmp/embeddinggemma.tflite")
+        val tokenizerFile = java.io.File("/tmp/sentencepiece.model")
+        var embedderFactoryCalls = 0
+        var capturedModelPath: String? = null
+        var capturedTokenizerPath: String? = null
+        val context = mockk<Context>(relaxed = true) {
+            every { filesDir } returns java.io.File("/tmp/app-files-stub")
+        }
+        coEvery { modelStore.requireComplete() } returns modelFile
+        coEvery { tokenizerStore.requireComplete() } returns tokenizerFile
+
+        val container = AppContainer(
+            applicationContext = context,
+            boxStoreFactory = { mockk<BoxStore>(relaxed = true) },
+            markdownStoreFactory = { mockk<MarkdownEntryStore>(relaxed = true) },
+            embeddingArtifactManifestLoader = { EmbeddingArtifactManifest.loadDefault() },
+            embeddingModelArtifactStoreFactory = { _, _, _ -> modelStore },
+            embeddingTokenizerArtifactStoreFactory = { _, _, _ -> tokenizerStore },
+            embedderFactory = { modelPath, tokenizerPath ->
+                embedderFactoryCalls += 1
+                capturedModelPath = modelPath
+                capturedTokenizerPath = tokenizerPath
+                embedder
+            },
+            recoveredEntryIdsLoader = { emptyList() },
+            foregroundServiceIntentFactory = { Intent("dev.anchildress1.vestige.TEST_START") },
+            foregroundServiceStarter = {},
+        )
+
+        val first = container.requireEmbedder()
+        val second = container.requireEmbedder()
+
+        assertEquals(embedder, first)
+        assertEquals(embedder, second)
+        assertEquals(1, embedderFactoryCalls)
+        assertEquals(modelFile.absolutePath, capturedModelPath)
+        assertEquals(tokenizerFile.absolutePath, capturedTokenizerPath)
+        coVerify(exactly = 1) { modelStore.requireComplete() }
+        coVerify(exactly = 1) { tokenizerStore.requireComplete() }
     }
 
     @Test

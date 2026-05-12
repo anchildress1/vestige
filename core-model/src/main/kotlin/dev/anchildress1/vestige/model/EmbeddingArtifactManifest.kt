@@ -30,6 +30,20 @@ data class EmbeddingArtifactManifest(
     /** Returns true only when both artifacts have pinned SHA-256s and byte sizes. */
     val isResolved: Boolean get() = model.isResolved && tokenizer.isResolved
 
+    /** Adapts the pinned model row to the single-file artifact contract from Story 1.9. */
+    fun modelArtifactManifest(): ModelManifest = model.toModelManifest(
+        schemaVersion = schemaVersion,
+        artifactRepo = artifactRepo,
+        allowedHosts = allowedHosts,
+    )
+
+    /** Adapts the pinned tokenizer row to the single-file artifact contract from Story 1.9. */
+    fun tokenizerArtifactManifest(): ModelManifest = tokenizer.toModelManifest(
+        schemaVersion = schemaVersion,
+        artifactRepo = artifactRepo,
+        allowedHosts = allowedHosts,
+    )
+
     companion object {
         const val SUPPORTED_SCHEMA_VERSION = 2
         const val PENDING_PROBE_TOKEN = "PENDING_PHASE_3_DOWNLOAD_PROBE"
@@ -85,6 +99,26 @@ data class EmbeddingArtifactManifest(
             if (raw == PENDING_PROBE_TOKEN) return null
             return raw.toLongOrNull()
                 ?: error("Model manifest key '$key' is not a long or the pending-probe token: '$raw'")
+        }
+
+        private fun ArtifactSpec.toModelManifest(
+            schemaVersion: Int,
+            artifactRepo: String,
+            allowedHosts: List<String>,
+        ): ModelManifest {
+            check(isResolved) {
+                "Embedding artifact '$filename' is unresolved; expected byte size " +
+                    "and SHA-256 must be pinned before adapting it to ModelArtifactStore."
+            }
+            return ModelManifest(
+                schemaVersion = schemaVersion,
+                artifactRepo = artifactRepo,
+                filename = filename,
+                downloadUrl = downloadUrl,
+                expectedByteSize = checkNotNull(expectedByteSize),
+                sha256 = sha256,
+                allowedHosts = allowedHosts,
+            )
         }
     }
 }

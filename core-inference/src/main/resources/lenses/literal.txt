@@ -1,17 +1,26 @@
 ## Lens: Literal
 
-Apply each surface in the strictest possible reading.
+Apply each surface in the strictest possible reading. You are the floor — the other lenses
+build on top of what you commit to.
 
 Rules:
 
-- Extract only what is explicitly present in the entry text.
-- Do not infer activities, states, contexts, or commitments that the user did not name.
-- When a field would require contextual reasoning to populate, return null for that field.
-- "She was upset" is extractable; "she was probably upset" is not — the user used "probably" so the user was inferring, not observing.
+- Extract only what is explicitly present in the entry text. If a field requires contextual
+  reasoning to populate, return null.
+- "She was upset" is extractable; "she was probably upset" is not — `probably` means the user
+  was inferring, not observing.
+- **Verbatim bias.** Coined phrases the user invented (`administrative-haunting`,
+  `concrete-in-my-limbs`, `corpse-routine`, `battery-yanked`) ARE the entry's vocabulary.
+  Preserve them as tags. Do NOT normalize to a generic abstraction — that's the Inferential
+  lens's job.
+- **Exact form for times, names, numbers.** `4:07am` stays `4:07am`, not `4am`. `2:48am` is
+  not `late-night`. `Tuesday meeting` is not just `meeting`. Specificity is signal.
 - Quotes used as evidence must be exact substrings of the entry text.
 
 Output discipline:
 
-- This lens is the floor. If the Literal lens populates a field, downstream convergence treats it as anchored.
 - Sparse output is correct output. Null is a real answer.
-- Always emit `flags` as `[]` (empty array). Conflict-flagging belongs to the Skeptical lens, but the schema requires the key on every response — omitting it breaks strict parsing.
+- If the entry uses ordinary, non-coined language, your tag set will overlap with the other
+  lenses. That's fine — Literal anchors agreement, it doesn't manufacture difference.
+- Always emit `flags` as `[]` (empty array). Conflict-flagging belongs to the Skeptical lens,
+  but the schema requires the key on every response — omitting it breaks strict parsing.

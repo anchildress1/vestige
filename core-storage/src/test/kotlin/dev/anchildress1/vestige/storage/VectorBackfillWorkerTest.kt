@@ -46,6 +46,20 @@ class VectorBackfillWorkerTest {
     }
 
     @Test
+    fun `hasPendingWork reports null-vector presence without touching the embedder`() {
+        val embedder: suspend (String) -> FloatArray = { error("embedder must not be called") }
+        val worker = VectorBackfillWorker(boxStore, embedder)
+
+        assertTrue(!worker.hasPendingWork())
+
+        insertEntry("already done", vector = FloatArray(DIMS) { 1f })
+        assertTrue(!worker.hasPendingWork())
+
+        insertEntry("needs backfill", vector = null)
+        assertTrue(worker.hasPendingWork())
+    }
+
+    @Test
     fun `empty database returns empty stats without invoking embedder`() = runTest {
         var calls = 0
         val embedder: suspend (String) -> FloatArray = {

@@ -276,6 +276,12 @@ class AppContainer(
      */
     fun launchVectorBackfillIfReady() {
         scope.launch {
+            val worker = VectorBackfillWorker(boxStore) { text -> requireEmbedder().embed(text) }
+            // Cheap presence-only check before paying for SHA-256 artifact verification — most
+            // cold starts have nothing to backfill and shouldn't read ~185 MB of model file just
+            // to discover that.
+            if (!worker.hasPendingWork()) return@launch
+
             val modelState = embeddingModelArtifactStore.currentState()
             val tokenizerState = embeddingTokenizerArtifactStore.currentState()
             if (modelState !is ModelArtifactState.Complete ||
@@ -284,8 +290,7 @@ class AppContainer(
                 Log.i(TAG, "Vector backfill skipped — embedding artifacts not yet complete")
                 return@launch
             }
-            val embedder = requireEmbedder()
-            VectorBackfillWorker(boxStore) { text -> embedder.embed(text) }.backfill()
+            worker.backfill()
         }
     }
 

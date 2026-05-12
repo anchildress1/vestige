@@ -57,8 +57,8 @@ class EntryEntity(
 
     /**
      * EmbeddingGemma 300M cosine-space vector over [entryText]. Null until the backfill worker
-     * (or save-time embedding) populates it. The HNSW index skips null entries, so cold-start
-     * vector search ignores un-embedded rows without breaking.
+     * (or save-time embedding) populates it. Hybrid retrieval treats a null vector as a zero
+     * cosine contribution so un-embedded rows still rank on keyword/tag/recency.
      */
     @HnswIndex(dimensions = EMBEDDING_DIMENSIONS, distanceType = VectorDistanceType.COSINE)
     var vector: FloatArray? = null,

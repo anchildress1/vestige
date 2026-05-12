@@ -14,6 +14,14 @@ import kotlinx.coroutines.ensureActive
  */
 class VectorBackfillWorker(private val boxStore: BoxStore, private val embedder: suspend (String) -> FloatArray) {
 
+    /**
+     * Cheap-ish presence check: returns true iff at least one entry has a null vector. Callers
+     * use this to gate expensive setup (artifact SHA-256 verification, embedder construction)
+     * so a cold start with no pending work pays no IO.
+     */
+    fun hasPendingWork(): Boolean =
+        boxStore.boxFor<EntryEntity>().all.any { it.vector == null }
+
     suspend fun backfill(): BackfillStats = coroutineScope {
         val entryBox = boxStore.boxFor<EntryEntity>()
         val pending = entryBox.all.filter { it.vector == null }

@@ -50,6 +50,9 @@ dependencies {
     // Embedding — bundled libgemma_embedding_model_jni.so statically links LiteRT TFLite +
     // SentencePiece, so it doesn't collide with litert-lm's libLiteRt.so.
     implementation(libs.localagents.rag)
+    // Runtime dep — only protobuf provider GemmaEmbeddingModel uses is behind the SDK's
+    // optional tasks-genai dep, which we don't otherwise need.
+    implementation(libs.protobuf.javalite)
     // Bridge the SDK's ListenableFuture return to suspend.
     implementation(libs.kotlinx.coroutines.guava)
 

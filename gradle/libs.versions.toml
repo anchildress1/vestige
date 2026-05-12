@@ -27,6 +27,9 @@ litert-lm = "0.11.0"
 # libgemma_embedding_model_jni.so statically links LiteRT TFLite + SentencePiece, so it
 # doesn't share libLiteRt.so with litert-lm.
 localagents-rag = "0.3.0"
+# Runtime dep of localagents-rag's GemmaEmbeddingModel — pulled directly because the SDK's
+# only protobuf provider sits behind its optional `tasks-genai` dependency.
+protobuf-javalite = "4.26.1"
 
 # Quality
 kover = "0.9.8"
@@ -79,6 +82,9 @@ litert-lm = { module = "com.google.ai.edge.litertlm:litertlm-android", version.r
 
 # Embedding (EmbeddingGemma via Google AI Edge LocalAgents RAG)
 localagents-rag = { module = "com.google.ai.edge.localagents:localagents-rag", version.ref = "localagents-rag" }
+# Runtime dep — only protobuf provider for GemmaEmbeddingModel is behind the SDK's optional
+# tasks-genai dep, which we don't need otherwise.
+protobuf-javalite = { module = "com.google.protobuf:protobuf-javalite", version.ref = "protobuf-javalite" }
 # Bridge ListenableFuture (returned by the localagents-rag SDK) to suspend functions.
 kotlinx-coroutines-guava = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-guava", version.ref = "kotlinx-coroutines" }
 

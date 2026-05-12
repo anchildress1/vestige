@@ -41,6 +41,8 @@ captures/
 *.swp
 *.log
 logs/
+# Archive raw logcat captures from STT-* harness runs — evidence for ADRs and the blog post.
+!docs/stt-results/*.raw.log
 
 # Env / secrets
 .env

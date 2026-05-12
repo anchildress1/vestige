@@ -1,5 +1,8 @@
 #!/usr/bin/env bash
-# Sequential runner for every instrumented test class on the connected device.
+# Sequential runner for the curated default subset of instrumented test classes on the
+# connected device. PatternEngineSmokeTest is omitted by default (see the comment block
+# below the GoblinHoursAddendumSmokeTest invocation for the on-demand command).
+#
 # Each test class needs different instrumentation args; gradle can't run them all in
 # one invocation without arg conflicts (manifestPath, modelPath, audioPath collide).
 # Logs land under docs/stt-results/full-suite-<YYYY-MM-DD>/<label>.{gradle,logcat}.raw.log.

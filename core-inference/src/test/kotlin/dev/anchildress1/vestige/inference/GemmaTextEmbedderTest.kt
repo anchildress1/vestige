@@ -1,7 +1,6 @@
 package dev.anchildress1.vestige.inference
 
 import com.google.ai.edge.localagents.rag.models.EmbedData
-import com.google.ai.edge.localagents.rag.models.Embedder as SdkEmbedder
 import com.google.ai.edge.localagents.rag.models.EmbeddingRequest
 import com.google.common.collect.ImmutableList
 import com.google.common.util.concurrent.Futures
@@ -14,6 +13,7 @@ import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNotSame
 import org.junit.jupiter.api.Assertions.assertThrows
 import org.junit.jupiter.api.Test
+import com.google.ai.edge.localagents.rag.models.Embedder as SdkEmbedder
 
 /**
  * Contract tests for [GemmaTextEmbedder]. The on-device cosine-similarity smoke (Story 3.2's

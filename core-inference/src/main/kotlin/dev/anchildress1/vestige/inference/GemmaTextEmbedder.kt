@@ -1,13 +1,13 @@
 package dev.anchildress1.vestige.inference
 
 import com.google.ai.edge.localagents.rag.models.EmbedData
-import com.google.ai.edge.localagents.rag.models.Embedder as SdkEmbedder
 import com.google.ai.edge.localagents.rag.models.EmbeddingRequest
 import com.google.ai.edge.localagents.rag.models.GemmaEmbeddingModel
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.guava.await
 import kotlinx.coroutines.withContext
+import com.google.ai.edge.localagents.rag.models.Embedder as SdkEmbedder
 
 /**
  * Wraps `GemmaEmbeddingModel` from `com.google.ai.edge.localagents:localagents-rag`. The SDK's

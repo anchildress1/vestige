@@ -2,7 +2,6 @@ package dev.anchildress1.vestige.model
 
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
-import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Assertions.assertThrows
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
@@ -17,6 +16,8 @@ class EmbeddingArtifactManifestTest {
         assertEquals("litert-community/embeddinggemma-300m", manifest.artifactRepo)
         assertEquals("embeddinggemma-300M_seq512_mixed-precision.tflite", manifest.model.filename)
         assertEquals("sentencepiece.model", manifest.tokenizer.filename)
+        assertEquals(179_132_472L, manifest.model.expectedByteSize)
+        assertEquals(4_683_319L, manifest.tokenizer.expectedByteSize)
         assertEquals(
             listOf("huggingface.co", "cas-bridge.xethub.hf.co"),
             manifest.allowedHosts,
@@ -24,15 +25,29 @@ class EmbeddingArtifactManifestTest {
     }
 
     @Test
-    fun `pending probe values surface as unresolved`() {
-        // SHA-256 and byte size both pin to PENDING_PHASE_3_DOWNLOAD_PROBE until the Phase 3
-        // on-device probe runs. `isResolved` must be false until both are real values.
+    fun `loadDefault reports resolved once the download probe has pinned SHA-256 + sizes`() {
         val manifest = EmbeddingArtifactManifest.loadDefault()
-        assertFalse(manifest.isResolved, "Phase 3 download probe has not pinned sizes/SHA-256 yet")
+        assertTrue(manifest.isResolved)
+        assertTrue(manifest.model.sha256IsResolved)
+        assertTrue(manifest.tokenizer.sha256IsResolved)
+        // Both SHA-256s must be 64 lowercase hex chars.
+        assertEquals(SHA256_HEX_LENGTH, manifest.model.sha256.length)
+        assertEquals(SHA256_HEX_LENGTH, manifest.tokenizer.sha256.length)
+        assertTrue(manifest.model.sha256.all { it in '0'..'9' || it in 'a'..'f' })
+        assertTrue(manifest.tokenizer.sha256.all { it in '0'..'9' || it in 'a'..'f' })
+    }
+
+    @Test
+    fun `pending probe values surface as unresolved via fromProperties`() {
+        // The baseProps() fixture leaves both rows at PENDING_PHASE_3_DOWNLOAD_PROBE — the
+        // data class must still parse, but isResolved must be false so callers gate Embedder
+        // instantiation on it.
+        val manifest = EmbeddingArtifactManifest.fromProperties(baseProps())
+        assertFalse(manifest.isResolved)
         assertFalse(manifest.model.sha256IsResolved)
-        assertNull(manifest.model.expectedByteSize)
         assertFalse(manifest.tokenizer.sha256IsResolved)
-        assertNull(manifest.tokenizer.expectedByteSize)
+        assertEquals(null, manifest.model.expectedByteSize)
+        assertEquals(null, manifest.tokenizer.expectedByteSize)
     }
 
     @Test

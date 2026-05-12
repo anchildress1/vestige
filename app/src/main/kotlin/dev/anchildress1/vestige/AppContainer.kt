@@ -50,7 +50,10 @@ import java.time.ZonedDateTime
 import java.util.concurrent.atomic.AtomicBoolean
 
 /** Process-singleton hub for Phase-2 cross-cutting concerns. */
-@Suppress("LongParameterList") // Constructor-injection seams: factories + lifecycle + scope.
+@Suppress(
+    "LongParameterList", // Constructor-injection seams: factories + lifecycle + scope.
+    "TooManyFunctions", // DI hub aggregates capture, save, lifecycle, and backfill orchestration.
+)
 class AppContainer(
     private val applicationContext: Context,
     boxStoreFactory: (Context) -> BoxStore = { ctx -> VestigeBoxStore.open(ctx) },
@@ -302,65 +305,66 @@ class AppContainer(
         require(vectorBackfillMaxRetries >= 0) {
             "vectorBackfillMaxRetries must be >= 0 (got $vectorBackfillMaxRetries)"
         }
-
-        suspend fun runVectorBackfillCycle(): VectorBackfillOutcome {
-            vectorBackfillRequested.set(false)
-            return vectorBackfillMutex.withLock {
-                val worker = vectorBackfillWorkerFactory(boxStore) { text -> requireEmbedder().embed(text) }
-                // Cheap presence-only check before paying for SHA-256 artifact verification —
-                // most cold starts and steady-state save completions have nothing to backfill.
-                if (!worker.hasPendingWork()) return@withLock VectorBackfillOutcome.IDLE
-
-                val modelState = embeddingModelArtifactStore.currentState()
-                val tokenizerState = embeddingTokenizerArtifactStore.currentState()
-                if (modelState !is ModelArtifactState.Complete ||
-                    tokenizerState !is ModelArtifactState.Complete
-                ) {
-                    Log.i(TAG, "Vector backfill delayed — embedding artifacts not yet complete")
-                    return@withLock VectorBackfillOutcome.RETRY_LATER
-                }
-                worker.backfill()
-                VectorBackfillOutcome.COMPLETE
-            }
-        }
-
-        fun relaunchVectorBackfillIfRequested() {
-            vectorBackfillRunning.set(false)
-            // A trigger can land after the loop decides it's done but before `running` flips
-            // false. Re-check and relaunch here so that wakeup is not lost.
-            if (vectorBackfillRequested.get() && vectorBackfillRunning.compareAndSet(false, true)) {
-                launchVectorBackfillRunner()
-            }
-        }
-
         scope.launch {
-            var retryCount = 0
             try {
-                while (true) {
-                    when (runVectorBackfillCycle()) {
-                        VectorBackfillOutcome.IDLE,
-                        VectorBackfillOutcome.COMPLETE,
-                        -> retryCount = 0
-
-                        VectorBackfillOutcome.RETRY_LATER -> {
-                            if (retryCount >= vectorBackfillMaxRetries) {
-                                Log.e(
-                                    TAG,
-                                    "Vector backfill abandoned after $vectorBackfillMaxRetries retries; " +
-                                        "a future save or cold start will retrigger it.",
-                                )
-                            } else {
-                                retryCount += 1
-                                delay(vectorBackfillRetryDelayMs)
-                                vectorBackfillRequested.set(true)
-                            }
-                        }
-                    }
-                    if (!vectorBackfillRequested.get()) break
-                }
+                drainVectorBackfillCycles()
             } finally {
                 relaunchVectorBackfillIfRequested()
             }
+        }
+    }
+
+    private suspend fun drainVectorBackfillCycles() {
+        var retryCount = 0
+        while (true) {
+            when (runVectorBackfillCycle()) {
+                VectorBackfillOutcome.IDLE, VectorBackfillOutcome.COMPLETE -> retryCount = 0
+
+                VectorBackfillOutcome.RETRY_LATER -> {
+                    if (retryCount >= vectorBackfillMaxRetries) {
+                        Log.e(
+                            TAG,
+                            "Vector backfill abandoned after $vectorBackfillMaxRetries retries; " +
+                                "a future save or cold start will retrigger it.",
+                        )
+                        return
+                    }
+                    retryCount += 1
+                    delay(vectorBackfillRetryDelayMs)
+                    vectorBackfillRequested.set(true)
+                }
+            }
+            if (!vectorBackfillRequested.get()) return
+        }
+    }
+
+    private suspend fun runVectorBackfillCycle(): VectorBackfillOutcome {
+        vectorBackfillRequested.set(false)
+        return vectorBackfillMutex.withLock {
+            val worker = vectorBackfillWorkerFactory(boxStore) { text -> requireEmbedder().embed(text) }
+            // Cheap presence-only check before paying for SHA-256 artifact verification —
+            // most cold starts and steady-state save completions have nothing to backfill.
+            if (!worker.hasPendingWork()) return@withLock VectorBackfillOutcome.IDLE
+
+            val modelState = embeddingModelArtifactStore.currentState()
+            val tokenizerState = embeddingTokenizerArtifactStore.currentState()
+            if (modelState !is ModelArtifactState.Complete ||
+                tokenizerState !is ModelArtifactState.Complete
+            ) {
+                Log.i(TAG, "Vector backfill delayed — embedding artifacts not yet complete")
+                return@withLock VectorBackfillOutcome.RETRY_LATER
+            }
+            worker.backfill()
+            VectorBackfillOutcome.COMPLETE
+        }
+    }
+
+    // A trigger can land after `drain` decides it's done but before `running` flips false.
+    // Re-check + CAS-relaunch here so the wakeup is not lost.
+    private fun relaunchVectorBackfillIfRequested() {
+        vectorBackfillRunning.set(false)
+        if (vectorBackfillRequested.get() && vectorBackfillRunning.compareAndSet(false, true)) {
+            launchVectorBackfillRunner()
         }
     }
 

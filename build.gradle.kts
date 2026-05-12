@@ -36,6 +36,19 @@ kover {
                         "dev.anchildress1.vestige.VestigeApplication",
                         "dev.anchildress1.vestige.VestigeApplication*",
                         "dev.anchildress1.vestige.ui.theme.*",
+                        // Compose screen + nav-host functions. Pure UI wiring; the testable
+                        // mapping logic was lifted into PatternFormatting.kt and is covered.
+                        // Composable bodies retain `$changed`/`$default` plugin branches that
+                        // no JVM test framework can reach — same precedent as MainActivity above.
+                        "dev.anchildress1.vestige.ui.patterns.PatternsListScreenKt",
+                        "dev.anchildress1.vestige.ui.patterns.PatternsListScreenKt*",
+                        "dev.anchildress1.vestige.ui.patterns.*PatternsListScreenKt*",
+                        "dev.anchildress1.vestige.ui.patterns.PatternDetailScreenKt",
+                        "dev.anchildress1.vestige.ui.patterns.PatternDetailScreenKt*",
+                        "dev.anchildress1.vestige.ui.patterns.*PatternDetailScreenKt*",
+                        "dev.anchildress1.vestige.ui.patterns.PatternsHostKt",
+                        "dev.anchildress1.vestige.ui.patterns.PatternsHostKt*",
+                        "dev.anchildress1.vestige.ui.patterns.*PatternsHostKt*",
                         // Model loading and audio recording require on-device hardware/model;
                         // exercised by androidTest, not JVM unit tests.
                         "dev.anchildress1.vestige.inference.LiteRtLmEngine",

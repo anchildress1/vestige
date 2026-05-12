@@ -64,16 +64,10 @@ fun PatternsListScreen(
         viewModel.events.collect { event ->
             when (event) {
                 is PatternsListEvent.ActionTaken -> {
-                    val message = when (event.action) {
-                        PatternAction.DISMISSED -> "Dismissed."
-                        PatternAction.SNOOZED -> "Snoozed 7 days."
-                        PatternAction.MARKED_RESOLVED -> "Marked resolved."
-                    }
-                    val undoLabel = if (event.undo == null) null else "Undo"
                     // Long ≈ 10s — Story 3.8 wants the undo affordance alive for ≥5s.
                     val result = snackbarHostState.showSnackbar(
-                        message = message,
-                        actionLabel = undoLabel,
+                        message = actionSnackbarMessage(event.action),
+                        actionLabel = undoLabelFor(event.undo),
                         duration = SnackbarDuration.Long,
                     )
                     if (result == SnackbarResult.ActionPerformed && event.undo != null) {
@@ -136,13 +130,9 @@ private fun PatternsListBody(
 
 @Composable
 private fun EmptyState(reason: PatternsListUiState.EmptyReason, modifier: Modifier = Modifier) {
-    val copy = when (reason) {
-        PatternsListUiState.EmptyReason.NO_ENTRIES -> "Insufficient data."
-        PatternsListUiState.EmptyReason.NO_PATTERNS -> "Nothing repeating yet."
-    }
     Box(modifier = modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         Text(
-            text = copy,
+            text = emptyStateCopy(reason),
             style = MaterialTheme.typography.bodyLarge,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )

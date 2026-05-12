@@ -2,7 +2,6 @@ package dev.anchildress1.vestige.ui.patterns
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import dev.anchildress1.vestige.model.PatternState
 import dev.anchildress1.vestige.storage.EntryEntity
 import dev.anchildress1.vestige.storage.EntryStore
 import dev.anchildress1.vestige.storage.PatternEntity
@@ -71,24 +70,16 @@ class PatternDetailViewModel(
     private fun PatternEntity.toLoaded(
         totalEntries: Long,
         sources: List<PatternSourceUi>,
-    ): PatternDetailUiState.Loaded {
-        val terminalLabel = when (state) {
-            PatternState.RESOLVED -> "Marked resolved ${formatShortDate(stateChangedTimestamp)}."
-            PatternState.DISMISSED -> "Dismissed ${formatShortDate(stateChangedTimestamp)}."
-            else -> null
-        }
-        val isTerminal = state == PatternState.RESOLVED || state == PatternState.DISMISSED
-        return PatternDetailUiState.Loaded(
-            patternId = patternId,
-            title = title,
-            templateLabel = templateLabel,
-            observation = latestCalloutText,
-            supportingCount = supportingEntries.size,
-            totalEntryCount = totalEntries,
-            lastSeenLabel = formatShortDate(lastSeenTimestamp),
-            sources = sources,
-            isTerminal = isTerminal,
-            terminalLabel = terminalLabel,
-        )
-    }
+    ): PatternDetailUiState.Loaded = PatternDetailUiState.Loaded(
+        patternId = patternId,
+        title = title,
+        templateLabel = templateLabel,
+        observation = latestCalloutText,
+        supportingCount = supportingEntries.size,
+        totalEntryCount = totalEntries,
+        lastSeenLabel = formatShortDate(lastSeenTimestamp),
+        sources = sources,
+        isTerminal = isTerminalState(state),
+        terminalLabel = terminalLabelFor(state, stateChangedTimestamp),
+    )
 }

@@ -102,8 +102,37 @@ class PatternDetailViewModelTest {
             val loaded = expectMostRecentItem() as PatternDetailUiState.Loaded
             assertTrue(loaded.isTerminal)
             assertNotNull(loaded.terminalLabel)
+            assertTrue(loaded.terminalLabel!!.startsWith("Marked resolved"))
         }
         assertEquals(PatternState.RESOLVED, patternStore.findByPatternId("p-resolve")?.state)
+    }
+
+    @Test
+    fun `dismiss surfaces a Dismissed terminal label`() = runTest(testDispatcher) {
+        val entries = seedEntries(1)
+        seedActivePattern("p-dismiss", lastSeenMs = 100L, supporting = entries)
+        val vm = newViewModel("p-dismiss")
+        vm.dismiss()
+        vm.state.test {
+            val loaded = expectMostRecentItem() as PatternDetailUiState.Loaded
+            assertTrue(loaded.isTerminal)
+            assertTrue(loaded.terminalLabel!!.startsWith("Dismissed"))
+        }
+        assertEquals(PatternState.DISMISSED, patternStore.findByPatternId("p-dismiss")?.state)
+    }
+
+    @Test
+    fun `snooze leaves the detail in a non-terminal Loaded state`() = runTest(testDispatcher) {
+        val entries = seedEntries(1)
+        seedActivePattern("p-snooze", lastSeenMs = 100L, supporting = entries)
+        val vm = newViewModel("p-snooze")
+        vm.snooze()
+        vm.state.test {
+            val loaded = expectMostRecentItem() as PatternDetailUiState.Loaded
+            assertEquals(false, loaded.isTerminal)
+            assertEquals(null, loaded.terminalLabel)
+        }
+        assertEquals(PatternState.SNOOZED, patternStore.findByPatternId("p-snooze")?.state)
     }
 
     private fun newViewModel(patternId: String) = PatternDetailViewModel(

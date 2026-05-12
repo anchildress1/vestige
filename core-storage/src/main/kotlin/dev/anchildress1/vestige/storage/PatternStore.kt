@@ -34,6 +34,10 @@ class PatternStore(private val boxStore: BoxStore, private val clock: Clock = Cl
         .build()
         .use { it.find() }
 
+    /** ACTIVE rows ordered most-recently-seen first — drives the Patterns list card order. */
+    fun findActiveSortedByLastSeen(): List<PatternEntity> =
+        findActive().sortedByDescending { it.lastSeenTimestamp }
+
     fun put(entity: PatternEntity): Long = box.put(entity)
 
     /**

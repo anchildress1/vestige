@@ -32,6 +32,8 @@ import java.time.Instant
  * "no markdown ⇒ no ObjectBox row" — the order of the in-flight operations is box-first only
  * within the un-committed transaction window.
  */
+// Two-phase lifecycle + observation append + read APIs land naturally above the default ceiling.
+@Suppress("TooManyFunctions")
 class EntryStore(private val boxStore: BoxStore, private val markdownStore: MarkdownEntryStore) {
 
     /**
@@ -96,6 +98,9 @@ class EntryStore(private val boxStore: BoxStore, private val markdownStore: Mark
 
     /** Read-only lookup. Returns `null` for missing rows so callers can act without throwing. */
     fun readEntry(entryId: Long): EntryEntity? = boxStore.boxFor<EntryEntity>().get(entryId)
+
+    /** Total persisted entries — denominator for `{N} of {M} entries` on pattern cards. */
+    fun count(): Long = boxStore.boxFor<EntryEntity>().count()
 
     /**
      * Append one observation to an already-completed entry's persisted list. Used by the

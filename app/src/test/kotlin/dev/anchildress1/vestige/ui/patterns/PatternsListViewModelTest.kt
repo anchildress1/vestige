@@ -105,7 +105,7 @@ class PatternsListViewModelTest {
     }
 
     @Test
-    fun `loaded list sorts by last-seen descending`() = runTest(testDispatcher) {
+    fun `loaded list sorts by last-seen descending and tags cards with their section`() = runTest(testDispatcher) {
         val entries = seedEntries(3)
         seedActivePattern("older", lastSeenMs = 100L, supporting = listOf(entries[0]))
         seedActivePattern("newer", lastSeenMs = 500L, supporting = listOf(entries[1], entries[2]))
@@ -115,6 +115,25 @@ class PatternsListViewModelTest {
             assertEquals(listOf("newer", "older"), loaded.cards.map { it.patternId })
             assertEquals(3L, loaded.cards.first().totalEntryCount)
             assertEquals(2, loaded.cards.first().supportingCount)
+            assertTrue(loaded.cards.all { it.section == PatternSection.ACTIVE })
+        }
+    }
+
+    @Test
+    fun `dismissed and snoozed patterns surface in their own sections`() = runTest(testDispatcher) {
+        val entries = seedEntries(3)
+        seedActivePattern("dismissed-one", lastSeenMs = 100L, supporting = listOf(entries[0]))
+        seedActivePattern("snoozed-one", lastSeenMs = 200L, supporting = listOf(entries[1]))
+        seedActivePattern("active-one", lastSeenMs = 300L, supporting = listOf(entries[2]))
+        patternRepo.dismiss("dismissed-one")
+        patternRepo.snooze("snoozed-one")
+        val vm = newViewModel()
+        vm.state.test {
+            val loaded = expectMostRecentItem() as PatternsListUiState.Loaded
+            val bySection = loaded.cards.groupBy { it.section }
+            assertEquals(listOf("active-one"), bySection[PatternSection.ACTIVE]!!.map { it.patternId })
+            assertEquals(listOf("snoozed-one"), bySection[PatternSection.SNOOZED]!!.map { it.patternId })
+            assertEquals(listOf("dismissed-one"), bySection[PatternSection.DISMISSED]!!.map { it.patternId })
         }
     }
 

@@ -197,6 +197,28 @@ class PatternFormattingTest {
 
     // endregion
 
+    // region sectionFor
+
+    @Test
+    fun `sectionFor maps every user-visible state to its section`() {
+        assertEquals(PatternSection.ACTIVE, sectionFor(PatternState.ACTIVE))
+        assertEquals(PatternSection.SNOOZED, sectionFor(PatternState.SNOOZED))
+        assertEquals(PatternSection.RESOLVED, sectionFor(PatternState.RESOLVED))
+        assertEquals(PatternSection.DISMISSED, sectionFor(PatternState.DISMISSED))
+    }
+
+    @Test
+    fun `sectionFor returns null for the internal-only BELOW_THRESHOLD state`() {
+        assertNull(sectionFor(PatternState.BELOW_THRESHOLD))
+    }
+
+    @Test
+    fun `sectionFor covers every PatternState variant`() {
+        PatternState.entries.forEach { sectionFor(it) }
+    }
+
+    // endregion
+
     // region isTerminalState
 
     @Test

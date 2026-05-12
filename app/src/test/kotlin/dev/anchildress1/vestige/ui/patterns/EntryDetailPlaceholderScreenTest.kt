@@ -2,6 +2,7 @@ package dev.anchildress1.vestige.ui.patterns
 
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -60,6 +61,12 @@ class EntryDetailPlaceholderScreenTest {
                 entryStore = entryStore,
                 onBack = {},
             )
+        }
+        // produceState runs the entry load on Dispatchers.IO; wait for the Loaded branch to
+        // compose before asserting against its content — otherwise this flakes when the test JVM
+        // is hot and the recomposition hasn't landed yet.
+        composeRule.waitUntil(timeoutMillis = 5_000L) {
+            composeRule.onAllNodesWithText("crashed after standup").fetchSemanticsNodes().isNotEmpty()
         }
 
         composeRule.onNodeWithText("crashed after standup").assertIsDisplayed()

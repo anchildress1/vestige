@@ -148,6 +148,14 @@ private fun LoadedBody(
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
 
+        // POC: "Intensity · 30 days" trace strip. Hero element of the detail screen.
+        Text(
+            text = "INTENSITY · 30 DAYS",
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        TraceBar(hits = loaded.traceHits, height = 28.dp)
+
         HorizontalDivider(color = MaterialTheme.colorScheme.outline)
 
         Text(text = "Seen in:", style = MaterialTheme.typography.titleSmall)

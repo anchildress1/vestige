@@ -37,6 +37,17 @@ class PatternStore(private val boxStore: BoxStore, private val clock: Clock = Cl
     /** ACTIVE rows ordered most-recently-seen first — drives the Patterns list card order. */
     fun findActiveSortedByLastSeen(): List<PatternEntity> = findActive().sortedByDescending { it.lastSeenTimestamp }
 
+    /**
+     * All rows the Patterns list surfaces — ACTIVE / SNOOZED / RESOLVED / DISMISSED, ordered
+     * most-recently-seen first. BELOW_THRESHOLD is an internal-only state per ADR-003 and stays
+     * hidden. Callers slice by [PatternEntity.state] to render the POC's status sections.
+     */
+    fun findVisibleSortedByLastSeen(): List<PatternEntity> = box.all
+        .asSequence()
+        .filter { it.state != PatternState.BELOW_THRESHOLD }
+        .sortedByDescending { it.lastSeenTimestamp }
+        .toList()
+
     fun put(entity: PatternEntity): Long = box.put(entity)
 
     /**

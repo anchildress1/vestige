@@ -18,6 +18,7 @@ import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.time.Clock
 
 /**
  * Drives Story 3.10's Pattern detail. Loads the pattern + its supporting entries on construction;
@@ -29,6 +30,7 @@ class PatternDetailViewModel(
     private val patternRepo: PatternRepo,
     private val entryStore: EntryStore,
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
+    private val clock: Clock = Clock.systemUTC(),
 ) : ViewModel() {
 
     private val _state = MutableStateFlow<PatternDetailUiState>(PatternDetailUiState.Loading)
@@ -80,10 +82,12 @@ class PatternDetailViewModel(
         val pattern = patternStore.findByPatternId(patternId)
             ?: return@withContext PatternDetailUiState.NotFound
         val totalEntries = entryStore.countCompleted()
-        val sources = pattern.supportingEntries
+        val supporting = pattern.supportingEntries.toList()
+        val sources = supporting
             .sortedByDescending { it.timestampEpochMs }
             .map { it.toSourceRow() }
-        pattern.toLoaded(totalEntries, sources)
+        val traceHits = traceBarHitsFromEntries(supporting, clock.millis())
+        pattern.toLoaded(totalEntries, sources, traceHits)
     }
 
     private fun EntryEntity.toSourceRow() = PatternSourceUi(
@@ -95,6 +99,7 @@ class PatternDetailViewModel(
     private fun PatternEntity.toLoaded(
         totalEntries: Long,
         sources: List<PatternSourceUi>,
+        traceHits: Set<Int>,
     ): PatternDetailUiState.Loaded = PatternDetailUiState.Loaded(
         patternId = patternId,
         title = title,
@@ -104,6 +109,7 @@ class PatternDetailViewModel(
         totalEntryCount = totalEntries,
         lastSeenLabel = formatShortDate(lastSeenTimestamp),
         sources = sources,
+        traceHits = traceHits,
         isTerminal = isTerminalState(state),
         terminalLabel = terminalLabelFor(state, stateChangedTimestamp),
     )

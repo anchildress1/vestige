@@ -9,7 +9,21 @@ data class PatternCardUi(
     val supportingCount: Int,
     val totalEntryCount: Long,
     val lastSeenLabel: String,
+    val section: PatternSection,
+    /** Indices 0..days-1 over the trailing 30-day window. See [traceBarHits]. */
+    val traceHits: Set<Int>,
 )
+
+/**
+ * Status grouping for the Patterns list, mirroring the POC's "Active / Snoozed · still drifting /
+ * Resolved · faded / Dismissed" sections. Internal `BELOW_THRESHOLD` is never user-visible.
+ */
+enum class PatternSection(val headerLabel: String) {
+    ACTIVE("Active"),
+    SNOOZED("Snoozed · still drifting"),
+    RESOLVED("Resolved · faded"),
+    DISMISSED("Dismissed"),
+}
 
 /**
  * Source row for the Pattern detail. [snippet] is the leading slice of the supporting entry's
@@ -40,6 +54,7 @@ sealed interface PatternDetailUiState {
         val totalEntryCount: Long,
         val lastSeenLabel: String,
         val sources: List<PatternSourceUi>,
+        val traceHits: Set<Int>,
         val isTerminal: Boolean,
         val terminalLabel: String?,
     ) : PatternDetailUiState

@@ -111,17 +111,36 @@ private fun PatternsListBody(
             contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            items(state.cards, key = { it.patternId }) { card ->
-                PatternCard(
-                    card = card,
-                    onClick = { onCardClick(card.patternId) },
-                    onDismiss = { actions.onDismiss(card.patternId) },
-                    onSnooze = { actions.onSnooze(card.patternId) },
-                    onMarkResolved = { actions.onMarkResolved(card.patternId) },
-                )
+            // Group cards into the POC's four sections; preserve last-seen ordering within each.
+            val grouped = state.cards.groupBy { it.section }
+            PatternSection.entries.forEach { section ->
+                val cards = grouped[section].orEmpty()
+                if (cards.isEmpty()) return@forEach
+                item(key = "header-${section.name}") {
+                    SectionHeader(section = section)
+                }
+                items(cards, key = { it.patternId }) { card ->
+                    PatternCard(
+                        card = card,
+                        onClick = { onCardClick(card.patternId) },
+                        onDismiss = { actions.onDismiss(card.patternId) },
+                        onSnooze = { actions.onSnooze(card.patternId) },
+                        onMarkResolved = { actions.onMarkResolved(card.patternId) },
+                    )
+                }
             }
         }
     }
+}
+
+@Composable
+private fun SectionHeader(section: PatternSection) {
+    Text(
+        text = section.headerLabel.uppercase(),
+        style = MaterialTheme.typography.labelSmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.padding(top = 4.dp, bottom = 4.dp),
+    )
 }
 
 @Composable
@@ -177,6 +196,11 @@ private fun PatternCard(
                     )
                 }
                 Text(text = card.observation, style = MaterialTheme.typography.bodyMedium)
+                Spacer(modifier = Modifier.height(2.dp))
+                TraceBar(
+                    hits = card.traceHits,
+                    accent = if (card.section == PatternSection.ACTIVE) PatternAccent else TraceBarDefaults.Muted,
+                )
                 Spacer(modifier = Modifier.height(2.dp))
                 Text(
                     text = "${card.supportingCount} of ${card.totalEntryCount} entries · " +
@@ -245,6 +269,8 @@ private fun PatternsListPreview() {
                         supportingCount = 4,
                         totalEntryCount = 12,
                         lastSeenLabel = "May 7",
+                        section = PatternSection.ACTIVE,
+                        traceHits = PREVIEW_TRACE_HITS,
                     ),
                 ),
             ),
@@ -254,3 +280,6 @@ private fun PatternsListPreview() {
         )
     }
 }
+
+// Mirrors the POC's `traceHits` for the Tuesday Meetings sample so the @Preview matches.
+private val PREVIEW_TRACE_HITS = setOf(3, 10, 17, 24, 26, 28)

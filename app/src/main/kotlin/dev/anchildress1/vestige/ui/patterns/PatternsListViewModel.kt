@@ -17,10 +17,12 @@ import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.time.Clock
 
 /**
- * Drives Story 3.9's Patterns list. Only ACTIVE patterns are surfaced — dismissed / snoozed /
- * resolved live behind filter chips that ship in Phase 4 (story scope note).
+ * Drives Story 3.9's Patterns list. Surfaces ACTIVE / SNOOZED / RESOLVED / DISMISSED patterns
+ * grouped by status section per `poc/screens-patterns.jsx`. Filter chips that scope the visible
+ * sections still ship in Phase 4.
  *
  * Actions delegate to [PatternRepo] so ADR-003 lifecycle invariants stay on one validator.
  * Snackbar undo affordances surface via [events]; the View owns the timeout window.
@@ -30,6 +32,7 @@ class PatternsListViewModel(
     private val patternRepo: PatternRepo,
     private val entryStore: EntryStore,
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
+    private val clock: Clock = Clock.systemUTC(),
 ) : ViewModel() {
 
     private val _state = MutableStateFlow<PatternsListUiState>(PatternsListUiState.Loading)
@@ -53,12 +56,17 @@ class PatternsListViewModel(
 
     private suspend fun loadState(): PatternsListUiState = withContext(ioDispatcher) {
         val totalEntries = entryStore.countCompleted()
-        val active = patternStore.findActiveSortedByLastSeen()
+        val visible = patternStore.findVisibleSortedByLastSeen()
         when {
-            active.isNotEmpty() -> PatternsListUiState.Loaded(active.map { it.toCard(totalEntries) })
+            visible.isNotEmpty() -> PatternsListUiState.Loaded(visible.toCards(totalEntries))
             totalEntries == 0L -> PatternsListUiState.Empty(PatternsListUiState.EmptyReason.NO_ENTRIES)
             else -> PatternsListUiState.Empty(PatternsListUiState.EmptyReason.NO_PATTERNS)
         }
+    }
+
+    private fun List<PatternEntity>.toCards(totalEntries: Long): List<PatternCardUi> {
+        val asOfMs = clock.millis()
+        return mapNotNull { it.toCardOrNull(totalEntries, asOfMs) }
     }
 
     fun dismiss(patternId: String) = dispatch(patternId, PatternAction.DISMISSED) {
@@ -96,13 +104,18 @@ class PatternsListViewModel(
         }
     }
 
-    private fun PatternEntity.toCard(totalEntries: Long) = PatternCardUi(
-        patternId = patternId,
-        title = title,
-        templateLabel = templateLabel,
-        observation = latestCalloutText,
-        supportingCount = supportingEntries.size,
-        totalEntryCount = totalEntries,
-        lastSeenLabel = formatShortDate(lastSeenTimestamp),
-    )
+    private fun PatternEntity.toCardOrNull(totalEntries: Long, asOfMs: Long): PatternCardUi? {
+        val section = sectionFor(state) ?: return null
+        return PatternCardUi(
+            patternId = patternId,
+            title = title,
+            templateLabel = templateLabel,
+            observation = latestCalloutText,
+            supportingCount = supportingEntries.size,
+            totalEntryCount = totalEntries,
+            lastSeenLabel = formatShortDate(lastSeenTimestamp),
+            section = section,
+            traceHits = traceBarHitsFromEntries(supportingEntries.toList(), asOfMs),
+        )
+    }
 }

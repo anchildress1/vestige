@@ -1,11 +1,13 @@
 package dev.anchildress1.vestige.ui.patterns
 
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
-import androidx.compose.ui.test.assertIsNotDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.test.core.app.ApplicationProvider
 import dev.anchildress1.vestige.model.ExtractionStatus
 import dev.anchildress1.vestige.model.PatternKind
@@ -96,11 +98,12 @@ class PatternDetailScreenTest {
         composeRule.onNodeWithText("Tuesday Meetings").assertIsDisplayed()
         composeRule.onNodeWithText("Aftermath").assertIsDisplayed()
         composeRule.onNodeWithText("Fourth entry mentions Tuesday meetings.").assertIsDisplayed()
-        composeRule.onNodeWithText("Seen in:").assertIsDisplayed()
-        composeRule.onNodeWithText("crashed after standup").assertIsDisplayed()
-        composeRule.onNodeWithText("Dismiss").assertIsDisplayed()
-        composeRule.onNodeWithText("Snooze 7 days").assertIsDisplayed()
-        composeRule.onNodeWithText("Mark resolved").assertIsDisplayed()
+        // Action row + sources live below the new TraceBar fold; scrolling brings them into view.
+        composeRule.onNodeWithText("Seen in:").performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithText("crashed after standup").performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithText("Dismiss").performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithText("Snooze 7 days").performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithText("Mark resolved").performScrollTo().assertIsDisplayed()
     }
 
     @Test
@@ -113,10 +116,10 @@ class PatternDetailScreenTest {
             PatternDetailScreen(viewModel = newViewModel("p-terminal"), onBack = {})
         }
 
-        composeRule.onNodeWithText("Dismissed", substring = true).assertIsDisplayed()
-        composeRule.onNodeWithText("Dismiss").assertIsNotDisplayed()
-        composeRule.onNodeWithText("Snooze 7 days").assertIsNotDisplayed()
-        composeRule.onNodeWithText("Mark resolved").assertIsNotDisplayed()
+        composeRule.onNodeWithText("Dismissed", substring = true).performScrollTo().assertIsDisplayed()
+        composeRule.onAllNodesWithText("Dismiss").assertCountEquals(0)
+        composeRule.onAllNodesWithText("Snooze 7 days").assertCountEquals(0)
+        composeRule.onAllNodesWithText("Mark resolved").assertCountEquals(0)
     }
 
     @Test
@@ -128,12 +131,12 @@ class PatternDetailScreenTest {
             PatternDetailScreen(viewModel = newViewModel("p-resolve-click"), onBack = {})
         }
 
-        composeRule.onNodeWithText("Mark resolved").performClick()
+        composeRule.onNodeWithText("Mark resolved").performScrollTo().performClick()
         composeRule.waitForIdle()
 
         assertEquals(PatternState.RESOLVED, patternStore.findByPatternId("p-resolve-click")?.state)
         // Action row is gone post-terminal — the only `Mark resolved` node was the button.
-        composeRule.onNodeWithText("Mark resolved").assertIsNotDisplayed()
+        composeRule.onAllNodesWithText("Mark resolved").assertCountEquals(0)
     }
 
     @Test
@@ -163,7 +166,7 @@ class PatternDetailScreenTest {
             )
         }
 
-        composeRule.onNodeWithText("crashed after standup").performClick()
+        composeRule.onNodeWithText("crashed after standup").performScrollTo().performClick()
         assertEquals(supporting.single().id, openedEntryId)
     }
 

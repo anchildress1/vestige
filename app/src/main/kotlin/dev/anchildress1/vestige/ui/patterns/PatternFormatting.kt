@@ -51,4 +51,16 @@ fun terminalLabelFor(state: PatternState, stateChangedMs: Long, zone: ZoneId = Z
 /** ADR-003 terminals: DISMISSED + RESOLVED. SNOOZED is recoverable; BELOW_THRESHOLD is internal. */
 fun isTerminalState(state: PatternState): Boolean = state == PatternState.DISMISSED || state == PatternState.RESOLVED
 
+/**
+ * Map a persisted [PatternState] onto the Patterns-list section it belongs in. Returns `null`
+ * for [PatternState.BELOW_THRESHOLD] — that's an internal-only state and never user-visible.
+ */
+fun sectionFor(state: PatternState): PatternSection? = when (state) {
+    PatternState.ACTIVE -> PatternSection.ACTIVE
+    PatternState.SNOOZED -> PatternSection.SNOOZED
+    PatternState.RESOLVED -> PatternSection.RESOLVED
+    PatternState.DISMISSED -> PatternSection.DISMISSED
+    PatternState.BELOW_THRESHOLD -> null
+}
+
 private const val MAX_SNIPPET_LEN = 60

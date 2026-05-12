@@ -317,39 +317,6 @@ class AppContainerTest {
     }
 
     @Test
-    fun `saveAndExtract reports the new entry as PENDING before returning`() = runTest {
-        val saveFlow = mockk<BackgroundExtractionSaveFlow>()
-        val engine = mockk<LiteRtLmEngine>(relaxed = true)
-        val capturedAt = ZonedDateTime.of(2026, 5, 12, 8, 15, 0, 0, ZoneId.of("America/New_York"))
-        coEvery {
-            saveFlow.saveAndExtract(
-                entryText = "persist me",
-                capturedAt = capturedAt,
-                retrievedHistory = emptyList(),
-                timeoutMs = null,
-                persona = dev.anchildress1.vestige.model.Persona.WITNESS,
-            )
-        } returns SaveOutcome.Pending(entryId = 42L, extractionJob = kotlinx.coroutines.Job())
-        val container = AppContainer(
-            applicationContext = mockk<Context>(relaxed = true),
-            boxStoreFactory = { mockk<BoxStore>(relaxed = true) },
-            markdownStoreFactory = { mockk<MarkdownEntryStore>(relaxed = true) },
-            modelPathLoader = { "/tmp/fake-model.litertlm" },
-            backgroundEngineFactory = { _, _ -> engine },
-            backgroundExtractionSaveFlowFactory = { _, _, _, _, _, _ -> saveFlow },
-            recoveredEntryIdsLoader = { emptyList() },
-            foregroundServiceIntentFactory = { Intent("dev.anchildress1.vestige.TEST_START") },
-            foregroundServiceStarter = {},
-            scope = backgroundScope,
-        )
-
-        val actual = container.saveAndExtract("persist me", capturedAt)
-
-        assertEquals(42L, actual.entryId)
-        assertEquals(BackgroundExtractionLifecycleState.PROMOTING, container.lifecycleStateMachine.state.value)
-    }
-
-    @Test
     fun `launchVectorBackfillIfReady retries the real pass after artifact states turn complete`() = runTest {
         val modelStore = mockk<ModelArtifactStore>()
         val tokenizerStore = mockk<ModelArtifactStore>()

@@ -61,6 +61,10 @@ class BackgroundExtractionSaveFlow(
     ): SaveOutcome.Pending {
         val entryId = entryStore.createPendingEntry(entryText, capturedAt.toInstant())
         val terminalRelay = DeferredTerminalRelay(listenerFactory(entryId))
+        // Emit PENDING before launching the detached coroutine — otherwise a fast-failing
+        // extraction can emit RUNNING/FAILED first and this report would overwrite the
+        // terminal state, leaving the entry stuck in-flight until process restart.
+        terminalRelay.workerListener.onUpdate(ExtractionStatus.PENDING, 0, null)
         val request = BackgroundExtractionRequest(
             entryText = entryText,
             capturedAt = capturedAt,

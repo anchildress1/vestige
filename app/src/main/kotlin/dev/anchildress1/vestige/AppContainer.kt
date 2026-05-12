@@ -268,7 +268,6 @@ class AppContainer(
             timeoutMs = timeoutMs,
             persona = persona,
         )
-        reportExtractionStatus(outcome.entryId, ExtractionStatus.PENDING)
         launchVectorBackfillIfReady()
         return outcome
     }

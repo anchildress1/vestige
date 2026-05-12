@@ -65,6 +65,32 @@ class BackgroundExtractionSaveFlowTest {
     )
 
     @Test
+    fun `saveAndExtract emits PENDING to the listener before invoking the worker`() = runTest {
+        val resolved = canonicalSample()
+        every { entryStore.createPendingEntry(any(), any()) } returns ENTRY_ID
+        val listenerSnapshotAtWorkerCall = mutableListOf<ExtractionStatus>()
+        coEvery { worker.extract(any(), any()) } coAnswers {
+            // Snapshot the listener history at the moment the worker is invoked. If PENDING
+            // hadn't fired pre-launch, this list would be empty (or the worker's own RUNNING
+            // would arrive first).
+            listenerSnapshotAtWorkerCall += listenerEvents
+            BackgroundExtractionResult.Success(
+                totalElapsedMs = 1L,
+                lensResults = emptyList(),
+                modelCallCount = 0,
+                resolved = resolved,
+                templateLabel = TemplateLabel.AFTERMATH,
+            )
+        }
+        coEvery { observationGenerator.generate(any(), any(), any()) } returns emptyList()
+
+        flow.saveAndExtract(SAMPLE_TEXT, SAMPLE_TIMESTAMP)
+
+        assertEquals(listOf(ExtractionStatus.PENDING), listenerSnapshotAtWorkerCall)
+        assertEquals(ExtractionStatus.PENDING, listenerEvents.first())
+    }
+
+    @Test
     fun `pattern orchestrator callout is appended to the persisted observations`() = runTest {
         val orchestrator = mockk<dev.anchildress1.vestige.patterns.PatternDetectionOrchestrator>()
         val flowWithOrch = BackgroundExtractionSaveFlow(
@@ -617,7 +643,10 @@ class BackgroundExtractionSaveFlowTest {
 
         flow.saveAndExtract(SAMPLE_TEXT, SAMPLE_TIMESTAMP)
 
-        assertEquals(listOf(ExtractionStatus.RUNNING, ExtractionStatus.COMPLETED), listenerEvents)
+        assertEquals(
+            listOf(ExtractionStatus.PENDING, ExtractionStatus.RUNNING, ExtractionStatus.COMPLETED),
+            listenerEvents,
+        )
         verify(exactly = 0) { entryStore.failEntry(any(), any(), any()) }
     }
 

@@ -1,0 +1,109 @@
+05-12 14:39:33.663  2619  2808 W NativeLibraryHelper: Failed to punch uncompressed elf file :libgemma_embedding_model_jni.so inside apk : /data/app/vmdl1635761780.tmp/base.apk at offset: 62685184
+05-12 14:39:33.669  2619  2808 W NativeLibraryHelper: Failed to punch uncompressed elf file :libgecko_embedding_model_jni.so inside apk : /data/app/vmdl1635761780.tmp/base.apk at offset: 45711360
+05-12 14:39:33.911  4296 30255 I HoneySpace.IconCache: add icon DB: [dev.anchildress1.vestige/.MainActivity#UserHandle{0}] - IconAndLabel(icon=android.graphics.Bitmap@f9f931f, label=Vestige) | false | 640 | false |false | -15050404
+05-12 14:39:33.911  4296  4296 I HoneySpace.DataCache: insertItem : id=52666, title=Vestige, type=APP, containerType=ITEM_GROUP, containerId=21, x=-1, y=-1, rank=28, spanX=-1, spanY=-1, scale=1.0, component=dev.anchildress1.vestige/.MainActivity, profileId=0, intent=null, restored=0, hidden=UNHIDDEN, appWidgetId=-1, options=0, refPackageName=null
+05-12 14:39:35.151 30717 30717 I AndroidJUnitRunner: newApplication dev.anchildress1.vestige.VestigeApplication
+05-12 14:39:35.207 30717 30717 D StrictMode: 	at dev.anchildress1.vestige.storage.VestigeBoxStore.open(VestigeBoxStore.kt:15)
+05-12 14:39:35.207 30717 30717 D StrictMode: 	at dev.anchildress1.vestige.VestigeApplication.onCreate(VestigeApplication.kt:18)
+05-12 14:39:35.208 30717 30717 D StrictMode: 	at dev.anchildress1.vestige.storage.VestigeBoxStore.open(VestigeBoxStore.kt:15)
+05-12 14:39:35.208 30717 30717 D StrictMode: 	at dev.anchildress1.vestige.VestigeApplication.onCreate(VestigeApplication.kt:18)
+05-12 14:39:35.208 30717 30717 D StrictMode: 	at dev.anchildress1.vestige.storage.VestigeBoxStore.open(VestigeBoxStore.kt:15)
+05-12 14:39:35.208 30717 30717 D StrictMode: 	at dev.anchildress1.vestige.VestigeApplication.onCreate(VestigeApplication.kt:18)
+05-12 14:39:35.209 30717 30717 D StrictMode: 	at dev.anchildress1.vestige.storage.VestigeBoxStore.open(VestigeBoxStore.kt:15)
+05-12 14:39:35.209 30717 30717 D StrictMode: 	at dev.anchildress1.vestige.VestigeApplication.onCreate(VestigeApplication.kt:18)
+05-12 14:39:35.209 30717 30717 D StrictMode: 	at dev.anchildress1.vestige.storage.VestigeBoxStore.open(VestigeBoxStore.kt:15)
+05-12 14:39:35.209 30717 30717 D StrictMode: 	at dev.anchildress1.vestige.VestigeApplication.onCreate(VestigeApplication.kt:18)
+05-12 14:39:35.210 30717 30717 D StrictMode: 	at dev.anchildress1.vestige.storage.VestigeBoxStore.open(VestigeBoxStore.kt:15)
+05-12 14:39:35.210 30717 30717 D StrictMode: 	at dev.anchildress1.vestige.VestigeApplication.onCreate(VestigeApplication.kt:18)
+05-12 14:39:35.211 30717 30717 D StrictMode: 	at dev.anchildress1.vestige.storage.VestigeBoxStore.open(VestigeBoxStore.kt:15)
+05-12 14:39:35.211 30717 30717 D StrictMode: 	at dev.anchildress1.vestige.VestigeApplication.onCreate(VestigeApplication.kt:18)
+05-12 14:39:35.211 30717 30717 D StrictMode: 	at dev.anchildress1.vestige.storage.VestigeBoxStore.open(VestigeBoxStore.kt:15)
+05-12 14:39:35.211 30717 30717 D StrictMode: 	at dev.anchildress1.vestige.VestigeApplication.onCreate(VestigeApplication.kt:18)
+05-12 14:39:35.212 30717 30717 D StrictMode: 	at dev.anchildress1.vestige.storage.VestigeBoxStore.open(VestigeBoxStore.kt:15)
+05-12 14:39:35.212 30717 30717 D StrictMode: 	at dev.anchildress1.vestige.VestigeApplication.onCreate(VestigeApplication.kt:18)
+05-12 14:39:35.213 30717 30717 D StrictMode: 	at dev.anchildress1.vestige.storage.VestigeBoxStore.open(VestigeBoxStore.kt:15)
+05-12 14:39:35.213 30717 30717 D StrictMode: 	at dev.anchildress1.vestige.VestigeApplication.onCreate(VestigeApplication.kt:18)
+05-12 14:39:35.245 30717 30731 I TestRunner: run started: 1 tests
+05-12 14:39:35.246 30717 30731 I TestRunner: started: hybridRetrieval_beatsTagOnlyBaselineAcrossTheCorpus(dev.anchildress1.vestige.SttEEmbeddingComparisonTest)
+05-12 14:39:35.278 30717 30731 D nativeloader: Load /data/app/~~GqFmUvyS4f-WiK-YEBvovQ==/dev.anchildress1.vestige-7-e1Hks-UW_cyhPmpf-A7g==/base.apk!/lib/arm64-v8a/libgemma_embedding_model_jni.so using class loader ns clns-9 (caller=/data/app/~~GqFmUvyS4f-WiK-YEBvovQ==/dev.anchildress1.vestige-7-e1Hks-UW_cyhPmpf-A7g==/base.apk!classes11.dex): ok
+05-12 14:39:35.282 30717 30738 I TfliteEmbeddingModelJni: Initializing embedder.
+05-12 14:39:35.583 30717 30738 I TfliteEmbeddingModelJni: Finished initializing embedder.
+05-12 14:39:35.594 30717 30738 I TfliteEmbeddingModelJni: Getting embeddings.
+05-12 14:39:35.594 30717 30738 I TfliteEmbeddingModelJni: Decoding request proto.
+05-12 14:39:36.466 30717 30738 I TfliteEmbeddingModelJni: Finished getting embeddings.
+05-12 14:39:36.479 30717 30738 I TfliteEmbeddingModelJni: Getting embeddings.
+05-12 14:39:36.479 30717 30738 I TfliteEmbeddingModelJni: Decoding request proto.
+05-12 14:39:37.341 30717 30738 I TfliteEmbeddingModelJni: Finished getting embeddings.
+05-12 14:39:37.364 30717 30738 I TfliteEmbeddingModelJni: Getting embeddings.
+05-12 14:39:37.364 30717 30738 I TfliteEmbeddingModelJni: Decoding request proto.
+05-12 14:39:38.229 30717 30738 I TfliteEmbeddingModelJni: Finished getting embeddings.
+05-12 14:39:38.244 30717 30738 I TfliteEmbeddingModelJni: Getting embeddings.
+05-12 14:39:38.244 30717 30738 I TfliteEmbeddingModelJni: Decoding request proto.
+05-12 14:39:39.105 30717 30738 I TfliteEmbeddingModelJni: Finished getting embeddings.
+05-12 14:39:39.123 30717 30738 I TfliteEmbeddingModelJni: Getting embeddings.
+05-12 14:39:39.123 30717 30738 I TfliteEmbeddingModelJni: Decoding request proto.
+05-12 14:39:39.990 30717 30738 I TfliteEmbeddingModelJni: Finished getting embeddings.
+05-12 14:39:40.013 30717 30738 I TfliteEmbeddingModelJni: Getting embeddings.
+05-12 14:39:40.013 30717 30738 I TfliteEmbeddingModelJni: Decoding request proto.
+05-12 14:39:40.874 30717 30738 I TfliteEmbeddingModelJni: Finished getting embeddings.
+05-12 14:39:40.898 30717 30738 I TfliteEmbeddingModelJni: Getting embeddings.
+05-12 14:39:40.898 30717 30738 I TfliteEmbeddingModelJni: Decoding request proto.
+05-12 14:39:41.760 30717 30738 I TfliteEmbeddingModelJni: Finished getting embeddings.
+05-12 14:39:41.786 30717 30738 I TfliteEmbeddingModelJni: Getting embeddings.
+05-12 14:39:41.786 30717 30738 I TfliteEmbeddingModelJni: Decoding request proto.
+05-12 14:39:42.654 30717 30738 I TfliteEmbeddingModelJni: Finished getting embeddings.
+05-12 14:39:42.676 30717 30738 I TfliteEmbeddingModelJni: Getting embeddings.
+05-12 14:39:42.676 30717 30738 I TfliteEmbeddingModelJni: Decoding request proto.
+05-12 14:39:43.551 30717 30738 I TfliteEmbeddingModelJni: Finished getting embeddings.
+05-12 14:39:43.573 30717 30738 I TfliteEmbeddingModelJni: Getting embeddings.
+05-12 14:39:43.573 30717 30738 I TfliteEmbeddingModelJni: Decoding request proto.
+05-12 14:39:44.443 30717 30738 I TfliteEmbeddingModelJni: Finished getting embeddings.
+05-12 14:39:44.464 30717 30738 I TfliteEmbeddingModelJni: Getting embeddings.
+05-12 14:39:44.465 30717 30738 I TfliteEmbeddingModelJni: Decoding request proto.
+05-12 14:39:45.327 30717 30738 I TfliteEmbeddingModelJni: Finished getting embeddings.
+05-12 14:39:45.350 30717 30738 I TfliteEmbeddingModelJni: Getting embeddings.
+05-12 14:39:45.350 30717 30738 I TfliteEmbeddingModelJni: Decoding request proto.
+05-12 14:39:46.233 30717 30738 I TfliteEmbeddingModelJni: Finished getting embeddings.
+05-12 14:39:46.257 30717 30738 I TfliteEmbeddingModelJni: Getting embeddings.
+05-12 14:39:46.257 30717 30738 I TfliteEmbeddingModelJni: Decoding request proto.
+05-12 14:39:47.118 30717 30738 I TfliteEmbeddingModelJni: Finished getting embeddings.
+05-12 14:39:47.148 30717 30738 I TfliteEmbeddingModelJni: Getting embeddings.
+05-12 14:39:47.148 30717 30738 I TfliteEmbeddingModelJni: Decoding request proto.
+05-12 14:39:48.009 30717 30738 I TfliteEmbeddingModelJni: Finished getting embeddings.
+05-12 14:39:48.031 30717 30738 I TfliteEmbeddingModelJni: Getting embeddings.
+05-12 14:39:48.031 30717 30738 I TfliteEmbeddingModelJni: Decoding request proto.
+05-12 14:39:48.891 30717 30738 I TfliteEmbeddingModelJni: Finished getting embeddings.
+05-12 14:39:48.910 30717 30738 I TfliteEmbeddingModelJni: Getting embeddings.
+05-12 14:39:48.910 30717 30738 I TfliteEmbeddingModelJni: Decoding request proto.
+05-12 14:39:49.772 30717 30738 I TfliteEmbeddingModelJni: Finished getting embeddings.
+05-12 14:39:49.789 30717 30738 I TfliteEmbeddingModelJni: Getting embeddings.
+05-12 14:39:49.789 30717 30738 I TfliteEmbeddingModelJni: Decoding request proto.
+05-12 14:39:50.649 30717 30738 I TfliteEmbeddingModelJni: Finished getting embeddings.
+05-12 14:39:50.669 30717 30738 I TfliteEmbeddingModelJni: Getting embeddings.
+05-12 14:39:50.669 30717 30738 I TfliteEmbeddingModelJni: Decoding request proto.
+05-12 14:39:51.529 30717 30738 I TfliteEmbeddingModelJni: Finished getting embeddings.
+05-12 14:39:51.625 30717 30738 I TfliteEmbeddingModelJni: Getting embeddings.
+05-12 14:39:51.625 30717 30738 I TfliteEmbeddingModelJni: Decoding request proto.
+05-12 14:39:52.497 30717 30738 I TfliteEmbeddingModelJni: Finished getting embeddings.
+05-12 14:39:52.521 30717 30731 I VestigeSttE: Q_aftermath baseline top-5: [A3, X2, D3, B3, A5] (relevant=2/6)
+05-12 14:39:52.521 30717 30731 I VestigeSttE: Q_aftermath hybrid top-5: [X2, A3, A2, D3, A1] (relevant=3/6, novelRelevant=[A2, A1])
+05-12 14:39:52.537 30717 30738 I TfliteEmbeddingModelJni: Getting embeddings.
+05-12 14:39:52.537 30717 30738 I TfliteEmbeddingModelJni: Decoding request proto.
+05-12 14:39:53.408 30717 30738 I TfliteEmbeddingModelJni: Finished getting embeddings.
+05-12 14:39:53.428 30717 30731 I VestigeSttE: Q_invoice baseline top-5: [B3, B2, B1, A5, D3] (relevant=3/3)
+05-12 14:39:53.428 30717 30731 I VestigeSttE: Q_invoice hybrid top-5: [B2, B1, B3, A1, A5] (relevant=3/3, novelRelevant=[])
+05-12 14:39:53.440 30717 30738 I TfliteEmbeddingModelJni: Getting embeddings.
+05-12 14:39:53.440 30717 30738 I TfliteEmbeddingModelJni: Decoding request proto.
+05-12 14:39:54.306 30717 30738 I TfliteEmbeddingModelJni: Finished getting embeddings.
+05-12 14:39:54.320 30717 30731 I VestigeSttE: Q_decision baseline top-5: [C1, A5, D3, B3, D2] (relevant=1/3)
+05-12 14:39:54.320 30717 30731 I VestigeSttE: Q_decision hybrid top-5: [C1, C2, A1, D2, A5] (relevant=2/3, novelRelevant=[C2])
+05-12 14:39:54.331 30717 30738 I TfliteEmbeddingModelJni: Getting embeddings.
+05-12 14:39:54.331 30717 30738 I TfliteEmbeddingModelJni: Decoding request proto.
+05-12 14:39:55.195 30717 30738 I TfliteEmbeddingModelJni: Finished getting embeddings.
+05-12 14:39:55.206 30717 30731 I VestigeSttE: Q_lateNight baseline top-5: [D1, B2, B1, A1, A5] (relevant=1/3)
+05-12 14:39:55.206 30717 30731 I VestigeSttE: Q_lateNight hybrid top-5: [D1, B2, A1, B1, D2] (relevant=2/3, novelRelevant=[D2])
+05-12 14:39:55.206 30717 30731 I VestigeSttE: STT-E win-rate: 3/4 queries
+05-12 14:39:55.212 30717 30731 I TestRunner: finished: hybridRetrieval_beatsTagOnlyBaselineAcrossTheCorpus(dev.anchildress1.vestige.SttEEmbeddingComparisonTest)
+05-12 14:39:55.215 30717 30731 I TestRunner: run finished: 1 tests, 0 failed, 0 ignored
+05-12 14:39:56.524  4296  4296 I HoneySpace.DataCache: deleteItem : id=52666, title=Vestige, type=APP, containerType=ITEM_GROUP, containerId=21, x=-1, y=-1, rank=28, spanX=-1, spanY=-1, scale=1.0, component=dev.anchildress1.vestige/.MainActivity, profileId=0, intent=null, restored=0, hidden=UNHIDDEN, appWidgetId=-1, options=0, refPackageName=null (vertical appList) package removed
+05-12 14:39:56.524  4296  7331 I HoneySpace.DataCache: delete item : (vertical appList) package removed - APP / 52666 / 21 / Vestige / dev.anchildress1.vestige/.MainActivity / -1 / 0

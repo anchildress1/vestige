@@ -1,0 +1,12 @@
+class	verdict	wall_clock	notes
+SttAAudioPlumbingTest	PASS	53s	skipped:assumeTrue;ran-clean;
+LiteRtLmTextSmokeTest	PASS	21s	skipped:assumeTrue;ran-clean;
+LiteRtLmStreamingTextSmokeTest	PASS	20s	skipped:assumeTrue;ran-clean;
+PersonaToneSmokeTest	PASS	79s	skipped:assumeTrue;ran-clean;
+PerCapturePersonaSmokeTest	PASS	153s	skipped:assumeTrue;ran-clean;
+GoblinHoursAddendumSmokeTest	PASS	113s	skipped:assumeTrue;ran-clean;
+PatternEngineSmokeTest	PASS	873s	skipped:assumeTrue;ran-clean;
+SttCTagStabilityTest	FAIL	5407s	skipped:assumeTrue;ran-clean;
+SttDLensDivergenceTest	PASS	635s	skipped:assumeTrue;ran-clean;
+EmbeddingGemmaSmokeTest	PASS	10s	
+SttEEmbeddingComparisonTest	PASS	26s	skipped:assumeTrue;ran-clean;

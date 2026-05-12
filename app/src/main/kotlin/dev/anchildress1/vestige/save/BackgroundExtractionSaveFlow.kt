@@ -13,39 +13,58 @@ import dev.anchildress1.vestige.model.Persona
 import dev.anchildress1.vestige.patterns.PatternDetectionOrchestrator
 import dev.anchildress1.vestige.storage.EntryStore
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.launch
 import java.time.ZonedDateTime
 
 /**
  * Glues [EntryStore] + [BackgroundExtractionWorker] + the per-entry status listener into one
- * call. Closes the persistence loop Story 2.6.5 staged: every entry's extraction status drives
- * the foreground-service lifecycle, and convergence outputs land in both ObjectBox and markdown.
+ * call. Two-tier per ADR-002 §"Two-Tier Processing Contract": the caller-facing [saveAndExtract]
+ * commits the pending entry and returns immediately with [SaveOutcome.Pending]. The 3-lens
+ * extraction + resolver + observation generation + pattern callout pipeline runs detached on
+ * the injected [scope] — terminal status flows through the `ExtractionStatusListener` from
+ * [listenerFactory] (typically `AppContainer.extractionStatusListener` → `BackgroundExtractionStatusBus`).
  *
  * Sequence per [saveAndExtract]:
  *   1. `EntryStore.createPendingEntry` writes the transcription and assigns an `entryId`.
- *   2. The caller-supplied [listenerFactory] (typically `AppContainer.extractionStatusListener`)
- *      yields the listener routed at that `entryId`.
- *   3. `BackgroundExtractionWorker.extract` runs the 3-lens sequential pipeline.
- *   4. Terminal worker states are buffered until persistence succeeds.
- *   5. `Success` → `EntryStore.completeEntry`; `Failed` / `TimedOut` → `EntryStore.failEntry`.
- *   6. Once storage succeeds, the buffered terminal state is forwarded to the lifecycle layer.
+ *      Synchronous — the caller awaits the row commit only.
+ *   2. The caller-supplied [listenerFactory] yields the listener routed at that `entryId`.
+ *   3. Caller receives [SaveOutcome.Pending] and resumes.
+ *   4. Detached: `BackgroundExtractionWorker.extract` runs the 3-lens sequential pipeline.
+ *   5. Detached: terminal worker states are buffered until persistence succeeds.
+ *   6. Detached: `Success` → `EntryStore.completeEntry`; `Failed` / `TimedOut` → `failEntry`.
+ *   7. Detached: once storage succeeds, the buffered terminal state is forwarded to the listener.
  */
+@Suppress("TooManyFunctions") // Pipeline + handlers + helpers; splitting hides the linear flow.
 class BackgroundExtractionSaveFlow(
     private val entryStore: EntryStore,
     private val worker: BackgroundExtractionWorker,
     private val observationGenerator: ObservationGenerator,
     private val listenerFactory: (Long) -> ExtractionStatusListener,
+    private val scope: CoroutineScope,
     private val patternOrchestrator: PatternDetectionOrchestrator? = null,
 ) {
 
+    /**
+     * Persist [entryText] as a `PENDING` row, return immediately, and launch the detached 3-lens
+     * extraction pipeline on the injected scope. Caller awaits only the entry commit; terminal
+     * extraction status is delivered to the listener registered against the returned entry id.
+     * Returns the detached [Job] on the outcome so tests + tooling can await completion.
+     */
     suspend fun saveAndExtract(
         entryText: String,
         capturedAt: ZonedDateTime,
         retrievedHistory: List<HistoryChunk> = emptyList(),
         timeoutMs: Long? = null,
         persona: Persona = Persona.WITNESS,
-    ): SaveOutcome {
+    ): SaveOutcome.Pending {
         val entryId = entryStore.createPendingEntry(entryText, capturedAt.toInstant())
         val terminalRelay = DeferredTerminalRelay(listenerFactory(entryId))
+        // Emit PENDING before launching the detached coroutine — otherwise a fast-failing
+        // extraction can emit RUNNING/FAILED first and this report would overwrite the
+        // terminal state, leaving the entry stuck in-flight until process restart.
+        terminalRelay.workerListener.onUpdate(ExtractionStatus.PENDING, 0, null)
         val request = BackgroundExtractionRequest(
             entryText = entryText,
             capturedAt = capturedAt,
@@ -54,30 +73,61 @@ class BackgroundExtractionSaveFlow(
             timeoutMs = timeoutMs,
         )
 
-        return when (val result = worker.extract(request, terminalRelay.workerListener)) {
-            is BackgroundExtractionResult.Success -> handleSuccess(
-                entryId = entryId,
-                entryText = entryText,
-                capturedAt = capturedAt,
-                entryAttemptCount = request.entryAttemptCount,
-                result = result,
-                terminalRelay = terminalRelay,
-                persona = persona,
-            )
+        val extractionJob = scope.launch {
+            runDetachedExtraction(entryId, entryText, capturedAt, request, terminalRelay, persona)
+        }
+        return SaveOutcome.Pending(entryId, extractionJob)
+    }
 
-            is BackgroundExtractionResult.Failed -> handleFailure(
-                entryId = entryId,
-                entryAttemptCount = request.entryAttemptCount,
-                result = result,
-                terminalRelay = terminalRelay,
-            )
+    @Suppress("LongParameterList") // Carries the saveAndExtract call's full context.
+    private suspend fun runDetachedExtraction(
+        entryId: Long,
+        entryText: String,
+        capturedAt: ZonedDateTime,
+        request: BackgroundExtractionRequest,
+        terminalRelay: DeferredTerminalRelay,
+        persona: Persona,
+    ) {
+        try {
+            when (val result = worker.extract(request, terminalRelay.workerListener)) {
+                is BackgroundExtractionResult.Success -> handleSuccess(
+                    entryId = entryId,
+                    entryText = entryText,
+                    capturedAt = capturedAt,
+                    entryAttemptCount = request.entryAttemptCount,
+                    result = result,
+                    terminalRelay = terminalRelay,
+                    persona = persona,
+                )
 
-            is BackgroundExtractionResult.TimedOut -> handleTimeout(
-                entryId = entryId,
-                entryAttemptCount = request.entryAttemptCount,
-                result = result,
-                terminalRelay = terminalRelay,
+                is BackgroundExtractionResult.Failed -> handleFailure(
+                    entryId = entryId,
+                    entryAttemptCount = request.entryAttemptCount,
+                    result = result,
+                    terminalRelay = terminalRelay,
+                )
+
+                is BackgroundExtractionResult.TimedOut -> handleTimeout(
+                    entryId = entryId,
+                    entryAttemptCount = request.entryAttemptCount,
+                    result = result,
+                    terminalRelay = terminalRelay,
+                )
+            }
+        } catch (cancellation: CancellationException) {
+            // Leave the entry in PENDING/RUNNING for the cold-start sweep; rethrow so
+            // structured concurrency propagates the cancellation upward.
+            throw cancellation
+        } catch (compensated: PersistenceCompensatedException) {
+            Log.w(
+                TAG,
+                "Detached extraction persistence already compensated for entryId=$entryId",
+                compensated.cause,
             )
+        } catch (@Suppress("TooGenericExceptionCaught") error: Exception) {
+            // Detached path has no caller to throw to — log + persist a terminal failure.
+            Log.e(TAG, "Detached extraction failed for entryId=$entryId", error)
+            compensatePersistenceFailure(entryId, request.entryAttemptCount, terminalRelay, error)
         }
     }
 
@@ -90,7 +140,7 @@ class BackgroundExtractionSaveFlow(
         result: BackgroundExtractionResult.Success,
         terminalRelay: DeferredTerminalRelay,
         persona: Persona,
-    ): SaveOutcome.Completed {
+    ) {
         val observations = runObservations(entryText, result, capturedAt)
         persistTerminalState(
             entryId = entryId,
@@ -101,9 +151,9 @@ class BackgroundExtractionSaveFlow(
         ) {
             entryStore.completeEntry(entryId, result.resolved, result.templateLabel, observations)
         }
-        val calloutObservation = runPatternOrchestration(entryId, persona)
-        val finalObservations = if (calloutObservation != null) observations + calloutObservation else observations
-        return SaveOutcome.Completed(entryId, result, finalObservations)
+        // Runs after the terminal commit so a callout failure can't unwind the resolved
+        // entry. Best-effort — failures are swallowed in runPatternOrchestration.
+        runPatternOrchestration(entryId, persona)
     }
 
     private suspend fun runPatternOrchestration(entryId: Long, persona: Persona): EntryObservation? {
@@ -113,7 +163,7 @@ class BackgroundExtractionSaveFlow(
         } catch (cancellation: CancellationException) {
             throw cancellation
         } catch (@Suppress("TooGenericExceptionCaught") error: Exception) {
-            // ADR-003: pattern detection is a best-effort layer, not blocking. Swallow + log.
+            // Best-effort layer; swallow so a pattern-detection failure doesn't fail the save.
             Log.w(
                 TAG,
                 "Pattern orchestration failed for entryId=$entryId: " +
@@ -165,7 +215,7 @@ class BackgroundExtractionSaveFlow(
         entryAttemptCount: Int,
         result: BackgroundExtractionResult.Failed,
         terminalRelay: DeferredTerminalRelay,
-    ): SaveOutcome.Failed {
+    ) {
         persistTerminalState(
             entryId = entryId,
             entryAttemptCount = entryAttemptCount,
@@ -175,7 +225,6 @@ class BackgroundExtractionSaveFlow(
         ) {
             entryStore.failEntry(entryId, ExtractionStatus.FAILED, result.lastError)
         }
-        return SaveOutcome.Failed(entryId, result)
     }
 
     private suspend fun handleTimeout(
@@ -183,7 +232,7 @@ class BackgroundExtractionSaveFlow(
         entryAttemptCount: Int,
         result: BackgroundExtractionResult.TimedOut,
         terminalRelay: DeferredTerminalRelay,
-    ): SaveOutcome.TimedOut {
+    ) {
         val timeoutReason = "timeout-after-${result.timeoutMs}ms"
         persistTerminalState(
             entryId = entryId,
@@ -194,7 +243,6 @@ class BackgroundExtractionSaveFlow(
         ) {
             entryStore.failEntry(entryId, ExtractionStatus.TIMED_OUT, timeoutReason)
         }
-        return SaveOutcome.TimedOut(entryId, result)
     }
 
     private suspend fun runObservations(
@@ -274,24 +322,25 @@ class BackgroundExtractionSaveFlow(
             throw cancellation
         } catch (@Suppress("TooGenericExceptionCaught") error: Exception) {
             compensatePersistenceFailure(entryId, entryAttemptCount, terminalRelay, error)
-            throw error
+            throw PersistenceCompensatedException(error)
         }
     }
+
+    private class PersistenceCompensatedException(cause: Exception) : Exception(cause)
 
     private companion object {
         private const val TAG = "VestigeSaveFlow"
     }
 }
 
+/**
+ * Result of the two-tier save flow. [Pending] is the only post-refactor variant — the entry is
+ * committed; extraction is in flight on the detached scope; callers observe terminal status via
+ * the per-entry `ExtractionStatusListener` (typically `BackgroundExtractionStatusBus`). Tests
+ * + tooling can await the embedded [extractionJob] to drain the detached work.
+ */
 sealed interface SaveOutcome {
     val entryId: Long
 
-    data class Completed(
-        override val entryId: Long,
-        val result: BackgroundExtractionResult.Success,
-        val observations: List<EntryObservation>,
-    ) : SaveOutcome
-
-    data class Failed(override val entryId: Long, val result: BackgroundExtractionResult.Failed) : SaveOutcome
-    data class TimedOut(override val entryId: Long, val result: BackgroundExtractionResult.TimedOut) : SaveOutcome
+    data class Pending(override val entryId: Long, val extractionJob: Job) : SaveOutcome
 }

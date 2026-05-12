@@ -1,0 +1,47 @@
+05-12 12:38:21.787  2619  2808 W NativeLibraryHelper: Failed to punch uncompressed elf file :libgemma_embedding_model_jni.so inside apk : /data/app/vmdl1592309646.tmp/base.apk at offset: 62685184
+05-12 12:38:21.788  2619  2808 W NativeLibraryHelper: Failed to punch uncompressed elf file :libgecko_embedding_model_jni.so inside apk : /data/app/vmdl1592309646.tmp/base.apk at offset: 45711360
+05-12 12:38:22.077  4296  4296 I HoneySpace.DataCache: insertItem : id=52539, title=Vestige, type=APP, containerType=ITEM_GROUP, containerId=21, x=-1, y=-1, rank=28, spanX=-1, spanY=-1, scale=1.0, component=dev.anchildress1.vestige/.MainActivity, profileId=0, intent=null, restored=0, hidden=UNHIDDEN, appWidgetId=-1, options=0, refPackageName=null
+05-12 12:38:22.143  4296 16411 I HoneySpace.IconCache: add icon DB: [dev.anchildress1.vestige/.MainActivity#UserHandle{0}] - IconAndLabel(icon=android.graphics.Bitmap@dd22491, label=Vestige) | false | 640 | false |false | -15050404
+05-12 12:38:23.185  7840  7840 I AndroidJUnitRunner: newApplication dev.anchildress1.vestige.VestigeApplication
+05-12 12:38:23.240  7840  7840 D StrictMode: 	at dev.anchildress1.vestige.storage.VestigeBoxStore.open(VestigeBoxStore.kt:15)
+05-12 12:38:23.240  7840  7840 D StrictMode: 	at dev.anchildress1.vestige.VestigeApplication.onCreate(VestigeApplication.kt:18)
+05-12 12:38:23.241  7840  7840 D StrictMode: 	at dev.anchildress1.vestige.storage.VestigeBoxStore.open(VestigeBoxStore.kt:15)
+05-12 12:38:23.241  7840  7840 D StrictMode: 	at dev.anchildress1.vestige.VestigeApplication.onCreate(VestigeApplication.kt:18)
+05-12 12:38:23.241  7840  7840 D StrictMode: 	at dev.anchildress1.vestige.storage.VestigeBoxStore.open(VestigeBoxStore.kt:15)
+05-12 12:38:23.241  7840  7840 D StrictMode: 	at dev.anchildress1.vestige.VestigeApplication.onCreate(VestigeApplication.kt:18)
+05-12 12:38:23.242  7840  7840 D StrictMode: 	at dev.anchildress1.vestige.storage.VestigeBoxStore.open(VestigeBoxStore.kt:15)
+05-12 12:38:23.242  7840  7840 D StrictMode: 	at dev.anchildress1.vestige.VestigeApplication.onCreate(VestigeApplication.kt:18)
+05-12 12:38:23.243  7840  7840 D StrictMode: 	at dev.anchildress1.vestige.storage.VestigeBoxStore.open(VestigeBoxStore.kt:15)
+05-12 12:38:23.243  7840  7840 D StrictMode: 	at dev.anchildress1.vestige.VestigeApplication.onCreate(VestigeApplication.kt:18)
+05-12 12:38:23.243  7840  7840 D StrictMode: 	at dev.anchildress1.vestige.storage.VestigeBoxStore.open(VestigeBoxStore.kt:15)
+05-12 12:38:23.243  7840  7840 D StrictMode: 	at dev.anchildress1.vestige.VestigeApplication.onCreate(VestigeApplication.kt:18)
+05-12 12:38:23.244  7840  7840 D StrictMode: 	at dev.anchildress1.vestige.storage.VestigeBoxStore.open(VestigeBoxStore.kt:15)
+05-12 12:38:23.244  7840  7840 D StrictMode: 	at dev.anchildress1.vestige.VestigeApplication.onCreate(VestigeApplication.kt:18)
+05-12 12:38:23.244  7840  7840 D StrictMode: 	at dev.anchildress1.vestige.storage.VestigeBoxStore.open(VestigeBoxStore.kt:15)
+05-12 12:38:23.244  7840  7840 D StrictMode: 	at dev.anchildress1.vestige.VestigeApplication.onCreate(VestigeApplication.kt:18)
+05-12 12:38:23.245  7840  7840 D StrictMode: 	at dev.anchildress1.vestige.storage.VestigeBoxStore.open(VestigeBoxStore.kt:15)
+05-12 12:38:23.245  7840  7840 D StrictMode: 	at dev.anchildress1.vestige.VestigeApplication.onCreate(VestigeApplication.kt:18)
+05-12 12:38:23.246  7840  7840 D StrictMode: 	at dev.anchildress1.vestige.storage.VestigeBoxStore.open(VestigeBoxStore.kt:15)
+05-12 12:38:23.246  7840  7840 D StrictMode: 	at dev.anchildress1.vestige.VestigeApplication.onCreate(VestigeApplication.kt:18)
+05-12 12:38:23.259  7840  7858 I TestRunner: run started: 1 tests
+05-12 12:38:23.259  7840  7858 I TestRunner: started: allThreePersonas_produceNonBlankDivergentResponses(dev.anchildress1.vestige.PersonaToneSmokeTest)
+05-12 12:38:23.265  7840  7871 D VestigeLiteRtLm: Loading /data/local/tmp/gemma-4-E4B-it.litertlm backend=CPU audio=off vision=off maxTokens=4096 sampler=topK=1,topP=1.0,temp=0.0,seed=42
+05-12 12:38:33.839  7840  7871 D VestigeLiteRtLm: Engine initialized in 10562ms
+05-12 12:38:53.071  7840  7871 D VestigeLiteRtLm: generateText completed in 19226ms (prompt=3377c, reply=173c)
+05-12 12:39:14.132  7840  7871 D VestigeLiteRtLm: generateText completed in 21059ms (prompt=4007c, reply=120c)
+05-12 12:39:35.430  7840  7871 D VestigeLiteRtLm: generateText completed in 21297ms (prompt=3559c, reply=122c)
+05-12 12:39:35.431  7840  7858 I VestigeTone: === WITNESS ===
+05-12 12:39:35.431  7840  7858 I VestigeTone: I said I'd send the doc by two. It's 4. I renamed it twice. Still open.
+05-12 12:39:35.431  7840  7858 I VestigeTone: 
+05-12 12:39:35.431  7840  7858 I VestigeTone: You said I'd send the doc by two. What was the last action taken on the doc before it remained open?
+05-12 12:39:35.431  7840  7858 I VestigeTone: === HARDASS ===
+05-12 12:39:35.431  7840  7858 I VestigeTone: I said I'd send the doc by two. It's 4. I renamed it twice. Still open.
+05-12 12:39:35.431  7840  7858 I VestigeTone: You are still renaming the doc. Send it by when?
+05-12 12:39:35.431  7840  7858 I VestigeTone: === EDITOR ===
+05-12 12:39:35.431  7840  7858 I VestigeTone: I said I'd send the doc by two. It's 4. I renamed it twice. Still open.
+05-12 12:39:35.431  7840  7858 I VestigeTone: 
+05-12 12:39:35.431  7840  7858 I VestigeTone: 'Still open' — which specific file? Use the name.
+05-12 12:39:35.750  7840  7858 I TestRunner: finished: allThreePersonas_produceNonBlankDivergentResponses(dev.anchildress1.vestige.PersonaToneSmokeTest)
+05-12 12:39:35.754  7840  7858 I TestRunner: run finished: 1 tests, 0 failed, 0 ignored
+05-12 12:39:37.593  4296  4296 I HoneySpace.DataCache: deleteItem : id=52539, title=Vestige, type=APP, containerType=ITEM_GROUP, containerId=21, x=-1, y=-1, rank=28, spanX=-1, spanY=-1, scale=1.0, component=dev.anchildress1.vestige/.MainActivity, profileId=0, intent=null, restored=0, hidden=UNHIDDEN, appWidgetId=-1, options=0, refPackageName=null (vertical appList) package removed
+05-12 12:39:37.593  4296  7331 I HoneySpace.DataCache: delete item : (vertical appList) package removed - APP / 52539 / 21 / Vestige / dev.anchildress1.vestige/.MainActivity / -1 / 0

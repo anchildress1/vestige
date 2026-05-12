@@ -106,20 +106,21 @@ class AppContainer(
         BackgroundExtractionWorker,
         ObservationGenerator,
         (Long) -> ExtractionStatusListener,
+        CoroutineScope,
         PatternDetectionOrchestrator?,
     ) -> BackgroundExtractionSaveFlow =
-        { entryStore, worker, observationGenerator, listenerFactory, orchestrator ->
+        { entryStore, worker, observationGenerator, listenerFactory, extractionScope, orchestrator ->
             BackgroundExtractionSaveFlow(
                 entryStore = entryStore,
                 worker = worker,
                 observationGenerator = observationGenerator,
                 listenerFactory = listenerFactory,
+                scope = extractionScope,
                 patternOrchestrator = orchestrator,
             )
         },
-    // Cold-start sweep — `null` means the live `VestigeBoxStore.findNonTerminalEntryIds(boxStore)`
-    // query (production default per ADR-006 §"Action Item #4"). Tests inject a fixed seed to keep
-    // them BoxStore-free.
+    // `null` triggers the live `VestigeBoxStore.findNonTerminalEntryIds(boxStore)` cold-start
+    // sweep; tests inject a fixed seed to stay BoxStore-free.
     private val recoveredEntryIdsLoader: (() -> Collection<Long>)? = null,
     private val foregroundServiceIntentFactory: () -> Intent = {
         Intent(applicationContext, BackgroundExtractionService::class.java)
@@ -153,8 +154,6 @@ class AppContainer(
     private val embeddingArtifactsDir: File by lazy { File(applicationContext.filesDir, MODEL_ARTIFACTS_SUBDIR) }
     private val embeddingArtifactManifest: EmbeddingArtifactManifest by lazy(embeddingArtifactManifestLoader)
 
-    // Story 2.12's production DI surface. `saveAndExtract(...)` below is the app-owned entrypoint
-    // that closes the loop; capture/UI code calls AppContainer, not the save flow directly.
     private val backgroundEngineDelegate = lazy {
         backgroundEngineFactory(
             modelPathLoader(applicationContext),
@@ -215,6 +214,7 @@ class AppContainer(
             backgroundExtractionWorker,
             observationGenerator,
             ::extractionStatusListener,
+            scope,
             patternDetectionOrchestrator,
         )
     }
@@ -244,13 +244,19 @@ class AppContainer(
         reportExtractionStatus(entryId, status)
     }
 
+    /**
+     * Two-tier per ADR-002: persists the pending entry, returns [SaveOutcome.Pending] immediately,
+     * and dispatches the detached 3-lens extraction on the container scope. UI callers must not
+     * await the embedded `extractionJob` on the main thread — subscribe to
+     * `BackgroundExtractionStatusBus` for terminal status instead.
+     */
     suspend fun saveAndExtract(
         entryText: String,
         capturedAt: ZonedDateTime,
         retrievedHistory: List<HistoryChunk> = emptyList(),
         timeoutMs: Long? = null,
         persona: Persona = Persona.WITNESS,
-    ): SaveOutcome {
+    ): SaveOutcome.Pending {
         ensureBackgroundEngineInitialized()
         val outcome = backgroundExtractionSaveFlow.saveAndExtract(
             entryText = entryText,

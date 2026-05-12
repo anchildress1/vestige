@@ -1,0 +1,43 @@
+05-12 12:39:41.692  2619  2808 W NativeLibraryHelper: Failed to punch uncompressed elf file :libgemma_embedding_model_jni.so inside apk : /data/app/vmdl708285383.tmp/base.apk at offset: 62685184
+05-12 12:39:41.698  2619  2808 W NativeLibraryHelper: Failed to punch uncompressed elf file :libgecko_embedding_model_jni.so inside apk : /data/app/vmdl708285383.tmp/base.apk at offset: 45711360
+05-12 12:39:42.090  4296 30279 I HoneySpace.IconCache: add icon DB: [dev.anchildress1.vestige/.MainActivity#UserHandle{0}] - IconAndLabel(icon=android.graphics.Bitmap@3393873, label=Vestige) | false | 640 | false |false | -15050404
+05-12 12:39:42.090  4296  4296 I HoneySpace.DataCache: insertItem : id=52556, title=Vestige, type=APP, containerType=ITEM_GROUP, containerId=21, x=-1, y=-1, rank=28, spanX=-1, spanY=-1, scale=1.0, component=dev.anchildress1.vestige/.MainActivity, profileId=0, intent=null, restored=0, hidden=UNHIDDEN, appWidgetId=-1, options=0, refPackageName=null
+05-12 12:39:43.550  9446  9446 I AndroidJUnitRunner: newApplication dev.anchildress1.vestige.VestigeApplication
+05-12 12:39:43.646  9446  9446 D StrictMode: 	at dev.anchildress1.vestige.storage.VestigeBoxStore.open(VestigeBoxStore.kt:15)
+05-12 12:39:43.646  9446  9446 D StrictMode: 	at dev.anchildress1.vestige.VestigeApplication.onCreate(VestigeApplication.kt:18)
+05-12 12:39:43.648  9446  9446 D StrictMode: 	at dev.anchildress1.vestige.storage.VestigeBoxStore.open(VestigeBoxStore.kt:15)
+05-12 12:39:43.648  9446  9446 D StrictMode: 	at dev.anchildress1.vestige.VestigeApplication.onCreate(VestigeApplication.kt:18)
+05-12 12:39:43.649  9446  9446 D StrictMode: 	at dev.anchildress1.vestige.storage.VestigeBoxStore.open(VestigeBoxStore.kt:15)
+05-12 12:39:43.649  9446  9446 D StrictMode: 	at dev.anchildress1.vestige.VestigeApplication.onCreate(VestigeApplication.kt:18)
+05-12 12:39:43.650  9446  9446 D StrictMode: 	at dev.anchildress1.vestige.storage.VestigeBoxStore.open(VestigeBoxStore.kt:15)
+05-12 12:39:43.650  9446  9446 D StrictMode: 	at dev.anchildress1.vestige.VestigeApplication.onCreate(VestigeApplication.kt:18)
+05-12 12:39:43.651  9446  9446 D StrictMode: 	at dev.anchildress1.vestige.storage.VestigeBoxStore.open(VestigeBoxStore.kt:15)
+05-12 12:39:43.651  9446  9446 D StrictMode: 	at dev.anchildress1.vestige.VestigeApplication.onCreate(VestigeApplication.kt:18)
+05-12 12:39:43.652  9446  9446 D StrictMode: 	at dev.anchildress1.vestige.storage.VestigeBoxStore.open(VestigeBoxStore.kt:15)
+05-12 12:39:43.652  9446  9446 D StrictMode: 	at dev.anchildress1.vestige.VestigeApplication.onCreate(VestigeApplication.kt:18)
+05-12 12:39:43.652  9446  9446 D StrictMode: 	at dev.anchildress1.vestige.storage.VestigeBoxStore.open(VestigeBoxStore.kt:15)
+05-12 12:39:43.652  9446  9446 D StrictMode: 	at dev.anchildress1.vestige.VestigeApplication.onCreate(VestigeApplication.kt:18)
+05-12 12:39:43.653  9446  9446 D StrictMode: 	at dev.anchildress1.vestige.storage.VestigeBoxStore.open(VestigeBoxStore.kt:15)
+05-12 12:39:43.653  9446  9446 D StrictMode: 	at dev.anchildress1.vestige.VestigeApplication.onCreate(VestigeApplication.kt:18)
+05-12 12:39:43.654  9446  9446 D StrictMode: 	at dev.anchildress1.vestige.storage.VestigeBoxStore.open(VestigeBoxStore.kt:15)
+05-12 12:39:43.654  9446  9446 D StrictMode: 	at dev.anchildress1.vestige.VestigeApplication.onCreate(VestigeApplication.kt:18)
+05-12 12:39:43.655  9446  9446 D StrictMode: 	at dev.anchildress1.vestige.storage.VestigeBoxStore.open(VestigeBoxStore.kt:15)
+05-12 12:39:43.655  9446  9446 D StrictMode: 	at dev.anchildress1.vestige.VestigeApplication.onCreate(VestigeApplication.kt:18)
+05-12 12:39:43.684  9446  9463 I TestRunner: run started: 1 tests
+05-12 12:39:43.685  9446  9463 I TestRunner: started: threePersonas_eachInOwnSession_produceDivergentFollowUps(dev.anchildress1.vestige.PerCapturePersonaSmokeTest)
+05-12 12:39:43.736  9446  9466 D VestigeLiteRtLm: Loading /data/local/tmp/gemma-4-E4B-it.litertlm backend=CPU audio=CPU vision=off maxTokens=4096 sampler=topK=1,topP=1.0,temp=0.0,seed=42
+05-12 12:39:59.851  9446  9466 D VestigeLiteRtLm: Engine initialized in 16084ms
+05-12 12:40:42.085  9446  9466 D VestigeLiteRtLm: sendMessageContents completed in 42126ms (parts=2, reply=266c)
+05-12 12:40:42.086  9446  9466 D VestigeForegroundInference: runForegroundCall persona=WITNESS elapsed=42205ms raw=266c
+05-12 12:40:42.097  9446  9463 I VestigePerCapturePersona: === WITNESS follow-up (42205ms) ===
+05-12 12:40:42.097  9446  9463 I VestigePerCapturePersona: You said completely flattened by 11 in the launch doc. What was on the launch doc you stared at?
+05-12 12:41:24.247  9446  9466 D VestigeLiteRtLm: sendMessageContents completed in 42143ms (parts=2, reply=269c)
+05-12 12:41:24.248  9446  9466 D VestigeForegroundInference: runForegroundCall persona=HARDASS elapsed=42149ms raw=269c
+05-12 12:41:24.248  9446  9463 I VestigePerCapturePersona: === HARDASS follow-up (42149ms) ===
+05-12 12:41:24.248  9446  9463 I VestigePerCapturePersona: You are still staring at the launch doc. What's the next observable action on that doc by when?
+05-12 12:42:07.450  9446  9466 D VestigeLiteRtLm: sendMessageContents completed in 43194ms (parts=2, reply=278c)
+05-12 12:42:07.456  9446  9466 D VestigeForegroundInference: runForegroundCall persona=EDITOR elapsed=43206ms raw=278c
+05-12 12:42:07.457  9446  9463 I VestigePerCapturePersona: === EDITOR follow-up (43206ms) ===
+05-12 12:42:07.458  9446  9463 I VestigePerCapturePersona: You said 'fine' and 'flattened' in relation to the same period. Which one describes the state at eleven?
+05-12 12:42:08.021  9446  9463 I TestRunner: finished: threePersonas_eachInOwnSession_produceDivergentFollowUps(dev.anchildress1.vestige.PerCapturePersonaSmokeTest)
+05-12 12:42:08.028  9446  9463 I TestRunner: run finished: 1 tests, 0 failed, 0 ignored

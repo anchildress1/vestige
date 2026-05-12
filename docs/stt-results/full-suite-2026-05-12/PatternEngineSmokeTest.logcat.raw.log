@@ -1,0 +1,101 @@
+05-12 12:44:03.364  4296  4296 I HoneySpace.DataCache: deleteItem : id=52573, title=Vestige, type=APP, containerType=ITEM_GROUP, containerId=21, x=-1, y=-1, rank=28, spanX=-1, spanY=-1, scale=1.0, component=dev.anchildress1.vestige/.MainActivity, profileId=0, intent=null, restored=0, hidden=UNHIDDEN, appWidgetId=-1, options=0, refPackageName=null (vertical appList) package removed
+05-12 12:44:03.365  4296  7331 I HoneySpace.DataCache: delete item : (vertical appList) package removed - APP / 52573 / 21 / Vestige / dev.anchildress1.vestige/.MainActivity / -1 / 0
+05-12 12:44:07.336  2619  2808 W NativeLibraryHelper: Failed to punch uncompressed elf file :libgemma_embedding_model_jni.so inside apk : /data/app/vmdl644275741.tmp/base.apk at offset: 62685184
+05-12 12:44:07.340  2619  2808 W NativeLibraryHelper: Failed to punch uncompressed elf file :libgecko_embedding_model_jni.so inside apk : /data/app/vmdl644275741.tmp/base.apk at offset: 45711360
+05-12 12:44:07.715  4296 13002 I HoneySpace.IconCache: add icon DB: [dev.anchildress1.vestige/.MainActivity#UserHandle{0}] - IconAndLabel(icon=android.graphics.Bitmap@49a0ce5, label=Vestige) | false | 640 | false |false | -15050404
+05-12 12:44:07.715  4296  4296 I HoneySpace.DataCache: insertItem : id=52590, title=Vestige, type=APP, containerType=ITEM_GROUP, containerId=21, x=-1, y=-1, rank=28, spanX=-1, spanY=-1, scale=1.0, component=dev.anchildress1.vestige/.MainActivity, profileId=0, intent=null, restored=0, hidden=UNHIDDEN, appWidgetId=-1, options=0, refPackageName=null
+05-12 12:44:09.354 13308 13308 I AndroidJUnitRunner: newApplication dev.anchildress1.vestige.VestigeApplication
+05-12 12:44:09.450 13308 13308 D StrictMode: 	at dev.anchildress1.vestige.storage.VestigeBoxStore.open(VestigeBoxStore.kt:15)
+05-12 12:44:09.450 13308 13308 D StrictMode: 	at dev.anchildress1.vestige.VestigeApplication.onCreate(VestigeApplication.kt:18)
+05-12 12:44:09.451 13308 13308 D StrictMode: 	at dev.anchildress1.vestige.storage.VestigeBoxStore.open(VestigeBoxStore.kt:15)
+05-12 12:44:09.451 13308 13308 D StrictMode: 	at dev.anchildress1.vestige.VestigeApplication.onCreate(VestigeApplication.kt:18)
+05-12 12:44:09.452 13308 13308 D StrictMode: 	at dev.anchildress1.vestige.storage.VestigeBoxStore.open(VestigeBoxStore.kt:15)
+05-12 12:44:09.452 13308 13308 D StrictMode: 	at dev.anchildress1.vestige.VestigeApplication.onCreate(VestigeApplication.kt:18)
+05-12 12:44:09.453 13308 13308 D StrictMode: 	at dev.anchildress1.vestige.storage.VestigeBoxStore.open(VestigeBoxStore.kt:15)
+05-12 12:44:09.453 13308 13308 D StrictMode: 	at dev.anchildress1.vestige.VestigeApplication.onCreate(VestigeApplication.kt:18)
+05-12 12:44:09.454 13308 13308 D StrictMode: 	at dev.anchildress1.vestige.storage.VestigeBoxStore.open(VestigeBoxStore.kt:15)
+05-12 12:44:09.454 13308 13308 D StrictMode: 	at dev.anchildress1.vestige.VestigeApplication.onCreate(VestigeApplication.kt:18)
+05-12 12:44:09.455 13308 13308 D StrictMode: 	at dev.anchildress1.vestige.storage.VestigeBoxStore.open(VestigeBoxStore.kt:15)
+05-12 12:44:09.455 13308 13308 D StrictMode: 	at dev.anchildress1.vestige.VestigeApplication.onCreate(VestigeApplication.kt:18)
+05-12 12:44:09.456 13308 13308 D StrictMode: 	at dev.anchildress1.vestige.storage.VestigeBoxStore.open(VestigeBoxStore.kt:15)
+05-12 12:44:09.456 13308 13308 D StrictMode: 	at dev.anchildress1.vestige.VestigeApplication.onCreate(VestigeApplication.kt:18)
+05-12 12:44:09.457 13308 13308 D StrictMode: 	at dev.anchildress1.vestige.storage.VestigeBoxStore.open(VestigeBoxStore.kt:15)
+05-12 12:44:09.457 13308 13308 D StrictMode: 	at dev.anchildress1.vestige.VestigeApplication.onCreate(VestigeApplication.kt:18)
+05-12 12:44:09.458 13308 13308 D StrictMode: 	at dev.anchildress1.vestige.storage.VestigeBoxStore.open(VestigeBoxStore.kt:15)
+05-12 12:44:09.458 13308 13308 D StrictMode: 	at dev.anchildress1.vestige.VestigeApplication.onCreate(VestigeApplication.kt:18)
+05-12 12:44:09.459 13308 13308 D StrictMode: 	at dev.anchildress1.vestige.storage.VestigeBoxStore.open(VestigeBoxStore.kt:15)
+05-12 12:44:09.459 13308 13308 D StrictMode: 	at dev.anchildress1.vestige.VestigeApplication.onCreate(VestigeApplication.kt:18)
+05-12 12:44:09.486 13308 13322 I TestRunner: run started: 1 tests
+05-12 12:44:09.487 13308 13322 I TestRunner: started: atLeastOnePatternSurfacesAfterCorpusPersist(dev.anchildress1.vestige.PatternEngineSmokeTest)
+05-12 12:44:09.534 13308 13322 I VestigeP3Smoke: Phase 3 smoke using backend=Cpu, 6 entries
+05-12 12:44:09.538 13308 13324 D VestigeLiteRtLm: Loading /data/local/tmp/gemma-4-E4B-it.litertlm backend=CPU audio=off vision=off maxTokens=4096 sampler=topK=1,topP=1.0,temp=0.0,seed=42
+05-12 12:44:25.861 13308 13324 D VestigeLiteRtLm: Engine initialized in 16304ms
+05-12 12:44:25.896 13308 13324 D VestigePromptComposer: compose lens=LITERAL chars=7674 tokens~=1919 history=0
+05-12 12:45:10.566 13308 13324 D VestigeLiteRtLm: generateText completed in 44670ms (prompt=7674c, reply=223c)
+05-12 12:45:10.567 13308 13324 D VestigeBackgroundExtraction: lens=LITERAL done parsed=true attempts=1 elapsed=44676ms
+05-12 12:45:10.573 13308 13324 D VestigePromptComposer: compose lens=INFERENTIAL chars=8219 tokens~=2055 history=0
+05-12 12:45:53.076 13308 13324 D VestigeLiteRtLm: generateText completed in 42502ms (prompt=8219c, reply=206c)
+05-12 12:45:53.077 13308 13324 D VestigeBackgroundExtraction: lens=INFERENTIAL done parsed=true attempts=1 elapsed=42509ms
+05-12 12:45:53.098 13308 13324 D VestigePromptComposer: compose lens=SKEPTICAL chars=8165 tokens~=2042 history=0
+05-12 12:46:46.882 13308 13324 D VestigeLiteRtLm: generateText completed in 53783ms (prompt=8165c, reply=401c)
+05-12 12:46:46.890 13308 13324 D VestigeBackgroundExtraction: lens=SKEPTICAL done parsed=true attempts=1 elapsed=53813ms
+05-12 12:46:46.898 13308 13324 D VestigeBackgroundExtraction: extract completed: lenses=3/3 model_calls=3 elapsed=141007ms
+05-12 12:46:46.920 13308 13322 I VestigeP3Smoke: entry=A1 template=audit elapsed=141007ms
+05-12 12:46:46.941 13308 13324 D VestigePromptComposer: compose lens=LITERAL chars=7672 tokens~=1918 history=0
+05-12 12:47:34.237 13308 13324 D VestigeLiteRtLm: generateText completed in 47295ms (prompt=7672c, reply=226c)
+05-12 12:47:34.239 13308 13324 D VestigeBackgroundExtraction: lens=LITERAL done parsed=true attempts=1 elapsed=47304ms
+05-12 12:47:34.244 13308 13324 D VestigePromptComposer: compose lens=INFERENTIAL chars=8217 tokens~=2055 history=0
+05-12 12:48:18.521 13308 13324 D VestigeLiteRtLm: generateText completed in 44276ms (prompt=8217c, reply=207c)
+05-12 12:48:18.522 13308 13324 D VestigeBackgroundExtraction: lens=INFERENTIAL done parsed=true attempts=1 elapsed=44282ms
+05-12 12:48:18.524 13308 13324 D VestigePromptComposer: compose lens=SKEPTICAL chars=8163 tokens~=2041 history=0
+05-12 12:49:06.437 13308 13324 D VestigeLiteRtLm: generateText completed in 47912ms (prompt=8163c, reply=332c)
+05-12 12:49:06.438 13308 13324 D VestigeBackgroundExtraction: lens=SKEPTICAL done parsed=true attempts=1 elapsed=47915ms
+05-12 12:49:06.438 13308 13324 D VestigeBackgroundExtraction: extract completed: lenses=3/3 model_calls=3 elapsed=139503ms
+05-12 12:49:06.455 13308 13322 I VestigeP3Smoke: entry=A2 template=audit elapsed=139503ms
+05-12 12:49:06.477 13308 13324 D VestigePromptComposer: compose lens=LITERAL chars=7658 tokens~=1915 history=0
+05-12 12:49:54.986 13308 13324 D VestigeLiteRtLm: generateText completed in 48508ms (prompt=7658c, reply=250c)
+05-12 12:49:54.991 13308 13324 D VestigeBackgroundExtraction: lens=LITERAL done parsed=true attempts=1 elapsed=48519ms
+05-12 12:49:55.003 13308 13324 D VestigePromptComposer: compose lens=INFERENTIAL chars=8203 tokens~=2051 history=0
+05-12 12:50:41.656 13308 13324 D VestigeLiteRtLm: generateText completed in 46651ms (prompt=8203c, reply=264c)
+05-12 12:50:41.663 13308 13324 D VestigeBackgroundExtraction: lens=INFERENTIAL done parsed=true attempts=1 elapsed=46670ms
+05-12 12:50:41.673 13308 13324 D VestigePromptComposer: compose lens=SKEPTICAL chars=8149 tokens~=2038 history=0
+05-12 12:51:29.475 13308 13324 D VestigeLiteRtLm: generateText completed in 47801ms (prompt=8149c, reply=264c)
+05-12 12:51:29.478 13308 13324 D VestigeBackgroundExtraction: lens=SKEPTICAL done parsed=true attempts=1 elapsed=47815ms
+05-12 12:51:29.482 13308 13324 D VestigeBackgroundExtraction: extract completed: lenses=3/3 model_calls=3 elapsed=143009ms
+05-12 12:51:29.491 13308 13322 I VestigeP3Smoke: entry=A3 template=audit elapsed=143009ms
+05-12 12:51:29.501 13308 13324 D VestigePromptComposer: compose lens=LITERAL chars=7683 tokens~=1921 history=0
+05-12 12:52:18.434 13308 13324 D VestigeLiteRtLm: generateText completed in 48931ms (prompt=7683c, reply=228c)
+05-12 12:52:18.435 13308 13324 D VestigeBackgroundExtraction: lens=LITERAL done parsed=true attempts=1 elapsed=48937ms
+05-12 12:52:18.437 13308 13324 D VestigePromptComposer: compose lens=INFERENTIAL chars=8228 tokens~=2057 history=0
+05-12 12:53:04.722 13308 13324 D VestigeLiteRtLm: generateText completed in 46284ms (prompt=8228c, reply=223c)
+05-12 12:53:04.723 13308 13324 D VestigeBackgroundExtraction: lens=INFERENTIAL done parsed=true attempts=1 elapsed=46287ms
+05-12 12:53:04.725 13308 13324 D VestigePromptComposer: compose lens=SKEPTICAL chars=8174 tokens~=2044 history=0
+05-12 12:53:53.502 13308 13324 D VestigeLiteRtLm: generateText completed in 48777ms (prompt=8174c, reply=224c)
+05-12 12:53:53.503 13308 13324 D VestigeBackgroundExtraction: lens=SKEPTICAL done parsed=true attempts=1 elapsed=48780ms
+05-12 12:53:53.504 13308 13324 D VestigeBackgroundExtraction: extract completed: lenses=3/3 model_calls=3 elapsed=144007ms
+05-12 12:53:53.518 13308 13322 I VestigeP3Smoke: entry=D1 template=goblin-hours elapsed=144007ms
+05-12 12:53:53.532 13308 13324 D VestigePromptComposer: compose lens=LITERAL chars=7645 tokens~=1912 history=0
+05-12 12:54:41.289 13308 13324 D VestigeLiteRtLm: generateText completed in 47755ms (prompt=7645c, reply=217c)
+05-12 12:54:41.294 13308 13324 D VestigeBackgroundExtraction: lens=LITERAL done parsed=true attempts=1 elapsed=47768ms
+05-12 12:54:41.306 13308 13324 D VestigePromptComposer: compose lens=INFERENTIAL chars=8190 tokens~=2048 history=0
+05-12 12:55:26.940 13308 13324 D VestigeLiteRtLm: generateText completed in 45633ms (prompt=8190c, reply=213c)
+05-12 12:55:26.941 13308 13324 D VestigeBackgroundExtraction: lens=INFERENTIAL done parsed=true attempts=1 elapsed=45646ms
+05-12 12:55:26.943 13308 13324 D VestigePromptComposer: compose lens=SKEPTICAL chars=8136 tokens~=2034 history=0
+05-12 12:56:12.869 13308 13324 D VestigeLiteRtLm: generateText completed in 45926ms (prompt=8136c, reply=216c)
+05-12 12:56:12.871 13308 13324 D VestigeBackgroundExtraction: lens=SKEPTICAL done parsed=true attempts=1 elapsed=45930ms
+05-12 12:56:12.872 13308 13324 D VestigeBackgroundExtraction: extract completed: lenses=3/3 model_calls=3 elapsed=139347ms
+05-12 12:56:12.881 13308 13322 I VestigeP3Smoke: entry=D2 template=decision-spiral elapsed=139347ms
+05-12 12:56:12.892 13308 13324 D VestigePromptComposer: compose lens=LITERAL chars=7661 tokens~=1916 history=0
+05-12 12:57:01.003 13308 13324 D VestigeLiteRtLm: generateText completed in 48109ms (prompt=7661c, reply=225c)
+05-12 12:57:01.005 13308 13324 D VestigeBackgroundExtraction: lens=LITERAL done parsed=true attempts=1 elapsed=48119ms
+05-12 12:57:01.006 13308 13324 D VestigePromptComposer: compose lens=INFERENTIAL chars=8206 tokens~=2052 history=0
+05-12 12:57:46.634 13308 13324 D VestigeLiteRtLm: generateText completed in 45627ms (prompt=8206c, reply=214c)
+05-12 12:57:46.635 13308 13324 D VestigeBackgroundExtraction: lens=INFERENTIAL done parsed=true attempts=1 elapsed=45630ms
+05-12 12:57:46.637 13308 13324 D VestigePromptComposer: compose lens=SKEPTICAL chars=8152 tokens~=2038 history=0
+05-12 12:58:33.180 13308 13324 D VestigeLiteRtLm: generateText completed in 46540ms (prompt=8152c, reply=224c)
+05-12 12:58:33.180 13308 13324 D VestigeBackgroundExtraction: lens=SKEPTICAL done parsed=true attempts=1 elapsed=46545ms
+05-12 12:58:33.181 13308 13324 D VestigeBackgroundExtraction: extract completed: lenses=3/3 model_calls=3 elapsed=140296ms
+05-12 12:58:33.194 13308 13322 I VestigeP3Smoke: entry=D3 template=audit elapsed=140296ms
+05-12 12:58:33.217 13308 13322 I VestigeP3Smoke: Detected 1 pattern(s) over 6 entries: template_recurrence(4)
+05-12 12:58:33.595 13308 13322 I TestRunner: finished: atLeastOnePatternSurfacesAfterCorpusPersist(dev.anchildress1.vestige.PatternEngineSmokeTest)
+05-12 12:58:33.599 13308 13322 I TestRunner: run finished: 1 tests, 0 failed, 0 ignored

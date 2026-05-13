@@ -129,6 +129,20 @@ class OnboardingHostTest {
     }
 
     @Test
+    fun `system back from notification permission returns to mic permission`() {
+        startHost()
+        tapPrimary("Continue") // -> LocalExplainer
+        tapPrimary("Got it") // -> MicPermission
+        tapPrimary("Skip — I'll type instead") // -> NotificationPermission
+        composeRule.onNodeWithText("One status notification.").assertIsDisplayed()
+
+        Espresso.pressBack()
+        composeRule.waitForIdle()
+
+        composeRule.onNodeWithText("Mic permission.").assertIsDisplayed()
+    }
+
+    @Test
     fun `current onboarding step survives host recreation`() {
         startHost()
         tapPrimary("Continue") // -> LocalExplainer
@@ -176,6 +190,22 @@ class OnboardingHostTest {
 
         composeRule.onNodeWithText("Downloading model.").assertIsDisplayed()
         composeRule.onNodeWithText("Continue").assertIsNotEnabled()
+        assertFalse(completed)
+        assertFalse(prefs.isComplete)
+    }
+
+    @Test
+    fun `ready screen re-checks model availability before marking onboarding complete`() {
+        prefs.setCurrentStep(OnboardingStep.Ready)
+        var completed = false
+
+        startHost(
+            onComplete = { completed = true },
+            modelAvailability = ModelAvailability { ModelArtifactState.Absent },
+        )
+
+        tapPrimary("Open Vestige")
+
         assertFalse(completed)
         assertFalse(prefs.isComplete)
     }

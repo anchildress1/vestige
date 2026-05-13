@@ -7,8 +7,10 @@ import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertIsNotSelected
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import dev.anchildress1.vestige.model.ModelArtifactState
 import dev.anchildress1.vestige.model.Persona
@@ -63,6 +65,23 @@ class OnboardingScreensTest {
         }
         composeRule.onNodeWithText("Editor").performClick()
         assertEquals(Persona.EDITOR, captured)
+    }
+
+    @Test
+    fun `persona pick Continue fires when tapped`() {
+        var continued = false
+        composeRule.activity.setContent {
+            VestigeTheme {
+                PersonaPickScreen(
+                    selected = Persona.WITNESS,
+                    onSelect = {},
+                    onContinue = { continued = true },
+                )
+            }
+        }
+
+        composeRule.onNodeWithText("Continue").performScrollTo().performClick()
+        assertTrue(continued)
     }
 
     @Test
@@ -222,6 +241,21 @@ class OnboardingScreensTest {
     }
 
     @Test
+    fun `model download placeholder uses generic downloading pill when Partial total is unknown`() {
+        composeRule.activity.setContent {
+            VestigeTheme {
+                ModelDownloadPlaceholderScreen(
+                    modelState = ModelArtifactState.Partial(currentBytes = 10L, expectedBytes = 0L),
+                    onContinue = {},
+                )
+            }
+        }
+
+        composeRule.onNodeWithText("DOWNLOADING").assertIsDisplayed()
+        composeRule.onNodeWithText("DOWNLOADING 1%").assertDoesNotExist()
+    }
+
+    @Test
     fun `model download placeholder swaps to ready pill once the artifact lands`() {
         composeRule.activity.setContent {
             VestigeTheme {
@@ -245,6 +279,37 @@ class OnboardingScreensTest {
         }
 
         composeRule.onNodeWithText("DOWNLOADING 47%").assertIsDisplayed()
+    }
+
+    @Test
+    fun `model download placeholder hides progress semantics and loading note once ready`() {
+        composeRule.activity.setContent {
+            VestigeTheme {
+                ModelDownloadPlaceholderScreen(
+                    modelState = ModelArtifactState.Complete,
+                    onContinue = {},
+                )
+            }
+        }
+
+        composeRule.onNodeWithText(
+            "Model file is still landing. Keep Vestige open — this is the one network event in the app's life.",
+        ).assertDoesNotExist()
+        composeRule.onNodeWithContentDescription("Download progress").assertDoesNotExist()
+    }
+
+    @Test
+    fun `model download placeholder exposes progress semantics while work is still in flight`() {
+        composeRule.activity.setContent {
+            VestigeTheme {
+                ModelDownloadPlaceholderScreen(
+                    modelState = ModelArtifactState.Partial(currentBytes = 470L, expectedBytes = 1_000L),
+                    onContinue = {},
+                )
+            }
+        }
+
+        composeRule.onNodeWithContentDescription("Download progress").assertIsDisplayed()
     }
 
     @Test
@@ -315,5 +380,96 @@ class OnboardingScreensTest {
         composeRule.onNodeWithText("I'll come back").performClick()
         assertTrue(openedSettings)
         assertTrue(cameBackLater)
+    }
+
+    @Test
+    fun `onboarding scaffold renders optional subhead and secondary action`() {
+        var primaryTapped = false
+        var secondaryTapped = false
+        composeRule.activity.setContent {
+            VestigeTheme {
+                OnboardingScaffold(
+                    header = "Header",
+                    subhead = "Subhead",
+                    primaryActionLabel = "Primary",
+                    onPrimary = { primaryTapped = true },
+                    secondaryActionLabel = "Secondary",
+                    onSecondary = { secondaryTapped = true },
+                )
+            }
+        }
+
+        composeRule.onNodeWithText("Subhead").assertIsDisplayed()
+        composeRule.onNodeWithText("Primary").performClick()
+        composeRule.onNodeWithText("Secondary").performClick()
+        assertTrue(primaryTapped)
+        assertTrue(secondaryTapped)
+    }
+
+    @Test
+    fun `onboarding scaffold omits optional chrome when not provided`() {
+        var primaryTapped = false
+        composeRule.activity.setContent {
+            VestigeTheme {
+                OnboardingScaffold(
+                    header = "Header",
+                    primaryActionLabel = "Primary",
+                    onPrimary = { primaryTapped = true },
+                )
+            }
+        }
+
+        composeRule.onNodeWithText("Subhead").assertDoesNotExist()
+        composeRule.onNodeWithText("Secondary").assertDoesNotExist()
+        composeRule.onNodeWithText("Primary").performClick()
+        assertTrue(primaryTapped)
+    }
+
+    @Test
+    fun `onboarding scaffold keeps primary disabled and suppresses orphan secondary label`() {
+        composeRule.activity.setContent {
+            VestigeTheme {
+                OnboardingScaffold(
+                    header = "Header",
+                    primaryActionLabel = "Primary",
+                    onPrimary = {},
+                    primaryEnabled = false,
+                    secondaryActionLabel = "Secondary",
+                    onSecondary = null,
+                    content = { BodyParagraph(text = "Body copy") },
+                )
+            }
+        }
+
+        composeRule.onNodeWithText("Body copy").assertIsDisplayed()
+        composeRule.onNodeWithText("Primary").assertIsNotEnabled()
+        composeRule.onNodeWithText("Secondary").assertDoesNotExist()
+    }
+
+    @Test
+    fun `onboarding scaffold suppresses orphan secondary callback when label is missing`() {
+        composeRule.activity.setContent {
+            VestigeTheme {
+                OnboardingScaffold(
+                    header = "Header",
+                    primaryActionLabel = "Primary",
+                    onPrimary = {},
+                    onSecondary = {},
+                )
+            }
+        }
+
+        composeRule.onNodeWithText("Secondary").assertDoesNotExist()
+    }
+
+    @Test
+    fun `onboarding footer link renders dim helper copy`() {
+        composeRule.activity.setContent {
+            VestigeTheme {
+                OnboardingFooterLink(text = "Footer helper")
+            }
+        }
+
+        composeRule.onNodeWithText("Footer helper").assertIsDisplayed()
     }
 }

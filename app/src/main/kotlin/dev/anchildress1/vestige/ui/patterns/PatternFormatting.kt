@@ -58,7 +58,7 @@ fun terminalLabelFor(
 }
 
 /** Format-string id + date payload for the terminal-state subline. */
-data class TerminalLabel(@param:StringRes val prefixRes: Int, val dateLabel: String)
+data class TerminalLabel(@StringRes val prefixRes: Int, val dateLabel: String)
 
 /** ADR-003 terminals: DISMISSED + RESOLVED. SNOOZED is recoverable; BELOW_THRESHOLD is internal. */
 fun isTerminalState(state: PatternState): Boolean = state == PatternState.DISMISSED || state == PatternState.RESOLVED

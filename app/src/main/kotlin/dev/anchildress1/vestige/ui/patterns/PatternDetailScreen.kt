@@ -305,10 +305,13 @@ private fun ActionRow(availableActions: Set<PatternAction>, actions: PatternActi
 
 @Composable
 private fun ActionButtonLabel(text: String) {
+    // Single-line, clip on overflow rather than paint past the button bounds — large font scales
+    // or longer locales would otherwise overlap the next button.
     Text(
         text = text,
         style = MaterialTheme.typography.labelLarge,
         maxLines = 1,
-        overflow = TextOverflow.Visible,
+        softWrap = false,
+        overflow = TextOverflow.Ellipsis,
     )
 }

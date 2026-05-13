@@ -1,7 +1,6 @@
 package dev.anchildress1.vestige.ui.atmosphere
 
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Brush
@@ -25,10 +24,16 @@ internal const val NOISE_DEFAULT_SEED: Int = 0x1E57
 private const val ALPHA_CHANNEL_RANGE: Int = 256
 private const val ALPHA_CHANNEL_SHIFT: Int = 24
 
-/** Overlay noise grain per poc/design-review.md §2.4. Opacity clamped to 0.05–0.18. */
-fun Modifier.noiseGrain(opacity: Float = 0.10f, seed: Int = NOISE_DEFAULT_SEED): Modifier = drawWithCache {
+/**
+ * Overlay noise grain per poc/design-review.md §2.4. Opacity clamped to 0.05–0.18.
+ *
+ * Seed is intentionally not exposed: the shared brush cache (private) would otherwise grow
+ * unbounded across recompositions if a caller varied seeds per frame. Tests reach the tunable
+ * seed via the `internal` [noiseAlphaPixels] / [buildNoiseTile] helpers in the same package.
+ */
+fun Modifier.noiseGrain(opacity: Float = 0.10f): Modifier = drawWithCache {
     val clamped = clampGrainOpacity(opacity)
-    val brush = sharedNoiseBrush(seed)
+    val brush = sharedNoiseBrush(NOISE_DEFAULT_SEED)
     onDrawBehind { drawNoiseOverlay(brush, clamped) }
 }
 

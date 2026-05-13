@@ -81,7 +81,7 @@ class VestigePrimitivesTest {
     }
 
     @Test
-    fun `accent modifiers compose onto a sized box without crashing`() {
+    fun `glowLeftRule draws against the receiver`() {
         composeRule.setContent {
             VestigeSurface(
                 modifier = Modifier.size(120.dp),
@@ -103,8 +103,10 @@ class VestigePrimitivesTest {
         assertEquals(8.dp, PulseDotDiameter)
     }
 
+    // vaporHaloOnRecording — pos / neg / err / edge
+
     @Test
-    fun `vapor halo idles at zero level`() {
+    fun `vapor halo idles at zero level (neg branch — skips draw)`() {
         composeRule.setContent {
             VestigeSurface(
                 modifier = Modifier.size(120.dp),
@@ -117,20 +119,33 @@ class VestigePrimitivesTest {
     }
 
     @Test
-    fun `vapor halo composes at active level`() {
+    fun `vapor halo paints at mid level (pos branch — exercises gradient math)`() {
         composeRule.setContent {
             VestigeSurface(
                 modifier = Modifier.size(120.dp),
-                accentModifier = Modifier.vaporHaloOnRecording(level = 0.8f),
+                accentModifier = Modifier.vaporHaloOnRecording(level = 0.5f),
             ) {
-                Text(text = "halo-active")
+                Text(text = "halo-mid")
             }
         }
-        composeRule.onNodeWithText("halo-active").assertIsDisplayed()
+        composeRule.onNodeWithText("halo-mid").assertIsDisplayed()
     }
 
     @Test
-    fun `vapor halo treats negative level as idle`() {
+    fun `vapor halo paints at full amp (edge upper bound)`() {
+        composeRule.setContent {
+            VestigeSurface(
+                modifier = Modifier.size(120.dp),
+                accentModifier = Modifier.vaporHaloOnRecording(level = 1f),
+            ) {
+                Text(text = "halo-full")
+            }
+        }
+        composeRule.onNodeWithText("halo-full").assertIsDisplayed()
+    }
+
+    @Test
+    fun `vapor halo clamps negative level to idle (err branch)`() {
         composeRule.setContent {
             VestigeSurface(
                 modifier = Modifier.size(120.dp),
@@ -143,7 +158,7 @@ class VestigePrimitivesTest {
     }
 
     @Test
-    fun `vapor halo treats NaN level as idle`() {
+    fun `vapor halo treats NaN as idle (err branch)`() {
         composeRule.setContent {
             VestigeSurface(
                 modifier = Modifier.size(120.dp),
@@ -156,7 +171,7 @@ class VestigePrimitivesTest {
     }
 
     @Test
-    fun `vapor halo clamps above 1`() {
+    fun `vapor halo clamps above 1 (edge upper bound)`() {
         composeRule.setContent {
             VestigeSurface(
                 modifier = Modifier.size(120.dp),
@@ -169,17 +184,15 @@ class VestigePrimitivesTest {
     }
 
     @Test
-    fun `pulse dot renders without crashing`() {
+    fun `pulse dot draws halo plus inner and rim circles`() {
         composeRule.setContent {
             VestigeSurface(modifier = Modifier.pulseDotForReady()) {}
         }
-        // Modifier composes through the drawBehind path; no text to assert. If the dot's draw
-        // stack throws, this test fails by exception — the assertion is "did not crash."
         composeRule.onRoot().assertIsDisplayed()
     }
 
     @Test
-    fun `error fill renders`() {
+    fun `error fill paints destructive rounded rect`() {
         composeRule.setContent {
             VestigeListCard(
                 modifier = Modifier.size(120.dp),

@@ -1,4 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="ic_launcher_background">#0F0F11</color>
+    <!-- Mirrors `dev.anchildress1.vestige.ui.theme.Bg` so the launcher background + window
+         chrome track the canonical V palette. Update both whenever §2.1 changes. -->
+    <color name="vestige_bg">#0E1124</color>
+    <color name="ic_launcher_background">#0E1124</color>
 </resources>

@@ -11,6 +11,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -26,6 +27,10 @@ import dev.anchildress1.vestige.ui.theme.Vapor
  */
 fun Modifier.glowLeftRule(width: Dp = GlowRuleWidth, color: Color = Glow): Modifier = drawWithContent {
     drawContent()
+    drawGlowLeftRule(width, color)
+}
+
+internal fun DrawScope.drawGlowLeftRule(width: Dp, color: Color) {
     drawRect(
         color = color,
         topLeft = Offset.Zero,
@@ -44,19 +49,22 @@ internal val GlowRuleWidth: Dp = 3.dp
  * + poc/design-review.md §3.3.
  */
 fun Modifier.vaporHaloOnRecording(level: Float, color: Color = Vapor): Modifier = drawWithContent {
-    val amp = if (level.isNaN()) 0f else level.coerceIn(0f, 1f)
-    if (amp > 0f) {
-        val maxR = maxOf(size.width, size.height) * VAPOR_HALO_BASE_RADIUS
-        val r = maxR * (VAPOR_HALO_MIN_SCALE + amp * VAPOR_HALO_AMP_SCALE)
-        drawRect(
-            brush = Brush.radialGradient(
-                colors = listOf(color.copy(alpha = VAPOR_HALO_ALPHA * amp), Color.Transparent),
-                center = Offset(size.width / 2f, size.height / 2f),
-                radius = r,
-            ),
-        )
-    }
+    drawVaporHaloOnRecording(level, color)
     drawContent()
+}
+
+internal fun DrawScope.drawVaporHaloOnRecording(level: Float, color: Color) {
+    val amp = if (level.isNaN()) 0f else level.coerceIn(0f, 1f)
+    if (amp <= 0f) return
+    val maxR = maxOf(size.width, size.height) * VAPOR_HALO_BASE_RADIUS
+    val r = maxR * (VAPOR_HALO_MIN_SCALE + amp * VAPOR_HALO_AMP_SCALE)
+    drawRect(
+        brush = Brush.radialGradient(
+            colors = listOf(color.copy(alpha = VAPOR_HALO_ALPHA * amp), Color.Transparent),
+            center = Offset(size.width / 2f, size.height / 2f),
+            radius = r,
+        ),
+    )
 }
 
 private const val VAPOR_HALO_BASE_RADIUS: Float = 0.6f
@@ -70,21 +78,23 @@ private const val VAPOR_HALO_ALPHA: Float = 0.45f
  */
 fun Modifier.pulseDotForReady(diameter: Dp = PulseDotDiameter, color: Color = Pulse): Modifier = this
     .size(diameter)
-    .drawBehind {
-        drawRect(
-            brush = Brush.radialGradient(
-                colors = listOf(color.copy(alpha = PULSE_HALO_ALPHA), Color.Transparent),
-                center = Offset(size.width / 2f, size.height / 2f),
-                radius = maxOf(size.width, size.height),
-            ),
-        )
-        drawCircle(color = color, radius = size.minDimension / 2f)
-        drawCircle(
-            color = color.copy(alpha = PULSE_RIM_ALPHA),
-            radius = size.minDimension / 2f,
-            style = Stroke(width = PulseRimWidth.toPx()),
-        )
-    }
+    .drawBehind { drawPulseDotForReady(color) }
+
+internal fun DrawScope.drawPulseDotForReady(color: Color) {
+    drawRect(
+        brush = Brush.radialGradient(
+            colors = listOf(color.copy(alpha = PULSE_HALO_ALPHA), Color.Transparent),
+            center = Offset(size.width / 2f, size.height / 2f),
+            radius = maxOf(size.width, size.height),
+        ),
+    )
+    drawCircle(color = color, radius = size.minDimension / 2f)
+    drawCircle(
+        color = color.copy(alpha = PULSE_RIM_ALPHA),
+        radius = size.minDimension / 2f,
+        style = Stroke(width = PulseRimWidth.toPx()),
+    )
+}
 
 internal val PulseDotDiameter: Dp = 8.dp
 private val PulseRimWidth: Dp = 1.dp
@@ -100,9 +110,13 @@ private const val PULSE_RIM_ALPHA: Float = 0.7f
 fun Modifier.errorFillForDestructive(cornerRadius: Dp = RadiusTokens.RPill): Modifier = this
     .clip(RoundedCornerShape(cornerRadius))
     .drawWithContent {
-        drawRoundRect(
-            color = ErrorRed,
-            cornerRadius = CornerRadius(cornerRadius.toPx(), cornerRadius.toPx()),
-        )
+        drawErrorFillForDestructive(cornerRadius)
         drawContent()
     }
+
+internal fun DrawScope.drawErrorFillForDestructive(cornerRadius: Dp) {
+    drawRoundRect(
+        color = ErrorRed,
+        cornerRadius = CornerRadius(cornerRadius.toPx(), cornerRadius.toPx()),
+    )
+}

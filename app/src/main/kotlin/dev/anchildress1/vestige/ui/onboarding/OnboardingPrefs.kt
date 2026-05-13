@@ -4,17 +4,12 @@ import android.content.Context
 import android.content.SharedPreferences
 import dev.anchildress1.vestige.model.Persona
 
-/**
- * Onboarding completion + default-persona persistence (Story 4.2). Backed by
- * SharedPreferences so the gate survives process death and uninstall-reinstall reuses no state.
- * Two flags only — anything more elaborate belongs in Settings (Story 4.9), not here.
- */
+/** Onboarding completion flag + default persona. SharedPreferences-backed; durable across cold starts. */
 class OnboardingPrefs(private val prefs: SharedPreferences) {
 
     val isComplete: Boolean
         get() = prefs.getBoolean(KEY_COMPLETE, false)
 
-    /** Default persona selected during onboarding. Witness when unset. */
     val defaultPersona: Persona
         get() = prefs.getString(KEY_PERSONA, null)
             ?.let { runCatching { Persona.valueOf(it) }.getOrNull() }
@@ -24,9 +19,9 @@ class OnboardingPrefs(private val prefs: SharedPreferences) {
         prefs.edit().putString(KEY_PERSONA, persona.name).apply()
     }
 
-    /** Marks onboarding as complete. Next launch skips straight to the post-onboarding shell. */
+    // Synchronous commit — one-shot gate where a missed disk flush would replay the entire flow.
     fun markComplete() {
-        prefs.edit().putBoolean(KEY_COMPLETE, true).apply()
+        prefs.edit().putBoolean(KEY_COMPLETE, true).commit()
     }
 
     companion object {

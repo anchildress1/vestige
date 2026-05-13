@@ -53,7 +53,9 @@ class MainActivity : ComponentActivity() {
         val onboardingPrefs = OnboardingPrefs.from(this)
         setContent {
             VestigeTheme {
-                var onboardingComplete by rememberSaveable { mutableStateOf(onboardingPrefs.isComplete) }
+                // SharedPreferences is the durable source of truth — process death re-reads
+                // it on cold start, so a plain `mutableStateOf` is enough for in-process flips.
+                var onboardingComplete by remember { mutableStateOf(onboardingPrefs.isComplete) }
                 if (!onboardingComplete) {
                     OnboardingHost(
                         prefs = onboardingPrefs,

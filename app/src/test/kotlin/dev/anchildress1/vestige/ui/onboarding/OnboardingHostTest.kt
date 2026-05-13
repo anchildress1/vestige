@@ -9,8 +9,10 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.test.core.app.ApplicationProvider
+import androidx.test.espresso.Espresso
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import dev.anchildress1.vestige.model.Persona
+import dev.anchildress1.vestige.ui.theme.VestigeTheme
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -20,7 +22,6 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.annotation.Config
-import dev.anchildress1.vestige.ui.theme.VestigeTheme
 
 @RunWith(AndroidJUnit4::class)
 @Config(sdk = [34], manifest = Config.NONE, application = OnboardingTestApplication::class)
@@ -75,7 +76,7 @@ class OnboardingHostTest {
         tapPrimary("Skip — work runs in foreground only") // Screen 3.5
         tapPrimary("Continue") // Screen 4
         tapPrimary("Download model") // Screen 5 (Wi-Fi connected)
-        tapPrimary("Continue without downloading") // Screen 6
+        tapPrimary("Continue") // Screen 6 (model download placeholder)
         tapPrimary("Open Vestige") // Screen 7
 
         assertTrue(completed)
@@ -102,6 +103,22 @@ class OnboardingHostTest {
         tapPrimary("Continue")
         tapPrimary("Got it")
         assertFalse(prefs.isComplete)
+    }
+
+    @Test
+    fun `system back walks the step pointer back through prior screens`() {
+        startHost()
+        tapPrimary("Continue") // → LocalExplainer
+        tapPrimary("Got it") // → MicPermission
+        composeRule.onNodeWithText("Mic permission.").assertIsDisplayed()
+
+        Espresso.pressBack()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithText("Everything stays on your phone.").assertIsDisplayed()
+
+        Espresso.pressBack()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithText("Pick a persona.").assertIsDisplayed()
     }
 
     private fun tapPrimary(label: String) {

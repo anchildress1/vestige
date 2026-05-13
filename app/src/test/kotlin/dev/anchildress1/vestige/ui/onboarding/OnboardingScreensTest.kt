@@ -3,6 +3,8 @@ package dev.anchildress1.vestige.ui.onboarding
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsNotSelected
+import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -28,11 +30,7 @@ class OnboardingScreensTest {
     fun `persona pick announces all three personas with descriptions`() {
         composeRule.activity.setContent {
             VestigeTheme {
-                PersonaPickScreen(
-                    selected = Persona.WITNESS,
-                    onSelect = {},
-                    onContinue = {},
-                )
+                PersonaPickScreen(selected = Persona.WITNESS, onSelect = {}, onContinue = {})
             }
         }
 
@@ -42,15 +40,23 @@ class OnboardingScreensTest {
     }
 
     @Test
+    fun `persona pick marks the selected card with a11y selected semantics`() {
+        composeRule.activity.setContent {
+            VestigeTheme {
+                PersonaPickScreen(selected = Persona.HARDASS, onSelect = {}, onContinue = {})
+            }
+        }
+        composeRule.onNodeWithText("Hardass").assertIsSelected()
+        composeRule.onNodeWithText("Witness").assertIsNotSelected()
+        composeRule.onNodeWithText("Editor").assertIsNotSelected()
+    }
+
+    @Test
     fun `persona pick reports the tapped persona`() {
         var captured: Persona? = null
         composeRule.activity.setContent {
             VestigeTheme {
-                PersonaPickScreen(
-                    selected = Persona.WITNESS,
-                    onSelect = { captured = it },
-                    onContinue = {},
-                )
+                PersonaPickScreen(selected = Persona.WITNESS, onSelect = { captured = it }, onContinue = {})
             }
         }
         composeRule.onNodeWithText("Editor").performClick()
@@ -58,28 +64,21 @@ class OnboardingScreensTest {
     }
 
     @Test
-    fun `mic permission denied notice only renders when flag is true`() {
-        var deniedFlag = false
+    fun `mic permission notice hidden without denied flag`() {
         composeRule.activity.setContent {
             VestigeTheme {
-                MicPermissionScreen(
-                    showDeniedNotice = deniedFlag,
-                    onAllow = {},
-                    onSkip = {},
-                )
+                MicPermissionScreen(showDeniedNotice = false, onAllow = {}, onSkip = {})
             }
         }
         composeRule.onNodeWithText("Mic permission required to record. Settings → Permissions.")
-            .assertDoesNotExistFallback()
+            .assertDoesNotExist()
+    }
 
-        deniedFlag = true
+    @Test
+    fun `mic permission notice rendered when denied flag is set`() {
         composeRule.activity.setContent {
             VestigeTheme {
-                MicPermissionScreen(
-                    showDeniedNotice = true,
-                    onAllow = {},
-                    onSkip = {},
-                )
+                MicPermissionScreen(showDeniedNotice = true, onAllow = {}, onSkip = {})
             }
         }
         composeRule.onNodeWithText("Mic permission required to record. Settings → Permissions.")
@@ -109,14 +108,5 @@ class OnboardingScreensTest {
         assertFalse(tapped)
         composeRule.onNodeWithText("Open Vestige").performClick()
         assertTrue(tapped)
-    }
-
-    private fun androidx.compose.ui.test.SemanticsNodeInteraction.assertDoesNotExistFallback() {
-        try {
-            assertIsDisplayed()
-            error("expected node not to be displayed")
-        } catch (_: AssertionError) {
-            // Expected — node should not be present.
-        }
     }
 }

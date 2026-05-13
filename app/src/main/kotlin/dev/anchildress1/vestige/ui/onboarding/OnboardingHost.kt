@@ -12,7 +12,6 @@ import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -23,26 +22,21 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.core.content.ContextCompat
 import dev.anchildress1.vestige.model.Persona
 
-/**
- * Hosts the 8-screen onboarding flow per Story 4.2. Step state survives backgrounding via
- * `rememberSaveable`; persona selection is persisted on every change so a kill mid-flow doesn't
- * lose the picked default. `onComplete` fires when the user taps "Open Vestige" on the Ready
- * screen — the gate flips here so the main shell never re-enters onboarding for that install.
- */
+/** Hosts the 8-screen onboarding flow. Step + persona survive process death via SharedPreferences. */
 @Composable
 fun OnboardingHost(
     prefs: OnboardingPrefs,
     onComplete: () -> Unit,
     modifier: Modifier = Modifier,
-    wifiAvailability: WifiAvailability = WifiAvailability.Default(LocalContext.current),
+    wifiAvailability: WifiAvailability? = null,
 ) {
     val context = LocalContext.current
+    val resolvedWifi = remember(context, wifiAvailability) {
+        wifiAvailability ?: WifiAvailability.Default(context)
+    }
     var step by rememberSaveable { mutableStateOf(OnboardingStep.PersonaPick) }
     var persona by rememberSaveable { mutableStateOf(prefs.defaultPersona) }
     var micPermissionDenied by rememberSaveable { mutableStateOf(false) }
-    val wifiState by remember(wifiAvailability) {
-        derivedStateOf { wifiAvailability.isWifiConnected() }
-    }
 
     val advance: () -> Unit = { step = step.next() ?: step }
     val micLauncher = rememberLauncherForActivityResult(
@@ -56,6 +50,9 @@ fun OnboardingHost(
     ) { _ -> advance() }
 
     BackHandler(enabled = step != OnboardingStep.PersonaPick) {
+        // Re-entering the mic screen via Back should not show a stale denied notice — the user
+        // is about to be re-asked.
+        if (step == OnboardingStep.NotificationPermission) micPermissionDenied = false
         step = step.previous() ?: step
     }
     LaunchedEffect(persona) { prefs.setDefaultPersona(persona) }
@@ -65,13 +62,12 @@ fun OnboardingHost(
         persona = persona,
         onPersonaChange = { persona = it },
         micPermissionDenied = micPermissionDenied,
-        wifiConnected = wifiState,
+        wifiConnected = resolvedWifi.isWifiConnected(),
         advance = advance,
         onMicAllow = { requestMic(context, micLauncher, advance) },
         onNotificationAllow = { requestNotifications(notifLauncher, advance) },
         onOpenWifiSettings = { openWifiSettings(context) },
         onOpenApp = {
-            prefs.setDefaultPersona(persona)
             prefs.markComplete()
             onComplete()
         },
@@ -101,19 +97,24 @@ private fun OnboardingStepContent(
             onSelect = onPersonaChange,
             onContinue = advance,
         )
+
         OnboardingStep.LocalExplainer -> LocalExplainerScreen(modifier = modifier, onContinue = advance)
+
         OnboardingStep.MicPermission -> MicPermissionScreen(
             modifier = modifier,
             showDeniedNotice = micPermissionDenied,
             onAllow = onMicAllow,
             onSkip = advance,
         )
+
         OnboardingStep.NotificationPermission -> NotificationPermissionScreen(
             modifier = modifier,
             onAllow = onNotificationAllow,
             onSkip = advance,
         )
+
         OnboardingStep.TypedFallback -> TypedFallbackScreen(modifier = modifier, onContinue = advance)
+
         OnboardingStep.WifiCheck -> WifiCheckScreen(
             modifier = modifier,
             isWifiConnected = wifiConnected,
@@ -121,10 +122,12 @@ private fun OnboardingStepContent(
             onOpenWifiSettings = onOpenWifiSettings,
             onComeBackLater = advance,
         )
+
         OnboardingStep.ModelDownload -> ModelDownloadPlaceholderScreen(
             modifier = modifier,
             onContinue = advance,
         )
+
         OnboardingStep.Ready -> ReadyScreen(
             modifier = modifier,
             persona = persona,
@@ -133,11 +136,7 @@ private fun OnboardingStepContent(
     }
 }
 
-private fun requestMic(
-    context: Context,
-    launcher: ActivityResultLauncher<String>,
-    advance: () -> Unit,
-) {
+private fun requestMic(context: Context, launcher: ActivityResultLauncher<String>, advance: () -> Unit) {
     if (hasRecordAudio(context)) {
         advance()
     } else {
@@ -145,10 +144,7 @@ private fun requestMic(
     }
 }
 
-private fun requestNotifications(
-    launcher: ActivityResultLauncher<String>,
-    advance: () -> Unit,
-) {
+private fun requestNotifications(launcher: ActivityResultLauncher<String>, advance: () -> Unit) {
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
         launcher.launch(Manifest.permission.POST_NOTIFICATIONS)
     } else {

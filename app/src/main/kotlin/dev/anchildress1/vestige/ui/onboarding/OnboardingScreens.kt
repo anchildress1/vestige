@@ -52,11 +52,7 @@ internal fun MicPermissionScreen(
 }
 
 @Composable
-internal fun NotificationPermissionScreen(
-    onAllow: () -> Unit,
-    onSkip: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
+internal fun NotificationPermissionScreen(onAllow: () -> Unit, onSkip: () -> Unit, modifier: Modifier = Modifier) {
     OnboardingScaffold(
         modifier = modifier,
         header = stringResource(id = R.string.onboarding_notif_header),
@@ -112,21 +108,15 @@ internal fun WifiCheckScreen(
     }
 }
 
-/**
- * Screen 6 is the onboarding-side trampoline only. Real download progress, retry, and Wi-Fi
- * gating land in Story 4.3 — until then, the primary action advances to the Ready screen so
- * the rest of the flow stays exercisable.
- */
 @Composable
 internal fun ModelDownloadPlaceholderScreen(onContinue: () -> Unit, modifier: Modifier = Modifier) {
     OnboardingScaffold(
         modifier = modifier,
         header = stringResource(id = R.string.onboarding_download_header),
-        primaryActionLabel = stringResource(id = R.string.onboarding_download_continue),
+        primaryActionLabel = stringResource(id = R.string.onboarding_continue),
         onPrimary = onContinue,
     ) {
         BodyParagraph(text = stringResource(id = R.string.onboarding_download_body))
-        BodyParagraph(text = stringResource(id = R.string.onboarding_download_pending), dim = true)
     }
 }
 

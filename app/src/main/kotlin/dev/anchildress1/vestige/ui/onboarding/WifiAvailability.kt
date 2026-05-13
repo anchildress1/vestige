@@ -4,11 +4,7 @@ import android.content.Context
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
 
-/**
- * Test seam for Screen 5's Wi-Fi gate. Production lookups go through [Default], which reads the
- * active network from [ConnectivityManager]. The interface keeps the screen composable mockable
- * under Robolectric without a real network stack.
- */
+/** Wi-Fi gate for the onboarding download screen. [Default] reads from [ConnectivityManager]. */
 fun interface WifiAvailability {
     fun isWifiConnected(): Boolean
 

@@ -67,11 +67,9 @@
     <string name="onboarding_wifi_open_settings">Open Wi-Fi settings</string>
     <string name="onboarding_wifi_come_back">I\'ll come back</string>
 
-    <!-- Screen 6 — Model download (handoff placeholder; Story 4.3 owns real progress + retry) -->
+    <!-- Screen 6 — Model download. Real progress, retry, and Wi-Fi gating live in the next story. -->
     <string name="onboarding_download_header">Downloading model.</string>
     <string name="onboarding_download_body">Quiet for a minute. This takes a while.</string>
-    <string name="onboarding_download_pending">Model download UX ships in Story 4.3.</string>
-    <string name="onboarding_download_continue">Continue without downloading</string>
 
     <!-- Screen 7 — Ready -->
     <string name="onboarding_ready_header">Ready.</string>

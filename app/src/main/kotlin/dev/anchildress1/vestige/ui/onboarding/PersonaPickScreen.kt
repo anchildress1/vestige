@@ -1,13 +1,9 @@
 package dev.anchildress1.vestige.ui.onboarding
 
-import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
@@ -19,6 +15,8 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import dev.anchildress1.vestige.R
 import dev.anchildress1.vestige.model.Persona
+import dev.anchildress1.vestige.ui.components.VestigeListCard
+import dev.anchildress1.vestige.ui.components.limeLeftRuleForActive
 import dev.anchildress1.vestige.ui.theme.VestigeTheme
 
 @Composable
@@ -49,50 +47,30 @@ internal fun PersonaPickScreen(
 }
 
 @Composable
-private fun PersonaCard(
-    option: PersonaOption,
-    isSelected: Boolean,
-    onSelect: () -> Unit,
-) {
-    val colors = VestigeTheme.colors
-    val shape = VestigeTheme.shapes.l
-    val accent = if (isSelected) colors.lime else colors.hair
-    val containerColor = if (isSelected) colors.s2 else colors.s1
-    Surface(
+private fun PersonaCard(option: PersonaOption, isSelected: Boolean, onSelect: () -> Unit) {
+    VestigeListCard(
         modifier = Modifier
             .fillMaxWidth()
             .semantics {
                 role = Role.RadioButton
                 selected = isSelected
-            }
-            .clickable(role = Role.RadioButton, onClick = onSelect),
-        color = containerColor,
-        contentColor = colors.ink,
-        shape = shape,
-        border = BorderStroke(if (isSelected) 2.dp else 1.dp, accent),
+            },
+        onClick = onSelect,
+        accentModifier = if (isSelected) Modifier.limeLeftRuleForActive() else Modifier,
+        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 14.dp),
     ) {
-        Column(
-            modifier = Modifier.padding(PaddingValues(horizontal = 16.dp, vertical = 14.dp)),
-            verticalArrangement = Arrangement.spacedBy(4.dp),
-        ) {
-            Text(
-                text = stringResource(id = option.nameRes),
-                style = VestigeTheme.typography.title,
-            )
+        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text(text = stringResource(id = option.nameRes), style = VestigeTheme.typography.title)
             Text(
                 text = stringResource(id = option.descRes),
                 style = VestigeTheme.typography.p,
-                color = colors.dim,
+                color = VestigeTheme.colors.dim,
             )
         }
     }
 }
 
-private data class PersonaOption(
-    val persona: Persona,
-    val nameRes: Int,
-    val descRes: Int,
-)
+private data class PersonaOption(val persona: Persona, val nameRes: Int, val descRes: Int)
 
 private fun personaOptions(): List<PersonaOption> = listOf(
     PersonaOption(Persona.WITNESS, R.string.onboarding_persona_witness_name, R.string.onboarding_persona_witness_desc),

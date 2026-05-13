@@ -11,10 +11,7 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.unit.dp
-import dev.anchildress1.vestige.ui.theme.Dim
 import dev.anchildress1.vestige.ui.theme.Ink
-import dev.anchildress1.vestige.ui.theme.S1
-import dev.anchildress1.vestige.ui.theme.S2
 import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
@@ -53,37 +50,12 @@ class VestigePrimitivesTest {
     }
 
     @Test
-    fun `VestigeSurface respects an explicit content color override`() {
-        var contentColor: Color? = null
-        composeRule.setContent {
-            VestigeSurface(modifier = Modifier.size(120.dp), contentColor = Dim) {
-                contentColor = LocalContentColor.current
-                Text(text = "surface-dim")
-            }
-        }
-        composeRule.onNodeWithText("surface-dim").assertIsDisplayed()
-        composeRule.runOnIdle { assertEquals(Dim, contentColor) }
-    }
-
-    @Test
     fun `VestigeRow renders label and value`() {
         composeRule.setContent {
             VestigeRow(label = "VERSION", value = "1.0.0")
         }
         composeRule.onNodeWithText("VERSION").assertIsDisplayed()
         composeRule.onNodeWithText("1.0.0").assertIsDisplayed()
-    }
-
-    @Test
-    fun `VestigeRow locks label color to Dim and value to Ink`() {
-        assertEquals(Dim, RowLabelColor)
-        assertEquals(Ink, RowValueColor)
-    }
-
-    @Test
-    fun `VestigeListCard fill is S1 when static and S2 when clickable`() {
-        assertEquals(S1, vestigeListCardFill(null))
-        assertEquals(S2, vestigeListCardFill(onClick = {}))
     }
 
     @Test

@@ -1,3 +1,6 @@
+// Compose layout cluster + lifecycle tone helpers; splitting hurts call-site readability.
+@file:Suppress("TooManyFunctions")
+
 package dev.anchildress1.vestige.ui.patterns
 
 import androidx.compose.foundation.clickable
@@ -40,9 +43,7 @@ import dev.anchildress1.vestige.R
 import dev.anchildress1.vestige.model.PatternState
 import dev.anchildress1.vestige.ui.components.VestigeListCard
 import dev.anchildress1.vestige.ui.components.VestigeSurface
-import dev.anchildress1.vestige.ui.theme.Ember
-import dev.anchildress1.vestige.ui.theme.Teal
-import dev.anchildress1.vestige.ui.theme.TealDim
+import dev.anchildress1.vestige.ui.theme.VestigeTheme
 
 @OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
@@ -82,9 +83,9 @@ fun PatternDetailScreen(
     }
 
     val backDescription = stringResource(R.string.pattern_back_description)
+    // Theme-owned colors — M3 default `colorScheme.background` + `onBackground`.
     Scaffold(
         modifier = modifier,
-        containerColor = androidx.compose.ui.graphics.Color.Transparent,
         topBar = {
             TopAppBar(
                 title = { Text("") },
@@ -135,7 +136,7 @@ private fun PatternDetailBody(
         ) {
             Text(
                 text = stringResource(R.string.pattern_detail_not_found),
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                color = VestigeTheme.colors.dim,
             )
         }
 
@@ -166,7 +167,7 @@ private fun LoadedBody(
         PatternSummaryCard(loaded)
         PatternIntensityCard(loaded.state, loaded.traceHits)
 
-        HorizontalDivider(color = MaterialTheme.colorScheme.outline)
+        HorizontalDivider(color = VestigeTheme.colors.hair)
 
         PatternSourcesCard(sources = loaded.sources, onOpenEntry = onOpenEntry)
 
@@ -174,7 +175,7 @@ private fun LoadedBody(
             Text(
                 text = stringResource(terminal.prefixRes, terminal.dateLabel),
                 style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                color = VestigeTheme.colors.dim,
             )
         }
 
@@ -193,7 +194,7 @@ private fun PatternSummaryCard(loaded: PatternDetailUiState.Loaded) {
                 Text(
                     text = it,
                     style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = VestigeTheme.colors.dim,
                 )
             }
             Text(text = loaded.observation, style = MaterialTheme.typography.bodyLarge)
@@ -207,7 +208,7 @@ private fun PatternSummaryCard(loaded: PatternDetailUiState.Loaded) {
                     loaded.lastSeenLabel,
                 ),
                 style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                color = VestigeTheme.colors.dim,
             )
         }
     }
@@ -216,13 +217,13 @@ private fun PatternSummaryCard(loaded: PatternDetailUiState.Loaded) {
 @Composable
 private fun PatternIntensityCard(state: PatternState, traceHits: Set<Int>) {
     // POC: "Intensity · 30 days" trace strip. Hero element of the detail screen.
-    val style = patternIntensityStyleFor(state)
+    val style = intensityToneFor(state).themedStyle()
     VestigeSurface(contentPadding = PaddingValues(16.dp)) {
         Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Text(
                 text = stringResource(R.string.pattern_detail_intensity_eyebrow),
                 style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                color = VestigeTheme.colors.dim,
             )
             TraceBarE(
                 hits = traceHits,
@@ -236,28 +237,36 @@ private fun PatternIntensityCard(state: PatternState, traceHits: Set<Int>) {
 
 internal data class PatternIntensityStyle(val accent: Color, val peak: Boolean)
 
-internal fun patternIntensityStyleFor(state: PatternState): PatternIntensityStyle = when (state) {
-    PatternState.ACTIVE -> PatternIntensityStyle(
-        accent = TraceBarDefaults.Accent,
-        peak = true,
-    )
+/**
+ * Tone variants kept enum-shaped so the lifecycle → tone mapping stays pure-Kotlin and trivially
+ * testable; the concrete color binding happens in [themedStyle], which pulls from the active
+ * `VestigeTheme.colors`. One source of truth — `themed*Style` is the only place that resolves
+ * tone → color.
+ */
+internal enum class IntensityTone(val peak: Boolean) {
+    ACTIVE_PEAK(peak = true),
+    SNOOZED(peak = false),
+    SETTLED(peak = false),
+    FROZEN(peak = false),
+}
 
-    PatternState.SNOOZED -> PatternIntensityStyle(
-        accent = Ember,
-        peak = false,
-    )
+internal fun intensityToneFor(state: PatternState): IntensityTone = when (state) {
+    PatternState.ACTIVE -> IntensityTone.ACTIVE_PEAK
+    PatternState.SNOOZED -> IntensityTone.SNOOZED
+    PatternState.RESOLVED, PatternState.DISMISSED -> IntensityTone.SETTLED
+    PatternState.BELOW_THRESHOLD -> IntensityTone.FROZEN
+}
 
-    PatternState.RESOLVED,
-    PatternState.DISMISSED,
-    -> PatternIntensityStyle(
-        accent = Teal,
-        peak = false,
-    )
-
-    PatternState.BELOW_THRESHOLD -> PatternIntensityStyle(
-        accent = TealDim,
-        peak = false,
-    )
+@Composable
+internal fun IntensityTone.themedStyle(): PatternIntensityStyle {
+    val colors = VestigeTheme.colors
+    val accent = when (this) {
+        IntensityTone.ACTIVE_PEAK -> colors.lime
+        IntensityTone.SNOOZED -> colors.ember
+        IntensityTone.SETTLED -> colors.teal
+        IntensityTone.FROZEN -> colors.tealDim
+    }
+    return PatternIntensityStyle(accent = accent, peak = peak)
 }
 
 @Composable
@@ -275,7 +284,7 @@ private fun PatternSourcesCard(sources: List<PatternSourceUi>, onOpenEntry: (Lon
                 Text(
                     text = stringResource(R.string.pattern_detail_no_sources),
                     style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = VestigeTheme.colors.dim,
                 )
             }
         }
@@ -297,9 +306,9 @@ private fun SourceRow(source: PatternSourceUi, onClick: () -> Unit) {
             Text(
                 text = source.dateLabel,
                 style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                color = VestigeTheme.colors.dim,
             )
-            Text(text = "—", color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(text = "—", color = VestigeTheme.colors.dim)
             Text(text = source.snippet, style = MaterialTheme.typography.bodyMedium)
         }
     }

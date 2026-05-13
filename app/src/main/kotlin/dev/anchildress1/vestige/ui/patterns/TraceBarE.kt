@@ -14,9 +14,7 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import dev.anchildress1.vestige.ui.theme.Hair
-import dev.anchildress1.vestige.ui.theme.Lime
-import dev.anchildress1.vestige.ui.theme.RadiusTokens
+import dev.anchildress1.vestige.ui.theme.VestigeTheme
 
 /**
  * Scoreboard TraceBar — replaces the Mist TraceBar. 30-day intensity glyph from
@@ -30,11 +28,12 @@ fun TraceBarE(
     modifier: Modifier = Modifier,
     days: Int = TRACE_BAR_DEFAULT_DAYS,
     height: Dp = TraceBarDefaults.Height,
-    accent: Color = TraceBarDefaults.Accent,
-    rail: Color = TraceBarDefaults.Rail,
+    accent: Color = VestigeTheme.colors.lime,
+    rail: Color = VestigeTheme.colors.hair,
     peak: Boolean = true,
 ) {
     require(days > 0) { "TraceBarE days must be > 0 (got $days)" }
+    val peakShape = VestigeTheme.shapes.xs
     Row(
         modifier = modifier
             .fillMaxWidth()
@@ -49,7 +48,7 @@ fun TraceBarE(
                     .weight(1f)
                     .fillMaxHeight(if (lit) 1f else UNLIT_HEIGHT_FRACTION)
                     .then(
-                        if (lit && peak) Modifier.shadow(elevation = 2.dp, shape = RadiusTokens.XS) else Modifier,
+                        if (lit && peak) Modifier.shadow(elevation = 2.dp, shape = peakShape) else Modifier,
                     )
                     .background(if (lit) accent else rail),
             )
@@ -57,14 +56,8 @@ fun TraceBarE(
     }
 }
 
-/** POC token mirror. Designers tweak once here. */
+/** Layout-only defaults; color defaults flow from `VestigeTheme.colors` on the composable params. */
 object TraceBarDefaults {
-    /** Electric lime — the live signal cell. */
-    val Accent: Color = Lime
-
-    /** Rail — hair-alpha for unlit cells. */
-    val Rail: Color = Hair
-
     /** Card glyph default height. */
     val Height: Dp = 28.dp
 }

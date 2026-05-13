@@ -2,6 +2,7 @@ package dev.anchildress1.vestige.ui.components
 
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
@@ -15,19 +16,18 @@ import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import dev.anchildress1.vestige.ui.theme.Coral
-import dev.anchildress1.vestige.ui.theme.ErrorRed
-import dev.anchildress1.vestige.ui.theme.Lime
-import dev.anchildress1.vestige.ui.theme.RadiusTokens
+import dev.anchildress1.vestige.ui.theme.VestigeTheme
 
 /**
  * Lime left-rule for active patterns. Caller omits this modifier for snoozed / resolved / dismissed.
  * Scope: pattern cards in `state=active` only. ADR-011 §"Token additions" / §"What this breaks".
  */
-fun Modifier.limeLeftRuleForActive(width: Dp = RuleWidth, color: Color = Lime): Modifier = drawWithContent {
-    drawLeftRule(width, color)
-    drawContent()
-}
+@Composable
+fun Modifier.limeLeftRuleForActive(width: Dp = RuleWidth, color: Color = VestigeTheme.colors.lime): Modifier =
+    drawWithContent {
+        drawLeftRule(width, color)
+        drawContent()
+    }
 
 internal fun DrawScope.drawLeftRule(width: Dp, color: Color) {
     drawRect(
@@ -46,7 +46,8 @@ internal val RuleWidth: Dp = 3.dp
  * Replaces the Mist `vaporHaloOnRecording` halo. Halo color is coral because recording is "heat,"
  * not "ready" — the ON AIR · LIVE state in `poc/Energy Direction.html` is coral throughout.
  */
-fun Modifier.coralHaloOnRecording(level: Float, color: Color = Coral): Modifier = drawWithContent {
+@Composable
+fun Modifier.coralHaloOnRecording(level: Float, color: Color = VestigeTheme.colors.coral): Modifier = drawWithContent {
     drawHalo(level, color)
     drawContent()
 }
@@ -74,7 +75,8 @@ private const val HALO_ALPHA: Float = 0.45f
  * LOCAL · GEMMA 4 status dot — lime when the model is ready. Halo stays small; status indicator,
  * not a brand accent. Coral overload comes from the chrome row, not this dot.
  */
-fun Modifier.limeDotForReady(diameter: Dp = StatusDotDiameter, color: Color = Lime): Modifier = this
+@Composable
+fun Modifier.limeDotForReady(diameter: Dp = StatusDotDiameter, color: Color = VestigeTheme.colors.lime): Modifier = this
     .size(diameter)
     .drawBehind { drawStatusDot(color) }
 
@@ -100,20 +102,27 @@ private const val DOT_HALO_ALPHA: Float = 0.25f
 private const val DOT_RIM_ALPHA: Float = 0.7f
 
 /**
- * Destructive fill — wipe confirmations only. Locks call sites to [ErrorRed] (which resolves to
- * Coral per ADR-011 — destructive and heat share the same atom). A destructive control can never
- * wear brand styling.
+ * Destructive fill — wipe confirmations only. Defaults to the destructive token in
+ * `VestigeTheme.colors.errorRed` (aliased to coral per ADR-011 — destructive and heat share the
+ * same atom). A destructive control can never wear brand styling.
  */
-fun Modifier.errorFillForDestructive(cornerRadius: Dp = RadiusTokens.RPill): Modifier = this
+@Composable
+fun Modifier.errorFillForDestructive(
+    cornerRadius: Dp = DestructivePillRadius,
+    color: Color = VestigeTheme.colors.errorRed,
+): Modifier = this
     .clip(RoundedCornerShape(cornerRadius))
     .drawWithContent {
-        drawDestructive(cornerRadius)
+        drawDestructive(cornerRadius, color)
         drawContent()
     }
 
-internal fun DrawScope.drawDestructive(cornerRadius: Dp) {
+internal fun DrawScope.drawDestructive(cornerRadius: Dp, color: Color) {
     drawRoundRect(
-        color = ErrorRed,
+        color = color,
         cornerRadius = CornerRadius(cornerRadius.toPx(), cornerRadius.toPx()),
     )
 }
+
+/** Stadium pill radius — matches `VestigeTheme.shapes.pill` corner. */
+internal val DestructivePillRadius: Dp = 9999.dp

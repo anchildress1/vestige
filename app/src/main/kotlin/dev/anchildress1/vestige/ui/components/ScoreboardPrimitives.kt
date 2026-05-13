@@ -8,7 +8,6 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -19,7 +18,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.windowInsetsPadding
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.material3.ripple
 import androidx.compose.runtime.Composable
@@ -46,16 +44,8 @@ import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
 import dev.anchildress1.vestige.ui.motion.VestigeMotion
 import dev.anchildress1.vestige.ui.motion.rememberSbBlink
-import dev.anchildress1.vestige.ui.theme.Coral
-import dev.anchildress1.vestige.ui.theme.Deep
-import dev.anchildress1.vestige.ui.theme.Dim
-import dev.anchildress1.vestige.ui.theme.Hair
-import dev.anchildress1.vestige.ui.theme.Ink
-import dev.anchildress1.vestige.ui.theme.Lime
-import dev.anchildress1.vestige.ui.theme.RadiusTokens
-import dev.anchildress1.vestige.ui.theme.S1
 import dev.anchildress1.vestige.ui.theme.VestigeFonts
-import dev.anchildress1.vestige.ui.theme.VestigeTextStyles
+import dev.anchildress1.vestige.ui.theme.VestigeTheme
 
 /**
  * Big Anton-condensed stat for hero numbers (capture stats, pattern detail count, scorecard).
@@ -66,23 +56,25 @@ fun BigStat(
     value: String,
     modifier: Modifier = Modifier,
     label: String? = null,
-    color: Color = Ink,
+    color: Color = Color.Unspecified,
     size: Int = BIG_STAT_DEFAULT_SP,
 ) {
     require(size > 0) { "BigStat size must be positive (was $size)" }
     val lineHeightSp = size * BIG_STAT_LINE_HEIGHT_RATIO
+    // Color.Unspecified falls through to LocalContentColor from the enclosing surface; the eyebrow
+    // label reads the semantic "secondary" slot directly. No token imports at the call site.
     Column(modifier = modifier, horizontalAlignment = Alignment.Start) {
         Text(
             text = value,
-            style = VestigeTextStyles.DisplayBig.copy(fontSize = size.sp, lineHeight = lineHeightSp.sp),
+            style = VestigeTheme.typography.displayBig.copy(fontSize = size.sp, lineHeight = lineHeightSp.sp),
             color = color,
         )
         if (label != null) {
             Text(
                 text = label,
                 modifier = Modifier.padding(top = 4.dp),
-                style = VestigeTextStyles.Eyebrow,
-                color = Dim,
+                style = VestigeTheme.typography.eyebrow,
+                color = VestigeTheme.colors.dim,
             )
         }
     }
@@ -91,17 +83,25 @@ fun BigStat(
 private const val BIG_STAT_DEFAULT_SP: Int = 56
 private const val BIG_STAT_LINE_HEIGHT_RATIO: Float = 0.85f
 
-/** Mono uppercase eyebrow row — single token color, tracking from [VestigeTextStyles.Eyebrow]. */
+/**
+ * Mono uppercase eyebrow row — always the `dim` slot. No color override; the theme owns the
+ * secondary-text foreground for every eyebrow site.
+ */
 @Composable
-fun EyebrowE(text: String, modifier: Modifier = Modifier, color: Color = Dim) {
-    Text(text = text, modifier = modifier, style = VestigeTextStyles.Eyebrow, color = color)
+fun EyebrowE(text: String, modifier: Modifier = Modifier) {
+    Text(
+        text = text,
+        modifier = modifier,
+        style = VestigeTheme.typography.eyebrow,
+        color = VestigeTheme.colors.dim,
+    )
 }
 
 /** Status dot, optionally blinking. Default lime; coral when recording. */
 @Composable
 fun StatusDot(
     modifier: Modifier = Modifier,
-    color: Color = Lime,
+    color: Color = VestigeTheme.colors.lime,
     blink: Boolean = false,
     size: Dp = DefaultStatusDotSize,
 ) {
@@ -138,21 +138,23 @@ data class AppTopStatus(
 )
 
 object AppTopStatuses {
-    val Ready: AppTopStatus = AppTopStatus(
-        text = "LOCAL · GEMMA 4",
-        contentDescription = "Local model ready: Gemma 4.",
-        color = Lime,
-        dot = true,
-        blink = true,
-    )
+    val Ready: AppTopStatus
+        @Composable get() = AppTopStatus(
+            text = "LOCAL · GEMMA 4",
+            contentDescription = "Local model ready: Gemma 4.",
+            color = VestigeTheme.colors.lime,
+            dot = true,
+            blink = true,
+        )
 
-    val Recording: AppTopStatus = AppTopStatus(
-        text = "ON AIR · LIVE",
-        contentDescription = "Recording. Local model active.",
-        color = Coral,
-        dot = true,
-        blink = true,
-    )
+    val Recording: AppTopStatus
+        @Composable get() = AppTopStatus(
+            text = "ON AIR · LIVE",
+            contentDescription = "Recording. Local model active.",
+            color = VestigeTheme.colors.coral,
+            dot = true,
+            blink = true,
+        )
 }
 
 /**
@@ -164,25 +166,30 @@ object AppTopStatuses {
 fun Pill(
     text: String,
     modifier: Modifier = Modifier,
-    color: Color = Lime,
+    color: Color = VestigeTheme.colors.lime,
     fill: Boolean = false,
     dot: Boolean = false,
     blink: Boolean = false,
 ) {
-    val fg = if (fill) Deep else color
+    val pillShape = VestigeTheme.shapes.pill
+    val deep = VestigeTheme.colors.deep
+    val fg = if (fill) deep else color
     Row(
         modifier = modifier
-            .clip(RadiusTokens.Pill)
-            .background(if (fill) color else Color.Transparent, RadiusTokens.Pill)
-            .border(width = 1.dp, color = color, shape = RadiusTokens.Pill)
+            .clip(pillShape)
+            .background(if (fill) color else Color.Transparent, pillShape)
+            .border(width = 1.dp, color = color, shape = pillShape)
             .padding(horizontal = 10.dp, vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(6.dp),
     ) {
-        if (dot) StatusDot(color = if (fill) Deep else color, blink = blink, size = PillDotSize)
+        if (dot) StatusDot(color = if (fill) deep else color, blink = blink, size = PillDotSize)
         Text(
             text = text,
-            style = VestigeTextStyles.PersonaLabel.copy(fontWeight = FontWeight.Bold, letterSpacing = 0.16.em),
+            style = VestigeTheme.typography.personaLabel.copy(
+                fontWeight = FontWeight.Bold,
+                letterSpacing = 0.16.em,
+            ),
             color = fg,
         )
     }
@@ -195,10 +202,11 @@ private val PillDotSize: Dp = 6.dp
 fun Delta(value: Int, modifier: Modifier = Modifier, label: String? = null) {
     val positive = value > 0
     val negative = value < 0
+    val colors = VestigeTheme.colors
     val color = when {
-        positive -> Lime
-        negative -> Coral
-        else -> Dim
+        positive -> colors.lime
+        negative -> colors.coral
+        else -> colors.dim
     }
     val glyph = when {
         positive -> "▲$value"
@@ -228,8 +236,8 @@ fun Delta(value: Int, modifier: Modifier = Modifier, label: String? = null) {
         if (label != null) {
             Text(
                 text = label,
-                style = VestigeTextStyles.Eyebrow.copy(fontWeight = FontWeight.Medium),
-                color = Dim,
+                style = VestigeTheme.typography.eyebrow.copy(fontWeight = FontWeight.Medium),
+                color = VestigeTheme.colors.dim,
             )
         }
     }
@@ -237,19 +245,23 @@ fun Delta(value: Int, modifier: Modifier = Modifier, label: String? = null) {
 
 /**
  * Newsroom mini-stat row — [BigStat]-style numbers grouped under mono eyebrow labels, divided by
- * hairline columns. Tape-grain backdrop reads as a printed scoreboard ribbon.
+ * hairline columns. Tape-grain backdrop reads as a printed scoreboard ribbon. Values inherit
+ * `LocalContentColor` from the surrounding surface; per-item accent only kicks in when the
+ * caller passes an explicit override (e.g. coral for "heat" stats on the Roast scorecard).
  */
-data class StatItem(val value: String, val label: String, val color: Color = Ink)
+data class StatItem(val value: String, val label: String, val color: Color = Color.Unspecified)
 
 @Composable
 fun StatRibbon(items: List<StatItem>, modifier: Modifier = Modifier) {
     require(items.isNotEmpty()) { "StatRibbon items must not be empty" }
+    val shape = VestigeTheme.shapes.m
+    val colors = VestigeTheme.colors
     Row(
         modifier = modifier
-            .clip(RadiusTokens.M)
-            .background(S1)
+            .clip(shape)
+            .background(colors.s1)
             .tapeGrain()
-            .border(1.dp, Hair, RadiusTokens.M),
+            .border(1.dp, colors.hair, shape),
     ) {
         items.forEachIndexed { index, item ->
             Column(
@@ -260,17 +272,17 @@ fun StatRibbon(items: List<StatItem>, modifier: Modifier = Modifier) {
             ) {
                 Text(
                     text = item.value,
-                    style = VestigeTextStyles.DisplayBig.copy(fontSize = 28.sp, lineHeight = 24.sp),
+                    style = VestigeTheme.typography.displayBig.copy(fontSize = 28.sp, lineHeight = 24.sp),
                     color = item.color,
                 )
-                EyebrowE(text = item.label, color = Dim)
+                EyebrowE(text = item.label)
             }
             if (index < items.lastIndex) {
                 Box(
                     modifier = Modifier
                         .padding(vertical = 6.dp)
                         .size(width = 1.dp, height = 28.dp)
-                        .background(Hair),
+                        .background(colors.hair),
                 )
             }
         }
@@ -282,16 +294,10 @@ fun StatRibbon(items: List<StatItem>, modifier: Modifier = Modifier) {
  * short hairlines. Used for the 30s chunk countdown on Capture.
  */
 @Composable
-@Suppress("LongParameterList") // primitive
-fun TickRule(
-    count: Int,
-    marks: Set<Int>,
-    modifier: Modifier = Modifier,
-    height: Dp = 8.dp,
-    tickColor: Color = Ink,
-    railColor: Color = Hair,
-) {
+fun TickRule(count: Int, marks: Set<Int>, modifier: Modifier = Modifier, height: Dp = 8.dp) {
     require(count > 0) { "TickRule count must be > 0 (got $count)" }
+    val tickColor = VestigeTheme.colors.ink
+    val railColor = VestigeTheme.colors.hair
     Row(
         modifier = modifier.height(height),
         horizontalArrangement = Arrangement.spacedBy(1.dp),
@@ -327,6 +333,7 @@ fun AppTop(
     onPersonaTap: (() -> Unit)? = null,
     onStatusTap: (() -> Unit)? = null,
 ) {
+    val hairlineColor = VestigeTheme.colors.hair
     Row(
         modifier = modifier
             .fillMaxWidth()
@@ -335,7 +342,7 @@ fun AppTop(
             .drawBehind {
                 val y = size.height
                 drawLine(
-                    color = Hair,
+                    color = hairlineColor,
                     start = Offset(0f, y),
                     end = Offset(size.width, y),
                     strokeWidth = Stroke.HairlineWidth,
@@ -361,7 +368,7 @@ fun AppTop(
             alignment = Alignment.CenterEnd,
             a11yLabel = personaA11yLabel,
         ) {
-            Pill(text = "$persona ▾", color = Ink, fill = false)
+            Pill(text = "$persona ▾", color = VestigeTheme.colors.ink, fill = false)
         }
     }
 }
@@ -369,7 +376,7 @@ fun AppTop(
 /**
  * 48dp-minimum tap target that shapes its ripple to the content (intended for [Pill]s in
  * [AppTop]). The outer [Box] reserves the touch slop with no indication; the inner [Box] hosts
- * the ripple clipped to [RadiusTokens.Pill], and both share an [MutableInteractionSource] so a
+ * the ripple clipped to the brand pill shape, and both share an [MutableInteractionSource] so a
  * tap anywhere in the slop animates the pill-shaped ripple.
  */
 @Composable
@@ -380,6 +387,7 @@ private fun ChromePill(
     content: @Composable () -> Unit,
 ) {
     val interactionSource = remember { MutableInteractionSource() }
+    val pillShape = VestigeTheme.shapes.pill
     val semanticsModifier = if (onClick != null) {
         Modifier.semantics(mergeDescendants = true) {
             role = Role.Button
@@ -408,7 +416,7 @@ private fun ChromePill(
     ) {
         Box(
             modifier = Modifier
-                .clip(RadiusTokens.Pill)
+                .clip(pillShape)
                 .then(
                     if (onClick != null) {
                         Modifier.indication(interactionSource, ripple(bounded = true))

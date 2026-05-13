@@ -1,51 +1,34 @@
 package dev.anchildress1.vestige.ui.patterns
 
+import dev.anchildress1.vestige.model.PatternState
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
-import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class PatternDetailScreenStyleTest {
 
     @Test
-    fun `patternIntensityStyleFor maps each lifecycle state to a visible accent`() {
-        val active = patternIntensityStyleFor(dev.anchildress1.vestige.model.PatternState.ACTIVE)
-        assertEquals(TraceBarDefaults.Accent, active.accent)
-        assertTrue(active.peak)
-
-        val snoozed = patternIntensityStyleFor(dev.anchildress1.vestige.model.PatternState.SNOOZED)
-        assertEquals(dev.anchildress1.vestige.ui.theme.Ember, snoozed.accent)
-        assertFalse(snoozed.peak)
-
-        val resolved = patternIntensityStyleFor(dev.anchildress1.vestige.model.PatternState.RESOLVED)
-        assertEquals(dev.anchildress1.vestige.ui.theme.Teal, resolved.accent)
-        assertFalse(resolved.peak)
-
-        val dismissed = patternIntensityStyleFor(dev.anchildress1.vestige.model.PatternState.DISMISSED)
-        assertEquals(dev.anchildress1.vestige.ui.theme.Teal, dismissed.accent)
-        assertFalse(dismissed.peak)
-
-        val belowThreshold = patternIntensityStyleFor(dev.anchildress1.vestige.model.PatternState.BELOW_THRESHOLD)
-        assertEquals(dev.anchildress1.vestige.ui.theme.TealDim, belowThreshold.accent)
-        assertFalse(belowThreshold.peak)
+    fun `intensityToneFor maps each lifecycle state to a visible tone`() {
+        assertEquals(IntensityTone.ACTIVE_PEAK, intensityToneFor(PatternState.ACTIVE))
+        assertEquals(IntensityTone.SNOOZED, intensityToneFor(PatternState.SNOOZED))
+        assertEquals(IntensityTone.SETTLED, intensityToneFor(PatternState.RESOLVED))
+        assertEquals(IntensityTone.SETTLED, intensityToneFor(PatternState.DISMISSED))
+        assertEquals(IntensityTone.FROZEN, intensityToneFor(PatternState.BELOW_THRESHOLD))
     }
 
     @Test
-    fun `patternCardTraceBarStyleFor keeps non-active sections readable`() {
-        val active = patternCardTraceBarStyleFor(PatternSection.ACTIVE)
-        assertEquals(TraceBarDefaults.Accent, active.accent)
-        assertTrue(active.peak)
+    fun `cardSectionToneFor keeps non-active sections readable`() {
+        assertEquals(IntensityTone.ACTIVE_PEAK, cardSectionToneFor(PatternSection.ACTIVE))
+        assertEquals(IntensityTone.SNOOZED, cardSectionToneFor(PatternSection.SNOOZED))
+        assertEquals(IntensityTone.SETTLED, cardSectionToneFor(PatternSection.RESOLVED))
+        assertEquals(IntensityTone.SETTLED, cardSectionToneFor(PatternSection.DISMISSED))
+    }
 
-        val snoozed = patternCardTraceBarStyleFor(PatternSection.SNOOZED)
-        assertEquals(dev.anchildress1.vestige.ui.theme.Ember, snoozed.accent)
-        assertFalse(snoozed.peak)
-
-        val resolved = patternCardTraceBarStyleFor(PatternSection.RESOLVED)
-        assertEquals(dev.anchildress1.vestige.ui.theme.Teal, resolved.accent)
-        assertFalse(resolved.peak)
-
-        val dismissed = patternCardTraceBarStyleFor(PatternSection.DISMISSED)
-        assertEquals(dev.anchildress1.vestige.ui.theme.Teal, dismissed.accent)
-        assertFalse(dismissed.peak)
+    @Test
+    fun `peak flag only lights for active patterns`() {
+        // Only ACTIVE_PEAK rises to peak; settled / snoozed / frozen lay flat.
+        assertEquals(true, IntensityTone.ACTIVE_PEAK.peak)
+        assertEquals(false, IntensityTone.SNOOZED.peak)
+        assertEquals(false, IntensityTone.SETTLED.peak)
+        assertEquals(false, IntensityTone.FROZEN.peak)
     }
 }

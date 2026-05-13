@@ -1,22 +1,23 @@
 package dev.anchildress1.vestige.ui.patterns
 
-import dev.anchildress1.vestige.ui.theme.Ink
-import dev.anchildress1.vestige.ui.theme.S2
-import org.junit.Assert.assertEquals
+import dev.anchildress1.vestige.ui.theme.ScoreboardColors
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import kotlin.math.pow
 
+/**
+ * Snackbar foreground colors flow from `VestigeColorScheme.inverseSurface` (= S2) and
+ * `inversePrimary` (= Ink) — see Theme.kt. This locks the contrast contract: the action label
+ * (`inversePrimary` = Ink) must clear AA contrast against the container (`inverseSurface` = S2)
+ * so the "Undo" affordance stays legible without per-call-site overrides.
+ */
 class PatternSnackbarHostTest {
 
     @Test
-    fun `snackbar action color stays on the locked token`() {
-        assertEquals(Ink, PatternSnackbarActionColor)
-    }
-
-    @Test
-    fun `snackbar action color clears AA contrast on S2`() {
-        assertTrue(contrastRatio(PatternSnackbarActionColor, S2) >= 4.5f)
+    fun `snackbar action color clears AA contrast on the inverse surface`() {
+        val foreground = ScoreboardColors.ink
+        val background = ScoreboardColors.s2
+        assertTrue(contrastRatio(foreground, background) >= 4.5f)
     }
 }
 

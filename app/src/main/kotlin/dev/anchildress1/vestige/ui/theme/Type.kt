@@ -1,6 +1,8 @@
 package dev.anchildress1.vestige.ui.theme
 
 import androidx.compose.material3.Typography
+import androidx.compose.runtime.Immutable
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -21,11 +23,34 @@ object VestigeFonts {
     val Mono: FontFamily = FontFamily.Monospace
 }
 
-object VestigeTextStyles {
+/**
+ * Brand text vocabulary — read everywhere via `VestigeTheme.typography` using the same pattern
+ * as `MaterialTheme.typography`. Slot names speak Vestige's design language (`displayBig` for
+ * the Anton-condensed scoreboard numbers, `eyebrow` for the mono uppercase labels, `pCompact`
+ * for the dense card-meta line). M3's `Typography` lives underneath as a one-way bridge so M3
+ * components keep resolving styles through `MaterialTheme.typography` without per-call overrides.
+ */
+@Immutable
+@Suppress("LongParameterList") // Theme objects are wide by design — one slot per token.
+data class VestigeTypography(
+    val displayBig: TextStyle,
+    val h1: TextStyle,
+    val h2: TextStyle,
+    val p: TextStyle,
+    val pCompact: TextStyle,
+    val title: TextStyle,
+    val titleCompact: TextStyle,
+    val personaLabel: TextStyle,
+    val eyebrow: TextStyle,
+)
+
+internal val ScoreboardTypography: VestigeTypography = buildScoreboardTypography()
+
+private fun buildScoreboardTypography(): VestigeTypography {
     // DisplayBig — Anton at scale. 56sp default; capture stats and pattern hero numbers
     // override up to ~96sp inline. `tnum` locks digit widths so scoreboard numbers don't
     // jitter when they update — ADR-011 §"Type stack" / "Tabular nums on stats".
-    val DisplayBig: TextStyle = TextStyle(
+    val displayBig = TextStyle(
         fontFamily = VestigeFonts.Display,
         fontWeight = FontWeight.Normal,
         fontSize = 56.sp,
@@ -33,63 +58,62 @@ object VestigeTextStyles {
         letterSpacing = (-0.01).em,
         fontFeatureSettings = "tnum",
     )
-
-    val H1: TextStyle = TextStyle(
-        fontFamily = VestigeFonts.Body,
-        fontWeight = FontWeight.Medium,
-        fontSize = 26.sp,
-        lineHeight = 32.sp,
-    )
-
-    val H2: TextStyle = TextStyle(
-        fontFamily = VestigeFonts.Body,
-        fontWeight = FontWeight.Medium,
-        fontSize = 22.sp,
-        lineHeight = 28.sp,
-    )
-
-    val P: TextStyle = TextStyle(
+    val p = TextStyle(
         fontFamily = VestigeFonts.Body,
         fontWeight = FontWeight.Normal,
         fontSize = 15.sp,
         lineHeight = 23.sp,
     )
-
-    val PersonaLabel: TextStyle = TextStyle(
-        fontFamily = VestigeFonts.Mono,
-        fontWeight = FontWeight.Bold,
-        fontSize = 10.sp,
-        letterSpacing = 0.20.em,
+    return VestigeTypography(
+        displayBig = displayBig,
+        h1 = TextStyle(
+            fontFamily = VestigeFonts.Body,
+            fontWeight = FontWeight.Medium,
+            fontSize = 26.sp,
+            lineHeight = 32.sp,
+        ),
+        h2 = TextStyle(
+            fontFamily = VestigeFonts.Body,
+            fontWeight = FontWeight.Medium,
+            fontSize = 22.sp,
+            lineHeight = 28.sp,
+        ),
+        p = p,
+        pCompact = p.copy(fontSize = 13.sp, lineHeight = 18.sp),
+        title = p.copy(fontWeight = FontWeight.Medium, fontSize = 18.sp, lineHeight = 24.sp),
+        titleCompact = p.copy(fontWeight = FontWeight.Medium, fontSize = 15.sp, lineHeight = 20.sp),
+        personaLabel = TextStyle(
+            fontFamily = VestigeFonts.Mono,
+            fontWeight = FontWeight.Bold,
+            fontSize = 10.sp,
+            letterSpacing = 0.20.em,
+        ),
+        eyebrow = TextStyle(
+            fontFamily = VestigeFonts.Mono,
+            fontWeight = FontWeight.SemiBold,
+            fontSize = 10.sp,
+            letterSpacing = 0.18.em,
+        ),
     )
-
-    val Eyebrow: TextStyle = TextStyle(
-        fontFamily = VestigeFonts.Mono,
-        fontWeight = FontWeight.SemiBold,
-        fontSize = 10.sp,
-        letterSpacing = 0.18.em,
-    )
-
-    val Title: TextStyle = P.copy(fontWeight = FontWeight.Medium, fontSize = 18.sp, lineHeight = 24.sp)
-
-    val TitleCompact: TextStyle = P.copy(fontWeight = FontWeight.Medium, fontSize = 15.sp, lineHeight = 20.sp)
-
-    val PCompact: TextStyle = P.copy(fontSize = 13.sp, lineHeight = 18.sp)
 }
 
-val VestigeTypography: Typography = Typography(
-    displayLarge = VestigeTextStyles.DisplayBig,
-    displayMedium = VestigeTextStyles.DisplayBig.copy(fontSize = 40.sp, lineHeight = 40.sp),
-    displaySmall = VestigeTextStyles.DisplayBig.copy(fontSize = 28.sp, lineHeight = 30.sp),
-    headlineLarge = VestigeTextStyles.H1,
-    headlineMedium = VestigeTextStyles.H2,
-    headlineSmall = VestigeTextStyles.H2,
-    titleLarge = VestigeTextStyles.Title,
-    titleMedium = VestigeTextStyles.Title,
-    titleSmall = VestigeTextStyles.TitleCompact,
-    bodyLarge = VestigeTextStyles.P,
-    bodyMedium = VestigeTextStyles.P.copy(fontSize = 14.sp, lineHeight = 20.sp),
-    bodySmall = VestigeTextStyles.PCompact,
-    labelLarge = VestigeTextStyles.Eyebrow.copy(fontSize = 12.sp, letterSpacing = 0.10.em),
-    labelMedium = VestigeTextStyles.Eyebrow,
-    labelSmall = VestigeTextStyles.PersonaLabel,
+internal val LocalVestigeTypography = staticCompositionLocalOf { ScoreboardTypography }
+
+/** M3 bridge — Material components resolve text through `MaterialTheme.typography.X`. */
+internal val M3Typography: Typography = Typography(
+    displayLarge = ScoreboardTypography.displayBig,
+    displayMedium = ScoreboardTypography.displayBig.copy(fontSize = 40.sp, lineHeight = 40.sp),
+    displaySmall = ScoreboardTypography.displayBig.copy(fontSize = 28.sp, lineHeight = 30.sp),
+    headlineLarge = ScoreboardTypography.h1,
+    headlineMedium = ScoreboardTypography.h2,
+    headlineSmall = ScoreboardTypography.h2,
+    titleLarge = ScoreboardTypography.title,
+    titleMedium = ScoreboardTypography.title,
+    titleSmall = ScoreboardTypography.titleCompact,
+    bodyLarge = ScoreboardTypography.p,
+    bodyMedium = ScoreboardTypography.p.copy(fontSize = 14.sp, lineHeight = 20.sp),
+    bodySmall = ScoreboardTypography.pCompact,
+    labelLarge = ScoreboardTypography.eyebrow.copy(fontSize = 12.sp, letterSpacing = 0.10.em),
+    labelMedium = ScoreboardTypography.eyebrow,
+    labelSmall = ScoreboardTypography.personaLabel,
 )

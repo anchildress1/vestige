@@ -20,7 +20,7 @@ import org.robolectric.annotation.GraphicsMode
  * instead of Robolectric's no-op canvas shadow.
  */
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [34], manifest = Config.NONE)
+@Config(sdk = [34], manifest = Config.NONE, application = android.app.Application::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 class AccentDrawScopeTest {
 
@@ -102,7 +102,7 @@ class AccentDrawScopeTest {
 
     @Test
     fun `drawDestructive paints destructive color across the receiver`() {
-        val bm = renderInBitmap(40, 40) { drawDestructive(cornerRadius = 4.dp) }
+        val bm = renderInBitmap(40, 40) { drawDestructive(cornerRadius = 4.dp, color = ErrorRed) }
         val pixel = bm.toPixelMap()[20, 20]
         assertTrue("red channel dominates destructive heat", pixel.red > pixel.green)
         assertTrue("red channel dominates destructive heat", pixel.red > pixel.blue)
@@ -111,7 +111,7 @@ class AccentDrawScopeTest {
 
     @Test
     fun `drawDestructive accepts pill radius (edge — large radius)`() {
-        val bm = renderInBitmap(40, 20) { drawDestructive(cornerRadius = 9999.dp) }
+        val bm = renderInBitmap(40, 20) { drawDestructive(cornerRadius = 9999.dp, color = ErrorRed) }
         assertTrue("stadium center painted", bm.alphaAt(20, 10) > 0.9f)
         assertEquals("stadium corner clipped", 0f, bm.alphaAt(0, 0), 0.01f)
     }

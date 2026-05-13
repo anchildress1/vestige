@@ -10,7 +10,6 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -43,11 +42,6 @@ import dev.anchildress1.vestige.ui.components.AppTop
 import dev.anchildress1.vestige.ui.components.AppTopStatus
 import dev.anchildress1.vestige.ui.components.VestigeSurface
 import dev.anchildress1.vestige.ui.patterns.PatternsHost
-import dev.anchildress1.vestige.ui.theme.Coral
-import dev.anchildress1.vestige.ui.theme.Ember
-import dev.anchildress1.vestige.ui.theme.Floor
-import dev.anchildress1.vestige.ui.theme.Lime
-import dev.anchildress1.vestige.ui.theme.VestigeTextStyles
 import dev.anchildress1.vestige.ui.theme.VestigeTheme
 
 class MainActivity : ComponentActivity() {
@@ -57,36 +51,32 @@ class MainActivity : ComponentActivity() {
         val container = (application as VestigeApplication).appContainer
         setContent {
             VestigeTheme {
-                Box(modifier = Modifier.fillMaxSize().background(Floor)) {
-                    var showPatterns by rememberSaveable { mutableStateOf(false) }
-                    if (showPatterns) {
-                        // Back unwinds patterns→shell; without this the activity exits and the user
-                        // loses their place in the rough Phase-3 nav.
-                        BackHandler { showPatterns = false }
-                        PatternsHost(
-                            patternStore = container.patternStore,
-                            patternRepo = container.patternRepo,
-                            entryStore = container.entryStore,
-                            onExit = { showPatterns = false },
-                            modifier = Modifier.fillMaxSize(),
+                var showPatterns by rememberSaveable { mutableStateOf(false) }
+                if (showPatterns) {
+                    // Back unwinds patterns→shell; without this the activity exits and the user
+                    // loses their place in the rough Phase-3 nav.
+                    BackHandler { showPatterns = false }
+                    PatternsHost(
+                        patternStore = container.patternStore,
+                        patternRepo = container.patternRepo,
+                        entryStore = container.entryStore,
+                        onExit = { showPatterns = false },
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                } else {
+                    val isDebuggable = (applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE) != 0
+                    // Default `containerColor` = `colorScheme.background` (= Floor) and default
+                    // `contentColor` = `onBackground` (= Ink) flow from VestigeTheme. No overrides.
+                    Scaffold(modifier = Modifier.fillMaxSize()) { padding ->
+                        PhaseOneShell(
+                            onOpenPatterns = { showPatterns = true },
+                            onDebugSeed = if (isDebuggable) {
+                                { DebugPatternSeeder.seed(filesDir, container.boxStore, container.patternStore) }
+                            } else {
+                                null
+                            },
+                            modifier = Modifier.padding(padding),
                         )
-                    } else {
-                        val isDebuggable = (applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE) != 0
-                        Scaffold(
-                            modifier = Modifier.fillMaxSize(),
-                            containerColor = androidx.compose.ui.graphics.Color.Transparent,
-                            contentColor = dev.anchildress1.vestige.ui.theme.Ink,
-                        ) { padding ->
-                            PhaseOneShell(
-                                onOpenPatterns = { showPatterns = true },
-                                onDebugSeed = if (isDebuggable) {
-                                    { DebugPatternSeeder.seed(filesDir, container.boxStore, container.patternStore) }
-                                } else {
-                                    null
-                                },
-                                modifier = Modifier.padding(padding),
-                            )
-                        }
                     }
                 }
             }
@@ -164,7 +154,7 @@ private fun phaseOneTopStatus(permissionGranted: Boolean, lastRequestDenied: Boo
         PhaseOneAppStatus.LOADING -> AppTopStatus(
             text = stringResource(R.string.app_top_loading),
             contentDescription = stringResource(R.string.app_top_loading_description),
-            color = Ember,
+            color = VestigeTheme.colors.ember,
             dot = false,
             blink = false,
         )
@@ -172,7 +162,7 @@ private fun phaseOneTopStatus(permissionGranted: Boolean, lastRequestDenied: Boo
         PhaseOneAppStatus.READY -> AppTopStatus(
             text = stringResource(R.string.app_top_ready),
             contentDescription = stringResource(R.string.app_top_ready_description),
-            color = Lime,
+            color = VestigeTheme.colors.lime,
             dot = true,
             blink = false,
         )
@@ -180,7 +170,7 @@ private fun phaseOneTopStatus(permissionGranted: Boolean, lastRequestDenied: Boo
         PhaseOneAppStatus.MIC_REQUIRED -> AppTopStatus(
             text = stringResource(R.string.app_top_mic_required),
             contentDescription = stringResource(R.string.mic_permission_denied),
-            color = Coral,
+            color = VestigeTheme.colors.coral,
             dot = false,
             blink = false,
         )
@@ -195,7 +185,7 @@ private fun PhaseOneShellCard(
     onDebugSeed: (() -> Unit)?,
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-        Text(text = stringResource(id = R.string.app_name), style = VestigeTextStyles.H1)
+        Text(text = stringResource(id = R.string.app_name), style = VestigeTheme.typography.h1)
 
         when {
             permissionGranted -> Text(text = stringResource(id = R.string.mic_permission_granted))

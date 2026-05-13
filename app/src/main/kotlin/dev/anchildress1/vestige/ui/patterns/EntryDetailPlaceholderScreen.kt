@@ -24,6 +24,7 @@ import dev.anchildress1.vestige.R
 import dev.anchildress1.vestige.storage.EntryEntity
 import dev.anchildress1.vestige.storage.EntryStore
 import dev.anchildress1.vestige.ui.components.VestigeSurface
+import dev.anchildress1.vestige.ui.theme.VestigeTheme
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -51,9 +52,9 @@ fun EntryDetailPlaceholderScreen(
         }
     }
 
+    // Theme-owned colors — M3 default `colorScheme.background` + `onBackground`.
     Scaffold(
         modifier = modifier,
-        containerColor = androidx.compose.ui.graphics.Color.Transparent,
         topBar = {
             TopAppBar(
                 title = { Text(text = stringResource(id = R.string.entry_detail_placeholder_title)) },
@@ -83,7 +84,7 @@ fun EntryDetailPlaceholderScreen(
             ) {
                 Text(
                     text = stringResource(id = R.string.entry_detail_placeholder_not_found),
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = VestigeTheme.colors.dim,
                 )
             }
 
@@ -100,7 +101,7 @@ fun EntryDetailPlaceholderScreen(
                         Text(
                             text = stringResource(id = R.string.entry_detail_placeholder_notice),
                             style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            color = VestigeTheme.colors.dim,
                         )
                         Text(text = uiState.entryText, style = MaterialTheme.typography.bodyLarge)
                     }

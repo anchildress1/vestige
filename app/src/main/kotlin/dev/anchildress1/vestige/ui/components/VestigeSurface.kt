@@ -1,7 +1,6 @@
 package dev.anchildress1.vestige.ui.components
 
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -9,13 +8,11 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.LocalContentColor
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
@@ -24,26 +21,20 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import dev.anchildress1.vestige.ui.theme.Dim
-import dev.anchildress1.vestige.ui.theme.Hair
-import dev.anchildress1.vestige.ui.theme.Ink
-import dev.anchildress1.vestige.ui.theme.RadiusTokens
-import dev.anchildress1.vestige.ui.theme.S1
-import dev.anchildress1.vestige.ui.theme.S2
-import dev.anchildress1.vestige.ui.theme.TapeGrain
+import dev.anchildress1.vestige.ui.theme.VestigeTheme
 
 private val SurfaceHairline: Dp = 1.dp
-internal val RowLabelColor: Color = Dim
-internal val RowValueColor: Color = Ink
 
 /** Spacing between tape-grain lines, in pixels — matches `poc/energy-tokens.jsx` TAPE_BG (4px). */
 internal const val TAPE_GRAIN_PERIOD_PX: Float = 4f
 
 /**
  * Horizontal printed-receipt grain per ADR-011 §"Surface texture". 1px line every 4px, low alpha.
- * Replaces the Mist noise-grain layer. Renders behind content; safe to chain after `.background`.
+ * Color resolves from `VestigeTheme.colors.tapeGrain`; the optional override is the only seam
+ * for tests / one-off visual demos and is not called from production code.
  */
-fun Modifier.tapeGrain(color: Color = TapeGrain): Modifier = drawWithCache {
+@Composable
+fun Modifier.tapeGrain(color: Color = VestigeTheme.colors.tapeGrain): Modifier = drawWithCache {
     onDrawBehind {
         val h = size.height
         val w = size.width
@@ -62,85 +53,87 @@ fun Modifier.tapeGrain(color: Color = TapeGrain): Modifier = drawWithCache {
 }
 
 /**
- * Card primitive per ADR-011: warm-espresso fill, tape-grain overlay, sharp hairline. No noise.
- * Provides [contentColor] locally so child text stays readable even when ambient containers are
- * transparent and don't supply a useful foreground.
+ * Card primitive per ADR-011 — M3 [Surface] handles container fill + `LocalContentColor`
+ * propagation. Vestige adds the tape-grain overlay and a hairline border in our brand outline
+ * token. No call-site color overrides; theme owns it.
  */
-@Suppress("LongParameterList") // Primitive API is intentionally explicit at the call site.
 @Composable
 fun VestigeSurface(
     modifier: Modifier = Modifier,
     accentModifier: Modifier = Modifier,
-    shape: Shape = RadiusTokens.XL,
-    fill: Color = S1,
-    contentColor: Color = Ink,
+    shape: Shape = VestigeTheme.shapes.xl,
     contentPadding: PaddingValues = PaddingValues(0.dp),
     content: @Composable () -> Unit,
 ) {
-    Box(
-        modifier = modifier
-            .clip(shape)
-            .background(fill, shape)
-            .tapeGrain()
-            .then(accentModifier)
-            .border(width = SurfaceHairline, color = Hair, shape = shape)
-            .padding(contentPadding),
+    val colors = VestigeTheme.colors
+    Surface(
+        modifier = modifier,
+        shape = shape,
+        color = colors.s1,
+        contentColor = colors.ink,
+        border = BorderStroke(SurfaceHairline, colors.hair),
     ) {
-        CompositionLocalProvider(LocalContentColor provides contentColor) {
+        Box(
+            modifier = Modifier
+                .tapeGrain()
+                .then(accentModifier)
+                .padding(contentPadding),
+        ) {
             content()
         }
     }
 }
 
-/** Key/value line — label [RowLabelColor], value [RowValueColor]. */
+/** Key/value line. Value inherits Ink via Surface's contentColor; label dims via `colors.dim`. */
 @Composable
 fun VestigeRow(
     label: String,
     value: String,
     modifier: Modifier = Modifier,
-    labelStyle: TextStyle = dev.anchildress1.vestige.ui.theme.VestigeTextStyles.Eyebrow,
-    valueStyle: TextStyle = dev.anchildress1.vestige.ui.theme.VestigeTextStyles.P,
+    labelStyle: TextStyle = VestigeTheme.typography.eyebrow,
+    valueStyle: TextStyle = VestigeTheme.typography.p,
 ) {
     Row(
         modifier = modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(text = label, style = labelStyle, color = RowLabelColor)
-        Text(text = value, style = valueStyle, color = RowValueColor)
+        Text(text = label, style = labelStyle, color = VestigeTheme.colors.dim)
+        Text(text = value, style = valueStyle)
     }
 }
 
-/**
- * Selectable [VestigeSurface] variant. With [onClick] the fill raises to [S2] and the surface
- * takes a button role.
- */
-@Suppress("LongParameterList") // Same primitive tradeoff: fewer wrappers, clearer call sites.
+/** Selectable [VestigeSurface] variant. With [onClick] the fill raises to `colors.s2`. */
 @Composable
+@Suppress("LongParameterList") // Same primitive tradeoff: fewer wrappers, clearer call sites.
 fun VestigeListCard(
     modifier: Modifier = Modifier,
     onClick: (() -> Unit)? = null,
     accentModifier: Modifier = Modifier,
-    shape: Shape = RadiusTokens.XL,
+    shape: Shape = VestigeTheme.shapes.xl,
     contentPadding: PaddingValues = PaddingValues(horizontal = 16.dp, vertical = 14.dp),
     content: @Composable () -> Unit,
 ) {
-    val interactionModifier = if (onClick != null) {
-        Modifier
-            .clip(shape)
-            .clickable(role = Role.Button, onClick = onClick)
+    val colors = VestigeTheme.colors
+    val rootModifier = if (onClick != null) {
+        modifier.clickable(role = Role.Button, onClick = onClick)
     } else {
-        Modifier
+        modifier
     }
-    VestigeSurface(
-        modifier = modifier.then(interactionModifier),
-        accentModifier = accentModifier,
+    Surface(
+        modifier = rootModifier,
         shape = shape,
-        fill = vestigeListCardFill(onClick),
-        contentColor = Ink,
-        contentPadding = contentPadding,
-        content = content,
-    )
+        color = if (onClick != null) colors.s2 else colors.s1,
+        contentColor = colors.ink,
+        border = BorderStroke(SurfaceHairline, colors.hair),
+    ) {
+        Box(
+            modifier = Modifier
+                .tapeGrain()
+                .then(accentModifier)
+                .padding(contentPadding),
+        ) {
+            content()
+        }
+    }
 }
-
-internal fun vestigeListCardFill(onClick: Any?): Color = if (onClick != null) S2 else S1

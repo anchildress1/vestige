@@ -1,7 +1,5 @@
 package dev.anchildress1.vestige.ui.patterns
 
-import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -9,7 +7,6 @@ import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -35,7 +32,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -45,15 +41,7 @@ import androidx.compose.ui.unit.dp
 import dev.anchildress1.vestige.R
 import dev.anchildress1.vestige.ui.components.VestigeListCard
 import dev.anchildress1.vestige.ui.components.limeLeftRuleForActive
-import dev.anchildress1.vestige.ui.theme.Ember
-import dev.anchildress1.vestige.ui.theme.Lime
-import dev.anchildress1.vestige.ui.theme.Teal
 import dev.anchildress1.vestige.ui.theme.VestigeTheme
-
-// Active patterns wear the electric-lime signal — matches `poc/Energy Direction.html` patterns frame.
-private val PatternAccent: Color = Lime
-private val SnoozedPatternAccent: Color = Ember
-private val SettledPatternAccent: Color = Teal
 
 @OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
@@ -92,9 +80,10 @@ fun PatternsListScreen(
         }
     }
 
+    // No containerColor override: M3 defaults to `colorScheme.background` (= Floor) and
+    // `contentColor` flows from `onBackground` (= Ink). Theme owns it.
     Scaffold(
         modifier = modifier,
-        containerColor = Color.Transparent,
         topBar = { TopAppBar(title = { Text(stringResource(R.string.patterns_title)) }) },
         snackbarHost = { PatternSnackbarHost(snackbarHostState) },
     ) { padding ->
@@ -161,7 +150,7 @@ private fun SectionHeader(section: PatternSection) {
     Text(
         text = stringResource(sectionHeaderRes(section)),
         style = MaterialTheme.typography.labelSmall,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        color = VestigeTheme.colors.dim,
         modifier = Modifier.padding(top = 4.dp, bottom = 4.dp),
     )
 }
@@ -172,7 +161,7 @@ private fun EmptyState(reason: PatternsListUiState.EmptyReason, modifier: Modifi
         Text(
             text = stringResource(emptyStateCopyRes(reason)),
             style = MaterialTheme.typography.bodyLarge,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            color = VestigeTheme.colors.dim,
         )
     }
 }
@@ -196,7 +185,7 @@ private fun PatternCard(
             },
         onClick = onClick,
         accentModifier = if (card.section == PatternSection.ACTIVE) {
-            Modifier.limeLeftRuleForActive(color = PatternAccent)
+            Modifier.limeLeftRuleForActive(color = VestigeTheme.colors.lime)
         } else {
             Modifier
         },
@@ -212,12 +201,12 @@ private fun PatternCard(
                     Text(
                         text = it,
                         style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        color = VestigeTheme.colors.dim,
                     )
                 }
                 Text(text = card.observation, style = MaterialTheme.typography.bodyMedium)
                 Spacer(modifier = Modifier.height(2.dp))
-                val traceBarStyle = patternCardTraceBarStyleFor(card.section)
+                val traceBarStyle = cardSectionToneFor(card.section).themedStyle()
                 TraceBarE(
                     hits = card.traceHits,
                     accent = traceBarStyle.accent,
@@ -234,7 +223,7 @@ private fun PatternCard(
                         card.lastSeenLabel,
                     ),
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = VestigeTheme.colors.dim,
                 )
             }
             OverflowMenu(
@@ -248,23 +237,10 @@ private fun PatternCard(
     }
 }
 
-internal fun patternCardTraceBarStyleFor(section: PatternSection): PatternIntensityStyle = when (section) {
-    PatternSection.ACTIVE -> PatternIntensityStyle(
-        accent = PatternAccent,
-        peak = true,
-    )
-
-    PatternSection.SNOOZED -> PatternIntensityStyle(
-        accent = SnoozedPatternAccent,
-        peak = false,
-    )
-
-    PatternSection.RESOLVED,
-    PatternSection.DISMISSED,
-    -> PatternIntensityStyle(
-        accent = SettledPatternAccent,
-        peak = false,
-    )
+internal fun cardSectionToneFor(section: PatternSection): IntensityTone = when (section) {
+    PatternSection.ACTIVE -> IntensityTone.ACTIVE_PEAK
+    PatternSection.SNOOZED -> IntensityTone.SNOOZED
+    PatternSection.RESOLVED, PatternSection.DISMISSED -> IntensityTone.SETTLED
 }
 
 @Composable

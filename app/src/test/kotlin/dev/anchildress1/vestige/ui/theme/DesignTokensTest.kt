@@ -80,12 +80,22 @@ class DesignTokensTest {
 
     @Test
     fun `radii match spec`() {
-        assertEquals(9999.dp, RadiusTokens.RPill)
-        assertEquals(18.dp, RadiusTokens.RXL)
-        assertEquals(12.dp, RadiusTokens.RL)
-        assertEquals(8.dp, RadiusTokens.RM)
-        assertEquals(4.dp, RadiusTokens.RS)
-        assertEquals(2.dp, RadiusTokens.RXS)
+        assertEquals(9999.dp, RPill)
+        assertEquals(18.dp, RXL)
+        assertEquals(12.dp, RL)
+        assertEquals(8.dp, RM)
+        assertEquals(4.dp, RS)
+        assertEquals(2.dp, RXS)
+    }
+
+    @Test
+    fun `Scoreboard shapes wrap the raw radii`() {
+        assertEquals(androidx.compose.foundation.shape.RoundedCornerShape(RPill), ScoreboardShapes.pill)
+        assertEquals(androidx.compose.foundation.shape.RoundedCornerShape(RXL), ScoreboardShapes.xl)
+        assertEquals(androidx.compose.foundation.shape.RoundedCornerShape(RL), ScoreboardShapes.l)
+        assertEquals(androidx.compose.foundation.shape.RoundedCornerShape(RM), ScoreboardShapes.m)
+        assertEquals(androidx.compose.foundation.shape.RoundedCornerShape(RS), ScoreboardShapes.s)
+        assertEquals(androidx.compose.foundation.shape.RoundedCornerShape(RXS), ScoreboardShapes.xs)
     }
 
     @Test
@@ -100,7 +110,7 @@ class DesignTokensTest {
 
     @Test
     fun `DisplayBig is condensed display at 56sp with tabular nums`() {
-        val style = VestigeTextStyles.DisplayBig
+        val style = ScoreboardTypography.displayBig
         assertEquals(VestigeFonts.Display, style.fontFamily)
         assertEquals(56f, style.fontSize.value)
         // ADR-011 §"Type stack" — stat numbers must not jitter on update. `tnum` locks digit widths.
@@ -115,28 +125,28 @@ class DesignTokensTest {
 
     @Test
     fun `H1 is body 26sp`() {
-        val style = VestigeTextStyles.H1
+        val style = ScoreboardTypography.h1
         assertEquals(VestigeFonts.Body, style.fontFamily)
         assertEquals(26f, style.fontSize.value)
     }
 
     @Test
     fun `H2 is body 22sp`() {
-        val style = VestigeTextStyles.H2
+        val style = ScoreboardTypography.h2
         assertEquals(VestigeFonts.Body, style.fontFamily)
         assertEquals(22f, style.fontSize.value)
     }
 
     @Test
     fun `P is body 15sp`() {
-        val style = VestigeTextStyles.P
+        val style = ScoreboardTypography.p
         assertEquals(VestigeFonts.Body, style.fontFamily)
         assertEquals(15f, style.fontSize.value)
     }
 
     @Test
     fun `PersonaLabel is mono 10sp with 0_20em tracking`() {
-        val style = VestigeTextStyles.PersonaLabel
+        val style = ScoreboardTypography.personaLabel
         assertEquals(VestigeFonts.Mono, style.fontFamily)
         assertEquals(10f, style.fontSize.value)
         assertEquals(0.20f, style.letterSpacing.value, 0.0001f)
@@ -144,18 +154,18 @@ class DesignTokensTest {
 
     @Test
     fun `Eyebrow is mono 10sp with 0_18em tracking`() {
-        val style = VestigeTextStyles.Eyebrow
+        val style = ScoreboardTypography.eyebrow
         assertEquals(VestigeFonts.Mono, style.fontFamily)
         assertEquals(10f, style.fontSize.value)
         assertEquals(0.18f, style.letterSpacing.value, 0.0001f)
     }
 
     @Test
-    fun `screen facing typography slots map to vestige styles`() {
-        assertEquals(VestigeTextStyles.Title, VestigeTypography.titleLarge)
-        assertEquals(VestigeTextStyles.Title, VestigeTypography.titleMedium)
-        assertEquals(VestigeTextStyles.TitleCompact, VestigeTypography.titleSmall)
-        assertEquals(VestigeTextStyles.H2, VestigeTypography.headlineSmall)
-        assertEquals(VestigeTextStyles.PCompact, VestigeTypography.bodySmall)
+    fun `M3 typography bridge maps to Scoreboard slots`() {
+        assertEquals(ScoreboardTypography.title, M3Typography.titleLarge)
+        assertEquals(ScoreboardTypography.title, M3Typography.titleMedium)
+        assertEquals(ScoreboardTypography.titleCompact, M3Typography.titleSmall)
+        assertEquals(ScoreboardTypography.h2, M3Typography.headlineSmall)
+        assertEquals(ScoreboardTypography.pCompact, M3Typography.bodySmall)
     }
 }

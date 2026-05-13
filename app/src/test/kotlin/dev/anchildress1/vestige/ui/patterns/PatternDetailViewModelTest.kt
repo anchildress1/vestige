@@ -54,7 +54,9 @@ class PatternDetailViewModelTest {
     @Before
     fun setUp() {
         Dispatchers.setMain(testDispatcher)
-        val tempRoot = File("/private/tmp/vestige-pattern-detail-viewmodel-tests").apply { mkdirs() }
+        val tempRoot = File(System.getProperty("java.io.tmpdir"), "vestige-pattern-detail-viewmodel-tests").apply {
+            mkdirs()
+        }
         dataDir = File(tempRoot, "ob-patterns-detail-${System.nanoTime()}").apply { mkdirs() }
         markdownDir = File(tempRoot, "md-${System.nanoTime()}").apply { mkdirs() }
         boxStore = VestigeBoxStore.openAt(dataDir)

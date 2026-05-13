@@ -33,6 +33,11 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
@@ -103,6 +108,9 @@ fun StatusDot(
     val alpha = if (blink) rememberSbBlink(periodMs = VestigeMotion.BLINK_MS).value else 1f
     Box(
         modifier = modifier
+            // Decorative — the surrounding pill announces its label and the dot is purely visual.
+            // Hiding it from a11y keeps TalkBack from announcing a meaningless region.
+            .clearAndSetSemantics { }
             .size(size)
             .alpha(alpha)
             .drawBehind {
@@ -172,7 +180,16 @@ fun Delta(value: Int, modifier: Modifier = Modifier, label: String? = null) {
         negative -> "▼${-value}"
         else -> "—"
     }
-    Row(modifier = modifier, verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+    val a11y = when {
+        positive -> "up $value${label?.let { " $it" }.orEmpty()}"
+        negative -> "down ${-value}${label?.let { " $it" }.orEmpty()}"
+        else -> "no change${label?.let { ", $it" }.orEmpty()}"
+    }
+    Row(
+        modifier = modifier.semantics(mergeDescendants = true) { contentDescription = a11y },
+        verticalAlignment = Alignment.Bottom,
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
         Text(
             text = glyph,
             style = TextStyle(
@@ -302,14 +319,23 @@ fun AppTop(
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        TappableChrome(onClick = onStatusTap, alignment = Alignment.CenterStart) {
+        val statusLabel = if (recording) "Recording. Local model active." else "Local model ready: Gemma 4."
+        TappableChrome(
+            onClick = onStatusTap,
+            alignment = Alignment.CenterStart,
+            a11yLabel = statusLabel,
+        ) {
             if (recording) {
                 Pill(text = "ON AIR · LIVE", color = Coral, dot = true, blink = true, fill = false)
             } else {
                 Pill(text = "LOCAL · GEMMA 4", color = Lime, dot = true, blink = true, fill = false)
             }
         }
-        TappableChrome(onClick = onPersonaTap, alignment = Alignment.CenterEnd) {
+        TappableChrome(
+            onClick = onPersonaTap,
+            alignment = Alignment.CenterEnd,
+            a11yLabel = "Active persona $persona. Change persona.",
+        ) {
             Pill(text = "$persona ▾", color = Ink, fill = false)
         }
     }
@@ -322,11 +348,20 @@ fun AppTop(
  * tap anywhere in the slop animates the pill-shaped ripple.
  */
 @Composable
-private fun TappableChrome(onClick: () -> Unit, alignment: Alignment, content: @Composable () -> Unit) {
+private fun TappableChrome(
+    onClick: () -> Unit,
+    alignment: Alignment,
+    a11yLabel: String,
+    content: @Composable () -> Unit,
+) {
     val interactionSource = remember { MutableInteractionSource() }
     Box(
         modifier = Modifier
             .sizeIn(minHeight = MinTapTarget)
+            .semantics(mergeDescendants = true) {
+                role = Role.Button
+                contentDescription = a11yLabel
+            }
             .clickable(
                 interactionSource = interactionSource,
                 indication = null,

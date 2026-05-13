@@ -1,9 +1,11 @@
 package dev.anchildress1.vestige
 
 import android.Manifest
+import android.content.pm.ApplicationInfo
 import android.content.pm.PackageManager
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -32,16 +34,42 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
+import dev.anchildress1.vestige.debug.DebugPatternSeeder
+import dev.anchildress1.vestige.ui.patterns.PatternsHost
 import dev.anchildress1.vestige.ui.theme.VestigeTheme
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        val container = (application as VestigeApplication).appContainer
         setContent {
             VestigeTheme {
-                Scaffold(modifier = Modifier.fillMaxSize()) { padding ->
-                    PhaseOneShell(modifier = Modifier.padding(padding))
+                var showPatterns by rememberSaveable { mutableStateOf(false) }
+                if (showPatterns) {
+                    // Back unwinds patterns→shell; without this the activity exits and the user
+                    // loses their place in the rough Phase-3 nav.
+                    BackHandler { showPatterns = false }
+                    PatternsHost(
+                        patternStore = container.patternStore,
+                        patternRepo = container.patternRepo,
+                        entryStore = container.entryStore,
+                        onExit = { showPatterns = false },
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                } else {
+                    val isDebuggable = (applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE) != 0
+                    Scaffold(modifier = Modifier.fillMaxSize()) { padding ->
+                        PhaseOneShell(
+                            onOpenPatterns = { showPatterns = true },
+                            onDebugSeed = if (isDebuggable) {
+                                { DebugPatternSeeder.seed(filesDir, container.boxStore, container.patternStore) }
+                            } else {
+                                null
+                            },
+                            modifier = Modifier.padding(padding),
+                        )
+                    }
                 }
             }
         }
@@ -55,7 +83,11 @@ class MainActivity : ComponentActivity() {
  * dev runs (Story 1.4). Polished onboarding copy and surfaces ship in Phase 4.
  */
 @Composable
-private fun PhaseOneShell(modifier: Modifier = Modifier) {
+private fun PhaseOneShell(
+    onOpenPatterns: () -> Unit = {},
+    onDebugSeed: (() -> Unit)? = null,
+    modifier: Modifier = Modifier,
+) {
     val context = LocalContext.current
     var permissionGranted by rememberSaveable {
         mutableStateOf(
@@ -98,6 +130,22 @@ private fun PhaseOneShell(modifier: Modifier = Modifier) {
             modifier = Modifier.semantics { role = Role.Button },
         ) {
             Text(text = stringResource(id = R.string.mic_permission_request))
+        }
+
+        Button(
+            onClick = onOpenPatterns,
+            modifier = Modifier.semantics { role = Role.Button },
+        ) {
+            Text(text = stringResource(id = R.string.open_patterns))
+        }
+
+        onDebugSeed?.let { seed ->
+            Button(
+                onClick = seed,
+                modifier = Modifier.semantics { role = Role.Button },
+            ) {
+                Text(text = stringResource(id = R.string.debug_seed_patterns))
+            }
         }
     }
 }

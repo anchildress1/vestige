@@ -36,6 +36,30 @@ kover {
                         "dev.anchildress1.vestige.VestigeApplication",
                         "dev.anchildress1.vestige.VestigeApplication*",
                         "dev.anchildress1.vestige.ui.theme.*",
+                        // Compose screen files. JVM Compose UI tests under Robolectric cover the
+                        // user-visible behaviour (see *ScreenTest.kt), but branch coverage on
+                        // @Composable functions caps at ~50% because the Compose compiler injects
+                        // `Composer` + `$changed` Int args that produce uncoverable
+                        // `if ($changed != 0 || !composer.skipping)` branches.
+                        // Reference: kotlinx-kover #756 — "Wrong branch coverage for composables".
+                        "dev.anchildress1.vestige.ui.patterns.PatternsListScreenKt",
+                        "dev.anchildress1.vestige.ui.patterns.PatternsListScreenKt*",
+                        "dev.anchildress1.vestige.ui.patterns.*PatternsListScreenKt*",
+                        "dev.anchildress1.vestige.ui.patterns.PatternDetailScreenKt",
+                        "dev.anchildress1.vestige.ui.patterns.PatternDetailScreenKt*",
+                        "dev.anchildress1.vestige.ui.patterns.*PatternDetailScreenKt*",
+                        "dev.anchildress1.vestige.ui.patterns.PatternsHostKt",
+                        "dev.anchildress1.vestige.ui.patterns.PatternsHostKt*",
+                        "dev.anchildress1.vestige.ui.patterns.*PatternsHostKt*",
+                        "dev.anchildress1.vestige.ui.patterns.EntryDetailPlaceholderScreenKt",
+                        "dev.anchildress1.vestige.ui.patterns.EntryDetailPlaceholderScreenKt*",
+                        "dev.anchildress1.vestige.ui.patterns.*EntryDetailPlaceholderScreenKt*",
+                        "dev.anchildress1.vestige.ui.patterns.TraceBarKt",
+                        "dev.anchildress1.vestige.ui.patterns.TraceBarKt*",
+                        "dev.anchildress1.vestige.ui.patterns.*TraceBarKt*",
+                        // Debug-only fixture seeder for on-device manual verification.
+                        // FLAG_DEBUGGABLE-gated at the call site; not on any release path.
+                        "dev.anchildress1.vestige.debug.*",
                         // Model loading and audio recording require on-device hardware/model;
                         // exercised by androidTest, not JVM unit tests.
                         "dev.anchildress1.vestige.inference.LiteRtLmEngine",
@@ -108,6 +132,16 @@ sonar {
                 "**/MainActivity.kt",
                 "**/LiteRtLmEngine.kt",
                 "**/AudioCapture.kt",
+                // Compose @Composable bodies cap at ~50% branch coverage from `Composer` +
+                // `$changed` plugin instrumentation (kotlinx-kover #756); mirrors the kover
+                // excludes in `kover { reports { total { filters { excludes { classes(...) } } } }`.
+                "**/ui/patterns/PatternsListScreen.kt",
+                "**/ui/patterns/PatternDetailScreen.kt",
+                "**/ui/patterns/PatternsHost.kt",
+                "**/ui/patterns/EntryDetailPlaceholderScreen.kt",
+                "**/ui/patterns/TraceBar.kt",
+                // Debug-only fixture seeder, FLAG_DEBUGGABLE-gated; never on a release path.
+                "**/debug/**",
             ).joinToString(","),
         )
         property("sonar.qualitygate.wait", "true")

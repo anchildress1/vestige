@@ -13,4 +13,50 @@
     <string name="notification_channel_local_processing_name">Local processing</string>
     <string name="notification_channel_local_processing_description">Status notification while Vestige reads an entry locally.</string>
     <string name="notification_local_processing_text">Reading the entry.</string>
+
+    <!-- Phase 3 rough nav: in-app entry point into the Patterns surface. Phase 4 replaces with a real nav graph. -->
+    <string name="open_patterns">View patterns</string>
+
+    <!-- Debug-only fixture seeder for Stories 3.9 / 3.10 manual verification. Hidden in release per FLAG_DEBUGGABLE gate. -->
+    <string name="debug_seed_patterns">[DEBUG] Seed sample patterns</string>
+
+    <!-- Phase 3 placeholder source-entry surface. Phase 4 replaces this with the real history detail screen. -->
+    <string name="entry_detail_placeholder_title">Entry</string>
+    <string name="entry_detail_placeholder_notice">History detail ships in Phase 4. For now, this proves the source link is live.</string>
+    <string name="entry_detail_placeholder_not_found">Entry not found.</string>
+
+    <!-- Patterns list + detail surface. Mirrors poc/screens-patterns.jsx + ux-copy.md §"Pattern List / Detail". -->
+    <string name="patterns_title">Patterns</string>
+    <string name="patterns_empty_no_entries">Insufficient data.</string>
+    <string name="patterns_empty_no_patterns">Nothing repeating yet.</string>
+    <string name="pattern_detail_seen_in">Seen in:</string>
+    <string name="pattern_detail_no_sources">No source entries.</string>
+    <string name="pattern_detail_not_found">Pattern not found.</string>
+    <string name="pattern_detail_intensity_eyebrow">INTENSITY · 30 DAYS</string>
+    <string name="pattern_action_dismiss">Dismiss</string>
+    <string name="pattern_action_snooze_7_days">Snooze 7 days</string>
+    <string name="pattern_action_mark_resolved">Mark resolved</string>
+    <string name="pattern_actions_overflow_description">Pattern actions</string>
+    <string name="pattern_back_description">Back</string>
+    <string name="pattern_undo">Undo</string>
+    <string name="snackbar_dismissed">Dismissed.</string>
+    <string name="snackbar_snoozed_7_days">Snoozed 7 days.</string>
+    <string name="snackbar_marked_resolved">Marked resolved.</string>
+
+    <!-- Patterns list section headers per poc/screens-patterns.jsx. -->
+    <string name="patterns_section_active">ACTIVE</string>
+    <string name="patterns_section_snoozed">SNOOZED · STILL DRIFTING</string>
+    <string name="patterns_section_resolved">RESOLVED · FADED</string>
+    <string name="patterns_section_dismissed">DISMISSED</string>
+
+    <!-- Pattern card source-count + last-seen meta line. Phase 4 can localise the date format. -->
+    <string name="pattern_card_meta">%1$d of %2$d entries · Last seen %3$s</string>
+
+    <!-- Pattern detail terminal-state sublines. The `%1$s` slot receives the formatted date. -->
+    <string name="pattern_terminal_resolved">Marked resolved %1$s.</string>
+    <string name="pattern_terminal_dismissed">Dismissed %1$s.</string>
+
+    <!-- Phase 3 placeholder overflow glyph fallback for the system A11Y description. -->
+    <string name="pattern_overflow_glyph">⋮</string>
+    <string name="pattern_back_glyph">←</string>
 </resources>

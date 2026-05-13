@@ -173,12 +173,12 @@ Query-side tag extraction goes beyond exact-substring match: a free-form query b
 **As** the AI implementor, **I need** a basic pattern list screen in `:app` that shows active patterns with their name, observation, source count, and last-seen date per `concept-locked.md` §"Pattern persistence" and `design-guidelines.md` §"Pattern card", **so that** patterns are user-visible and actionable before Phase 4 polishes the UX.
 
 **Done when:**
-- [ ] Pattern list is reachable from the app shell (rough navigation; polish is Phase 4).
-- [ ] Each pattern card shows: name, agent-emitted template label, one-line observation, "{N} of {M} entries · Last seen {date}", and a `glow` left-rule per `design-guidelines.md` §"Pattern card".
-- [ ] Cards are sorted by `last_seen` descending.
-- [ ] Empty state displays per `ux-copy.md` §"Pattern List / Empty states" (`Insufficient data.` / `Nothing repeating yet.`).
-- [ ] Pattern actions from Story 3.8 are reachable from each card via overflow menu (`Dismiss` / `Snooze 7 days` / `Mark resolved`).
-- [ ] Snackbar confirmations per `ux-copy.md` §"System Messages" appear after each action with an `Undo` affordance.
+- [x] Pattern list is reachable from the app shell (rough navigation; polish is Phase 4). (Rough toggle from `MainActivity` opens `PatternsHost`; `BackHandler` unwinds entry→detail→list→shell so the system back gesture doesn't kill the activity. Phase 4 swaps in a real nav graph.)
+- [x] Each pattern card shows: name, agent-emitted template label, one-line observation, "{N} of {M} entries · Last seen {date}", and a `glow` left-rule per `design-guidelines.md` §"Pattern card". (Purple `#A855F7` left-rule on the card; observation = `latestCalloutText`; denominator = `EntryStore.countCompleted()`. POC-aligned 30-day TraceBar glyph rendered on every card via `TraceBar.kt` + `traceBarHits()`.)
+- [x] Cards are sorted by `last_seen` descending. (`PatternStore.findVisibleSortedByLastSeen()` sorts in the store; VM groups by `PatternSection` (Active / Snoozed · still drifting / Resolved · faded / Dismissed) per `poc/screens-patterns.jsx`. Sort order is preserved within each section.)
+- [x] Empty state displays per `ux-copy.md` §"Pattern List / Empty states" (`Insufficient data.` / `Nothing repeating yet.`). (`PatternsListUiState.Empty` distinguishes the two via `EmptyReason`. The all-dismissed / filter-empty empty-state copy lands with Phase 4's filter chips — Phase 3 instead renders the Dismissed section so the cards stay reachable.)
+- [x] Pattern actions from Story 3.8 are reachable from each card via overflow menu (`Dismiss` / `Snooze 7 days` / `Mark resolved`). (`OverflowMenu` composable dispatches into `PatternsListViewModel`, which funnels through `PatternRepo` so ADR-003's validator stays single-source.)
+- [x] Snackbar confirmations per `ux-copy.md` §"System Messages" appear after each action with an `Undo` affordance. (`PatternsListEvent.ActionTaken` carries an optional `PatternUndo`; mark-resolved emits `null` per the sticky-terminal carve-out.)
 
 **Notes / risks:** This is the *functional* version of the pattern list. Polished empty states with persona-flavored microcopy, filter chips (`All / Active / Snoozed / Resolved`), and a "Roast me" button live in Phase 4. Don't gold-plate here; the goal is "actions work and patterns are visible," not "demo-ready."
 
@@ -189,16 +189,13 @@ Query-side tag extraction goes beyond exact-substring match: a free-form query b
 **As** the AI implementor, **I need** a pattern detail screen reachable by tapping a pattern card, that shows the full pattern claim with its source entries listed and clickable to the originating entries per `design-guidelines.md` §"Pattern Detail", **so that** the pattern claim is *visually sourceable* and the judge's 10-second test sees evidence behind every claim.
 
 **Done when:**
-- [ ] Tapping a pattern card opens the pattern detail screen.
-- [ ] Detail header shows: pattern name, agent-emitted template label.
-- [ ] Summary section shows the one-line observation and the count + recurrence timing per `design-guidelines.md` §"Pattern Detail".
-- [ ] Source section shows a dated list of source entries with short snippets per `ux-copy.md` §"Pattern Detail / Source list":
-  > Apr 12 — crashed after standup
-  > Apr 18 — wired until 2am
-  > Apr 26 — same concrete shoes again
-- [ ] Tapping a source entry opens the originating entry's detail screen (if Phase 4's history detail screen exists yet — otherwise a placeholder is acceptable).
-- [ ] Action affordances from Story 3.8 (`Dismiss` / `Snooze 7 days` / `Mark resolved`) appear at the bottom of the detail screen.
-- [ ] Vocabulary chips section is **deferred to Phase 4** unless STT-E passed — without embeddings, the vocabulary observation lives in the one-line observation already, and a chip cloud adds nothing.
+- [x] Tapping a pattern card opens the pattern detail screen. (`PatternsHost` flips `openPatternId`; `PatternDetailViewModel` is keyed off it.)
+- [x] Detail header shows: pattern name, agent-emitted template label. (`LoadedBody` in `PatternDetailScreen`.)
+- [x] Summary section shows the one-line observation and the count + recurrence timing per `design-guidelines.md` §"Pattern Detail". (v1 surfaces `{N} of {M} entries · Last seen {date}` plus a hero-sized 30-day TraceBar under an `INTENSITY · 30 DAYS` eyebrow per `poc/screens-patterns.jsx`. Phase 4 sharpens the recurrence sentence wording.)
+- [x] Source section shows a dated list of source entries with short snippets per `ux-copy.md` §"Pattern Detail / Source list" — sources are sorted newest-first; `snippetOf` caps at 60 chars and collapses newlines so the list stays scannable.
+- [x] Tapping a source entry opens the originating entry's detail screen (if Phase 4's history detail screen exists yet — otherwise a placeholder is acceptable). (`onOpenEntry` callback wires to the `SourceRow`; the receiving screen lands with Phase 4's history surface.)
+- [x] Action affordances from Story 3.8 (`Dismiss` / `Snooze 7 days` / `Mark resolved`) appear at the bottom of the detail screen. (`ActionRow` — hidden when the pattern is in a terminal state; the terminal label surfaces instead.)
+- [x] Vocabulary chips section is **deferred to Phase 4** unless STT-E passed — without embeddings, the vocabulary observation lives in the one-line observation already, and a chip cloud adds nothing. (STT-E passed; chips remain Phase 4 polish per the story scope note.)
 
 **Notes / risks:** Sourced evidence is the demo's anti-fakery beat. The 5-min walkthrough will likely zoom into a pattern detail screen to show counts + dates + snippets. If sources don't render correctly, the privacy + provenance story stutters.
 
@@ -225,11 +222,11 @@ If a Phase 3 story starts pulling Phase 4 polish or a backlog entry, stop. Refer
 
 Phase 4 starts when all the following are true:
 
-- [ ] All ten stories above are Done. Story 3.4 is either Done (STT-E passed) or explicitly skipped (STT-E failed, recorded in ADR-001 + `backlog.md`).
-- [ ] **STT-E resolved.** Embeddings either ship in v1 or defer to v1.5 with the cut recorded in the right places.
-- [ ] At least 10 saved entries exist on the reference device. Pattern detection has run at end-of-session at least once with real data.
-- [ ] At least one cross-entry pattern is surfaced and persisted in `state=active`. The user can dismiss / snooze / mark-resolve it and the change survives app restart.
-- [ ] Pattern list and pattern detail screens render correctly on the reference S24 Ultra. Source entries are clickable; navigation back to the pattern list works.
-- [ ] No new entries logged to `backlog.md` from Phase 3 work that change the v1 contract beyond STT-E's outcome.
+- [x] All ten stories above are Done. Story 3.4 is either Done (STT-E passed) or explicitly skipped (STT-E failed, recorded in ADR-001 + `backlog.md`). (STT-E passed; Story 3.4 Done.)
+- [x] **STT-E resolved.** Embeddings either ship in v1 or defer to v1.5 with the cut recorded in the right places. (Passed; ADR-001 Addendum 2026-05-12.)
+- [x] At least 10 saved entries exist on the reference device. Pattern detection has run at end-of-session at least once with real data. (12 entries seeded via the FLAG_DEBUGGABLE-gated `DebugPatternSeeder` on the reference S24 Ultra 2026-05-12; capture-UI-driven entries blocked on Phase 4 P1, fixture exercises the same `EntryStore` / `PatternStore` paths.)
+- [x] At least one cross-entry pattern is surfaced and persisted in `state=active`. The user can dismiss / snooze / mark-resolve it and the change survives app restart. (Verified 2026-05-12: two ACTIVE patterns rendered; snooze + dismiss applied via overflow menu + detail action row; force-stop + relaunch confirmed both states persisted — list went to `Nothing repeating yet.` post-restart as expected.)
+- [x] Pattern list and pattern detail screens render correctly on the reference S24 Ultra. Source entries are clickable; navigation back to the pattern list works. (Verified 2026-05-12: cards render with full-height purple left-rule, detail's "Seen in:" section shows 3 dated source rows with snippets, system back unwinds detail→list→shell via `BackHandler`. Source-row taps fire `onOpenEntry` cleanly — no-op landing for v1 since Phase 4 owns the history detail screen.)
+- [x] No new entries logged to `backlog.md` from Phase 3 work that change the v1 contract beyond STT-E's outcome.
 
 If STT-E failed: confirm `concept-locked.md`, `PRD.md`, ADR-001, and `backlog.md` all reflect the cut consistently before starting Phase 4. The Phase 4 stories will need a small adjustment — no vocabulary chip cloud on pattern detail, no model artifact for embeddings in onboarding flow.

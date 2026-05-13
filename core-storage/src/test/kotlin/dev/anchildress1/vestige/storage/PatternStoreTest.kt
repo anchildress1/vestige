@@ -178,6 +178,51 @@ class PatternStoreTest {
     }
 
     @Test
+    fun `findVisibleSortedByLastSeen surfaces all four user-visible states newest-first`() {
+        val base = now.toEpochMilli()
+        seed(state = PatternState.ACTIVE, patternId = "a".repeat(64)).also {
+            it.lastSeenTimestamp = base - 400
+            store.put(it)
+        }
+        seed(state = PatternState.SNOOZED, patternId = "b".repeat(64)).also {
+            it.lastSeenTimestamp = base - 300
+            it.snoozedUntil = base + 86_400_000
+            store.put(it)
+        }
+        seed(state = PatternState.RESOLVED, patternId = "c".repeat(64)).also {
+            it.lastSeenTimestamp = base - 200
+            store.put(it)
+        }
+        seed(state = PatternState.DISMISSED, patternId = "d".repeat(64)).also {
+            it.lastSeenTimestamp = base - 100
+            store.put(it)
+        }
+        // Hidden internal state — must not appear in the visible result set.
+        seed(state = PatternState.BELOW_THRESHOLD, patternId = "e".repeat(64)).also {
+            it.lastSeenTimestamp = base - 50
+            store.put(it)
+        }
+
+        val visible = store.findVisibleSortedByLastSeen()
+        val ids = visible.map { it.patternId }
+        assertEquals(
+            listOf("d".repeat(64), "c".repeat(64), "b".repeat(64), "a".repeat(64)),
+            ids,
+        )
+    }
+
+    @Test
+    fun `findVisibleSortedByLastSeen returns empty when the table only holds BELOW_THRESHOLD rows`() {
+        seed(state = PatternState.BELOW_THRESHOLD, patternId = "z".repeat(64))
+        assertEquals(emptyList<PatternEntity>(), store.findVisibleSortedByLastSeen())
+    }
+
+    @Test
+    fun `findVisibleSortedByLastSeen returns empty on an empty table`() {
+        assertEquals(emptyList<PatternEntity>(), store.findVisibleSortedByLastSeen())
+    }
+
+    @Test
     fun `state survives BoxStore restart`() {
         val seeded = seed()
         store.transitionState(seeded.patternId, PatternState.SNOOZED, snoozedUntilMs = now.toEpochMilli() + 1_000)

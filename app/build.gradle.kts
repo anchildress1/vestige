@@ -160,6 +160,18 @@ dependencies {
     testImplementation(libs.turbine)
     testImplementation(libs.kotlinx.coroutines.test)
     testImplementation(libs.robolectric)
+    // Compose UI tests run under Robolectric on the JVM — same `src/test/` tree as the rest of
+    // the suite. ui-test-manifest provides the no-op activity host createComposeRule needs.
+    // Explicit androidx.test.ext:junit pin overrides the 1.1.5 transitive that compose-ui-test
+    // pulls in; we only trust 1.2.1+ in gradle/verification-metadata.xml.
+    testImplementation(platform(libs.compose.bom))
+    testImplementation(libs.compose.ui.test.junit4)
+    testImplementation(libs.compose.ui.test.manifest)
+    testImplementation(libs.androidx.test.ext.junit)
+    // ui-test-junit4 (from Compose BoM 2026.05.00) drags in older espresso/runner/annotation
+    // transitives than the trusted set in gradle/verification-metadata.xml. Pin to the trusted
+    // versions instead of widening the metadata trust list.
+    testImplementation(libs.androidx.test.espresso.core)
 
     androidTestImplementation(libs.androidx.test.ext.junit)
     androidTestImplementation(libs.androidx.test.espresso.core)
@@ -169,6 +181,11 @@ dependencies {
 
 tasks.withType<Test>().configureEach {
     useJUnitPlatform()
+    // ObjectBox loads its JNI native lib once per JVM. Compose UI tests (createComposeRule)
+    // interleave with ObjectBox-backed tests and a second test class can't re-System.load the
+    // same .so, leaving NativeLibraryLoader in a poisoned state. Forking per class isolates
+    // the native-lib state and is the canonical 2026 Compose+Robolectric guidance.
+    forkEvery = 1
 }
 
 // Privacy gate per ADR-001 §Q7 + AGENTS.md guardrail 13. Walks the release runtime classpath

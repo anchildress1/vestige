@@ -299,7 +299,13 @@ Header:
 Action button (top right):
 > **Roast me**
 
-Filter chips (small, secondary text):
+Section headers (uppercase, mono eyebrow — one per non-empty section per `poc/screens-patterns.jsx`):
+> ACTIVE
+> SNOOZED · STILL DRIFTING
+> RESOLVED · FADED
+> DISMISSED
+
+Filter chips (small, secondary text — Phase 4 polish on top of the section structure):
 > All · Active · Snoozed · Resolved
 
 Pattern card structure:
@@ -336,6 +342,9 @@ Summary observation (one line, primary text):
 
 Stats row:
 > {N} of {M} entries · {timing detail, e.g., "All on Tuesdays in the last 6 weeks"}
+
+Intensity strip eyebrow (above the hero TraceBar):
+> INTENSITY · 30 DAYS
 
 Source section header:
 > **Seen in:**

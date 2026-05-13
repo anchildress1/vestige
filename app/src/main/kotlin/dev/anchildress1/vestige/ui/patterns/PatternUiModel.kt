@@ -1,5 +1,7 @@
 package dev.anchildress1.vestige.ui.patterns
 
+import dev.anchildress1.vestige.model.PatternState
+
 /** Card row payload for the Patterns list. Pure UI — no ObjectBox handles leak past the VM. */
 data class PatternCardUi(
     val patternId: String,
@@ -57,13 +59,20 @@ sealed interface PatternDetailUiState {
         val lastSeenLabel: String,
         val sources: List<PatternSourceUi>,
         val traceHits: Set<Int>,
+        val state: PatternState,
         val isTerminal: Boolean,
         val terminalLabel: TerminalLabel?,
         val availableActions: Set<PatternAction>,
     ) : PatternDetailUiState
 }
 
-enum class PatternAction { DISMISSED, SNOOZED, MARKED_RESOLVED }
+/**
+ * MARKED_RESOLVED is system-only in v1 — never reachable from a user tap per
+ * `spec-pattern-action-buttons.md`. It survives in the enum because v1.5's
+ * `pattern-auto-close` (`backlog.md`) sets the same state. v1 user actions are
+ * DISMISSED (`Drop`), SNOOZED (`Skip`), and RESTART (`Restart`).
+ */
+enum class PatternAction { DISMISSED, SNOOZED, MARKED_RESOLVED, RESTART }
 
 /** One-shot snackbar payload shared by the list and detail surfaces. */
 data class PatternActionEvent(val patternId: String, val action: PatternAction, val undo: PatternUndo?)
@@ -73,7 +82,17 @@ data class PatternActionCallbacks<T>(
     val onDismiss: (T) -> Unit,
     val onSnooze: (T) -> Unit,
     val onMarkResolved: (T) -> Unit,
+    val onRestart: (T) -> Unit = {},
 )
 
-/** Inverse-action payload the snackbar reissues if the user taps `Undo` while it's alive. */
-data class PatternUndo(val patternId: String, val action: PatternAction)
+/**
+ * Inverse-action payload the snackbar reissues if the user taps `Undo` while it's alive.
+ * [previousState] / [previousSnoozedUntil] are non-null only for RESTART so the undo path can
+ * restore the exact pre-restart snapshot.
+ */
+data class PatternUndo(
+    val patternId: String,
+    val action: PatternAction,
+    val previousState: PatternState? = null,
+    val previousSnoozedUntil: Long? = null,
+)

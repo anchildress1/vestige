@@ -374,3 +374,75 @@ spacing (other entries did go by); to the engine it's the simpler invariant — 
 no carve-out, deterministic wall-clock pacing. The "anti-pushy brand" rule is satisfied
 either way because the perceived nag-rate is what the user types between, not what the
 counter says internally.
+
+### Addendum (2026-05-13) — user actions reduced to two; resolution becomes model-detected
+
+`§Lifecycle & state transitions` and `§Mark-resolved is sticky for the demo` are superseded
+for v1 forward by `docs/spec-pattern-action-buttons.md` and `docs/ux-copy.md` §"Pattern List".
+
+What changes:
+
+- User-facing actions on a pattern collapse from three (`Dismiss` / `Snooze 7 days` /
+  `Mark resolved`) to **two** (`Skip` / `Drop`). The `Mark resolved` affordance is
+  removed entirely — a pattern closing should be earned by behavioral evidence, not
+  self-reported. That mirrors the core product framing: Vestige observes, it does not
+  validate.
+- `PatternState` enum renames: `RESOLVED` → `CLOSED`, `DISMISSED` → `DROPPED`. The new
+  `CLOSED` state is **model-detected only** — no user transition reaches it in v1. The
+  staleness check that lands a pattern in `CLOSED` is deferred to v1.5 (`backlog.md`
+  §`pattern-auto-close`). v1 ships with the `CLOSED` enum value reserved but unreachable
+  so the v1.5 transition is a backfill plus check, not an ObjectBox migration.
+- New field `PatternEntity.snoozedUntil: Long?` (epoch ms; null when not snoozed). Cold-
+  start sweep transitions `SNOOZED → ACTIVE` when `snoozedUntil` has elapsed; no
+  WorkManager job (per spec §P0.4).
+- Snackbar copy: `Dropped.` and `Skipped.` retain `Undo`. Model-detected `Closed`
+  is silent — no snackbar, visible on next list load.
+- Section headers: `ACTIVE` / `SKIPPED · ON HOLD` / `CLOSED · DONE` / `DROPPED` per
+  `ux-copy.md` §"Pattern List / Section headers". The Mist-era `RESOLVED · FADED` and
+  `DISMISSED` labels retire with `Mark resolved`.
+
+What does not change:
+
+- Detection algorithm (five primitives, 90-day window, ObjectBox persistence).
+- Callout cooldown semantics (Addendum 2026-05-11 still applies).
+- Snoozed-on-stale-evidence rule (the snooze wake-up still requires the pattern to still
+  meet threshold; spec §P0.4 honors this implicitly via the detection re-emerge path).
+- Re-eval interaction with `below_threshold`.
+
+Story 4.8 carries the implementation. Story 3.8's `markResolved` API path and the
+`PatternAction.MARKED_RESOLVED` enum value retire with that story; both stay live in v1
+until Story 4.8 lands so existing shipped code keeps compiling.
+
+### Addendum (2026-05-13b) — Restart action; non-active states are reversible; snooze window preserved on undo
+
+Refinement on top of the prior 2026-05-13 Addendum. The two-action user surface
+(`Skip` / `Drop`) is extended by a third user-driven control, `Restart`, on any
+non-active visible state. See `docs/spec-pattern-action-buttons.md` §P0.3 for the
+acceptance criteria.
+
+What changes:
+
+- User-facing actions become `Skip` + `Drop` (on `ACTIVE`) and `Restart` (on
+  `SNOOZED` / `DISMISSED` / `RESOLVED`). `MARKED_RESOLVED` / `Done` stays system-only
+  (`pattern-auto-close`, v1.5) — the prior addendum's "no user transition reaches
+  CLOSED in v1" rule still holds for that specific path.
+- `DISMISSED` and `RESOLVED` are no longer terminal in the original "no transition
+  out in v1" sense from `§Lifecycle & state transitions`. The persistence shape is
+  unchanged — only the set of legal next states expands. The ObjectBox schema does
+  not move.
+- `Restart` undo restores the **exact pre-restart snapshot**, including the original
+  `snoozedUntil` when the prior state was `SNOOZED`. Previously the undo path reset
+  `snoozedUntil` to `null`, which would have left the row in `SNOOZED` with no expiry
+  — a silent foot-gun (the cold-start sweep would never wake it). `PatternRepo.restart`
+  now takes a `previousSnoozedUntil: Long?` and `forceTo(...)` preserves it; a
+  `require(snoozedUntilMs != null)` precondition rejects a malformed snooze restore.
+- Snackbar copy adds `Pattern is back.` (with Undo) for the Restart path. `Skipped.`
+  and `Dropped.` retain their copy from the prior addendum.
+
+What does not change:
+
+- Detection algorithm, callout cooldown, snoozed-on-stale-evidence rule, re-eval with
+  `below_threshold` — all carried forward from the prior addenda.
+- Story 3.8's `markResolved` API path and the `PatternAction.MARKED_RESOLVED` enum
+  value still retire with Story 4.8, per the prior addendum; Restart adds to the user
+  surface, it does not change the retirement plan for the resolved-write path.

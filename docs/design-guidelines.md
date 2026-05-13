@@ -6,6 +6,24 @@ This document is design-only. Engineering, runtime, and model details live in `c
 
 ---
 
+> ## ⚠ Superseded by ADR-011 (2026-05-13) — Scoreboard direction
+>
+> The visual language below — Mist palette, Newsreader italic, MistHero, fog drift, glow / vapor accents, the "Quiet. Observational. Restrained in the visuals." core feeling — is **superseded** by [`adrs/ADR-011-design-language-scoreboard-pivot.md`](adrs/ADR-011-design-language-scoreboard-pivot.md).
+>
+> **New canonical visual sources:**
+> - `poc/Energy Direction.html` — direction walkthrough.
+> - `poc/energy-tokens.jsx` — palette (warm espresso surfaces, electric lime, alarm coral, teal, ember), Anton + Space Grotesk + JetBrains Mono type stack, sharper radii, `sb*` motion keyframes.
+> - `poc/energy-screens.jsx` — screen-level reference compositions.
+> - `poc/screenshots/hero.png` + `poc/screenshots/scorecard.png` — fixed reference frames.
+>
+> **New core feeling:** *Loud. Observational. Local. Precise. Biting in the words and in the visuals.* Concept: "the coach is a dick." See ADR-011 for the full delta (palette, type, motion, primitives, what breaks, what holds).
+>
+> **What still holds from this doc:** product framing (cognition tracker, not journal), forbidden vocabulary (no brains / hearts / journals / sparkles / mascots / badges), screen list, 10-second judge test. **What does not:** every Mist palette token, Newsreader, MistHero, fog drift, glow / vapor accents, "Restrained in the visuals" rule, and any "no celebrations" reading that rejects `▲N` deltas (deltas ship; see ADR-011 §"What this breaks").
+>
+> The body of this document is preserved as the historical Mist spec. Read it for product framing context, not for visual implementation. Visual implementation: ADR-011 + the POC files above.
+
+---
+
 ## Product Frame
 
 Vestige is an on-device cognition and pattern-tracking app for ADHD-flavored adults.
@@ -323,7 +341,7 @@ Default is highlighted. Selection changes the active persona for the next captur
 
 Cards present pattern observations on dark surfaces. Restrained, atmospheric, sourced. No clinical or procedural-drama styling.
 
-**Status sections.** Patterns group into four sections per `poc/screens-patterns.jsx` — Active / Snoozed · still drifting / Resolved · faded / Dismissed. Each section header appears only when that section has cards; the headers themselves come from `ux-copy.md` §"Pattern List · Section headers". Filter chips that scope which sections render are Phase 4 polish on top of this base.
+**Status sections.** Patterns group into four sections per `ux-copy.md` §"Pattern List / Section headers" + `spec-pattern-action-buttons.md` §P0.3 — Active / Skipped · on hold / Closed · done (model-detected, v1.5) / Dropped. Each section header appears only when that section has cards. `CLOSED · DONE` is empty in v1 (model-detected; see `backlog.md` §`pattern-auto-close`). Filter chips that scope which sections render are Phase 4 polish on top of this base.
 
 **Card structure:**
 - Short title (the pattern name, e.g., `Tuesday Meetings`)
@@ -332,7 +350,7 @@ Cards present pattern observations on dark surfaces. Restrained, atmospheric, so
 - **TraceBar — 30-day recurrence glyph** per `poc/tokens.jsx` §TraceBar. 30 thin columns; days the pattern landed render full-height in the glow purple (`#A855F7`); empty days render at 34% height in the muted hair tone. Newest day on the right. The bar is the visual answer to "how often does this come back."
 - Source count (e.g., `4 of 12 entries`)
 - Last seen (date)
-- Actions (`Dismiss`, `Snooze`, `Mark resolved`)
+- Actions (`Skip`, `Drop`) per `spec-pattern-action-buttons.md` §P0.1 / P0.2
 
 **Active-state rule** (`#A855F7`) — Phase 3 ships as a 3dp left-rule on every card for legibility. Phase 4 swaps it for the POC's glow-soft border + radial-glow corner treatment on active cards only.
 
@@ -358,7 +376,7 @@ Tap a card → detail screen. Make the pattern claim visually sourceable.
 - **Intensity strip — 30-day TraceBar at hero size** under an `INTENSITY · 30 DAYS` eyebrow. Same glyph as the card, taller (~28dp) so the cadence reads at a glance.
 - Source snippets (dated, short, clickable to the full entry — placeholder entry screen in Phase 3, full history detail in Phase 4)
 - Related vocabulary (the actual words the user used across these entries — Phase 4 polish)
-- Action controls (`Dismiss`, `Snooze`, `Mark resolved`). Terminal-state patterns hide the action row and surface the terminal label instead (`Dismissed May 12.` / `Marked resolved May 12.`).
+- Action controls (`Skip`, `Drop`) per `spec-pattern-action-buttons.md` §P0.1 / P0.2. Closed-state patterns are read-only (v1.5, model-detected) and surface `Closed {date}. No new entries matched in {N} days.` instead of the action row. Dropped patterns surface `Dropped {date}.`.
 
 **Source section example:**
 > **Seen in:**

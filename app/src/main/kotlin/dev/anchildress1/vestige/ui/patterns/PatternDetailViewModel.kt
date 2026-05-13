@@ -3,6 +3,7 @@ package dev.anchildress1.vestige.ui.patterns
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import dev.anchildress1.vestige.model.PatternState
 import dev.anchildress1.vestige.storage.EntryEntity
 import dev.anchildress1.vestige.storage.EntryStore
 import dev.anchildress1.vestige.storage.PatternEntity
@@ -57,14 +58,43 @@ class PatternDetailViewModel(
     fun snooze() = dispatch(PatternAction.SNOOZED) { patternRepo.snooze(patternId) }
     fun markResolved() = dispatch(PatternAction.MARKED_RESOLVED) { patternRepo.markResolved(patternId) }
 
+    fun restart() {
+        viewModelScope.launch {
+            val undo = withContext(ioDispatcher) {
+                val current = patternStore.findByPatternId(patternId)
+                    ?: error("PatternDetailViewModel: no pattern row for patternId=$patternId")
+                val priorState = current.state
+                val priorSnoozedUntil = current.snoozedUntil
+                patternRepo.restart(patternId)
+                PatternUndo(
+                    patternId = patternId,
+                    action = PatternAction.RESTART,
+                    previousState = priorState,
+                    previousSnoozedUntil = priorSnoozedUntil,
+                )
+            }
+            _state.value = loadState()
+            _events.emit(PatternActionEvent(patternId, PatternAction.RESTART, undo))
+        }
+    }
+
     fun undo(undo: PatternUndo) {
         viewModelScope.launch {
             withContext(ioDispatcher) {
                 runCatching {
                     when (undo.action) {
                         PatternAction.DISMISSED -> patternRepo.dismiss(undo.patternId, undo = true)
+
                         PatternAction.SNOOZED -> patternRepo.snooze(undo.patternId, undo = true)
+
                         PatternAction.MARKED_RESOLVED -> Unit
+
+                        PatternAction.RESTART -> patternRepo.restart(
+                            patternId = undo.patternId,
+                            undo = true,
+                            previousState = undo.previousState ?: PatternState.ACTIVE,
+                            previousSnoozedUntil = undo.previousSnoozedUntil,
+                        )
                     }
                 }.onFailure { failure ->
                     // Stale undo path (e.g. snooze → dismiss → tap-undo on the older snooze
@@ -122,6 +152,7 @@ class PatternDetailViewModel(
         lastSeenLabel = formatShortDate(lastSeenTimestamp),
         sources = sources,
         traceHits = traceHits,
+        state = state,
         isTerminal = isTerminalState(state),
         terminalLabel = terminalLabelFor(state, stateChangedTimestamp),
         availableActions = availableActionsFor(state),

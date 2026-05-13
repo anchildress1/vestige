@@ -225,8 +225,11 @@ Sample data for STT-C, STT-D, STT-E lives in `sample-data-scenarios.md`.
 6. Per-entry observation generation wired into the capture loop (P0)
 
 ### Phase 4 — UX surface
+
+> Design language pivots to Scoreboard direction on 2026-05-13 per [ADR-011](adrs/ADR-011-design-language-scoreboard-pivot.md). Mist tokens (shipped via Story 4.1 / PR #25) are superseded by Story 4.1.5; visual language references throughout Phase 4 are `poc/Energy Direction.html` + `poc/energy-tokens.jsx`, not the deleted `poc/design-review.md`.
+
 1. Onboarding flow with model download UX
-2. Capture UI polish (`MistHero` capture stone with `AudioMeter` per `poc/design-review.md` §3.3 / §3.4, chunk indicator, single-turn entry transcript)
+2. Capture UI polish (Scoreboard "ON AIR" record state with live timer + `sbBars` audio meter + `TickRule` 30s chunk countdown per `adrs/ADR-011-design-language-scoreboard-pivot.md` + `poc/Energy Direction.html`, single-turn entry transcript)
 3. History list + entry detail (transcript, tags, template label, per-entry observation)
 4. Polished Pattern List + Pattern Detail UI, action affordances, empty states
 5. Persistent Local Model Status indicator/screen (P0 — visible from app shell or settings)

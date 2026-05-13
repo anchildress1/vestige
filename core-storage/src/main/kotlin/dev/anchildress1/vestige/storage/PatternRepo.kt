@@ -49,12 +49,40 @@ class PatternRepo(private val store: PatternStore, private val clock: Clock = Cl
     }
 
     /**
-     * Sticky per ADR-003 §"Mark-resolved is sticky for the demo." No undo path in v1 — the
-     * ADR is explicit that "reopening is a backlog candidate" and that mark-resolved
-     * "respects user agency … if they kill it, they killed it."
+     * Sticky per ADR-003 §"Mark-resolved is sticky for the demo." User-tap path was retired in
+     * the 2026-05-13 lifecycle update (see `spec-pattern-action-buttons.md`); the method survives
+     * as the system-set entry point for v1.5's `pattern-auto-close` (`backlog.md`).
      */
     fun markResolved(patternId: String) {
         store.transitionState(patternId, PatternState.RESOLVED)
+    }
+
+    /**
+     * Restart — moves a non-active pattern (`DISMISSED` / `SNOOZED` / `RESOLVED`) back to
+     * `ACTIVE`. Undo of a Restart restores the exact state snapshot the row had before the
+     * restart, including the original `snoozedUntil` when coming back to `SNOOZED`.
+     */
+    fun restart(
+        patternId: String,
+        undo: Boolean = false,
+        previousState: PatternState = PatternState.ACTIVE,
+        previousSnoozedUntil: Long? = null,
+    ) {
+        if (undo) {
+            forceTo(
+                patternId = patternId,
+                target = previousState,
+                expectedFrom = PatternState.ACTIVE,
+                snoozedUntilMs = if (previousState == PatternState.SNOOZED) previousSnoozedUntil else null,
+            )
+        } else {
+            val current = store.findByPatternId(patternId)
+                ?: error("PatternRepo: no pattern row for patternId=$patternId")
+            require(current.state != PatternState.ACTIVE && current.state != PatternState.BELOW_THRESHOLD) {
+                "PatternRepo.restart requires a non-active visible state, found ${current.state}"
+            }
+            forceTo(patternId, PatternState.ACTIVE, expectedFrom = current.state)
+        }
     }
 
     /**
@@ -64,14 +92,22 @@ class PatternRepo(private val store: PatternStore, private val clock: Clock = Cl
      * precondition: the row must currently be in that state, otherwise the bypass would let a
      * misrouted snackbar callback rewrite a `RESOLVED` (sticky-terminal) row to `ACTIVE`.
      */
-    private fun forceTo(patternId: String, target: PatternState, expectedFrom: PatternState) {
+    private fun forceTo(
+        patternId: String,
+        target: PatternState,
+        expectedFrom: PatternState,
+        snoozedUntilMs: Long? = null,
+    ) {
         val entity = store.findByPatternId(patternId)
             ?: error("PatternRepo undo: no pattern row for patternId=$patternId")
         require(entity.state == expectedFrom) {
             "PatternRepo undo requires current state=$expectedFrom for patternId=$patternId, found ${entity.state}"
         }
+        require(target != PatternState.SNOOZED || snoozedUntilMs != null) {
+            "PatternRepo forceTo requires snoozedUntilMs when restoring SNOOZED for patternId=$patternId"
+        }
         entity.state = target
-        entity.snoozedUntil = null
+        entity.snoozedUntil = if (target == PatternState.SNOOZED) snoozedUntilMs else null
         entity.stateChangedTimestamp = clock.millis()
         store.put(entity)
     }

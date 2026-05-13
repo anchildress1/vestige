@@ -8,7 +8,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
@@ -23,7 +22,9 @@ import androidx.compose.ui.unit.dp
 import dev.anchildress1.vestige.R
 import dev.anchildress1.vestige.storage.EntryEntity
 import dev.anchildress1.vestige.storage.EntryStore
+import dev.anchildress1.vestige.ui.components.VestigeScaffold
 import dev.anchildress1.vestige.ui.components.VestigeSurface
+import dev.anchildress1.vestige.ui.theme.VestigeTheme
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -51,9 +52,8 @@ fun EntryDetailPlaceholderScreen(
         }
     }
 
-    Scaffold(
+    VestigeScaffold(
         modifier = modifier,
-        containerColor = androidx.compose.ui.graphics.Color.Transparent,
         topBar = {
             TopAppBar(
                 title = { Text(text = stringResource(id = R.string.entry_detail_placeholder_title)) },
@@ -83,7 +83,7 @@ fun EntryDetailPlaceholderScreen(
             ) {
                 Text(
                     text = stringResource(id = R.string.entry_detail_placeholder_not_found),
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = VestigeTheme.colors.dim,
                 )
             }
 
@@ -100,7 +100,7 @@ fun EntryDetailPlaceholderScreen(
                         Text(
                             text = stringResource(id = R.string.entry_detail_placeholder_notice),
                             style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            color = VestigeTheme.colors.dim,
                         )
                         Text(text = uiState.entryText, style = MaterialTheme.typography.bodyLarge)
                     }

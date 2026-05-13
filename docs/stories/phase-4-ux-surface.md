@@ -1,8 +1,10 @@
 # Phase 4 — UX Surface
 
-**Status:** Not started
+**Status:** In progress (Story 4.1 shipped Mist tokens via PR #25; pivoted to Scoreboard direction per ADR-011 on 2026-05-13 — Story 4.1.5 carries the rebuild)
 **Dates:** TBD — kicks off after Phase 3 exits with STT-E resolved (Story 3.4 either Done or explicitly skipped)
-**References:** `PRD.md` §Phase 4, `concept-locked.md`, `design-guidelines.md` (entire), `ux-copy.md` (entire), `AGENTS.md`, `architecture-brief.md`, `adrs/ADR-002-multi-lens-extraction-pattern.md` §Q3 (re-eval cost story), `adrs/ADR-004-app-backgrounding-and-model-handle-lifecycle.md` (entire — notification permission, tap target, fallback evaluation)
+**References:** `PRD.md` §Phase 4, `concept-locked.md`, `adrs/ADR-011-design-language-scoreboard-pivot.md` (visual language — supersedes the Mist sections of `design-guidelines.md`), `design-guidelines.md` (product framing + forbidden vocabulary + screen list — visual sections superseded by ADR-011), `ux-copy.md` (entire — status-row label flips from `LOCAL · READY` to `LOCAL · GEMMA 4` / `ON AIR · LIVE` per ADR-011, rest holds), `poc/Energy Direction.html` + `poc/energy-tokens.jsx` + `poc/energy-screens.jsx` (canonical visual sources, replace deleted `poc/design-review.md`), `AGENTS.md`, `architecture-brief.md`, `adrs/ADR-002-multi-lens-extraction-pattern.md` §Q3 (re-eval cost story), `adrs/ADR-004-app-backgrounding-and-model-handle-lifecycle.md` (entire — notification permission, tap target, fallback evaluation)
+
+> **⚠ Design pivot — 2026-05-13.** Stories below were authored against the Mist direction (`poc/design-review.md`, now deleted). Per [ADR-011](../adrs/ADR-011-design-language-scoreboard-pivot.md), the visual language pivots to Scoreboard: warm espresso surfaces, electric lime as the single signal, alarm coral as recording / heat, Anton condensed display, Space Grotesk body, tape-grain on cards, no fog drift, "ON AIR · LIVE" recording chrome, box-score pattern cards with `▲N` / `▼N` deltas. References to `MistHero`, `Newsreader`, `glow`, `vapor`, `pulse` (Mist), `fog drift`, and `poc/design-review.md` §-anything below should be read as superseded — implement against `poc/energy-tokens.jsx` primitives (`BigStat`, `Pill`, `Delta`, `TraceBarE`, `StatRibbon`, `TickRule`, `EyebrowE`, `StatusDot`, `AppTop`) instead. Behavior bullets (what each screen *does*) are unchanged; primitive names and palette tokens are not.
 
 ---
 
@@ -16,11 +18,11 @@ Wrap the app in a coherent, dark, atmospheric UX that meets the 10-second judge 
 
 ## Phase-level acceptance criteria
 
-- [ ] Design language pass complete: full palette tokens (`void` / `bg` / `s1` / `s2` / `s3` / `ink` / `mist` / `glow` / `vapor` / `pulse` / `error`) per `poc/design-review.md` §2.1 applied across all screens. Three-font system (`Inter` body, `Newsreader` italic for hero titles only, `JetBrains Mono` for forensic labels) per `design-review.md` §2.2. Atmospheric layer (noise grain + fog drift, §2.4) on all surfaces. Contrast targets per `design-guidelines.md` §"Color rules".
+- [ ] Design language pass complete per ADR-011 §"Token additions": Scoreboard palette (`floor` / `deep` / `s1` / `s2` / `s3` / `ink` / `dim` / `faint` / `ghost` / `hair` / `lime` / `coral` / `teal` / `ember` + soft variants), three-font system (`Anton` display / `Space Grotesk` body / `JetBrains Mono` forensic), `sb*` motion keyframes, tape-grain surface texture on cards (halftone on call-outs), Scoreboard primitives (`BigStat` / `Pill` / `Delta` / `TraceBarE` / `StatRibbon` / `TickRule` / `EyebrowE` / `StatusDot` / `AppTop`) applied across all screens. Mist symbols deleted from `:app`. Contrast targets unchanged: body ≥4.5:1 (WCAG AA), primary content ≥7:1 (AAA).
 - [ ] Onboarding 8-screen flow per `ux-copy.md` §Onboarding (includes Screen 3.5 notification permission per `adrs/ADR-004-app-backgrounding-and-model-handle-lifecycle.md` §"Permission Flow") works end-to-end on a fresh install on the reference S24 Ultra.
 - [ ] Model download UX handles Wi-Fi gating, real progress, retry on stall/failure, and survives app restart mid-download.
 - [ ] Persistent Local Model Status surface exists and is reachable from app shell or settings; status is accurate.
-- [ ] Capture screen polished per `design-guidelines.md` §"Capture Screen" with the `MistHero` capture stone + `AudioMeter` primitive per `poc/design-review.md` §3.3 / §3.4 (no flat record button, no separate live waveform widget), transcription appearing post-inference (latency budget per `adrs/ADR-002-multi-lens-extraction-pattern.md` §"Latency budget" — 1–5 s target unmet on E4B CPU, currently ~24–33 s per `docs/stories/phase-2-core-loop.md` §Story 2.3 device record), entry transcript with muted user transcription + primary model follow-up (single-turn-per-capture per the STT-B v1 scope choice; see `adrs/ADR-005-stt-b-scope-and-v1-single-turn.md`).
+- [ ] Capture screen polished per `poc/Energy Direction.html` capture frames + `poc/screenshots/{capture-still,capture-running}.png` — `AppTop` shell with `LOCAL · GEMMA 4` ↔ `ON AIR · LIVE` swap, big "ON AIR" record button (idle: outline; recording: coral fill + pulsing `StatusDot` + live timer + `TickRule` 30s countdown), `sbBars` audio meter primitive while recording, transcription appearing post-inference (latency budget per `adrs/ADR-002-multi-lens-extraction-pattern.md` §"Latency budget" — 1–5 s target unmet on E4B CPU, currently ~24–33 s per `docs/stories/phase-2-core-loop.md` §Story 2.3 device record), entry transcript with muted user transcription + primary model follow-up (single-turn-per-capture per the STT-B v1 scope choice; see `adrs/ADR-005-stt-b-scope-and-v1-single-turn.md`). The Mist `MistHero` / `AudioMeter` halo composition is **not** built — superseded by ADR-011.
 - [ ] History list, Entry Detail, Pattern List, and Pattern Detail are all polished and navigable per their `design-guidelines.md` specs.
 - [ ] Settings screen P0 scope works: persona default, export all entries (zip of markdown), delete all data, model status / re-download / delete.
 - [ ] Empty states across major screens use the locked microcopy from `ux-copy.md` §"Empty states".
@@ -49,6 +51,31 @@ Wrap the app in a coherent, dark, atmospheric UX that meets the 10-second judge 
 - [x] Predictive back gestures are wired per `design-guidelines.md` §"Shape, Spacing, Motion" — restrained, native, no fighting the system default. (Android 15+ system default. `MainActivity` keeps the existing `BackHandler` for the in-app patterns nav unwind; nothing in the design-system foundation intercepts predictive back.)
 
 **Notes / risks:** Material 3's expressive features default to bolder motion and shapes. We use the system but suppress expressivity per `design-guidelines.md`. If a Material 3 component has a "subtle" / "standard" / "expressive" variant, pick subtle/standard. No carousels, no FAB menus, no vertical floating toolbars unless they earn their keep.
+
+**Addendum (2026-05-13) — superseded by ADR-011 + Story 4.1.5.**
+Checked bullets above are the historical record that the Mist tokens shipped to `:app` in PR #25. The visual language has pivoted to Scoreboard ([ADR-011](../adrs/ADR-011-design-language-scoreboard-pivot.md)); the Mist palette, `Newsreader` italic, `MistHero`, fog drift, glow / vapor / pulse(Mist) accents, `VestigeSurface` / `VestigeRow` / `VestigeListCard` (Mist), and the `Modifier.noiseGrain` / `FogDrift` atmospheric pair are all replaced. Do not unwind 4.1 — Story 4.1.5 carries the rebuild and deletes the Mist symbols. This story stays checked as evidence that the Mist direction was implemented end-to-end before it was retired.
+
+---
+
+### Story 4.1.5 — Scoreboard design language re-pass
+
+**As** the AI implementor, **I need** the Scoreboard visual language from `poc/energy-tokens.jsx` + `poc/Energy Direction.html` translated into Compose theme tokens, primitives, and motion specs, **so that** every Phase 4 UI story from 4.2 onward implements against the Scoreboard system instead of the retired Mist system — and so the Mist symbols stop existing in `:app`.
+
+**Done when:**
+- [x] `:app` Compose theme replaces the Mist palette with Scoreboard tokens per ADR-011 §"Token additions": `floor`, `deep`, `s1`, `s2`, `s3`, `ink`, `dim`, `faint`, `ghost`, `hair`, `lime` (+ `limeDim` / `limeSoft`), `coral` (+ `coralDim` / `coralSoft`), `teal` (+ `tealDim`), `ember`. oklch source values in token comments; sRGB values land in `Color.kt` literals. (`ui/theme/Color.kt`; values locked via `DesignTokensTest` rewrite.)
+- [x] Three font families wired per ADR-011 §"Type stack": `Anton` (display — condensed, huge numbers and headers), `Space Grotesk` (sans body), `JetBrains Mono` (forensic labels — retained). `VestigeFonts` aliases stay (`FontFamily.SansSerif` / `FontFamily.Serif` / `FontFamily.Monospace`) until `.ttf` bundling earns its keep in Phase 5; the alias scheme remaps so `display` resolves to a condensed-fallback-friendly family and `sans` resolves to SansSerif. Type primitives: `DisplayBig` (Anton, 56–96px display), `H1` (Space Grotesk, 26px), `P` (Space Grotesk, 15px / line-height 1.55), `PersonaLabel` (mono 9.5px / 0.20em), `Eyebrow` (mono 9.5px / 0.18–0.24em). Contrast targets unchanged (body ≥4.5:1 WCAG AA; primary ≥7:1 AAA). `Newsreader` family removed.
+- [x] Radius tokens replaced per ADR-011: `rPill: 9999`, `rXL: 18`, `rL: 12`, `rM: 8`, `rS: 4`, `rXS: 2`. `RadiusTokens` test rewritten.
+- [x] Atmospheric layer per ADR-011 §"Surface texture": `TAPE_BG` (1px horizontal grain, 4px period, 3% opacity) on cards; `HALFTONE_BG` (0.7px dot at 1.2px period, 15% opacity) on call-out blocks. **`FogDrift` and `NoiseGrain` are deleted** — the activity root no longer mounts an atmospheric layer; tape-grain lives on the primitive (cards), not the screen.
+- [x] New Compose primitives shipped (translating `poc/energy-tokens.jsx`): `BigStat`, `Pill`, `Delta`, `TraceBarE`, `StatRibbon`, `TickRule`, `EyebrowE`, `StatusDot`, `AppTop`. `PhoneE` is POC-only and **not** translated. Primitives live under `ui/components/` (or `ui/scoreboard/` if a parallel package is cleaner during the migration). Each has a unit / Compose test covering layout invariants (tabular nums on stats, mono tracking on labels, accent boundedness — one accent per element).
+- [x] Motion keyframes replaced (`sbPulse`, `sbBlink`, `sbScroll`, `sbTick`, `sbBars`, `sbSweep`, `sbWobble`, `sbRise`). `VestigeMotion` rewritten. The old `vesPulse` / `vesBreath` / `vesIn` / `vesFade` / `vesSlide` / `vesShimmer` / `vesSpin` / `vesDrift1` / `vesDrift2` symbols are removed. M3 expressive motion suppression retained.
+- [x] Accent modifier conventions rewritten: replace `glowLeftRule` / `vaporHaloOnRecording` / `pulseDotForReady` with `limeLeftRuleForActive` / `coralHaloOnRecording` / `limeDotForReady` (or equivalent). `errorFillForDestructive` retained; re-themed to coral (alarm coral and destructive share the heat semantic — that is intentional per ADR-011's accent system).
+- [x] Mist symbols deleted (no compat layer per AGENTS.md rule 16): `Glow`, `Vapor`, `Pulse` (Mist), `Mist`, `MistHero` (was not yet built; just the symbol reservation goes), `FogDrift`, `NoiseGrain`, `Modifier.noiseGrain`, `Modifier.glowLeftRule` / `vaporHaloOnRecording` / `pulseDotForReady`, the Mist `VestigeSurface` / `VestigeRow` / `VestigeListCard` definitions (re-implemented against Scoreboard tokens — same call sites work).
+- [x] No light theme. Single `darkColorScheme(...)` only. `isSystemInDarkTheme()` not called in `:app`.
+- [x] Existing screens (`PhaseOneShell`, `PatternsListScreen`, `PatternDetailScreen`, `EntryDetailPlaceholderScreen`) re-skinned to compile against the new primitives. Behavior unchanged.
+- [x] Tests rewritten / replaced: `DesignTokensTest`, `VestigePrimitivesTest`, `AtmosphereTest`, `FogDriftDrawScopeTest`, `FogDriftComposeTest` (deleted), `AccentDrawScopeTest`, `VestigeMotionTest`, `VestigeMotionComposeTest`. Coverage gate per `:app/build.gradle.kts` does not regress. New Scoreboard primitive tests included.
+- [x] Predictive back gestures unchanged.
+
+**Notes / risks:** This is the forcing-function story for the design pivot. The rebuild deletes Mist symbols outright — every screen file that imports them fails to compile until updated. That is intentional. `MainActivity`'s mount of `FogDrift` at the activity root is deleted with this story; subsequent stories (4.2 onboarding, 4.5 capture) consume `AppTop` and the new primitives directly. If Anton at condensed display sizes reads as too aggressive on device, soften with letter-spacing only — do not roll back to Newsreader.
 
 ---
 
@@ -200,21 +227,23 @@ Wrap the app in a coherent, dark, atmospheric UX that meets the 10-second judge 
 
 **Done when:**
 - [ ] Pattern list header includes the `Roast me` button per `ux-copy.md` §"Pattern List / Action button" (the Roast bottom sheet itself is Story 4.14, P1 contingent — the button can land here as a no-op or hidden state if Story 4.14 doesn't ship).
-- [ ] Filter chips: `All · Active · Snoozed · Resolved` per `ux-copy.md` §"Pattern List / Filter chips". Default `Active`.
-- [ ] Empty states per `ux-copy.md` §"Pattern List / Empty states":
-  - No entries yet: `Insufficient data.`
-  - Has entries, no patterns: `Nothing repeating yet.`
-  - All dismissed: `All clear.`
+- [ ] Filter chips: `All · Active · Skipped · Closed · Dropped` per `ux-copy.md` §"Pattern List / Filter chips" + `spec-pattern-action-buttons.md` §P1.1. Default `All` (filter chips are P1 — defer until P0 actions stable).
+- [ ] Empty states per `ux-copy.md` §"Pattern List / Empty states" + `spec-pattern-action-buttons.md` §P1.2:
+  - Fewer than 10 entries (Day 1): eyebrow `VESTIGES · 0 ENTRIES · 30 DAYS`, header `Nothing to read yet.`, body `Patterns surface after 10 entries. Keep recording.`
+  - Has entries, no pattern detected: header `No repeating pattern detected.`, body `The model looked. Nothing came back twice.`
+  - Active tab empty (all snoozed or closed): eyebrow `ACTIVE`, header `Nothing active.`, sub `{N} snoozed · {N} closed`
   - Filter returns nothing: `Nothing matches.`
-- [ ] Pattern card uses the `glow` left-rule treatment per `design-guidelines.md` §"Pattern card" only on cards with `state=active`. Snoozed/resolved/dismissed cards lose the rule.
-- [ ] Pattern card embeds the `TraceBar` primitive per `poc/design-review.md` §3.4 (30 cells, lit cells = days the pattern showed up, full-height + glow on lit, 34% height + hairline on unlit). Single source of truth for "how often does this return" visual. Sourced from `Pattern.traceHits[]`.
-- [ ] Pattern action overflow menu uses the locked microcopy: `Dismiss` / `Snooze 7 days` / `Mark resolved`.
-- [ ] Snackbars after each action use `ux-copy.md` §"System Messages" copy with `Undo` affordance.
+- [ ] Pattern card uses the lime left-rule (`limeLeftRuleForActive`) per ADR-011 + `design-guidelines.md` §"Pattern card" only on cards with `state = ACTIVE`. Snoozed / closed / dropped cards lose the rule.
+- [ ] Pattern card embeds the `TraceBarE` primitive per ADR-011 §"New primitives" + `poc/energy-tokens.jsx`. Lime accent + peak on active; ember on snoozed; teal on closed / dropped; teal-dim on below-threshold (already wired in Story 4.1.5 via `patternCardTraceBarStyleFor`).
+- [ ] Pattern action surfaces — overflow menu + Pattern Detail action row — use `Skip` / `Drop` on ACTIVE patterns and `Restart` on non-active patterns per `ux-copy.md` §"Pattern List / Card actions" + `spec-pattern-action-buttons.md` §P0.1 / P0.3. `Mark resolved` stays system-only. `Restart` undo on a skipped pattern must restore the original `snoozedUntil`, not mint a fresh window.
+- [ ] Snackbars: `Skipped.` / `Dropped.` / `Pattern is back.` with `Undo` (~4s) per `ux-copy.md` §"System Messages". Model-detected `Closed` is silent — no snackbar (visible on next list load) per spec §P0.6.
+- [ ] Pattern lifecycle states: `PatternState` enum is `ACTIVE` / `SNOOZED` / `CLOSED` / `DROPPED` (renamed from `RESOLVED` / `DISMISSED`). `CLOSED` state is reserved for v1.5 (`backlog.md` §`pattern-auto-close`) and unreachable from user actions in v1. `snoozedUntil` added to `PatternEntity` per spec §"Data Model".
+- [ ] Snooze wake-up: on app start / resume, patterns whose `snoozedUntil` has elapsed transition `SNOOZED → ACTIVE` automatically (cold-start sweep, not WorkManager — per spec §P0.4).
 - [ ] Pattern detail screen polished per `design-guidelines.md` §"Pattern Detail":
-  - Source list rows are clickable to entry detail (Story 4.7).
-  - Action row at the bottom uses the same actions as the list.
+  - Source list rows clickable to entry detail (Story 4.7).
+  - Action row at the bottom uses the same action contract as the list: `Skip` / `Drop` on ACTIVE, `Restart` otherwise (spec §P0.1 / P0.3).
   - Vocabulary chips below the observation **only if STT-E passed** (Story 3.4 ran). If STT-E failed, no chip cloud.
-  - Resolved patterns show `Marked resolved {date}` per `ux-copy.md`.
+  - Dropped patterns surface `Dropped {date}.` Closed patterns (v1.5) surface `Closed {date}. No new entries matched in {N} days.` and hide the action row entirely.
 
 **Notes / risks:** `Roast me` button visibility is gated on Story 4.14 shipping. If 4.14 doesn't ship in v1, hide the button rather than showing a button that does nothing. (Per `AGENTS.md` and the scope rule, don't ship dead UI.)
 

@@ -51,7 +51,7 @@ Lock the demo. Curate the sample data set the recording will use, write the demo
 - [ ] `demo-storyboard.md` exists at `docs/` root.
 - [ ] **90-second pitch section** breaks the pitch into beats with timing budgets:
   - 0:00–0:10 — Opening hook (the bite + the persona voice).
-  - 0:10–0:30 — Voice in moment (`MistHero` capture stone activating, `AudioMeter` waveform, transcription appearing).
+  - 0:10–0:30 — Voice in moment (Scoreboard "ON AIR" record button engaging, `sbBars` audio meter, `TickRule` 30s countdown, transcription appearing — per ADR-011 + `poc/Energy Direction.html`).
   - 0:30–0:50 — Pattern callout moment (a real surfaced pattern with sourced evidence).
   - 0:50–1:10 — Privacy proof beat (Local Model Status + a brief tcpdump window showing zero outbound during a session).
   - 1:10–1:30 — Brand moment + tagline + GitHub link.

@@ -1,50 +1,51 @@
-// Vestige · design tokens, type, texture, restrained shape primitives.
-// POC reference only. The Compose port follows the challenge docs:
-// cool dark surfaces, purple for pattern/depth, blue for active recording,
-// system error red for destructive actions.
+// Vestige · design tokens, type, texture, expressive shape primitives
+// "Mist & Trace" — a misty/shadow tracker. One cohesive cool monochrome
+// palette in oklch, varied through a single moonstone-glow accent. All
+// surfaces wear texture: SVG grain + drifting fog auras.
 
 const V = {
   // ─── Surfaces ───────────────────────────────────────────────────
-  void:  '#0A0E1A',
-  deep:  '#0A0E1A',
-  bg:    '#0E1124',
-  s1:    '#161A2E',
-  s2:    '#1E2238',
-  s3:    '#2A2E48',
+  // Cool blue-violet undertone. Each step is a layer of fog thickening.
+  void:  'oklch(13% 0.018 252)', // page floor — out beyond the phone
+  deep:  'oklch(15% 0.020 252)', // device interior base
+  bg:    'oklch(17% 0.020 252)', // alias of deep for legacy props
+  s1:    'oklch(22% 0.022 252)', // card base
+  s2:    'oklch(28% 0.024 252)', // raised / interactive
+  s3:    'oklch(36% 0.026 252)', // hover / pressed
 
   // ─── Ink ────────────────────────────────────────────────────────
-  ink:   '#E8ECF4',
-  mist:  '#7B8497',
-  faint: '#5F6A80',
-  ghost: 'rgba(123, 132, 151, 0.55)',
-  hair:  'rgba(123, 132, 151, 0.18)',
-  hair2: 'rgba(123, 132, 151, 0.09)',
+  ink:   'oklch(96% 0.010 250)',
+  mist:  'oklch(70% 0.022 250)',
+  faint: 'oklch(55% 0.020 250)',
+  ghost: 'oklch(45% 0.018 250 / 0.55)',
+  hair:  'oklch(75% 0.020 250 / 0.10)',
+  hair2: 'oklch(75% 0.020 250 / 0.05)',
 
-  // ─── Accents ───────────────────────────────────────────────────
-  glow:     '#A855F7', // purple: identity / pattern / depth
-  glowDim:  'rgba(168, 85, 247, 0.18)',
-  glowSoft: 'rgba(168, 85, 247, 0.48)',
-  glowRule: 'rgba(168, 85, 247, 0.82)',
-  vapor:    '#2563EB', // blue: active / recording / focus
-  vaporDim: 'rgba(37, 99, 235, 0.18)',
-  vaporSoft:'rgba(37, 99, 235, 0.48)',
-  vaporRule:'rgba(37, 99, 235, 0.82)',
-  pulse:    '#38A169',
-  pulseDim: 'rgba(56, 161, 105, 0.22)',
-  error:    '#B3261E',
-  errorSoft:'rgba(179, 38, 30, 0.50)',
+  // ─── Accent — single moonstone glow ────────────────────────────
+  // Rare. Marks the trace: a pattern returning, recording live, cuts that bite.
+  // Same hue family as the surfaces; just lifted into luminous range.
+  glow:    'oklch(86% 0.105 245)',          // pale moonstone — primary accent
+  glowDim: 'oklch(86% 0.105 245 / 0.20)',
+  glowSoft:'oklch(86% 0.105 245 / 0.55)',
+  vapor:   'oklch(70% 0.075 245)',          // calmer chrome accent
+  vaporDim:'oklch(70% 0.075 245 / 0.22)',
+  pulse:   'oklch(82% 0.090 218)',          // health/alive — same family, half-step warmer
+  pulseDim:'oklch(82% 0.090 218 / 0.22)',
+  glowRule:'oklch(86% 0.105 245 / 0.85)',   // hard rule edge
 
   // ─── Radii — Material 3 Expressive: deliberate variation ───────
   rPill: 9999,
-  rXL:   8,
-  rL:    8,
-  rM:    6,
-  rS:    4,
-  rXS:   4,
+  rXL:   28,
+  rL:    20,
+  rM:    14,
+  rS:    8,
+  rXS:   6,
 
   // ─── Type ───────────────────────────────────────────────────────
-  // System-sans first. No wellness serif treatment in the port.
-  display: 'Inter, system-ui, -apple-system, sans-serif',
+  // Inter for UI. Newsreader (variable serif w/ italic + opsz axis) for
+  // atmospheric display moments — the "vestige" name itself, hero titles.
+  // JetBrains Mono for forensic-instrument labels.
+  display: '"Newsreader", "Iowan Old Style", Georgia, serif',
   sans:    'Inter, system-ui, -apple-system, sans-serif',
   mono:    '"JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace',
 };
@@ -175,9 +176,9 @@ function Eyebrow({ children, color }) {
 function HDisplay({ children, style }) {
   return (
     <h1 style={{
-      margin: 0, fontFamily: V.display,
+      margin: 0, fontFamily: V.display, fontStyle: 'italic',
       fontWeight: 400, fontSize: 38, lineHeight: 1.05,
-      letterSpacing: 0, color: V.ink, textWrap: 'balance',
+      letterSpacing: '-0.015em', color: V.ink, textWrap: 'balance',
       fontOpticalSizing: 'auto', ...style,
     }}>{children}</h1>
   );
@@ -188,7 +189,7 @@ function H1({ children, style }) {
   return (
     <h1 style={{
       margin: 0, fontFamily: V.sans, fontWeight: 500,
-      fontSize: 26, lineHeight: 1.2, letterSpacing: 0,
+      fontSize: 26, lineHeight: 1.2, letterSpacing: '-0.01em',
       color: V.ink, textWrap: 'balance', ...style,
     }}>{children}</h1>
   );
@@ -211,8 +212,8 @@ function PrimaryBtn({ children, onClick, disabled, danger, style }) {
     <button onClick={onClick} disabled={disabled} style={{
       width: '100%', minHeight: 52, padding: '14px 22px',
       borderRadius: V.rPill,
-      background: disabled ? V.s2 : (danger ? V.error : V.ink),
-      color: disabled ? V.faint : (danger ? '#FFFFFF' : V.deep),
+      background: disabled ? V.s2 : (danger ? V.glow : V.ink),
+      color: disabled ? V.faint : (danger ? V.deep : V.deep),
       border: 'none', cursor: disabled ? 'default' : 'pointer',
       fontFamily: V.sans, fontSize: 15, fontWeight: 600,
       letterSpacing: '0.005em',
@@ -266,9 +267,9 @@ function IconBtn({ children, onClick, ariaLabel, style }) {
 // to make the status pill a no-op (for first-run onboarding).
 function AppShellTop({ modelState = 'ready', onStatusTap, left, right, interactive = true }) {
   const stateMap = {
-    ready:       { dot: V.pulse,  label: 'LOCAL · READY' },
+    ready:       { dot: V.pulse,  label: 'Local · Listening' },
     downloading: { dot: V.vapor,  label: 'Downloading…' },
-    stalled:     { dot: V.error,  label: 'STALLED' },
+    stalled:     { dot: V.glow,   label: 'Stalled' },
     updating:    { dot: V.vapor,  label: 'Updating' },
     off:         { dot: V.mist,   label: 'Offline' },
   };

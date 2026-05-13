@@ -2,6 +2,7 @@ package dev.anchildress1.vestige.ui.components
 
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
@@ -15,22 +16,20 @@ import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import dev.anchildress1.vestige.ui.theme.ErrorRed
-import dev.anchildress1.vestige.ui.theme.Glow
-import dev.anchildress1.vestige.ui.theme.Pulse
-import dev.anchildress1.vestige.ui.theme.RadiusTokens
-import dev.anchildress1.vestige.ui.theme.Vapor
+import dev.anchildress1.vestige.ui.theme.VestigeTheme
 
 /**
- * Glow left-rule for active patterns. Caller omits this modifier for snoozed / resolved / dismissed.
- * Spec: design-guidelines.md §"Where each accent lives".
+ * Lime left-rule for active patterns. Caller omits this modifier for snoozed / resolved / dismissed.
+ * Scope: pattern cards in `state=active` only. ADR-011 §"Token additions" / §"What this breaks".
  */
-fun Modifier.glowLeftRule(width: Dp = GlowRuleWidth, color: Color = Glow): Modifier = drawWithContent {
-    drawGlowLeftRule(width, color)
-    drawContent()
-}
+@Composable
+fun Modifier.limeLeftRuleForActive(width: Dp = RuleWidth, color: Color = VestigeTheme.colors.lime): Modifier =
+    drawWithContent {
+        drawLeftRule(width, color)
+        drawContent()
+    }
 
-internal fun DrawScope.drawGlowLeftRule(width: Dp, color: Color) {
+internal fun DrawScope.drawLeftRule(width: Dp, color: Color) {
     drawRect(
         color = color,
         topLeft = Offset.Zero,
@@ -38,85 +37,92 @@ internal fun DrawScope.drawGlowLeftRule(width: Dp, color: Color) {
     )
 }
 
-internal val GlowRuleWidth: Dp = 3.dp
+internal val RuleWidth: Dp = 3.dp
 
 /**
- * Vapor halo scaled by audio amplitude [level] (0..1).
+ * Coral halo scaled by audio amplitude [level] (0..1). Drawn behind the record button while
+ * the capture session is on-air. Idle (or NaN / negative) draws nothing.
  *
- * Idle (or NaN / negative) draws nothing. Use this through `VestigeSurface(accentModifier = …)`
- * so it sits between the glass fill and foreground content, or on a larger wrapper if the halo
- * needs to spill beyond the stone bounds. Spec: design-guidelines.md §"Where each accent lives"
- * + poc/design-review.md §3.3.
+ * Replaces the Mist `vaporHaloOnRecording` halo. Halo color is coral because recording is "heat,"
+ * not "ready" — the ON AIR · LIVE state in `poc/Energy Direction.html` is coral throughout.
  */
-fun Modifier.vaporHaloOnRecording(level: Float, color: Color = Vapor): Modifier = drawWithContent {
-    drawVaporHaloOnRecording(level, color)
+@Composable
+fun Modifier.coralHaloOnRecording(level: Float, color: Color = VestigeTheme.colors.coral): Modifier = drawWithContent {
+    drawHalo(level, color)
     drawContent()
 }
 
-internal fun DrawScope.drawVaporHaloOnRecording(level: Float, color: Color) {
+internal fun DrawScope.drawHalo(level: Float, color: Color) {
     val amp = if (level.isNaN()) 0f else level.coerceIn(0f, 1f)
     if (amp <= 0f) return
-    val maxR = maxOf(size.width, size.height) * VAPOR_HALO_BASE_RADIUS
-    val r = maxR * (VAPOR_HALO_MIN_SCALE + amp * VAPOR_HALO_AMP_SCALE)
+    val maxR = maxOf(size.width, size.height) * HALO_BASE_RADIUS
+    val r = maxR * (HALO_MIN_SCALE + amp * HALO_AMP_SCALE)
     drawRect(
         brush = Brush.radialGradient(
-            colors = listOf(color.copy(alpha = VAPOR_HALO_ALPHA * amp), Color.Transparent),
+            colors = listOf(color.copy(alpha = HALO_ALPHA * amp), Color.Transparent),
             center = Offset(size.width / 2f, size.height / 2f),
             radius = r,
         ),
     )
 }
 
-private const val VAPOR_HALO_BASE_RADIUS: Float = 0.6f
-private const val VAPOR_HALO_MIN_SCALE: Float = 0.6f
-private const val VAPOR_HALO_AMP_SCALE: Float = 0.8f
-private const val VAPOR_HALO_ALPHA: Float = 0.45f
+private const val HALO_BASE_RADIUS: Float = 0.6f
+private const val HALO_MIN_SCALE: Float = 0.6f
+private const val HALO_AMP_SCALE: Float = 0.8f
+private const val HALO_ALPHA: Float = 0.45f
 
 /**
- * LOCAL · READY status dot. Halo stays small — status indicator, not a brand accent.
- * Spec: design-guidelines.md §"Where each accent lives".
+ * LOCAL · GEMMA 4 status dot — lime when the model is ready. Halo stays small; status indicator,
+ * not a brand accent. Coral overload comes from the chrome row, not this dot.
  */
-fun Modifier.pulseDotForReady(diameter: Dp = PulseDotDiameter, color: Color = Pulse): Modifier = this
+@Composable
+fun Modifier.limeDotForReady(diameter: Dp = StatusDotDiameter, color: Color = VestigeTheme.colors.lime): Modifier = this
     .size(diameter)
-    .drawBehind { drawPulseDotForReady(color) }
+    .drawBehind { drawStatusDot(color) }
 
-internal fun DrawScope.drawPulseDotForReady(color: Color) {
+internal fun DrawScope.drawStatusDot(color: Color) {
     drawRect(
         brush = Brush.radialGradient(
-            colors = listOf(color.copy(alpha = PULSE_HALO_ALPHA), Color.Transparent),
+            colors = listOf(color.copy(alpha = DOT_HALO_ALPHA), Color.Transparent),
             center = Offset(size.width / 2f, size.height / 2f),
             radius = maxOf(size.width, size.height),
         ),
     )
     drawCircle(color = color, radius = size.minDimension / 2f)
     drawCircle(
-        color = color.copy(alpha = PULSE_RIM_ALPHA),
+        color = color.copy(alpha = DOT_RIM_ALPHA),
         radius = size.minDimension / 2f,
-        style = Stroke(width = PulseRimWidth.toPx()),
+        style = Stroke(width = DotRimWidth.toPx()),
     )
 }
 
-internal val PulseDotDiameter: Dp = 8.dp
-private val PulseRimWidth: Dp = 1.dp
-private const val PULSE_HALO_ALPHA: Float = 0.25f
-private const val PULSE_RIM_ALPHA: Float = 0.7f
+internal val StatusDotDiameter: Dp = 8.dp
+private val DotRimWidth: Dp = 1.dp
+private const val DOT_HALO_ALPHA: Float = 0.25f
+private const val DOT_RIM_ALPHA: Float = 0.7f
 
 /**
- * Destructive fill — wipe confirmations only. Use this through `VestigeSurface(accentModifier = …)`
- * so it replaces the glass fill without tinting foreground content. Locks call-sites to [ErrorRed]
- * so a destructive control can never wear brand styling. Spec: design-guidelines.md §"Where each
- * accent lives".
+ * Destructive fill — wipe confirmations only. Defaults to the destructive token in
+ * `VestigeTheme.colors.errorRed` (aliased to coral per ADR-011 — destructive and heat share the
+ * same atom). A destructive control can never wear brand styling.
  */
-fun Modifier.errorFillForDestructive(cornerRadius: Dp = RadiusTokens.RPill): Modifier = this
+@Composable
+fun Modifier.errorFillForDestructive(
+    cornerRadius: Dp = DestructivePillRadius,
+    color: Color = VestigeTheme.colors.errorRed,
+): Modifier = this
     .clip(RoundedCornerShape(cornerRadius))
     .drawWithContent {
-        drawErrorFillForDestructive(cornerRadius)
+        drawDestructive(cornerRadius, color)
         drawContent()
     }
 
-internal fun DrawScope.drawErrorFillForDestructive(cornerRadius: Dp) {
+internal fun DrawScope.drawDestructive(cornerRadius: Dp, color: Color) {
     drawRoundRect(
-        color = ErrorRed,
+        color = color,
         cornerRadius = CornerRadius(cornerRadius.toPx(), cornerRadius.toPx()),
     )
 }
+
+/** Stadium pill radius — matches `VestigeTheme.shapes.pill` corner. */
+internal val DestructivePillRadius: Dp = 9999.dp

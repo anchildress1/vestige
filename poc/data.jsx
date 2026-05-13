@@ -82,7 +82,7 @@ const PATTERNS = [
   {
     id: 'the-email',
     title: 'The Email',
-    category: 'Concrete shoes',
+    category: 'Concrete Shoes',
     observation: 'Mentioned in 7 entries since April 9. Not sent.',
     count: '7 of 31 entries',
     lastSeen: 'May 6',
@@ -100,7 +100,7 @@ const PATTERNS = [
   {
     id: 'tired-meanings',
     title: '"Tired" — three meanings',
-    category: 'Audit',
+    category: 'Vocabulary',
     observation: 'You used "tired" 23 times. Three distinct meanings. None defined.',
     count: '23 mentions',
     lastSeen: 'May 8',
@@ -116,7 +116,7 @@ const PATTERNS = [
   {
     id: 'fine-crashed',
     title: '"Fine" precedes "crashed"',
-    category: 'Audit',
+    category: 'Co-occurrence',
     observation: 'The word "fine" appears in 7 entries that also include "crashed".',
     count: '7 co-occurrences',
     lastSeen: 'May 5',
@@ -131,7 +131,7 @@ const PATTERNS = [
   {
     id: 'her',
     title: 'Conversation with her',
-    category: 'Audit',
+    category: 'Said-not-done',
     observation: 'Said you\u2019d talk to her on Apr 12. No mention of her since Apr 24.',
     count: '0 mentions in 14 days',
     lastSeen: 'Apr 24',

@@ -1,7 +1,5 @@
 package dev.anchildress1.vestige.ui.patterns
 
-import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -9,7 +7,6 @@ import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -20,7 +17,6 @@ import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SnackbarResult
@@ -35,7 +31,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -44,17 +39,9 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import dev.anchildress1.vestige.R
 import dev.anchildress1.vestige.ui.components.VestigeListCard
-import dev.anchildress1.vestige.ui.components.glowLeftRule
-import dev.anchildress1.vestige.ui.theme.Vapor
+import dev.anchildress1.vestige.ui.components.VestigeScaffold
+import dev.anchildress1.vestige.ui.components.limeLeftRuleForActive
 import dev.anchildress1.vestige.ui.theme.VestigeTheme
-
-/**
- * The active-pattern accent — [Vapor] — matches the blue lit cells in
- * `poc/screenshots/patterns.png`. The `design-guidelines.md` §"glow = patterns" wording is
- * overruled by the visual reference: lit TraceBar cells and the active-card rule both read blue,
- * not purple. Glow stays reserved for the Roast me button (Story 4.14).
- */
-private val PatternAccent: Color = Vapor
 
 @OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
@@ -70,14 +57,16 @@ fun PatternsListScreen(
     val dismissedMessage = stringResource(R.string.snackbar_dismissed)
     val snoozedMessage = stringResource(R.string.snackbar_snoozed_7_days)
     val resolvedMessage = stringResource(R.string.snackbar_marked_resolved)
+    val restartMessage = stringResource(R.string.snackbar_pattern_back)
     val undoLabel = stringResource(R.string.pattern_undo)
 
-    LaunchedEffect(viewModel, dismissedMessage, snoozedMessage, resolvedMessage, undoLabel) {
+    LaunchedEffect(viewModel, dismissedMessage, snoozedMessage, resolvedMessage, restartMessage, undoLabel) {
         viewModel.events.collect { event ->
             val message = when (event.action) {
                 PatternAction.DISMISSED -> dismissedMessage
                 PatternAction.SNOOZED -> snoozedMessage
                 PatternAction.MARKED_RESOLVED -> resolvedMessage
+                PatternAction.RESTART -> restartMessage
             }
             // Long ≈ 10s — Story 3.8 wants the undo affordance alive for ≥5s.
             val result = snackbarHostState.showSnackbar(
@@ -91,9 +80,8 @@ fun PatternsListScreen(
         }
     }
 
-    Scaffold(
+    VestigeScaffold(
         modifier = modifier,
-        containerColor = Color.Transparent,
         topBar = { TopAppBar(title = { Text(stringResource(R.string.patterns_title)) }) },
         snackbarHost = { PatternSnackbarHost(snackbarHostState) },
     ) { padding ->
@@ -105,6 +93,7 @@ fun PatternsListScreen(
                 onDismiss = viewModel::dismiss,
                 onSnooze = viewModel::snooze,
                 onMarkResolved = viewModel::markResolved,
+                onRestart = viewModel::restart,
             ),
         )
     }
@@ -144,6 +133,7 @@ private fun PatternsListBody(
                         onDismiss = { actions.onDismiss(card.patternId) },
                         onSnooze = { actions.onSnooze(card.patternId) },
                         onMarkResolved = { actions.onMarkResolved(card.patternId) },
+                        onRestart = { actions.onRestart(card.patternId) },
                     )
                 }
             }
@@ -158,7 +148,7 @@ private fun SectionHeader(section: PatternSection) {
     Text(
         text = stringResource(sectionHeaderRes(section)),
         style = MaterialTheme.typography.labelSmall,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        color = VestigeTheme.colors.dim,
         modifier = Modifier.padding(top = 4.dp, bottom = 4.dp),
     )
 }
@@ -169,19 +159,20 @@ private fun EmptyState(reason: PatternsListUiState.EmptyReason, modifier: Modifi
         Text(
             text = stringResource(emptyStateCopyRes(reason)),
             style = MaterialTheme.typography.bodyLarge,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            color = VestigeTheme.colors.dim,
         )
     }
 }
 
 @Composable
-@Suppress("LongMethod") // Compose layout cluster; the call-site clarity wins over splitting.
+@Suppress("LongMethod", "LongParameterList") // Compose layout cluster; call-site clarity wins.
 private fun PatternCard(
     card: PatternCardUi,
     onClick: () -> Unit,
     onDismiss: () -> Unit,
     onSnooze: () -> Unit,
     onMarkResolved: () -> Unit,
+    onRestart: () -> Unit,
 ) {
     VestigeListCard(
         modifier = Modifier
@@ -192,7 +183,7 @@ private fun PatternCard(
             },
         onClick = onClick,
         accentModifier = if (card.section == PatternSection.ACTIVE) {
-            Modifier.glowLeftRule(color = PatternAccent)
+            Modifier.limeLeftRuleForActive(color = VestigeTheme.colors.lime)
         } else {
             Modifier
         },
@@ -208,14 +199,16 @@ private fun PatternCard(
                     Text(
                         text = it,
                         style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        color = VestigeTheme.colors.dim,
                     )
                 }
                 Text(text = card.observation, style = MaterialTheme.typography.bodyMedium)
                 Spacer(modifier = Modifier.height(2.dp))
-                TraceBar(
+                val traceBarStyle = cardSectionToneFor(card.section).themedStyle()
+                TraceBarE(
                     hits = card.traceHits,
-                    accent = if (card.section == PatternSection.ACTIVE) PatternAccent else TraceBarDefaults.Muted,
+                    accent = traceBarStyle.accent,
+                    peak = traceBarStyle.peak,
                 )
                 Spacer(modifier = Modifier.height(2.dp))
                 // POC card meta is a single eyebrow line — no "Seen in:" label. (Two-eyebrow
@@ -228,7 +221,7 @@ private fun PatternCard(
                         card.lastSeenLabel,
                     ),
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = VestigeTheme.colors.dim,
                 )
             }
             OverflowMenu(
@@ -236,17 +229,20 @@ private fun PatternCard(
                 onDismiss = onDismiss,
                 onSnooze = onSnooze,
                 onMarkResolved = onMarkResolved,
+                onRestart = onRestart,
             )
         }
     }
 }
 
 @Composable
+@Suppress("LongParameterList") // primitive UI dispatch — one callback per action.
 private fun OverflowMenu(
     availableActions: Set<PatternAction>,
     onDismiss: () -> Unit,
     onSnooze: () -> Unit,
     onMarkResolved: () -> Unit,
+    onRestart: () -> Unit,
 ) {
     if (availableActions.isEmpty()) return
     var expanded by remember { mutableStateOf(false) }
@@ -286,6 +282,15 @@ private fun OverflowMenu(
                     },
                 )
             }
+            if (PatternAction.RESTART in availableActions) {
+                DropdownMenuItem(
+                    text = { Text(stringResource(R.string.pattern_action_restart)) },
+                    onClick = {
+                        expanded = false
+                        onRestart()
+                    },
+                )
+            }
         }
     }
 }
@@ -317,7 +322,7 @@ private fun PatternsListPreview() {
             ),
             padding = PaddingValues(0.dp),
             onCardClick = {},
-            actions = PatternActionCallbacks(onDismiss = {}, onSnooze = {}, onMarkResolved = {}),
+            actions = PatternActionCallbacks(onDismiss = {}, onSnooze = {}, onMarkResolved = {}, onRestart = {}),
         )
     }
 }

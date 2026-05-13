@@ -29,6 +29,7 @@ fun actionSnackbarMessageRes(action: PatternAction): Int = when (action) {
     PatternAction.DISMISSED -> R.string.snackbar_dismissed
     PatternAction.SNOOZED -> R.string.snackbar_snoozed_7_days
     PatternAction.MARKED_RESOLVED -> R.string.snackbar_marked_resolved
+    PatternAction.RESTART -> R.string.snackbar_pattern_back
 }
 
 /** `null` when the action is terminal (no undo control); otherwise the `Undo` resource id. */
@@ -58,22 +59,25 @@ fun terminalLabelFor(
 }
 
 /** Format-string id + date payload for the terminal-state subline. */
-data class TerminalLabel(@StringRes val prefixRes: Int, val dateLabel: String)
+data class TerminalLabel(@field:StringRes val prefixRes: Int, val dateLabel: String)
 
 /** ADR-003 terminals: DISMISSED + RESOLVED. SNOOZED is recoverable; BELOW_THRESHOLD is internal. */
 fun isTerminalState(state: PatternState): Boolean = state == PatternState.DISMISSED || state == PatternState.RESOLVED
 
-/** Only expose actions the persisted lifecycle can legally accept from the current state. */
+/**
+ * Per `spec-pattern-action-buttons.md`: ACTIVE patterns expose Drop + Skip; every other
+ * user-visible state exposes Restart. MARKED_RESOLVED is system-only (`pattern-auto-close`,
+ * v1.5) — never reachable from the action menu.
+ */
 fun availableActionsFor(state: PatternState): Set<PatternAction> = when (state) {
-    PatternState.ACTIVE -> setOf(
-        PatternAction.DISMISSED,
-        PatternAction.SNOOZED,
-        PatternAction.MARKED_RESOLVED,
-    )
+    PatternState.ACTIVE -> setOf(PatternAction.DISMISSED, PatternAction.SNOOZED)
 
-    PatternState.SNOOZED -> setOf(PatternAction.DISMISSED)
+    PatternState.SNOOZED,
+    PatternState.DISMISSED,
+    PatternState.RESOLVED,
+    -> setOf(PatternAction.RESTART)
 
-    PatternState.DISMISSED, PatternState.RESOLVED, PatternState.BELOW_THRESHOLD -> emptySet()
+    PatternState.BELOW_THRESHOLD -> emptySet()
 }
 
 /**

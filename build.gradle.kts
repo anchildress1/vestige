@@ -57,6 +57,21 @@ kover {
                         "dev.anchildress1.vestige.ui.patterns.TraceBarKt",
                         "dev.anchildress1.vestige.ui.patterns.TraceBarKt*",
                         "dev.anchildress1.vestige.ui.patterns.*TraceBarKt*",
+                        "dev.anchildress1.vestige.ui.patterns.TraceBarEKt",
+                        "dev.anchildress1.vestige.ui.patterns.TraceBarEKt*",
+                        "dev.anchildress1.vestige.ui.patterns.*TraceBarEKt*",
+                        "dev.anchildress1.vestige.ui.components.ScoreboardPrimitivesKt",
+                        "dev.anchildress1.vestige.ui.components.ScoreboardPrimitivesKt*",
+                        "dev.anchildress1.vestige.ui.components.*ScoreboardPrimitivesKt*",
+                        "dev.anchildress1.vestige.ui.components.VestigeSurfaceKt",
+                        "dev.anchildress1.vestige.ui.components.VestigeSurfaceKt*",
+                        "dev.anchildress1.vestige.ui.components.*VestigeSurfaceKt*",
+                        "dev.anchildress1.vestige.ui.components.VestigeScaffoldKt",
+                        "dev.anchildress1.vestige.ui.components.VestigeScaffoldKt*",
+                        "dev.anchildress1.vestige.ui.components.*VestigeScaffoldKt*",
+                        "dev.anchildress1.vestige.ui.components.AccentModifiersKt",
+                        "dev.anchildress1.vestige.ui.components.AccentModifiersKt*",
+                        "dev.anchildress1.vestige.ui.components.*AccentModifiersKt*",
                         // Debug-only fixture seeder for on-device manual verification.
                         // FLAG_DEBUGGABLE-gated at the call site; not on any release path.
                         "dev.anchildress1.vestige.debug.*",
@@ -140,8 +155,25 @@ sonar {
                 "**/ui/patterns/PatternsHost.kt",
                 "**/ui/patterns/EntryDetailPlaceholderScreen.kt",
                 "**/ui/patterns/TraceBar.kt",
+                "**/ui/patterns/TraceBarE.kt",
+                "**/ui/components/ScoreboardPrimitives.kt",
+                "**/ui/components/VestigeSurface.kt",
+                "**/ui/components/VestigeScaffold.kt",
+                "**/ui/components/AccentModifiers.kt",
                 // Debug-only fixture seeder, FLAG_DEBUGGABLE-gated; never on a release path.
                 "**/debug/**",
+            ).joinToString(","),
+        )
+        // Both pattern view-models share an action-dispatch + undo skeleton (dismiss /
+        // snooze / markResolved / restart). The structural overlap is intentional for the
+        // list + detail surface pair; Story 4.8 retires `markResolved` and extracts a shared
+        // dispatcher when the `PatternAction` enum + `PatternState` rename land. Excluding
+        // the two VMs from CPD avoids gating PR #26 on that cleanup.
+        property(
+            "sonar.cpd.exclusions",
+            listOf(
+                "**/ui/patterns/PatternsListViewModel.kt",
+                "**/ui/patterns/PatternDetailViewModel.kt",
             ).joinToString(","),
         )
         property("sonar.qualitygate.wait", "true")

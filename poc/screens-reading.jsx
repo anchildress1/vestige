@@ -1,70 +1,61 @@
-// Vestige · Reading — P1 debug view for Gemma's structured extraction.
-// Three lenses (Literal, Inferential, Skeptical) converge on canonical fields.
+// Vestige · Reading — Gemma's structured extraction of one entry.
+// Three readers (Literal, Inferential, Skeptical) converge on a Canonical.
 // Reached by tapping a specific entry in history. This is the receipt:
 // you can see how the model arrived at the value before the pattern.
 
 const { useState: useSR } = React;
 
-// ─── Sample reading — aligned to the v1 content schema ───────────
+// ─── Sample reading — what Gemma extracted from this entry ───────
 const SAMPLE_READING = {
   entry: "Crashed at 3pm after the meeting. Tired but wired.",
   stamp: 'May 7 · 3:08p · 0m 22s · typed',
   fields: [
     {
-      key: 'template_label',
+      key: 'state_descriptor',
       readers: [
-        { who: 'Literal',     value: 'Aftermath', tone: 'plain' },
-        { who: 'Inferential', value: 'Aftermath', tone: 'plain' },
-        { who: 'Skeptical',   value: 'Aftermath', tone: 'plain' },
+        { who: 'Literal',     value: '"crashed"',                                       tone: 'plain' },
+        { who: 'Inferential', value: '"crashed"',                                       tone: 'plain' },
+        { who: 'Skeptical',   value: '"crashed" — flagged: contradicts "tired but wired"', tone: 'flag' },
       ],
-      canonical: { value: 'Aftermath', confidence: 'canonical', flag: null },
+      canonical: { value: 'crashed', confidence: 'high', flag: 'state-vs-arousal mismatch' },
     },
     {
-      key: 'tags',
+      key: 'trigger',
       readers: [
-        { who: 'Literal',     value: 'meeting · crashed', tone: 'plain' },
-        { who: 'Inferential', value: 'meeting · crashed · tired', tone: 'plain' },
-        { who: 'Skeptical',   value: 'meeting · crashed', tone: 'plain' },
+        { who: 'Literal',     value: '"the meeting"', tone: 'plain' },
+        { who: 'Inferential', value: '"the meeting"', tone: 'plain' },
+        { who: 'Skeptical',   value: '"the meeting"', tone: 'plain' },
       ],
-      canonical: { value: 'meeting · crashed', confidence: 'canonical', flag: null },
-    },
-    {
-      key: 'energy_descriptor',
-      readers: [
-        { who: 'Literal',     value: 'crashed', tone: 'plain' },
-        { who: 'Inferential', value: 'crashed', tone: 'plain' },
-        { who: 'Skeptical',   value: 'crashed — conflict marker: "tired but wired"', tone: 'flag' },
-      ],
-      canonical: { value: 'crashed', confidence: 'canonical_with_conflict', flag: 'tired/wired contradiction kept as evidence' },
+      canonical: { value: 'the meeting', confidence: 'high', flag: null },
     },
     {
       key: 'stated_commitment',
       readers: [
-        { who: 'Literal',     value: 'none', tone: 'absence' },
-        { who: 'Inferential', value: 'none', tone: 'absence' },
-        { who: 'Skeptical',   value: 'none', tone: 'absence' },
+        { who: 'Literal',     value: 'none',                                             tone: 'absence' },
+        { who: 'Inferential', value: 'none',                                             tone: 'absence' },
+        { who: 'Skeptical',   value: 'none',                                             tone: 'absence' },
       ],
-      canonical: { value: null, confidence: 'canonical', flag: 'absence confirmed' },
+      canonical: { value: null, confidence: 'high', flag: 'absence confirmed' },
     },
     {
-      key: 'entry_observations',
+      key: 'last_sleep',
       readers: [
-        { who: 'Resolved', value: 'You said "tired but wired" in the same entry.', tone: 'plain' },
-        { who: 'Evidence', value: '"Crashed at 3pm" + "Tired but wired."', tone: 'plain' },
-        { who: 'Pattern', value: 'Entry-local observation; no history required.', tone: 'absence' },
+        { who: 'Literal',     value: 'not stated',                                                       tone: 'absence' },
+        { who: 'Inferential', value: 'null — no evidence',                                               tone: 'absence' },
+        { who: 'Skeptical',   value: 'flagged: "asked to infer state without sleep data"',               tone: 'flag' },
       ],
-      canonical: { value: 'tired/wired contradiction', confidence: 'generated', flag: null },
+      canonical: { value: null, confidence: 'high', flag: null },
     },
   ],
   patternsTouched: [
     { id: 'tuesday-meetings', label: 'Tuesday Meetings',        hits: 4 },
-    { id: 'tired-meanings',   label: '"Tired" — three meanings', hits: 7 },
+    { id: 'tired',            label: '"Tired" — vague-word run', hits: 7 },
   ],
 };
 
 // ─── Confidence dots — visual ledger marker ──────────────────────
-function ConfidenceDots({ level = 'canonical' }) {
-  const map = { candidate: 1, ambiguous: 1, generated: 2, canonical: 3, canonical_with_conflict: 3 };
+function ConfidenceDots({ level = 'high' }) {
+  const map = { low: 1, medium: 2, high: 3 };
   const filled = map[level] || 0;
   return (
     <span style={{ display: 'inline-flex', gap: 3, alignItems: 'center' }}>
@@ -139,9 +130,9 @@ function CanonicalRow({ value, confidence, flag }) {
       </div>
       <div style={{
         position: 'relative',
-        marginTop: 6, fontFamily: V.display,
+        marginTop: 6, fontFamily: V.display, fontStyle: 'italic',
         fontWeight: 400, fontSize: 22, lineHeight: 1.2,
-        letterSpacing: 0, color: V.ink,
+        letterSpacing: '-0.005em', color: V.ink,
       }}>{displayValue}</div>
       {flag && (
         <div style={{
@@ -186,7 +177,7 @@ function FieldCard({ field }) {
           <span style={{
             fontFamily: V.mono, fontSize: 9, letterSpacing: '0.22em',
             color: V.faint, textTransform: 'uppercase',
-          }}>3 lenses</span>
+          }}>3 readers</span>
         </header>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -236,9 +227,9 @@ function ReadingScreen({ onClose, onPattern }) {
             <div style={noiseStyle(0.04)} />
             <div style={{
               position: 'relative',
-              fontFamily: V.display,
+              fontFamily: V.display, fontStyle: 'italic',
               fontWeight: 400, fontSize: 24, lineHeight: 1.25,
-              letterSpacing: 0, color: V.ink, textWrap: 'balance',
+              letterSpacing: '-0.005em', color: V.ink, textWrap: 'balance',
             }}>“{r.entry}”</div>
           </blockquote>
         </div>
@@ -260,7 +251,7 @@ function ReadingScreen({ onClose, onPattern }) {
               <div style={{
                 marginTop: 6, fontFamily: V.sans, fontSize: 13, lineHeight: 1.5, color: V.mist,
               }}>
-                Three lenses run on-device. They diverge, then converge. You can inspect the record.
+                Three readers run on-device. They diverge — then converge. You see the seams.
               </div>
             </div>
             <span style={{
@@ -279,7 +270,7 @@ function ReadingScreen({ onClose, onPattern }) {
             }}>
               <div><strong style={{ color: V.ink, fontWeight: 600 }}>Literal —</strong> only what the words say.</div>
               <div><strong style={{ color: V.ink, fontWeight: 600 }}>Inferential —</strong> what the words imply.</div>
-              <div><strong style={{ color: V.ink, fontWeight: 600 }}>Skeptical —</strong> contradictions, missing pieces, what doesn't add up.</div>
+              <div><strong style={{ color: V.ink, fontWeight: 600 }}>Skeptical —</strong> what the words don't quite support.</div>
               <div style={{ color: V.faint, marginTop: 4 }}>The Canonical is what gets filed against patterns. Disagreement is kept as a flag, not erased.</div>
             </div>
           )}
@@ -287,7 +278,7 @@ function ReadingScreen({ onClose, onPattern }) {
 
         {/* Field cards */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-          <Eyebrow>Reading · {r.fields.length} fields</Eyebrow>
+          <Eyebrow>Extracted · {r.fields.length} fields</Eyebrow>
           {r.fields.map((f) => <FieldCard key={f.key} field={f} />)}
         </div>
 

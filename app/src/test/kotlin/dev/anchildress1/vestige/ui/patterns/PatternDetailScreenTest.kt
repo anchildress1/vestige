@@ -1,6 +1,7 @@
 package dev.anchildress1.vestige.ui.patterns
 
 import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.assertHasClickAction
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
@@ -8,7 +9,6 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
-import androidx.test.core.app.ApplicationProvider
 import dev.anchildress1.vestige.model.ExtractionStatus
 import dev.anchildress1.vestige.model.PatternKind
 import dev.anchildress1.vestige.model.PatternState
@@ -36,6 +36,12 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import java.io.File
 
+/**
+ * Pos / neg / edge + a11y coverage for the detail screen.
+ *
+ * Err-state handling stays in repo / viewmodel tests; this composable only renders resolved UI
+ * state plus callback wiring.
+ */
 @OptIn(ExperimentalCoroutinesApi::class)
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34], manifest = Config.NONE, application = PatternsTestApplication::class)
@@ -45,6 +51,7 @@ class PatternDetailScreenTest {
     val composeRule = createComposeRule()
 
     private lateinit var dataDir: File
+    private lateinit var markdownDir: File
     private lateinit var boxStore: BoxStore
     private lateinit var entryStore: EntryStore
     private lateinit var patternStore: PatternStore
@@ -54,12 +61,15 @@ class PatternDetailScreenTest {
     @Before
     fun setUp() {
         Dispatchers.setMain(testDispatcher)
-        val context = ApplicationProvider.getApplicationContext<android.content.Context>()
-        dataDir = File(context.filesDir, "ob-detail-screen-${System.nanoTime()}")
+        val tempRoot = File(System.getProperty("java.io.tmpdir"), "vestige-pattern-detail-screen-tests").apply {
+            mkdirs()
+        }
+        dataDir = File(tempRoot, "ob-detail-screen-${System.nanoTime()}").apply { mkdirs() }
+        markdownDir = File(tempRoot, "md-${System.nanoTime()}").apply { mkdirs() }
         boxStore = VestigeBoxStore.openAt(dataDir)
         entryStore = EntryStore(
             boxStore,
-            MarkdownEntryStore(File(context.filesDir, "md-${System.nanoTime()}")),
+            MarkdownEntryStore(markdownDir),
         )
         patternStore = PatternStore(boxStore)
         patternRepo = PatternRepo(patternStore)
@@ -70,6 +80,7 @@ class PatternDetailScreenTest {
         Dispatchers.resetMain()
         boxStore.close()
         dataDir.deleteRecursively()
+        markdownDir.deleteRecursively()
     }
 
     @Test
@@ -100,13 +111,16 @@ class PatternDetailScreenTest {
         composeRule.onNodeWithText("Fourth entry mentions Tuesday meetings.").assertIsDisplayed()
         // Action row + sources live below the new card stack; scrolling brings them into view.
         composeRule.onNodeWithText("crashed after standup").performScrollTo().assertIsDisplayed()
-        composeRule.onNodeWithText("Dismiss").performScrollTo().assertIsDisplayed()
-        composeRule.onNodeWithText("Snooze 7 days").performScrollTo().assertIsDisplayed()
-        composeRule.onNodeWithText("Mark resolved").performScrollTo().assertIsDisplayed()
+        // Active patterns expose user actions Drop + Skip only; Restart belongs to terminal patterns.
+        composeRule.onNodeWithText("Drop").performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithText("Skip").performScrollTo().assertIsDisplayed()
+        composeRule.onAllNodesWithText("Mark resolved").assertCountEquals(0)
+        composeRule.onAllNodesWithText("Done").assertCountEquals(0)
+        composeRule.onAllNodesWithText("Restart").assertCountEquals(0)
     }
 
     @Test
-    fun `terminal state hides the action row and surfaces the terminal label`() {
+    fun `terminal dismissed pattern surfaces the terminal label and Restart action`() {
         val supporting = listOf(seedEntry("crashed"))
         seedActivePattern("p-terminal", "Tuesday Meetings", "Aftermath", "Callout.", supporting)
         patternRepo.dismiss("p-terminal")
@@ -115,14 +129,15 @@ class PatternDetailScreenTest {
             PatternDetailScreen(viewModel = newViewModel("p-terminal"), onBack = {})
         }
 
-        composeRule.onNodeWithText("Dismissed", substring = true).performScrollTo().assertIsDisplayed()
-        composeRule.onAllNodesWithText("Dismiss").assertCountEquals(0)
-        composeRule.onAllNodesWithText("Snooze 7 days").assertCountEquals(0)
+        composeRule.onNodeWithText("Dropped", substring = true).performScrollTo().assertIsDisplayed()
+        composeRule.onAllNodesWithText("Drop").assertCountEquals(0)
+        composeRule.onAllNodesWithText("Skip").assertCountEquals(0)
         composeRule.onAllNodesWithText("Mark resolved").assertCountEquals(0)
+        composeRule.onNodeWithText("Restart").performScrollTo().assertIsDisplayed()
     }
 
     @Test
-    fun `snoozed detail only exposes dismiss`() {
+    fun `snoozed detail only exposes Restart`() {
         val supporting = listOf(seedEntry("crashed"))
         seedActivePattern("p-snoozed-detail", "Tuesday Meetings", "Aftermath", "Callout.", supporting)
         patternRepo.snooze("p-snoozed-detail")
@@ -131,26 +146,26 @@ class PatternDetailScreenTest {
             PatternDetailScreen(viewModel = newViewModel("p-snoozed-detail"), onBack = {})
         }
 
-        composeRule.onNodeWithText("Dismiss").performScrollTo().assertIsDisplayed()
-        composeRule.onAllNodesWithText("Snooze 7 days").assertCountEquals(0)
+        composeRule.onNodeWithText("Restart").performScrollTo().assertIsDisplayed()
+        composeRule.onAllNodesWithText("Drop").assertCountEquals(0)
+        composeRule.onAllNodesWithText("Skip").assertCountEquals(0)
         composeRule.onAllNodesWithText("Mark resolved").assertCountEquals(0)
     }
 
     @Test
-    fun `Mark resolved button transitions pattern to RESOLVED and renders terminal label`() {
+    fun `Restart button on a dismissed pattern transitions it back to ACTIVE`() {
         val supporting = listOf(seedEntry("crashed"))
-        seedActivePattern("p-resolve-click", "Tuesday Meetings", "Aftermath", "Callout.", supporting)
+        seedActivePattern("p-restart-click", "Tuesday Meetings", "Aftermath", "Callout.", supporting)
+        patternRepo.dismiss("p-restart-click")
 
         composeRule.setContent {
-            PatternDetailScreen(viewModel = newViewModel("p-resolve-click"), onBack = {})
+            PatternDetailScreen(viewModel = newViewModel("p-restart-click"), onBack = {})
         }
 
-        composeRule.onNodeWithText("Mark resolved").performScrollTo().performClick()
+        composeRule.onNodeWithText("Restart").performScrollTo().performClick()
         composeRule.waitForIdle()
 
-        assertEquals(PatternState.RESOLVED, patternStore.findByPatternId("p-resolve-click")?.state)
-        // Action row is gone post-terminal — the only `Mark resolved` node was the button.
-        composeRule.onAllNodesWithText("Mark resolved").assertCountEquals(0)
+        assertEquals(PatternState.ACTIVE, patternStore.findByPatternId("p-restart-click")?.state)
     }
 
     @Test
@@ -164,6 +179,17 @@ class PatternDetailScreenTest {
         }
         composeRule.onNodeWithContentDescription("Back").performClick()
         assertTrue("back callback fired", backFired)
+    }
+
+    @Test
+    fun `Back navigation icon exposes an accessible click target (a11y)`() {
+        composeRule.setContent {
+            PatternDetailScreen(
+                viewModel = newViewModel("missing"),
+                onBack = {},
+            )
+        }
+        composeRule.onNodeWithContentDescription("Back").assertHasClickAction()
     }
 
     @Test

@@ -10,15 +10,14 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Button
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -38,11 +37,10 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import dev.anchildress1.vestige.debug.DebugPatternSeeder
-import dev.anchildress1.vestige.ui.atmosphere.FogDrift
+import dev.anchildress1.vestige.ui.components.AppTop
+import dev.anchildress1.vestige.ui.components.VestigeScaffold
 import dev.anchildress1.vestige.ui.components.VestigeSurface
 import dev.anchildress1.vestige.ui.patterns.PatternsHost
-import dev.anchildress1.vestige.ui.theme.Bg
-import dev.anchildress1.vestige.ui.theme.VestigeTextStyles
 import dev.anchildress1.vestige.ui.theme.VestigeTheme
 
 class MainActivity : ComponentActivity() {
@@ -52,36 +50,30 @@ class MainActivity : ComponentActivity() {
         val container = (application as VestigeApplication).appContainer
         setContent {
             VestigeTheme {
-                Box(modifier = Modifier.fillMaxSize().background(Bg)) {
-                    FogDrift(modifier = Modifier.fillMaxSize())
-                    var showPatterns by rememberSaveable { mutableStateOf(false) }
-                    if (showPatterns) {
-                        // Back unwinds patterns→shell; without this the activity exits and the user
-                        // loses their place in the rough Phase-3 nav.
-                        BackHandler { showPatterns = false }
-                        PatternsHost(
-                            patternStore = container.patternStore,
-                            patternRepo = container.patternRepo,
-                            entryStore = container.entryStore,
-                            onExit = { showPatterns = false },
-                            modifier = Modifier.fillMaxSize(),
+                var showPatterns by rememberSaveable { mutableStateOf(false) }
+                if (showPatterns) {
+                    // Back unwinds patterns→shell; without this the activity exits and the user
+                    // loses their place in the rough Phase-3 nav.
+                    BackHandler { showPatterns = false }
+                    PatternsHost(
+                        patternStore = container.patternStore,
+                        patternRepo = container.patternRepo,
+                        entryStore = container.entryStore,
+                        onExit = { showPatterns = false },
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                } else {
+                    val isDebuggable = (applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE) != 0
+                    VestigeScaffold(modifier = Modifier.fillMaxSize()) { padding ->
+                        PhaseOneShell(
+                            onOpenPatterns = { showPatterns = true },
+                            onDebugSeed = if (isDebuggable) {
+                                { DebugPatternSeeder.seed(filesDir, container.boxStore, container.patternStore) }
+                            } else {
+                                null
+                            },
+                            modifier = Modifier.padding(padding),
                         )
-                    } else {
-                        val isDebuggable = (applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE) != 0
-                        Scaffold(
-                            modifier = Modifier.fillMaxSize(),
-                            containerColor = androidx.compose.ui.graphics.Color.Transparent,
-                        ) { padding ->
-                            PhaseOneShell(
-                                onOpenPatterns = { showPatterns = true },
-                                onDebugSeed = if (isDebuggable) {
-                                    { DebugPatternSeeder.seed(filesDir, container.boxStore, container.patternStore) }
-                                } else {
-                                    null
-                                },
-                                modifier = Modifier.padding(padding),
-                            )
-                        }
                     }
                 }
             }
@@ -123,45 +115,71 @@ private fun PhaseOneShell(
         }
     }
 
-    Column(
-        modifier = modifier
-            .fillMaxSize()
-            .padding(horizontal = 24.dp, vertical = 24.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp, Alignment.CenterVertically),
-        horizontalAlignment = Alignment.Start,
-    ) {
-        VestigeSurface(contentPadding = PaddingValues(20.dp)) {
-            Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                Text(text = stringResource(id = R.string.app_name), style = VestigeTextStyles.H1)
+    Column(modifier = modifier.fillMaxSize()) {
+        AppTop(
+            persona = "WITNESS",
+            onPersonaTap = { toastTap(context, "persona tap") },
+            onStatusTap = { toastTap(context, "status tap") },
+        )
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 24.dp, vertical = 24.dp),
+            contentAlignment = Alignment.CenterStart,
+        ) {
+            VestigeSurface(
+                modifier = Modifier.fillMaxWidth(),
+                contentPadding = PaddingValues(20.dp),
+            ) {
+                PhaseOneShellCard(
+                    permissionGranted = permissionGranted,
+                    lastRequestDenied = lastRequestDenied,
+                    onRequestMicPermission = { launcher.launch(Manifest.permission.RECORD_AUDIO) },
+                    onOpenPatterns = onOpenPatterns,
+                    onDebugSeed = onDebugSeed,
+                )
+            }
+        }
+    }
+}
 
-                when {
-                    permissionGranted -> Text(text = stringResource(id = R.string.mic_permission_granted))
-                    lastRequestDenied -> Text(text = stringResource(id = R.string.mic_permission_denied))
-                }
+@Composable
+private fun PhaseOneShellCard(
+    permissionGranted: Boolean,
+    lastRequestDenied: Boolean,
+    onRequestMicPermission: () -> Unit,
+    onOpenPatterns: () -> Unit,
+    onDebugSeed: (() -> Unit)?,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        Text(text = stringResource(id = R.string.app_name), style = VestigeTheme.typography.h1)
 
-                Button(
-                    onClick = { launcher.launch(Manifest.permission.RECORD_AUDIO) },
-                    enabled = !permissionGranted,
-                    modifier = Modifier.semantics { role = Role.Button },
-                ) {
-                    Text(text = stringResource(id = R.string.mic_permission_request))
-                }
+        when {
+            permissionGranted -> Text(text = stringResource(id = R.string.mic_permission_granted))
+            lastRequestDenied -> Text(text = stringResource(id = R.string.mic_permission_denied))
+        }
 
-                Button(
-                    onClick = onOpenPatterns,
-                    modifier = Modifier.semantics { role = Role.Button },
-                ) {
-                    Text(text = stringResource(id = R.string.open_patterns))
-                }
+        Button(
+            onClick = onRequestMicPermission,
+            enabled = !permissionGranted,
+            modifier = Modifier.semantics { role = Role.Button },
+        ) {
+            Text(text = stringResource(id = R.string.mic_permission_request))
+        }
 
-                onDebugSeed?.let { seed ->
-                    Button(
-                        onClick = seed,
-                        modifier = Modifier.semantics { role = Role.Button },
-                    ) {
-                        Text(text = stringResource(id = R.string.debug_seed_patterns))
-                    }
-                }
+        Button(
+            onClick = onOpenPatterns,
+            modifier = Modifier.semantics { role = Role.Button },
+        ) {
+            Text(text = stringResource(id = R.string.open_patterns))
+        }
+
+        onDebugSeed?.let { seed ->
+            Button(
+                onClick = seed,
+                modifier = Modifier.semantics { role = Role.Button },
+            ) {
+                Text(text = stringResource(id = R.string.debug_seed_patterns))
             }
         }
     }
@@ -173,4 +191,11 @@ private fun PhaseOneShellPreview() {
     VestigeTheme {
         PhaseOneShell()
     }
+}
+
+// TEMP DEBUG — remove once on-device tap behavior is confirmed. Tests already cover the click
+// wiring; this exists only to surface a visible signal on the device while diagnosing a reported
+// "no click, no highlight" regression on the AppTop chrome pills.
+private fun toastTap(context: android.content.Context, label: String) {
+    android.widget.Toast.makeText(context, label, android.widget.Toast.LENGTH_SHORT).show()
 }

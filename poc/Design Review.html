@@ -1,0 +1,1036 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Vestige · Design Review</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Newsreader:ital,opsz,wght@0,6..72,300..600;1,6..72,300..600&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --void:  oklch(13% 0.018 252);
+    --deep:  oklch(15% 0.020 252);
+    --s1:    oklch(19% 0.020 252);
+    --s2:    oklch(24% 0.022 252);
+    --s3:    oklch(30% 0.024 252);
+    --ink:   oklch(96% 0.010 250);
+    --mist:  oklch(72% 0.022 250);
+    --faint: oklch(55% 0.020 250);
+    --hair:  oklch(75% 0.020 250 / 0.10);
+    --hair2: oklch(75% 0.020 250 / 0.05);
+    --glow:  oklch(86% 0.105 245);
+    --glowDim: oklch(86% 0.105 245 / 0.18);
+    --glowSoft: oklch(86% 0.105 245 / 0.55);
+    --vapor: oklch(70% 0.075 245);
+    --pulse: oklch(82% 0.090 218);
+    --crit:  oklch(74% 0.150 25);
+    --crit-dim: oklch(74% 0.150 25 / 0.18);
+    --warn:  oklch(82% 0.130 75);
+    --warn-dim: oklch(82% 0.130 75 / 0.18);
+    --note:  oklch(78% 0.080 200);
+    --note-dim: oklch(78% 0.080 200 / 0.18);
+
+    --display: "Newsreader", "Iowan Old Style", Georgia, serif;
+    --sans: Inter, system-ui, -apple-system, sans-serif;
+    --mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  }
+  *, *::before, *::after { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    background: var(--void);
+    color: var(--ink);
+    font-family: var(--sans);
+    -webkit-font-smoothing: antialiased;
+    line-height: 1.55;
+    min-height: 100vh;
+  }
+
+  /* ─── Layout ──────────────────────────────────────────────────── */
+  .page {
+    max-width: 980px;
+    margin: 0 auto;
+    padding: 56px 32px 120px;
+    position: relative;
+  }
+  .fog {
+    position: fixed; inset: 0; pointer-events: none; z-index: 0;
+    overflow: hidden;
+  }
+  .fog::before, .fog::after {
+    content: ""; position: absolute; border-radius: 50%;
+    filter: blur(60px); opacity: 0.45;
+  }
+  .fog::before {
+    width: 60vw; height: 60vw; left: -10vw; top: -20vw;
+    background: radial-gradient(closest-side, oklch(70% 0.10 245 / 0.5), transparent 70%);
+  }
+  .fog::after {
+    width: 50vw; height: 50vw; right: -10vw; bottom: -10vw;
+    background: radial-gradient(closest-side, oklch(60% 0.08 220 / 0.35), transparent 70%);
+  }
+  .page > * { position: relative; z-index: 1; }
+
+  /* ─── Type ────────────────────────────────────────────────────── */
+  .eyebrow {
+    font-family: var(--mono); font-size: 10px; font-weight: 500;
+    letter-spacing: 0.20em; text-transform: uppercase;
+    color: var(--faint); line-height: 1.4;
+  }
+  .display {
+    font-family: var(--display); font-style: italic;
+    font-weight: 400; letter-spacing: -0.02em; line-height: 0.95;
+    color: var(--ink);
+    text-wrap: balance;
+  }
+  .h-section {
+    font-family: var(--sans); font-weight: 500; font-size: 22px;
+    letter-spacing: -0.01em; line-height: 1.2;
+    color: var(--ink); margin: 0;
+  }
+  .lead {
+    font-family: var(--sans); font-size: 16px; line-height: 1.6;
+    color: var(--mist); text-wrap: pretty;
+    max-width: 60ch;
+  }
+  p { margin: 0; text-wrap: pretty; }
+  code {
+    font-family: var(--mono); font-size: 0.86em;
+    background: var(--s1); border: 1px solid var(--hair2);
+    border-radius: 4px; padding: 1px 5px; color: var(--ink);
+    white-space: nowrap;
+  }
+  .path {
+    font-family: var(--mono); font-size: 12px; color: var(--mist);
+    letter-spacing: 0;
+  }
+  .path em { color: var(--glow); font-style: normal; }
+
+  /* ─── Header strip ───────────────────────────────────────────── */
+  header.cover {
+    border-bottom: 1px solid var(--hair);
+    padding-bottom: 28px;
+    margin-bottom: 48px;
+    display: grid;
+    grid-template-columns: 1fr auto;
+    align-items: end;
+    gap: 28px;
+  }
+  header.cover .title-row {
+    display: flex; align-items: baseline; gap: 14px; margin-top: 10px;
+  }
+  header.cover h1.display {
+    font-size: 64px; margin: 0;
+  }
+  header.cover .pron {
+    font-family: var(--mono); font-size: 11px; color: var(--faint);
+    letter-spacing: 0.18em; text-transform: uppercase;
+  }
+  header.cover .lead { margin-top: 14px; }
+  header.cover .meta {
+    display: flex; flex-direction: column; gap: 4px; align-items: flex-end;
+    font-family: var(--mono); font-size: 10px; letter-spacing: 0.16em;
+    color: var(--faint); text-transform: uppercase; text-align: right;
+  }
+  header.cover .meta .accent { color: var(--mist); }
+
+  /* ─── Severity legend ────────────────────────────────────────── */
+  .legend {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1px;
+    background: var(--hair);
+    border: 1px solid var(--hair);
+    margin-bottom: 56px;
+  }
+  .legend > div {
+    background: var(--deep);
+    padding: 16px 18px;
+    display: flex; flex-direction: column; gap: 6px;
+  }
+  .legend .pill { align-self: flex-start; }
+  .legend .desc {
+    font-family: var(--sans); font-size: 13px; color: var(--mist); line-height: 1.45;
+  }
+
+  .pill {
+    display: inline-flex; align-items: center; gap: 7px;
+    padding: 4px 10px 4px 9px; border-radius: 999px;
+    font-family: var(--mono); font-size: 9.5px; font-weight: 600;
+    letter-spacing: 0.20em; text-transform: uppercase;
+    border: 1px solid;
+    line-height: 1;
+  }
+  .pill::before {
+    content: ""; width: 6px; height: 6px; border-radius: 50%;
+    background: currentColor;
+    box-shadow: 0 0 6px currentColor;
+  }
+  .pill.crit { color: var(--crit); background: var(--crit-dim); border-color: var(--crit); }
+  .pill.warn { color: var(--warn); background: var(--warn-dim); border-color: oklch(82% 0.130 75 / 0.4); }
+  .pill.note { color: var(--note); background: var(--note-dim); border-color: oklch(78% 0.080 200 / 0.4); }
+
+  /* ─── Section ─────────────────────────────────────────────────── */
+  section.group {
+    margin-bottom: 60px;
+  }
+  section.group > header {
+    display: flex; align-items: baseline; justify-content: space-between;
+    gap: 24px; padding-bottom: 14px; margin-bottom: 22px;
+    border-bottom: 1px solid var(--hair);
+  }
+  section.group > header .num {
+    font-family: var(--mono); font-size: 11px; color: var(--faint);
+    letter-spacing: 0.22em; text-transform: uppercase;
+  }
+  section.group > header h2 {
+    font-family: var(--display); font-style: italic; font-weight: 400;
+    font-size: 30px; line-height: 1.05; letter-spacing: -0.015em;
+    color: var(--ink); margin: 0;
+  }
+  section.group > header .count {
+    font-family: var(--mono); font-size: 10px; color: var(--mist);
+    letter-spacing: 0.18em; text-transform: uppercase;
+  }
+
+  /* ─── Finding card ───────────────────────────────────────────── */
+  article.finding {
+    display: grid;
+    grid-template-columns: 64px 1fr;
+    column-gap: 22px;
+    padding: 22px 0 26px;
+    border-bottom: 1px solid var(--hair2);
+  }
+  article.finding:last-of-type { border-bottom: none; }
+  article.finding .id {
+    font-family: var(--mono); font-size: 11px; font-weight: 500;
+    letter-spacing: 0.10em; color: var(--faint);
+    padding-top: 5px;
+  }
+  article.finding .body { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+  article.finding .topline {
+    display: flex; align-items: center; flex-wrap: wrap; gap: 10px;
+  }
+  article.finding h3 {
+    margin: 0; font-family: var(--sans); font-weight: 600;
+    font-size: 18.5px; line-height: 1.3; letter-spacing: -0.005em;
+    color: var(--ink); text-wrap: pretty;
+  }
+  article.finding .meta {
+    font-family: var(--mono); font-size: 10px; letter-spacing: 0.16em;
+    color: var(--faint); text-transform: uppercase;
+  }
+  article.finding .what {
+    font-size: 14.5px; color: var(--mist); line-height: 1.55;
+    text-wrap: pretty;
+  }
+  article.finding .what strong { color: var(--ink); font-weight: 500; }
+  article.finding .evidence {
+    margin-top: 4px;
+    border-left: 2px solid var(--glowSoft);
+    padding: 2px 0 2px 14px;
+    display: flex; flex-direction: column; gap: 6px;
+  }
+  article.finding .evidence .lbl {
+    font-family: var(--mono); font-size: 9.5px; letter-spacing: 0.22em;
+    color: var(--glow); text-transform: uppercase;
+  }
+  article.finding .evidence .row {
+    font-family: var(--sans); font-size: 13px; color: var(--mist);
+    line-height: 1.5;
+  }
+  article.finding .fix {
+    margin-top: 6px;
+    padding: 12px 14px;
+    background: oklch(20% 0.020 252 / 0.55);
+    border: 1px solid var(--hair2);
+    border-radius: 6px;
+    display: flex; flex-direction: column; gap: 6px;
+  }
+  article.finding .fix .lbl {
+    font-family: var(--mono); font-size: 9.5px; letter-spacing: 0.22em;
+    color: var(--vapor); text-transform: uppercase;
+  }
+  article.finding .fix .text {
+    font-size: 13.5px; color: var(--ink); line-height: 1.55;
+    text-wrap: pretty;
+  }
+  article.finding .fix .text em { font-style: normal; color: var(--mist); }
+
+  /* ─── Summary box (TL;DR) ────────────────────────────────────── */
+  .tldr {
+    margin-bottom: 56px;
+    padding: 26px 28px 28px;
+    background: oklch(18% 0.020 252 / 0.6);
+    border: 1px solid var(--hair);
+    border-left: 2px solid var(--glow);
+    border-radius: 4px;
+    position: relative; overflow: hidden;
+  }
+  .tldr::before {
+    content: ""; position: absolute; right: -80px; top: -80px;
+    width: 240px; height: 240px; border-radius: 50%;
+    background: radial-gradient(closest-side, var(--glowDim), transparent 70%);
+    filter: blur(20px); pointer-events: none;
+  }
+  .tldr h2 {
+    font-family: var(--display); font-style: italic; font-weight: 400;
+    font-size: 28px; line-height: 1.1; letter-spacing: -0.015em;
+    margin: 0 0 14px; color: var(--ink); position: relative;
+  }
+  .tldr p { color: var(--mist); font-size: 15.5px; line-height: 1.6; max-width: 64ch; position: relative; }
+  .tldr ol {
+    margin: 16px 0 0; padding: 0; list-style: none;
+    counter-reset: tldr;
+    display: flex; flex-direction: column; gap: 10px;
+    position: relative;
+  }
+  .tldr ol li {
+    counter-increment: tldr;
+    display: grid; grid-template-columns: 28px 1fr; align-items: baseline;
+    gap: 12px;
+    font-size: 14.5px; color: var(--ink);
+    line-height: 1.5;
+  }
+  .tldr ol li::before {
+    content: counter(tldr, decimal-leading-zero);
+    font-family: var(--mono); font-size: 10px; font-weight: 600;
+    letter-spacing: 0.16em; color: var(--glow);
+    align-self: center;
+  }
+  .tldr ol li strong { font-weight: 600; color: var(--ink); }
+  .tldr ol li span { color: var(--mist); }
+
+  /* ─── Closeout checklist ─────────────────────────────────────── */
+  .checklist {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1px;
+    background: var(--hair);
+    border: 1px solid var(--hair);
+    margin-top: 24px;
+  }
+  .checklist .item {
+    background: var(--deep);
+    padding: 16px 18px;
+    display: flex; gap: 12px; align-items: flex-start;
+  }
+  .checklist .item .box {
+    flex: none;
+    width: 14px; height: 14px;
+    border: 1px solid var(--mist);
+    border-radius: 3px;
+    margin-top: 4px;
+  }
+  .checklist .item .text {
+    font-size: 13.5px; line-height: 1.5;
+    color: var(--ink);
+  }
+  .checklist .item .text small {
+    display: block; margin-top: 3px;
+    font-family: var(--mono); font-size: 10px; letter-spacing: 0.14em;
+    color: var(--faint); text-transform: uppercase;
+  }
+
+  /* ─── Closing ────────────────────────────────────────────────── */
+  footer.signoff {
+    margin-top: 80px;
+    padding-top: 28px;
+    border-top: 1px solid var(--hair);
+    display: flex; justify-content: space-between; align-items: flex-end;
+    gap: 24px; flex-wrap: wrap;
+  }
+  footer.signoff .quote {
+    font-family: var(--display); font-style: italic; font-weight: 400;
+    font-size: 22px; line-height: 1.25; color: var(--ink);
+    max-width: 520px;
+    text-wrap: balance;
+  }
+  footer.signoff .stamp {
+    font-family: var(--mono); font-size: 10px; letter-spacing: 0.18em;
+    color: var(--faint); text-transform: uppercase; text-align: right;
+    line-height: 1.6;
+  }
+
+  @media (max-width: 720px) {
+    header.cover { grid-template-columns: 1fr; }
+    header.cover .meta { align-items: flex-start; text-align: left; }
+    header.cover h1.display { font-size: 48px; }
+    .legend, .checklist { grid-template-columns: 1fr; }
+    article.finding { grid-template-columns: 1fr; column-gap: 0; }
+    article.finding .id { padding-top: 0; }
+  }
+</style>
+</head>
+<body>
+
+<div class="fog" aria-hidden="true"></div>
+
+<main class="page">
+
+  <!-- ─── Cover ─────────────────────────────────────────────────── -->
+  <header class="cover">
+    <div>
+      <div class="eyebrow">design review · poc · pre-implementation handoff</div>
+      <div class="title-row">
+        <h1 class="display">Vestige</h1>
+        <span class="pron">a structural read</span>
+      </div>
+      <p class="lead">
+        The prototype is atmospherically strong and the information design holds up.
+        Before it goes to the builder, the seams need attention: two visual systems share
+        one app, one data model has been forked four ways, and a handful of routes do
+        things they shouldn't. None of it is fatal. All of it is cheaper to fix now
+        than after the build.
+      </p>
+    </div>
+    <div class="meta">
+      <div>reviewer · principal designer</div>
+      <div>scope · 11 source files · 12 screens</div>
+      <div class="accent">— hand off when green</div>
+    </div>
+  </header>
+
+  <!-- ─── TL;DR ─────────────────────────────────────────────────── -->
+  <section class="tldr">
+    <h2>What to fix before build.</h2>
+    <p>
+      Five structural decisions account for most of the noise in this prototype. Resolve
+      these and the rest of the punch list collapses to polish.
+    </p>
+    <ol>
+      <li><strong>Collapse the legacy palette.</strong> <span>Tokens still ship pink/blue/live aliases mapped to the new moonstone family. Half the screens use the old names. Pick one set, delete the other.</span></li>
+      <li><strong>Unify the surface system.</strong> <span>Capture / Patterns / Reading use glass + noise + large radii. Onboarding / Status / Roast / Error use flat cards + 6px corners. They look like two apps. Pick one card primitive and use it everywhere.</span></li>
+      <li><strong>Make Roast a real overlay.</strong> <span>Today it's rendered by stacking PatternsScreen and RoastScreen in a fragment so the sheet has a backdrop. Build a proper sheet primitive with its own route or modal stack.</span></li>
+      <li><strong>One persona record, not four.</strong> <span>PERSONAS, VOICES, ROAST, INLINE_REPLIES are four maps keyed by the same id. Fold them into one shape so a new persona is one object, not four edits.</span></li>
+      <li><strong>Co-locate pattern data with patterns.</strong> <span>The 30-day hit map is duplicated in three places (PatternsScreen, PatternDetailScreen, Capture teaser). Move <code>traceHits</code> onto each pattern record.</span></li>
+    </ol>
+  </section>
+
+  <!-- ─── Severity legend ───────────────────────────────────────── -->
+  <div class="legend" aria-label="severity legend">
+    <div>
+      <span class="pill crit">Critical</span>
+      <div class="desc">Real bug, data duplication, or structural mismatch the builder will inherit. Fix before implementation.</div>
+    </div>
+    <div>
+      <span class="pill warn">Structural</span>
+      <div class="desc">Architecture / boundary issue. Doesn't break the prototype but will compound during build.</div>
+    </div>
+    <div>
+      <span class="pill note">Polish</span>
+      <div class="desc">Inconsistency, dead code, or small craft issue. Cheap to fix; ignore at your discretion.</div>
+    </div>
+  </div>
+
+  <!-- ─── 01. Architecture & Routing ────────────────────────────── -->
+  <section class="group">
+    <header>
+      <span class="num">01</span>
+      <h2>Architecture &amp; routing.</h2>
+      <span class="count">5 findings</span>
+    </header>
+
+    <article class="finding">
+      <div class="id">A.01</div>
+      <div class="body">
+        <div class="topline">
+          <span class="pill crit">Critical</span>
+          <span class="meta">app.jsx · screens-roast.jsx</span>
+        </div>
+        <h3>Roast is rendered by stacking two screens in a fragment.</h3>
+        <p class="what">
+          The <code>'roast'</code> route returns <code>&lt;PatternsScreen /&gt;</code> followed by
+          <code>&lt;RoastScreen /&gt;</code> inside a fragment. <code>RoastScreen</code> then
+          positions itself <code>absolute</code> over its sibling so the dim Patterns view
+          shows through. There is no real modal/overlay primitive — Roast is a screen
+          pretending to be a sheet. The dev-nav button "10 Roast" only works because of this trick.
+        </p>
+        <div class="evidence">
+          <div class="lbl">Where</div>
+          <div class="row">app.jsx · case <code>'roast'</code> in <code>renderScreen()</code></div>
+          <div class="row">screens-roast.jsx · <code>RoastScreen</code> uses <code>position: absolute</code> on its root</div>
+        </div>
+        <div class="fix">
+          <div class="lbl">Fix</div>
+          <div class="text">
+            Lift modal/sheet state out of the screen switch. A <code>&lt;Sheet open onDismiss&gt;</code>
+            primitive that renders over the current route is the cleanest path. Roast becomes
+            a sheet opened from Patterns, not a peer route. <em>Side benefit: removes the
+            screen-stacking hack and makes Pattern Detail's "Resolved" / "Snooze" actions reusable
+            as sheets later.</em>
+          </div>
+        </div>
+      </div>
+    </article>
+
+    <article class="finding">
+      <div class="id">A.02</div>
+      <div class="body">
+        <div class="topline">
+          <span class="pill crit">Critical</span>
+          <span class="meta">screens-reading.jsx · tokens.jsx</span>
+        </div>
+        <h3>ReadingScreen passes <code>left=</code> to AppShellTop, which doesn't accept it.</h3>
+        <p class="what">
+          <code>AppShellTop</code> accepts <code>title</code>, <code>modelState</code>,
+          <code>onStatusTap</code>, <code>right</code>, <code>dense</code>. ReadingScreen passes
+          a <code>left</code> prop holding a back button. It's silently dropped — there's no
+          back affordance on the Reading screen except the model-status pill, which opens the
+          status modal instead. Real bug, easy to miss in dev-nav demos because users land
+          on Reading via a button rather than a flow.
+        </p>
+        <div class="evidence">
+          <div class="lbl">Where</div>
+          <div class="row">screens-reading.jsx · <code>&lt;AppShellTop left={…}&gt;</code></div>
+          <div class="row">tokens.jsx · <code>function AppShellTop({ title, modelState, onStatusTap, right, dense })</code></div>
+        </div>
+        <div class="fix">
+          <div class="lbl">Fix</div>
+          <div class="text">
+            Either teach <code>AppShellTop</code> a <code>left</code> slot (recommended — Pattern Detail
+            and Persona screens currently put their back button on the right, which is wrong for Android),
+            or remove the <code>left</code> prop from Reading and pick the right pattern globally.
+            <em>Pick a side and apply it to every detail screen.</em>
+          </div>
+        </div>
+      </div>
+    </article>
+
+    <article class="finding">
+      <div class="id">A.03</div>
+      <div class="body">
+        <div class="topline">
+          <span class="pill warn">Structural</span>
+          <span class="meta">screens-onboarding.jsx · tokens.jsx</span>
+        </div>
+        <h3>Status pill is tappable during onboarding — and traps the user.</h3>
+        <p class="what">
+          <code>AppShellTop</code> is mounted in onboarding with no <code>onStatusTap</code> override,
+          so tapping the model dot dispatches <code>vestige:open-status</code>. That handler runs
+          <code>setScreen('status')</code> globally — which yanks the user out of onboarding into the
+          Local Model screen, with no path back into the flow. First-run trap.
+        </p>
+        <div class="evidence">
+          <div class="lbl">Where</div>
+          <div class="row">app.jsx · global <code>'vestige:open-status'</code> listener</div>
+          <div class="row">screens-onboarding.jsx · <code>&lt;AppShellTop modelState=…&gt;</code> with no override</div>
+        </div>
+        <div class="fix">
+          <div class="lbl">Fix</div>
+          <div class="text">
+            Make the status pill a no-op (or non-interactive) inside onboarding. Better:
+            move the global event listener into a context that's only active once onboarding is done.
+          </div>
+        </div>
+      </div>
+    </article>
+
+    <article class="finding">
+      <div class="id">A.04</div>
+      <div class="body">
+        <div class="topline">
+          <span class="pill warn">Structural</span>
+          <span class="meta">screens-reading.jsx · screens-patterns.jsx</span>
+        </div>
+        <h3>"Reading" has two contradictory entry points.</h3>
+        <p class="what">
+          ReadingScreen is reached two ways: (a) from the dev nav as its own route, and
+          (b) by tapping a source row in Pattern Detail, which calls <code>onOpenReading(source)</code>
+          and passes the source object. ReadingScreen ignores the argument and always renders
+          <code>SAMPLE_READING</code>. So tapping any source row on any pattern shows the same
+          Crashed-at-3pm reading. Boundary between "the reading for THIS entry" and "the reading
+          screen" is unclear.
+        </p>
+        <div class="evidence">
+          <div class="lbl">Where</div>
+          <div class="row">screens-patterns.jsx · <code>onClick={() =&gt; onOpenReading &amp;&amp; onOpenReading(s)}</code></div>
+          <div class="row">screens-reading.jsx · <code>const r = SAMPLE_READING;</code> — argument never read</div>
+        </div>
+        <div class="fix">
+          <div class="lbl">Fix</div>
+          <div class="text">
+            Either commit to ReadingScreen receiving an entry id (and put a real <code>readings</code>
+            map in <code>data.jsx</code>), or remove the source-row affordance until that data exists.
+            Don't ship a tap target that lies.
+          </div>
+        </div>
+      </div>
+    </article>
+
+    <article class="finding">
+      <div class="id">A.05</div>
+      <div class="body">
+        <div class="topline">
+          <span class="pill note">Polish</span>
+          <span class="meta">app.jsx</span>
+        </div>
+        <h3>Destructive confirm dumps users into Onboarding.</h3>
+        <p class="what">
+          On confirm of "Wipe everything", the app routes to <code>'onboarding'</code>. The intent
+          is clear (wiped → first-run), but the transition is jarring: no acknowledgment beat,
+          no "wiped" success state, just an instant jump. For a destructive action this is too quiet.
+        </p>
+        <div class="fix">
+          <div class="lbl">Fix</div>
+          <div class="text">
+            Add a brief "Wiped." beat (one screen, mono, 1.5s, single line) before onboarding loads.
+            Matches the app's restraint and confirms the action took effect.
+          </div>
+        </div>
+      </div>
+    </article>
+  </section>
+
+  <!-- ─── 02. Design system & tokens ────────────────────────────── -->
+  <section class="group">
+    <header>
+      <span class="num">02</span>
+      <h2>Design system &amp; tokens.</h2>
+      <span class="count">4 findings</span>
+    </header>
+
+    <article class="finding">
+      <div class="id">D.01</div>
+      <div class="body">
+        <div class="topline">
+          <span class="pill crit">Critical</span>
+          <span class="meta">tokens.jsx</span>
+        </div>
+        <h3>Two visual systems live in the app at once.</h3>
+        <p class="what">
+          <strong>System A — atmospheric:</strong> Capture, Patterns, Pattern Detail, Reading.
+          Translucent surfaces (<code>oklch(22% 0.022 252 / 0.7)</code>), <code>backdropFilter: blur</code>,
+          inline noise overlays, large radii (<code>rL: 20</code>, <code>rXL: 28</code>), moonstone halos.
+          <br>
+          <strong>System B — flat:</strong> Onboarding, Local Model, Persona Selector, Roast,
+          Error, Destructive. Solid <code>V.s1</code> cards, hard <code>borderRadius: 6</code>
+          magic numbers, no glass, no noise, legacy pink/blue palette.
+          <br>
+          The same primitive — "a card" — has two completely different implementations depending on which file you're in.
+        </p>
+        <div class="evidence">
+          <div class="lbl">Worst offenders</div>
+          <div class="row"><code>PatternCard</code> (atmospheric, rL=20) vs <code>PersonaCard</code> (flat, 6) — both are "selectable list cards"</div>
+          <div class="row"><code>FieldCard</code> (Reading) vs the row stack in <code>ModelStatusScreen</code> — both are "key-value blocks"</div>
+        </div>
+        <div class="fix">
+          <div class="lbl">Fix</div>
+          <div class="text">
+            Pick one. The atmospheric system is the brand — commit to it. Build three shared primitives:
+            <code>&lt;Surface&gt;</code> (the glass + noise card), <code>&lt;Row&gt;</code> (a key/value line),
+            <code>&lt;ListCard&gt;</code> (selectable variant of Surface). Migrate Onboarding, Status,
+            Persona, Roast, Error, Destructive onto them. <em>The "flat" treatment in onboarding currently
+            reads as unfinished, not as a deliberate counterpoint.</em>
+          </div>
+        </div>
+      </div>
+    </article>
+
+    <article class="finding">
+      <div class="id">D.02</div>
+      <div class="body">
+        <div class="topline">
+          <span class="pill crit">Critical</span>
+          <span class="meta">tokens.jsx · all screens</span>
+        </div>
+        <h3>Legacy color aliases shipped, and half the app still references them.</h3>
+        <p class="what">
+          Tokens carry <code>pink / pinkDim / pinkRule / blue / blueDim / live / liveDim</code> with
+          a comment marking them as legacy aliases mapped onto the new <code>glow / vapor / pulse</code>
+          palette. Onboarding, Persona, Roast, Error, Destructive, ModelStatus all reference the
+          legacy names. Capture, Patterns, Reading reference the new ones. Visually they currently
+          render the same color — but the moment someone retunes the moonstone hue, only half the
+          app moves.
+        </p>
+        <div class="fix">
+          <div class="lbl">Fix</div>
+          <div class="text">
+            Codemod the screens onto the canonical names (<code>V.glow</code>, <code>V.vapor</code>, <code>V.pulse</code>),
+            then delete the alias block. Land this <em>before</em> the builder picks it up; cleaning it
+            after means searching across both vocabularies.
+          </div>
+        </div>
+      </div>
+    </article>
+
+    <article class="finding">
+      <div class="id">D.03</div>
+      <div class="body">
+        <div class="topline">
+          <span class="pill warn">Structural</span>
+          <span class="meta">all screens</span>
+        </div>
+        <h3>Magic radii in production code.</h3>
+        <p class="what">
+          The radii scale (<code>rPill, rXL: 28, rL: 20, rM: 14, rS: 8</code>) is intentional and
+          well-thought. But raw <code>borderRadius: 6</code> appears in roughly a dozen places —
+          PersonaCard, model download bar, error/destructive containers, Roast wipe button, etc.
+          Six is below <code>rS</code>; it was never declared.
+        </p>
+        <div class="fix">
+          <div class="lbl">Fix</div>
+          <div class="text">
+            Either add an <code>rXS: 6</code> token if 6px is a real step, or push offenders to <code>rS: 8</code>.
+            No ambient magic numbers.
+          </div>
+        </div>
+      </div>
+    </article>
+
+    <article class="finding">
+      <div class="id">D.04</div>
+      <div class="body">
+        <div class="topline">
+          <span class="pill note">Polish</span>
+          <span class="meta">tokens.jsx</span>
+        </div>
+        <h3>Per-component <code>&lt;style&gt;</code> tags duplicate keyframes.</h3>
+        <p class="what">
+          <code>vesPulse</code>, <code>vesIn</code>, <code>vesShimmer</code>, <code>vesBreath</code>,
+          <code>vesSpin</code>, <code>vesDrift1/2</code>, <code>vesFade</code>, <code>vesSlide</code>
+          are each declared in whichever component first uses them. <code>vesSpin</code> is declared
+          twice. They'll drift.
+        </p>
+        <div class="fix">
+          <div class="lbl">Fix</div>
+          <div class="text">
+            Move all keyframes to a single global <code>&lt;style&gt;</code> block injected from
+            <code>tokens.jsx</code>. Components reference by name only.
+          </div>
+        </div>
+      </div>
+    </article>
+  </section>
+
+  <!-- ─── 03. Data model ──────────────────────────────────────── -->
+  <section class="group">
+    <header>
+      <span class="num">03</span>
+      <h2>Data model.</h2>
+      <span class="count">3 findings</span>
+    </header>
+
+    <article class="finding">
+      <div class="id">M.01</div>
+      <div class="body">
+        <div class="topline">
+          <span class="pill crit">Critical</span>
+          <span class="meta">data.jsx</span>
+        </div>
+        <h3>Persona content is forked across four maps.</h3>
+        <p class="what">
+          <code>PERSONAS</code> holds id + name + tagline. <code>VOICES</code> holds the example
+          transcript. <code>ROAST</code> holds the roast lines. <code>INLINE_REPLIES</code> holds
+          mid-session replies. Four separate objects keyed by the same persona id. Adding a fourth
+          persona ("Therapist", say) is four edits, three of which are easy to forget. <code>INLINE_REPLIES</code>
+          is currently declared but isn't actually consumed anywhere.
+        </p>
+        <div class="fix">
+          <div class="lbl">Fix</div>
+          <div class="text">
+            Collapse to one shape:
+            <code>{ id, name, tagline, transcript, roast, inlineReplies }</code>.
+            Each persona is one record. Drop <code>INLINE_REPLIES</code> if the recording flow doesn't
+            actually need the third surface — the prototype scripts pre-rendered turns from
+            <code>VOICES.transcript</code> instead, which suggests it was abandoned.
+          </div>
+        </div>
+      </div>
+    </article>
+
+    <article class="finding">
+      <div class="id">M.02</div>
+      <div class="body">
+        <div class="topline">
+          <span class="pill crit">Critical</span>
+          <span class="meta">screens-patterns.jsx · screens-capture.jsx</span>
+        </div>
+        <h3>The 30-day hit map is duplicated three times.</h3>
+        <p class="what">
+          A literal <code>hitMap</code> object lives in <code>PatternsScreen</code> and again in
+          <code>PatternDetailScreen</code>. The Capture teaser uses a <em>different</em> hardcoded
+          spread (<code>[2, 9, 16, 23, 5, 12, 19, 26, 28]</code>) that doesn't correspond to any
+          single pattern. Same data, three places, one of them lying.
+        </p>
+        <div class="fix">
+          <div class="lbl">Fix</div>
+          <div class="text">
+            Move <code>traceHits: number[]</code> onto each PATTERN record. The Capture teaser
+            should display either an aggregate (union of all active patterns' hits) or one
+            representative pattern's hits — pick on intent and make it derive from the source.
+          </div>
+        </div>
+      </div>
+    </article>
+
+    <article class="finding">
+      <div class="id">M.03</div>
+      <div class="body">
+        <div class="topline">
+          <span class="pill warn">Structural</span>
+          <span class="meta">screens-patterns.jsx</span>
+        </div>
+        <h3>Pattern lifecycle (active / snoozed / resolved) is fictitious.</h3>
+        <p class="what">
+          Patterns expose three states in the list (Active / Snoozed / Resolved) — but the
+          partition is hardcoded with <code>dormant.slice(0, 1)</code>. PatternDetailScreen's
+          three lifecycle buttons (<em>Snooze</em> / <em>Resolved</em> / <em>Dismiss</em>) all
+          call <code>onClose</code>. There is no transition path. Builder should not assume
+          this is wired.
+        </p>
+        <div class="fix">
+          <div class="lbl">Fix</div>
+          <div class="text">
+            Add <code>status: 'active' | 'snoozed' | 'resolved'</code> to each pattern record;
+            wire the detail buttons to mutate it; partition the list by status. Document this as
+            "the prototype's biggest fiction" so the builder knows where to start.
+          </div>
+        </div>
+      </div>
+    </article>
+  </section>
+
+  <!-- ─── 04. Component boundaries ──────────────────────────────── -->
+  <section class="group">
+    <header>
+      <span class="num">04</span>
+      <h2>Component boundaries.</h2>
+      <span class="count">4 findings</span>
+    </header>
+
+    <article class="finding">
+      <div class="id">C.01</div>
+      <div class="body">
+        <div class="topline">
+          <span class="pill warn">Structural</span>
+          <span class="meta">screens-capture.jsx</span>
+        </div>
+        <h3>MistHero overlays state on top of itself instead of accepting it.</h3>
+        <p class="what">
+          <code>MistHero</code> renders its own 14px ink dot at the center. RecordingScreen then
+          renders an <em>absolutely-positioned</em> overlay (square box, spinner, etc.) on top of
+          the dot to express listening / thinking states. So the stone has two stacked center
+          marks; the inner dot is hidden by the overlay rather than swapped. Re-skinning the
+          state expression means editing two files.
+        </p>
+        <div class="fix">
+          <div class="lbl">Fix</div>
+          <div class="text">
+            Hoist the center mark to a <code>state</code> prop on <code>MistHero</code>:
+            <code>&lt;MistHero state="idle | listening | thinking | replied" /&gt;</code>.
+            One component owns its full rendering surface.
+          </div>
+        </div>
+      </div>
+    </article>
+
+    <article class="finding">
+      <div class="id">C.02</div>
+      <div class="body">
+        <div class="topline">
+          <span class="pill warn">Structural</span>
+          <span class="meta">screens-capture.jsx · tokens.jsx</span>
+        </div>
+        <h3>IconSlot is being used as production chrome.</h3>
+        <p class="what">
+          <code>IconSlot</code> is documented as a palimpsest <em>placeholder</em> — a watermark
+          for an icon that hasn't been drawn. The persona pill on Capture uses it with
+          <code>label="·"</code> as a real visual element. Reads as unfinished, not deliberate.
+        </p>
+        <div class="fix">
+          <div class="lbl">Fix</div>
+          <div class="text">
+            Replace with a small persona dot (the moonstone glow at 12–14px) or a 2-letter
+            initial chip in mono. Reserve IconSlot for actual placeholders during build-out.
+          </div>
+        </div>
+      </div>
+    </article>
+
+    <article class="finding">
+      <div class="id">C.03</div>
+      <div class="body">
+        <div class="topline">
+          <span class="pill note">Polish</span>
+          <span class="meta">tokens.jsx</span>
+        </div>
+        <h3>AppShellTop has dead props.</h3>
+        <p class="what">
+          <code>title</code> is consumed only by ModelStatusScreen, which passes it as the empty
+          string. <code>dense</code> is declared but never set anywhere. The centered-title slot
+          is structurally there but visually never used.
+        </p>
+        <div class="fix">
+          <div class="lbl">Fix</div>
+          <div class="text">
+            Drop <code>title</code> and <code>dense</code>. If a future detail screen needs a
+            centered title, add it back deliberately.
+          </div>
+        </div>
+      </div>
+    </article>
+
+    <article class="finding">
+      <div class="id">C.04</div>
+      <div class="body">
+        <div class="topline">
+          <span class="pill note">Polish</span>
+          <span class="meta">app.jsx · all screens</span>
+        </div>
+        <h3>Aliased React hook destructures.</h3>
+        <p class="what">
+          Each file destructures <code>useState</code> and <code>useEffect</code> under unique
+          aliases — <code>useSA</code>, <code>useSC</code>, <code>useSO</code>, <code>useSP</code>,
+          <code>useSR</code> (twice, in roast and reading). Babel's per-script scoping makes this
+          safe today, but the aliases are pure noise and confuse new readers.
+        </p>
+        <div class="fix">
+          <div class="lbl">Fix</div>
+          <div class="text">
+            Standardize on <code>const { useState, useEffect } = React;</code> at the top of
+            every file. The alias dance is a vestige of an earlier worry about scope collisions
+            that doesn't apply.
+          </div>
+        </div>
+      </div>
+    </article>
+  </section>
+
+  <!-- ─── 05. Tweaks & dev surface ──────────────────────────────── -->
+  <section class="group">
+    <header>
+      <span class="num">05</span>
+      <h2>Tweaks &amp; dev surface.</h2>
+      <span class="count">2 findings</span>
+    </header>
+
+    <article class="finding">
+      <div class="id">T.01</div>
+      <div class="body">
+        <div class="topline">
+          <span class="pill note">Polish</span>
+          <span class="meta">app.jsx</span>
+        </div>
+        <h3>Dead tweak: <code>density</code>.</h3>
+        <p class="what">
+          <code>TWEAK_DEFAULTS.density = 'regular'</code> is declared and persisted but never
+          read or exposed in the panel. Either wire it (Compact / Regular density toggle on
+          Patterns + Reading) or remove it.
+        </p>
+      </div>
+    </article>
+
+    <article class="finding">
+      <div class="id">T.02</div>
+      <div class="body">
+        <div class="topline">
+          <span class="pill note">Polish</span>
+          <span class="meta">screens-capture.jsx · app.jsx</span>
+        </div>
+        <h3>"History" footer button opens the Error screen.</h3>
+        <p class="what">
+          The Capture footer's <em>history</em> link is wired to <code>onError</code>. It's a
+          dev-nav shortcut that ships looking like a real entry-point. A user testing the build
+          will tap this and get a network error.
+        </p>
+        <div class="fix">
+          <div class="lbl">Fix</div>
+          <div class="text">
+            Either remove the link until History exists, or hide it behind the Tweaks toggle
+            so it only appears in dev mode.
+          </div>
+        </div>
+      </div>
+    </article>
+  </section>
+
+  <!-- ─── 06. Closeout ──────────────────────────────────────────── -->
+  <section class="group">
+    <header>
+      <span class="num">06</span>
+      <h2>Closeout checklist.</h2>
+      <span class="count">for the builder</span>
+    </header>
+
+    <p class="lead" style="margin-bottom: 6px;">
+      Tick these in order. Items 1–3 unlock everything else; 4–8 are independent and can fan out.
+    </p>
+
+    <div class="checklist">
+      <div class="item">
+        <div class="box"></div>
+        <div class="text">
+          Decide single-system: atmospheric. Migrate the flat screens.
+          <small>Unblocks D.01, D.02, D.03</small>
+        </div>
+      </div>
+      <div class="item">
+        <div class="box"></div>
+        <div class="text">
+          Build <code>&lt;Sheet&gt;</code> primitive; rewire Roast through it.
+          <small>Unblocks A.01, opens Snooze/Resolve sheets later</small>
+        </div>
+      </div>
+      <div class="item">
+        <div class="box"></div>
+        <div class="text">
+          Collapse persona content into one record per persona.
+          <small>M.01 — easiest big win</small>
+        </div>
+      </div>
+      <div class="item">
+        <div class="box"></div>
+        <div class="text">
+          Move <code>traceHits</code> onto pattern records; remove all hitMaps.
+          <small>M.02</small>
+        </div>
+      </div>
+      <div class="item">
+        <div class="box"></div>
+        <div class="text">
+          Add <code>left</code> slot to <code>AppShellTop</code>; standardize back-button placement on Android.
+          <small>A.02</small>
+        </div>
+      </div>
+      <div class="item">
+        <div class="box"></div>
+        <div class="text">
+          Wire pattern lifecycle (active / snoozed / resolved) for real.
+          <small>M.03</small>
+        </div>
+      </div>
+      <div class="item">
+        <div class="box"></div>
+        <div class="text">
+          Hoist all keyframes into one global stylesheet.
+          <small>D.04</small>
+        </div>
+      </div>
+      <div class="item">
+        <div class="box"></div>
+        <div class="text">
+          Remove dead surface: <code>title</code>, <code>dense</code>, <code>density</code>, <code>INLINE_REPLIES</code>, history link, useS_ aliases.
+          <small>C.03, C.04, T.01, T.02, M.01</small>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ─── Sign-off ──────────────────────────────────────────────── -->
+  <footer class="signoff">
+    <div class="quote">
+      The atmosphere is right. The architecture isn't yet.<br>
+      Fix the seams and ship the room.
+    </div>
+    <div class="stamp">
+      <div>review · v1 · pre-handoff</div>
+      <div>14 findings · 5 critical</div>
+      <div>green when items 1–3 land</div>
+    </div>
+  </footer>
+
+</main>
+
+</body>
+</html>

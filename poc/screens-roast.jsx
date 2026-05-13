@@ -1,8 +1,8 @@
-// Vestige · The Roast (P1 modal bottom sheet) + Error + Destructive + Wiped
+// Vestige · The Roast (modal bottom sheet) + Error + Destructive + Wiped
 
 const { useState: useSR } = React;
 
-function RoastScreen({ persona = 'witness', onClose }) {
+function RoastScreen({ persona = 'witness', onClose, onWipe }) {
   const personas = window.VESTIGE_DATA.PERSONAS;
   const meta = window.VESTIGE_DATA.ROAST_META;
   const p = personas.find((x) => x.id === persona) || personas[0];
@@ -31,6 +31,12 @@ function RoastScreen({ persona = 'witness', onClose }) {
       borderTop: `1px solid ${V.hair2}`,
     }}>
       <GhostBtn onClick={onClose} style={{ flex: 1 }}>Close</GhostBtn>
+      <button onClick={onWipe} style={{
+        flex: 1, minHeight: 44, padding: '10px 18px', borderRadius: V.rXS,
+        background: 'transparent', color: V.glow,
+        border: `1px solid ${V.glowRule}`, cursor: 'pointer',
+        fontFamily: V.sans, fontSize: 13, fontWeight: 600,
+      }}>Wipe and start over</button>
     </div>
   );
 
@@ -45,7 +51,7 @@ function RoastScreen({ persona = 'witness', onClose }) {
           <div key={i} style={{
             fontFamily: V.sans, fontSize: 19, lineHeight: 1.4,
             color: V.ink, fontWeight: 500, textWrap: 'pretty',
-            letterSpacing: 0,
+            letterSpacing: '-0.005em',
           }}>{line}</div>
         ))}
       </div>
@@ -103,7 +109,7 @@ function DestructiveScreen({ onCancel, onConfirm }) {
         flex: 1, padding: '32px 24px 24px',
         display: 'flex', flexDirection: 'column', gap: 14,
       }}>
-        <Eyebrow color={V.error}>Destructive</Eyebrow>
+        <Eyebrow color={V.glow}>Destructive</Eyebrow>
         <H1 style={{ fontSize: 32, lineHeight: 1.1 }}>This deletes everything.</H1>
         <P dim>All entries. All transcripts. All patterns. No backup. No undo.</P>
         <div style={{ marginTop: 14 }}>
@@ -115,7 +121,7 @@ function DestructiveScreen({ onCancel, onConfirm }) {
             style={{
               marginTop: 10, width: '100%', boxSizing: 'border-box',
               padding: '14px 16px', borderRadius: V.rXS,
-              background: V.s1, border: `1px solid ${ok ? V.errorSoft : V.hair}`,
+              background: V.s1, border: `1px solid ${ok ? V.glowRule : V.hair}`,
               color: V.ink, fontFamily: V.mono, fontSize: 15, letterSpacing: '0.18em',
               outline: 'none', textTransform: 'uppercase',
             }}

@@ -1,0 +1,218 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Vestige · Energy Direction</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Anton&family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet" />
+<style>
+  html, body {
+    margin: 0; padding: 0;
+    background: oklch(11% 0.010 55);
+    font-family: 'Space Grotesk', system-ui, sans-serif;
+    color: oklch(95% 0.015 85);
+    min-height: 100vh;
+    -webkit-font-smoothing: antialiased;
+  }
+  *, *::before, *::after { box-sizing: border-box; }
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: oklch(35% 0.012 55); }
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+
+<script type="text/babel" src="data.jsx"></script>
+<script type="text/babel" src="energy-tokens.jsx"></script>
+<script type="text/babel" src="energy-screens.jsx"></script>
+
+<script type="text/babel">
+function Direction() {
+  return (
+    <div style={{
+      padding: '36px 32px 80px',
+      minHeight: '100vh',
+      background: `
+        radial-gradient(900px 600px at 10% -10%, oklch(20% 0.04 28 / 0.20), transparent 60%),
+        radial-gradient(800px 700px at 110% 10%, oklch(20% 0.05 115 / 0.16), transparent 60%),
+        oklch(11% 0.010 55)
+      `,
+    }}>
+      {/* ─── Header ─────────────────────────────────────────────── */}
+      <div style={{ maxWidth: 1100, margin: '0 auto 36px' }}>
+        <div style={{
+          display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start',
+          gap: 24, flexWrap: 'wrap',
+        }}>
+          <div style={{ maxWidth: 720 }}>
+            <div style={{
+              fontFamily: ET.mono, fontSize: 10, fontWeight: 700,
+              letterSpacing: '0.24em', textTransform: 'uppercase',
+              color: E.lime,
+            }}>● DIRECTION 02 · SCOREBOARD</div>
+            <h1 style={{
+              margin: '10px 0 0', fontFamily: ET.display, fontSize: 96,
+              lineHeight: 0.85, color: E.ink, letterSpacing: '-0.005em',
+              textTransform: 'uppercase',
+            }}>STRAVA<br />FOR YOUR<br />ATTENTION<span style={{ color: E.coral }}>.</span></h1>
+            <p style={{
+              margin: '20px 0 0', maxWidth: 560,
+              fontFamily: ET.sans, fontSize: 15, lineHeight: 1.55, color: E.dim,
+            }}>
+              The Mist direction was beautiful but it read like Calm. <span style={{ color: E.ink }}>The
+              concept is "the coach is a dick."</span> Warm dark replaces cool blue, electric lime
+              replaces moonstone purple, Anton replaces Newsreader. Numbers hum.
+              Recording is on-air. Patterns are box scores. The roast is a scorecard.
+            </p>
+          </div>
+
+          <div style={{
+            display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 0,
+            border: `1px solid ${E.hair}`, minWidth: 260,
+            fontFamily: ET.mono, fontSize: 10, fontWeight: 600,
+            textTransform: 'uppercase', letterSpacing: '0.16em',
+          }}>
+            {[
+              ['Floor',   'warm espresso',  E.ink],
+              ['Signal',  'electric lime',  E.lime],
+              ['Heat',    'alarm coral',    E.coral],
+              ['Cool',    'teal · resolved', E.teal],
+              ['Display', 'anton condensed', E.ink],
+              ['Body',    'space grotesk',  E.ink],
+            ].map(([k, v, c], i) => (
+              <div key={i} style={{
+                padding: '8px 10px', borderRight: i % 2 === 0 ? `1px solid ${E.hair}` : 'none',
+                borderBottom: i < 4 ? `1px solid ${E.hair}` : 'none',
+                display: 'flex', flexDirection: 'column', gap: 3,
+              }}>
+                <span style={{ color: E.faint }}>{k}</span>
+                <span style={{ color: c, fontSize: 11 }}>{v}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* What's changing strip */}
+        <div style={{
+          marginTop: 28, padding: '14px 18px',
+          border: `1px solid ${E.hair}`,
+          backgroundImage: TAPE_BG,
+          background: 'oklch(15% 0.012 55)',
+          display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 0,
+        }}>
+          {[
+            { from: 'Cool blue-violet mist', to: 'Warm espresso + lime signal',  why: 'warm reads alive · blue reads sedated' },
+            { from: 'Newsreader italic hero', to: 'Anton condensed at scale',     why: 'numbers humming = ADHD attention' },
+            { from: 'Moonstone "Mist Hero"',  to: 'ON AIR button + live timer',   why: 'unmistakably "this is on"' },
+            { from: 'Pattern cards on dark',  to: 'Box scores with deltas',       why: 'Strava DNA — "you up +4 this week"' },
+          ].map((row, i) => (
+            <div key={i} style={{
+              padding: '4px 14px',
+              borderRight: i < 3 ? `1px solid ${E.hair}` : 'none',
+              display: 'flex', flexDirection: 'column', gap: 4,
+            }}>
+              <div style={{
+                fontFamily: ET.mono, fontSize: 8.5, fontWeight: 600,
+                letterSpacing: '0.20em', textTransform: 'uppercase', color: E.faint,
+                textDecoration: 'line-through',
+              }}>{row.from}</div>
+              <div style={{
+                fontFamily: ET.mono, fontSize: 10, fontWeight: 700,
+                letterSpacing: '0.16em', textTransform: 'uppercase', color: E.lime,
+              }}>↓ {row.to}</div>
+              <div style={{
+                fontFamily: ET.sans, fontSize: 11, color: E.dim, lineHeight: 1.4,
+                marginTop: 2,
+              }}>{row.why}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* ─── Phones row ─────────────────────────────────────────── */}
+      <div style={{
+        display: 'flex', gap: 32, overflowX: 'auto', padding: '0 0 24px',
+        scrollSnapType: 'x mandatory',
+      }}>
+        <div style={{ flexShrink: 0, width: 32 }} />
+        <div style={{ scrollSnapAlign: 'start' }}><PhoneE label="01 · CAPTURE" sub="IDLE" accent={E.ink}><EnergyCapture /></PhoneE></div>
+        <div style={{ scrollSnapAlign: 'start' }}><PhoneE label="02 · CAPTURE" sub="ON AIR" accent={E.coral}><EnergyCaptureLive /></PhoneE></div>
+        <div style={{ scrollSnapAlign: 'start' }}><PhoneE label="03 · PATTERNS" sub="BOX SCORES" accent={E.lime}><EnergyPatterns /></PhoneE></div>
+        <div style={{ scrollSnapAlign: 'start' }}><PhoneE label="04 · DETAIL" sub="TUE MEETINGS" accent={E.ink}><EnergyPatternDetail /></PhoneE></div>
+        <div style={{ scrollSnapAlign: 'start' }}><PhoneE label="05 · ROAST" sub="HARDASS" accent={E.coral}><EnergyRoast /></PhoneE></div>
+        <div style={{ flexShrink: 0, width: 32 }} />
+      </div>
+
+      {/* ─── Bottom annotations ────────────────────────────────── */}
+      <div style={{ maxWidth: 1100, margin: '40px auto 0' }}>
+        <div style={{
+          fontFamily: ET.mono, fontSize: 10, fontWeight: 700,
+          letterSpacing: '0.24em', textTransform: 'uppercase', color: E.lime,
+        }}>● MOTION NOTES</div>
+        <div style={{
+          marginTop: 16,
+          display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16,
+        }}>
+          {[
+            ['REC PULSE', 'The on-air dot pulses 1.8s · breathing. Pressing it locks the timer in coral.'],
+            ['NUMBERS TICK', 'Every stat number sub-pixel jitters on update — a scoreboard tick, not a smooth count-up.'],
+            ['DELTAS ARE LOUD', 'A ▲4 this week is the loudest thing on the screen. If nothing changed, no delta — never invent motion.'],
+            ['NO FOG DRIFT', 'Atmospheric drift is killed. Replaced with a thin tape-rule grain on cards — printed receipt energy.'],
+            ['ROAST STAMP', 'The roast banner sits at -1.5° wobble, halftone fill. Lands like a stamp, not a chat bubble.'],
+            ['CHUNK COUNTDOWN', 'Recording shows a literal 30s bar with tick marks. The thing chunks. You can see it chunk.'],
+          ].map(([k, v]) => (
+            <div key={k} style={{
+              padding: '12px 14px', border: `1px solid ${E.hair}`,
+              background: 'oklch(15% 0.012 55)',
+            }}>
+              <div style={{
+                fontFamily: ET.mono, fontSize: 9.5, fontWeight: 700,
+                letterSpacing: '0.20em', textTransform: 'uppercase', color: E.ink,
+              }}>{k}</div>
+              <div style={{
+                marginTop: 6, fontFamily: ET.sans, fontSize: 12, lineHeight: 1.45,
+                color: E.dim,
+              }}>{v}</div>
+            </div>
+          ))}
+        </div>
+
+        <div style={{
+          marginTop: 36, padding: '16px 18px',
+          border: `1px solid ${E.coralSoft}`,
+          background: 'oklch(20% 0.08 28 / 0.18)',
+        }}>
+          <div style={{
+            fontFamily: ET.mono, fontSize: 10, fontWeight: 700,
+            letterSpacing: '0.20em', textTransform: 'uppercase', color: E.coral,
+          }}>● TENSIONS WITH design-guidelines.md</div>
+          <div style={{
+            marginTop: 10, fontFamily: ET.sans, fontSize: 13, lineHeight: 1.55,
+            color: E.ink,
+          }}>
+            This direction <span style={{ color: E.coral, fontWeight: 600 }}>breaks four rules</span> in the
+            current spec, on purpose: <em>"Restrained in the visuals"</em> (we made them loud),
+            <em>"Quiet. Observational."</em> (we kept observational, killed quiet), <em>"No celebrations"</em>
+            (deltas celebrate streaks — small, dry, but they do), and the
+            <em> glow/vapor purple-and-blue accent system</em> (replaced wholesale).
+            The bite stays in the words — the visuals just got off the couch.
+            <span style={{ color: E.dim }}> If you like this, the design-guidelines.md doc needs
+            a rewrite to match. Tell me which screens land and I'll iterate.</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<Direction />);
+</script>
+</body>
+</html>

@@ -1,6 +1,7 @@
 package dev.anchildress1.vestige.ui.patterns
 
 import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.assertHasClickAction
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithContentDescription
@@ -35,6 +36,12 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import java.io.File
 
+/**
+ * Pos / neg / edge + a11y coverage for the list screen.
+ *
+ * Err-state handling lives below this layer in the store / repo / viewmodel tests; the screen
+ * contract itself receives only stable UI state and action callbacks.
+ */
 @OptIn(ExperimentalCoroutinesApi::class)
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34], manifest = Config.NONE, application = PatternsTestApplication::class)
@@ -114,10 +121,10 @@ class PatternsListScreenTest {
         composeRule.setContent { PatternsListScreen(viewModel = newViewModel(), onOpenPattern = {}) }
 
         composeRule.onNodeWithText("ACTIVE").assertIsDisplayed()
-        composeRule.onNodeWithText("DISMISSED").assertIsDisplayed()
-        // No snoozed or resolved cards in this seed, so those headers must stay hidden.
-        composeRule.onAllNodesWithText("SNOOZED · STILL DRIFTING").assertCountEquals(0)
-        composeRule.onAllNodesWithText("RESOLVED · FADED").assertCountEquals(0)
+        composeRule.onNodeWithText("DROPPED").assertIsDisplayed()
+        // No snoozed or closed cards in this seed, so those headers must stay hidden.
+        composeRule.onAllNodesWithText("SKIPPED · ON HOLD").assertCountEquals(0)
+        composeRule.onAllNodesWithText("CLOSED · DONE").assertCountEquals(0)
     }
 
     @Test
@@ -135,6 +142,17 @@ class PatternsListScreenTest {
     }
 
     @Test
+    fun `loaded card and overflow affordance expose click semantics and labels (a11y)`() {
+        val supporting = listOf(seedEntry("crashed", ExtractionStatus.COMPLETED))
+        seedActivePattern("p-a11y", "Tuesday Meetings", "Aftermath", "Callout.", supporting)
+
+        composeRule.setContent { PatternsListScreen(viewModel = newViewModel(), onOpenPattern = {}) }
+
+        composeRule.onNodeWithText("Tuesday Meetings").assertHasClickAction()
+        composeRule.onNodeWithContentDescription("Pattern actions").assertHasClickAction()
+    }
+
+    @Test
     fun `snackbar Undo restores a dismissed pattern back to ACTIVE`() {
         val supporting = listOf(seedEntry("crashed", ExtractionStatus.COMPLETED))
         seedActivePattern("p-undo", "Tuesday Meetings", "Aftermath", "Callout.", supporting)
@@ -142,7 +160,7 @@ class PatternsListScreenTest {
         composeRule.setContent { PatternsListScreen(viewModel = newViewModel(), onOpenPattern = {}) }
 
         composeRule.onNodeWithContentDescription("Pattern actions").performClick()
-        composeRule.onNodeWithText("Dismiss").performClick()
+        composeRule.onNodeWithText("Drop").performClick()
         composeRule.waitForIdle()
         // Snackbar surfaces with Undo while the pattern is in DISMISSED state.
         assertEquals(PatternState.DISMISSED, patternStore.findByPatternId("p-undo")?.state)
@@ -159,14 +177,14 @@ class PatternsListScreenTest {
         composeRule.setContent { PatternsListScreen(viewModel = newViewModel(), onOpenPattern = {}) }
 
         composeRule.onNodeWithContentDescription("Pattern actions").performClick()
-        composeRule.onNodeWithText("Dismiss").performClick()
+        composeRule.onNodeWithText("Drop").performClick()
         composeRule.waitForIdle()
 
         assertEquals(PatternState.DISMISSED, patternStore.findByPatternId("p-dismiss")?.state)
     }
 
     @Test
-    fun `snoozed cards only expose dismiss in overflow menu`() {
+    fun `snoozed cards only expose Restart in overflow menu`() {
         val supporting = listOf(seedEntry("crashed", ExtractionStatus.COMPLETED))
         seedActivePattern("p-snoozed", "Tuesday Meetings", "Aftermath", "Callout.", supporting)
         patternRepo.snooze("p-snoozed")
@@ -174,20 +192,37 @@ class PatternsListScreenTest {
         composeRule.setContent { PatternsListScreen(viewModel = newViewModel(), onOpenPattern = {}) }
 
         composeRule.onNodeWithContentDescription("Pattern actions").performClick()
-        composeRule.onNodeWithText("Dismiss").assertIsDisplayed()
-        composeRule.onAllNodesWithText("Snooze 7 days").assertCountEquals(0)
+        composeRule.onNodeWithText("Restart").assertIsDisplayed()
+        composeRule.onAllNodesWithText("Drop").assertCountEquals(0)
+        composeRule.onAllNodesWithText("Skip").assertCountEquals(0)
         composeRule.onAllNodesWithText("Mark resolved").assertCountEquals(0)
     }
 
     @Test
-    fun `dismissed cards do not render an overflow menu`() {
+    fun `dismissed cards expose Restart in overflow menu`() {
         val supporting = listOf(seedEntry("crashed", ExtractionStatus.COMPLETED))
         seedActivePattern("p-dismissed", "Tuesday Meetings", "Aftermath", "Callout.", supporting)
         patternRepo.dismiss("p-dismissed")
 
         composeRule.setContent { PatternsListScreen(viewModel = newViewModel(), onOpenPattern = {}) }
 
-        composeRule.onAllNodesWithContentDescription("Pattern actions").assertCountEquals(0)
+        composeRule.onNodeWithContentDescription("Pattern actions").performClick()
+        composeRule.onNodeWithText("Restart").assertIsDisplayed()
+    }
+
+    @Test
+    fun `Restart from a dropped card transitions pattern back to ACTIVE`() {
+        val supporting = listOf(seedEntry("crashed", ExtractionStatus.COMPLETED))
+        seedActivePattern("p-restart-list", "Tuesday Meetings", "Aftermath", "Callout.", supporting)
+        patternRepo.dismiss("p-restart-list")
+
+        composeRule.setContent { PatternsListScreen(viewModel = newViewModel(), onOpenPattern = {}) }
+
+        composeRule.onNodeWithContentDescription("Pattern actions").performClick()
+        composeRule.onNodeWithText("Restart").performClick()
+        composeRule.waitForIdle()
+
+        assertEquals(PatternState.ACTIVE, patternStore.findByPatternId("p-restart-list")?.state)
     }
 
     private fun newViewModel() = PatternsListViewModel(

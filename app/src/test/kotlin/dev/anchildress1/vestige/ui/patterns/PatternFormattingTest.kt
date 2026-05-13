@@ -122,6 +122,14 @@ class PatternFormattingTest {
     }
 
     @Test
+    fun `actionSnackbarMessageRes maps RESTART to the pattern-is-back snackbar resource`() {
+        assertEquals(
+            dev.anchildress1.vestige.R.string.snackbar_pattern_back,
+            actionSnackbarMessageRes(PatternAction.RESTART),
+        )
+    }
+
+    @Test
     fun `actionSnackbarMessageRes covers every PatternAction variant`() {
         // Guards silent enum extension — the day someone adds a new action, this test fails
         // until the mapping is updated.

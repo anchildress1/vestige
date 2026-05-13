@@ -1,3 +1,6 @@
+// Compose layout cluster + lifecycle tone helpers; splitting hurts call-site readability.
+@file:Suppress("TooManyFunctions")
+
 package dev.anchildress1.vestige.ui.patterns
 
 import androidx.compose.foundation.clickable
@@ -15,7 +18,6 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SnackbarResult
@@ -28,6 +30,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -36,11 +39,15 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import dev.anchildress1.vestige.R
+import dev.anchildress1.vestige.model.PatternState
 import dev.anchildress1.vestige.ui.components.VestigeListCard
+import dev.anchildress1.vestige.ui.components.VestigeScaffold
 import dev.anchildress1.vestige.ui.components.VestigeSurface
+import dev.anchildress1.vestige.ui.theme.VestigeTheme
 
 @OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
+@Suppress("LongMethod") // Compose layout cluster; splitting hurts call-site readability.
 fun PatternDetailScreen(
     viewModel: PatternDetailViewModel,
     onBack: () -> Unit,
@@ -53,14 +60,16 @@ fun PatternDetailScreen(
     val dismissedMessage = stringResource(R.string.snackbar_dismissed)
     val snoozedMessage = stringResource(R.string.snackbar_snoozed_7_days)
     val resolvedMessage = stringResource(R.string.snackbar_marked_resolved)
+    val restartMessage = stringResource(R.string.snackbar_pattern_back)
     val undoLabel = stringResource(R.string.pattern_undo)
 
-    LaunchedEffect(viewModel, dismissedMessage, snoozedMessage, resolvedMessage, undoLabel) {
+    LaunchedEffect(viewModel, dismissedMessage, snoozedMessage, resolvedMessage, restartMessage, undoLabel) {
         viewModel.events.collect { event ->
             val message = when (event.action) {
                 PatternAction.DISMISSED -> dismissedMessage
                 PatternAction.SNOOZED -> snoozedMessage
                 PatternAction.MARKED_RESOLVED -> resolvedMessage
+                PatternAction.RESTART -> restartMessage
             }
             val result = snackbarHostState.showSnackbar(
                 message = message,
@@ -74,9 +83,8 @@ fun PatternDetailScreen(
     }
 
     val backDescription = stringResource(R.string.pattern_back_description)
-    Scaffold(
+    VestigeScaffold(
         modifier = modifier,
-        containerColor = androidx.compose.ui.graphics.Color.Transparent,
         topBar = {
             TopAppBar(
                 title = { Text("") },
@@ -103,6 +111,7 @@ fun PatternDetailScreen(
                 onDismiss = { viewModel.dismiss() },
                 onSnooze = { viewModel.snooze() },
                 onMarkResolved = { viewModel.markResolved() },
+                onRestart = { viewModel.restart() },
             ),
         )
     }
@@ -126,7 +135,7 @@ private fun PatternDetailBody(
         ) {
             Text(
                 text = stringResource(R.string.pattern_detail_not_found),
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                color = VestigeTheme.colors.dim,
             )
         }
 
@@ -155,9 +164,9 @@ private fun LoadedBody(
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         PatternSummaryCard(loaded)
-        PatternIntensityCard(loaded.traceHits)
+        PatternIntensityCard(loaded.state, loaded.traceHits)
 
-        HorizontalDivider(color = MaterialTheme.colorScheme.outline)
+        HorizontalDivider(color = VestigeTheme.colors.hair)
 
         PatternSourcesCard(sources = loaded.sources, onOpenEntry = onOpenEntry)
 
@@ -165,7 +174,7 @@ private fun LoadedBody(
             Text(
                 text = stringResource(terminal.prefixRes, terminal.dateLabel),
                 style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                color = VestigeTheme.colors.dim,
             )
         }
 
@@ -184,7 +193,7 @@ private fun PatternSummaryCard(loaded: PatternDetailUiState.Loaded) {
                 Text(
                     text = it,
                     style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = VestigeTheme.colors.dim,
                 )
             }
             Text(text = loaded.observation, style = MaterialTheme.typography.bodyLarge)
@@ -198,26 +207,34 @@ private fun PatternSummaryCard(loaded: PatternDetailUiState.Loaded) {
                     loaded.lastSeenLabel,
                 ),
                 style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                color = VestigeTheme.colors.dim,
             )
         }
     }
 }
 
 @Composable
-private fun PatternIntensityCard(traceHits: Set<Int>) {
+private fun PatternIntensityCard(state: PatternState, traceHits: Set<Int>) {
     // POC: "Intensity · 30 days" trace strip. Hero element of the detail screen.
+    val style = intensityToneFor(state).themedStyle()
     VestigeSurface(contentPadding = PaddingValues(16.dp)) {
         Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Text(
                 text = stringResource(R.string.pattern_detail_intensity_eyebrow),
                 style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                color = VestigeTheme.colors.dim,
             )
-            TraceBar(hits = traceHits, height = 28.dp)
+            TraceBarE(
+                hits = traceHits,
+                height = 28.dp,
+                accent = style.accent,
+                peak = style.peak,
+            )
         }
     }
 }
+
+internal data class PatternIntensityStyle(val accent: Color, val peak: Boolean)
 
 @Composable
 private fun PatternSourcesCard(sources: List<PatternSourceUi>, onOpenEntry: (Long) -> Unit) {
@@ -234,7 +251,7 @@ private fun PatternSourcesCard(sources: List<PatternSourceUi>, onOpenEntry: (Lon
                 Text(
                     text = stringResource(R.string.pattern_detail_no_sources),
                     style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = VestigeTheme.colors.dim,
                 )
             }
         }
@@ -256,9 +273,9 @@ private fun SourceRow(source: PatternSourceUi, onClick: () -> Unit) {
             Text(
                 text = source.dateLabel,
                 style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                color = VestigeTheme.colors.dim,
             )
-            Text(text = "—", color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(text = "—", color = VestigeTheme.colors.dim)
             Text(text = source.snippet, style = MaterialTheme.typography.bodyMedium)
         }
     }
@@ -266,8 +283,8 @@ private fun SourceRow(source: PatternSourceUi, onClick: () -> Unit) {
 
 @Composable
 private fun ActionRow(availableActions: Set<PatternAction>, actions: PatternActionCallbacks<Unit>) {
-    // Compact padding + single-line text keeps "Mark resolved" / "Snooze 7 days" inside the
-    // button at phone widths. Default OutlinedButton padding (24 dp / side) overflowed.
+    // Compact padding + single-line text keeps the action labels inside the buttons at phone
+    // widths. Default OutlinedButton padding (24 dp / side) overflowed.
     val padding = PaddingValues(horizontal = 10.dp, vertical = 8.dp)
     Row(
         modifier = Modifier.fillMaxWidth(),
@@ -298,6 +315,15 @@ private fun ActionRow(availableActions: Set<PatternAction>, actions: PatternActi
                 contentPadding = padding,
             ) {
                 ActionButtonLabel(stringResource(R.string.pattern_action_mark_resolved))
+            }
+        }
+        if (PatternAction.RESTART in availableActions) {
+            OutlinedButton(
+                onClick = { actions.onRestart(Unit) },
+                modifier = Modifier.weight(1f),
+                contentPadding = padding,
+            ) {
+                ActionButtonLabel(stringResource(R.string.pattern_action_restart))
             }
         }
     }

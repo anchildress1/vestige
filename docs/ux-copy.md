@@ -188,7 +188,7 @@ Primary action:
 
 ### Status row (top)
 
-- Local model status indicator: `LOCAL · READY` (when idle, model loaded)
+- Local model status indicator: `LOCAL · GEMMA 4` (when idle, model loaded) / `ON AIR · LIVE` (when recording) — per ADR-011
 - Persona dropdown label: `WITNESS ▾` (or active persona)
 
 ### Patterns peek (below status)
@@ -198,6 +198,13 @@ Card title:
 
 Card body (one-line teaser):
 > {pattern_name_1} · {pattern_name_2} · {pattern_name_3}
+
+If model still downloading (record button disabled):
+> Model loading. Typed entries work now.
+
+Status pill during download: `DOWNLOADING · {N}%`
+Status pill if paused (no Wi-Fi): `MODEL PAUSED`
+Below button if paused: `Reconnect to Wi-Fi to resume. Typed entries work now.`
 
 If no active patterns:
 > Nothing repeating yet.
@@ -296,8 +303,10 @@ Primary action:
 Header:
 > **Patterns**
 
-Action button (top right):
-> **Roast me**
+Action button (top right) — persona-aware:
+- Witness: **Roast me**
+- Hardass: **Run the numbers.**
+- Editor: **Audit my vocabulary.**
 
 Section headers (uppercase, mono eyebrow — one per non-empty section per `poc/screens-patterns.jsx`):
 > ACTIVE
@@ -322,10 +331,18 @@ Card actions (per card, in overflow menu):
 
 Empty states:
 
-- No entries yet: `Insufficient data.`
-- Has entries, no patterns: `Nothing repeating yet.`
-- All dismissed: `No active patterns.`
-- Filter returns nothing: `Nothing matches.`
+- **Fewer than 10 entries (Day 1):**
+  - Eyebrow: `VESTIGES · 0 ENTRIES · 30 DAYS`
+  - Header: `Nothing to read yet.`
+  - Body: `Patterns surface after 10 entries. Keep recording.`
+- **Enough entries, no pattern detected:**
+  - Header: `No repeating pattern detected.`
+  - Body: `The model looked. Nothing came back twice.`
+- **Active tab empty (all snoozed or resolved):**
+  - Eyebrow: `ACTIVE`
+  - Header: `Nothing active.`
+  - Sub: `{N} snoozed · {N} resolved` (live counts)
+- **Filter returns nothing:** `Nothing matches.`
 
 ---
 
@@ -374,8 +391,8 @@ If resolved:
 
 P1 conditional. Do not implement before the normal Pattern List and Pattern Detail are working with sourced evidence.
 
-Header:
-> **{Persona} · Roast · {date}**
+Header (all-caps mono eyebrow — consistent with other eyebrow labels):
+> `{PERSONA} · ROAST · {DATE}`
 
 Body — the roast itself, 3-5 lines, persona-specific. Examples already in `design-guidelines.md`. Persona-flavored, not data recitation.
 
@@ -384,9 +401,29 @@ Source line at bottom:
 
 Footer actions:
 - **Close**
+- **Wipe everything.** *(destructive — routes to DestructiveScreen)*
 
-If no roast available (insufficient data):
-> Insufficient data. Come back when you've left more behind.
+If no roast available (insufficient data) — persona-aware:
+- Witness: `Not enough entries yet. Come back when there's something to observe.`
+- Hardass: `{N} entries. Not enough to work with. Keep recording.`
+- Editor: `Vocabulary sample too thin. {N} entries logged. Need more.`
+
+Loading state (model generating):
+> Eyebrow: `{PERSONA} · ROAST · {DATE}`
+> Body: `Reading 30 days...`
+
+---
+
+## Empty States (additional)
+
+### Capture history (no entries yet)
+> Eyebrow: `HISTORY`
+> Header: `No entries yet.`
+> Body: `First one takes 30 seconds.`
+
+### Pattern detail — no sources
+Should not occur in normal flow (a pattern requires entries). If it renders:
+> `No entries logged for this pattern yet.`
 
 ---
 
@@ -420,7 +457,8 @@ Diff actions:
 | Model download failed | `Network choked.` |
 | Model download stalled | `Download stalled. Retry.` |
 | Model file corrupt | `Model file unreadable. Re-download from settings.` |
-| Mic permission denied | `Mic permission required to record. Settings → Permissions.` |
+| Mic permission denied (first time) | `Mic permission required to record. Settings → Permissions.` |
+| Mic permission permanently denied (system-level, "don't ask again") | `Mic blocked at the system level.` / `Settings → Apps → Vestige → Permissions → Microphone.` / secondary action: `Use typed entry instead` |
 | Mic hardware unavailable | `Mic unavailable. Try typing.` |
 | Inference timeout | `Model timed out. Try a shorter chunk.` |
 | Inference failed | `Model couldn't read that. Try again.` |

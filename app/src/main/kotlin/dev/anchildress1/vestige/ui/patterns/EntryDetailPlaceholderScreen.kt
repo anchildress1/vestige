@@ -54,7 +54,6 @@ fun EntryDetailPlaceholderScreen(
     Scaffold(
         modifier = modifier,
         containerColor = androidx.compose.ui.graphics.Color.Transparent,
-        contentColor = dev.anchildress1.vestige.ui.theme.Ink,
         topBar = {
             TopAppBar(
                 title = { Text(text = stringResource(id = R.string.entry_detail_placeholder_title)) },

@@ -95,9 +95,6 @@ fun PatternsListScreen(
     Scaffold(
         modifier = modifier,
         containerColor = Color.Transparent,
-        // Transparent container resolves `contentColorFor(...)` to Color.Unspecified, which falls
-        // back to Color.Black for LocalContentColor — invisible on the Floor backdrop. Pin to Ink.
-        contentColor = dev.anchildress1.vestige.ui.theme.Ink,
         topBar = { TopAppBar(title = { Text(stringResource(R.string.patterns_title)) }) },
         snackbarHost = { PatternSnackbarHost(snackbarHostState) },
     ) { padding ->

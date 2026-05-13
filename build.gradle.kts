@@ -66,6 +66,12 @@ kover {
                         "dev.anchildress1.vestige.ui.components.VestigeSurfaceKt",
                         "dev.anchildress1.vestige.ui.components.VestigeSurfaceKt*",
                         "dev.anchildress1.vestige.ui.components.*VestigeSurfaceKt*",
+                        "dev.anchildress1.vestige.ui.components.VestigeScaffoldKt",
+                        "dev.anchildress1.vestige.ui.components.VestigeScaffoldKt*",
+                        "dev.anchildress1.vestige.ui.components.*VestigeScaffoldKt*",
+                        "dev.anchildress1.vestige.ui.components.AccentModifiersKt",
+                        "dev.anchildress1.vestige.ui.components.AccentModifiersKt*",
+                        "dev.anchildress1.vestige.ui.components.*AccentModifiersKt*",
                         // Debug-only fixture seeder for on-device manual verification.
                         // FLAG_DEBUGGABLE-gated at the call site; not on any release path.
                         "dev.anchildress1.vestige.debug.*",
@@ -152,6 +158,8 @@ sonar {
                 "**/ui/patterns/TraceBarE.kt",
                 "**/ui/components/ScoreboardPrimitives.kt",
                 "**/ui/components/VestigeSurface.kt",
+                "**/ui/components/VestigeScaffold.kt",
+                "**/ui/components/AccentModifiers.kt",
                 // Debug-only fixture seeder, FLAG_DEBUGGABLE-gated; never on a release path.
                 "**/debug/**",
             ).joinToString(","),

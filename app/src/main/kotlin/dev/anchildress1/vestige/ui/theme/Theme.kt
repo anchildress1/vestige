@@ -21,7 +21,7 @@ private val VestigeColorScheme = darkColorScheme(
     surfaceContainerHighest = S3,
     onSurface = Ink,
     onSurfaceVariant = Dim,
-    outline = S3,
+    outline = Hair,
     error = ErrorRed,
     onError = Deep,
 )

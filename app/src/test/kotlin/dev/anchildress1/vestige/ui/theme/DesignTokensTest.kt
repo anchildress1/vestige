@@ -99,10 +99,18 @@ class DesignTokensTest {
     }
 
     @Test
-    fun `DisplayBig is condensed display at 56sp`() {
+    fun `DisplayBig is condensed display at 56sp with tabular nums`() {
         val style = VestigeTextStyles.DisplayBig
         assertEquals(VestigeFonts.Display, style.fontFamily)
         assertEquals(56f, style.fontSize.value)
+        // ADR-011 §"Type stack" — stat numbers must not jitter on update. `tnum` locks digit widths.
+        assertEquals("tnum", style.fontFeatureSettings)
+    }
+
+    @Test
+    fun `tape grain alpha matches POC 3 percent`() {
+        // poc/energy-tokens.jsx TAPE_BG uses oklch(.../ 0.03). Hair2 at 6% reads twice as strong.
+        assertEquals(0.03f, TapeGrain.alpha, ALPHA_TOLERANCE)
     }
 
     @Test

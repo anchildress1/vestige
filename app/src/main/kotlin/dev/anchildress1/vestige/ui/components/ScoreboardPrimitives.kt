@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -36,7 +37,6 @@ import dev.anchildress1.vestige.ui.theme.Coral
 import dev.anchildress1.vestige.ui.theme.Deep
 import dev.anchildress1.vestige.ui.theme.Dim
 import dev.anchildress1.vestige.ui.theme.Hair
-import dev.anchildress1.vestige.ui.theme.Hair2
 import dev.anchildress1.vestige.ui.theme.Ink
 import dev.anchildress1.vestige.ui.theme.Lime
 import dev.anchildress1.vestige.ui.theme.RadiusTokens
@@ -198,7 +198,7 @@ fun StatRibbon(items: List<StatItem>, modifier: Modifier = Modifier) {
         modifier = modifier
             .clip(RadiusTokens.M)
             .background(S1)
-            .tapeGrain(color = Hair2)
+            .tapeGrain()
             .border(1.dp, Hair, RadiusTokens.M),
     ) {
         items.forEachIndexed { index, item ->
@@ -261,6 +261,9 @@ fun TickRule(
 
 private const val TICK_RAIL_HEIGHT: Float = 0.40f
 
+/** Minimum touch target per Material accessibility guideline (Android 48dp guidance). */
+private val MinTapTarget: Dp = 48.dp
+
 /**
  * App shell top — LOCAL · GEMMA 4 status pill (or ON AIR · LIVE while recording) on the left,
  * persona switcher chrome on the right. Used by Capture and any screen that wants the chrome.
@@ -291,8 +294,10 @@ fun AppTop(
     ) {
         Box(
             modifier = Modifier
+                .sizeIn(minHeight = MinTapTarget)
                 .clip(RadiusTokens.XS)
                 .clickable(onClick = onStatusTap),
+            contentAlignment = Alignment.CenterStart,
         ) {
             if (recording) {
                 Pill(text = "ON AIR · LIVE", color = Coral, dot = true, blink = true, fill = false)
@@ -300,7 +305,12 @@ fun AppTop(
                 Pill(text = "LOCAL · GEMMA 4", color = Lime, dot = true, blink = true, fill = false)
             }
         }
-        Box(modifier = Modifier.clickable(onClick = onPersonaTap)) {
+        Box(
+            modifier = Modifier
+                .sizeIn(minHeight = MinTapTarget)
+                .clickable(onClick = onPersonaTap),
+            contentAlignment = Alignment.CenterEnd,
+        ) {
             Pill(text = "$persona ▾", color = Ink, fill = false)
         }
     }

@@ -23,13 +23,15 @@ object VestigeFonts {
 
 object VestigeTextStyles {
     // DisplayBig — Anton at scale. 56sp default; capture stats and pattern hero numbers
-    // override up to ~96sp inline. Tight letter-spacing for the condensed look.
+    // override up to ~96sp inline. `tnum` locks digit widths so scoreboard numbers don't
+    // jitter when they update — ADR-011 §"Type stack" / "Tabular nums on stats".
     val DisplayBig: TextStyle = TextStyle(
         fontFamily = VestigeFonts.Display,
         fontWeight = FontWeight.Normal,
         fontSize = 56.sp,
         lineHeight = 56.sp,
         letterSpacing = (-0.01).em,
+        fontFeatureSettings = "tnum",
     )
 
     val H1: TextStyle = TextStyle(

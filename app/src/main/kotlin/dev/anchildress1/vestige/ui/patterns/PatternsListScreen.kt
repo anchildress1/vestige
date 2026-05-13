@@ -45,11 +45,15 @@ import androidx.compose.ui.unit.dp
 import dev.anchildress1.vestige.R
 import dev.anchildress1.vestige.ui.components.VestigeListCard
 import dev.anchildress1.vestige.ui.components.limeLeftRuleForActive
+import dev.anchildress1.vestige.ui.theme.Ember
 import dev.anchildress1.vestige.ui.theme.Lime
+import dev.anchildress1.vestige.ui.theme.Teal
 import dev.anchildress1.vestige.ui.theme.VestigeTheme
 
 // Active patterns wear the electric-lime signal — matches `poc/Energy Direction.html` patterns frame.
 private val PatternAccent: Color = Lime
+private val SnoozedPatternAccent: Color = Ember
+private val SettledPatternAccent: Color = Teal
 
 @OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
@@ -208,10 +212,11 @@ private fun PatternCard(
                 }
                 Text(text = card.observation, style = MaterialTheme.typography.bodyMedium)
                 Spacer(modifier = Modifier.height(2.dp))
+                val traceBarStyle = patternCardTraceBarStyleFor(card.section)
                 TraceBarE(
                     hits = card.traceHits,
-                    accent = if (card.section == PatternSection.ACTIVE) PatternAccent else TraceBarDefaults.Rail,
-                    peak = card.section == PatternSection.ACTIVE,
+                    accent = traceBarStyle.accent,
+                    peak = traceBarStyle.peak,
                 )
                 Spacer(modifier = Modifier.height(2.dp))
                 // POC card meta is a single eyebrow line — no "Seen in:" label. (Two-eyebrow
@@ -235,6 +240,25 @@ private fun PatternCard(
             )
         }
     }
+}
+
+internal fun patternCardTraceBarStyleFor(section: PatternSection): PatternIntensityStyle = when (section) {
+    PatternSection.ACTIVE -> PatternIntensityStyle(
+        accent = PatternAccent,
+        peak = true,
+    )
+
+    PatternSection.SNOOZED -> PatternIntensityStyle(
+        accent = SnoozedPatternAccent,
+        peak = false,
+    )
+
+    PatternSection.RESOLVED,
+    PatternSection.DISMISSED,
+    -> PatternIntensityStyle(
+        accent = SettledPatternAccent,
+        peak = false,
+    )
 }
 
 @Composable

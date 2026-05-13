@@ -40,6 +40,9 @@ import dev.anchildress1.vestige.R
 import dev.anchildress1.vestige.model.PatternState
 import dev.anchildress1.vestige.ui.components.VestigeListCard
 import dev.anchildress1.vestige.ui.components.VestigeSurface
+import dev.anchildress1.vestige.ui.theme.Ember
+import dev.anchildress1.vestige.ui.theme.Teal
+import dev.anchildress1.vestige.ui.theme.TealDim
 
 @OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
@@ -235,12 +238,20 @@ internal fun patternIntensityStyleFor(state: PatternState): PatternIntensityStyl
         peak = true,
     )
 
-    PatternState.SNOOZED,
+    PatternState.SNOOZED -> PatternIntensityStyle(
+        accent = Ember,
+        peak = false,
+    )
+
     PatternState.RESOLVED,
     PatternState.DISMISSED,
-    PatternState.BELOW_THRESHOLD,
     -> PatternIntensityStyle(
-        accent = TraceBarDefaults.Rail,
+        accent = Teal,
+        peak = false,
+    )
+
+    PatternState.BELOW_THRESHOLD -> PatternIntensityStyle(
+        accent = TealDim,
         peak = false,
     )
 }

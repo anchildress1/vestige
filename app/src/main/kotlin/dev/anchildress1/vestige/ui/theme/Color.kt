@@ -26,6 +26,7 @@ private const val HAIR_B: Int = 0x91
 val Ghost: Color = Color(red = HAIR_R, green = HAIR_G, blue = HAIR_B, alpha = 0x99) // 0.60
 val Hair: Color = Color(red = HAIR_R, green = HAIR_G, blue = HAIR_B, alpha = 0x1F) // 0.12
 val Hair2: Color = Color(red = HAIR_R, green = HAIR_G, blue = HAIR_B, alpha = 0x0F) // 0.06
+val TapeGrain: Color = Color(red = HAIR_R, green = HAIR_G, blue = HAIR_B, alpha = 0x08) // 0.03 per POC TAPE_BG
 
 // Accents — ONE per element. Lime and Coral never co-occur on the same atom.
 // Lime: signal — live / active / "on" (model ready, pattern active, on-air dot when idle).

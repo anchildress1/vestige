@@ -24,11 +24,11 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import dev.anchildress1.vestige.ui.theme.Dim
 import dev.anchildress1.vestige.ui.theme.Hair
-import dev.anchildress1.vestige.ui.theme.Hair2
 import dev.anchildress1.vestige.ui.theme.Ink
 import dev.anchildress1.vestige.ui.theme.RadiusTokens
 import dev.anchildress1.vestige.ui.theme.S1
 import dev.anchildress1.vestige.ui.theme.S2
+import dev.anchildress1.vestige.ui.theme.TapeGrain
 
 private val SurfaceHairline: Dp = 1.dp
 internal val RowLabelColor: Color = Dim
@@ -41,7 +41,7 @@ internal const val TAPE_GRAIN_PERIOD_PX: Float = 4f
  * Horizontal printed-receipt grain per ADR-011 §"Surface texture". 1px line every 4px, low alpha.
  * Replaces the Mist noise-grain layer. Renders behind content; safe to chain after `.background`.
  */
-fun Modifier.tapeGrain(color: Color = Hair): Modifier = drawWithCache {
+fun Modifier.tapeGrain(color: Color = TapeGrain): Modifier = drawWithCache {
     onDrawBehind {
         val h = size.height
         val w = size.width
@@ -76,7 +76,7 @@ fun VestigeSurface(
         modifier = modifier
             .clip(shape)
             .background(fill, shape)
-            .tapeGrain(color = Hair2)
+            .tapeGrain()
             .then(accentModifier)
             .border(width = SurfaceHairline, color = Hair, shape = shape)
             .padding(contentPadding),

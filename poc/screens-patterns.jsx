@@ -10,7 +10,6 @@ function PatternsScreen({ persona = 'witness', onClose, onOpen, onRoast, onUpdat
   const active   = patterns.filter((p) => p.status === 'active');
   const snoozed  = patterns.filter((p) => p.status === 'snoozed');
   const resolved = patterns.filter((p) => p.status === 'resolved');
-  const dismissed = patterns.filter((p) => p.status === 'dismissed');
 
   return (
     <>
@@ -21,9 +20,9 @@ function PatternsScreen({ persona = 'witness', onClose, onOpen, onRoast, onUpdat
       <div className="ves-scroll" style={{ flex: 1, overflowY: 'auto', padding: '4px 22px 28px' }}>
         <Eyebrow>Vestiges · 31 entries · 30 days</Eyebrow>
         <div style={{
-          marginTop: 10, fontFamily: V.display,
+          marginTop: 10, fontFamily: V.display, fontStyle: 'italic',
           fontWeight: 400, fontSize: 34, lineHeight: 1.05,
-          letterSpacing: 0, color: V.ink,
+          letterSpacing: '-0.015em', color: V.ink,
         }}>What keeps returning.</div>
 
         <button onClick={onRoast} style={{
@@ -72,19 +71,6 @@ function PatternsScreen({ persona = 'witness', onClose, onOpen, onRoast, onUpdat
             </div>
           </>
         )}
-
-        {dismissed.length > 0 && (
-          <>
-            <div style={{ marginTop: 24, marginBottom: 10 }}>
-              <Eyebrow>Dismissed</Eyebrow>
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-              {dismissed.map((p) => (
-                <PatternCard key={p.id} p={p} onClick={() => onOpen(p.id)} />
-              ))}
-            </div>
-          </>
-        )}
       </div>
     </>
   );
@@ -120,7 +106,7 @@ function PatternCard({ p, onClick }) {
           <Eyebrow color={V.faint}>{p.category}</Eyebrow>
           <div style={{
             marginTop: 4, fontFamily: V.sans, fontSize: 17, fontWeight: 600,
-            color: V.ink, letterSpacing: 0,
+            color: V.ink, letterSpacing: '-0.005em',
           }}>{p.title}</div>
         </div>
         {isActive && (
@@ -175,9 +161,9 @@ function PatternDetailScreen({ patternId, onClose, onOpenReading, onUpdateStatus
       <div className="ves-scroll" style={{ flex: 1, overflowY: 'auto', padding: '4px 22px 28px' }}>
         <Eyebrow>{p.category}</Eyebrow>
         <div style={{
-          marginTop: 8, fontFamily: V.display,
+          marginTop: 8, fontFamily: V.display, fontStyle: 'italic',
           fontWeight: 400, fontSize: 36, lineHeight: 1.0,
-          letterSpacing: 0, color: V.ink,
+          letterSpacing: '-0.018em', color: V.ink,
         }}>{p.title}</div>
 
         {/* Trace intensity bar */}
@@ -254,9 +240,8 @@ function PatternDetailScreen({ patternId, onClose, onOpenReading, onUpdateStatus
 
         {/* Actions — wired to lifecycle */}
         <div style={{ marginTop: 26, display: 'flex', gap: 8 }}>
-          <GhostBtn onClick={() => setStatus('dismissed')} style={{ flex: 1 }} disabled={p.status === 'dismissed'}>Dismiss</GhostBtn>
-          <GhostBtn onClick={() => setStatus('snoozed')} style={{ flex: 1 }} disabled={p.status === 'snoozed'}>Snooze 7 days</GhostBtn>
-          <GhostBtn onClick={() => setStatus('resolved')} style={{ flex: 1 }} disabled={p.status === 'resolved'}>Mark resolved</GhostBtn>
+          <GhostBtn onClick={() => setStatus('snoozed')} style={{ flex: 1 }} disabled={p.status === 'snoozed'}>Snooze</GhostBtn>
+          <GhostBtn onClick={() => setStatus('resolved')} style={{ flex: 1 }} disabled={p.status === 'resolved'}>Resolved</GhostBtn>
           <GhostBtn onClick={() => setStatus('active')} subtle style={{ flex: 'none', padding: '10px 14px' }} disabled={p.status === 'active'}>Reactivate</GhostBtn>
         </div>
       </div>

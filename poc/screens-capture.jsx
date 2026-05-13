@@ -23,7 +23,7 @@ function MistHero({ state = 'idle', level = 0, onClick, ariaLabel = 'start recor
       {/* Outer halo — slow drift, audio-reactive when recording */}
       <div aria-hidden style={{
         position: 'absolute', inset: -36, borderRadius: '50%',
-        background: `radial-gradient(closest-side, ${V.vaporDim}, transparent 70%)`,
+        background: `radial-gradient(closest-side, ${V.glowDim}, transparent 70%)`,
         filter: 'blur(8px)',
         transform: `scale(${haloAmp})`,
         transition: 'transform 90ms linear',
@@ -32,7 +32,7 @@ function MistHero({ state = 'idle', level = 0, onClick, ariaLabel = 'start recor
       {/* Mid ring — moonstone wash */}
       <div aria-hidden style={{
         position: 'absolute', inset: -8, borderRadius: '50%',
-        background: `conic-gradient(from 220deg, ${V.vaporSoft}, rgba(37, 99, 235, 0.30), ${V.vaporSoft}, rgba(37, 99, 235, 0.18), ${V.vaporSoft})`,
+        background: `conic-gradient(from 220deg, ${V.glowSoft}, oklch(70% 0.075 245 / 0.4), ${V.glowSoft}, oklch(50% 0.05 245 / 0.3), ${V.glowSoft})`,
         filter: 'blur(14px)', opacity: recording ? 0.95 : 0.85,
         animation: `vesSpin ${recording ? '12s' : '18s'} linear infinite`,
       }} />
@@ -45,7 +45,7 @@ function MistHero({ state = 'idle', level = 0, onClick, ariaLabel = 'start recor
           'oklch(28% 0.04 245)',
         ].join(', '),
         boxShadow: [
-          `0 0 ${60 + level * 40}px ${V.vaporDim}`,
+          `0 0 ${60 + level * 40}px ${V.glowDim}`,
           `inset 0 1px 0 oklch(95% 0.04 245 / 0.45)`,
           `inset 0 -22px 36px oklch(15% 0.02 245 / 0.6)`,
         ].join(', '),
@@ -60,7 +60,7 @@ function MistHero({ state = 'idle', level = 0, onClick, ariaLabel = 'start recor
             position: 'relative', zIndex: 2,
             width: 14, height: 14, borderRadius: 7,
             background: V.ink,
-            boxShadow: `0 0 16px ${V.vaporSoft}`,
+            boxShadow: `0 0 16px ${V.glowSoft}`,
           }} />
         )}
         {state === 'recording' && (
@@ -68,7 +68,7 @@ function MistHero({ state = 'idle', level = 0, onClick, ariaLabel = 'start recor
             position: 'relative', zIndex: 2,
             width: 22, height: 22, borderRadius: 4,
             background: V.deep,
-            boxShadow: `inset 0 0 0 1px rgba(10, 14, 26, 0.6), 0 0 18px ${V.vaporSoft}`,
+            boxShadow: `inset 0 0 0 1px oklch(15% 0.020 252 / 0.6), 0 0 18px ${V.glowSoft}`,
           }} />
         )}
       </div>
@@ -94,9 +94,9 @@ function AudioMeter({ history = [], live = false }) {
             height: `${Math.max(10, h * 100)}%`,
             minHeight: 2,
             borderRadius: 1.5,
-            background: live ? V.vapor : V.hair,
+            background: live ? V.glow : V.hair,
             opacity: alpha,
-            boxShadow: live && recent && h > 0.45 ? `0 0 6px ${V.vaporDim}` : 'none',
+            boxShadow: live && recent && h > 0.45 ? `0 0 6px ${V.glowDim}` : 'none',
             transition: 'height 90ms linear, opacity 90ms linear',
           }} />
         );
@@ -165,15 +165,15 @@ function CaptureScreen({
   const topRight = recording ? (
     <span style={{
       fontFamily: V.mono, fontSize: 13, fontWeight: 500,
-      color: V.vapor, letterSpacing: '0.06em',
+      color: V.glow, letterSpacing: '0.06em',
       fontVariantNumeric: 'tabular-nums',
       padding: '6px 12px', borderRadius: V.rPill,
-      background: V.vaporDim, border: `1px solid ${V.vaporSoft}`,
+      background: V.glowDim, border: `1px solid ${V.glowSoft}`,
       display: 'inline-flex', alignItems: 'center', gap: 8,
     }}>
       <span style={{
-        width: 6, height: 6, borderRadius: 3, background: V.vapor,
-        boxShadow: `0 0 6px ${V.vapor}`,
+        width: 6, height: 6, borderRadius: 3, background: V.glow,
+        boxShadow: `0 0 6px ${V.glow}`,
         animation: 'vesPulse 1.4s ease-in-out infinite',
       }} />
       {mm}:{ss}
@@ -201,10 +201,10 @@ function CaptureScreen({
   );
 
   // Hero copy swaps by state
-  const heroKicker = recording ? 'Recording · on-device' : 'Record';
+  const heroKicker = recording ? 'Listening · on-device' : 'Hold the stone · speak';
   const heroSub = recording
-    ? 'Reading happens after stop.'
-    : 'Tap to talk. Audio discarded after extraction.';
+    ? 'Speak freely. The model reads after.'
+    : '30s chunks · audio discarded after extraction';
 
   return (
     <>
@@ -228,9 +228,9 @@ function CaptureScreen({
               : 'Thursday · 9:41 · 31 entries kept'}
           </Eyebrow>
           <div style={{
-            marginTop: 8, fontFamily: V.display,
+            marginTop: 8, fontFamily: V.display, fontStyle: 'italic',
             fontWeight: 400, fontSize: 26, lineHeight: 1.18,
-            letterSpacing: 0, color: V.ink, textWrap: 'balance',
+            letterSpacing: '-0.01em', color: V.ink, textWrap: 'balance',
           }}>
             {recording ? 'Whatever lingered.' : 'What lingered from yesterday?'}
           </div>
@@ -259,7 +259,7 @@ function CaptureScreen({
           )}
 
           <div style={{ textAlign: 'center', maxWidth: 280 }}>
-            <Eyebrow color={recording ? V.vapor : V.mist}>{heroKicker}</Eyebrow>
+            <Eyebrow color={recording ? V.glow : V.glow}>{heroKicker}</Eyebrow>
             <div style={{
               marginTop: 6, fontFamily: V.sans, fontSize: 13, color: V.mist,
               lineHeight: 1.5,
@@ -281,7 +281,7 @@ function CaptureScreen({
               backdropFilter: 'blur(8px)',
             }}>
               {Icons.type}
-              <span>Type</span>
+              <span>Type instead</span>
             </button>
 
             <button onClick={onPatterns} style={{
@@ -297,7 +297,7 @@ function CaptureScreen({
                 position: 'relative', zIndex: 1,
                 display: 'flex', alignItems: 'center', justifyContent: 'space-between',
               }}>
-                <Eyebrow color={V.glow}>3 active patterns</Eyebrow>
+                <Eyebrow color={V.glow}>3 active traces</Eyebrow>
                 <span style={{
                   fontFamily: V.mono, fontSize: 10, letterSpacing: '0.18em',
                   color: V.faint, textTransform: 'uppercase',
@@ -328,13 +328,13 @@ function CaptureScreen({
               background: V.ink, color: V.deep,
               border: 'none', cursor: 'pointer',
               fontFamily: V.sans, fontSize: 15, fontWeight: 600,
-              boxShadow: `0 0 32px ${V.vaporDim}`,
+              boxShadow: `0 0 32px ${V.glowDim}`,
               display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10,
             }}>
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
                 <path d="M5 12.5l4.5 4.5L19 7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
               </svg>
-              Log entry
+              File entry
             </button>
             <button onClick={cancelEntry} style={{
               padding: '10px 14px', background: 'transparent',
@@ -397,16 +397,16 @@ function TypedEntryScreen({ persona = 'witness', onClose, onSave }) {
       }}>
         <Eyebrow>Typed entry · {stamp}</Eyebrow>
         <div style={{
-          marginTop: 10, fontFamily: V.display,
+          marginTop: 10, fontFamily: V.display, fontStyle: 'italic',
           fontWeight: 400, fontSize: 28, lineHeight: 1.15,
-          letterSpacing: 0, color: V.ink,
+          letterSpacing: '-0.01em', color: V.ink,
         }}>What did you notice?</div>
 
         <textarea
           value={text}
           onChange={(e) => setText(e.target.value)}
           autoFocus
-          placeholder="What just happened."
+          placeholder="Just the observation. Behavior, not feeling. The mind file-clerks the rest."
           style={{
             marginTop: 14, flex: 1, minHeight: 200,
             background: 'oklch(22% 0.022 252 / 0.6)', color: V.ink,

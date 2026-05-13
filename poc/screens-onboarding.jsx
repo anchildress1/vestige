@@ -36,7 +36,7 @@ function OnboardingScreen({ onDone }) {
   const Steps = [
     // 0 — choose persona
     () => (
-      <Step eyebrow="01 of 07" title="Pick a persona." subtitle="Default is Witness. Change it later in settings.">
+      <Step eyebrow="01 of 07" title="Pick a voice." subtitle="Default is Witness. Change it later in settings.">
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           {onboardingPersonas.map((p) => (
             <PersonaCard key={p.id} p={p} active={persona === p.id} onClick={() => setPersona(p.id)} />
@@ -46,16 +46,16 @@ function OnboardingScreen({ onDone }) {
     ),
     // 1 — local processing
     () => (
-      <Step eyebrow="02 of 07" title="Everything stays on your phone." subtitle="No cloud processing. No servers for entries. No telemetry.">
+      <Step eyebrow="02 of 07" title="Everything runs on your phone." subtitle="Your voice never leaves the device. No account. No cloud.">
         <DiagramLocal />
       </Step>
     ),
     // 2 — mic permission
     () => (
-      <Step eyebrow="03 of 07" title="Mic permission." subtitle="Required to record. Audio is processed locally, then discarded.">
+      <Step eyebrow="03 of 07" title="Microphone." subtitle="Required to record. Audio is transcribed locally, then discarded.">
         <div style={{
           padding: 18, background: V.s1, border: `1px solid ${V.hair}`,
-          borderRadius: V.rM, display: 'flex', alignItems: 'center', gap: 14,
+          borderRadius: 6, display: 'flex', alignItems: 'center', gap: 14,
         }}>
           <div style={{
             width: 44, height: 44, borderRadius: 22, background: V.s2,
@@ -70,10 +70,10 @@ function OnboardingScreen({ onDone }) {
     ),
     // 3 — typed fallback
     () => (
-      <Step eyebrow="04 of 07" title="Or type." subtitle="Typed entries work the same way. The button stays one tap from the home screen.">
+      <Step eyebrow="04 of 07" title={"Don’t want to talk."} subtitle="Typed entries work the same way. The button stays one tap from the home screen.">
         <div style={{
           padding: 18, background: V.s1, border: `1px solid ${V.hair}`,
-          borderRadius: V.rM, display: 'flex', alignItems: 'center', gap: 14,
+          borderRadius: 6, display: 'flex', alignItems: 'center', gap: 14,
         }}>
           <div style={{
             width: 44, height: 44, borderRadius: 22, background: V.s2,
@@ -88,10 +88,10 @@ function OnboardingScreen({ onDone }) {
     ),
     // 4 — wifi check
     () => (
-      <Step eyebrow="05 of 07" title="Wi-Fi." subtitle="Model download is ~3.7 GB. Wi-Fi only. Once.">
+      <Step eyebrow="05 of 07" title="Wi-Fi." subtitle="Model download is 2.1 GB. Wi-Fi only. Once.">
         <div style={{
           padding: 18, background: V.s1, border: `1px solid ${V.hair}`,
-          borderRadius: V.rM, display: 'flex', alignItems: 'center', gap: 14,
+          borderRadius: 6, display: 'flex', alignItems: 'center', gap: 14,
         }}>
           <div style={{ width: 44, height: 44, borderRadius: 22, background: V.s2, display: 'flex', alignItems: 'center', justifyContent: 'center', color: V.ink }}>{Icons.wifi}</div>
           <div style={{ flex: 1 }}>
@@ -112,7 +112,7 @@ function OnboardingScreen({ onDone }) {
       <Step eyebrow="07 of 07" title="Record." subtitle="One short entry. Doesn\u2019t have to be coherent.">
         <div style={{
           padding: '32px 18px', background: V.s1, border: `1px solid ${V.hair}`,
-          borderRadius: V.rM, textAlign: 'center',
+          borderRadius: 6, textAlign: 'center',
         }}>
           <div style={{
             width: 80, height: 80, borderRadius: 40, margin: '0 auto',
@@ -209,7 +209,7 @@ function PersonaCard({ p, active, onClick }) {
         <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, flex: 1, minWidth: 0 }}>
           <div style={{
             fontFamily: V.sans, fontSize: 16, fontWeight: 600,
-            color: active ? V.ink : V.mist, letterSpacing: 0,
+            color: active ? V.ink : V.mist, letterSpacing: '-0.005em',
           }}>{p.name}</div>
           <div style={{
             fontFamily: V.sans, fontSize: 13, color: V.mist, fontWeight: 400,
@@ -255,7 +255,7 @@ function DiagramLocal() {
   return (
     <div style={{
       padding: '28px 18px', background: V.s1, border: `1px solid ${V.hair}`,
-      borderRadius: V.rM, display: 'flex', flexDirection: 'column', gap: 14, alignItems: 'center',
+      borderRadius: 6, display: 'flex', flexDirection: 'column', gap: 14, alignItems: 'center',
     }}>
       <div style={{
         width: 96, height: 96, borderRadius: 48,
@@ -283,16 +283,16 @@ function DiagramLocal() {
 }
 
 function ModelDownload({ progress = 0 }) {
-  const mb = Math.round(progress * 3660);
+  const mb = Math.round(progress * 2147);
   return (
     <div style={{
-      padding: 18, background: V.s1, border: `1px solid ${V.hair}`, borderRadius: V.rM,
+      padding: 18, background: V.s1, border: `1px solid ${V.hair}`, borderRadius: 6,
       display: 'flex', flexDirection: 'column', gap: 14,
     }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
-        <div style={{ fontFamily: V.sans, fontSize: 14, fontWeight: 500, color: V.ink }}>Gemma 4 E4B · LiteRT-LM</div>
+        <div style={{ fontFamily: V.sans, fontSize: 14, fontWeight: 500, color: V.ink }}>gemma-3n-2b-it</div>
         <div style={{ fontFamily: V.mono, fontSize: 11, color: V.mist, fontVariantNumeric: 'tabular-nums' }}>
-          {mb} / 3660 MB
+          {mb} / 2147 MB
         </div>
       </div>
       <div style={{ height: 4, background: V.s2, borderRadius: 2, overflow: 'hidden' }}>
@@ -311,7 +311,7 @@ function ModelStatusScreen({ state = 'ready', onClose, onRetry }) {
   const map = {
     ready:       { eyebrow: 'Status', title: 'Model ready.',       sub: 'Running locally. No network.', tone: V.ink },
     downloading: { eyebrow: 'Downloading', title: 'Downloading model.', sub: 'Wi-Fi only. Quiet for a minute.', tone: V.vapor },
-    stalled:     { eyebrow: 'Error',  title: 'Download stalled.',  sub: 'Network choked. Try again.', tone: V.error },
+    stalled:     { eyebrow: 'Error',  title: 'Download stalled.',  sub: 'Network choked. Try again.', tone: V.glow },
     updating:    { eyebrow: 'Update', title: 'Updating model.',    sub: 'New weights. Same shape.', tone: V.vapor },
   };
   const s = map[state] || map.ready;
@@ -330,25 +330,25 @@ function ModelStatusScreen({ state = 'ready', onClose, onRetry }) {
 
         <div style={{
           marginTop: 6, padding: 18, background: V.s1, border: `1px solid ${V.hair}`,
-          borderRadius: V.rM, display: 'flex', flexDirection: 'column', gap: 12,
+          borderRadius: 6, display: 'flex', flexDirection: 'column', gap: 12,
         }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
-            <div style={{ fontFamily: V.sans, fontSize: 14, fontWeight: 500, color: V.ink }}>Gemma 4 E4B · LiteRT-LM</div>
+            <div style={{ fontFamily: V.sans, fontSize: 14, fontWeight: 500, color: V.ink }}>gemma-3n-2b-it</div>
             <div style={{ fontFamily: V.mono, fontSize: 11, color: V.mist, fontVariantNumeric: 'tabular-nums' }}>
-              {state === 'ready' ? '3.66 GB · v{version}' : `${Math.round(fakeProgress * 3660)} / 3660 MB`}
+              {state === 'ready' ? '2147 MB · v1.2' : `${Math.round(fakeProgress * 2147)} / 2147 MB`}
             </div>
           </div>
           <div style={{ height: 4, background: V.s2, borderRadius: 2, overflow: 'hidden' }}>
             <div style={{
               width: `${fakeProgress * 100}%`, height: '100%',
-              background: state === 'stalled' ? V.error : (state === 'ready' ? V.pulse : V.vapor),
+              background: state === 'stalled' ? V.glow : (state === 'ready' ? V.pulse : V.vapor),
             }} />
           </div>
           <div style={{ display: 'flex', justifyContent: 'space-between' }}>
             <Eyebrow color={V.faint}>{state === 'stalled' ? 'Stuck at 62%.' : (state === 'ready' ? 'Local. No telemetry.' : `ETA ~${Math.max(5, Math.round((1 - fakeProgress) * 120))}s`)}</Eyebrow>
             {state === 'stalled' && (
               <button onClick={onRetry} style={{
-                background: 'transparent', border: 'none', color: V.error,
+                background: 'transparent', border: 'none', color: V.glow,
                 fontFamily: V.mono, fontSize: 10, letterSpacing: '0.16em',
                 textTransform: 'uppercase', cursor: 'pointer',
                 display: 'flex', alignItems: 'center', gap: 6,
@@ -359,13 +359,13 @@ function ModelStatusScreen({ state = 'ready', onClose, onRetry }) {
 
         {/* Detail rows — sourceable, technical-but-restrained */}
         <div style={{
-          background: V.s1, border: `1px solid ${V.hair}`, borderRadius: V.rM,
+          background: V.s1, border: `1px solid ${V.hair}`, borderRadius: 6,
         }}>
           {[
-            ['Runtime', 'On-device · LiteRT-LM'],
+            ['Runtime', 'On-device · MediaPipe GenAI'],
             ['Network', 'Not used after download'],
             ['Telemetry', 'None'],
-            ['Storage', '3.66 GB · app-internal model file'],
+            ['Storage', '2.1 GB · /data/models/gemma'],
             ['Last run', state === 'ready' ? '24 ms ago' : '—'],
           ].map((row, i) => (
             <div key={i} style={{

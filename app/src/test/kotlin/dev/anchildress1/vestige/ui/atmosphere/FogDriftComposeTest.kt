@@ -55,4 +55,15 @@ class FogDriftComposeTest {
         }
         composeRule.onNodeWithText("fog-clamped").assertIsDisplayed()
     }
+
+    @Test
+    fun `fog drift clamps negative intensity`() {
+        composeRule.setContent {
+            Box(modifier = Modifier.size(200.dp)) {
+                FogDrift(intensity = -5f)
+                Text(text = "fog-neg")
+            }
+        }
+        composeRule.onNodeWithText("fog-neg").assertIsDisplayed()
+    }
 }

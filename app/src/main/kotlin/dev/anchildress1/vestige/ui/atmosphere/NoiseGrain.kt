@@ -5,17 +5,16 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.composed
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.BlendMode
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.ImageShader
+import androidx.compose.ui.graphics.ShaderBrush
+import androidx.compose.ui.graphics.TileMode
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.drawscope.DrawScope
-import androidx.compose.ui.unit.IntOffset
-import androidx.compose.ui.unit.IntSize
-import kotlin.math.roundToInt
 import kotlin.random.Random
 
-/** Documented opacity band per poc/design-review.md §2.4. */
+/** Documented opacity band per poc/design-review.md §2.4. Outside this range the texture stops reading as grain. */
 const val NOISE_GRAIN_MIN_OPACITY: Float = 0.05f
 const val NOISE_GRAIN_MAX_OPACITY: Float = 0.18f
 
@@ -27,17 +26,11 @@ internal const val NOISE_DEFAULT_SEED: Int = 0x1E57
 private const val ALPHA_CHANNEL_RANGE: Int = 256
 private const val ALPHA_CHANNEL_SHIFT: Int = 24
 
-/**
- * Overlay noise-grain texture per poc/design-review.md §2.4 + §8.
- *
- * Bakes a deterministic 180×180 monochrome tile once via [remember] and stamps it across the
- * surface with [BlendMode.Overlay]. Opacity is clamped to the documented 0.05–0.18 band so
- * callers can't drift toward visible noise.
- */
+/** Overlay noise grain per poc/design-review.md §2.4. Opacity clamped to 0.05–0.18. */
 fun Modifier.noiseGrain(opacity: Float = 0.10f, seed: Int = NOISE_DEFAULT_SEED): Modifier = composed {
     val clamped = clampGrainOpacity(opacity)
-    val tile = remember(seed) { buildNoiseTile(seed) }
-    drawBehind { drawNoiseOverlay(tile, clamped) }
+    val brush = remember(seed) { ShaderBrush(ImageShader(buildNoiseTile(seed), TileMode.Repeated, TileMode.Repeated)) }
+    drawBehind { drawNoiseOverlay(brush, clamped) }
 }
 
 internal fun clampGrainOpacity(raw: Float): Float = raw.coerceIn(NOISE_GRAIN_MIN_OPACITY, NOISE_GRAIN_MAX_OPACITY)
@@ -60,18 +53,7 @@ internal fun buildNoiseTile(seed: Int): ImageBitmap {
     return bitmap.asImageBitmap()
 }
 
-private fun DrawScope.drawNoiseOverlay(tile: ImageBitmap, opacity: Float) {
-    val w = size.width.roundToInt()
-    val h = size.height.roundToInt()
-    if (w <= 0 || h <= 0) return
-    drawImage(
-        image = tile,
-        srcOffset = IntOffset.Zero,
-        srcSize = IntSize(NOISE_TILE_PX, NOISE_TILE_PX),
-        dstOffset = IntOffset.Zero,
-        dstSize = IntSize(w, h),
-        alpha = opacity,
-        colorFilter = ColorFilter.tint(Color.White, BlendMode.SrcIn),
-        blendMode = BlendMode.Overlay,
-    )
+private fun DrawScope.drawNoiseOverlay(brush: Brush, opacity: Float) {
+    if (size.width <= 0f || size.height <= 0f) return
+    drawRect(brush = brush, alpha = opacity, blendMode = BlendMode.Overlay)
 }

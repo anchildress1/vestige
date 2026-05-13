@@ -20,11 +20,8 @@ import dev.anchildress1.vestige.ui.theme.RadiusTokens
 import dev.anchildress1.vestige.ui.theme.Vapor
 
 /**
- * Glow left-rule per design-guidelines.md §"Where each accent lives" — active patterns only.
- *
- * Paints a 3 dp [Glow] stripe down the leading edge of the receiver. The rule is the surface
- * signal that a pattern is `state=active`; snoozed / resolved / dismissed cards drop the rule
- * (caller chooses not to apply this modifier).
+ * Glow left-rule for active patterns. Caller omits this modifier for snoozed / resolved / dismissed.
+ * Spec: design-guidelines.md §"Where each accent lives".
  */
 fun Modifier.glowLeftRule(width: Dp = GlowRuleWidth, color: Color = Glow): Modifier = drawWithContent {
     drawContent()
@@ -35,17 +32,17 @@ fun Modifier.glowLeftRule(width: Dp = GlowRuleWidth, color: Color = Glow): Modif
     )
 }
 
-private val GlowRuleWidth: Dp = 3.dp
+internal val GlowRuleWidth: Dp = 3.dp
 
 /**
- * Vapor halo for the recording state of `MistHero` per design-guidelines.md §"vapor".
+ * Vapor halo scaled by audio amplitude [level] (0..1).
  *
- * Scales a radial-gradient halo by [level] (0..1 audio amplitude). Idle ([level] == 0) draws no
- * halo so the stone stays calm; recording (level > 0) shows an animated [Vapor] glow that the
- * caller drives off the live `AudioMeter` signal.
+ * Idle (or NaN / negative) draws nothing. The halo paints into the receiver's bounds — apply on a
+ * wrapper at least ~1.5× the stone size so the halo reads outside the stone itself. Spec:
+ * design-guidelines.md §"Where each accent lives" + poc/design-review.md §3.3.
  */
 fun Modifier.vaporHaloOnRecording(level: Float, color: Color = Vapor): Modifier = drawBehind {
-    val amp = level.coerceIn(0f, 1f)
+    val amp = if (level.isNaN()) 0f else level.coerceIn(0f, 1f)
     if (amp <= 0f) return@drawBehind
     val maxR = maxOf(size.width, size.height) * VAPOR_HALO_BASE_RADIUS
     val r = maxR * (VAPOR_HALO_MIN_SCALE + amp * VAPOR_HALO_AMP_SCALE)
@@ -64,11 +61,8 @@ private const val VAPOR_HALO_AMP_SCALE: Float = 0.8f
 private const val VAPOR_HALO_ALPHA: Float = 0.45f
 
 /**
- * Pulse ready-dot per design-guidelines.md §"pulse" — `LOCAL · READY` only.
- *
- * Sized 8 dp by default with a soft surrounding halo at low opacity. The halo intentionally
- * stays small so the dot doesn't read as an accent surface; it's a status indicator, not a brand
- * moment.
+ * LOCAL · READY status dot. Halo stays small — status indicator, not a brand accent.
+ * Spec: design-guidelines.md §"Where each accent lives".
  */
 fun Modifier.pulseDotForReady(diameter: Dp = PulseDotDiameter, color: Color = Pulse): Modifier = this
     .size(diameter)
@@ -88,16 +82,14 @@ fun Modifier.pulseDotForReady(diameter: Dp = PulseDotDiameter, color: Color = Pu
         )
     }
 
-private val PulseDotDiameter: Dp = 8.dp
+internal val PulseDotDiameter: Dp = 8.dp
 private val PulseRimWidth: Dp = 1.dp
 private const val PULSE_HALO_ALPHA: Float = 0.25f
 private const val PULSE_RIM_ALPHA: Float = 0.7f
 
 /**
- * Destructive fill — wipe confirmations only per design-guidelines.md §"error".
- *
- * Lock at the call-site so destructive surfaces always use [ErrorRed] and "ink in a red box"
- * disguised as brand styling stops being a way to lose data.
+ * Destructive fill — wipe confirmations only. Locks call-sites to [ErrorRed] so a destructive
+ * button can never wear brand styling. Spec: design-guidelines.md §"Where each accent lives".
  */
 fun Modifier.errorFillForDestructive(): Modifier = this
     .clip(RadiusTokens.Pill)

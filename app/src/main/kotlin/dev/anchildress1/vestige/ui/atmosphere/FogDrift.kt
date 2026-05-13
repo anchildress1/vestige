@@ -14,25 +14,26 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import dev.anchildress1.vestige.ui.theme.Glow
-import dev.anchildress1.vestige.ui.theme.Vapor
+import dev.anchildress1.vestige.ui.theme.S2
 import kotlin.math.cos
 import kotlin.math.sin
 
-/** Drift period A — `vesDrift1` per poc/design-review.md §2.5. */
+/** Drift period A — `vesDrift1` mirrors poc/tokens.jsx `vesDrift1` keyframes. */
 internal const val FOG_PERIOD_A_MS: Int = 22_000
 
 /** Drift period B — `vesDrift2`. Alternating to keep the two blobs from beating in phase. */
 internal const val FOG_PERIOD_B_MS: Int = 28_000
 
 /**
- * Ambient fog drift per poc/design-review.md §2.4 + §8.
+ * Ambient fog drift per poc/design-review.md §2.4.
  *
- * Two radial-gradient blobs orbit slowly under everything. Default tints pull on [Glow] /
- * [Vapor] at low opacity so the layer reads as atmosphere, not as either accent's domain.
+ * Defaults to a single cool atmospheric tone — accent tints stay opt-in so this layer cannot
+ * silently violate design-guidelines.md §"Color rules" ("`glow` and `vapor` … neither becomes
+ * wallpaper"). Capture screen can pass `hueB = Vapor` during recording, Patterns can pass
+ * `hueA = Glow`. Never both at once.
  */
 @Composable
-fun FogDrift(modifier: Modifier = Modifier, intensity: Float = 0.35f, hueA: Color = Glow, hueB: Color = Vapor) {
+fun FogDrift(modifier: Modifier = Modifier, intensity: Float = 0.35f, hueA: Color = S2, hueB: Color = S2) {
     val transition = rememberInfiniteTransition(label = "fogDrift")
     val phaseA by transition.animateFloat(
         initialValue = 0f,

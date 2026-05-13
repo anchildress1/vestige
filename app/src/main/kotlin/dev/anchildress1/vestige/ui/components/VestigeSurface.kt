@@ -9,15 +9,14 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -30,12 +29,12 @@ import dev.anchildress1.vestige.ui.theme.S2
 import dev.anchildress1.vestige.ui.theme.S3
 import dev.anchildress1.vestige.ui.theme.VestigeTextStyles
 
-/**
- * Glass card per poc/design-review.md §7.3.
- *
- * Three layers: tinted fill ([S1]) + noise overlay (via [Modifier.noiseGrain]) + hairline outline
- * ([S3]). Everything else (sheets, list cards, rows) composes against this.
- */
+private const val SURFACE_GRAIN_OPACITY: Float = 0.10f
+private val SurfaceHairline: Dp = 1.dp
+internal val RowLabelColor: Color = Mist
+internal val RowValueColor: Color = Ink
+
+/** Glass card primitive per poc/design-review.md §7.3 — tinted fill + noise + hairline. */
 @Composable
 fun VestigeSurface(
     modifier: Modifier = Modifier,
@@ -56,10 +55,7 @@ fun VestigeSurface(
     }
 }
 
-private const val SURFACE_GRAIN_OPACITY: Float = 0.10f
-private val SurfaceHairline: Dp = 1.dp
-
-/** Key/value line per poc/design-review.md §7.3 — label in [Mist], value in [Ink]. */
+/** Key/value line per poc/design-review.md §7.3 — label [RowLabelColor], value [RowValueColor]. */
 @Composable
 fun VestigeRow(
     label: String,
@@ -73,14 +69,16 @@ fun VestigeRow(
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        CompositionLocalProvider(LocalContentColor provides Mist) {
-            Text(text = label, style = labelStyle, color = Mist)
-        }
-        Text(text = value, style = valueStyle, color = Ink)
+        Text(text = label, style = labelStyle, color = RowLabelColor)
+        Text(text = value, style = valueStyle, color = RowValueColor)
     }
 }
 
-/** Selectable [VestigeSurface] variant per poc/design-review.md §7.3. [onClick] toggles raise. */
+/**
+ * Selectable [VestigeSurface] variant per poc/design-review.md §7.3.
+ *
+ * With [onClick] the fill raises to [S2] and the surface takes a button role.
+ */
 @Composable
 fun VestigeListCard(
     modifier: Modifier = Modifier,
@@ -92,15 +90,17 @@ fun VestigeListCard(
     val interactionModifier = if (onClick != null) {
         Modifier
             .clip(shape)
-            .clickable(onClick = onClick)
+            .clickable(role = Role.Button, onClick = onClick)
     } else {
         Modifier
     }
     VestigeSurface(
         modifier = modifier.then(interactionModifier),
         shape = shape,
-        fill = if (onClick != null) S2 else S1,
+        fill = vestigeListCardFill(onClick),
         contentPadding = contentPadding,
         content = content,
     )
 }
+
+internal fun vestigeListCardFill(onClick: Any?): Color = if (onClick != null) S2 else S1

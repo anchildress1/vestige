@@ -1,9 +1,10 @@
 package dev.anchildress1.vestige.ui.atmosphere
 
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNotEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import kotlin.math.PI
 
 /** Locks the pure pieces of the atmospheric layer — image construction needs an Android runtime. */
 class AtmosphereTest {
@@ -38,7 +39,7 @@ class AtmosphereTest {
     fun `noise pixels diverge across seeds`() {
         val a = noiseAlphaPixels(seed = 1)
         val b = noiseAlphaPixels(seed = 2)
-        assertNotEquals(a.first(), b.first())
+        assertFalse(a.contentEquals(b))
     }
 
     @Test
@@ -65,5 +66,17 @@ class AtmosphereTest {
         val quarter = fogCenter(phase = 0.25f, w = w, h = h, swing = 0.2f, offset = 0f)
         assertEquals(50f, quarter.x, 0.01f)
         assertEquals(50f + 20f, quarter.y, 0.01f)
+    }
+
+    @Test
+    fun `fog offset phase-shifts the second blob into anti-phase`() {
+        // Blob B uses offset = π so its center mirrors blob A through the surface midpoint.
+        val w = 100f
+        val h = 100f
+        val a = fogCenter(phase = 0f, w = w, h = h, swing = 0.2f, offset = 0f)
+        val b = fogCenter(phase = 0f, w = w, h = h, swing = 0.2f, offset = PI.toFloat())
+        // a.x = 50 + 20 = 70, b.x = 50 - 20 = 30
+        assertEquals(70f, a.x, 0.01f)
+        assertEquals(30f, b.x, 0.01f)
     }
 }

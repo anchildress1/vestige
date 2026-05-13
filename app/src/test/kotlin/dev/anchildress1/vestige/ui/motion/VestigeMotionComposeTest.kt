@@ -65,4 +65,32 @@ class VestigeMotionComposeTest {
         }
         composeRule.onNodeWithText("rottrue").assertIsDisplayed()
     }
+
+    @Test(expected = IllegalArgumentException::class)
+    fun `pulse rejects zero period`() {
+        composeRule.setContent {
+            rememberVesPulse(periodMs = 0)
+        }
+    }
+
+    @Test(expected = IllegalArgumentException::class)
+    fun `breath rejects negative period`() {
+        composeRule.setContent {
+            rememberVesBreath(periodMs = -1)
+        }
+    }
+
+    @Test(expected = IllegalArgumentException::class)
+    fun `shimmer rejects zero period`() {
+        composeRule.setContent {
+            rememberVesShimmer(periodMs = 0)
+        }
+    }
+
+    @Test(expected = IllegalArgumentException::class)
+    fun `spin rejects negative period`() {
+        composeRule.setContent {
+            rememberVesSpin(periodMs = -2)
+        }
+    }
 }

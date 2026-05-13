@@ -4,9 +4,9 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
 
-// Dark only. The scheme does not branch on isSystemInDarkTheme() per design-guidelines.md.
-// glow / vapor / pulse / error stay out of the M3 colorScheme — they are scoped accents,
-// applied via accent modifiers, not promoted to "primary" which Material would scatter widely.
+// Dark only. glow / vapor / pulse / error stay out of the M3 colorScheme — they are scoped
+// accents, applied via accent modifiers, not promoted to "primary" which Material would scatter
+// widely (design-guidelines.md §"Where each accent lives").
 private val VestigeColorScheme = darkColorScheme(
     primary = Ink,
     onPrimary = Deep,

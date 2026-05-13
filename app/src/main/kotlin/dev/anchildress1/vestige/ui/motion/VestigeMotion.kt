@@ -14,11 +14,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.State
 
 /**
- * Compose translations of the `ves*` keyframe set in poc/design-review.md §2.5.
+ * Compose port of the `ves*` keyframe names from poc/tokens.jsx.
  *
- * Periodic animations are returned as [State]&lt;Float&gt; so callers can read them inside a
- * composable without recomposition churn. One-shot animations are exposed as [AnimationSpec]
- * presets so transitions reach for the same easing curves across screens.
+ * Period defaults are the port's choices — JSX names carry behavior, not durations.
  */
 object VestigeMotion {
 
@@ -40,16 +38,17 @@ object VestigeMotion {
     /** `vesFade` — 240 ms fade, standard curve. */
     val Fade: AnimationSpec<Float> = tween(durationMillis = 240, easing = FastOutSlowInEasing)
 
-    /** `vesSlide` — 320 ms slide, accelerate to decelerate, used for the [Sheet] entry. */
+    /** `vesSlide` — 320 ms slide, used for sheet entry per poc/design-review.md §3.1. */
     val Slide: AnimationSpec<Float> = tween(durationMillis = 320, easing = FastOutSlowInEasing)
 
     /** Counterpart to [In] — 180 ms exit, accelerate-in. */
     val Out: AnimationSpec<Float> = tween(durationMillis = 180, easing = FastOutLinearInEasing)
 }
 
-/** Returns a 0..1 sawtooth driven by [periodMs]. Useful for halos that breathe with audio idle. */
+/** 0..1 triangle wave at [periodMs]. For halos that breathe with audio idle. */
 @Composable
 fun rememberVesPulse(periodMs: Int = VestigeMotion.PULSE_MS): State<Float> {
+    require(periodMs > 0) { "periodMs must be positive (was $periodMs)" }
     val transition = rememberInfiniteTransition(label = "vesPulse")
     return transition.animateFloat(
         initialValue = 0f,
@@ -62,9 +61,10 @@ fun rememberVesPulse(periodMs: Int = VestigeMotion.PULSE_MS): State<Float> {
     )
 }
 
-/** Slow ambient breathing — 0..1 reverse linear. */
+/** 0..1 triangle wave for hero-surface ambient breathing. */
 @Composable
 fun rememberVesBreath(periodMs: Int = VestigeMotion.BREATH_MS): State<Float> {
+    require(periodMs > 0) { "periodMs must be positive (was $periodMs)" }
     val transition = rememberInfiniteTransition(label = "vesBreath")
     return transition.animateFloat(
         initialValue = 0f,
@@ -77,9 +77,10 @@ fun rememberVesBreath(periodMs: Int = VestigeMotion.BREATH_MS): State<Float> {
     )
 }
 
-/** Shimmer sweep — 0..1 linear restart for gradient-x offsets on loading placeholders. */
+/** 0..1 sawtooth — restart-mode sweep for loading-placeholder gradient-x offsets. */
 @Composable
 fun rememberVesShimmer(periodMs: Int = VestigeMotion.SHIMMER_MS): State<Float> {
+    require(periodMs > 0) { "periodMs must be positive (was $periodMs)" }
     val transition = rememberInfiniteTransition(label = "vesShimmer")
     return transition.animateFloat(
         initialValue = 0f,
@@ -95,6 +96,7 @@ fun rememberVesShimmer(periodMs: Int = VestigeMotion.SHIMMER_MS): State<Float> {
 /** Continuous rotation — 0..360 degrees for the `MistHero` conic ring. */
 @Composable
 fun rememberVesSpin(periodMs: Int = VestigeMotion.SPIN_MS): State<Float> {
+    require(periodMs > 0) { "periodMs must be positive (was $periodMs)" }
     val transition = rememberInfiniteTransition(label = "vesSpin")
     return transition.animateFloat(
         initialValue = 0f,

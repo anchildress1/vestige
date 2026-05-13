@@ -6,10 +6,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.unit.dp
+import dev.anchildress1.vestige.ui.theme.Ink
+import dev.anchildress1.vestige.ui.theme.Mist
+import dev.anchildress1.vestige.ui.theme.S1
+import dev.anchildress1.vestige.ui.theme.S2
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -40,6 +44,18 @@ class VestigePrimitivesTest {
         }
         composeRule.onNodeWithText("VERSION").assertIsDisplayed()
         composeRule.onNodeWithText("1.0.0").assertIsDisplayed()
+    }
+
+    @Test
+    fun `VestigeRow locks label color to Mist and value to Ink`() {
+        assertEquals(Mist, RowLabelColor)
+        assertEquals(Ink, RowValueColor)
+    }
+
+    @Test
+    fun `VestigeListCard fill is S1 when static and S2 when clickable`() {
+        assertEquals(S1, vestigeListCardFill(null))
+        assertEquals(S2, vestigeListCardFill(onClick = {}))
     }
 
     @Test
@@ -75,11 +91,19 @@ class VestigePrimitivesTest {
     }
 
     @Test
-    fun `vapor halo accepts zero level without drawing`() {
+    fun `glow rule width matches spec`() {
+        assertEquals(3.dp, GlowRuleWidth)
+    }
+
+    @Test
+    fun `pulse dot diameter matches spec`() {
+        assertEquals(8.dp, PulseDotDiameter)
+    }
+
+    @Test
+    fun `vapor halo idles at zero level`() {
         composeRule.setContent {
-            VestigeSurface(
-                modifier = Modifier.size(120.dp).vaporHaloOnRecording(level = 0f),
-            ) {
+            VestigeSurface(modifier = Modifier.size(120.dp).vaporHaloOnRecording(level = 0f)) {
                 Text(text = "halo-idle")
             }
         }
@@ -89,9 +113,7 @@ class VestigePrimitivesTest {
     @Test
     fun `vapor halo composes at active level`() {
         composeRule.setContent {
-            VestigeSurface(
-                modifier = Modifier.size(120.dp).vaporHaloOnRecording(level = 0.8f),
-            ) {
+            VestigeSurface(modifier = Modifier.size(120.dp).vaporHaloOnRecording(level = 0.8f)) {
                 Text(text = "halo-active")
             }
         }
@@ -99,13 +121,43 @@ class VestigePrimitivesTest {
     }
 
     @Test
-    fun `pulse dot renders`() {
+    fun `vapor halo treats negative level as idle`() {
+        composeRule.setContent {
+            VestigeSurface(modifier = Modifier.size(120.dp).vaporHaloOnRecording(level = -0.5f)) {
+                Text(text = "halo-negative")
+            }
+        }
+        composeRule.onNodeWithText("halo-negative").assertIsDisplayed()
+    }
+
+    @Test
+    fun `vapor halo treats NaN level as idle`() {
+        composeRule.setContent {
+            VestigeSurface(modifier = Modifier.size(120.dp).vaporHaloOnRecording(level = Float.NaN)) {
+                Text(text = "halo-nan")
+            }
+        }
+        composeRule.onNodeWithText("halo-nan").assertIsDisplayed()
+    }
+
+    @Test
+    fun `vapor halo clamps above 1`() {
+        composeRule.setContent {
+            VestigeSurface(modifier = Modifier.size(120.dp).vaporHaloOnRecording(level = 99f)) {
+                Text(text = "halo-clamped")
+            }
+        }
+        composeRule.onNodeWithText("halo-clamped").assertIsDisplayed()
+    }
+
+    @Test
+    fun `pulse dot renders without crashing`() {
         composeRule.setContent {
             VestigeSurface(modifier = Modifier.pulseDotForReady()) {}
         }
-        // Nothing to assert by text — the test ensures the modifier composes without
-        // throwing through the drawBehind path.
-        assertTrue(true)
+        // Modifier composes through the drawBehind path; no text to assert. If the dot's draw
+        // stack throws, this test fails by exception — the assertion is "did not crash."
+        composeRule.onRoot().assertIsDisplayed()
     }
 
     @Test

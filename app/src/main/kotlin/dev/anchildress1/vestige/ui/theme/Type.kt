@@ -8,16 +8,13 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
 
-// Three families per poc/design-review.md §2.2. System fallbacks per the spec's
-// "Compose port should use system sans / Inter-like typography" note — real .ttf bundling
-// is a later swap that doesn't touch call-sites.
+// System fallbacks now; .ttf swap later won't touch call-sites. Spec: poc/design-review.md §2.2 + §8.
 object VestigeFonts {
     val Body: FontFamily = FontFamily.SansSerif
     val Display: FontFamily = FontFamily.Serif
     val Mono: FontFamily = FontFamily.Monospace
 }
 
-// Type primitives per poc/design-review.md §2.2 + §8 Compose translation notes.
 object VestigeTextStyles {
     val HDisplay: TextStyle = TextStyle(
         fontFamily = VestigeFonts.Display,

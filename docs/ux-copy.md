@@ -310,12 +310,12 @@ Action button (top right) — persona-aware:
 
 Section headers (uppercase, mono eyebrow — one per non-empty section per `poc/screens-patterns.jsx`):
 > ACTIVE
-> SNOOZED · STILL DRIFTING
-> RESOLVED · FADED
-> DISMISSED
+> SKIPPED · ON HOLD
+> CLOSED · DONE
+> DROPPED
 
 Filter chips (small, secondary text — Phase 4 polish on top of the section structure):
-> All · Active · Snoozed · Resolved
+> All · Active · Skipped · Closed · Dropped
 
 Pattern card structure:
 
@@ -325,9 +325,10 @@ Pattern card structure:
 > {N} of {M} entries · Last seen {date}
 
 Card actions (per card, in overflow menu):
-- **Dismiss**
-- **Snooze 7 days**
-- **Mark resolved**
+- **Skip**
+- **Drop**
+
+Note: Closed is model-detected — not available as a user action. Pattern auto-close is deferred to v1.5 (`pattern-auto-close` backlog entry).
 
 Empty states:
 
@@ -338,10 +339,10 @@ Empty states:
 - **Enough entries, no pattern detected:**
   - Header: `No repeating pattern detected.`
   - Body: `The model looked. Nothing came back twice.`
-- **Active tab empty (all snoozed or resolved):**
+- **Active tab empty (all skipped or closed):**
   - Eyebrow: `ACTIVE`
   - Header: `Nothing active.`
-  - Sub: `{N} snoozed · {N} resolved` (live counts)
+  - Sub: `{N} skipped · {N} closed` (live counts)
 - **Filter returns nothing:** `Nothing matches.`
 
 ---
@@ -378,12 +379,11 @@ Vocabulary tags (small chips):
 > tired · fine · crashed · meeting
 
 Action row (bottom):
-- **Dismiss**
-- **Snooze 7 days**
-- **Mark resolved**
+- **Skip**
+- **Drop**
 
-If resolved:
-> Marked resolved {date}.
+If model-detected Closed (read-only state — no action row shown):
+> Closed {date}. No new entries matched in {N} days.
 
 ---
 
@@ -569,9 +569,9 @@ Use sparingly. Only for actions where the user needs confirmation that something
 |---|---|
 | Entry saved | *(no snackbar — the transcript appearing is the confirmation)* |
 | Persona changed for next capture | `Active persona: {name}.` |
-| Pattern dismissed | `Dismissed.` *(with Undo)* |
-| Pattern snoozed | `Snoozed 7 days.` *(with Undo)* |
-| Pattern marked resolved | `Marked resolved.` *(with Undo)* |
+| Pattern dropped | `Dropped.` *(with Undo)* |
+| Pattern skipped | `Skipped.` *(with Undo)* |
+| Pattern closed (model) | *(no snackbar — silent state change, visible on next list load)* |
 | Export complete | `Exported {N} entries to Downloads.` |
 | Model re-download started | `Downloading model.` *(opens status screen)* |
 | Model deleted | `Model deleted.` |
@@ -636,7 +636,9 @@ A short forbidden-copy list. If any of these end up in a build, it's a regressio
 ## Locked UX Decisions
 
 - Pattern names are model-generated in v1. No user rename/edit affordance.
-- Snooze duration is fixed at 7 days in v1.
+- Skip duration is fixed at 7 days in v1.
+- Pattern closure is model-detected only. Users cannot manually resolve or close a pattern. Closed is earned by the data, not declared.
+- User-facing lifecycle actions are exactly two: Skip and Drop. No third option.
 - Export format is a zip of per-entry markdown files only. Rolled-up `.md` and PDF are v1.5+.
 - No first-time mock data. Empty means empty; demo seed data is a dev/demo setup concern, not user-facing fiction.
 - Loading copy stays distinct: `Reading the entry.` for single-entry inference, `Reading the file.` for Roast generation.

@@ -341,7 +341,7 @@ Default is highlighted. Selection changes the active persona for the next captur
 
 Cards present pattern observations on dark surfaces. Restrained, atmospheric, sourced. No clinical or procedural-drama styling.
 
-**Status sections.** Patterns group into four sections per `poc/screens-patterns.jsx` — Active / Snoozed · still drifting / Resolved · faded / Dismissed. Each section header appears only when that section has cards; the headers themselves come from `ux-copy.md` §"Pattern List · Section headers". Filter chips that scope which sections render are Phase 4 polish on top of this base.
+**Status sections.** Patterns group into four sections per `ux-copy.md` §"Pattern List / Section headers" + `spec-pattern-action-buttons.md` §P0.3 — Active / Snoozed · on hold / Closed · done (model-detected, v1.5) / Dropped. Each section header appears only when that section has cards. `CLOSED · DONE` is empty in v1 (model-detected; see `backlog.md` §`pattern-auto-close`). Filter chips that scope which sections render are Phase 4 polish on top of this base.
 
 **Card structure:**
 - Short title (the pattern name, e.g., `Tuesday Meetings`)
@@ -350,7 +350,7 @@ Cards present pattern observations on dark surfaces. Restrained, atmospheric, so
 - **TraceBar — 30-day recurrence glyph** per `poc/tokens.jsx` §TraceBar. 30 thin columns; days the pattern landed render full-height in the glow purple (`#A855F7`); empty days render at 34% height in the muted hair tone. Newest day on the right. The bar is the visual answer to "how often does this come back."
 - Source count (e.g., `4 of 12 entries`)
 - Last seen (date)
-- Actions (`Dismiss`, `Snooze`, `Mark resolved`)
+- Actions (`Snooze`, `Drop`) per `spec-pattern-action-buttons.md` §P0.1 / P0.2
 
 **Active-state rule** (`#A855F7`) — Phase 3 ships as a 3dp left-rule on every card for legibility. Phase 4 swaps it for the POC's glow-soft border + radial-glow corner treatment on active cards only.
 
@@ -376,7 +376,7 @@ Tap a card → detail screen. Make the pattern claim visually sourceable.
 - **Intensity strip — 30-day TraceBar at hero size** under an `INTENSITY · 30 DAYS` eyebrow. Same glyph as the card, taller (~28dp) so the cadence reads at a glance.
 - Source snippets (dated, short, clickable to the full entry — placeholder entry screen in Phase 3, full history detail in Phase 4)
 - Related vocabulary (the actual words the user used across these entries — Phase 4 polish)
-- Action controls (`Dismiss`, `Snooze`, `Mark resolved`). Terminal-state patterns hide the action row and surface the terminal label instead (`Dismissed May 12.` / `Marked resolved May 12.`).
+- Action controls (`Snooze`, `Drop`) per `spec-pattern-action-buttons.md` §P0.1 / P0.2. Closed-state patterns are read-only (v1.5, model-detected) and surface `Closed {date}. No new entries matched in {N} days.` instead of the action row. Dropped patterns surface `Dropped {date}.`.
 
 **Source section example:**
 > **Seen in:**

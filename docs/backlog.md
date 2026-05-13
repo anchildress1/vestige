@@ -51,10 +51,37 @@ stt-N : conditional on stop-and-test outcome (see PRD §"Build philosophy: build
 | `parallel-lens-execution-via-clone` | v1.5 | inference | **Deferred 2026-05-11** after the ADR-008 feasibility probe confirmed `litertlm-android:0.11.0` does not expose `Session.clone()` or any parent-Session API. JNI bridge inspected — `nativeCreateSession(engineHandle, samplerConfig)` has no parent reference. Upstream PR #1515 (Kotlin clone surface) was closed unmerged 2026-03-09; upstream Issue #1226 ("Session Advanced" Android support) is open with no shipped timeline. Story 2.6.6 superseded; v1 ships ADR-002's original sequential 3-lens rule. Full evidence in `adrs/ADR-009-litertlm-kotlin-session-clone-unavailable.md`. | One of: a new `com.google.ai.edge.litertlm:litertlm-android` artifact >0.11.0 publishes; upstream `main` HEAD adds `Session.clone()` or parent-Session `SessionConfig`; Issue #1226 closes "shipped"; a Google-authored Kotlin clone PR merges. See ADR-009 §"Revival triggers" |
 | `retrieval-indexed-prefilter` | v1.5 | memory | **Deferred 2026-05-11.** Story 3.1 `RetrievalRepo.query` loads `entryBox.all` + `tagBox.all` per call. At v1 scale (ADR-003 sizes Phase 3 to ≤1000 entries with detection cost in tens of ms) the in-memory scan is fast and trivially deterministic. ObjectBox prefilter (keyword `contains` + tag join) + stem-key index trades complexity for a future scale problem. PR #19 Copilot review flagged. | Measured retrieval latency degrades on the reference S24U beyond the foreground budget, *or* entry count crosses ~1000 in real usage |
 | ~~`backfill-on-artifact-complete`~~ | — | — | **Resolved 2026-05-12.** `AppContainer.launchVectorBackfillIfReady()` now keeps one bounded in-process drain loop alive: if backlog exists before artifacts are complete, it retries for up to 12 delayed passes (60 s budget at 5 s intervals), then exits cleanly. A later save or cold start retriggers the worker. No Phase 4 download-complete event hook is required for correctness. | n/a — closed |
+| `pattern-auto-close` | v1.5 | patterns | PatternEngine detects and updates patterns forward but has no staleness scan; nothing currently transitions a pattern from active → Closed; demo scenario doesn't require auto-removal; v1 user actions are Snooze and Drop only (Closed is model-detected per ADR-011 UX direction) | post-v1 usage data shows patterns accumulating without removal; or Phase 5 UX audit surfaces the missing lifecycle transition |
 
 ## Detail blocks
 
 Only items where the index row drops information needed to disambiguate.
+
+### `pattern-auto-close`
+
+```
+mechanism-needed:
+  After each extraction, PatternEngine runs a staleness check on all active patterns.
+  If a pattern has not matched any new entry in the last N days (v1.5 proposal: 30 days),
+  it transitions to CLOSED state automatically. No user action triggers this.
+
+user-visible-on-close:
+  Pattern detail shows: "Closed {date}. No new entries matched in {N} days."
+  State badge: CLOSED · DONE (per docs/ux-copy.md §Pattern List section headers)
+  No snackbar — state change is silent; visible on next list load.
+
+user-actions-in-closed-state:
+  Read-only. Snooze and Drop are not available once a pattern is Closed.
+
+why-not-v1:
+  PatternEngine in v1 is forward-only — it detects and updates confidence on new entries.
+  A staleness check requires either (a) a scheduled WorkManager pass or (b) a post-extraction
+  hook that scans all active patterns for last-matched date. Neither is in the v1 story budget.
+  The demo scenario uses a fresh corpus where patterns are actively firing; no stale patterns
+  accumulate during the pitch window.
+
+design-ref: docs/ux-copy.md §Pattern List, §Pattern Detail; docs/stories/phase-4-ux-surface.md
+```
 
 ### `archetype-fields`
 

@@ -383,7 +383,7 @@ for v1 forward by `docs/spec-pattern-action-buttons.md` and `docs/ux-copy.md` §
 What changes:
 
 - User-facing actions on a pattern collapse from three (`Dismiss` / `Snooze 7 days` /
-  `Mark resolved`) to **two** (`Snooze` / `Drop`). The `Mark resolved` affordance is
+  `Mark resolved`) to **two** (`Skip` / `Drop`). The `Mark resolved` affordance is
   removed entirely — a pattern closing should be earned by behavioral evidence, not
   self-reported. That mirrors the core product framing: Vestige observes, it does not
   validate.
@@ -395,9 +395,9 @@ What changes:
 - New field `PatternEntity.snoozedUntil: Long?` (epoch ms; null when not snoozed). Cold-
   start sweep transitions `SNOOZED → ACTIVE` when `snoozedUntil` has elapsed; no
   WorkManager job (per spec §P0.4).
-- Snackbar copy: `Dropped.` and `Snoozed 7 days.` retain `Undo`. Model-detected `Closed`
+- Snackbar copy: `Dropped.` and `Skipped.` retain `Undo`. Model-detected `Closed`
   is silent — no snackbar, visible on next list load.
-- Section headers: `ACTIVE` / `SNOOZED · ON HOLD` / `CLOSED · DONE` / `DROPPED` per
+- Section headers: `ACTIVE` / `SKIPPED · ON HOLD` / `CLOSED · DONE` / `DROPPED` per
   `ux-copy.md` §"Pattern List / Section headers". The Mist-era `RESOLVED · FADED` and
   `DISMISSED` labels retire with `Mark resolved`.
 

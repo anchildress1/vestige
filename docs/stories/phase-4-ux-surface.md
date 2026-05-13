@@ -227,7 +227,7 @@ Checked bullets above are the historical record that the Mist tokens shipped to 
 
 **Done when:**
 - [ ] Pattern list header includes the `Roast me` button per `ux-copy.md` §"Pattern List / Action button" (the Roast bottom sheet itself is Story 4.14, P1 contingent — the button can land here as a no-op or hidden state if Story 4.14 doesn't ship).
-- [ ] Filter chips: `All · Active · Snoozed · Closed · Dropped` per `ux-copy.md` §"Pattern List / Filter chips" + `spec-pattern-action-buttons.md` §P1.1. Default `All` (filter chips are P1 — defer until P0 actions stable).
+- [ ] Filter chips: `All · Active · Skipped · Closed · Dropped` per `ux-copy.md` §"Pattern List / Filter chips" + `spec-pattern-action-buttons.md` §P1.1. Default `All` (filter chips are P1 — defer until P0 actions stable).
 - [ ] Empty states per `ux-copy.md` §"Pattern List / Empty states" + `spec-pattern-action-buttons.md` §P1.2:
   - Fewer than 10 entries (Day 1): eyebrow `VESTIGES · 0 ENTRIES · 30 DAYS`, header `Nothing to read yet.`, body `Patterns surface after 10 entries. Keep recording.`
   - Has entries, no pattern detected: header `No repeating pattern detected.`, body `The model looked. Nothing came back twice.`
@@ -235,13 +235,13 @@ Checked bullets above are the historical record that the Mist tokens shipped to 
   - Filter returns nothing: `Nothing matches.`
 - [ ] Pattern card uses the lime left-rule (`limeLeftRuleForActive`) per ADR-011 + `design-guidelines.md` §"Pattern card" only on cards with `state = ACTIVE`. Snoozed / closed / dropped cards lose the rule.
 - [ ] Pattern card embeds the `TraceBarE` primitive per ADR-011 §"New primitives" + `poc/energy-tokens.jsx`. Lime accent + peak on active; ember on snoozed; teal on closed / dropped; teal-dim on below-threshold (already wired in Story 4.1.5 via `patternCardTraceBarStyleFor`).
-- [ ] Pattern action surfaces — overflow menu + Pattern Detail action row — use `Snooze` / `Drop` per `ux-copy.md` §"Pattern List / Card actions" + `spec-pattern-action-buttons.md` §P0.1 / P0.2. No third action. The pre-pivot `Dismiss` / `Mark resolved` strings (and the `PatternAction.MARKED_RESOLVED` / `pattern_action_mark_resolved` symbols) are deleted as part of this story; `pattern_terminal_resolved` retires with them.
-- [ ] Snackbars: `Snoozed 7 days.` / `Dropped.` with `Undo` (~4s) per `ux-copy.md` §"System Messages". Model-detected `Closed` is silent — no snackbar (visible on next list load) per spec §P0.5.
+- [ ] Pattern action surfaces — overflow menu + Pattern Detail action row — use `Skip` / `Drop` per `ux-copy.md` §"Pattern List / Card actions" + `spec-pattern-action-buttons.md` §P0.1 / P0.2. No third action. The pre-pivot `Dismiss` / `Mark resolved` strings (and the `PatternAction.MARKED_RESOLVED` / `pattern_action_mark_resolved` symbols) are deleted as part of this story; `pattern_terminal_resolved` retires with them.
+- [ ] Snackbars: `Skipped.` / `Dropped.` with `Undo` (~4s) per `ux-copy.md` §"System Messages". Model-detected `Closed` is silent — no snackbar (visible on next list load) per spec §P0.5.
 - [ ] Pattern lifecycle states: `PatternState` enum is `ACTIVE` / `SNOOZED` / `CLOSED` / `DROPPED` (renamed from `RESOLVED` / `DISMISSED`). `CLOSED` state is reserved for v1.5 (`backlog.md` §`pattern-auto-close`) and unreachable from user actions in v1. `snoozedUntil` added to `PatternEntity` per spec §"Data Model".
 - [ ] Snooze wake-up: on app start / resume, patterns whose `snoozedUntil` has elapsed transition `SNOOZED → ACTIVE` automatically (cold-start sweep, not WorkManager — per spec §P0.4).
 - [ ] Pattern detail screen polished per `design-guidelines.md` §"Pattern Detail":
   - Source list rows clickable to entry detail (Story 4.7).
-  - Action row at the bottom uses the same `Snooze` / `Drop` actions as the list (spec §P0.1 / P0.2).
+  - Action row at the bottom uses the same `Skip` / `Drop` actions as the list (spec §P0.1 / P0.2).
   - Vocabulary chips below the observation **only if STT-E passed** (Story 3.4 ran). If STT-E failed, no chip cloud.
   - Dropped patterns surface `Dropped {date}.` Closed patterns (v1.5) surface `Closed {date}. No new entries matched in {N} days.` and hide the action row entirely.
 

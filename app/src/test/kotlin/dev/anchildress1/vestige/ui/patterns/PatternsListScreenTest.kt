@@ -116,7 +116,7 @@ class PatternsListScreenTest {
         composeRule.onNodeWithText("ACTIVE").assertIsDisplayed()
         composeRule.onNodeWithText("DROPPED").assertIsDisplayed()
         // No snoozed or closed cards in this seed, so those headers must stay hidden.
-        composeRule.onAllNodesWithText("SNOOZED · ON HOLD").assertCountEquals(0)
+        composeRule.onAllNodesWithText("SKIPPED · ON HOLD").assertCountEquals(0)
         composeRule.onAllNodesWithText("CLOSED · DONE").assertCountEquals(0)
     }
 
@@ -175,7 +175,7 @@ class PatternsListScreenTest {
 
         composeRule.onNodeWithContentDescription("Pattern actions").performClick()
         composeRule.onNodeWithText("Drop").assertIsDisplayed()
-        composeRule.onAllNodesWithText("Snooze").assertCountEquals(0)
+        composeRule.onAllNodesWithText("Skip").assertCountEquals(0)
         composeRule.onAllNodesWithText("Mark resolved").assertCountEquals(0)
     }
 

@@ -34,22 +34,22 @@
     <string name="pattern_detail_not_found">Pattern not found.</string>
     <string name="pattern_detail_intensity_eyebrow">INTENSITY · 30 DAYS</string>
     <!-- Action labels per docs/ux-copy.md §"Pattern List / Card actions" + spec-pattern-action-buttons.md.
-         User-facing actions are Snooze and Drop only; Closed is model-detected (v1.5 — see
-         `backlog.md` §`pattern-auto-close`). Keys retain their legacy names (DISMISSED / MARKED_RESOLVED)
-         until Story 4.8 swaps the PatternAction enum; values are the new spec-locked copy. -->
+         User-facing actions are Skip and Drop only; Closed is model-detected (v1.5 — see
+         `backlog.md` §`pattern-auto-close`). Keys retain their legacy names (DISMISSED / MARKED_RESOLVED /
+         SNOOZED) until Story 4.8 swaps the PatternAction enum; values are the new spec-locked copy. -->
     <string name="pattern_action_dismiss">Drop</string>
-    <string name="pattern_action_snooze_7_days">Snooze</string>
+    <string name="pattern_action_snooze_7_days">Skip</string>
     <string name="pattern_action_mark_resolved">Mark resolved</string>
     <string name="pattern_actions_overflow_description">Pattern actions</string>
     <string name="pattern_back_description">Back</string>
     <string name="pattern_undo">Undo</string>
     <string name="snackbar_dismissed">Dropped.</string>
-    <string name="snackbar_snoozed_7_days">Snoozed 7 days.</string>
+    <string name="snackbar_snoozed_7_days">Skipped.</string>
     <string name="snackbar_marked_resolved">Marked resolved.</string>
 
     <!-- Patterns list section headers per docs/ux-copy.md §"Pattern List / Section headers". -->
     <string name="patterns_section_active">ACTIVE</string>
-    <string name="patterns_section_snoozed">SNOOZED · ON HOLD</string>
+    <string name="patterns_section_snoozed">SKIPPED · ON HOLD</string>
     <string name="patterns_section_resolved">CLOSED · DONE</string>
     <string name="patterns_section_dismissed">DROPPED</string>
 

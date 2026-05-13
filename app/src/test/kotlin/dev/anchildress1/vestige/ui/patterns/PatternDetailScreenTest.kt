@@ -105,7 +105,7 @@ class PatternDetailScreenTest {
         // Action row + sources live below the new card stack; scrolling brings them into view.
         composeRule.onNodeWithText("crashed after standup").performScrollTo().assertIsDisplayed()
         composeRule.onNodeWithText("Drop").performScrollTo().assertIsDisplayed()
-        composeRule.onNodeWithText("Snooze").performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithText("Skip").performScrollTo().assertIsDisplayed()
         composeRule.onNodeWithText("Mark resolved").performScrollTo().assertIsDisplayed()
     }
 
@@ -121,7 +121,7 @@ class PatternDetailScreenTest {
 
         composeRule.onNodeWithText("Dropped", substring = true).performScrollTo().assertIsDisplayed()
         composeRule.onAllNodesWithText("Drop").assertCountEquals(0)
-        composeRule.onAllNodesWithText("Snooze").assertCountEquals(0)
+        composeRule.onAllNodesWithText("Skip").assertCountEquals(0)
         composeRule.onAllNodesWithText("Mark resolved").assertCountEquals(0)
     }
 
@@ -136,7 +136,7 @@ class PatternDetailScreenTest {
         }
 
         composeRule.onNodeWithText("Drop").performScrollTo().assertIsDisplayed()
-        composeRule.onAllNodesWithText("Snooze").assertCountEquals(0)
+        composeRule.onAllNodesWithText("Skip").assertCountEquals(0)
         composeRule.onAllNodesWithText("Mark resolved").assertCountEquals(0)
     }
 

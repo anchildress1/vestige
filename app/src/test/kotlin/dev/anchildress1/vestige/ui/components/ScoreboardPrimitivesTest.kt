@@ -164,6 +164,18 @@ class ScoreboardPrimitivesTest {
     }
 
     @Test
+    fun `Delta negative without label announces direction-only (a11y — label-null branch)`() {
+        composeRule.setContent { Delta(value = -3) }
+        composeRule.onNodeWithContentDescription("down 3").assertIsDisplayed()
+    }
+
+    @Test
+    fun `Delta zero with label announces no-change with label suffix (a11y — zero plus label)`() {
+        composeRule.setContent { Delta(value = 0, label = "vs last week") }
+        composeRule.onNodeWithContentDescription("no change, vs last week").assertIsDisplayed()
+    }
+
+    @Test
     fun `Delta accepts max-int (edge — upper bound)`() {
         composeRule.setContent { Delta(value = Int.MAX_VALUE) }
         composeRule.onNodeWithText("▲${Int.MAX_VALUE}").assertIsDisplayed()

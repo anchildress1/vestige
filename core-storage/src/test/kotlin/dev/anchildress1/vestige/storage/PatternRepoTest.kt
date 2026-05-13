@@ -162,4 +162,60 @@ class PatternRepoTest {
         val raised = runCatching { repo.markResolved(id) }
         assertTrue("DISMISSED→RESOLVED must throw", raised.isFailure)
     }
+
+    @Test
+    fun `restart from DISMISSED returns the pattern to ACTIVE`() {
+        val id = seed()
+        repo.dismiss(id)
+        repo.restart(id)
+        val row = store.findByPatternId(id)!!
+        assertEquals(PatternState.ACTIVE, row.state)
+        assertNull(row.snoozedUntil)
+    }
+
+    @Test
+    fun `restart from SNOOZED returns the pattern to ACTIVE and clears snoozedUntil`() {
+        val id = seed()
+        repo.snooze(id)
+        assertNotNull(store.findByPatternId(id)!!.snoozedUntil)
+        repo.restart(id)
+        val row = store.findByPatternId(id)!!
+        assertEquals(PatternState.ACTIVE, row.state)
+        assertNull(row.snoozedUntil)
+    }
+
+    @Test
+    fun `restart from RESOLVED returns the pattern to ACTIVE`() {
+        val id = seed()
+        repo.markResolved(id)
+        repo.restart(id)
+        assertEquals(PatternState.ACTIVE, store.findByPatternId(id)!!.state)
+    }
+
+    @Test
+    fun `restart rejects ACTIVE rows — restart is terminal-only`() {
+        val id = seed()
+        val raised = runCatching { repo.restart(id) }
+        assertTrue("ACTIVE → restart must throw", raised.isFailure)
+    }
+
+    @Test
+    fun `restart undo returns the row to the previousState terminal`() {
+        val id = seed()
+        repo.dismiss(id)
+        repo.restart(id)
+        repo.restart(id, undo = true, previousState = PatternState.DISMISSED)
+        assertEquals(PatternState.DISMISSED, store.findByPatternId(id)!!.state)
+    }
+
+    @Test
+    fun `restart undo rejects rows that are not currently ACTIVE`() {
+        val id = seed()
+        repo.dismiss(id)
+        // Row is DISMISSED — undo path expects ACTIVE and must reject.
+        val raised = runCatching {
+            repo.restart(id, undo = true, previousState = PatternState.DISMISSED)
+        }
+        assertTrue("undo precondition must reject non-ACTIVE rows", raised.isFailure)
+    }
 }

@@ -10,6 +10,7 @@ import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import dev.anchildress1.vestige.model.ModelArtifactState
 import dev.anchildress1.vestige.model.Persona
 import dev.anchildress1.vestige.ui.theme.VestigeTheme
 import org.junit.Assert.assertEquals
@@ -115,7 +116,7 @@ class OnboardingScreensTest {
     fun `model download placeholder disables Continue until the model is present`() {
         composeRule.activity.setContent {
             VestigeTheme {
-                ModelDownloadPlaceholderScreen(modelReady = false, onContinue = {})
+                ModelDownloadPlaceholderScreen(modelState = ModelArtifactState.Absent, onContinue = {})
             }
         }
 
@@ -126,7 +127,7 @@ class OnboardingScreensTest {
     fun `model download placeholder shows downloading pill + loading note while waiting`() {
         composeRule.activity.setContent {
             VestigeTheme {
-                ModelDownloadPlaceholderScreen(modelReady = false, onContinue = {})
+                ModelDownloadPlaceholderScreen(modelState = ModelArtifactState.Absent, onContinue = {})
             }
         }
 
@@ -141,12 +142,26 @@ class OnboardingScreensTest {
     fun `model download placeholder swaps to ready pill once the artifact lands`() {
         composeRule.activity.setContent {
             VestigeTheme {
-                ModelDownloadPlaceholderScreen(modelReady = true, onContinue = {})
+                ModelDownloadPlaceholderScreen(modelState = ModelArtifactState.Complete, onContinue = {})
             }
         }
 
         composeRule.onNodeWithText("MODEL READY").assertIsDisplayed()
         composeRule.onNodeWithText("DOWNLOADING").assertDoesNotExist()
+    }
+
+    @Test
+    fun `model download placeholder interpolates percent into the pill on Partial state`() {
+        composeRule.activity.setContent {
+            VestigeTheme {
+                ModelDownloadPlaceholderScreen(
+                    modelState = ModelArtifactState.Partial(currentBytes = 470L, expectedBytes = 1_000L),
+                    onContinue = {},
+                )
+            }
+        }
+
+        composeRule.onNodeWithText("DOWNLOADING 47%").assertIsDisplayed()
     }
 
     @Test

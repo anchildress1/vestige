@@ -29,6 +29,7 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import dev.anchildress1.vestige.model.ModelArtifactState
 import dev.anchildress1.vestige.model.Persona
 import dev.anchildress1.vestige.ui.components.VestigeScaffold
 import kotlinx.coroutines.launch
@@ -86,7 +87,7 @@ fun OnboardingHost(
             onPersonaChange = { persona = it },
             micPermissionDenied = micPermissionDenied,
             wifiConnected = environment.wifiConnected,
-            modelReady = environment.modelReady,
+            modelState = environment.modelState,
             advance = advance,
             onMicAllow = { requestMic(context, micLauncher, advance) },
             onNotificationAllow = { requestNotifications(notifLauncher, advance) },
@@ -94,7 +95,7 @@ fun OnboardingHost(
             onComeBackLater = { moveTaskToBack(context) },
             onOpenApp = {
                 scope.launch {
-                    if (!modelAvailability.isModelReady()) return@launch
+                    if (!modelAvailability.status().isReady) return@launch
                     prefs.markComplete()
                     onComplete()
                 }
@@ -104,7 +105,7 @@ fun OnboardingHost(
     }
 }
 
-private data class OnboardingEnvironment(val wifiConnected: Boolean, val modelReady: Boolean)
+private data class OnboardingEnvironment(val wifiConnected: Boolean, val modelState: ModelArtifactState)
 
 @Composable
 private fun rememberOnboardingEnvironment(
@@ -116,19 +117,19 @@ private fun rememberOnboardingEnvironment(
     val lifecycleOwner = LocalLifecycleOwner.current
     val scope = rememberCoroutineScope()
     var wifiConnected by remember { mutableStateOf(wifiAvailability.isWifiConnected()) }
-    var modelReady by remember { mutableStateOf(false) }
+    var modelState by remember { mutableStateOf<ModelArtifactState>(ModelArtifactState.Absent) }
 
     LaunchedEffect(step) {
         prefs.setCurrentStep(step)
         wifiConnected = wifiAvailability.isWifiConnected()
-        modelReady = modelAvailability.isModelReady()
+        modelState = modelAvailability.status()
     }
     DisposableEffect(lifecycleOwner, wifiAvailability, modelAvailability) {
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME) {
                 scope.launch {
                     wifiConnected = wifiAvailability.isWifiConnected()
-                    modelReady = modelAvailability.isModelReady()
+                    modelState = modelAvailability.status()
                 }
             }
         }
@@ -138,7 +139,7 @@ private fun rememberOnboardingEnvironment(
 
     return OnboardingEnvironment(
         wifiConnected = wifiConnected,
-        modelReady = modelReady,
+        modelState = modelState,
     )
 }
 
@@ -150,7 +151,7 @@ private fun OnboardingStepContent(
     onPersonaChange: (Persona) -> Unit,
     micPermissionDenied: Boolean,
     wifiConnected: Boolean,
-    modelReady: Boolean,
+    modelState: ModelArtifactState,
     advance: () -> Unit,
     onMicAllow: () -> Unit,
     onNotificationAllow: () -> Unit,
@@ -194,7 +195,7 @@ private fun OnboardingStepContent(
 
         OnboardingStep.ModelDownload -> ModelDownloadPlaceholderScreen(
             modifier = modifier,
-            modelReady = modelReady,
+            modelState = modelState,
             onContinue = advance,
         )
 

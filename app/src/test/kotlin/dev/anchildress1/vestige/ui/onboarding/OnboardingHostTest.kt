@@ -13,6 +13,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.espresso.Espresso
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import dev.anchildress1.vestige.model.ModelArtifactState
 import dev.anchildress1.vestige.model.Persona
 import dev.anchildress1.vestige.ui.theme.VestigeTheme
 import org.junit.After
@@ -73,13 +74,13 @@ class OnboardingHostTest {
         startHost(
             onComplete = { completed = true },
             wifiAvailability = { true },
-            modelAvailability = ModelAvailability { true },
+            modelAvailability = ModelAvailability { ModelArtifactState.Complete },
         )
 
         tapPrimary("Continue") // Screen 1
         tapPrimary("Got it") // Screen 2
         tapPrimary("Skip — I'll type instead") // Screen 3
-        tapPrimary("Skip — work runs in foreground only") // Screen 3.5
+        tapPrimary("Skip — watch the app work") // Screen 3.5
         tapPrimary("Continue") // Screen 4
         tapPrimary("Download model") // Screen 5 (Wi-Fi connected)
         tapPrimary("Continue") // Screen 6 (model download placeholder)
@@ -95,7 +96,7 @@ class OnboardingHostTest {
         tapPrimary("Continue")
         tapPrimary("Got it")
         tapPrimary("Skip — I'll type instead")
-        tapPrimary("Skip — work runs in foreground only")
+        tapPrimary("Skip — watch the app work")
         tapPrimary("Continue")
 
         composeRule.onNodeWithText("Wi-Fi required.").assertIsDisplayed()
@@ -105,7 +106,7 @@ class OnboardingHostTest {
 
     @Test
     fun `does not mark complete until final Open Vestige tap`() {
-        startHost(wifiAvailability = { true }, modelAvailability = ModelAvailability { true })
+        startHost(wifiAvailability = { true }, modelAvailability = ModelAvailability { ModelArtifactState.Complete })
         tapPrimary("Continue")
         tapPrimary("Got it")
         assertFalse(prefs.isComplete)
@@ -145,7 +146,7 @@ class OnboardingHostTest {
         tapPrimary("Continue")
         tapPrimary("Got it")
         tapPrimary("Skip — I'll type instead")
-        tapPrimary("Skip — work runs in foreground only")
+        tapPrimary("Skip — watch the app work")
         tapPrimary("Continue")
 
         composeRule.onNodeWithText("Wi-Fi required.").assertIsDisplayed()
@@ -164,12 +165,12 @@ class OnboardingHostTest {
         startHost(
             onComplete = { completed = true },
             wifiAvailability = { true },
-            modelAvailability = ModelAvailability { false },
+            modelAvailability = ModelAvailability { ModelArtifactState.Absent },
         )
         tapPrimary("Continue")
         tapPrimary("Got it")
         tapPrimary("Skip — I'll type instead")
-        tapPrimary("Skip — work runs in foreground only")
+        tapPrimary("Skip — watch the app work")
         tapPrimary("Continue")
         tapPrimary("Download model")
 
@@ -187,7 +188,7 @@ class OnboardingHostTest {
     private fun startHost(
         onComplete: () -> Unit = {},
         wifiAvailability: WifiAvailability = WifiAvailability { false },
-        modelAvailability: ModelAvailability = ModelAvailability { false },
+        modelAvailability: ModelAvailability = ModelAvailability { ModelArtifactState.Absent },
     ) {
         composeRule.activity.setContent {
             VestigeTheme {

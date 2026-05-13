@@ -1,7 +1,7 @@
 package dev.anchildress1.vestige.ui.patterns
 
 import androidx.compose.ui.test.assertIsDisplayed
-import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
@@ -13,6 +13,11 @@ import dev.anchildress1.vestige.storage.EntryStore
 import dev.anchildress1.vestige.storage.MarkdownEntryStore
 import dev.anchildress1.vestige.storage.VestigeBoxStore
 import io.objectbox.BoxStore
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.test.UnconfinedTestDispatcher
+import kotlinx.coroutines.test.resetMain
+import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -23,6 +28,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import java.io.File
 
+@OptIn(ExperimentalCoroutinesApi::class)
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34], manifest = Config.NONE, application = PatternsTestApplication::class)
 class EntryDetailPlaceholderScreenTest {
@@ -33,9 +39,11 @@ class EntryDetailPlaceholderScreenTest {
     private lateinit var dataDir: File
     private lateinit var boxStore: BoxStore
     private lateinit var entryStore: EntryStore
+    private val testDispatcher = UnconfinedTestDispatcher()
 
     @Before
     fun setUp() {
+        Dispatchers.setMain(testDispatcher)
         val context = ApplicationProvider.getApplicationContext<android.content.Context>()
         dataDir = File(context.filesDir, "ob-entry-detail-${System.nanoTime()}")
         boxStore = VestigeBoxStore.openAt(dataDir)
@@ -47,6 +55,7 @@ class EntryDetailPlaceholderScreenTest {
 
     @After
     fun tearDown() {
+        Dispatchers.resetMain()
         boxStore.close()
         dataDir.deleteRecursively()
     }
@@ -60,6 +69,7 @@ class EntryDetailPlaceholderScreenTest {
                 entryId = entryId,
                 entryStore = entryStore,
                 onBack = {},
+                ioDispatcher = testDispatcher,
             )
         }
         // produceState runs the entry load on Dispatchers.IO; wait for the Loaded branch to
@@ -80,6 +90,7 @@ class EntryDetailPlaceholderScreenTest {
                 entryId = 9_999L,
                 entryStore = entryStore,
                 onBack = {},
+                ioDispatcher = testDispatcher,
             )
         }
         composeRule.onNodeWithText("Entry not found.").assertIsDisplayed()
@@ -94,6 +105,7 @@ class EntryDetailPlaceholderScreenTest {
                 entryId = entryId,
                 entryStore = entryStore,
                 onBack = { backFired = true },
+                ioDispatcher = testDispatcher,
             )
         }
         composeRule.onNodeWithContentDescription("Back").performClick()

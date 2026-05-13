@@ -3,9 +3,10 @@ package dev.anchildress1.vestige.ui.patterns
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.ui.test.assertIsDisplayed
-import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.test.core.app.ApplicationProvider
 import dev.anchildress1.vestige.model.ExtractionStatus
 import dev.anchildress1.vestige.model.PatternKind
@@ -83,10 +84,10 @@ class PatternsHostTest {
         // List → detail.
         composeRule.onNodeWithText("Tuesday Meetings").performClick()
         composeRule.waitForIdle()
-        composeRule.onNodeWithText("Seen in:").assertIsDisplayed()
+        composeRule.onNodeWithText("Callout.").assertIsDisplayed()
 
         // Detail → entry placeholder.
-        composeRule.onNodeWithText("crashed after standup").performClick()
+        composeRule.onNodeWithText("crashed after standup").performScrollTo().performClick()
         composeRule.waitForIdle()
         composeRule.onNodeWithText("Entry").assertIsDisplayed()
         composeRule.onNodeWithText("crashed after standup").assertIsDisplayed()

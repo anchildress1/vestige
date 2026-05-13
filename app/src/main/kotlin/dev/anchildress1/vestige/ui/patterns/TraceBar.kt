@@ -13,6 +13,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import dev.anchildress1.vestige.ui.theme.Hair
+import dev.anchildress1.vestige.ui.theme.Vapor
 
 /**
  * 30-day intensity glyph from `poc/screens-patterns.jsx` / `poc/tokens.jsx` §TraceBar.
@@ -52,11 +54,11 @@ fun TraceBar(
 
 /** POC token mirror. Kept here so designers tweak in one place rather than per call-site. */
 object TraceBarDefaults {
-    /** `V.glow` from `poc/tokens.jsx` — pattern/identity purple. */
-    val Accent: Color = Color(0xFFA855F7)
+    /** [Vapor] — matches the blue lit cells in `poc/screenshots/patterns.png`. */
+    val Accent: Color = Vapor
 
-    /** `V.hair` — muted divider tone (mist @ 18% opacity over the deep background). */
-    val Muted: Color = Color(0x2E7B8497)
+    /** [Hair] — mist @ 18 % alpha over the deep background. */
+    val Muted: Color = Hair
 
     /** Card glyph default — POC uses `22`. Detail screen passes a larger value. */
     val Height: Dp = 22.dp

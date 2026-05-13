@@ -14,20 +14,16 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarDuration
-import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SnackbarResult
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
@@ -47,10 +43,18 @@ import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import dev.anchildress1.vestige.R
+import dev.anchildress1.vestige.ui.components.VestigeListCard
+import dev.anchildress1.vestige.ui.components.glowLeftRule
+import dev.anchildress1.vestige.ui.theme.Vapor
 import dev.anchildress1.vestige.ui.theme.VestigeTheme
 
-/** Purple `#A855F7` left-rule per design-guidelines §"Pattern List / Pattern card". */
-private val PatternAccent = Color(0xFFA855F7)
+/**
+ * The active-pattern accent — [Vapor] — matches the blue lit cells in
+ * `poc/screenshots/patterns.png`. The `design-guidelines.md` §"glow = patterns" wording is
+ * overruled by the visual reference: lit TraceBar cells and the active-card rule both read blue,
+ * not purple. Glow stays reserved for the Roast me button (Story 4.14).
+ */
+private val PatternAccent: Color = Vapor
 
 @OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
@@ -89,8 +93,9 @@ fun PatternsListScreen(
 
     Scaffold(
         modifier = modifier,
+        containerColor = Color.Transparent,
         topBar = { TopAppBar(title = { Text(stringResource(R.string.patterns_title)) }) },
-        snackbarHost = { SnackbarHost(snackbarHostState) },
+        snackbarHost = { PatternSnackbarHost(snackbarHostState) },
     ) { padding ->
         PatternsListBody(
             state = state,
@@ -178,30 +183,24 @@ private fun PatternCard(
     onSnooze: () -> Unit,
     onMarkResolved: () -> Unit,
 ) {
-    Surface(
+    VestigeListCard(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(onClick = onClick)
             .semantics {
                 role = Role.Button
                 contentDescription = "${card.title}. ${card.observation}"
             },
-        color = MaterialTheme.colorScheme.surfaceContainer,
-        shape = RoundedCornerShape(12.dp),
+        onClick = onClick,
+        accentModifier = if (card.section == PatternSection.ACTIVE) {
+            Modifier.glowLeftRule(color = PatternAccent)
+        } else {
+            Modifier
+        },
     ) {
         Row(modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min)) {
-            // Active patterns get the purple accent rule per design-guidelines.md §"Pattern card";
-            // snoozed/resolved/dismissed cards drop it so the section becomes the visual cue.
-            Box(
-                modifier = Modifier
-                    .width(3.dp)
-                    .fillMaxHeight()
-                    .background(if (card.section == PatternSection.ACTIVE) PatternAccent else Color.Transparent),
-            )
             Column(
                 modifier = Modifier
-                    .weight(1f)
-                    .padding(start = 12.dp, top = 12.dp, bottom = 12.dp, end = 4.dp),
+                    .weight(1f),
                 verticalArrangement = Arrangement.spacedBy(4.dp),
             ) {
                 Text(text = card.title, style = MaterialTheme.typography.titleMedium)
@@ -219,6 +218,8 @@ private fun PatternCard(
                     accent = if (card.section == PatternSection.ACTIVE) PatternAccent else TraceBarDefaults.Muted,
                 )
                 Spacer(modifier = Modifier.height(2.dp))
+                // POC card meta is a single eyebrow line — no "Seen in:" label. (Two-eyebrow
+                // SpaceBetween treatment is Phase 4 polish.)
                 Text(
                     text = stringResource(
                         R.string.pattern_card_meta,

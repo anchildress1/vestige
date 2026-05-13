@@ -12,6 +12,8 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -28,6 +30,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import dev.anchildress1.vestige.model.Persona
+import dev.anchildress1.vestige.ui.components.VestigeScaffold
 import kotlinx.coroutines.launch
 
 /** Hosts the 8-screen onboarding flow. Step + persona survive process death via SharedPreferences. */
@@ -73,27 +76,32 @@ fun OnboardingHost(
         modelAvailability = modelAvailability,
     )
 
-    OnboardingStepContent(
-        step = step,
-        persona = persona,
-        onPersonaChange = { persona = it },
-        micPermissionDenied = micPermissionDenied,
-        wifiConnected = environment.wifiConnected,
-        modelReady = environment.modelReady,
-        advance = advance,
-        onMicAllow = { requestMic(context, micLauncher, advance) },
-        onNotificationAllow = { requestNotifications(notifLauncher, advance) },
-        onOpenWifiSettings = { openWifiSettings(context) },
-        onComeBackLater = { moveTaskToBack(context) },
-        onOpenApp = {
-            scope.launch {
-                if (!modelAvailability.isModelReady()) return@launch
-                prefs.markComplete()
-                onComplete()
-            }
-        },
-        modifier = modifier,
-    )
+    // VestigeScaffold owns floor/ink color propagation — onboarding screens render plain
+    // composables (no per-screen Surface), so the scaffold is the only thing that keeps
+    // foreground readable on the floor background. Per AGENTS rule 26.
+    VestigeScaffold(modifier = modifier) { padding ->
+        OnboardingStepContent(
+            step = step,
+            persona = persona,
+            onPersonaChange = { persona = it },
+            micPermissionDenied = micPermissionDenied,
+            wifiConnected = environment.wifiConnected,
+            modelReady = environment.modelReady,
+            advance = advance,
+            onMicAllow = { requestMic(context, micLauncher, advance) },
+            onNotificationAllow = { requestNotifications(notifLauncher, advance) },
+            onOpenWifiSettings = { openWifiSettings(context) },
+            onComeBackLater = { moveTaskToBack(context) },
+            onOpenApp = {
+                scope.launch {
+                    if (!modelAvailability.isModelReady()) return@launch
+                    prefs.markComplete()
+                    onComplete()
+                }
+            },
+            modifier = Modifier.fillMaxSize().padding(padding),
+        )
+    }
 }
 
 private data class OnboardingEnvironment(val wifiConnected: Boolean, val modelReady: Boolean)

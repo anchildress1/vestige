@@ -53,6 +53,7 @@
     <string name="onboarding_notif_body">Vestige briefly shows a status when it\'s working locally on an entry. That\'s the only notification it will ever send. It disappears when work is done.</string>
     <string name="onboarding_notif_allow">Allow notifications</string>
     <string name="onboarding_notif_skip">Skip — work runs in foreground only</string>
+    <string name="onboarding_notif_skip_note">Skipping is fine. Without the notification, Vestige can only finish reading an entry while the app is open — keep it foregrounded until the transcript lands.</string>
 
     <!-- Screen 4 — Typed fallback -->
     <string name="onboarding_type_header">Or type.</string>
@@ -70,6 +71,9 @@
     <!-- Screen 6 — Model download. Real progress, retry, and Wi-Fi gating live in the next story. -->
     <string name="onboarding_download_header">Downloading model.</string>
     <string name="onboarding_download_body">Quiet for a minute. This takes a while.</string>
+    <string name="onboarding_download_loading_pill">DOWNLOADING</string>
+    <string name="onboarding_download_loading_note">Model file is still landing. Keep Vestige open — this is the one network event in the app\'s life.</string>
+    <string name="onboarding_download_ready_pill">MODEL READY</string>
 
     <!-- Screen 7 — Ready -->
     <string name="onboarding_ready_header">Ready.</string>

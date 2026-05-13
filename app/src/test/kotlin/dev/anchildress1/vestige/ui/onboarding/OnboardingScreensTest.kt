@@ -121,4 +121,44 @@ class OnboardingScreensTest {
 
         composeRule.onNodeWithText("Continue").assertIsNotEnabled()
     }
+
+    @Test
+    fun `model download placeholder shows downloading pill + loading note while waiting`() {
+        composeRule.activity.setContent {
+            VestigeTheme {
+                ModelDownloadPlaceholderScreen(modelReady = false, onContinue = {})
+            }
+        }
+
+        composeRule.onNodeWithText("DOWNLOADING").assertIsDisplayed()
+        composeRule.onNodeWithText(
+            "Model file is still landing. Keep Vestige open — this is the one network event in the app's life.",
+        ).assertIsDisplayed()
+        composeRule.onNodeWithText("MODEL READY").assertDoesNotExist()
+    }
+
+    @Test
+    fun `model download placeholder swaps to ready pill once the artifact lands`() {
+        composeRule.activity.setContent {
+            VestigeTheme {
+                ModelDownloadPlaceholderScreen(modelReady = true, onContinue = {})
+            }
+        }
+
+        composeRule.onNodeWithText("MODEL READY").assertIsDisplayed()
+        composeRule.onNodeWithText("DOWNLOADING").assertDoesNotExist()
+    }
+
+    @Test
+    fun `notification permission screen warns that skipping limits work to foreground`() {
+        composeRule.activity.setContent {
+            VestigeTheme {
+                NotificationPermissionScreen(onAllow = {}, onSkip = {})
+            }
+        }
+
+        val expected = "Skipping is fine. Without the notification, Vestige can only finish " +
+            "reading an entry while the app is open — keep it foregrounded until the transcript lands."
+        composeRule.onNodeWithText(expected).assertIsDisplayed()
+    }
 }

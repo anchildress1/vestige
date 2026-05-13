@@ -1,4 +1,4 @@
-.PHONY: install bootstrap-wrapper doctor build assemble reinstall test lint format ktlint-format ktlint-check detekt android-lint secret-scan commitlint verify-no-telemetry verify ci clean
+.PHONY: install bootstrap-wrapper doctor build assemble reinstall reinstall-tail logcat test lint format ktlint-format ktlint-check detekt android-lint secret-scan commitlint verify-no-telemetry verify ci clean
 
 GRADLE := ./gradlew
 KTLINT := $(or $(shell command -v ktlint 2>/dev/null), $(HOME)/.local/bin/ktlint)
@@ -28,6 +28,27 @@ build:
 
 reinstall:
 	adb uninstall dev.anchildress1.vestige; $(GRADLE) :app:installDebug
+
+# Reinstall then tail device logs for the app PID. `--pid=$(adb shell pidof ...)` filters to the
+# app only; the inline retry handles the brief window between install and process start. Ctrl-C
+# to stop. Add EXTRA="..." to append filters, e.g. `make reinstall-tail EXTRA='*:W'`.
+reinstall-tail: reinstall logcat
+
+logcat:
+	@command -v adb >/dev/null 2>&1 || { echo "❌ adb not found. Install Android platform-tools."; exit 1; }
+	@adb get-state >/dev/null 2>&1 || { echo "❌ no device connected. Run 'adb devices' to check."; exit 1; }
+	@adb shell am start -n dev.anchildress1.vestige/.MainActivity >/dev/null 2>&1 || true
+	@pid=""; for i in 1 2 3 4 5; do \
+		pid=$$(adb shell pidof dev.anchildress1.vestige | tr -d '\r'); \
+		[ -n "$$pid" ] && break; sleep 1; \
+	done; \
+	if [ -z "$$pid" ]; then \
+		echo "⚠ could not resolve app PID — falling back to package-name filter"; \
+		adb logcat -v color -T 1 $(EXTRA); \
+	else \
+		echo "📱 tailing pid=$$pid (Ctrl-C to stop)"; \
+		adb logcat -v color -T 1 --pid="$$pid" $(EXTRA); \
+	fi
 
 assemble:
 	$(GRADLE) :app:assembleRelease

@@ -1,13 +1,18 @@
 package dev.anchildress1.vestige.ui.onboarding
 
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.dp
 import dev.anchildress1.vestige.R
 import dev.anchildress1.vestige.model.Persona
+import dev.anchildress1.vestige.ui.components.Pill
 import dev.anchildress1.vestige.ui.theme.VestigeTheme
 
 @Composable
@@ -62,6 +67,10 @@ internal fun NotificationPermissionScreen(onAllow: () -> Unit, onSkip: () -> Uni
         onSecondary = onSkip,
     ) {
         BodyParagraph(text = stringResource(id = R.string.onboarding_notif_body))
+        // Skip consequence note — the app keeps reading entries only while foregrounded
+        // without the status notification. Spec leans toward "no degraded copy on skip" but
+        // a quiet operational note clears the surprise on the first long-running entry.
+        BodyParagraph(text = stringResource(id = R.string.onboarding_notif_skip_note), dim = true)
     }
 }
 
@@ -122,6 +131,43 @@ internal fun ModelDownloadPlaceholderScreen(
         primaryEnabled = modelReady,
     ) {
         BodyParagraph(text = stringResource(id = R.string.onboarding_download_body))
+        ModelReadinessBanner(modelReady = modelReady)
+    }
+}
+
+@Composable
+private fun ModelReadinessBanner(modelReady: Boolean) {
+    val colors = VestigeTheme.colors
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            if (modelReady) {
+                Pill(
+                    text = stringResource(id = R.string.onboarding_download_ready_pill),
+                    color = colors.lime,
+                    dot = true,
+                    blink = false,
+                )
+            } else {
+                // Coral + blinking dot is the same "live work in progress" semantic as the
+                // capture-screen ON AIR pill (ADR-011 §"Accent system"). Reuses the shared
+                // primitive so the loading state stays consistent across the app.
+                Pill(
+                    text = stringResource(id = R.string.onboarding_download_loading_pill),
+                    color = colors.coral,
+                    dot = true,
+                    blink = true,
+                )
+            }
+        }
+        if (!modelReady) {
+            BodyParagraph(
+                text = stringResource(id = R.string.onboarding_download_loading_note),
+                dim = true,
+            )
+        }
     }
 }
 

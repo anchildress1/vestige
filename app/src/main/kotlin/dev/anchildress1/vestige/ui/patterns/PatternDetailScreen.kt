@@ -17,7 +17,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarDuration
-import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Text
@@ -34,6 +33,7 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import dev.anchildress1.vestige.R
 
@@ -90,7 +90,7 @@ fun PatternDetailScreen(
                 },
             )
         },
-        snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
+        snackbarHost = { PatternSnackbarHost(snackbarHostState) },
     ) { padding ->
         PatternDetailBody(
             state = state,
@@ -229,24 +229,49 @@ private fun SourceRow(source: PatternSourceUi, onClick: () -> Unit) {
 
 @Composable
 private fun ActionRow(availableActions: Set<PatternAction>, actions: PatternActionCallbacks<Unit>) {
+    // Compact padding + single-line text keeps "Mark resolved" / "Snooze 7 days" inside the
+    // button at phone widths. Default OutlinedButton padding (24 dp / side) overflowed.
+    val padding = PaddingValues(horizontal = 10.dp, vertical = 8.dp)
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         if (PatternAction.DISMISSED in availableActions) {
-            OutlinedButton(onClick = { actions.onDismiss(Unit) }, modifier = Modifier.weight(1f)) {
-                Text(stringResource(R.string.pattern_action_dismiss))
+            OutlinedButton(
+                onClick = { actions.onDismiss(Unit) },
+                modifier = Modifier.weight(1f),
+                contentPadding = padding,
+            ) {
+                ActionButtonLabel(stringResource(R.string.pattern_action_dismiss))
             }
         }
         if (PatternAction.SNOOZED in availableActions) {
-            OutlinedButton(onClick = { actions.onSnooze(Unit) }, modifier = Modifier.weight(1f)) {
-                Text(stringResource(R.string.pattern_action_snooze_7_days))
+            OutlinedButton(
+                onClick = { actions.onSnooze(Unit) },
+                modifier = Modifier.weight(1f),
+                contentPadding = padding,
+            ) {
+                ActionButtonLabel(stringResource(R.string.pattern_action_snooze_7_days))
             }
         }
         if (PatternAction.MARKED_RESOLVED in availableActions) {
-            OutlinedButton(onClick = { actions.onMarkResolved(Unit) }, modifier = Modifier.weight(1f)) {
-                Text(stringResource(R.string.pattern_action_mark_resolved))
+            OutlinedButton(
+                onClick = { actions.onMarkResolved(Unit) },
+                modifier = Modifier.weight(1f),
+                contentPadding = padding,
+            ) {
+                ActionButtonLabel(stringResource(R.string.pattern_action_mark_resolved))
             }
         }
     }
+}
+
+@Composable
+private fun ActionButtonLabel(text: String) {
+    Text(
+        text = text,
+        style = MaterialTheme.typography.labelLarge,
+        maxLines = 1,
+        overflow = TextOverflow.Visible,
+    )
 }

@@ -118,8 +118,8 @@ private fun PhaseOneShell(
     Column(modifier = modifier.fillMaxSize()) {
         AppTop(
             persona = "WITNESS",
-            onPersonaTap = {},
-            onStatusTap = {},
+            onPersonaTap = { toastTap(context, "persona tap") },
+            onStatusTap = { toastTap(context, "status tap") },
         )
         Box(
             modifier = Modifier
@@ -191,4 +191,11 @@ private fun PhaseOneShellPreview() {
     VestigeTheme {
         PhaseOneShell()
     }
+}
+
+// TEMP DEBUG — remove once on-device tap behavior is confirmed. Tests already cover the click
+// wiring; this exists only to surface a visible signal on the device while diagnosing a reported
+// "no click, no highlight" regression on the AppTop chrome pills.
+private fun toastTap(context: android.content.Context, label: String) {
+    android.widget.Toast.makeText(context, label, android.widget.Toast.LENGTH_SHORT).show()
 }

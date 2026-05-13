@@ -210,6 +210,7 @@ private fun PatternCard(
                 )
             }
             OverflowMenu(
+                availableActions = card.availableActions,
                 onDismiss = onDismiss,
                 onSnooze = onSnooze,
                 onMarkResolved = onMarkResolved,
@@ -219,7 +220,13 @@ private fun PatternCard(
 }
 
 @Composable
-private fun OverflowMenu(onDismiss: () -> Unit, onSnooze: () -> Unit, onMarkResolved: () -> Unit) {
+private fun OverflowMenu(
+    availableActions: Set<PatternAction>,
+    onDismiss: () -> Unit,
+    onSnooze: () -> Unit,
+    onMarkResolved: () -> Unit,
+) {
+    if (availableActions.isEmpty()) return
     var expanded by remember { mutableStateOf(false) }
     Box {
         IconButton(
@@ -229,27 +236,33 @@ private fun OverflowMenu(onDismiss: () -> Unit, onSnooze: () -> Unit, onMarkReso
             Text(text = "⋮", style = MaterialTheme.typography.titleLarge)
         }
         DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
-            DropdownMenuItem(
-                text = { Text("Dismiss") },
-                onClick = {
-                    expanded = false
-                    onDismiss()
-                },
-            )
-            DropdownMenuItem(
-                text = { Text("Snooze 7 days") },
-                onClick = {
-                    expanded = false
-                    onSnooze()
-                },
-            )
-            DropdownMenuItem(
-                text = { Text("Mark resolved") },
-                onClick = {
-                    expanded = false
-                    onMarkResolved()
-                },
-            )
+            if (PatternAction.DISMISSED in availableActions) {
+                DropdownMenuItem(
+                    text = { Text("Dismiss") },
+                    onClick = {
+                        expanded = false
+                        onDismiss()
+                    },
+                )
+            }
+            if (PatternAction.SNOOZED in availableActions) {
+                DropdownMenuItem(
+                    text = { Text("Snooze 7 days") },
+                    onClick = {
+                        expanded = false
+                        onSnooze()
+                    },
+                )
+            }
+            if (PatternAction.MARKED_RESOLVED in availableActions) {
+                DropdownMenuItem(
+                    text = { Text("Mark resolved") },
+                    onClick = {
+                        expanded = false
+                        onMarkResolved()
+                    },
+                )
+            }
         }
     }
 }
@@ -271,6 +284,11 @@ private fun PatternsListPreview() {
                         lastSeenLabel = "May 7",
                         section = PatternSection.ACTIVE,
                         traceHits = PREVIEW_TRACE_HITS,
+                        availableActions = setOf(
+                            PatternAction.DISMISSED,
+                            PatternAction.SNOOZED,
+                            PatternAction.MARKED_RESOLVED,
+                        ),
                     ),
                 ),
             ),

@@ -63,7 +63,7 @@ class MainActivity : ComponentActivity() {
                         PhaseOneShell(
                             onOpenPatterns = { showPatterns = true },
                             onDebugSeed = if (isDebuggable) {
-                                { DebugPatternSeeder.seed(container.boxStore, container.patternStore) }
+                                { DebugPatternSeeder.seed(filesDir, container.boxStore, container.patternStore) }
                             } else {
                                 null
                             },

@@ -2,7 +2,8 @@ package dev.anchildress1.vestige.ui.patterns
 
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
-import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
@@ -162,6 +163,31 @@ class PatternsListScreenTest {
         composeRule.waitForIdle()
 
         assertEquals(PatternState.DISMISSED, patternStore.findByPatternId("p-dismiss")?.state)
+    }
+
+    @Test
+    fun `snoozed cards only expose dismiss in overflow menu`() {
+        val supporting = listOf(seedEntry("crashed", ExtractionStatus.COMPLETED))
+        seedActivePattern("p-snoozed", "Tuesday Meetings", "Aftermath", "Callout.", supporting)
+        patternRepo.snooze("p-snoozed")
+
+        composeRule.setContent { PatternsListScreen(viewModel = newViewModel(), onOpenPattern = {}) }
+
+        composeRule.onNodeWithContentDescription("Pattern actions").performClick()
+        composeRule.onNodeWithText("Dismiss").assertIsDisplayed()
+        composeRule.onAllNodesWithText("Snooze 7 days").assertCountEquals(0)
+        composeRule.onAllNodesWithText("Mark resolved").assertCountEquals(0)
+    }
+
+    @Test
+    fun `dismissed cards do not render an overflow menu`() {
+        val supporting = listOf(seedEntry("crashed", ExtractionStatus.COMPLETED))
+        seedActivePattern("p-dismissed", "Tuesday Meetings", "Aftermath", "Callout.", supporting)
+        patternRepo.dismiss("p-dismissed")
+
+        composeRule.setContent { PatternsListScreen(viewModel = newViewModel(), onOpenPattern = {}) }
+
+        composeRule.onAllNodesWithContentDescription("Pattern actions").assertCountEquals(0)
     }
 
     private fun newViewModel() = PatternsListViewModel(

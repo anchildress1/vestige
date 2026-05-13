@@ -51,6 +51,19 @@ fun terminalLabelFor(state: PatternState, stateChangedMs: Long, zone: ZoneId = Z
 /** ADR-003 terminals: DISMISSED + RESOLVED. SNOOZED is recoverable; BELOW_THRESHOLD is internal. */
 fun isTerminalState(state: PatternState): Boolean = state == PatternState.DISMISSED || state == PatternState.RESOLVED
 
+/** Only expose actions the persisted lifecycle can legally accept from the current state. */
+fun availableActionsFor(state: PatternState): Set<PatternAction> = when (state) {
+    PatternState.ACTIVE -> setOf(
+        PatternAction.DISMISSED,
+        PatternAction.SNOOZED,
+        PatternAction.MARKED_RESOLVED,
+    )
+
+    PatternState.SNOOZED -> setOf(PatternAction.DISMISSED)
+
+    PatternState.DISMISSED, PatternState.RESOLVED, PatternState.BELOW_THRESHOLD -> emptySet()
+}
+
 /**
  * Map a persisted [PatternState] onto the Patterns-list section it belongs in. Returns `null`
  * for [PatternState.BELOW_THRESHOLD] — that's an internal-only state and never user-visible.

@@ -12,6 +12,8 @@ data class PatternCardUi(
     val section: PatternSection,
     /** Indices 0..days-1 over the trailing 30-day window. See [traceBarHits]. */
     val traceHits: Set<Int>,
+    /** UI must only surface actions the lifecycle state machine will accept. */
+    val availableActions: Set<PatternAction>,
 )
 
 /**
@@ -57,6 +59,7 @@ sealed interface PatternDetailUiState {
         val traceHits: Set<Int>,
         val isTerminal: Boolean,
         val terminalLabel: String?,
+        val availableActions: Set<PatternAction>,
     ) : PatternDetailUiState
 }
 

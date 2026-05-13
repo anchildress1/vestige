@@ -2,7 +2,7 @@ package dev.anchildress1.vestige.ui.patterns
 
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
-import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
@@ -118,6 +118,21 @@ class PatternDetailScreenTest {
 
         composeRule.onNodeWithText("Dismissed", substring = true).performScrollTo().assertIsDisplayed()
         composeRule.onAllNodesWithText("Dismiss").assertCountEquals(0)
+        composeRule.onAllNodesWithText("Snooze 7 days").assertCountEquals(0)
+        composeRule.onAllNodesWithText("Mark resolved").assertCountEquals(0)
+    }
+
+    @Test
+    fun `snoozed detail only exposes dismiss`() {
+        val supporting = listOf(seedEntry("crashed"))
+        seedActivePattern("p-snoozed-detail", "Tuesday Meetings", "Aftermath", "Callout.", supporting)
+        patternRepo.snooze("p-snoozed-detail")
+
+        composeRule.setContent {
+            PatternDetailScreen(viewModel = newViewModel("p-snoozed-detail"), onBack = {})
+        }
+
+        composeRule.onNodeWithText("Dismiss").performScrollTo().assertIsDisplayed()
         composeRule.onAllNodesWithText("Snooze 7 days").assertCountEquals(0)
         composeRule.onAllNodesWithText("Mark resolved").assertCountEquals(0)
     }

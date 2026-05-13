@@ -116,6 +116,7 @@ class PatternsListViewModel(
             lastSeenLabel = formatShortDate(lastSeenTimestamp),
             section = section,
             traceHits = traceBarHitsFromEntries(supportingEntries.toList(), asOfMs),
+            availableActions = availableActionsFor(state),
         )
     }
 }

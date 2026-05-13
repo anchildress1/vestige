@@ -1,11 +1,14 @@
 package dev.anchildress1.vestige.debug
 
+import dev.anchildress1.vestige.model.ExtractionStatus
 import dev.anchildress1.vestige.model.PatternKind
 import dev.anchildress1.vestige.model.PatternState
 import dev.anchildress1.vestige.storage.EntryEntity
+import dev.anchildress1.vestige.storage.MarkdownEntryStore
 import dev.anchildress1.vestige.storage.PatternEntity
 import dev.anchildress1.vestige.storage.PatternStore
 import io.objectbox.BoxStore
+import java.io.File
 import java.security.MessageDigest
 
 /**
@@ -28,8 +31,10 @@ object DebugPatternSeeder {
     )
 
     @Suppress("MagicNumber") // Fixture timestamps + corpus shape are deliberately concrete.
-    fun seed(boxStore: BoxStore, patternStore: PatternStore) {
+    fun seed(filesDir: File, boxStore: BoxStore, patternStore: PatternStore) {
+        val markdownStore = MarkdownEntryStore(filesDir)
         boxStore.runInTx {
+            markdownStore.listAll().forEach(File::delete)
             boxStore.boxFor(EntryEntity::class.java).removeAll()
             boxStore.boxFor(PatternEntity::class.java).removeAll()
 
@@ -53,7 +58,11 @@ object DebugPatternSeeder {
                     markdownFilename = "debug-seed-$idx.md",
                     entryText = text,
                     timestampEpochMs = baseMs + idx * DAY_MS,
-                ).also { boxStore.boxFor(EntryEntity::class.java).put(it) }
+                    extractionStatus = ExtractionStatus.COMPLETED,
+                ).also {
+                    markdownStore.write(it)
+                    boxStore.boxFor(EntryEntity::class.java).put(it)
+                }
             }
 
             // Two ACTIVE patterns wired to disjoint entry slices so the list has multiple cards

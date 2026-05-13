@@ -112,5 +112,6 @@ class PatternDetailViewModel(
         traceHits = traceHits,
         isTerminal = isTerminalState(state),
         terminalLabel = terminalLabelFor(state, stateChangedTimestamp),
+        availableActions = availableActionsFor(state),
     )
 }

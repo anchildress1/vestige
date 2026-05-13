@@ -90,6 +90,14 @@ class PatternDetailViewModelTest {
             assertEquals(entries.reversed().map { it.id }, sourceTimestamps)
             assertFalse(loaded.isTerminal)
             assertNull(loaded.terminalLabel)
+            assertEquals(
+                setOf(
+                    PatternAction.DISMISSED,
+                    PatternAction.SNOOZED,
+                    PatternAction.MARKED_RESOLVED,
+                ),
+                loaded.availableActions,
+            )
         }
     }
 
@@ -160,6 +168,7 @@ class PatternDetailViewModelTest {
             val loaded = expectMostRecentItem() as PatternDetailUiState.Loaded
             assertEquals(false, loaded.isTerminal)
             assertEquals(null, loaded.terminalLabel)
+            assertEquals(setOf(PatternAction.DISMISSED), loaded.availableActions)
         }
         assertEquals(PatternState.SNOOZED, patternStore.findByPatternId("p-snooze")?.state)
     }

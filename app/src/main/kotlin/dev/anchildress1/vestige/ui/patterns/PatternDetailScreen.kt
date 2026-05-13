@@ -178,8 +178,8 @@ private fun LoadedBody(
             )
         }
 
-        if (!loaded.isTerminal) {
-            ActionRow(actions = actions)
+        if (loaded.availableActions.isNotEmpty()) {
+            ActionRow(availableActions = loaded.availableActions, actions = actions)
         }
     }
 }
@@ -205,15 +205,25 @@ private fun SourceRow(source: PatternSourceUi, onClick: () -> Unit) {
 }
 
 @Composable
-private fun ActionRow(actions: PatternActionCallbacks<Unit>) {
+private fun ActionRow(availableActions: Set<PatternAction>, actions: PatternActionCallbacks<Unit>) {
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        OutlinedButton(onClick = { actions.onDismiss(Unit) }, modifier = Modifier.weight(1f)) { Text("Dismiss") }
-        OutlinedButton(onClick = { actions.onSnooze(Unit) }, modifier = Modifier.weight(1f)) { Text("Snooze 7 days") }
-        OutlinedButton(onClick = { actions.onMarkResolved(Unit) }, modifier = Modifier.weight(1f)) {
-            Text("Mark resolved")
+        if (PatternAction.DISMISSED in availableActions) {
+            OutlinedButton(onClick = { actions.onDismiss(Unit) }, modifier = Modifier.weight(1f)) {
+                Text("Dismiss")
+            }
+        }
+        if (PatternAction.SNOOZED in availableActions) {
+            OutlinedButton(onClick = { actions.onSnooze(Unit) }, modifier = Modifier.weight(1f)) {
+                Text("Snooze 7 days")
+            }
+        }
+        if (PatternAction.MARKED_RESOLVED in availableActions) {
+            OutlinedButton(onClick = { actions.onMarkResolved(Unit) }, modifier = Modifier.weight(1f)) {
+                Text("Mark resolved")
+            }
         }
     }
 }

@@ -37,7 +37,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import dev.anchildress1.vestige.R
 import dev.anchildress1.vestige.ui.components.VestigeListCard
-import dev.anchildress1.vestige.ui.components.VestigeRow
 import dev.anchildress1.vestige.ui.components.VestigeSurface
 
 @OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
@@ -189,15 +188,17 @@ private fun PatternSummaryCard(loaded: PatternDetailUiState.Loaded) {
                 )
             }
             Text(text = loaded.observation, style = MaterialTheme.typography.bodyLarge)
-            VestigeRow(
-                label = stringResource(R.string.pattern_detail_seen_in),
-                value = stringResource(
+            // Count meta renders without a label — "Seen in:" is reserved for the sources card
+            // heading below.
+            Text(
+                text = stringResource(
                     R.string.pattern_card_meta,
                     loaded.supportingCount,
                     loaded.totalEntryCount,
                     loaded.lastSeenLabel,
                 ),
-                valueStyle = MaterialTheme.typography.bodyMedium,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
     }

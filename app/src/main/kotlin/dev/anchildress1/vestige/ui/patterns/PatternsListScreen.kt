@@ -46,7 +46,6 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import dev.anchildress1.vestige.R
 import dev.anchildress1.vestige.ui.components.VestigeListCard
-import dev.anchildress1.vestige.ui.components.VestigeRow
 import dev.anchildress1.vestige.ui.components.glowLeftRule
 import dev.anchildress1.vestige.ui.theme.VestigeTheme
 
@@ -215,15 +214,17 @@ private fun PatternCard(
                     accent = if (card.section == PatternSection.ACTIVE) PatternAccent else TraceBarDefaults.Muted,
                 )
                 Spacer(modifier = Modifier.height(2.dp))
-                VestigeRow(
-                    label = stringResource(R.string.pattern_detail_seen_in),
-                    value = stringResource(
+                // POC card meta is a single eyebrow line — no "Seen in:" label. (Two-eyebrow
+                // SpaceBetween treatment is Phase 4 polish.)
+                Text(
+                    text = stringResource(
                         R.string.pattern_card_meta,
                         card.supportingCount,
                         card.totalEntryCount,
                         card.lastSeenLabel,
                     ),
-                    valueStyle = MaterialTheme.typography.bodySmall,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
             OverflowMenu(

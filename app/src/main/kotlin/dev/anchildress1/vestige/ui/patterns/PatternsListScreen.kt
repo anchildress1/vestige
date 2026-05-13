@@ -17,7 +17,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.IconButton
@@ -46,6 +45,9 @@ import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import dev.anchildress1.vestige.R
+import dev.anchildress1.vestige.ui.components.VestigeListCard
+import dev.anchildress1.vestige.ui.components.VestigeRow
+import dev.anchildress1.vestige.ui.components.glowLeftRule
 import dev.anchildress1.vestige.ui.theme.VestigeTheme
 
 /** Purple `#A855F7` left-rule per design-guidelines §"Pattern List / Pattern card". */
@@ -88,6 +90,7 @@ fun PatternsListScreen(
 
     Scaffold(
         modifier = modifier,
+        containerColor = Color.Transparent,
         topBar = { TopAppBar(title = { Text(stringResource(R.string.patterns_title)) }) },
         snackbarHost = { PatternSnackbarHost(snackbarHostState) },
     ) { padding ->
@@ -177,30 +180,24 @@ private fun PatternCard(
     onSnooze: () -> Unit,
     onMarkResolved: () -> Unit,
 ) {
-    Surface(
+    VestigeListCard(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(onClick = onClick)
             .semantics {
                 role = Role.Button
                 contentDescription = "${card.title}. ${card.observation}"
             },
-        color = MaterialTheme.colorScheme.surfaceContainer,
-        shape = RoundedCornerShape(12.dp),
+        onClick = onClick,
+        accentModifier = if (card.section == PatternSection.ACTIVE) {
+            Modifier.glowLeftRule(color = PatternAccent)
+        } else {
+            Modifier
+        },
     ) {
         Row(modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min)) {
-            // Active patterns get the purple accent rule per design-guidelines.md §"Pattern card";
-            // snoozed/resolved/dismissed cards drop it so the section becomes the visual cue.
-            Box(
-                modifier = Modifier
-                    .width(3.dp)
-                    .fillMaxHeight()
-                    .background(if (card.section == PatternSection.ACTIVE) PatternAccent else Color.Transparent),
-            )
             Column(
                 modifier = Modifier
-                    .weight(1f)
-                    .padding(start = 12.dp, top = 12.dp, bottom = 12.dp, end = 4.dp),
+                    .weight(1f),
                 verticalArrangement = Arrangement.spacedBy(4.dp),
             ) {
                 Text(text = card.title, style = MaterialTheme.typography.titleMedium)
@@ -218,15 +215,15 @@ private fun PatternCard(
                     accent = if (card.section == PatternSection.ACTIVE) PatternAccent else TraceBarDefaults.Muted,
                 )
                 Spacer(modifier = Modifier.height(2.dp))
-                Text(
-                    text = stringResource(
+                VestigeRow(
+                    label = stringResource(R.string.pattern_detail_seen_in),
+                    value = stringResource(
                         R.string.pattern_card_meta,
                         card.supportingCount,
                         card.totalEntryCount,
                         card.lastSeenLabel,
                     ),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    valueStyle = MaterialTheme.typography.bodySmall,
                 )
             }
             OverflowMenu(

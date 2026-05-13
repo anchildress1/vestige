@@ -36,6 +36,9 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import dev.anchildress1.vestige.R
+import dev.anchildress1.vestige.ui.components.VestigeListCard
+import dev.anchildress1.vestige.ui.components.VestigeRow
+import dev.anchildress1.vestige.ui.components.VestigeSurface
 
 @OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
@@ -74,6 +77,7 @@ fun PatternDetailScreen(
     val backDescription = stringResource(R.string.pattern_back_description)
     Scaffold(
         modifier = modifier,
+        containerColor = androidx.compose.ui.graphics.Color.Transparent,
         topBar = {
             TopAppBar(
                 title = { Text("") },
@@ -151,47 +155,12 @@ private fun LoadedBody(
             .padding(horizontal = 20.dp, vertical = 16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        Text(text = loaded.title, style = MaterialTheme.typography.headlineSmall)
-        loaded.templateLabel?.let {
-            Text(
-                text = it,
-                style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-        Text(text = loaded.observation, style = MaterialTheme.typography.bodyLarge)
-        Text(
-            text = stringResource(
-                R.string.pattern_card_meta,
-                loaded.supportingCount,
-                loaded.totalEntryCount,
-                loaded.lastSeenLabel,
-            ),
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-
-        // POC: "Intensity · 30 days" trace strip. Hero element of the detail screen.
-        Text(
-            text = stringResource(R.string.pattern_detail_intensity_eyebrow),
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        TraceBar(hits = loaded.traceHits, height = 28.dp)
+        PatternSummaryCard(loaded)
+        PatternIntensityCard(loaded.traceHits)
 
         HorizontalDivider(color = MaterialTheme.colorScheme.outline)
 
-        Text(text = stringResource(R.string.pattern_detail_seen_in), style = MaterialTheme.typography.titleSmall)
-        loaded.sources.forEach { source ->
-            SourceRow(source = source, onClick = { onOpenEntry(source.entryId) })
-        }
-        if (loaded.sources.isEmpty()) {
-            Text(
-                text = stringResource(R.string.pattern_detail_no_sources),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
+        PatternSourcesCard(sources = loaded.sources, onOpenEntry = onOpenEntry)
 
         loaded.terminalLabel?.let { terminal ->
             Text(
@@ -208,22 +177,89 @@ private fun LoadedBody(
 }
 
 @Composable
+private fun PatternSummaryCard(loaded: PatternDetailUiState.Loaded) {
+    VestigeSurface(contentPadding = PaddingValues(16.dp)) {
+        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Text(text = loaded.title, style = MaterialTheme.typography.headlineSmall)
+            loaded.templateLabel?.let {
+                Text(
+                    text = it,
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            Text(text = loaded.observation, style = MaterialTheme.typography.bodyLarge)
+            VestigeRow(
+                label = stringResource(R.string.pattern_detail_seen_in),
+                value = stringResource(
+                    R.string.pattern_card_meta,
+                    loaded.supportingCount,
+                    loaded.totalEntryCount,
+                    loaded.lastSeenLabel,
+                ),
+                valueStyle = MaterialTheme.typography.bodyMedium,
+            )
+        }
+    }
+}
+
+@Composable
+private fun PatternIntensityCard(traceHits: Set<Int>) {
+    // POC: "Intensity · 30 days" trace strip. Hero element of the detail screen.
+    VestigeSurface(contentPadding = PaddingValues(16.dp)) {
+        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Text(
+                text = stringResource(R.string.pattern_detail_intensity_eyebrow),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            TraceBar(hits = traceHits, height = 28.dp)
+        }
+    }
+}
+
+@Composable
+private fun PatternSourcesCard(sources: List<PatternSourceUi>, onOpenEntry: (Long) -> Unit) {
+    VestigeSurface(contentPadding = PaddingValues(16.dp)) {
+        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Text(
+                text = stringResource(R.string.pattern_detail_seen_in),
+                style = MaterialTheme.typography.titleSmall,
+            )
+            sources.forEach { source ->
+                SourceRow(source = source, onClick = { onOpenEntry(source.entryId) })
+            }
+            if (sources.isEmpty()) {
+                Text(
+                    text = stringResource(R.string.pattern_detail_no_sources),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+    }
+}
+
+@Composable
 private fun SourceRow(source: PatternSourceUi, onClick: () -> Unit) {
-    Row(
+    VestigeListCard(
         modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick)
             .semantics { role = Role.Button }
-            .padding(vertical = 6.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+            .padding(vertical = 2.dp),
+        onClick = onClick,
     ) {
-        Text(
-            text = source.dateLabel,
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        Text(text = "—", color = MaterialTheme.colorScheme.onSurfaceVariant)
-        Text(text = source.snippet, style = MaterialTheme.typography.bodyMedium)
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Text(
+                text = source.dateLabel,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Text(text = "—", color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(text = source.snippet, style = MaterialTheme.typography.bodyMedium)
+        }
     }
 }
 

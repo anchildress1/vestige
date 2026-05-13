@@ -98,8 +98,7 @@ class PatternDetailScreenTest {
         composeRule.onNodeWithText("Tuesday Meetings").assertIsDisplayed()
         composeRule.onNodeWithText("Aftermath").assertIsDisplayed()
         composeRule.onNodeWithText("Fourth entry mentions Tuesday meetings.").assertIsDisplayed()
-        // Action row + sources live below the new TraceBar fold; scrolling brings them into view.
-        composeRule.onNodeWithText("Seen in:").performScrollTo().assertIsDisplayed()
+        // Action row + sources live below the new card stack; scrolling brings them into view.
         composeRule.onNodeWithText("crashed after standup").performScrollTo().assertIsDisplayed()
         composeRule.onNodeWithText("Dismiss").performScrollTo().assertIsDisplayed()
         composeRule.onNodeWithText("Snooze 7 days").performScrollTo().assertIsDisplayed()

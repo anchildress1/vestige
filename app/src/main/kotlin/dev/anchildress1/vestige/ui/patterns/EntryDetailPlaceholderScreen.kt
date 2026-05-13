@@ -3,6 +3,7 @@ package dev.anchildress1.vestige.ui.patterns
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.IconButton
@@ -22,6 +23,7 @@ import androidx.compose.ui.unit.dp
 import dev.anchildress1.vestige.R
 import dev.anchildress1.vestige.storage.EntryEntity
 import dev.anchildress1.vestige.storage.EntryStore
+import dev.anchildress1.vestige.ui.components.VestigeSurface
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -51,6 +53,7 @@ fun EntryDetailPlaceholderScreen(
 
     Scaffold(
         modifier = modifier,
+        containerColor = androidx.compose.ui.graphics.Color.Transparent,
         topBar = {
             TopAppBar(
                 title = { Text(text = stringResource(id = R.string.entry_detail_placeholder_title)) },
@@ -91,13 +94,17 @@ fun EntryDetailPlaceholderScreen(
                     .padding(horizontal = 20.dp, vertical = 16.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                Text(text = uiState.dateLabel, style = MaterialTheme.typography.titleMedium)
-                Text(
-                    text = stringResource(id = R.string.entry_detail_placeholder_notice),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                Text(text = uiState.entryText, style = MaterialTheme.typography.bodyLarge)
+                VestigeSurface(contentPadding = PaddingValues(16.dp)) {
+                    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Text(text = uiState.dateLabel, style = MaterialTheme.typography.titleMedium)
+                        Text(
+                            text = stringResource(id = R.string.entry_detail_placeholder_notice),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        Text(text = uiState.entryText, style = MaterialTheme.typography.bodyLarge)
+                    }
+                }
             }
         }
     }

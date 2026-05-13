@@ -10,8 +10,11 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Button
@@ -35,7 +38,11 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import dev.anchildress1.vestige.debug.DebugPatternSeeder
+import dev.anchildress1.vestige.ui.atmosphere.FogDrift
+import dev.anchildress1.vestige.ui.components.VestigeSurface
 import dev.anchildress1.vestige.ui.patterns.PatternsHost
+import dev.anchildress1.vestige.ui.theme.Bg
+import dev.anchildress1.vestige.ui.theme.VestigeTextStyles
 import dev.anchildress1.vestige.ui.theme.VestigeTheme
 
 class MainActivity : ComponentActivity() {
@@ -45,30 +52,36 @@ class MainActivity : ComponentActivity() {
         val container = (application as VestigeApplication).appContainer
         setContent {
             VestigeTheme {
-                var showPatterns by rememberSaveable { mutableStateOf(false) }
-                if (showPatterns) {
-                    // Back unwinds patterns→shell; without this the activity exits and the user
-                    // loses their place in the rough Phase-3 nav.
-                    BackHandler { showPatterns = false }
-                    PatternsHost(
-                        patternStore = container.patternStore,
-                        patternRepo = container.patternRepo,
-                        entryStore = container.entryStore,
-                        onExit = { showPatterns = false },
-                        modifier = Modifier.fillMaxSize(),
-                    )
-                } else {
-                    val isDebuggable = (applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE) != 0
-                    Scaffold(modifier = Modifier.fillMaxSize()) { padding ->
-                        PhaseOneShell(
-                            onOpenPatterns = { showPatterns = true },
-                            onDebugSeed = if (isDebuggable) {
-                                { DebugPatternSeeder.seed(filesDir, container.boxStore, container.patternStore) }
-                            } else {
-                                null
-                            },
-                            modifier = Modifier.padding(padding),
+                Box(modifier = Modifier.fillMaxSize().background(Bg)) {
+                    FogDrift(modifier = Modifier.fillMaxSize())
+                    var showPatterns by rememberSaveable { mutableStateOf(false) }
+                    if (showPatterns) {
+                        // Back unwinds patterns→shell; without this the activity exits and the user
+                        // loses their place in the rough Phase-3 nav.
+                        BackHandler { showPatterns = false }
+                        PatternsHost(
+                            patternStore = container.patternStore,
+                            patternRepo = container.patternRepo,
+                            entryStore = container.entryStore,
+                            onExit = { showPatterns = false },
+                            modifier = Modifier.fillMaxSize(),
                         )
+                    } else {
+                        val isDebuggable = (applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE) != 0
+                        Scaffold(
+                            modifier = Modifier.fillMaxSize(),
+                            containerColor = androidx.compose.ui.graphics.Color.Transparent,
+                        ) { padding ->
+                            PhaseOneShell(
+                                onOpenPatterns = { showPatterns = true },
+                                onDebugSeed = if (isDebuggable) {
+                                    { DebugPatternSeeder.seed(filesDir, container.boxStore, container.patternStore) }
+                                } else {
+                                    null
+                                },
+                                modifier = Modifier.padding(padding),
+                            )
+                        }
                     }
                 }
             }
@@ -117,34 +130,38 @@ private fun PhaseOneShell(
         verticalArrangement = Arrangement.spacedBy(16.dp, Alignment.CenterVertically),
         horizontalAlignment = Alignment.Start,
     ) {
-        Text(text = stringResource(id = R.string.app_name))
+        VestigeSurface(contentPadding = PaddingValues(20.dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                Text(text = stringResource(id = R.string.app_name), style = VestigeTextStyles.H1)
 
-        when {
-            permissionGranted -> Text(text = stringResource(id = R.string.mic_permission_granted))
-            lastRequestDenied -> Text(text = stringResource(id = R.string.mic_permission_denied))
-        }
+                when {
+                    permissionGranted -> Text(text = stringResource(id = R.string.mic_permission_granted))
+                    lastRequestDenied -> Text(text = stringResource(id = R.string.mic_permission_denied))
+                }
 
-        Button(
-            onClick = { launcher.launch(Manifest.permission.RECORD_AUDIO) },
-            enabled = !permissionGranted,
-            modifier = Modifier.semantics { role = Role.Button },
-        ) {
-            Text(text = stringResource(id = R.string.mic_permission_request))
-        }
+                Button(
+                    onClick = { launcher.launch(Manifest.permission.RECORD_AUDIO) },
+                    enabled = !permissionGranted,
+                    modifier = Modifier.semantics { role = Role.Button },
+                ) {
+                    Text(text = stringResource(id = R.string.mic_permission_request))
+                }
 
-        Button(
-            onClick = onOpenPatterns,
-            modifier = Modifier.semantics { role = Role.Button },
-        ) {
-            Text(text = stringResource(id = R.string.open_patterns))
-        }
+                Button(
+                    onClick = onOpenPatterns,
+                    modifier = Modifier.semantics { role = Role.Button },
+                ) {
+                    Text(text = stringResource(id = R.string.open_patterns))
+                }
 
-        onDebugSeed?.let { seed ->
-            Button(
-                onClick = seed,
-                modifier = Modifier.semantics { role = Role.Button },
-            ) {
-                Text(text = stringResource(id = R.string.debug_seed_patterns))
+                onDebugSeed?.let { seed ->
+                    Button(
+                        onClick = seed,
+                        modifier = Modifier.semantics { role = Role.Button },
+                    ) {
+                        Text(text = stringResource(id = R.string.debug_seed_patterns))
+                    }
+                }
             }
         }
     }

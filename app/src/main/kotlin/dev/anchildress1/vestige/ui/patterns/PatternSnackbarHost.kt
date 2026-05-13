@@ -4,16 +4,17 @@ import androidx.compose.material3.Snackbar
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.Composable
-import dev.anchildress1.vestige.ui.theme.Glow
 import dev.anchildress1.vestige.ui.theme.Ink
 import dev.anchildress1.vestige.ui.theme.S2
+
+internal val PatternSnackbarActionColor = Ink
 
 /**
  * Snackbar host with explicit accent on the `Undo` action.
  *
  * M3's default snackbar action draws in `inversePrimary` over `inverseSurface`. With our
- * Ink-as-primary palette that combo gives near-zero contrast — the Undo button renders, but
- * users can't see or hit it. This host paints `actionColor = Glow` so the affordance reads.
+ * Ink-as-primary palette that combo gives near-zero contrast. Keep the action on Ink as well so
+ * the affordance clears the story's 4.5:1 floor on S2.
  */
 @Composable
 fun PatternSnackbarHost(state: SnackbarHostState) {
@@ -22,8 +23,8 @@ fun PatternSnackbarHost(state: SnackbarHostState) {
             snackbarData = data,
             containerColor = S2,
             contentColor = Ink,
-            actionColor = Glow,
-            actionContentColor = Glow,
+            actionColor = PatternSnackbarActionColor,
+            actionContentColor = PatternSnackbarActionColor,
         )
     }
 }

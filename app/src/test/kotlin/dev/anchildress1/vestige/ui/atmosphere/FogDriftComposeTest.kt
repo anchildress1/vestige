@@ -10,6 +10,7 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.unit.dp
 import dev.anchildress1.vestige.ui.theme.Glow
 import dev.anchildress1.vestige.ui.theme.Vapor
+import org.junit.Assert.assertSame
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -65,5 +66,10 @@ class FogDriftComposeTest {
             }
         }
         composeRule.onNodeWithText("fog-neg").assertIsDisplayed()
+    }
+
+    @Test
+    fun `noise grain cache reuses the same brush for the same seed`() {
+        assertSame(sharedNoiseBrush(NOISE_DEFAULT_SEED), sharedNoiseBrush(NOISE_DEFAULT_SEED))
     }
 }

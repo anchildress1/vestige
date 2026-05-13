@@ -84,17 +84,17 @@ Checked bullets above are the historical record that the Mist tokens shipped to 
 **As** a first-time user, **I need** to walk through the 8 onboarding screens per `ux-copy.md` §Onboarding without dead-ends, **so that** I can pick a persona, grant mic and notification permissions, see a typed-fallback affordance, and start the model download — and so that judges installing the APK have a credible first 60 seconds.
 
 **Done when:**
-- [ ] Screen 1 — Persona pick: three persona cards (Witness default highlighted, Hardass, Editor) with the locked one-line descriptions per `ux-copy.md`. Tap-to-select + Continue.
-- [ ] Screen 2 — Local processing explainer: copy from `ux-copy.md` §"Screen 2". One primary action.
-- [ ] Screen 3 — Microphone permission: copy from `ux-copy.md` §"Screen 3". Allow + Skip-typing affordance. Denied path lands on the correct error state (Story 4.11).
-- [ ] Screen 3.5 — Notification permission per ADR-004 §"Permission Flow." Copy from `ux-copy.md` §"Screen 3.5" (added alongside this story). On Android 13+, requests `POST_NOTIFICATIONS` runtime permission. Allow + Skip affordances. Skip path is supported: extractions only complete while the app is in the foreground; cold-start sweep from ADR-001 Q3 recovers the rest. No degraded copy on skip.
-- [ ] Screen 4 — Typed fallback explainer: copy from `ux-copy.md` §"Screen 4".
-- [ ] Screen 5 — Wi-Fi check: branches per `ux-copy.md` §"Screen 5" based on connectivity.
-- [ ] Screen 6 — Model download: hands off to Story 4.3.
-- [ ] Screen 7 — First entry scaffold: copy from `ux-copy.md` §"Screen 7". Lands on the polished Capture screen (Story 4.5).
-- [ ] Each onboarding screen uses one primary action and the design tokens from Story 4.1.
-- [ ] Onboarding state survives backgrounding — closing the app between screens resumes at the same step.
-- [ ] After completion, opening the app skips onboarding and lands directly on Capture.
+- [x] Screen 1 — Persona pick: three persona cards (Witness default highlighted, Hardass, Editor) with the locked one-line descriptions per `ux-copy.md`. Tap-to-select + Continue. (`PersonaPickScreen`; selection persists via `OnboardingPrefs.setDefaultPersona` on every change; a11y selection asserted in `OnboardingScreensTest`.)
+- [x] Screen 2 — Local processing explainer: copy from `ux-copy.md` §"Screen 2". One primary action. (`LocalExplainerScreen`; header + body + detail + "Got it".)
+- [x] Screen 3 — Microphone permission: copy from `ux-copy.md` §"Screen 3". Allow + Skip-typing affordance. Denied path lands on the correct error state (Story 4.11). (`MicPermissionScreen`; in-screen denied notice shipped — polished error-state surface from Story 4.11 lands later.)
+- [x] Screen 3.5 — Notification permission per ADR-004 §"Permission Flow." Copy from `ux-copy.md` §"Screen 3.5" (added alongside this story). On Android 13+, requests `POST_NOTIFICATIONS` runtime permission. Allow + Skip affordances. Skip path is supported: extractions only complete while the app is in the foreground; cold-start sweep from ADR-001 Q3 recovers the rest. No degraded copy on skip. (`NotificationPermissionScreen`; `POST_NOTIFICATIONS` declared in `AndroidManifest.xml`; pre-API-33 short-circuits to advance since channel registration in `VestigeApplication` covers older devices.)
+- [x] Screen 4 — Typed fallback explainer: copy from `ux-copy.md` §"Screen 4". (`TypedFallbackScreen`.)
+- [x] Screen 5 — Wi-Fi check: branches per `ux-copy.md` §"Screen 5" based on connectivity. (`WifiCheckScreen` + `WifiAvailability` seam; both branches exercised in `OnboardingHostTest`.)
+- [x] Screen 6 — Model download: hands off to Story 4.3. (`ModelDownloadPlaceholderScreen` is the onboarding-side trampoline; Story 4.3 owns real progress / retry / Wi-Fi gating.)
+- [x] Screen 7 — First entry scaffold: copy from `ux-copy.md` §"Screen 7". Lands on the polished Capture screen (Story 4.5). (`ReadyScreen`; primary action calls `prefs.markComplete()` then `onComplete`, which flips the MainActivity gate to the existing post-onboarding shell until Story 4.5 polishes Capture.)
+- [x] Each onboarding screen uses one primary action and the design tokens from Story 4.1. (Shared `OnboardingScaffold`; `PersonaCard` uses `VestigeListCard` + `limeLeftRuleForActive` per ADR-011 — no per-screen color or shape overrides.)
+- [ ] Onboarding state survives backgrounding — closing the app between screens resumes at the same step. (Code: step + persona held in `rememberSaveable`, persona also persisted to prefs on every change; verify on-device by backgrounding mid-flow and re-opening.)
+- [ ] After completion, opening the app skips onboarding and lands directly on Capture. (Code: `MainActivity` reads `OnboardingPrefs.isComplete` on every `setContent` and routes to the post-onboarding shell when true; the post-onboarding shell stays at `PhaseOneShell` until Story 4.5 polishes Capture. Verify on-device by completing onboarding once, force-stopping, and re-launching.)
 
 **Notes / risks:** No "Welcome to your journey" copy anywhere, ever. `ux-copy.md` §"Things to NEVER Write" is the litmus test. Screen 3.5 copy must clear the same bar — single-status framing, not "we'll keep you posted." The notification permission and channel registration plumbing land in Phase 2 Story 2.6.5; this story owns the user-facing ask flow only.
 

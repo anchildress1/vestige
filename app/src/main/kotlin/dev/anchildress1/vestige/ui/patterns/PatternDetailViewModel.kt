@@ -1,5 +1,6 @@
 package dev.anchildress1.vestige.ui.patterns
 
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dev.anchildress1.vestige.storage.EntryEntity
@@ -59,16 +60,27 @@ class PatternDetailViewModel(
     fun undo(undo: PatternUndo) {
         viewModelScope.launch {
             withContext(ioDispatcher) {
-                when (undo.action) {
-                    PatternAction.DISMISSED -> patternRepo.dismiss(undo.patternId, undo = true)
-                    PatternAction.SNOOZED -> patternRepo.snooze(undo.patternId, undo = true)
-                    PatternAction.MARKED_RESOLVED -> Unit
+                runCatching {
+                    when (undo.action) {
+                        PatternAction.DISMISSED -> patternRepo.dismiss(undo.patternId, undo = true)
+                        PatternAction.SNOOZED -> patternRepo.snooze(undo.patternId, undo = true)
+                        PatternAction.MARKED_RESOLVED -> Unit
+                    }
+                }.onFailure { failure ->
+                    // Stale undo path (e.g. snooze → dismiss → tap-undo on the older snooze
+                    // snackbar) sends SNOOZED→ACTIVE through a row already in DISMISSED.
+                    // PatternRepo/PatternStore throw on illegal transitions per ADR-003; the
+                    // refresh below replays the persisted state back onto the detail screen.
+                    Log.w(TAG, "Ignoring stale undo for ${undo.patternId}", failure)
                 }
             }
             _state.value = loadState()
         }
     }
 
+    @Suppress("kotlin:S6311") // The `mutate` lambdas are non-suspending repo calls; `withContext`
+    // is what moves them off the main thread for ObjectBox I/O. Sonar's S6311 sees the suspend
+    // signature on the lambda and assumes the dispatcher is redundant; that's a shallow read.
     private fun dispatch(action: PatternAction, mutate: suspend () -> Unit) {
         viewModelScope.launch {
             withContext(ioDispatcher) { mutate() }
@@ -114,4 +126,8 @@ class PatternDetailViewModel(
         terminalLabel = terminalLabelFor(state, stateChangedTimestamp),
         availableActions = availableActionsFor(state),
     )
+
+    private companion object {
+        const val TAG = "PatternDetailVM"
+    }
 }

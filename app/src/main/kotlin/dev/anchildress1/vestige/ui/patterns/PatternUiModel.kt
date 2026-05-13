@@ -58,7 +58,7 @@ sealed interface PatternDetailUiState {
         val sources: List<PatternSourceUi>,
         val traceHits: Set<Int>,
         val isTerminal: Boolean,
-        val terminalLabel: String?,
+        val terminalLabel: TerminalLabel?,
         val availableActions: Set<PatternAction>,
     ) : PatternDetailUiState
 }

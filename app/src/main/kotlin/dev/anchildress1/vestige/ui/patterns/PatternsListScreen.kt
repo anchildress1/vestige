@@ -40,11 +40,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
+import dev.anchildress1.vestige.R
 import dev.anchildress1.vestige.ui.theme.VestigeTheme
 
 /** Purple `#A855F7` left-rule per design-guidelines §"Pattern List / Pattern card". */
@@ -60,12 +62,23 @@ fun PatternsListScreen(
     val state by viewModel.state.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
 
-    LaunchedEffect(viewModel) {
+    // Pre-resolve copy at composition so the LaunchedEffect's non-composable scope can use it.
+    val dismissedMessage = stringResource(R.string.snackbar_dismissed)
+    val snoozedMessage = stringResource(R.string.snackbar_snoozed_7_days)
+    val resolvedMessage = stringResource(R.string.snackbar_marked_resolved)
+    val undoLabel = stringResource(R.string.pattern_undo)
+
+    LaunchedEffect(viewModel, dismissedMessage, snoozedMessage, resolvedMessage, undoLabel) {
         viewModel.events.collect { event ->
+            val message = when (event.action) {
+                PatternAction.DISMISSED -> dismissedMessage
+                PatternAction.SNOOZED -> snoozedMessage
+                PatternAction.MARKED_RESOLVED -> resolvedMessage
+            }
             // Long ≈ 10s — Story 3.8 wants the undo affordance alive for ≥5s.
             val result = snackbarHostState.showSnackbar(
-                message = actionSnackbarMessage(event.action),
-                actionLabel = undoLabelFor(event.undo),
+                message = message,
+                actionLabel = if (event.undo != null) undoLabel else null,
                 duration = SnackbarDuration.Long,
             )
             if (result == SnackbarResult.ActionPerformed && event.undo != null) {
@@ -76,7 +89,7 @@ fun PatternsListScreen(
 
     Scaffold(
         modifier = modifier,
-        topBar = { TopAppBar(title = { Text("Patterns") }) },
+        topBar = { TopAppBar(title = { Text(stringResource(R.string.patterns_title)) }) },
         snackbarHost = { SnackbarHost(snackbarHostState) },
     ) { padding ->
         PatternsListBody(
@@ -135,8 +148,10 @@ private fun PatternsListBody(
 
 @Composable
 private fun SectionHeader(section: PatternSection) {
+    // String resources already carry the uppercase form, removing the Turkish-i locale risk
+    // that bit us when we called `uppercase()` at the call site.
     Text(
-        text = section.headerLabel.uppercase(),
+        text = stringResource(sectionHeaderRes(section)),
         style = MaterialTheme.typography.labelSmall,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
         modifier = Modifier.padding(top = 4.dp, bottom = 4.dp),
@@ -147,7 +162,7 @@ private fun SectionHeader(section: PatternSection) {
 private fun EmptyState(reason: PatternsListUiState.EmptyReason, modifier: Modifier = Modifier) {
     Box(modifier = modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         Text(
-            text = emptyStateCopy(reason),
+            text = stringResource(emptyStateCopyRes(reason)),
             style = MaterialTheme.typography.bodyLarge,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -155,6 +170,7 @@ private fun EmptyState(reason: PatternsListUiState.EmptyReason, modifier: Modifi
 }
 
 @Composable
+@Suppress("LongMethod") // Compose layout cluster; the call-site clarity wins over splitting.
 private fun PatternCard(
     card: PatternCardUi,
     onClick: () -> Unit,
@@ -174,12 +190,13 @@ private fun PatternCard(
         shape = RoundedCornerShape(12.dp),
     ) {
         Row(modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min)) {
-            // Rule must stretch the full card height so observation wrapping doesn't strand it.
+            // Active patterns get the purple accent rule per design-guidelines.md §"Pattern card";
+            // snoozed/resolved/dismissed cards drop it so the section becomes the visual cue.
             Box(
                 modifier = Modifier
                     .width(3.dp)
                     .fillMaxHeight()
-                    .background(PatternAccent),
+                    .background(if (card.section == PatternSection.ACTIVE) PatternAccent else Color.Transparent),
             )
             Column(
                 modifier = Modifier
@@ -203,8 +220,12 @@ private fun PatternCard(
                 )
                 Spacer(modifier = Modifier.height(2.dp))
                 Text(
-                    text = "${card.supportingCount} of ${card.totalEntryCount} entries · " +
-                        "Last seen ${card.lastSeenLabel}",
+                    text = stringResource(
+                        R.string.pattern_card_meta,
+                        card.supportingCount,
+                        card.totalEntryCount,
+                        card.lastSeenLabel,
+                    ),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -228,17 +249,18 @@ private fun OverflowMenu(
 ) {
     if (availableActions.isEmpty()) return
     var expanded by remember { mutableStateOf(false) }
+    val overflowDescription = stringResource(R.string.pattern_actions_overflow_description)
     Box {
         IconButton(
             onClick = { expanded = true },
-            modifier = Modifier.semantics { contentDescription = "Pattern actions" },
+            modifier = Modifier.semantics { contentDescription = overflowDescription },
         ) {
-            Text(text = "⋮", style = MaterialTheme.typography.titleLarge)
+            Text(text = stringResource(R.string.pattern_overflow_glyph), style = MaterialTheme.typography.titleLarge)
         }
         DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
             if (PatternAction.DISMISSED in availableActions) {
                 DropdownMenuItem(
-                    text = { Text("Dismiss") },
+                    text = { Text(stringResource(R.string.pattern_action_dismiss)) },
                     onClick = {
                         expanded = false
                         onDismiss()
@@ -247,7 +269,7 @@ private fun OverflowMenu(
             }
             if (PatternAction.SNOOZED in availableActions) {
                 DropdownMenuItem(
-                    text = { Text("Snooze 7 days") },
+                    text = { Text(stringResource(R.string.pattern_action_snooze_7_days)) },
                     onClick = {
                         expanded = false
                         onSnooze()
@@ -256,7 +278,7 @@ private fun OverflowMenu(
             }
             if (PatternAction.MARKED_RESOLVED in availableActions) {
                 DropdownMenuItem(
-                    text = { Text("Mark resolved") },
+                    text = { Text(stringResource(R.string.pattern_action_mark_resolved)) },
                     onClick = {
                         expanded = false
                         onMarkResolved()

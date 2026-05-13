@@ -123,7 +123,10 @@ class PatternDetailViewModelTest {
             val loaded = expectMostRecentItem() as PatternDetailUiState.Loaded
             assertTrue(loaded.isTerminal)
             assertNotNull(loaded.terminalLabel)
-            assertTrue(loaded.terminalLabel!!.startsWith("Marked resolved"))
+            assertEquals(
+                dev.anchildress1.vestige.R.string.pattern_terminal_resolved,
+                loaded.terminalLabel!!.prefixRes,
+            )
         }
         assertEquals(PatternState.RESOLVED, patternStore.findByPatternId("p-resolve")?.state)
     }
@@ -153,7 +156,10 @@ class PatternDetailViewModelTest {
         vm.state.test {
             val loaded = expectMostRecentItem() as PatternDetailUiState.Loaded
             assertTrue(loaded.isTerminal)
-            assertTrue(loaded.terminalLabel!!.startsWith("Dismissed"))
+            assertEquals(
+                dev.anchildress1.vestige.R.string.pattern_terminal_dismissed,
+                loaded.terminalLabel!!.prefixRes,
+            )
         }
         assertEquals(PatternState.DISMISSED, patternStore.findByPatternId("p-dismiss")?.state)
     }

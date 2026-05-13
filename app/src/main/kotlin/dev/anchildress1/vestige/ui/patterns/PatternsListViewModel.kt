@@ -1,5 +1,6 @@
 package dev.anchildress1.vestige.ui.patterns
 
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dev.anchildress1.vestige.storage.EntryStore
@@ -84,16 +85,28 @@ class PatternsListViewModel(
     fun undo(undo: PatternUndo) {
         viewModelScope.launch {
             withContext(ioDispatcher) {
-                when (undo.action) {
-                    PatternAction.DISMISSED -> patternRepo.dismiss(undo.patternId, undo = true)
-                    PatternAction.SNOOZED -> patternRepo.snooze(undo.patternId, undo = true)
-                    PatternAction.MARKED_RESOLVED -> Unit
+                runCatching {
+                    when (undo.action) {
+                        PatternAction.DISMISSED -> patternRepo.dismiss(undo.patternId, undo = true)
+                        PatternAction.SNOOZED -> patternRepo.snooze(undo.patternId, undo = true)
+                        PatternAction.MARKED_RESOLVED -> Unit
+                    }
+                }.onFailure { failure ->
+                    // A stale undo (e.g. snooze→dismiss→tap-undo on the older snooze snackbar)
+                    // routes a SNOOZED→ACTIVE transition through a row already in DISMISSED.
+                    // PatternRepo/PatternStore throw on illegal lifecycle moves per ADR-003;
+                    // ignore the throw so the UI doesn't crash, and the refresh below replays
+                    // the persisted state back onto the list.
+                    Log.w(TAG, "Ignoring stale undo for ${undo.patternId}", failure)
                 }
             }
             _state.value = loadState()
         }
     }
 
+    @Suppress("kotlin:S6311") // The `mutate` lambdas are non-suspending repo calls; `withContext`
+    // is what moves them off the main thread for ObjectBox I/O. Sonar's S6311 sees the suspend
+    // signature on the lambda and assumes the dispatcher is redundant; that's a shallow read.
     private fun dispatch(patternId: String, action: PatternAction, mutate: suspend () -> Unit) {
         viewModelScope.launch {
             withContext(ioDispatcher) { mutate() }
@@ -118,5 +131,9 @@ class PatternsListViewModel(
             traceHits = traceBarHitsFromEntries(supportingEntries.toList(), asOfMs),
             availableActions = availableActionsFor(state),
         )
+    }
+
+    private companion object {
+        const val TAG = "PatternsListVM"
     }
 }

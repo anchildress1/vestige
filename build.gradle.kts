@@ -54,6 +54,9 @@ kover {
                         "dev.anchildress1.vestige.ui.patterns.EntryDetailPlaceholderScreenKt",
                         "dev.anchildress1.vestige.ui.patterns.EntryDetailPlaceholderScreenKt*",
                         "dev.anchildress1.vestige.ui.patterns.*EntryDetailPlaceholderScreenKt*",
+                        "dev.anchildress1.vestige.ui.patterns.TraceBarKt",
+                        "dev.anchildress1.vestige.ui.patterns.TraceBarKt*",
+                        "dev.anchildress1.vestige.ui.patterns.*TraceBarKt*",
                         // Debug-only fixture seeder for on-device manual verification.
                         // FLAG_DEBUGGABLE-gated at the call site; not on any release path.
                         "dev.anchildress1.vestige.debug.*",

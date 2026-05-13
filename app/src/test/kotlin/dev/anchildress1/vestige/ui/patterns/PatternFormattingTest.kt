@@ -95,64 +95,82 @@ class PatternFormattingTest {
 
     // endregion
 
-    // region actionSnackbarMessage
+    // region actionSnackbarMessageRes
 
     @Test
-    fun `actionSnackbarMessage maps DISMISSED to past-tense one-liner`() {
-        assertEquals("Dismissed.", actionSnackbarMessage(PatternAction.DISMISSED))
+    fun `actionSnackbarMessageRes maps DISMISSED to the dismissed snackbar resource`() {
+        assertEquals(
+            dev.anchildress1.vestige.R.string.snackbar_dismissed,
+            actionSnackbarMessageRes(PatternAction.DISMISSED),
+        )
     }
 
     @Test
-    fun `actionSnackbarMessage maps SNOOZED to the 7-day copy`() {
-        assertEquals("Snoozed 7 days.", actionSnackbarMessage(PatternAction.SNOOZED))
+    fun `actionSnackbarMessageRes maps SNOOZED to the 7-day snackbar resource`() {
+        assertEquals(
+            dev.anchildress1.vestige.R.string.snackbar_snoozed_7_days,
+            actionSnackbarMessageRes(PatternAction.SNOOZED),
+        )
     }
 
     @Test
-    fun `actionSnackbarMessage maps MARKED_RESOLVED to past-tense one-liner`() {
-        assertEquals("Marked resolved.", actionSnackbarMessage(PatternAction.MARKED_RESOLVED))
+    fun `actionSnackbarMessageRes maps MARKED_RESOLVED to the resolved snackbar resource`() {
+        assertEquals(
+            dev.anchildress1.vestige.R.string.snackbar_marked_resolved,
+            actionSnackbarMessageRes(PatternAction.MARKED_RESOLVED),
+        )
     }
 
     @Test
-    fun `actionSnackbarMessage covers every PatternAction variant`() {
+    fun `actionSnackbarMessageRes covers every PatternAction variant`() {
         // Guards silent enum extension — the day someone adds a new action, this test fails
         // until the mapping is updated.
         PatternAction.entries.forEach { action ->
-            assertNotNull(actionSnackbarMessage(action), "no snackbar copy for $action")
+            actionSnackbarMessageRes(action)
         }
     }
 
     // endregion
 
-    // region undoLabelFor
+    // region undoLabelResFor
 
     @Test
-    fun `undoLabelFor returns Undo when the undo payload is present`() {
-        assertEquals("Undo", undoLabelFor(PatternUndo("any-id", PatternAction.DISMISSED)))
+    fun `undoLabelResFor returns the Undo resource when the undo payload is present`() {
+        assertEquals(
+            dev.anchildress1.vestige.R.string.pattern_undo,
+            undoLabelResFor(PatternUndo("any-id", PatternAction.DISMISSED)),
+        )
     }
 
     @Test
-    fun `undoLabelFor returns null when the action is terminal`() {
-        assertNull(undoLabelFor(null))
+    fun `undoLabelResFor returns null when the action is terminal`() {
+        assertNull(undoLabelResFor(null))
     }
 
     // endregion
 
-    // region emptyStateCopy
+    // region emptyStateCopyRes
 
     @Test
-    fun `emptyStateCopy NO_ENTRIES maps to insufficient-data copy`() {
-        assertEquals("Insufficient data.", emptyStateCopy(PatternsListUiState.EmptyReason.NO_ENTRIES))
+    fun `emptyStateCopyRes NO_ENTRIES maps to the insufficient-data resource`() {
+        assertEquals(
+            dev.anchildress1.vestige.R.string.patterns_empty_no_entries,
+            emptyStateCopyRes(PatternsListUiState.EmptyReason.NO_ENTRIES),
+        )
     }
 
     @Test
-    fun `emptyStateCopy NO_PATTERNS maps to nothing-repeating copy`() {
-        assertEquals("Nothing repeating yet.", emptyStateCopy(PatternsListUiState.EmptyReason.NO_PATTERNS))
+    fun `emptyStateCopyRes NO_PATTERNS maps to the nothing-repeating resource`() {
+        assertEquals(
+            dev.anchildress1.vestige.R.string.patterns_empty_no_patterns,
+            emptyStateCopyRes(PatternsListUiState.EmptyReason.NO_PATTERNS),
+        )
     }
 
     @Test
-    fun `emptyStateCopy covers every EmptyReason variant`() {
+    fun `emptyStateCopyRes covers every EmptyReason variant`() {
         PatternsListUiState.EmptyReason.entries.forEach { reason ->
-            assertNotNull(emptyStateCopy(reason), "no empty-state copy for $reason")
+            emptyStateCopyRes(reason)
         }
     }
 
@@ -161,21 +179,19 @@ class PatternFormattingTest {
     // region terminalLabelFor
 
     @Test
-    fun `terminalLabelFor RESOLVED renders the resolution date`() {
+    fun `terminalLabelFor RESOLVED returns the resolved prefix resource and dated label`() {
         val ms = Instant.parse("2026-05-12T12:00:00Z").toEpochMilli()
-        assertEquals(
-            "Marked resolved May 12.",
-            terminalLabelFor(PatternState.RESOLVED, ms, ZoneOffset.UTC),
-        )
+        val label = terminalLabelFor(PatternState.RESOLVED, ms, ZoneOffset.UTC)
+        assertEquals(dev.anchildress1.vestige.R.string.pattern_terminal_resolved, label?.prefixRes)
+        assertEquals("May 12", label?.dateLabel)
     }
 
     @Test
-    fun `terminalLabelFor DISMISSED renders the dismissal date`() {
+    fun `terminalLabelFor DISMISSED returns the dismissed prefix resource and dated label`() {
         val ms = Instant.parse("2026-05-12T12:00:00Z").toEpochMilli()
-        assertEquals(
-            "Dismissed May 12.",
-            terminalLabelFor(PatternState.DISMISSED, ms, ZoneOffset.UTC),
-        )
+        val label = terminalLabelFor(PatternState.DISMISSED, ms, ZoneOffset.UTC)
+        assertEquals(dev.anchildress1.vestige.R.string.pattern_terminal_dismissed, label?.prefixRes)
+        assertEquals("May 12", label?.dateLabel)
     }
 
     @Test

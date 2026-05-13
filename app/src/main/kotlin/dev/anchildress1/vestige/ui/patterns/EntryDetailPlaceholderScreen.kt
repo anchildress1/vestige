@@ -22,23 +22,29 @@ import androidx.compose.ui.unit.dp
 import dev.anchildress1.vestige.R
 import dev.anchildress1.vestige.storage.EntryEntity
 import dev.anchildress1.vestige.storage.EntryStore
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 @OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
+// Single Compose layout function; further splitting churns the diff without clarifying the shape.
+@Suppress("LongMethod")
 @Composable
 fun EntryDetailPlaceholderScreen(
     entryId: Long,
     entryStore: EntryStore,
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
+    // Hoisted so tests / Phase 4 nav can inject a deterministic dispatcher; defaults to IO for
+    // the production ObjectBox read.
+    ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) {
     val state by produceState<EntryDetailPlaceholderUiState>(
         initialValue = EntryDetailPlaceholderUiState.Loading,
         key1 = entryId,
         key2 = entryStore,
     ) {
-        value = withContext(Dispatchers.IO) {
+        value = withContext(ioDispatcher) {
             entryStore.readEntry(entryId)?.toUiState() ?: EntryDetailPlaceholderUiState.NotFound
         }
     }
@@ -49,11 +55,15 @@ fun EntryDetailPlaceholderScreen(
             TopAppBar(
                 title = { Text(text = stringResource(id = R.string.entry_detail_placeholder_title)) },
                 navigationIcon = {
+                    val backDescription = stringResource(R.string.pattern_back_description)
                     IconButton(
                         onClick = onBack,
-                        modifier = Modifier.semantics { contentDescription = "Back" },
+                        modifier = Modifier.semantics { contentDescription = backDescription },
                     ) {
-                        Text(text = "←", style = MaterialTheme.typography.titleLarge)
+                        Text(
+                            text = stringResource(R.string.pattern_back_glyph),
+                            style = MaterialTheme.typography.titleLarge,
+                        )
                     }
                 },
             )

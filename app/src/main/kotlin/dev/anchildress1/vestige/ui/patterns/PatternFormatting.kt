@@ -1,5 +1,7 @@
 package dev.anchildress1.vestige.ui.patterns
 
+import androidx.annotation.StringRes
+import dev.anchildress1.vestige.R
 import dev.anchildress1.vestige.model.PatternState
 import java.time.Instant
 import java.time.ZoneId
@@ -21,32 +23,42 @@ fun snippetOf(entryText: String, maxLen: Int = MAX_SNIPPET_LEN): String {
     return "$cut…"
 }
 
-/** Snackbar copy per `ux-copy.md` §"System Messages" mapped from the dispatched action. */
-fun actionSnackbarMessage(action: PatternAction): String = when (action) {
-    PatternAction.DISMISSED -> "Dismissed."
-    PatternAction.SNOOZED -> "Snoozed 7 days."
-    PatternAction.MARKED_RESOLVED -> "Marked resolved."
+/** Snackbar copy string-resource per `ux-copy.md` §"System Messages". UI resolves via `stringResource`. */
+@StringRes
+fun actionSnackbarMessageRes(action: PatternAction): Int = when (action) {
+    PatternAction.DISMISSED -> R.string.snackbar_dismissed
+    PatternAction.SNOOZED -> R.string.snackbar_snoozed_7_days
+    PatternAction.MARKED_RESOLVED -> R.string.snackbar_marked_resolved
 }
 
-/** `null` when the action is terminal (no undo control); `"Undo"` otherwise. */
-fun undoLabelFor(undo: PatternUndo?): String? = if (undo == null) null else "Undo"
+/** `null` when the action is terminal (no undo control); otherwise the `Undo` resource id. */
+@StringRes
+fun undoLabelResFor(undo: PatternUndo?): Int? = if (undo == null) null else R.string.pattern_undo
 
-/** Empty-state copy per `ux-copy.md` §"Pattern List / Empty states". */
-fun emptyStateCopy(reason: PatternsListUiState.EmptyReason): String = when (reason) {
-    PatternsListUiState.EmptyReason.NO_ENTRIES -> "Insufficient data."
-    PatternsListUiState.EmptyReason.NO_PATTERNS -> "Nothing repeating yet."
+/** Empty-state copy resource per `ux-copy.md` §"Pattern List / Empty states". */
+@StringRes
+fun emptyStateCopyRes(reason: PatternsListUiState.EmptyReason): Int = when (reason) {
+    PatternsListUiState.EmptyReason.NO_ENTRIES -> R.string.patterns_empty_no_entries
+    PatternsListUiState.EmptyReason.NO_PATTERNS -> R.string.patterns_empty_no_patterns
 }
 
 /**
- * Terminal-state subline shown on the pattern detail screen. Returns `null` for non-terminal
- * states (the action row renders instead).
+ * Terminal-state subline payload for the pattern detail screen. Returns `null` for non-terminal
+ * states (the action row renders instead). UI composes the final string with
+ * `stringResource(prefixRes, dateLabel)`.
  */
-fun terminalLabelFor(state: PatternState, stateChangedMs: Long, zone: ZoneId = ZoneId.systemDefault()): String? =
-    when (state) {
-        PatternState.RESOLVED -> "Marked resolved ${formatShortDate(stateChangedMs, zone)}."
-        PatternState.DISMISSED -> "Dismissed ${formatShortDate(stateChangedMs, zone)}."
-        PatternState.ACTIVE, PatternState.SNOOZED, PatternState.BELOW_THRESHOLD -> null
-    }
+fun terminalLabelFor(
+    state: PatternState,
+    stateChangedMs: Long,
+    zone: ZoneId = ZoneId.systemDefault(),
+): TerminalLabel? = when (state) {
+    PatternState.RESOLVED -> TerminalLabel(R.string.pattern_terminal_resolved, formatShortDate(stateChangedMs, zone))
+    PatternState.DISMISSED -> TerminalLabel(R.string.pattern_terminal_dismissed, formatShortDate(stateChangedMs, zone))
+    PatternState.ACTIVE, PatternState.SNOOZED, PatternState.BELOW_THRESHOLD -> null
+}
+
+/** Format-string id + date payload for the terminal-state subline. */
+data class TerminalLabel(@StringRes val prefixRes: Int, val dateLabel: String)
 
 /** ADR-003 terminals: DISMISSED + RESOLVED. SNOOZED is recoverable; BELOW_THRESHOLD is internal. */
 fun isTerminalState(state: PatternState): Boolean = state == PatternState.DISMISSED || state == PatternState.RESOLVED
@@ -74,6 +86,15 @@ fun sectionFor(state: PatternState): PatternSection? = when (state) {
     PatternState.RESOLVED -> PatternSection.RESOLVED
     PatternState.DISMISSED -> PatternSection.DISMISSED
     PatternState.BELOW_THRESHOLD -> null
+}
+
+/** Section header string resource per `ux-copy.md` §"Pattern List / Section headers". */
+@StringRes
+fun sectionHeaderRes(section: PatternSection): Int = when (section) {
+    PatternSection.ACTIVE -> R.string.patterns_section_active
+    PatternSection.SNOOZED -> R.string.patterns_section_snoozed
+    PatternSection.RESOLVED -> R.string.patterns_section_resolved
+    PatternSection.DISMISSED -> R.string.patterns_section_dismissed
 }
 
 private const val MAX_SNIPPET_LEN = 60

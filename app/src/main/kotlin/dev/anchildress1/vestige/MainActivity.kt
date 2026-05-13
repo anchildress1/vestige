@@ -75,6 +75,7 @@ class MainActivity : ComponentActivity() {
                         Scaffold(
                             modifier = Modifier.fillMaxSize(),
                             containerColor = androidx.compose.ui.graphics.Color.Transparent,
+                            contentColor = dev.anchildress1.vestige.ui.theme.Ink,
                         ) { padding ->
                             PhaseOneShell(
                                 onOpenPatterns = { showPatterns = true },

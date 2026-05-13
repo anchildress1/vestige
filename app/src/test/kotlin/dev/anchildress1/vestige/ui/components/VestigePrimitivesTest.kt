@@ -1,8 +1,10 @@
 package dev.anchildress1.vestige.ui.components
 
 import androidx.compose.foundation.layout.size
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.Text
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
@@ -21,7 +23,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [34], manifest = Config.NONE)
+@Config(sdk = [34], manifest = Config.NONE, application = android.app.Application::class)
 class VestigePrimitivesTest {
 
     @get:Rule
@@ -35,6 +37,32 @@ class VestigePrimitivesTest {
             }
         }
         composeRule.onNodeWithText("surface-content").assertIsDisplayed()
+    }
+
+    @Test
+    fun `VestigeSurface provides Ink as the default content color`() {
+        var contentColor: Color? = null
+        composeRule.setContent {
+            VestigeSurface(modifier = Modifier.size(120.dp)) {
+                contentColor = LocalContentColor.current
+                Text(text = "surface-ink")
+            }
+        }
+        composeRule.onNodeWithText("surface-ink").assertIsDisplayed()
+        composeRule.runOnIdle { assertEquals(Ink, contentColor) }
+    }
+
+    @Test
+    fun `VestigeSurface respects an explicit content color override`() {
+        var contentColor: Color? = null
+        composeRule.setContent {
+            VestigeSurface(modifier = Modifier.size(120.dp), contentColor = Dim) {
+                contentColor = LocalContentColor.current
+                Text(text = "surface-dim")
+            }
+        }
+        composeRule.onNodeWithText("surface-dim").assertIsDisplayed()
+        composeRule.runOnIdle { assertEquals(Dim, contentColor) }
     }
 
     @Test

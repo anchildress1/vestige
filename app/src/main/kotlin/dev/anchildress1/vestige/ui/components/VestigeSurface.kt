@@ -9,8 +9,10 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -61,6 +63,8 @@ fun Modifier.tapeGrain(color: Color = TapeGrain): Modifier = drawWithCache {
 
 /**
  * Card primitive per ADR-011: warm-espresso fill, tape-grain overlay, sharp hairline. No noise.
+ * Provides [contentColor] locally so child text stays readable even when ambient containers are
+ * transparent and don't supply a useful foreground.
  */
 @Suppress("LongParameterList") // Primitive API is intentionally explicit at the call site.
 @Composable
@@ -69,6 +73,7 @@ fun VestigeSurface(
     accentModifier: Modifier = Modifier,
     shape: Shape = RadiusTokens.XL,
     fill: Color = S1,
+    contentColor: Color = Ink,
     contentPadding: PaddingValues = PaddingValues(0.dp),
     content: @Composable () -> Unit,
 ) {
@@ -81,7 +86,9 @@ fun VestigeSurface(
             .border(width = SurfaceHairline, color = Hair, shape = shape)
             .padding(contentPadding),
     ) {
-        content()
+        CompositionLocalProvider(LocalContentColor provides contentColor) {
+            content()
+        }
     }
 }
 
@@ -130,6 +137,7 @@ fun VestigeListCard(
         accentModifier = accentModifier,
         shape = shape,
         fill = vestigeListCardFill(onClick),
+        contentColor = Ink,
         contentPadding = contentPadding,
         content = content,
     )

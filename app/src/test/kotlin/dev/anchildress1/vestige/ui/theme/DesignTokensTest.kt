@@ -8,7 +8,9 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
 import org.junit.Test
 
-/** Locks the canonical V palette per poc/design-review.md §2.1. */
+private const val ALPHA_TOLERANCE: Float = 0.005f
+
+/** Locks the canonical V palette per poc/design-review.md §2.1 + poc/tokens.jsx. */
 class DesignTokensTest {
 
     @Test fun `void matches spec`() = assertEquals(Color(0xFF0A0E1A), Void)
@@ -34,6 +36,42 @@ class DesignTokensTest {
     @Test fun `pulse matches spec`() = assertEquals(Color(0xFF38A169), Pulse)
 
     @Test fun `error matches spec`() = assertEquals(Color(0xFFB3261E), ErrorRed)
+
+    @Test fun `faint matches spec`() = assertEquals(Color(0xFF5F6A80), Faint)
+
+    @Test
+    fun `mist alpha rails carry the documented alphas`() {
+        // 0.55 / 0.18 / 0.09 per poc/tokens.jsx, rounded to byte.
+        assertEquals(0.55f, Ghost.alpha, ALPHA_TOLERANCE)
+        assertEquals(0.18f, Hair.alpha, ALPHA_TOLERANCE)
+        assertEquals(0.09f, Hair2.alpha, ALPHA_TOLERANCE)
+        // RGB tracks Mist for every rail.
+        listOf(Ghost, Hair, Hair2).forEach { rail ->
+            assertEquals(Mist.red, rail.red, ALPHA_TOLERANCE)
+            assertEquals(Mist.green, rail.green, ALPHA_TOLERANCE)
+            assertEquals(Mist.blue, rail.blue, ALPHA_TOLERANCE)
+        }
+    }
+
+    @Test
+    fun `glow alpha rails carry the documented alphas`() {
+        assertEquals(0.18f, GlowDim.alpha, ALPHA_TOLERANCE)
+        assertEquals(0.48f, GlowSoft.alpha, ALPHA_TOLERANCE)
+        assertEquals(0.82f, GlowRule.alpha, ALPHA_TOLERANCE)
+    }
+
+    @Test
+    fun `vapor alpha rails carry the documented alphas`() {
+        assertEquals(0.18f, VaporDim.alpha, ALPHA_TOLERANCE)
+        assertEquals(0.48f, VaporSoft.alpha, ALPHA_TOLERANCE)
+        assertEquals(0.82f, VaporRule.alpha, ALPHA_TOLERANCE)
+    }
+
+    @Test
+    fun `pulse and error alpha rails carry the documented alphas`() {
+        assertEquals(0.22f, PulseDim.alpha, ALPHA_TOLERANCE)
+        assertEquals(0.50f, ErrorSoft.alpha, ALPHA_TOLERANCE)
+    }
 
     @Test
     fun `accents are distinct`() {

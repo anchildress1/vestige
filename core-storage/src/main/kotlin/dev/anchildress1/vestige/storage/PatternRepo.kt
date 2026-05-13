@@ -49,12 +49,31 @@ class PatternRepo(private val store: PatternStore, private val clock: Clock = Cl
     }
 
     /**
-     * Sticky per ADR-003 §"Mark-resolved is sticky for the demo." No undo path in v1 — the
-     * ADR is explicit that "reopening is a backlog candidate" and that mark-resolved
-     * "respects user agency … if they kill it, they killed it."
+     * Sticky per ADR-003 §"Mark-resolved is sticky for the demo." User-tap path was retired in
+     * the 2026-05-13 lifecycle update (see `spec-pattern-action-buttons.md`); the method survives
+     * as the system-set entry point for v1.5's `pattern-auto-close` (`backlog.md`).
      */
     fun markResolved(patternId: String) {
         store.transitionState(patternId, PatternState.RESOLVED)
+    }
+
+    /**
+     * Restart — moves a terminal-state pattern (`DISMISSED` / `SNOOZED` / `RESOLVED`) back to
+     * `ACTIVE`. The only legal exit from the sticky terminals other than the snackbar `Undo`;
+     * see `spec-pattern-action-buttons.md` §P0.X — Restart. Undo of a Restart returns the row
+     * to [previousState] via the same `forceTo` bypass.
+     */
+    fun restart(patternId: String, undo: Boolean = false, previousState: PatternState = PatternState.ACTIVE) {
+        if (undo) {
+            forceTo(patternId, previousState, expectedFrom = PatternState.ACTIVE)
+        } else {
+            val current = store.findByPatternId(patternId)
+                ?: error("PatternRepo: no pattern row for patternId=$patternId")
+            require(current.state != PatternState.ACTIVE && current.state != PatternState.BELOW_THRESHOLD) {
+                "PatternRepo.restart requires a terminal state, found ${current.state}"
+            }
+            forceTo(patternId, PatternState.ACTIVE, expectedFrom = current.state)
+        }
     }
 
     /**

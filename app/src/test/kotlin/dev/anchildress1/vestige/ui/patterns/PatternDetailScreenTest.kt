@@ -104,13 +104,16 @@ class PatternDetailScreenTest {
         composeRule.onNodeWithText("Fourth entry mentions Tuesday meetings.").assertIsDisplayed()
         // Action row + sources live below the new card stack; scrolling brings them into view.
         composeRule.onNodeWithText("crashed after standup").performScrollTo().assertIsDisplayed()
+        // Active patterns expose user actions Drop + Skip only; Restart belongs to terminal patterns.
         composeRule.onNodeWithText("Drop").performScrollTo().assertIsDisplayed()
         composeRule.onNodeWithText("Skip").performScrollTo().assertIsDisplayed()
-        composeRule.onNodeWithText("Mark resolved").performScrollTo().assertIsDisplayed()
+        composeRule.onAllNodesWithText("Mark resolved").assertCountEquals(0)
+        composeRule.onAllNodesWithText("Done").assertCountEquals(0)
+        composeRule.onAllNodesWithText("Restart").assertCountEquals(0)
     }
 
     @Test
-    fun `terminal state hides the action row and surfaces the terminal label`() {
+    fun `terminal dismissed pattern surfaces the terminal label and Restart action`() {
         val supporting = listOf(seedEntry("crashed"))
         seedActivePattern("p-terminal", "Tuesday Meetings", "Aftermath", "Callout.", supporting)
         patternRepo.dismiss("p-terminal")
@@ -123,10 +126,11 @@ class PatternDetailScreenTest {
         composeRule.onAllNodesWithText("Drop").assertCountEquals(0)
         composeRule.onAllNodesWithText("Skip").assertCountEquals(0)
         composeRule.onAllNodesWithText("Mark resolved").assertCountEquals(0)
+        composeRule.onNodeWithText("Restart").performScrollTo().assertIsDisplayed()
     }
 
     @Test
-    fun `snoozed detail only exposes dismiss`() {
+    fun `snoozed detail only exposes Restart`() {
         val supporting = listOf(seedEntry("crashed"))
         seedActivePattern("p-snoozed-detail", "Tuesday Meetings", "Aftermath", "Callout.", supporting)
         patternRepo.snooze("p-snoozed-detail")
@@ -135,26 +139,26 @@ class PatternDetailScreenTest {
             PatternDetailScreen(viewModel = newViewModel("p-snoozed-detail"), onBack = {})
         }
 
-        composeRule.onNodeWithText("Drop").performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithText("Restart").performScrollTo().assertIsDisplayed()
+        composeRule.onAllNodesWithText("Drop").assertCountEquals(0)
         composeRule.onAllNodesWithText("Skip").assertCountEquals(0)
         composeRule.onAllNodesWithText("Mark resolved").assertCountEquals(0)
     }
 
     @Test
-    fun `Mark resolved button transitions pattern to RESOLVED and renders terminal label`() {
+    fun `Restart button on a dismissed pattern transitions it back to ACTIVE`() {
         val supporting = listOf(seedEntry("crashed"))
-        seedActivePattern("p-resolve-click", "Tuesday Meetings", "Aftermath", "Callout.", supporting)
+        seedActivePattern("p-restart-click", "Tuesday Meetings", "Aftermath", "Callout.", supporting)
+        patternRepo.dismiss("p-restart-click")
 
         composeRule.setContent {
-            PatternDetailScreen(viewModel = newViewModel("p-resolve-click"), onBack = {})
+            PatternDetailScreen(viewModel = newViewModel("p-restart-click"), onBack = {})
         }
 
-        composeRule.onNodeWithText("Mark resolved").performScrollTo().performClick()
+        composeRule.onNodeWithText("Restart").performScrollTo().performClick()
         composeRule.waitForIdle()
 
-        assertEquals(PatternState.RESOLVED, patternStore.findByPatternId("p-resolve-click")?.state)
-        // Action row is gone post-terminal — the only `Mark resolved` node was the button.
-        composeRule.onAllNodesWithText("Mark resolved").assertCountEquals(0)
+        assertEquals(PatternState.ACTIVE, patternStore.findByPatternId("p-restart-click")?.state)
     }
 
     @Test

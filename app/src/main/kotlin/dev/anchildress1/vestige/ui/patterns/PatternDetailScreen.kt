@@ -46,6 +46,7 @@ import dev.anchildress1.vestige.ui.theme.TealDim
 
 @OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
+@Suppress("LongMethod") // Compose layout cluster; splitting hurts call-site readability.
 fun PatternDetailScreen(
     viewModel: PatternDetailViewModel,
     onBack: () -> Unit,
@@ -58,14 +59,16 @@ fun PatternDetailScreen(
     val dismissedMessage = stringResource(R.string.snackbar_dismissed)
     val snoozedMessage = stringResource(R.string.snackbar_snoozed_7_days)
     val resolvedMessage = stringResource(R.string.snackbar_marked_resolved)
+    val restartMessage = stringResource(R.string.snackbar_pattern_back)
     val undoLabel = stringResource(R.string.pattern_undo)
 
-    LaunchedEffect(viewModel, dismissedMessage, snoozedMessage, resolvedMessage, undoLabel) {
+    LaunchedEffect(viewModel, dismissedMessage, snoozedMessage, resolvedMessage, restartMessage, undoLabel) {
         viewModel.events.collect { event ->
             val message = when (event.action) {
                 PatternAction.DISMISSED -> dismissedMessage
                 PatternAction.SNOOZED -> snoozedMessage
                 PatternAction.MARKED_RESOLVED -> resolvedMessage
+                PatternAction.RESTART -> restartMessage
             }
             val result = snackbarHostState.showSnackbar(
                 message = message,
@@ -109,6 +112,7 @@ fun PatternDetailScreen(
                 onDismiss = { viewModel.dismiss() },
                 onSnooze = { viewModel.snooze() },
                 onMarkResolved = { viewModel.markResolved() },
+                onRestart = { viewModel.restart() },
             ),
         )
     }
@@ -336,6 +340,15 @@ private fun ActionRow(availableActions: Set<PatternAction>, actions: PatternActi
                 contentPadding = padding,
             ) {
                 ActionButtonLabel(stringResource(R.string.pattern_action_mark_resolved))
+            }
+        }
+        if (PatternAction.RESTART in availableActions) {
+            OutlinedButton(
+                onClick = { actions.onRestart(Unit) },
+                modifier = Modifier.weight(1f),
+                contentPadding = padding,
+            ) {
+                ActionButtonLabel(stringResource(R.string.pattern_action_restart))
             }
         }
     }

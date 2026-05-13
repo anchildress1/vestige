@@ -166,7 +166,7 @@ class PatternsListScreenTest {
     }
 
     @Test
-    fun `snoozed cards only expose dismiss in overflow menu`() {
+    fun `snoozed cards only expose Restart in overflow menu`() {
         val supporting = listOf(seedEntry("crashed", ExtractionStatus.COMPLETED))
         seedActivePattern("p-snoozed", "Tuesday Meetings", "Aftermath", "Callout.", supporting)
         patternRepo.snooze("p-snoozed")
@@ -174,20 +174,37 @@ class PatternsListScreenTest {
         composeRule.setContent { PatternsListScreen(viewModel = newViewModel(), onOpenPattern = {}) }
 
         composeRule.onNodeWithContentDescription("Pattern actions").performClick()
-        composeRule.onNodeWithText("Drop").assertIsDisplayed()
+        composeRule.onNodeWithText("Restart").assertIsDisplayed()
+        composeRule.onAllNodesWithText("Drop").assertCountEquals(0)
         composeRule.onAllNodesWithText("Skip").assertCountEquals(0)
         composeRule.onAllNodesWithText("Mark resolved").assertCountEquals(0)
     }
 
     @Test
-    fun `dismissed cards do not render an overflow menu`() {
+    fun `dismissed cards expose Restart in overflow menu`() {
         val supporting = listOf(seedEntry("crashed", ExtractionStatus.COMPLETED))
         seedActivePattern("p-dismissed", "Tuesday Meetings", "Aftermath", "Callout.", supporting)
         patternRepo.dismiss("p-dismissed")
 
         composeRule.setContent { PatternsListScreen(viewModel = newViewModel(), onOpenPattern = {}) }
 
-        composeRule.onAllNodesWithContentDescription("Pattern actions").assertCountEquals(0)
+        composeRule.onNodeWithContentDescription("Pattern actions").performClick()
+        composeRule.onNodeWithText("Restart").assertIsDisplayed()
+    }
+
+    @Test
+    fun `Restart from a dropped card transitions pattern back to ACTIVE`() {
+        val supporting = listOf(seedEntry("crashed", ExtractionStatus.COMPLETED))
+        seedActivePattern("p-restart-list", "Tuesday Meetings", "Aftermath", "Callout.", supporting)
+        patternRepo.dismiss("p-restart-list")
+
+        composeRule.setContent { PatternsListScreen(viewModel = newViewModel(), onOpenPattern = {}) }
+
+        composeRule.onNodeWithContentDescription("Pattern actions").performClick()
+        composeRule.onNodeWithText("Restart").performClick()
+        composeRule.waitForIdle()
+
+        assertEquals(PatternState.ACTIVE, patternStore.findByPatternId("p-restart-list")?.state)
     }
 
     private fun newViewModel() = PatternsListViewModel(

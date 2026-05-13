@@ -66,7 +66,13 @@ sealed interface PatternDetailUiState {
     ) : PatternDetailUiState
 }
 
-enum class PatternAction { DISMISSED, SNOOZED, MARKED_RESOLVED }
+/**
+ * MARKED_RESOLVED is system-only in v1 — never reachable from a user tap per
+ * `spec-pattern-action-buttons.md`. It survives in the enum because v1.5's
+ * `pattern-auto-close` (`backlog.md`) sets the same state. v1 user actions are
+ * DISMISSED (`Drop`), SNOOZED (`Skip`), and RESTART (`Restart`).
+ */
+enum class PatternAction { DISMISSED, SNOOZED, MARKED_RESOLVED, RESTART }
 
 /** One-shot snackbar payload shared by the list and detail surfaces. */
 data class PatternActionEvent(val patternId: String, val action: PatternAction, val undo: PatternUndo?)
@@ -76,7 +82,12 @@ data class PatternActionCallbacks<T>(
     val onDismiss: (T) -> Unit,
     val onSnooze: (T) -> Unit,
     val onMarkResolved: (T) -> Unit,
+    val onRestart: (T) -> Unit = {},
 )
 
-/** Inverse-action payload the snackbar reissues if the user taps `Undo` while it's alive. */
-data class PatternUndo(val patternId: String, val action: PatternAction)
+/**
+ * Inverse-action payload the snackbar reissues if the user taps `Undo` while it's alive.
+ * [previousState] is non-null only for RESTART so the undo path knows which terminal state to
+ * return to.
+ */
+data class PatternUndo(val patternId: String, val action: PatternAction, val previousState: PatternState? = null)

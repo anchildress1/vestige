@@ -99,11 +99,7 @@ class PatternDetailViewModelTest {
             assertFalse(loaded.isTerminal)
             assertNull(loaded.terminalLabel)
             assertEquals(
-                setOf(
-                    PatternAction.DISMISSED,
-                    PatternAction.SNOOZED,
-                    PatternAction.MARKED_RESOLVED,
-                ),
+                setOf(PatternAction.DISMISSED, PatternAction.SNOOZED),
                 loaded.availableActions,
             )
         }
@@ -216,7 +212,7 @@ class PatternDetailViewModelTest {
             assertEquals(PatternState.SNOOZED, loaded.state)
             assertEquals(false, loaded.isTerminal)
             assertEquals(null, loaded.terminalLabel)
-            assertEquals(setOf(PatternAction.DISMISSED), loaded.availableActions)
+            assertEquals(setOf(PatternAction.RESTART), loaded.availableActions)
         }
         assertEquals(PatternState.SNOOZED, patternStore.findByPatternId("p-snooze")?.state)
     }

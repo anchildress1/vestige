@@ -69,14 +69,16 @@ fun PatternsListScreen(
     val dismissedMessage = stringResource(R.string.snackbar_dismissed)
     val snoozedMessage = stringResource(R.string.snackbar_snoozed_7_days)
     val resolvedMessage = stringResource(R.string.snackbar_marked_resolved)
+    val restartMessage = stringResource(R.string.snackbar_pattern_back)
     val undoLabel = stringResource(R.string.pattern_undo)
 
-    LaunchedEffect(viewModel, dismissedMessage, snoozedMessage, resolvedMessage, undoLabel) {
+    LaunchedEffect(viewModel, dismissedMessage, snoozedMessage, resolvedMessage, restartMessage, undoLabel) {
         viewModel.events.collect { event ->
             val message = when (event.action) {
                 PatternAction.DISMISSED -> dismissedMessage
                 PatternAction.SNOOZED -> snoozedMessage
                 PatternAction.MARKED_RESOLVED -> resolvedMessage
+                PatternAction.RESTART -> restartMessage
             }
             // Long ≈ 10s — Story 3.8 wants the undo affordance alive for ≥5s.
             val result = snackbarHostState.showSnackbar(
@@ -107,6 +109,7 @@ fun PatternsListScreen(
                 onDismiss = viewModel::dismiss,
                 onSnooze = viewModel::snooze,
                 onMarkResolved = viewModel::markResolved,
+                onRestart = viewModel::restart,
             ),
         )
     }
@@ -146,6 +149,7 @@ private fun PatternsListBody(
                         onDismiss = { actions.onDismiss(card.patternId) },
                         onSnooze = { actions.onSnooze(card.patternId) },
                         onMarkResolved = { actions.onMarkResolved(card.patternId) },
+                        onRestart = { actions.onRestart(card.patternId) },
                     )
                 }
             }
@@ -177,13 +181,14 @@ private fun EmptyState(reason: PatternsListUiState.EmptyReason, modifier: Modifi
 }
 
 @Composable
-@Suppress("LongMethod") // Compose layout cluster; the call-site clarity wins over splitting.
+@Suppress("LongMethod", "LongParameterList") // Compose layout cluster; call-site clarity wins.
 private fun PatternCard(
     card: PatternCardUi,
     onClick: () -> Unit,
     onDismiss: () -> Unit,
     onSnooze: () -> Unit,
     onMarkResolved: () -> Unit,
+    onRestart: () -> Unit,
 ) {
     VestigeListCard(
         modifier = Modifier
@@ -240,6 +245,7 @@ private fun PatternCard(
                 onDismiss = onDismiss,
                 onSnooze = onSnooze,
                 onMarkResolved = onMarkResolved,
+                onRestart = onRestart,
             )
         }
     }
@@ -265,11 +271,13 @@ internal fun patternCardTraceBarStyleFor(section: PatternSection): PatternIntens
 }
 
 @Composable
+@Suppress("LongParameterList") // primitive UI dispatch — one callback per action.
 private fun OverflowMenu(
     availableActions: Set<PatternAction>,
     onDismiss: () -> Unit,
     onSnooze: () -> Unit,
     onMarkResolved: () -> Unit,
+    onRestart: () -> Unit,
 ) {
     if (availableActions.isEmpty()) return
     var expanded by remember { mutableStateOf(false) }
@@ -309,6 +317,15 @@ private fun OverflowMenu(
                     },
                 )
             }
+            if (PatternAction.RESTART in availableActions) {
+                DropdownMenuItem(
+                    text = { Text(stringResource(R.string.pattern_action_restart)) },
+                    onClick = {
+                        expanded = false
+                        onRestart()
+                    },
+                )
+            }
         }
     }
 }
@@ -340,7 +357,7 @@ private fun PatternsListPreview() {
             ),
             padding = PaddingValues(0.dp),
             onCardClick = {},
-            actions = PatternActionCallbacks(onDismiss = {}, onSnooze = {}, onMarkResolved = {}),
+            actions = PatternActionCallbacks(onDismiss = {}, onSnooze = {}, onMarkResolved = {}, onRestart = {}),
         )
     }
 }

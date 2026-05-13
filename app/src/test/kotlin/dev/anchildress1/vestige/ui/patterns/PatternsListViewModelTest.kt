@@ -117,11 +117,7 @@ class PatternsListViewModelTest {
             assertEquals(2, loaded.cards.first().supportingCount)
             assertTrue(loaded.cards.all { it.section == PatternSection.ACTIVE })
             assertEquals(
-                setOf(
-                    PatternAction.DISMISSED,
-                    PatternAction.SNOOZED,
-                    PatternAction.MARKED_RESOLVED,
-                ),
+                setOf(PatternAction.DISMISSED, PatternAction.SNOOZED),
                 loaded.cards.first().availableActions,
             )
         }
@@ -143,11 +139,11 @@ class PatternsListViewModelTest {
             assertEquals(listOf("snoozed-one"), bySection[PatternSection.SNOOZED]!!.map { it.patternId })
             assertEquals(listOf("dismissed-one"), bySection[PatternSection.DISMISSED]!!.map { it.patternId })
             assertEquals(
-                setOf(PatternAction.DISMISSED),
+                setOf(PatternAction.RESTART),
                 bySection[PatternSection.SNOOZED]!!.single().availableActions,
             )
             assertEquals(
-                emptySet<PatternAction>(),
+                setOf(PatternAction.RESTART),
                 bySection[PatternSection.DISMISSED]!!.single().availableActions,
             )
         }

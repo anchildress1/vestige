@@ -52,8 +52,8 @@ fun TraceBar(
 
 /** POC token mirror. Kept here so designers tweak in one place rather than per call-site. */
 object TraceBarDefaults {
-    /** `V.glow` from `poc/tokens.jsx` — pattern/identity purple. */
-    val Accent: Color = Color(0xFFA855F7)
+    /** `V.vapor` from `poc/tokens.jsx` — matches the blue lit cells in `poc/screenshots/patterns.png`. */
+    val Accent: Color = Color(0xFF2563EB)
 
     /** `V.hair` — muted divider tone (mist @ 18% opacity over the deep background). */
     val Muted: Color = Color(0x2E7B8497)

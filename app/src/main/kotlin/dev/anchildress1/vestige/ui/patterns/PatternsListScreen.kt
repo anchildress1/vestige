@@ -47,8 +47,13 @@ import dev.anchildress1.vestige.ui.components.VestigeListCard
 import dev.anchildress1.vestige.ui.components.glowLeftRule
 import dev.anchildress1.vestige.ui.theme.VestigeTheme
 
-/** Purple `#A855F7` left-rule per design-guidelines §"Pattern List / Pattern card". */
-private val PatternAccent = Color(0xFFA855F7)
+/**
+ * Blue `#2563EB` (Vapor) — the active-pattern accent in `poc/screenshots/patterns.png`. The
+ * `design-guidelines.md` §"glow = patterns" wording is overruled by the visual reference: lit
+ * TraceBar cells and the active-card rule both read blue, not purple. Glow stays reserved for
+ * the Roast me button (Story 4.14).
+ */
+private val PatternAccent = Color(0xFF2563EB)
 
 @OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable

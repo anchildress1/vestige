@@ -3,24 +3,33 @@ package dev.anchildress1.vestige.ui.theme
 import androidx.compose.material3.Typography
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
-import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
 
-// System fallbacks now; .ttf swap later won't touch call-sites. Spec: poc/design-review.md §2.2 + §8.
+// Type stack per ADR-011 + poc/energy-tokens.jsx.
+// Real .ttf bundling (Anton, Space Grotesk) is a Phase 5 swap if it earns its keep — until then,
+// each family aliases a system fallback. Call sites consume VestigeFonts.Display / Body / Mono so
+// the swap is a one-line change here.
+//
+// Display reads as a condensed sans on system; the real font is Anton (huge condensed numbers).
+// Body reads as the system sans; the real font is Space Grotesk.
+// Mono is JetBrains Mono; system Monospace stays the fallback.
 object VestigeFonts {
+    val Display: FontFamily = FontFamily.SansSerif
     val Body: FontFamily = FontFamily.SansSerif
-    val Display: FontFamily = FontFamily.Serif
     val Mono: FontFamily = FontFamily.Monospace
 }
 
 object VestigeTextStyles {
-    val HDisplay: TextStyle = TextStyle(
+    // DisplayBig — Anton at scale. 56sp default; capture stats and pattern hero numbers
+    // override up to ~96sp inline. Tight letter-spacing for the condensed look.
+    val DisplayBig: TextStyle = TextStyle(
         fontFamily = VestigeFonts.Display,
-        fontStyle = FontStyle.Italic,
-        fontSize = 38.sp,
-        lineHeight = 44.sp,
+        fontWeight = FontWeight.Normal,
+        fontSize = 56.sp,
+        lineHeight = 56.sp,
+        letterSpacing = (-0.01).em,
     )
 
     val H1: TextStyle = TextStyle(
@@ -30,28 +39,33 @@ object VestigeTextStyles {
         lineHeight = 32.sp,
     )
 
+    val H2: TextStyle = TextStyle(
+        fontFamily = VestigeFonts.Body,
+        fontWeight = FontWeight.Medium,
+        fontSize = 22.sp,
+        lineHeight = 28.sp,
+    )
+
     val P: TextStyle = TextStyle(
         fontFamily = VestigeFonts.Body,
         fontWeight = FontWeight.Normal,
         fontSize = 15.sp,
-        lineHeight = 22.sp,
+        lineHeight = 23.sp,
     )
 
     val PersonaLabel: TextStyle = TextStyle(
         fontFamily = VestigeFonts.Mono,
-        fontWeight = FontWeight.Medium,
-        fontSize = 10.sp,
-        letterSpacing = 0.24.em,
-    )
-
-    val Eyebrow: TextStyle = TextStyle(
-        fontFamily = VestigeFonts.Mono,
-        fontWeight = FontWeight.Medium,
+        fontWeight = FontWeight.Bold,
         fontSize = 10.sp,
         letterSpacing = 0.20.em,
     )
 
-    val H2: TextStyle = H1.copy(fontSize = 22.sp, lineHeight = 28.sp)
+    val Eyebrow: TextStyle = TextStyle(
+        fontFamily = VestigeFonts.Mono,
+        fontWeight = FontWeight.SemiBold,
+        fontSize = 10.sp,
+        letterSpacing = 0.18.em,
+    )
 
     val Title: TextStyle = P.copy(fontWeight = FontWeight.Medium, fontSize = 18.sp, lineHeight = 24.sp)
 
@@ -61,9 +75,9 @@ object VestigeTextStyles {
 }
 
 val VestigeTypography: Typography = Typography(
-    displayLarge = VestigeTextStyles.HDisplay,
-    displayMedium = VestigeTextStyles.HDisplay.copy(fontSize = 32.sp, lineHeight = 38.sp),
-    displaySmall = VestigeTextStyles.HDisplay.copy(fontSize = 28.sp, lineHeight = 34.sp),
+    displayLarge = VestigeTextStyles.DisplayBig,
+    displayMedium = VestigeTextStyles.DisplayBig.copy(fontSize = 40.sp, lineHeight = 40.sp),
+    displaySmall = VestigeTextStyles.DisplayBig.copy(fontSize = 28.sp, lineHeight = 30.sp),
     headlineLarge = VestigeTextStyles.H1,
     headlineMedium = VestigeTextStyles.H2,
     headlineSmall = VestigeTextStyles.H2,

@@ -2,7 +2,6 @@ package dev.anchildress1.vestige.ui.theme
 
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontFamily
-import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.unit.dp
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
@@ -10,137 +9,137 @@ import org.junit.Test
 
 private const val ALPHA_TOLERANCE: Float = 0.005f
 
-/** Locks the canonical V palette per poc/design-review.md §2.1 + poc/tokens.jsx. */
+/** Locks the Scoreboard palette + type + radii per ADR-011 + poc/energy-tokens.jsx. */
 class DesignTokensTest {
 
-    @Test fun `void matches spec`() = assertEquals(Color(0xFF0A0E1A), Void)
+    // Surface tokens — oklch values pre-converted to sRGB literals.
+    @Test fun `floor matches spec`() = assertEquals(Color(0xFF0B0604), Floor)
 
-    @Test fun `deep aliases void`() = assertEquals(Void, Deep)
+    @Test fun `deep matches spec`() = assertEquals(Color(0xFF100A06), Deep)
 
-    @Test fun `bg matches spec`() = assertEquals(Color(0xFF0E1124), Bg)
+    @Test fun `s1 matches spec`() = assertEquals(Color(0xFF1A120D), S1)
 
-    @Test fun `s1 matches spec`() = assertEquals(Color(0xFF161A2E), S1)
+    @Test fun `s2 matches spec`() = assertEquals(Color(0xFF261D17), S2)
 
-    @Test fun `s2 matches spec`() = assertEquals(Color(0xFF1E2238), S2)
+    @Test fun `s3 matches spec`() = assertEquals(Color(0xFF362B24), S3)
 
-    @Test fun `s3 matches spec`() = assertEquals(Color(0xFF2A2E48), S3)
+    // Ink levels.
+    @Test fun `ink matches spec`() = assertEquals(Color(0xFFF3EEE3), Ink)
 
-    @Test fun `ink matches spec`() = assertEquals(Color(0xFFE8ECF4), Ink)
+    @Test fun `dim matches spec`() = assertEquals(Color(0xFFA69D91), Dim)
 
-    @Test fun `mist matches spec`() = assertEquals(Color(0xFF7B8497), Mist)
+    @Test fun `faint matches spec`() = assertEquals(Color(0xFF797066), Faint)
 
-    @Test fun `glow matches spec`() = assertEquals(Color(0xFFA855F7), Glow)
+    // Accents.
+    @Test fun `lime matches spec`() = assertEquals(Color(0xFFD8E830), Lime)
 
-    @Test fun `vapor matches spec`() = assertEquals(Color(0xFF2563EB), Vapor)
+    @Test fun `coral matches spec`() = assertEquals(Color(0xFFFF6254), Coral)
 
-    @Test fun `pulse matches spec`() = assertEquals(Color(0xFF38A169), Pulse)
+    @Test fun `teal matches spec`() = assertEquals(Color(0xFF36CCCC), Teal)
 
-    @Test fun `error matches spec`() = assertEquals(Color(0xFFB3261E), ErrorRed)
+    @Test fun `ember matches spec`() = assertEquals(Color(0xFFFFAC41), Ember)
 
-    @Test fun `faint matches spec`() = assertEquals(Color(0xFF5F6A80), Faint)
+    @Test fun `error aliases coral`() = assertEquals(Coral, ErrorRed)
 
     @Test
-    fun `mist alpha rails carry the documented alphas`() {
-        // 0.55 / 0.18 / 0.09 per poc/tokens.jsx, rounded to byte.
-        assertEquals(0.55f, Ghost.alpha, ALPHA_TOLERANCE)
-        assertEquals(0.18f, Hair.alpha, ALPHA_TOLERANCE)
-        assertEquals(0.09f, Hair2.alpha, ALPHA_TOLERANCE)
-        // RGB tracks Mist for every rail.
+    fun `ink alpha rails carry the documented alphas`() {
+        // 0.60 / 0.12 / 0.06 per poc/energy-tokens.jsx, rounded to byte.
+        assertEquals(0.60f, Ghost.alpha, ALPHA_TOLERANCE)
+        assertEquals(0.12f, Hair.alpha, ALPHA_TOLERANCE)
+        assertEquals(0.06f, Hair2.alpha, ALPHA_TOLERANCE)
+        // RGB tracks the Dim hue family for every rail so they read coherent over warm surfaces.
         listOf(Ghost, Hair, Hair2).forEach { rail ->
-            assertEquals(Mist.red, rail.red, ALPHA_TOLERANCE)
-            assertEquals(Mist.green, rail.green, ALPHA_TOLERANCE)
-            assertEquals(Mist.blue, rail.blue, ALPHA_TOLERANCE)
+            assertEquals(0xA7 / 255f, rail.red, ALPHA_TOLERANCE)
+            assertEquals(0x9D / 255f, rail.green, ALPHA_TOLERANCE)
+            assertEquals(0x91 / 255f, rail.blue, ALPHA_TOLERANCE)
         }
     }
 
     @Test
-    fun `glow alpha rails carry the documented alphas`() {
-        assertEquals(0.18f, GlowDim.alpha, ALPHA_TOLERANCE)
-        assertEquals(0.48f, GlowSoft.alpha, ALPHA_TOLERANCE)
-        assertEquals(0.82f, GlowRule.alpha, ALPHA_TOLERANCE)
+    fun `lime alpha rails carry the documented alphas`() {
+        assertEquals(0.20f, LimeDim.alpha, ALPHA_TOLERANCE)
+        assertEquals(0.55f, LimeSoft.alpha, ALPHA_TOLERANCE)
     }
 
     @Test
-    fun `vapor alpha rails carry the documented alphas`() {
-        assertEquals(0.18f, VaporDim.alpha, ALPHA_TOLERANCE)
-        assertEquals(0.48f, VaporSoft.alpha, ALPHA_TOLERANCE)
-        assertEquals(0.82f, VaporRule.alpha, ALPHA_TOLERANCE)
+    fun `coral alpha rails carry the documented alphas`() {
+        assertEquals(0.20f, CoralDim.alpha, ALPHA_TOLERANCE)
+        assertEquals(0.55f, CoralSoft.alpha, ALPHA_TOLERANCE)
     }
 
     @Test
-    fun `pulse and error alpha rails carry the documented alphas`() {
-        assertEquals(0.22f, PulseDim.alpha, ALPHA_TOLERANCE)
-        assertEquals(0.50f, ErrorSoft.alpha, ALPHA_TOLERANCE)
+    fun `teal alpha rail carries the documented alpha`() {
+        assertEquals(0.20f, TealDim.alpha, ALPHA_TOLERANCE)
     }
 
     @Test
     fun `accents are distinct`() {
-        val accents = listOf(Glow, Vapor, Pulse, ErrorRed)
+        val accents = listOf(Lime, Coral, Teal, Ember)
         assertEquals(accents.size, accents.toSet().size)
     }
 
     @Test
     fun `radii match spec`() {
         assertEquals(9999.dp, RadiusTokens.RPill)
-        assertEquals(8.dp, RadiusTokens.RXL)
-        assertEquals(8.dp, RadiusTokens.RL)
-        assertEquals(6.dp, RadiusTokens.RM)
+        assertEquals(18.dp, RadiusTokens.RXL)
+        assertEquals(12.dp, RadiusTokens.RL)
+        assertEquals(8.dp, RadiusTokens.RM)
         assertEquals(4.dp, RadiusTokens.RS)
-        assertEquals(4.dp, RadiusTokens.RXS)
+        assertEquals(2.dp, RadiusTokens.RXS)
     }
 
     @Test
     fun `font families assigned`() {
+        // Display + Body alias the same system family until real .ttf bundling lands in Phase 5.
+        // The split is preserved on the API surface so the swap is a one-line change.
         assertEquals(FontFamily.SansSerif, VestigeFonts.Body)
-        assertEquals(FontFamily.Serif, VestigeFonts.Display)
+        assertEquals(FontFamily.SansSerif, VestigeFonts.Display)
         assertEquals(FontFamily.Monospace, VestigeFonts.Mono)
-        assertNotEquals(VestigeFonts.Body, VestigeFonts.Display)
         assertNotEquals(VestigeFonts.Body, VestigeFonts.Mono)
     }
 
     @Test
-    fun `HDisplay is editorial italic serif at 38sp`() {
-        val style = VestigeTextStyles.HDisplay
+    fun `DisplayBig is condensed display at 56sp`() {
+        val style = VestigeTextStyles.DisplayBig
         assertEquals(VestigeFonts.Display, style.fontFamily)
-        assertEquals(FontStyle.Italic, style.fontStyle)
-        assertEquals(38f, style.fontSize.value)
+        assertEquals(56f, style.fontSize.value)
     }
 
     @Test
-    fun `H1 is body sans 26sp`() {
+    fun `H1 is body 26sp`() {
         val style = VestigeTextStyles.H1
         assertEquals(VestigeFonts.Body, style.fontFamily)
         assertEquals(26f, style.fontSize.value)
     }
 
     @Test
-    fun `H2 is body sans 22sp`() {
+    fun `H2 is body 22sp`() {
         val style = VestigeTextStyles.H2
         assertEquals(VestigeFonts.Body, style.fontFamily)
         assertEquals(22f, style.fontSize.value)
     }
 
     @Test
-    fun `P is body sans 15sp`() {
+    fun `P is body 15sp`() {
         val style = VestigeTextStyles.P
         assertEquals(VestigeFonts.Body, style.fontFamily)
         assertEquals(15f, style.fontSize.value)
     }
 
     @Test
-    fun `PersonaLabel is mono 10sp with 0_24em tracking`() {
+    fun `PersonaLabel is mono 10sp with 0_20em tracking`() {
         val style = VestigeTextStyles.PersonaLabel
         assertEquals(VestigeFonts.Mono, style.fontFamily)
         assertEquals(10f, style.fontSize.value)
-        assertEquals(0.24f, style.letterSpacing.value, 0.0001f)
+        assertEquals(0.20f, style.letterSpacing.value, 0.0001f)
     }
 
     @Test
-    fun `Eyebrow is mono 10sp with 0_20em tracking`() {
+    fun `Eyebrow is mono 10sp with 0_18em tracking`() {
         val style = VestigeTextStyles.Eyebrow
         assertEquals(VestigeFonts.Mono, style.fontFamily)
         assertEquals(10f, style.fontSize.value)
-        assertEquals(0.20f, style.letterSpacing.value, 0.0001f)
+        assertEquals(0.18f, style.letterSpacing.value, 0.0001f)
     }
 
     @Test

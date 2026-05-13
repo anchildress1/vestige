@@ -214,7 +214,7 @@ private fun PatternIntensityCard(traceHits: Set<Int>) {
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            TraceBar(hits = traceHits, height = 28.dp)
+            TraceBarE(hits = traceHits, height = 28.dp)
         }
     }
 }

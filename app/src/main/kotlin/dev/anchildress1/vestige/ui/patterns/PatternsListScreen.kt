@@ -44,17 +44,12 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import dev.anchildress1.vestige.R
 import dev.anchildress1.vestige.ui.components.VestigeListCard
-import dev.anchildress1.vestige.ui.components.glowLeftRule
-import dev.anchildress1.vestige.ui.theme.Vapor
+import dev.anchildress1.vestige.ui.components.limeLeftRuleForActive
+import dev.anchildress1.vestige.ui.theme.Lime
 import dev.anchildress1.vestige.ui.theme.VestigeTheme
 
-/**
- * The active-pattern accent — [Vapor] — matches the blue lit cells in
- * `poc/screenshots/patterns.png`. The `design-guidelines.md` §"glow = patterns" wording is
- * overruled by the visual reference: lit TraceBar cells and the active-card rule both read blue,
- * not purple. Glow stays reserved for the Roast me button (Story 4.14).
- */
-private val PatternAccent: Color = Vapor
+// Active patterns wear the electric-lime signal — matches `poc/Energy Direction.html` patterns frame.
+private val PatternAccent: Color = Lime
 
 @OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
@@ -192,7 +187,7 @@ private fun PatternCard(
             },
         onClick = onClick,
         accentModifier = if (card.section == PatternSection.ACTIVE) {
-            Modifier.glowLeftRule(color = PatternAccent)
+            Modifier.limeLeftRuleForActive(color = PatternAccent)
         } else {
             Modifier
         },
@@ -213,9 +208,10 @@ private fun PatternCard(
                 }
                 Text(text = card.observation, style = MaterialTheme.typography.bodyMedium)
                 Spacer(modifier = Modifier.height(2.dp))
-                TraceBar(
+                TraceBarE(
                     hits = card.traceHits,
-                    accent = if (card.section == PatternSection.ACTIVE) PatternAccent else TraceBarDefaults.Muted,
+                    accent = if (card.section == PatternSection.ACTIVE) PatternAccent else TraceBarDefaults.Rail,
+                    peak = card.section == PatternSection.ACTIVE,
                 )
                 Spacer(modifier = Modifier.height(2.dp))
                 // POC card meta is a single eyebrow line — no "Seen in:" label. (Two-eyebrow

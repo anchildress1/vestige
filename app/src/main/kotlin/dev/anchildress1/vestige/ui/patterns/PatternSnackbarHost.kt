@@ -7,9 +7,8 @@ import androidx.compose.runtime.Composable
 import dev.anchildress1.vestige.ui.theme.Ink
 import dev.anchildress1.vestige.ui.theme.S2
 
-// Glow / Vapor both fail AA on S2 (3.96 / 3.03 vs 4.5 floor). Ink keeps the affordance
-// accessible; M3's intrinsic button styling on the action slot supplies the visual
-// differentiation that the matching color sacrifices.
+// Lime fails AA on S2 contrast; Ink keeps the action accessible. M3's intrinsic action-slot
+// styling supplies the affordance differentiation that matching the surface color sacrifices.
 internal val PatternSnackbarActionColor = Ink
 
 /**

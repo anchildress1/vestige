@@ -9,8 +9,8 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.unit.dp
+import dev.anchildress1.vestige.ui.theme.Dim
 import dev.anchildress1.vestige.ui.theme.Ink
-import dev.anchildress1.vestige.ui.theme.Mist
 import dev.anchildress1.vestige.ui.theme.S1
 import dev.anchildress1.vestige.ui.theme.S2
 import org.junit.Assert.assertEquals
@@ -47,8 +47,8 @@ class VestigePrimitivesTest {
     }
 
     @Test
-    fun `VestigeRow locks label color to Mist and value to Ink`() {
-        assertEquals(Mist, RowLabelColor)
+    fun `VestigeRow locks label color to Dim and value to Ink`() {
+        assertEquals(Dim, RowLabelColor)
         assertEquals(Ink, RowValueColor)
     }
 
@@ -81,36 +81,36 @@ class VestigePrimitivesTest {
     }
 
     @Test
-    fun `glowLeftRule draws against the receiver`() {
+    fun `limeLeftRuleForActive draws against the receiver`() {
         composeRule.setContent {
             VestigeSurface(
                 modifier = Modifier.size(120.dp),
-                accentModifier = Modifier.glowLeftRule(),
+                accentModifier = Modifier.limeLeftRuleForActive(),
             ) {
-                Text(text = "glow-rule")
+                Text(text = "lime-rule")
             }
         }
-        composeRule.onNodeWithText("glow-rule").assertIsDisplayed()
+        composeRule.onNodeWithText("lime-rule").assertIsDisplayed()
     }
 
     @Test
-    fun `glow rule width matches spec`() {
-        assertEquals(3.dp, GlowRuleWidth)
+    fun `rule width matches spec`() {
+        assertEquals(3.dp, RuleWidth)
     }
 
     @Test
-    fun `pulse dot diameter matches spec`() {
-        assertEquals(8.dp, PulseDotDiameter)
+    fun `status dot diameter matches spec`() {
+        assertEquals(8.dp, StatusDotDiameter)
     }
 
-    // vaporHaloOnRecording — pos / neg / err / edge
+    // coralHaloOnRecording — pos / neg / err / edge
 
     @Test
-    fun `vapor halo idles at zero level (neg branch — skips draw)`() {
+    fun `coral halo idles at zero level (neg branch — skips draw)`() {
         composeRule.setContent {
             VestigeSurface(
                 modifier = Modifier.size(120.dp),
-                accentModifier = Modifier.vaporHaloOnRecording(level = 0f),
+                accentModifier = Modifier.coralHaloOnRecording(level = 0f),
             ) {
                 Text(text = "halo-idle")
             }
@@ -119,11 +119,11 @@ class VestigePrimitivesTest {
     }
 
     @Test
-    fun `vapor halo paints at mid level (pos branch — exercises gradient math)`() {
+    fun `coral halo paints at mid level (pos branch — exercises gradient math)`() {
         composeRule.setContent {
             VestigeSurface(
                 modifier = Modifier.size(120.dp),
-                accentModifier = Modifier.vaporHaloOnRecording(level = 0.5f),
+                accentModifier = Modifier.coralHaloOnRecording(level = 0.5f),
             ) {
                 Text(text = "halo-mid")
             }
@@ -132,11 +132,11 @@ class VestigePrimitivesTest {
     }
 
     @Test
-    fun `vapor halo paints at full amp (edge upper bound)`() {
+    fun `coral halo paints at full amp (edge upper bound)`() {
         composeRule.setContent {
             VestigeSurface(
                 modifier = Modifier.size(120.dp),
-                accentModifier = Modifier.vaporHaloOnRecording(level = 1f),
+                accentModifier = Modifier.coralHaloOnRecording(level = 1f),
             ) {
                 Text(text = "halo-full")
             }
@@ -145,11 +145,11 @@ class VestigePrimitivesTest {
     }
 
     @Test
-    fun `vapor halo clamps negative level to idle (err branch)`() {
+    fun `coral halo clamps negative level to idle (err branch)`() {
         composeRule.setContent {
             VestigeSurface(
                 modifier = Modifier.size(120.dp),
-                accentModifier = Modifier.vaporHaloOnRecording(level = -0.5f),
+                accentModifier = Modifier.coralHaloOnRecording(level = -0.5f),
             ) {
                 Text(text = "halo-negative")
             }
@@ -158,11 +158,11 @@ class VestigePrimitivesTest {
     }
 
     @Test
-    fun `vapor halo treats NaN as idle (err branch)`() {
+    fun `coral halo treats NaN as idle (err branch)`() {
         composeRule.setContent {
             VestigeSurface(
                 modifier = Modifier.size(120.dp),
-                accentModifier = Modifier.vaporHaloOnRecording(level = Float.NaN),
+                accentModifier = Modifier.coralHaloOnRecording(level = Float.NaN),
             ) {
                 Text(text = "halo-nan")
             }
@@ -171,11 +171,11 @@ class VestigePrimitivesTest {
     }
 
     @Test
-    fun `vapor halo clamps above 1 (edge upper bound)`() {
+    fun `coral halo clamps above 1 (edge upper bound)`() {
         composeRule.setContent {
             VestigeSurface(
                 modifier = Modifier.size(120.dp),
-                accentModifier = Modifier.vaporHaloOnRecording(level = 99f),
+                accentModifier = Modifier.coralHaloOnRecording(level = 99f),
             ) {
                 Text(text = "halo-clamped")
             }
@@ -184,9 +184,9 @@ class VestigePrimitivesTest {
     }
 
     @Test
-    fun `pulse dot draws halo plus inner and rim circles`() {
+    fun `lime dot draws halo plus inner circle`() {
         composeRule.setContent {
-            VestigeSurface(modifier = Modifier.pulseDotForReady()) {}
+            VestigeSurface(modifier = Modifier.limeDotForReady()) {}
         }
         composeRule.onRoot().assertIsDisplayed()
     }
@@ -202,5 +202,15 @@ class VestigePrimitivesTest {
             }
         }
         composeRule.onNodeWithText("destructive").assertIsDisplayed()
+    }
+
+    @Test
+    fun `tape grain composes`() {
+        composeRule.setContent {
+            VestigeSurface(modifier = Modifier.size(120.dp)) {
+                Text(text = "tape")
+            }
+        }
+        composeRule.onNodeWithText("tape").assertIsDisplayed()
     }
 }

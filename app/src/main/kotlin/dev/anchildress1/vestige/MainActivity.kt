@@ -38,10 +38,9 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import dev.anchildress1.vestige.debug.DebugPatternSeeder
-import dev.anchildress1.vestige.ui.atmosphere.FogDrift
 import dev.anchildress1.vestige.ui.components.VestigeSurface
 import dev.anchildress1.vestige.ui.patterns.PatternsHost
-import dev.anchildress1.vestige.ui.theme.Bg
+import dev.anchildress1.vestige.ui.theme.Floor
 import dev.anchildress1.vestige.ui.theme.VestigeTextStyles
 import dev.anchildress1.vestige.ui.theme.VestigeTheme
 
@@ -52,8 +51,7 @@ class MainActivity : ComponentActivity() {
         val container = (application as VestigeApplication).appContainer
         setContent {
             VestigeTheme {
-                Box(modifier = Modifier.fillMaxSize().background(Bg)) {
-                    FogDrift(modifier = Modifier.fillMaxSize())
+                Box(modifier = Modifier.fillMaxSize().background(Floor)) {
                     var showPatterns by rememberSaveable { mutableStateOf(false) }
                     if (showPatterns) {
                         // Back unwinds patterns→shell; without this the activity exits and the user

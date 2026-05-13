@@ -25,7 +25,7 @@ class VestigeMotionComposeTest {
     @Test
     fun `pulse helper composes`() {
         composeRule.setContent {
-            val fraction by rememberVesPulse(periodMs = 1_400)
+            val fraction by rememberSbPulse(periodMs = VestigeMotion.PULSE_MS)
             Box(modifier = Modifier.size(40.dp)) {
                 Text(text = "p${fraction.coerceIn(0f, 1f) >= 0f}")
             }
@@ -34,9 +34,9 @@ class VestigeMotionComposeTest {
     }
 
     @Test
-    fun `breath helper composes`() {
+    fun `blink helper composes`() {
         composeRule.setContent {
-            val fraction by rememberVesBreath(periodMs = 6_000)
+            val fraction by rememberSbBlink(periodMs = VestigeMotion.BLINK_MS)
             Box(modifier = Modifier.size(40.dp)) {
                 Text(text = "b${fraction.coerceIn(0f, 1f) >= 0f}")
             }
@@ -45,9 +45,20 @@ class VestigeMotionComposeTest {
     }
 
     @Test
-    fun `shimmer helper composes`() {
+    fun `bars helper composes`() {
         composeRule.setContent {
-            val fraction by rememberVesShimmer(periodMs = 1_800)
+            val fraction by rememberSbBars(periodMs = VestigeMotion.BARS_MS)
+            Box(modifier = Modifier.size(40.dp)) {
+                Text(text = "a${fraction.coerceIn(0f, 1f) >= 0f}")
+            }
+        }
+        composeRule.onNodeWithText("atrue").assertIsDisplayed()
+    }
+
+    @Test
+    fun `sweep helper composes`() {
+        composeRule.setContent {
+            val fraction by rememberSbSweep(periodMs = VestigeMotion.SWEEP_MS)
             Box(modifier = Modifier.size(40.dp)) {
                 Text(text = "s${fraction.coerceIn(0f, 1f) >= 0f}")
             }
@@ -56,41 +67,48 @@ class VestigeMotionComposeTest {
     }
 
     @Test
-    fun `spin helper composes`() {
+    fun `wobble helper composes`() {
         composeRule.setContent {
-            val degrees by rememberVesSpin(periodMs = 16_000)
+            val fraction by rememberSbWobble(periodMs = VestigeMotion.WOBBLE_MS)
             Box(modifier = Modifier.size(40.dp)) {
-                Text(text = "rot${degrees >= 0f}")
+                Text(text = "w${fraction in -1f..1f}")
             }
         }
-        composeRule.onNodeWithText("rottrue").assertIsDisplayed()
+        composeRule.onNodeWithText("wtrue").assertIsDisplayed()
     }
 
     @Test(expected = IllegalArgumentException::class)
     fun `pulse rejects zero period`() {
         composeRule.setContent {
-            rememberVesPulse(periodMs = 0)
+            rememberSbPulse(periodMs = 0)
         }
     }
 
     @Test(expected = IllegalArgumentException::class)
-    fun `breath rejects negative period`() {
+    fun `blink rejects negative period`() {
         composeRule.setContent {
-            rememberVesBreath(periodMs = -1)
+            rememberSbBlink(periodMs = -1)
         }
     }
 
     @Test(expected = IllegalArgumentException::class)
-    fun `shimmer rejects zero period`() {
+    fun `bars rejects zero period`() {
         composeRule.setContent {
-            rememberVesShimmer(periodMs = 0)
+            rememberSbBars(periodMs = 0)
         }
     }
 
     @Test(expected = IllegalArgumentException::class)
-    fun `spin rejects negative period`() {
+    fun `sweep rejects negative period`() {
         composeRule.setContent {
-            rememberVesSpin(periodMs = -2)
+            rememberSbSweep(periodMs = -2)
+        }
+    }
+
+    @Test(expected = IllegalArgumentException::class)
+    fun `wobble rejects zero period`() {
+        composeRule.setContent {
+            rememberSbWobble(periodMs = 0)
         }
     }
 }

@@ -194,6 +194,24 @@ class PatternsListViewModelTest {
     }
 
     @Test
+    fun `undo on a stale state logs and refreshes without crashing`() = runTest(testDispatcher) {
+        val entries = seedEntries(1)
+        seedActivePattern("p-stale-list", lastSeenMs = 100L, supporting = entries)
+        val vm = newViewModel()
+        vm.snooze("p-stale-list")
+        assertEquals(PatternState.SNOOZED, patternStore.findByPatternId("p-stale-list")?.state)
+        vm.dismiss("p-stale-list")
+        assertEquals(PatternState.DISMISSED, patternStore.findByPatternId("p-stale-list")?.state)
+        // Snackbar callback fires SNOOZED-undo against a now-DISMISSED row — PatternRepo throws.
+        vm.undo(PatternUndo("p-stale-list", PatternAction.SNOOZED))
+        assertEquals(PatternState.DISMISSED, patternStore.findByPatternId("p-stale-list")?.state)
+        vm.state.test {
+            val loaded = expectMostRecentItem() as PatternsListUiState.Loaded
+            assertTrue(loaded.cards.any { it.patternId == "p-stale-list" && it.section == PatternSection.DISMISSED })
+        }
+    }
+
+    @Test
     fun `undo restores a dismissed pattern back to ACTIVE`() = runTest(testDispatcher) {
         val entries = seedEntries(1)
         seedActivePattern("p3", lastSeenMs = 100L, supporting = entries)

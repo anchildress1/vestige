@@ -132,6 +132,38 @@ class PatternDetailViewModelTest {
     }
 
     @Test
+    fun `undo on MARKED_RESOLVED is a no-op since the state is sticky-terminal`() = runTest(testDispatcher) {
+        val entries = seedEntries(1)
+        seedActivePattern("p-noop-detail", lastSeenMs = 100L, supporting = entries)
+        val vm = newViewModel("p-noop-detail")
+        vm.markResolved()
+        assertEquals(PatternState.RESOLVED, patternStore.findByPatternId("p-noop-detail")?.state)
+        vm.undo(PatternUndo("p-noop-detail", PatternAction.MARKED_RESOLVED))
+        assertEquals(PatternState.RESOLVED, patternStore.findByPatternId("p-noop-detail")?.state)
+    }
+
+    @Test
+    fun `undo on a stale state logs and refreshes without crashing`() = runTest(testDispatcher) {
+        val entries = seedEntries(1)
+        seedActivePattern("p-stale", lastSeenMs = 100L, supporting = entries)
+        val vm = newViewModel("p-stale")
+        // Snooze then dismiss in quick succession — state is now DISMISSED.
+        vm.snooze()
+        assertEquals(PatternState.SNOOZED, patternStore.findByPatternId("p-stale")?.state)
+        vm.dismiss()
+        assertEquals(PatternState.DISMISSED, patternStore.findByPatternId("p-stale")?.state)
+        // Tap-undo on the older SNOOZED snackbar — PatternRepo.snooze(undo=true) requires SNOOZED,
+        // but the row is DISMISSED → throws. runCatching must swallow it.
+        vm.undo(PatternUndo("p-stale", PatternAction.SNOOZED))
+        // State unchanged; VM didn't crash.
+        assertEquals(PatternState.DISMISSED, patternStore.findByPatternId("p-stale")?.state)
+        vm.state.test {
+            val loaded = expectMostRecentItem() as PatternDetailUiState.Loaded
+            assertTrue(loaded.isTerminal)
+        }
+    }
+
+    @Test
     fun `dismiss emits undo event and undo restores ACTIVE state`() = runTest(testDispatcher) {
         val entries = seedEntries(1)
         seedActivePattern("p-dismiss-undo", lastSeenMs = 100L, supporting = entries)

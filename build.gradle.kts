@@ -132,6 +132,16 @@ sonar {
                 "**/MainActivity.kt",
                 "**/LiteRtLmEngine.kt",
                 "**/AudioCapture.kt",
+                // Compose @Composable bodies cap at ~50% branch coverage from `Composer` +
+                // `$changed` plugin instrumentation (kotlinx-kover #756); mirrors the kover
+                // excludes in `kover { reports { total { filters { excludes { classes(...) } } } }`.
+                "**/ui/patterns/PatternsListScreen.kt",
+                "**/ui/patterns/PatternDetailScreen.kt",
+                "**/ui/patterns/PatternsHost.kt",
+                "**/ui/patterns/EntryDetailPlaceholderScreen.kt",
+                "**/ui/patterns/TraceBar.kt",
+                // Debug-only fixture seeder, FLAG_DEBUGGABLE-gated; never on a release path.
+                "**/debug/**",
             ).joinToString(","),
         )
         property("sonar.qualitygate.wait", "true")

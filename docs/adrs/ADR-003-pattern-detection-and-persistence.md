@@ -18,7 +18,7 @@ What is already locked elsewhere (do not change):
 |---|---|
 | Detection runs every 10 entries (hardcoded for v1) | `PRD.md` §P0 Patterns |
 | Pattern threshold = ≥3 supporting entries | `PRD.md` §P0 Capture loop |
-| Pattern actions = `dismiss` / `snooze` / `mark-resolved` (P0) | `PRD.md` §P0 Patterns |
+| User-facing pattern actions = `Drop` / `Skip` on ACTIVE, `Restart` on non-active | `docs/spec-pattern-action-buttons.md` |
 | Snooze duration = 7 days, fixed | `ux-copy.md` §"Locked v1 behavior" |
 | Pattern-callout cooldown = 3 entries (callout only, not detection) | `concept-locked.md` §Analysis |
 | Pattern claims must be sourced (counts, dates, snippets, tags, field evidence) | AGENTS.md guardrail 12 |
@@ -32,14 +32,14 @@ What this ADR closes:
 2. **`pattern_id` generation** — content-addressable hash of which inputs, in what order.
 3. The **matching predicate** — when a new entry "supports" an existing pattern.
 4. The **persisted shape** — ObjectBox `Pattern` entity fields, lifecycle states, transitions.
-5. The **cooldown** semantics — global vs. per-pattern; how callouts interact with snooze/resolve.
+5. The **cooldown** semantics — global vs. per-pattern; how callouts interact with skip/drop/done.
 6. **Re-eval and dismissal interactions** — what happens when supporting entries change after the user took an action.
 
 ---
 
 ## Decision (summary)
 
-Ship five pattern primitives in v1, all sourced and content-addressable. Pattern detection is a deterministic Kotlin pass over entries from the last 90 days, run after every 10th entry. Patterns persist in ObjectBox keyed by content hash; the entity carries lifecycle state (`active` / `dismissed` / `snoozed` / `resolved`) plus the supporting-entry references needed for the source list. Cooldown is global, not per-pattern. Mark-resolved is sticky — new evidence does not re-open a resolved pattern.
+Ship five pattern primitives in v1, all sourced and content-addressable. Pattern detection is a deterministic Kotlin pass over entries from the last 90 days, run after every 10th entry. Patterns persist in ObjectBox keyed by content hash; the entity carries lifecycle state (`active` / `dismissed` / `snoozed` / `resolved`) plus the supporting-entry references needed for the source list. Cooldown is global, not per-pattern. `resolved` is system-set for "Done"; user control is `Drop` / `Skip` on ACTIVE and `Restart` on non-active rows.
 
 ---
 
@@ -127,7 +127,7 @@ Run on every new entry, not only on detection-trigger entries. Cheap; bounds ext
 8. For the entry that triggered detection, ask the pattern engine for one matching active pattern (if cooldown allows) → that becomes the pattern-enhanced callout appended to the per-entry observation.
 ```
 
-**Step 6's "UPDATE silently" is the key product call.** A dismissed pattern still grows its supporting set in the background, so if the user un-dismisses it later (v1.5 affordance) the count is honest. In v1, dismiss is one-way; the count just keeps quietly.
+**Step 6's "UPDATE silently" is the key product call.** A dismissed or resolved pattern still grows its supporting set in the background, so if the user restarts it later the count is honest instead of frozen at the moment it left ACTIVE.
 
 **Pattern title generation (step 6 INSERT).** When a new active pattern lands, generate a short title via one short model call using the persona-injected observation-generation prompt (ADR-002 §3). Title is ≤24 chars (`Tuesday Meetings`, `Goblin Hours`, `Invoice Email`). Persisted on insert; never regenerated in v1.
 
@@ -175,23 +175,22 @@ data class Pattern(
 
 ```
 NEW (computed)   →  active            when threshold ≥3 first crossed
-active           →  dismissed         user tapped Dismiss
-active           →  snoozed           user tapped Snooze 7 days; sets snoozed_until = now + 7d
-active           →  resolved          user tapped Mark resolved
+active           →  dismissed         user tapped Drop
+active           →  snoozed           user tapped Skip; sets snoozed_until = now + 7d
+active           →  resolved          system marks Done (v1.5 auto-close path; no user tap sets this)
 active           →  below_threshold   Re-eval drops support count <3 (internal only, not user-facing — see §"Re-eval interaction")
 below_threshold  →  active            later entry restores support count ≥3 (idempotent re-emerge)
 snoozed          →  active            snoozed_until passed AND a detection run sees the pattern still meeting threshold
-snoozed          →  active            user tapped Un-snooze (Patterns view exposes this)
-snoozed          →  dismissed         user tapped Dismiss while snoozed (skip the un-snooze step)
-dismissed        →  (terminal)        no transition out in v1
-resolved         →  (terminal)        no transition out in v1; new evidence accumulates silently per "UPDATE silently" rule
+snoozed          →  active            user tapped Restart
+dismissed        →  active            user tapped Restart
+resolved         →  active            user tapped Restart
 ```
 
-**Why `dismissed` and `resolved` are terminal in v1.** Adding "un-dismiss" or "auto-reopen on stronger evidence" doubles the state-machine surface and is invisible in the demo. The user has agency to act on a pattern; if they kill it, they killed it. Reopening is a `../backlog.md` candidate (similar to `reeval-auto-promote`).
+**Why Restart exists.** Skip and Drop are reversible product judgments, not destructive deletes. Restart keeps that explicit and local: the user can bring a pattern back immediately without waiting for the skip timer or future model evidence.
 
 **Auto-promotion of snoozed → active.** Detection step 6 handles this. A user who snoozed Tuesday Meetings 7 days ago will see it return on the next detection run after the snooze expires *if the pattern still has fresh supporting entries*. If the pattern has decayed (no new supporting entries in the last 30 days), it stays snoozed silently — re-surfacing a stale pattern is more annoying than helpful.
 
-**Mark-resolved is sticky for the demo.** Concept-locked says the app respects user agency; this is the cleanest expression of that. Pattern Detail still shows the sourced evidence (P1 history filter applies), but the Patterns list does not include it.
+**Resolved / Done is model-set, not user-declared.** Concept-locked says the app respects user agency, but closure is still a claim about evidence. The model can land a pattern in `resolved`; the user can still Restart it if they want it back in ACTIVE.
 
 ---
 
@@ -296,7 +295,7 @@ The other significant trade-off is **mark-resolved sticky vs. auto-reopen**. Sti
 **Revisit when:**
 - Entry counts cross ~1000 and full-recompute every 10 entries starts costing noticeable battery → introduce incremental aggregates.
 - A v1.5 demo scenario actually needs tag triples or learned-cluster patterns → write a successor ADR; don't patch this one.
-- User feedback shows mark-resolved is too sticky → add `auto-reopen-on-fresh-evidence` semantics (already noted in `../backlog.md`?).
+- User feedback shows Restart is too permissive or too hidden → revisit where the control lives, not the persistence contract.
 
 ---
 
@@ -311,8 +310,8 @@ The other significant trade-off is **mark-resolved sticky vs. auto-reopen**. Sti
 5. [ ] Phase 3 — pattern title generation via the observation-generation prompt (ADR-002 §3); cache title on insert, never regenerate in v1.
 6. [ ] Phase 3 — global cooldown enforcement on pattern-callout append.
 7. [ ] Phase 3 — Re-eval recompute path: on Re-eval commit, recompute matches and update `supportingEntryIds`; flip patterns to/from `below_threshold` as needed.
-8. [ ] Phase 3 — unit-test fixture suite mirroring ADR-002 Q4: synthetic entry sets covering each primitive's threshold edge, the cooldown reset, dismiss/snooze/resolved transitions, and the snoozed-until expiry path.
-9. [ ] Phase 4 — Patterns list / Pattern Detail UI per `design-guidelines.md` and `ux-copy.md`; un-snooze affordance lands here.
+8. [ ] Phase 3 — unit-test fixture suite mirroring ADR-002 Q4: synthetic entry sets covering each primitive's threshold edge, the cooldown reset, drop/skip/restart transitions, and the snoozed-until expiry path.
+9. [ ] Phase 4 — Patterns list / Pattern Detail UI per `design-guidelines.md` and `ux-copy.md`; Restart affordance lands here.
 10. [ ] Update `architecture-brief.md` §"AppContainer Ownership" — `PatternStore` ownership note now references this ADR for state-machine behavior.
 
 ---
@@ -374,41 +373,3 @@ spacing (other entries did go by); to the engine it's the simpler invariant — 
 no carve-out, deterministic wall-clock pacing. The "anti-pushy brand" rule is satisfied
 either way because the perceived nag-rate is what the user types between, not what the
 counter says internally.
-
-### Addendum (2026-05-13) — user actions reduced to two; resolution becomes model-detected
-
-`§Lifecycle & state transitions` and `§Mark-resolved is sticky for the demo` are superseded
-for v1 forward by `docs/spec-pattern-action-buttons.md` and `docs/ux-copy.md` §"Pattern List".
-
-What changes:
-
-- User-facing actions on a pattern collapse from three (`Dismiss` / `Snooze 7 days` /
-  `Mark resolved`) to **two** (`Skip` / `Drop`). The `Mark resolved` affordance is
-  removed entirely — a pattern closing should be earned by behavioral evidence, not
-  self-reported. That mirrors the core product framing: Vestige observes, it does not
-  validate.
-- `PatternState` enum renames: `RESOLVED` → `CLOSED`, `DISMISSED` → `DROPPED`. The new
-  `CLOSED` state is **model-detected only** — no user transition reaches it in v1. The
-  staleness check that lands a pattern in `CLOSED` is deferred to v1.5 (`backlog.md`
-  §`pattern-auto-close`). v1 ships with the `CLOSED` enum value reserved but unreachable
-  so the v1.5 transition is a backfill plus check, not an ObjectBox migration.
-- New field `PatternEntity.snoozedUntil: Long?` (epoch ms; null when not snoozed). Cold-
-  start sweep transitions `SNOOZED → ACTIVE` when `snoozedUntil` has elapsed; no
-  WorkManager job (per spec §P0.4).
-- Snackbar copy: `Dropped.` and `Skipped.` retain `Undo`. Model-detected `Closed`
-  is silent — no snackbar, visible on next list load.
-- Section headers: `ACTIVE` / `SKIPPED · ON HOLD` / `CLOSED · DONE` / `DROPPED` per
-  `ux-copy.md` §"Pattern List / Section headers". The Mist-era `RESOLVED · FADED` and
-  `DISMISSED` labels retire with `Mark resolved`.
-
-What does not change:
-
-- Detection algorithm (five primitives, 90-day window, ObjectBox persistence).
-- Callout cooldown semantics (Addendum 2026-05-11 still applies).
-- Snoozed-on-stale-evidence rule (the snooze wake-up still requires the pattern to still
-  meet threshold; spec §P0.4 honors this implicitly via the detection re-emerge path).
-- Re-eval interaction with `below_threshold`.
-
-Story 4.8 carries the implementation. Story 3.8's `markResolved` API path and the
-`PatternAction.MARKED_RESOLVED` enum value retire with that story; both stay live in v1
-until Story 4.8 lands so existing shipped code keeps compiling.

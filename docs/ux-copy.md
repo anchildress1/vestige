@@ -328,7 +328,10 @@ Card actions (per card, in overflow menu):
 - **Skip**
 - **Drop**
 
-Note: Closed is model-detected — not available as a user action. Pattern auto-close is deferred to v1.5 (`pattern-auto-close` backlog entry).
+Card actions (non-active cards, in overflow menu):
+- **Restart**
+
+Note: Closed is model-detected — not set by a user tap. Pattern auto-close is deferred to v1.5 (`pattern-auto-close` backlog entry), but a done card can still be restarted.
 
 Empty states:
 
@@ -381,6 +384,9 @@ Vocabulary tags (small chips):
 Action row (bottom):
 - **Skip**
 - **Drop**
+
+Action row (non-active state):
+- **Restart**
 
 If model-detected Closed (read-only state — no action row shown):
 > Closed {date}. No new entries matched in {N} days.
@@ -571,6 +577,7 @@ Use sparingly. Only for actions where the user needs confirmation that something
 | Persona changed for next capture | `Active persona: {name}.` |
 | Pattern dropped | `Dropped.` *(with Undo)* |
 | Pattern skipped | `Skipped.` *(with Undo)* |
+| Pattern restarted | `Pattern is back.` *(with Undo)* |
 | Pattern closed (model) | *(no snackbar — silent state change, visible on next list load)* |
 | Export complete | `Exported {N} entries to Downloads.` |
 | Model re-download started | `Downloading model.` *(opens status screen)* |

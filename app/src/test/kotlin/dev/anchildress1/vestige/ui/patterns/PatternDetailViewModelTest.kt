@@ -217,6 +217,29 @@ class PatternDetailViewModelTest {
         assertEquals(PatternState.SNOOZED, patternStore.findByPatternId("p-snooze")?.state)
     }
 
+    @Test
+    fun `restart undo from snoozed restores the original snoozedUntil`() = runTest(testDispatcher) {
+        val entries = seedEntries(1)
+        seedActivePattern("p-restart-snooze-detail", lastSeenMs = 100L, supporting = entries)
+        val vm = newViewModel("p-restart-snooze-detail")
+        vm.snooze()
+        val originalSnoozedUntil = patternStore.findByPatternId("p-restart-snooze-detail")?.snoozedUntil
+        assertNotNull(originalSnoozedUntil)
+
+        vm.events.test {
+            vm.restart()
+            val event = awaitItem()
+            assertEquals(PatternAction.RESTART, event.action)
+            assertEquals(PatternState.SNOOZED, event.undo?.previousState)
+            assertEquals(originalSnoozedUntil, event.undo?.previousSnoozedUntil)
+            vm.undo(event.undo!!)
+        }
+
+        val row = patternStore.findByPatternId("p-restart-snooze-detail")!!
+        assertEquals(PatternState.SNOOZED, row.state)
+        assertEquals(originalSnoozedUntil, row.snoozedUntil)
+    }
+
     private fun newViewModel(patternId: String) = PatternDetailViewModel(
         patternId = patternId,
         patternStore = patternStore,

@@ -85,21 +85,21 @@ class PatternsListViewModel(
 
     fun restart(patternId: String) {
         viewModelScope.launch {
-            val previousState = withContext(ioDispatcher) {
+            val undo = withContext(ioDispatcher) {
                 val current = patternStore.findByPatternId(patternId)
                     ?: error("PatternsListViewModel: no pattern row for patternId=$patternId")
-                val prior = current.state
+                val priorState = current.state
+                val priorSnoozedUntil = current.snoozedUntil
                 patternRepo.restart(patternId)
-                prior
+                PatternUndo(
+                    patternId = patternId,
+                    action = PatternAction.RESTART,
+                    previousState = priorState,
+                    previousSnoozedUntil = priorSnoozedUntil,
+                )
             }
             _state.value = loadState()
-            _events.emit(
-                PatternActionEvent(
-                    patternId,
-                    PatternAction.RESTART,
-                    PatternUndo(patternId, PatternAction.RESTART, previousState),
-                ),
-            )
+            _events.emit(PatternActionEvent(patternId, PatternAction.RESTART, undo))
         }
     }
 
@@ -118,6 +118,7 @@ class PatternsListViewModel(
                             patternId = undo.patternId,
                             undo = true,
                             previousState = undo.previousState ?: PatternState.ACTIVE,
+                            previousSnoozedUntil = undo.previousSnoozedUntil,
                         )
                     }
                 }.onFailure { failure ->

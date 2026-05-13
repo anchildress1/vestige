@@ -315,8 +315,8 @@ private fun SourceRow(source: PatternSourceUi, onClick: () -> Unit) {
 
 @Composable
 private fun ActionRow(availableActions: Set<PatternAction>, actions: PatternActionCallbacks<Unit>) {
-    // Compact padding + single-line text keeps "Mark resolved" / "Snooze 7 days" inside the
-    // button at phone widths. Default OutlinedButton padding (24 dp / side) overflowed.
+    // Compact padding + single-line text keeps the action labels inside the buttons at phone
+    // widths. Default OutlinedButton padding (24 dp / side) overflowed.
     val padding = PaddingValues(horizontal = 10.dp, vertical = 8.dp)
     Row(
         modifier = Modifier.fillMaxWidth(),

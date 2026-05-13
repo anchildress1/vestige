@@ -1,6 +1,5 @@
 package dev.anchildress1.vestige.ui.patterns
 
-import androidx.test.core.app.ApplicationProvider
 import app.cash.turbine.test
 import dev.anchildress1.vestige.model.ExtractionStatus
 import dev.anchildress1.vestige.model.PatternKind
@@ -50,10 +49,15 @@ class PatternsListViewModelTest {
     @Before
     fun setUp() {
         Dispatchers.setMain(testDispatcher)
-        val context = ApplicationProvider.getApplicationContext<android.content.Context>()
-        dataDir = File(context.filesDir, "ob-patterns-list-${System.nanoTime()}")
+        val tempRoot = File(System.getProperty("java.io.tmpdir"), "vestige-patterns-list-viewmodel-tests").apply {
+            mkdirs()
+        }
+        dataDir = File(tempRoot, "ob-patterns-list-${System.nanoTime()}").apply { mkdirs() }
         boxStore = VestigeBoxStore.openAt(dataDir)
-        entryStore = EntryStore(boxStore, MarkdownEntryStore(File(context.filesDir, "md-${System.nanoTime()}")))
+        entryStore = EntryStore(
+            boxStore,
+            MarkdownEntryStore(File(tempRoot, "md-${System.nanoTime()}").apply { mkdirs() }),
+        )
         patternStore = PatternStore(boxStore, baseClock)
         patternRepo = PatternRepo(patternStore, baseClock)
     }
@@ -220,6 +224,29 @@ class PatternsListViewModelTest {
             val loaded = expectMostRecentItem() as PatternsListUiState.Loaded
             assertTrue(loaded.cards.any { it.patternId == "p3" })
         }
+    }
+
+    @Test
+    fun `restart undo from snoozed restores the original snoozedUntil`() = runTest(testDispatcher) {
+        val entries = seedEntries(1)
+        seedActivePattern("p-restart-snooze-list", lastSeenMs = 100L, supporting = entries)
+        patternRepo.snooze("p-restart-snooze-list")
+        val originalSnoozedUntil = patternStore.findByPatternId("p-restart-snooze-list")?.snoozedUntil
+        assertNotNull(originalSnoozedUntil)
+
+        val vm = newViewModel()
+        vm.events.test {
+            vm.restart("p-restart-snooze-list")
+            val event = awaitItem()
+            assertEquals(PatternAction.RESTART, event.action)
+            assertEquals(PatternState.SNOOZED, event.undo?.previousState)
+            assertEquals(originalSnoozedUntil, event.undo?.previousSnoozedUntil)
+            vm.undo(event.undo!!)
+        }
+
+        val row = patternStore.findByPatternId("p-restart-snooze-list")!!
+        assertEquals(PatternState.SNOOZED, row.state)
+        assertEquals(originalSnoozedUntil, row.snoozedUntil)
     }
 
     private fun newViewModel() = PatternsListViewModel(

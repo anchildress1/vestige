@@ -58,19 +58,28 @@ class PatternRepo(private val store: PatternStore, private val clock: Clock = Cl
     }
 
     /**
-     * Restart — moves a terminal-state pattern (`DISMISSED` / `SNOOZED` / `RESOLVED`) back to
-     * `ACTIVE`. The only legal exit from the sticky terminals other than the snackbar `Undo`;
-     * see `spec-pattern-action-buttons.md` §P0.X — Restart. Undo of a Restart returns the row
-     * to [previousState] via the same `forceTo` bypass.
+     * Restart — moves a non-active pattern (`DISMISSED` / `SNOOZED` / `RESOLVED`) back to
+     * `ACTIVE`. Undo of a Restart restores the exact state snapshot the row had before the
+     * restart, including the original `snoozedUntil` when coming back to `SNOOZED`.
      */
-    fun restart(patternId: String, undo: Boolean = false, previousState: PatternState = PatternState.ACTIVE) {
+    fun restart(
+        patternId: String,
+        undo: Boolean = false,
+        previousState: PatternState = PatternState.ACTIVE,
+        previousSnoozedUntil: Long? = null,
+    ) {
         if (undo) {
-            forceTo(patternId, previousState, expectedFrom = PatternState.ACTIVE)
+            forceTo(
+                patternId = patternId,
+                target = previousState,
+                expectedFrom = PatternState.ACTIVE,
+                snoozedUntilMs = if (previousState == PatternState.SNOOZED) previousSnoozedUntil else null,
+            )
         } else {
             val current = store.findByPatternId(patternId)
                 ?: error("PatternRepo: no pattern row for patternId=$patternId")
             require(current.state != PatternState.ACTIVE && current.state != PatternState.BELOW_THRESHOLD) {
-                "PatternRepo.restart requires a terminal state, found ${current.state}"
+                "PatternRepo.restart requires a non-active visible state, found ${current.state}"
             }
             forceTo(patternId, PatternState.ACTIVE, expectedFrom = current.state)
         }
@@ -83,14 +92,22 @@ class PatternRepo(private val store: PatternStore, private val clock: Clock = Cl
      * precondition: the row must currently be in that state, otherwise the bypass would let a
      * misrouted snackbar callback rewrite a `RESOLVED` (sticky-terminal) row to `ACTIVE`.
      */
-    private fun forceTo(patternId: String, target: PatternState, expectedFrom: PatternState) {
+    private fun forceTo(
+        patternId: String,
+        target: PatternState,
+        expectedFrom: PatternState,
+        snoozedUntilMs: Long? = null,
+    ) {
         val entity = store.findByPatternId(patternId)
             ?: error("PatternRepo undo: no pattern row for patternId=$patternId")
         require(entity.state == expectedFrom) {
             "PatternRepo undo requires current state=$expectedFrom for patternId=$patternId, found ${entity.state}"
         }
+        require(target != PatternState.SNOOZED || snoozedUntilMs != null) {
+            "PatternRepo forceTo requires snoozedUntilMs when restoring SNOOZED for patternId=$patternId"
+        }
         entity.state = target
-        entity.snoozedUntil = null
+        entity.snoozedUntil = if (target == PatternState.SNOOZED) snoozedUntilMs else null
         entity.stateChangedTimestamp = clock.millis()
         store.put(entity)
     }

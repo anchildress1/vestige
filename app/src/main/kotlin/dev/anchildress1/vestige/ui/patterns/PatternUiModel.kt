@@ -87,7 +87,12 @@ data class PatternActionCallbacks<T>(
 
 /**
  * Inverse-action payload the snackbar reissues if the user taps `Undo` while it's alive.
- * [previousState] is non-null only for RESTART so the undo path knows which terminal state to
- * return to.
+ * [previousState] / [previousSnoozedUntil] are non-null only for RESTART so the undo path can
+ * restore the exact pre-restart snapshot.
  */
-data class PatternUndo(val patternId: String, val action: PatternAction, val previousState: PatternState? = null)
+data class PatternUndo(
+    val patternId: String,
+    val action: PatternAction,
+    val previousState: PatternState? = null,
+    val previousSnoozedUntil: Long? = null,
+)

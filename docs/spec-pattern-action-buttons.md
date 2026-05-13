@@ -1,6 +1,6 @@
 # Spec — Pattern Action Buttons
 
-**Feature:** Pattern lifecycle actions — Skip and Drop (user), model-detected Close (v1.5)
+**Feature:** Pattern lifecycle actions — Skip, Drop, and Restart (user), model-detected Close (v1.5)
 **Status:** Draft — 2026-05-13
 **Phase:** 4 (UX Surface)
 **Author:** Ashley (sole owner). AI implementors read this as authoritative.
@@ -12,17 +12,23 @@
 
 The pattern list has no user-facing actions that move a pattern out of the active state. Patterns accumulate indefinitely once detected. The prior action model (Dismiss / Snooze 7 days / Mark resolved) had two problems: Dismiss and Mark resolved were functionally identical — both expressed "I am done with this" — and user-declared resolution is the wrong model. A pattern closing should be earned by behavioral evidence (it stopped appearing in entries), not self-reported by the user. That mirrors the core product philosophy: Vestige observes, it doesn't validate.
 
-In v1, users need exactly two controls: Skip (this is real but I don't want to look at it right now — temporary) and Drop (this is noise, remove it from my view — permanent). Closed is a state the model earns for a pattern in v1.5 when it has not appeared in entries for long enough.
+In v1, users need three clear controls with different jobs:
+- Skip: this is real but I don't want to look at it right now.
+- Drop: this is noise, get it out of my active view.
+- Restart: bring a skipped, dropped, or done pattern back to ACTIVE immediately.
+
+Closed is still a state the model earns for a pattern in v1.5 when it has not appeared in entries for long enough.
 
 ---
 
 ## Goals
 
 1. Users can remove a pattern from the active view with two distinct semantic gestures (Skip vs. Drop) — both complete in one tap from the overflow menu or action row.
-2. Skipped patterns surface again after 7 days without any user action — no re-add required.
-3. Dropped patterns are accessible in a DROPPED section (not deleted) — the record exists, the claim doesn't.
-4. Pattern state transitions are undoable within the snackbar window (standard Material 3 undo timing, ~4s).
-5. No third user-facing "I resolved this" action exists. The spec eliminates the false affordance that closure is user-declared.
+2. Users can bring a skipped, dropped, or done pattern back to ACTIVE with Restart.
+3. Skipped patterns surface again after 7 days without any user action — no re-add required.
+4. Dropped patterns are accessible in a DROPPED section (not deleted) — the record exists, the claim doesn't.
+5. Pattern state transitions are undoable within the snackbar window (standard Material 3 undo timing, ~4s).
+6. No user-facing "Mark resolved" / "Done" action exists. Closure is not user-declared.
 
 ---
 
@@ -32,7 +38,7 @@ In v1, users need exactly two controls: Skip (this is real but I don't want to l
 2. **Custom skip durations.** Skip is 7 days, fixed. No picker, no settings row. See `ux-copy.md` §Locked UX Decisions.
 3. **Permanent deletion.** Drop moves a pattern to DROPPED state — it does not delete the ObjectBox record. Purge-on-wipe (DestructiveScreen) handles mass deletion.
 4. **Cross-pattern actions.** No multi-select, no "skip all," no batch drop. Single-pattern scope only for v1.
-5. **Re-activation from Dropped.** Dropped is a terminal user intent in v1. If the pattern resurfaces in new entries, the PatternEngine re-detects it and creates a new pattern card — it does not un-drop the old one.
+5. **Automatic re-activation from new evidence for Dropped.** Restart is the explicit user path back to ACTIVE. This spec does not add a silent "new evidence auto-un-drops it" rule.
 
 ---
 
@@ -51,6 +57,8 @@ In v1, users need exactly two controls: Skip (this is real but I don't want to l
 **As** Vestige's user, **I want** skipped patterns to live under a SKIPPED · ON HOLD section **so that** I can confirm they exist and haven't been deleted.
 
 **As** Vestige's user, **I want** dropped patterns to live under a DROPPED section **so that** there's an audit trail of what I've called noise.
+
+**As** Vestige's user, **I want** a restart action on skipped, dropped, or done patterns **so that** I can bring one back immediately without waiting for the 7-day wake-up or new model evidence.
 
 ---
 
@@ -88,7 +96,22 @@ Acceptance criteria:
 - Snackbar fires: `Dropped.` with Undo (~4s window).
 - Tapping Undo reverses the state to ACTIVE.
 
-**P0.3 — Section structure**
+**P0.3 — Restart action (overflow + detail action row)**
+
+Users can Restart a non-active pattern from two surfaces:
+- Pattern card overflow menu
+- Pattern Detail bottom action row (single-button row)
+
+Behavior: transitions pattern state from `SKIPPED` / `DROPPED` / `CLOSED` → `ACTIVE`.
+
+Acceptance criteria:
+- Given a skipped pattern card, when user taps Restart, the card disappears from `SKIPPED · ON HOLD` and appears in `ACTIVE`.
+- Given a dropped pattern card, when user taps Restart, the card disappears from `DROPPED` and appears in `ACTIVE`.
+- Given a done pattern card, when user taps Restart, the card disappears from `CLOSED · DONE` and appears in `ACTIVE`.
+- Snackbar fires: `Pattern is back.` with Undo (~4s window).
+- Tapping Undo restores the exact prior state snapshot. If the prior state was `SKIPPED`, the original `skippedUntil` timestamp is restored rather than reset.
+
+**P0.4 — Section structure**
 
 Pattern List displays four sections, each only rendered when non-empty:
 
@@ -106,7 +129,7 @@ Acceptance criteria:
 - CLOSED · DONE section is absent in v1 (no patterns reach CLOSED state without `pattern-auto-close` shipping).
 - Section order is fixed: ACTIVE → SKIPPED → CLOSED → DROPPED.
 
-**P0.4 — Skip wake-up**
+**P0.5 — Skip wake-up**
 
 When `skippedUntil` elapses, the pattern transitions from `SKIPPED` → `ACTIVE` automatically.
 
@@ -116,9 +139,9 @@ Acceptance criteria:
 - No user action is required to bring a skipped pattern back.
 - Implementation: evaluated on app start / resume via `AppContainer` or the existing cold-start sweep — not a WorkManager job in v1 (pattern-auto-close deferred; this is a simpler date check on load).
 
-**P0.5 — No "Mark resolved" / "Dismiss" / "Snooze" actions**
+**P0.6 — No user-facing "Mark resolved" / "Dismiss" / "Snooze" actions**
 
-None of these labels appear anywhere in the UI. No third action exists in the overflow or action row. No undo copy references resolution.
+None of these labels appear anywhere in the UI as user-facing copy. Restart is the only action shown outside ACTIVE. No undo copy references resolution.
 
 Acceptance criteria:
 - Full-text search of `:app` source for "dismiss", "Dismiss", "resolve", "Resolve", "Mark resolved", "Snooze" returns zero hits in any user-visible string resource or composable.
@@ -163,9 +186,12 @@ All copy is locked in `ux-copy.md`. Reproduced here for implementor convenience.
 - `Skip`
 - `Drop`
 
-**Action row (Pattern Detail):**
+**Action row (Pattern Detail, ACTIVE):**
 - `Skip`
 - `Drop`
+
+**Action row / overflow (non-active patterns):**
+- `Restart`
 
 **Pattern Detail — Closed state banner (v1.5, read-only, no action row):**
 > Closed {date}. No new entries matched in {N} days.
@@ -173,6 +199,7 @@ All copy is locked in `ux-copy.md`. Reproduced here for implementor convenience.
 **Snackbars:**
 - `Skipped.` *(with Undo)*
 - `Dropped.` *(with Undo)*
+- `Pattern is back.` *(with Undo)*
 - Pattern closed (model): *(no snackbar — silent, visible on next list load)*
 
 **Section headers (JetBrains Mono, EyebrowE primitive):**
@@ -206,6 +233,12 @@ State transition rules:
 | ACTIVE | Drop | DROPPED | null |
 | SKIPPED | Undo (skip) | ACTIVE | null |
 | DROPPED | Undo (drop) | ACTIVE | null |
+| SKIPPED | Restart | ACTIVE | null |
+| DROPPED | Restart | ACTIVE | null |
+| CLOSED | Restart | ACTIVE | null |
+| ACTIVE | Undo (restart from SKIPPED) | SKIPPED | restore original value |
+| ACTIVE | Undo (restart from DROPPED) | DROPPED | null |
+| ACTIVE | Undo (restart from CLOSED) | CLOSED | null |
 | SKIPPED | Wake-up check on load | ACTIVE | null (cleared) |
 | ACTIVE | Model detects stale (v1.5) | CLOSED | null |
 

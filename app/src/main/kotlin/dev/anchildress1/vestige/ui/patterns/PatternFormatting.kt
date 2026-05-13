@@ -59,14 +59,14 @@ fun terminalLabelFor(
 }
 
 /** Format-string id + date payload for the terminal-state subline. */
-data class TerminalLabel(@StringRes val prefixRes: Int, val dateLabel: String)
+data class TerminalLabel(@field:StringRes val prefixRes: Int, val dateLabel: String)
 
 /** ADR-003 terminals: DISMISSED + RESOLVED. SNOOZED is recoverable; BELOW_THRESHOLD is internal. */
 fun isTerminalState(state: PatternState): Boolean = state == PatternState.DISMISSED || state == PatternState.RESOLVED
 
 /**
- * Per `spec-pattern-action-buttons.md`: user-tap surface is Drop (DISMISSED) + Skip (SNOOZED) on
- * ACTIVE, and Restart on every terminal. MARKED_RESOLVED is system-only (`pattern-auto-close`,
+ * Per `spec-pattern-action-buttons.md`: ACTIVE patterns expose Drop + Skip; every other
+ * user-visible state exposes Restart. MARKED_RESOLVED is system-only (`pattern-auto-close`,
  * v1.5) — never reachable from the action menu.
  */
 fun availableActionsFor(state: PatternState): Set<PatternAction> = when (state) {

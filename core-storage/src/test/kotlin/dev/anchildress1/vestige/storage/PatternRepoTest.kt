@@ -1,6 +1,5 @@
 package dev.anchildress1.vestige.storage
 
-import androidx.test.core.app.ApplicationProvider
 import dev.anchildress1.vestige.model.PatternKind
 import dev.anchildress1.vestige.model.PatternState
 import io.objectbox.BoxStore
@@ -32,8 +31,10 @@ class PatternRepoTest {
 
     @Before
     fun setUp() {
-        val context = ApplicationProvider.getApplicationContext<android.content.Context>()
-        dataDir = File(context.filesDir, "objectbox-patternrepo-${System.nanoTime()}")
+        val tempRoot = File(System.getProperty("java.io.tmpdir"), "vestige-pattern-repo-tests").apply {
+            mkdirs()
+        }
+        dataDir = File(tempRoot, "objectbox-patternrepo-${System.nanoTime()}").apply { mkdirs() }
         boxStore = VestigeBoxStore.openAt(dataDir)
         store = PatternStore(boxStore, clock)
         repo = PatternRepo(store, clock)
@@ -206,6 +207,26 @@ class PatternRepoTest {
         repo.restart(id)
         repo.restart(id, undo = true, previousState = PatternState.DISMISSED)
         assertEquals(PatternState.DISMISSED, store.findByPatternId(id)!!.state)
+    }
+
+    @Test
+    fun `restart undo restores the original snoozedUntil when returning to SNOOZED`() {
+        val id = seed()
+        repo.snooze(id, days = 3)
+        val originalSnoozedUntil = store.findByPatternId(id)!!.snoozedUntil
+        assertNotNull(originalSnoozedUntil)
+
+        repo.restart(id)
+        repo.restart(
+            id,
+            undo = true,
+            previousState = PatternState.SNOOZED,
+            previousSnoozedUntil = originalSnoozedUntil,
+        )
+
+        val row = store.findByPatternId(id)!!
+        assertEquals(PatternState.SNOOZED, row.state)
+        assertEquals(originalSnoozedUntil, row.snoozedUntil)
     }
 
     @Test

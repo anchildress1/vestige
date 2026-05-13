@@ -3,6 +3,8 @@ package dev.anchildress1.vestige.ui.components
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.indication
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -19,7 +21,9 @@ import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
+import androidx.compose.material3.ripple
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -298,26 +302,44 @@ fun AppTop(
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Box(
-            modifier = Modifier
-                .sizeIn(minHeight = MinTapTarget)
-                .clip(RadiusTokens.XS)
-                .clickable(onClick = onStatusTap),
-            contentAlignment = Alignment.CenterStart,
-        ) {
+        TappableChrome(onClick = onStatusTap, alignment = Alignment.CenterStart) {
             if (recording) {
                 Pill(text = "ON AIR · LIVE", color = Coral, dot = true, blink = true, fill = false)
             } else {
                 Pill(text = "LOCAL · GEMMA 4", color = Lime, dot = true, blink = true, fill = false)
             }
         }
+        TappableChrome(onClick = onPersonaTap, alignment = Alignment.CenterEnd) {
+            Pill(text = "$persona ▾", color = Ink, fill = false)
+        }
+    }
+}
+
+/**
+ * 48dp-minimum tap target that shapes its ripple to the content (intended for [Pill]s in
+ * [AppTop]). The outer [Box] reserves the touch slop with no indication; the inner [Box] hosts
+ * the ripple clipped to [RadiusTokens.Pill], and both share an [MutableInteractionSource] so a
+ * tap anywhere in the slop animates the pill-shaped ripple.
+ */
+@Composable
+private fun TappableChrome(onClick: () -> Unit, alignment: Alignment, content: @Composable () -> Unit) {
+    val interactionSource = remember { MutableInteractionSource() }
+    Box(
+        modifier = Modifier
+            .sizeIn(minHeight = MinTapTarget)
+            .clickable(
+                interactionSource = interactionSource,
+                indication = null,
+                onClick = onClick,
+            ),
+        contentAlignment = alignment,
+    ) {
         Box(
             modifier = Modifier
-                .sizeIn(minHeight = MinTapTarget)
-                .clickable(onClick = onPersonaTap),
-            contentAlignment = Alignment.CenterEnd,
+                .clip(RadiusTokens.Pill)
+                .indication(interactionSource, ripple(bounded = true)),
         ) {
-            Pill(text = "$persona ▾", color = Ink, fill = false)
+            content()
         }
     }
 }

@@ -38,7 +38,6 @@ import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import dev.anchildress1.vestige.debug.DebugPatternSeeder
 import dev.anchildress1.vestige.ui.components.AppTop
-import dev.anchildress1.vestige.ui.components.AppTopStatus
 import dev.anchildress1.vestige.ui.components.VestigeScaffold
 import dev.anchildress1.vestige.ui.components.VestigeSurface
 import dev.anchildress1.vestige.ui.patterns.PatternsHost
@@ -119,10 +118,8 @@ private fun PhaseOneShell(
     Column(modifier = modifier.fillMaxSize()) {
         AppTop(
             persona = "WITNESS",
-            status = phaseOneTopStatus(
-                permissionGranted = permissionGranted,
-                lastRequestDenied = lastRequestDenied,
-            ),
+            onPersonaTap = {},
+            onStatusTap = {},
         )
         Box(
             modifier = Modifier
@@ -145,34 +142,6 @@ private fun PhaseOneShell(
         }
     }
 }
-
-@Composable
-private fun phaseOneTopStatus(permissionGranted: Boolean, lastRequestDenied: Boolean): AppTopStatus =
-    when (phaseOneAppStatus(permissionGranted, lastRequestDenied)) {
-        PhaseOneAppStatus.LOADING -> AppTopStatus(
-            text = stringResource(R.string.app_top_loading),
-            contentDescription = stringResource(R.string.app_top_loading_description),
-            color = VestigeTheme.colors.ember,
-            dot = false,
-            blink = false,
-        )
-
-        PhaseOneAppStatus.READY -> AppTopStatus(
-            text = stringResource(R.string.app_top_ready),
-            contentDescription = stringResource(R.string.app_top_ready_description),
-            color = VestigeTheme.colors.lime,
-            dot = true,
-            blink = false,
-        )
-
-        PhaseOneAppStatus.MIC_REQUIRED -> AppTopStatus(
-            text = stringResource(R.string.app_top_mic_required),
-            contentDescription = stringResource(R.string.mic_permission_denied),
-            color = VestigeTheme.colors.coral,
-            dot = false,
-            blink = false,
-        )
-    }
 
 @Composable
 private fun PhaseOneShellCard(
@@ -222,16 +191,4 @@ private fun PhaseOneShellPreview() {
     VestigeTheme {
         PhaseOneShell()
     }
-}
-
-internal enum class PhaseOneAppStatus {
-    LOADING,
-    READY,
-    MIC_REQUIRED,
-}
-
-internal fun phaseOneAppStatus(permissionGranted: Boolean, lastRequestDenied: Boolean): PhaseOneAppStatus = when {
-    permissionGranted -> PhaseOneAppStatus.READY
-    lastRequestDenied -> PhaseOneAppStatus.MIC_REQUIRED
-    else -> PhaseOneAppStatus.LOADING
 }

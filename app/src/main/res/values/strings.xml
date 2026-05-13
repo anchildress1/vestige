@@ -6,11 +6,6 @@
     <string name="mic_permission_request">Allow microphone</string>
     <string name="mic_permission_granted">Mic permission granted.</string>
     <string name="mic_permission_denied">Mic permission required to record. Settings → Permissions.</string>
-    <string name="app_top_loading">APP · LOADING</string>
-    <string name="app_top_loading_description">App loading.</string>
-    <string name="app_top_ready">APP · READY</string>
-    <string name="app_top_ready_description">App ready.</string>
-    <string name="app_top_mic_required">MIC · REQUIRED</string>
 
     <!-- Background extraction notification copy. Single source of truth = ux-copy.md §"Loading States" /
          mid-session inference. Mirrored on the in-app placeholder so the system notification and the

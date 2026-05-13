@@ -40,6 +40,9 @@ fun Modifier.noiseGrain(opacity: Float = 0.10f): Modifier = drawWithCache {
 internal fun clampGrainOpacity(raw: Float): Float = raw.coerceIn(NOISE_GRAIN_MIN_OPACITY, NOISE_GRAIN_MAX_OPACITY)
 
 /** Deterministic alpha noise pixels packed as `0xAA000000`. Pure Kotlin so JVM tests can assert. */
+@Suppress("kotlin:S2245") // Visual atmosphere only — alpha tile for an overlay BlendMode. Not a
+// security boundary, not a cryptographic seed; SecureRandom would defeat the determinism the
+// shared brush cache + render snapshot tests rely on.
 internal fun noiseAlphaPixels(seed: Int): IntArray {
     val rng = Random(seed)
     return IntArray(NOISE_TILE_PX * NOISE_TILE_PX) {

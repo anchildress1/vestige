@@ -109,12 +109,17 @@ internal fun WifiCheckScreen(
 }
 
 @Composable
-internal fun ModelDownloadPlaceholderScreen(onContinue: () -> Unit, modifier: Modifier = Modifier) {
+internal fun ModelDownloadPlaceholderScreen(
+    modelReady: Boolean,
+    onContinue: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
     OnboardingScaffold(
         modifier = modifier,
         header = stringResource(id = R.string.onboarding_download_header),
         primaryActionLabel = stringResource(id = R.string.onboarding_continue),
         onPrimary = onContinue,
+        primaryEnabled = modelReady,
     ) {
         BodyParagraph(text = stringResource(id = R.string.onboarding_download_body))
     }

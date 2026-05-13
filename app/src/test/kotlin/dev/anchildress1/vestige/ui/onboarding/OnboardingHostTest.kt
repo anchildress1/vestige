@@ -4,10 +4,12 @@ import android.content.Context
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
+import androidx.lifecycle.Lifecycle
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.espresso.Espresso
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -68,7 +70,11 @@ class OnboardingHostTest {
     @Test
     fun `full flow advances through all eight screens and marks complete on Open Vestige`() {
         var completed = false
-        startHost(onComplete = { completed = true }, wifiAvailability = { true })
+        startHost(
+            onComplete = { completed = true },
+            wifiAvailability = { true },
+            modelAvailability = ModelAvailability { true },
+        )
 
         tapPrimary("Continue") // Screen 1
         tapPrimary("Got it") // Screen 2
@@ -99,7 +105,7 @@ class OnboardingHostTest {
 
     @Test
     fun `does not mark complete until final Open Vestige tap`() {
-        startHost(wifiAvailability = { true })
+        startHost(wifiAvailability = { true }, modelAvailability = ModelAvailability { true })
         tapPrimary("Continue")
         tapPrimary("Got it")
         assertFalse(prefs.isComplete)
@@ -121,6 +127,58 @@ class OnboardingHostTest {
         composeRule.onNodeWithText("Pick a persona.").assertIsDisplayed()
     }
 
+    @Test
+    fun `current onboarding step survives host recreation`() {
+        startHost()
+        tapPrimary("Continue") // -> LocalExplainer
+        tapPrimary("Got it") // -> MicPermission
+
+        startHost()
+
+        composeRule.onNodeWithText("Mic permission.").assertIsDisplayed()
+    }
+
+    @Test
+    fun `Wi-Fi branch refreshes after returning from settings`() {
+        var wifiConnected = false
+        startHost(wifiAvailability = { wifiConnected })
+        tapPrimary("Continue")
+        tapPrimary("Got it")
+        tapPrimary("Skip — I'll type instead")
+        tapPrimary("Skip — work runs in foreground only")
+        tapPrimary("Continue")
+
+        composeRule.onNodeWithText("Wi-Fi required.").assertIsDisplayed()
+
+        wifiConnected = true
+        composeRule.activityRule.scenario.moveToState(Lifecycle.State.CREATED)
+        composeRule.activityRule.scenario.moveToState(Lifecycle.State.RESUMED)
+        composeRule.waitForIdle()
+
+        composeRule.onNodeWithText("Wi-Fi connected.").assertIsDisplayed()
+    }
+
+    @Test
+    fun `download screen does not allow completion until model is ready`() {
+        var completed = false
+        startHost(
+            onComplete = { completed = true },
+            wifiAvailability = { true },
+            modelAvailability = ModelAvailability { false },
+        )
+        tapPrimary("Continue")
+        tapPrimary("Got it")
+        tapPrimary("Skip — I'll type instead")
+        tapPrimary("Skip — work runs in foreground only")
+        tapPrimary("Continue")
+        tapPrimary("Download model")
+
+        composeRule.onNodeWithText("Downloading model.").assertIsDisplayed()
+        composeRule.onNodeWithText("Continue").assertIsNotEnabled()
+        assertFalse(completed)
+        assertFalse(prefs.isComplete)
+    }
+
     private fun tapPrimary(label: String) {
         composeRule.onNodeWithText(label).performScrollTo().performClick()
         composeRule.waitForIdle()
@@ -129,15 +187,18 @@ class OnboardingHostTest {
     private fun startHost(
         onComplete: () -> Unit = {},
         wifiAvailability: WifiAvailability = WifiAvailability { false },
+        modelAvailability: ModelAvailability = ModelAvailability { false },
     ) {
         composeRule.activity.setContent {
             VestigeTheme {
                 OnboardingHost(
                     prefs = prefs,
                     onComplete = onComplete,
+                    modelAvailability = modelAvailability,
                     wifiAvailability = wifiAvailability,
                 )
             }
         }
+        composeRule.waitForIdle()
     }
 }

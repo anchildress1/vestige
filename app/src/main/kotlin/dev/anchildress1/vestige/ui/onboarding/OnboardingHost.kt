@@ -1,7 +1,9 @@
 package dev.anchildress1.vestige.ui.onboarding
 
 import android.Manifest
+import android.app.Activity
 import android.content.Context
+import android.content.ContextWrapper
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
@@ -11,30 +13,38 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import dev.anchildress1.vestige.model.Persona
+import kotlinx.coroutines.launch
 
 /** Hosts the 8-screen onboarding flow. Step + persona survive process death via SharedPreferences. */
 @Composable
 fun OnboardingHost(
     prefs: OnboardingPrefs,
     onComplete: () -> Unit,
+    modelAvailability: ModelAvailability,
     modifier: Modifier = Modifier,
     wifiAvailability: WifiAvailability? = null,
 ) {
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
     val resolvedWifi = remember(context, wifiAvailability) {
         wifiAvailability ?: WifiAvailability.Default(context)
     }
-    var step by rememberSaveable { mutableStateOf(OnboardingStep.PersonaPick) }
+    var step by rememberSaveable { mutableStateOf(prefs.currentStep) }
     var persona by rememberSaveable { mutableStateOf(prefs.defaultPersona) }
     var micPermissionDenied by rememberSaveable { mutableStateOf(false) }
 
@@ -56,22 +66,71 @@ fun OnboardingHost(
         step = step.previous() ?: step
     }
     LaunchedEffect(persona) { prefs.setDefaultPersona(persona) }
+    val environment = rememberOnboardingEnvironment(
+        prefs = prefs,
+        step = step,
+        wifiAvailability = resolvedWifi,
+        modelAvailability = modelAvailability,
+    )
 
     OnboardingStepContent(
         step = step,
         persona = persona,
         onPersonaChange = { persona = it },
         micPermissionDenied = micPermissionDenied,
-        wifiConnected = resolvedWifi.isWifiConnected(),
+        wifiConnected = environment.wifiConnected,
+        modelReady = environment.modelReady,
         advance = advance,
         onMicAllow = { requestMic(context, micLauncher, advance) },
         onNotificationAllow = { requestNotifications(notifLauncher, advance) },
         onOpenWifiSettings = { openWifiSettings(context) },
+        onComeBackLater = { moveTaskToBack(context) },
         onOpenApp = {
-            prefs.markComplete()
-            onComplete()
+            scope.launch {
+                if (!modelAvailability.isModelReady()) return@launch
+                prefs.markComplete()
+                onComplete()
+            }
         },
         modifier = modifier,
+    )
+}
+
+private data class OnboardingEnvironment(val wifiConnected: Boolean, val modelReady: Boolean)
+
+@Composable
+private fun rememberOnboardingEnvironment(
+    prefs: OnboardingPrefs,
+    step: OnboardingStep,
+    wifiAvailability: WifiAvailability,
+    modelAvailability: ModelAvailability,
+): OnboardingEnvironment {
+    val lifecycleOwner = LocalLifecycleOwner.current
+    val scope = rememberCoroutineScope()
+    var wifiConnected by remember { mutableStateOf(wifiAvailability.isWifiConnected()) }
+    var modelReady by remember { mutableStateOf(false) }
+
+    LaunchedEffect(step) {
+        prefs.setCurrentStep(step)
+        wifiConnected = wifiAvailability.isWifiConnected()
+        modelReady = modelAvailability.isModelReady()
+    }
+    DisposableEffect(lifecycleOwner, wifiAvailability, modelAvailability) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                scope.launch {
+                    wifiConnected = wifiAvailability.isWifiConnected()
+                    modelReady = modelAvailability.isModelReady()
+                }
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+
+    return OnboardingEnvironment(
+        wifiConnected = wifiConnected,
+        modelReady = modelReady,
     )
 }
 
@@ -83,10 +142,12 @@ private fun OnboardingStepContent(
     onPersonaChange: (Persona) -> Unit,
     micPermissionDenied: Boolean,
     wifiConnected: Boolean,
+    modelReady: Boolean,
     advance: () -> Unit,
     onMicAllow: () -> Unit,
     onNotificationAllow: () -> Unit,
     onOpenWifiSettings: () -> Unit,
+    onComeBackLater: () -> Unit,
     onOpenApp: () -> Unit,
     modifier: Modifier,
 ) {
@@ -120,11 +181,12 @@ private fun OnboardingStepContent(
             isWifiConnected = wifiConnected,
             onContinue = advance,
             onOpenWifiSettings = onOpenWifiSettings,
-            onComeBackLater = advance,
+            onComeBackLater = onComeBackLater,
         )
 
         OnboardingStep.ModelDownload -> ModelDownloadPlaceholderScreen(
             modifier = modifier,
+            modelReady = modelReady,
             onContinue = advance,
         )
 
@@ -160,6 +222,16 @@ private fun openWifiSettings(context: Context) {
             Intent(Settings.ACTION_WIFI_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
         )
     }
+}
+
+private fun moveTaskToBack(context: Context) {
+    context.findActivity()?.moveTaskToBack(true)
+}
+
+private tailrec fun Context.findActivity(): Activity? = when (this) {
+    is Activity -> this
+    is ContextWrapper -> baseContext.findActivity()
+    else -> null
 }
 
 private fun hasRecordAudio(context: Context): Boolean =

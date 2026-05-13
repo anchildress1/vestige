@@ -3,6 +3,7 @@ package dev.anchildress1.vestige.ui.onboarding
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertIsNotSelected
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
@@ -108,5 +109,16 @@ class OnboardingScreensTest {
         assertFalse(tapped)
         composeRule.onNodeWithText("Open Vestige").performClick()
         assertTrue(tapped)
+    }
+
+    @Test
+    fun `model download placeholder disables Continue until the model is present`() {
+        composeRule.activity.setContent {
+            VestigeTheme {
+                ModelDownloadPlaceholderScreen(modelReady = false, onContinue = {})
+            }
+        }
+
+        composeRule.onNodeWithText("Continue").assertIsNotEnabled()
     }
 }

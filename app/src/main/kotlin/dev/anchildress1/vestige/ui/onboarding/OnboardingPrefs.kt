@@ -15,19 +15,32 @@ class OnboardingPrefs(private val prefs: SharedPreferences) {
             ?.let { runCatching { Persona.valueOf(it) }.getOrNull() }
             ?: Persona.WITNESS
 
+    val currentStep: OnboardingStep
+        get() = prefs.getString(KEY_STEP, null)
+            ?.let { runCatching { OnboardingStep.valueOf(it) }.getOrNull() }
+            ?: OnboardingStep.PersonaPick
+
     fun setDefaultPersona(persona: Persona) {
         prefs.edit().putString(KEY_PERSONA, persona.name).apply()
     }
 
+    fun setCurrentStep(step: OnboardingStep) {
+        prefs.edit().putString(KEY_STEP, step.name).commit()
+    }
+
     // Synchronous commit — one-shot gate where a missed disk flush would replay the entire flow.
     fun markComplete() {
-        prefs.edit().putBoolean(KEY_COMPLETE, true).commit()
+        prefs.edit()
+            .putBoolean(KEY_COMPLETE, true)
+            .remove(KEY_STEP)
+            .commit()
     }
 
     companion object {
         const val PREFS_NAME: String = "vestige.onboarding"
         private const val KEY_COMPLETE = "complete"
         private const val KEY_PERSONA = "default_persona"
+        private const val KEY_STEP = "current_step"
 
         fun from(context: Context): OnboardingPrefs =
             OnboardingPrefs(context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE))

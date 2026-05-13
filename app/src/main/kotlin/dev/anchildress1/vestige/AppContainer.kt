@@ -151,6 +151,7 @@ class AppContainer(
     private var embedderInstance: Embedder? = null
 
     private val networkGate: NetworkGate = networkGateFactory()
+    private val mainModelManifest: ModelManifest by lazy(ModelManifest::loadDefault)
     private val embeddingArtifactsDir: File by lazy { File(applicationContext.filesDir, MODEL_ARTIFACTS_SUBDIR) }
     private val embeddingArtifactManifest: EmbeddingArtifactManifest by lazy(embeddingArtifactManifestLoader)
 
@@ -161,6 +162,14 @@ class AppContainer(
         )
     }
     val backgroundEngine: LiteRtLmEngine by backgroundEngineDelegate
+
+    val mainModelArtifactStore: ModelArtifactStore by lazy {
+        DefaultModelArtifactStore(
+            manifest = mainModelManifest,
+            baseDir = File(applicationContext.filesDir, MODEL_ARTIFACTS_SUBDIR),
+            httpClient = ArtifactHttpClient(mainModelManifest.allowedHosts, networkGate),
+        )
+    }
 
     val embeddingModelArtifactStore: ModelArtifactStore by lazy {
         embeddingModelArtifactStoreFactory(

@@ -49,11 +49,28 @@ class OnboardingPrefsTest {
     }
 
     @Test
+    fun `setCurrentStep round-trips the onboarding step`() {
+        prefs.setCurrentStep(OnboardingStep.WifiCheck)
+        val ctx = ApplicationProvider.getApplicationContext<Context>()
+        val reopened = OnboardingPrefs.from(ctx)
+        assertEquals(OnboardingStep.WifiCheck, reopened.currentStep)
+    }
+
+    @Test
     fun `unknown persona string falls back to Witness without throwing`() {
         val ctx = ApplicationProvider.getApplicationContext<Context>()
         ctx.getSharedPreferences(OnboardingPrefs.PREFS_NAME, Context.MODE_PRIVATE)
             .edit().putString("default_persona", "NOT_A_PERSONA").commit()
         val reopened = OnboardingPrefs.from(ctx)
         assertEquals(Persona.WITNESS, reopened.defaultPersona)
+    }
+
+    @Test
+    fun `markComplete clears the stored onboarding step`() {
+        prefs.setCurrentStep(OnboardingStep.Ready)
+        prefs.markComplete()
+        val ctx = ApplicationProvider.getApplicationContext<Context>()
+        val reopened = OnboardingPrefs.from(ctx)
+        assertEquals(OnboardingStep.PersonaPick, reopened.currentStep)
     }
 }

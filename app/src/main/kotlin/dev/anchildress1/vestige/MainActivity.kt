@@ -40,6 +40,7 @@ import dev.anchildress1.vestige.debug.DebugPatternSeeder
 import dev.anchildress1.vestige.ui.components.AppTop
 import dev.anchildress1.vestige.ui.components.VestigeScaffold
 import dev.anchildress1.vestige.ui.components.VestigeSurface
+import dev.anchildress1.vestige.ui.onboarding.ModelAvailability
 import dev.anchildress1.vestige.ui.onboarding.OnboardingHost
 import dev.anchildress1.vestige.ui.onboarding.OnboardingPrefs
 import dev.anchildress1.vestige.ui.patterns.PatternsHost
@@ -60,6 +61,7 @@ class MainActivity : ComponentActivity() {
                     OnboardingHost(
                         prefs = onboardingPrefs,
                         onComplete = { onboardingComplete = true },
+                        modelAvailability = ModelAvailability.Default(container.mainModelArtifactStore),
                         modifier = Modifier.fillMaxSize(),
                     )
                     return@VestigeTheme

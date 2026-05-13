@@ -35,9 +35,11 @@ internal val RowLabelColor: Color = Mist
 internal val RowValueColor: Color = Ink
 
 /** Glass card primitive per poc/design-review.md §7.3 — tinted fill + noise + hairline. */
+@Suppress("LongParameterList") // Primitive API is intentionally explicit at the call site.
 @Composable
 fun VestigeSurface(
     modifier: Modifier = Modifier,
+    accentModifier: Modifier = Modifier,
     shape: Shape = RadiusTokens.XL,
     fill: Color = S1,
     contentPadding: PaddingValues = PaddingValues(0.dp),
@@ -48,6 +50,7 @@ fun VestigeSurface(
             .clip(shape)
             .background(fill, shape)
             .noiseGrain(opacity = SURFACE_GRAIN_OPACITY)
+            .then(accentModifier)
             .border(width = SurfaceHairline, color = S3, shape = shape)
             .padding(contentPadding),
     ) {
@@ -79,10 +82,12 @@ fun VestigeRow(
  *
  * With [onClick] the fill raises to [S2] and the surface takes a button role.
  */
+@Suppress("LongParameterList") // Same primitive tradeoff: fewer wrappers, clearer call sites.
 @Composable
 fun VestigeListCard(
     modifier: Modifier = Modifier,
     onClick: (() -> Unit)? = null,
+    accentModifier: Modifier = Modifier,
     shape: Shape = RadiusTokens.XL,
     contentPadding: PaddingValues = PaddingValues(horizontal = 16.dp, vertical = 14.dp),
     content: @Composable () -> Unit,
@@ -96,6 +101,7 @@ fun VestigeListCard(
     }
     VestigeSurface(
         modifier = modifier.then(interactionModifier),
+        accentModifier = accentModifier,
         shape = shape,
         fill = vestigeListCardFill(onClick),
         contentPadding = contentPadding,

@@ -83,7 +83,10 @@ class VestigePrimitivesTest {
     @Test
     fun `accent modifiers compose onto a sized box without crashing`() {
         composeRule.setContent {
-            VestigeSurface(modifier = Modifier.size(120.dp).glowLeftRule()) {
+            VestigeSurface(
+                modifier = Modifier.size(120.dp),
+                accentModifier = Modifier.glowLeftRule(),
+            ) {
                 Text(text = "glow-rule")
             }
         }
@@ -103,7 +106,10 @@ class VestigePrimitivesTest {
     @Test
     fun `vapor halo idles at zero level`() {
         composeRule.setContent {
-            VestigeSurface(modifier = Modifier.size(120.dp).vaporHaloOnRecording(level = 0f)) {
+            VestigeSurface(
+                modifier = Modifier.size(120.dp),
+                accentModifier = Modifier.vaporHaloOnRecording(level = 0f),
+            ) {
                 Text(text = "halo-idle")
             }
         }
@@ -113,7 +119,10 @@ class VestigePrimitivesTest {
     @Test
     fun `vapor halo composes at active level`() {
         composeRule.setContent {
-            VestigeSurface(modifier = Modifier.size(120.dp).vaporHaloOnRecording(level = 0.8f)) {
+            VestigeSurface(
+                modifier = Modifier.size(120.dp),
+                accentModifier = Modifier.vaporHaloOnRecording(level = 0.8f),
+            ) {
                 Text(text = "halo-active")
             }
         }
@@ -123,7 +132,10 @@ class VestigePrimitivesTest {
     @Test
     fun `vapor halo treats negative level as idle`() {
         composeRule.setContent {
-            VestigeSurface(modifier = Modifier.size(120.dp).vaporHaloOnRecording(level = -0.5f)) {
+            VestigeSurface(
+                modifier = Modifier.size(120.dp),
+                accentModifier = Modifier.vaporHaloOnRecording(level = -0.5f),
+            ) {
                 Text(text = "halo-negative")
             }
         }
@@ -133,7 +145,10 @@ class VestigePrimitivesTest {
     @Test
     fun `vapor halo treats NaN level as idle`() {
         composeRule.setContent {
-            VestigeSurface(modifier = Modifier.size(120.dp).vaporHaloOnRecording(level = Float.NaN)) {
+            VestigeSurface(
+                modifier = Modifier.size(120.dp),
+                accentModifier = Modifier.vaporHaloOnRecording(level = Float.NaN),
+            ) {
                 Text(text = "halo-nan")
             }
         }
@@ -143,7 +158,10 @@ class VestigePrimitivesTest {
     @Test
     fun `vapor halo clamps above 1`() {
         composeRule.setContent {
-            VestigeSurface(modifier = Modifier.size(120.dp).vaporHaloOnRecording(level = 99f)) {
+            VestigeSurface(
+                modifier = Modifier.size(120.dp),
+                accentModifier = Modifier.vaporHaloOnRecording(level = 99f),
+            ) {
                 Text(text = "halo-clamped")
             }
         }
@@ -163,7 +181,10 @@ class VestigePrimitivesTest {
     @Test
     fun `error fill renders`() {
         composeRule.setContent {
-            VestigeListCard(modifier = Modifier.size(120.dp).errorFillForDestructive()) {
+            VestigeListCard(
+                modifier = Modifier.size(120.dp),
+                accentModifier = Modifier.errorFillForDestructive(),
+            ) {
                 Text(text = "destructive")
             }
         }

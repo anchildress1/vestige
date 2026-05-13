@@ -76,6 +76,13 @@ class DesignTokensTest {
     }
 
     @Test
+    fun `H2 is body sans 22sp`() {
+        val style = VestigeTextStyles.H2
+        assertEquals(VestigeFonts.Body, style.fontFamily)
+        assertEquals(22f, style.fontSize.value)
+    }
+
+    @Test
     fun `P is body sans 15sp`() {
         val style = VestigeTextStyles.P
         assertEquals(VestigeFonts.Body, style.fontFamily)
@@ -96,5 +103,14 @@ class DesignTokensTest {
         assertEquals(VestigeFonts.Mono, style.fontFamily)
         assertEquals(10f, style.fontSize.value)
         assertEquals(0.20f, style.letterSpacing.value, 0.0001f)
+    }
+
+    @Test
+    fun `screen facing typography slots map to vestige styles`() {
+        assertEquals(VestigeTextStyles.Title, VestigeTypography.titleLarge)
+        assertEquals(VestigeTextStyles.Title, VestigeTypography.titleMedium)
+        assertEquals(VestigeTextStyles.TitleCompact, VestigeTypography.titleSmall)
+        assertEquals(VestigeTextStyles.H2, VestigeTypography.headlineSmall)
+        assertEquals(VestigeTextStyles.PCompact, VestigeTypography.bodySmall)
     }
 }

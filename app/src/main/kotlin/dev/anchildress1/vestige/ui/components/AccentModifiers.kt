@@ -1,11 +1,12 @@
 package dev.anchildress1.vestige.ui.components
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
@@ -37,22 +38,25 @@ internal val GlowRuleWidth: Dp = 3.dp
 /**
  * Vapor halo scaled by audio amplitude [level] (0..1).
  *
- * Idle (or NaN / negative) draws nothing. The halo paints into the receiver's bounds — apply on a
- * wrapper at least ~1.5× the stone size so the halo reads outside the stone itself. Spec:
- * design-guidelines.md §"Where each accent lives" + poc/design-review.md §3.3.
+ * Idle (or NaN / negative) draws nothing. Use this through `VestigeSurface(accentModifier = …)`
+ * so it sits between the glass fill and foreground content, or on a larger wrapper if the halo
+ * needs to spill beyond the stone bounds. Spec: design-guidelines.md §"Where each accent lives"
+ * + poc/design-review.md §3.3.
  */
-fun Modifier.vaporHaloOnRecording(level: Float, color: Color = Vapor): Modifier = drawBehind {
+fun Modifier.vaporHaloOnRecording(level: Float, color: Color = Vapor): Modifier = drawWithContent {
     val amp = if (level.isNaN()) 0f else level.coerceIn(0f, 1f)
-    if (amp <= 0f) return@drawBehind
-    val maxR = maxOf(size.width, size.height) * VAPOR_HALO_BASE_RADIUS
-    val r = maxR * (VAPOR_HALO_MIN_SCALE + amp * VAPOR_HALO_AMP_SCALE)
-    drawRect(
-        brush = Brush.radialGradient(
-            colors = listOf(color.copy(alpha = VAPOR_HALO_ALPHA * amp), Color.Transparent),
-            center = Offset(size.width / 2f, size.height / 2f),
-            radius = r,
-        ),
-    )
+    if (amp > 0f) {
+        val maxR = maxOf(size.width, size.height) * VAPOR_HALO_BASE_RADIUS
+        val r = maxR * (VAPOR_HALO_MIN_SCALE + amp * VAPOR_HALO_AMP_SCALE)
+        drawRect(
+            brush = Brush.radialGradient(
+                colors = listOf(color.copy(alpha = VAPOR_HALO_ALPHA * amp), Color.Transparent),
+                center = Offset(size.width / 2f, size.height / 2f),
+                radius = r,
+            ),
+        )
+    }
+    drawContent()
 }
 
 private const val VAPOR_HALO_BASE_RADIUS: Float = 0.6f
@@ -88,9 +92,17 @@ private const val PULSE_HALO_ALPHA: Float = 0.25f
 private const val PULSE_RIM_ALPHA: Float = 0.7f
 
 /**
- * Destructive fill — wipe confirmations only. Locks call-sites to [ErrorRed] so a destructive
- * button can never wear brand styling. Spec: design-guidelines.md §"Where each accent lives".
+ * Destructive fill — wipe confirmations only. Use this through `VestigeSurface(accentModifier = …)`
+ * so it replaces the glass fill without tinting foreground content. Locks call-sites to [ErrorRed]
+ * so a destructive control can never wear brand styling. Spec: design-guidelines.md §"Where each
+ * accent lives".
  */
-fun Modifier.errorFillForDestructive(): Modifier = this
-    .clip(RadiusTokens.Pill)
-    .background(ErrorRed, RadiusTokens.Pill)
+fun Modifier.errorFillForDestructive(cornerRadius: Dp = RadiusTokens.RPill): Modifier = this
+    .clip(RoundedCornerShape(cornerRadius))
+    .drawWithContent {
+        drawRoundRect(
+            color = ErrorRed,
+            cornerRadius = CornerRadius(cornerRadius.toPx(), cornerRadius.toPx()),
+        )
+        drawContent()
+    }

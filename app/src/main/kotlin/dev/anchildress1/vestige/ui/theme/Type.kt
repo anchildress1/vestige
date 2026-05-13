@@ -50,14 +50,29 @@ object VestigeTextStyles {
         fontSize = 10.sp,
         letterSpacing = 0.20.em,
     )
+
+    val H2: TextStyle = H1.copy(fontSize = 22.sp, lineHeight = 28.sp)
+
+    val Title: TextStyle = P.copy(fontWeight = FontWeight.Medium, fontSize = 18.sp, lineHeight = 24.sp)
+
+    val TitleCompact: TextStyle = P.copy(fontWeight = FontWeight.Medium, fontSize = 15.sp, lineHeight = 20.sp)
+
+    val PCompact: TextStyle = P.copy(fontSize = 13.sp, lineHeight = 18.sp)
 }
 
 val VestigeTypography: Typography = Typography(
     displayLarge = VestigeTextStyles.HDisplay,
+    displayMedium = VestigeTextStyles.HDisplay.copy(fontSize = 32.sp, lineHeight = 38.sp),
+    displaySmall = VestigeTextStyles.HDisplay.copy(fontSize = 28.sp, lineHeight = 34.sp),
     headlineLarge = VestigeTextStyles.H1,
-    headlineMedium = VestigeTextStyles.H1.copy(fontSize = 22.sp, lineHeight = 28.sp),
+    headlineMedium = VestigeTextStyles.H2,
+    headlineSmall = VestigeTextStyles.H2,
+    titleLarge = VestigeTextStyles.Title,
+    titleMedium = VestigeTextStyles.Title,
+    titleSmall = VestigeTextStyles.TitleCompact,
     bodyLarge = VestigeTextStyles.P,
     bodyMedium = VestigeTextStyles.P.copy(fontSize = 14.sp, lineHeight = 20.sp),
+    bodySmall = VestigeTextStyles.PCompact,
     labelLarge = VestigeTextStyles.Eyebrow.copy(fontSize = 12.sp, letterSpacing = 0.10.em),
     labelMedium = VestigeTextStyles.Eyebrow,
     labelSmall = VestigeTextStyles.PersonaLabel,

@@ -40,6 +40,8 @@ import dev.anchildress1.vestige.debug.DebugPatternSeeder
 import dev.anchildress1.vestige.ui.components.AppTop
 import dev.anchildress1.vestige.ui.components.VestigeScaffold
 import dev.anchildress1.vestige.ui.components.VestigeSurface
+import dev.anchildress1.vestige.ui.onboarding.OnboardingHost
+import dev.anchildress1.vestige.ui.onboarding.OnboardingPrefs
 import dev.anchildress1.vestige.ui.patterns.PatternsHost
 import dev.anchildress1.vestige.ui.theme.VestigeTheme
 
@@ -48,8 +50,18 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         val container = (application as VestigeApplication).appContainer
+        val onboardingPrefs = OnboardingPrefs.from(this)
         setContent {
             VestigeTheme {
+                var onboardingComplete by rememberSaveable { mutableStateOf(onboardingPrefs.isComplete) }
+                if (!onboardingComplete) {
+                    OnboardingHost(
+                        prefs = onboardingPrefs,
+                        onComplete = { onboardingComplete = true },
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                    return@VestigeTheme
+                }
                 var showPatterns by rememberSaveable { mutableStateOf(false) }
                 if (showPatterns) {
                     // Back unwinds patterns→shell; without this the activity exits and the user

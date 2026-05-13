@@ -1,0 +1,126 @@
+package dev.anchildress1.vestige.ui.onboarding
+
+import android.content.Context
+import androidx.activity.ComponentActivity
+import androidx.activity.compose.setContent
+import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
+import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
+import androidx.test.core.app.ApplicationProvider
+import androidx.test.ext.junit.runners.AndroidJUnit4
+import dev.anchildress1.vestige.model.Persona
+import org.junit.After
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
+import org.junit.Before
+import org.junit.Rule
+import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.annotation.Config
+import dev.anchildress1.vestige.ui.theme.VestigeTheme
+
+@RunWith(AndroidJUnit4::class)
+@Config(sdk = [34], manifest = Config.NONE, application = OnboardingTestApplication::class)
+class OnboardingHostTest {
+
+    @get:Rule
+    val composeRule = createAndroidComposeRule<ComponentActivity>()
+
+    private lateinit var prefs: OnboardingPrefs
+
+    @Before
+    fun setUp() {
+        val ctx = ApplicationProvider.getApplicationContext<Context>()
+        ctx.getSharedPreferences(OnboardingPrefs.PREFS_NAME, Context.MODE_PRIVATE)
+            .edit().clear().commit()
+        prefs = OnboardingPrefs.from(ctx)
+    }
+
+    @After
+    fun tearDown() {
+        val ctx = ApplicationProvider.getApplicationContext<Context>()
+        ctx.getSharedPreferences(OnboardingPrefs.PREFS_NAME, Context.MODE_PRIVATE)
+            .edit().clear().commit()
+    }
+
+    @Test
+    fun `lands on persona pick with Witness default`() {
+        startHost()
+        composeRule.onNodeWithText("Pick a persona.").assertIsDisplayed()
+        composeRule.onNodeWithText("Witness").assertIsDisplayed()
+        composeRule.onNodeWithText("Hardass").assertIsDisplayed()
+        composeRule.onNodeWithText("Editor").assertIsDisplayed()
+    }
+
+    @Test
+    fun `selecting Hardass persists default persona to prefs`() {
+        startHost()
+        composeRule.onNodeWithText("Hardass").performScrollTo().performClick()
+        composeRule.onNodeWithText("Continue").performScrollTo().performClick()
+        composeRule.waitForIdle()
+        assertEquals(Persona.HARDASS, prefs.defaultPersona)
+    }
+
+    @Test
+    fun `full flow advances through all eight screens and marks complete on Open Vestige`() {
+        var completed = false
+        startHost(onComplete = { completed = true }, wifiAvailability = { true })
+
+        tapPrimary("Continue") // Screen 1
+        tapPrimary("Got it") // Screen 2
+        tapPrimary("Skip — I'll type instead") // Screen 3
+        tapPrimary("Skip — work runs in foreground only") // Screen 3.5
+        tapPrimary("Continue") // Screen 4
+        tapPrimary("Download model") // Screen 5 (Wi-Fi connected)
+        tapPrimary("Continue without downloading") // Screen 6
+        tapPrimary("Open Vestige") // Screen 7
+
+        assertTrue(completed)
+        assertTrue(prefs.isComplete)
+    }
+
+    @Test
+    fun `Wi-Fi missing branch shows open settings + come back actions`() {
+        startHost(wifiAvailability = { false })
+        tapPrimary("Continue")
+        tapPrimary("Got it")
+        tapPrimary("Skip — I'll type instead")
+        tapPrimary("Skip — work runs in foreground only")
+        tapPrimary("Continue")
+
+        composeRule.onNodeWithText("Wi-Fi required.").assertIsDisplayed()
+        composeRule.onNodeWithText("Open Wi-Fi settings").performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithText("I'll come back").performScrollTo().assertIsDisplayed()
+    }
+
+    @Test
+    fun `does not mark complete until final Open Vestige tap`() {
+        startHost(wifiAvailability = { true })
+        tapPrimary("Continue")
+        tapPrimary("Got it")
+        assertFalse(prefs.isComplete)
+    }
+
+    private fun tapPrimary(label: String) {
+        composeRule.onNodeWithText(label).performScrollTo().performClick()
+        composeRule.waitForIdle()
+    }
+
+    private fun startHost(
+        onComplete: () -> Unit = {},
+        wifiAvailability: WifiAvailability = WifiAvailability { false },
+    ) {
+        composeRule.activity.setContent {
+            VestigeTheme {
+                OnboardingHost(
+                    prefs = prefs,
+                    onComplete = onComplete,
+                    wifiAvailability = wifiAvailability,
+                )
+            }
+        }
+    }
+}

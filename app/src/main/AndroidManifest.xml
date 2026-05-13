@@ -14,6 +14,7 @@
          keep-alive. POST_NOTIFICATIONS is asked at onboarding screen 3.5 in Phase 4. -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
     <!-- The mic is required hardware. -->
     <uses-feature

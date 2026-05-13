@@ -143,13 +143,12 @@ fun Pill(
     dot: Boolean = false,
     blink: Boolean = false,
 ) {
-    val borderColor = if (fill) color else color
     val fg = if (fill) Deep else color
     Row(
         modifier = modifier
             .clip(RadiusTokens.Pill)
             .background(if (fill) color else Color.Transparent, RadiusTokens.Pill)
-            .border(width = 1.dp, color = borderColor, shape = RadiusTokens.Pill)
+            .border(width = 1.dp, color = color, shape = RadiusTokens.Pill)
             .padding(horizontal = 10.dp, vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(6.dp),

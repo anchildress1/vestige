@@ -37,7 +37,12 @@ fun Modifier.noiseGrain(opacity: Float = 0.10f): Modifier = drawWithCache {
     onDrawBehind { drawNoiseOverlay(brush, clamped) }
 }
 
-internal fun clampGrainOpacity(raw: Float): Float = raw.coerceIn(NOISE_GRAIN_MIN_OPACITY, NOISE_GRAIN_MAX_OPACITY)
+internal fun clampGrainOpacity(raw: Float): Float {
+    // `Float.NaN.coerceIn(...)` returns NaN, which would propagate to `drawRect(alpha = NaN)`
+    // and silently kill the noise overlay. Treat non-finite inputs as the documented floor.
+    if (raw.isNaN()) return NOISE_GRAIN_MIN_OPACITY
+    return raw.coerceIn(NOISE_GRAIN_MIN_OPACITY, NOISE_GRAIN_MAX_OPACITY)
+}
 
 /** Deterministic alpha noise pixels packed as `0xAA000000`. Pure Kotlin so JVM tests can assert. */
 @Suppress("kotlin:S2245") // Visual atmosphere only — alpha tile for an overlay BlendMode. Not a

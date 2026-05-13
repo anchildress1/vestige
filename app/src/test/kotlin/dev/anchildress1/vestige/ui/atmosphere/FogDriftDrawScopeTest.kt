@@ -61,6 +61,14 @@ class FogDriftDrawScopeTest {
     }
 
     @Test
+    fun `drawFogDrift treats NaN intensity as transparent (err — coerceIn does not clamp NaN)`() {
+        val bm = renderInBitmap(40, 40) {
+            drawFogDrift(intensity = Float.NaN, hueA = Vapor, hueB = Vapor, phaseA = 0f, phaseB = 0f)
+        }
+        assertEquals("NaN intensity must collapse to fully transparent", 0f, bm.alphaAt(20, 20), 0.01f)
+    }
+
+    @Test
     fun `drawFogDrift bails out on zero-sized canvas (neg — degenerate size)`() {
         // Smallest non-zero ImageBitmap is 1×1; we render at that size and confirm no throw.
         val bm = renderInBitmap(1, 1) {

@@ -67,7 +67,9 @@ fun FogDrift(modifier: Modifier = Modifier, intensity: Float = 0.35f, hueA: Colo
 }
 
 internal fun DrawScope.drawFogDrift(intensity: Float, hueA: Color, hueB: Color, phaseA: Float, phaseB: Float) {
-    val alpha = intensity.coerceIn(0f, 1f)
+    // NaN guard — coerceIn returns NaN on NaN input, which would propagate into
+    // `Color.copy(alpha = NaN)` and produce undefined behavior in the gradient.
+    val alpha = if (intensity.isNaN()) 0f else intensity.coerceIn(0f, 1f)
     val w = size.width
     val h = size.height
     if (w <= 0f || h <= 0f) return

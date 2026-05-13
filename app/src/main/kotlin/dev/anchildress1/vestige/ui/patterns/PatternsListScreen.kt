@@ -45,15 +45,16 @@ import androidx.compose.ui.unit.dp
 import dev.anchildress1.vestige.R
 import dev.anchildress1.vestige.ui.components.VestigeListCard
 import dev.anchildress1.vestige.ui.components.glowLeftRule
+import dev.anchildress1.vestige.ui.theme.Vapor
 import dev.anchildress1.vestige.ui.theme.VestigeTheme
 
 /**
- * Blue `#2563EB` (Vapor) — the active-pattern accent in `poc/screenshots/patterns.png`. The
- * `design-guidelines.md` §"glow = patterns" wording is overruled by the visual reference: lit
- * TraceBar cells and the active-card rule both read blue, not purple. Glow stays reserved for
- * the Roast me button (Story 4.14).
+ * The active-pattern accent — [Vapor] — matches the blue lit cells in
+ * `poc/screenshots/patterns.png`. The `design-guidelines.md` §"glow = patterns" wording is
+ * overruled by the visual reference: lit TraceBar cells and the active-card rule both read blue,
+ * not purple. Glow stays reserved for the Roast me button (Story 4.14).
  */
-private val PatternAccent = Color(0xFF2563EB)
+private val PatternAccent: Color = Vapor
 
 @OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable

@@ -26,8 +26,8 @@ import dev.anchildress1.vestige.ui.theme.Vapor
  * Spec: design-guidelines.md §"Where each accent lives".
  */
 fun Modifier.glowLeftRule(width: Dp = GlowRuleWidth, color: Color = Glow): Modifier = drawWithContent {
-    drawContent()
     drawGlowLeftRule(width, color)
+    drawContent()
 }
 
 internal fun DrawScope.drawGlowLeftRule(width: Dp, color: Color) {

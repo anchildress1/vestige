@@ -29,6 +29,12 @@ class AtmosphereTest {
     }
 
     @Test
+    fun `grain opacity treats NaN as the documented floor (err)`() {
+        // Bare coerceIn(NaN) returns NaN; the guard pins it to the floor instead.
+        assertEquals(NOISE_GRAIN_MIN_OPACITY, clampGrainOpacity(Float.NaN))
+    }
+
+    @Test
     fun `noise pixels are deterministic per seed`() {
         val a = noiseAlphaPixels(NOISE_DEFAULT_SEED)
         val b = noiseAlphaPixels(NOISE_DEFAULT_SEED)

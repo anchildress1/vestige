@@ -298,7 +298,7 @@ This story is **infra-only**; no user-visible UX changes. The "Reading the entry
 
 ### Story 2.11 — Inference latency UI: foreground placeholder — **MERGED INTO STORY 4.5 (2026-05-10)**
 
-Phase 2 has no capture screen to attach a placeholder to — Story 4.5 builds the surface (`MistHero`, transcript). All five `Done when` boxes from this story (placeholder display, 200 ms minimum hold, error-state replacement on `ParseFailure` / cancellation, no streaming) landed under Story 4.5 as the `Inference placeholder lifecycle (absorbed from Story 2.11)` bullet. Track them there.
+Phase 2 has no capture screen to attach a placeholder to — Story 4.5 builds the surface (Scoreboard "ON AIR" record state + entry transcript per ADR-011; original Mist `MistHero` framing retired). All five `Done when` boxes from this story (placeholder display, 200 ms minimum hold, error-state replacement on `ParseFailure` / cancellation, no streaming) landed under Story 4.5 as the `Inference placeholder lifecycle (absorbed from Story 2.11)` bullet. Track them there.
 
 ---
 

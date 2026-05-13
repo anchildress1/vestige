@@ -6,6 +6,24 @@ This document is design-only. Engineering, runtime, and model details live in `c
 
 ---
 
+> ## ⚠ Superseded by ADR-011 (2026-05-13) — Scoreboard direction
+>
+> The visual language below — Mist palette, Newsreader italic, MistHero, fog drift, glow / vapor accents, the "Quiet. Observational. Restrained in the visuals." core feeling — is **superseded** by [`adrs/ADR-011-design-language-scoreboard-pivot.md`](adrs/ADR-011-design-language-scoreboard-pivot.md).
+>
+> **New canonical visual sources:**
+> - `poc/Energy Direction.html` — direction walkthrough.
+> - `poc/energy-tokens.jsx` — palette (warm espresso surfaces, electric lime, alarm coral, teal, ember), Anton + Space Grotesk + JetBrains Mono type stack, sharper radii, `sb*` motion keyframes.
+> - `poc/energy-screens.jsx` — screen-level reference compositions.
+> - `poc/screenshots/hero.png` + `poc/screenshots/scorecard.png` — fixed reference frames.
+>
+> **New core feeling:** *Loud. Observational. Local. Precise. Biting in the words and in the visuals.* Concept: "the coach is a dick." See ADR-011 for the full delta (palette, type, motion, primitives, what breaks, what holds).
+>
+> **What still holds from this doc:** product framing (cognition tracker, not journal), forbidden vocabulary (no brains / hearts / journals / sparkles / mascots / badges), screen list, 10-second judge test. **What does not:** every Mist palette token, Newsreader, MistHero, fog drift, glow / vapor accents, "Restrained in the visuals" rule, and any "no celebrations" reading that rejects `▲N` deltas (deltas ship; see ADR-011 §"What this breaks").
+>
+> The body of this document is preserved as the historical Mist spec. Read it for product framing context, not for visual implementation. Visual implementation: ADR-011 + the POC files above.
+
+---
+
 ## Product Frame
 
 Vestige is an on-device cognition and pattern-tracking app for ADHD-flavored adults.

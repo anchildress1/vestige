@@ -28,6 +28,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -36,6 +37,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import dev.anchildress1.vestige.R
+import dev.anchildress1.vestige.model.PatternState
 import dev.anchildress1.vestige.ui.components.VestigeListCard
 import dev.anchildress1.vestige.ui.components.VestigeSurface
 
@@ -155,7 +157,7 @@ private fun LoadedBody(
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         PatternSummaryCard(loaded)
-        PatternIntensityCard(loaded.traceHits)
+        PatternIntensityCard(loaded.state, loaded.traceHits)
 
         HorizontalDivider(color = MaterialTheme.colorScheme.outline)
 
@@ -205,8 +207,9 @@ private fun PatternSummaryCard(loaded: PatternDetailUiState.Loaded) {
 }
 
 @Composable
-private fun PatternIntensityCard(traceHits: Set<Int>) {
+private fun PatternIntensityCard(state: PatternState, traceHits: Set<Int>) {
     // POC: "Intensity · 30 days" trace strip. Hero element of the detail screen.
+    val style = patternIntensityStyleFor(state)
     VestigeSurface(contentPadding = PaddingValues(16.dp)) {
         Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Text(
@@ -214,9 +217,32 @@ private fun PatternIntensityCard(traceHits: Set<Int>) {
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            TraceBarE(hits = traceHits, height = 28.dp)
+            TraceBarE(
+                hits = traceHits,
+                height = 28.dp,
+                accent = style.accent,
+                peak = style.peak,
+            )
         }
     }
+}
+
+internal data class PatternIntensityStyle(val accent: Color, val peak: Boolean)
+
+internal fun patternIntensityStyleFor(state: PatternState): PatternIntensityStyle = when (state) {
+    PatternState.ACTIVE -> PatternIntensityStyle(
+        accent = TraceBarDefaults.Accent,
+        peak = true,
+    )
+
+    PatternState.SNOOZED,
+    PatternState.RESOLVED,
+    PatternState.DISMISSED,
+    PatternState.BELOW_THRESHOLD,
+    -> PatternIntensityStyle(
+        accent = TraceBarDefaults.Rail,
+        peak = false,
+    )
 }
 
 @Composable

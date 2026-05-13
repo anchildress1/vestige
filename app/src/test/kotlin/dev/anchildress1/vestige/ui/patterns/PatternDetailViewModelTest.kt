@@ -1,6 +1,5 @@
 package dev.anchildress1.vestige.ui.patterns
 
-import androidx.test.core.app.ApplicationProvider
 import app.cash.turbine.test
 import dev.anchildress1.vestige.model.ExtractionStatus
 import dev.anchildress1.vestige.model.PatternKind
@@ -37,10 +36,14 @@ import java.time.ZoneOffset
 
 @OptIn(ExperimentalCoroutinesApi::class)
 @RunWith(RobolectricTestRunner::class)
-@Config(manifest = Config.NONE)
+@Config(
+    manifest = Config.NONE,
+    application = android.app.Application::class,
+)
 class PatternDetailViewModelTest {
 
     private lateinit var dataDir: File
+    private lateinit var markdownDir: File
     private lateinit var boxStore: BoxStore
     private lateinit var entryStore: EntryStore
     private lateinit var patternStore: PatternStore
@@ -51,10 +54,11 @@ class PatternDetailViewModelTest {
     @Before
     fun setUp() {
         Dispatchers.setMain(testDispatcher)
-        val context = ApplicationProvider.getApplicationContext<android.content.Context>()
-        dataDir = File(context.filesDir, "ob-patterns-detail-${System.nanoTime()}")
+        val tempRoot = File("/private/tmp/vestige-pattern-detail-viewmodel-tests").apply { mkdirs() }
+        dataDir = File(tempRoot, "ob-patterns-detail-${System.nanoTime()}").apply { mkdirs() }
+        markdownDir = File(tempRoot, "md-${System.nanoTime()}").apply { mkdirs() }
         boxStore = VestigeBoxStore.openAt(dataDir)
-        entryStore = EntryStore(boxStore, MarkdownEntryStore(File(context.filesDir, "md-${System.nanoTime()}")))
+        entryStore = EntryStore(boxStore, MarkdownEntryStore(markdownDir))
         patternStore = PatternStore(boxStore, baseClock)
         patternRepo = PatternRepo(patternStore, baseClock)
     }
@@ -64,6 +68,7 @@ class PatternDetailViewModelTest {
         Dispatchers.resetMain()
         boxStore.close()
         dataDir.deleteRecursively()
+        markdownDir.deleteRecursively()
     }
 
     @Test
@@ -85,6 +90,7 @@ class PatternDetailViewModelTest {
             assertEquals("p-detail", loaded.patternId)
             assertEquals(3, loaded.supportingCount)
             assertEquals(3L, loaded.totalEntryCount)
+            assertEquals(PatternState.ACTIVE, loaded.state)
             val sourceTimestamps = loaded.sources.map { it.entryId }
             // Entries seeded with ascending timestamps; sources should be reverse order.
             assertEquals(entries.reversed().map { it.id }, sourceTimestamps)
@@ -121,6 +127,7 @@ class PatternDetailViewModelTest {
         vm.markResolved()
         vm.state.test {
             val loaded = expectMostRecentItem() as PatternDetailUiState.Loaded
+            assertEquals(PatternState.RESOLVED, loaded.state)
             assertTrue(loaded.isTerminal)
             assertNotNull(loaded.terminalLabel)
             assertEquals(
@@ -204,6 +211,7 @@ class PatternDetailViewModelTest {
         vm.snooze()
         vm.state.test {
             val loaded = expectMostRecentItem() as PatternDetailUiState.Loaded
+            assertEquals(PatternState.SNOOZED, loaded.state)
             assertEquals(false, loaded.isTerminal)
             assertEquals(null, loaded.terminalLabel)
             assertEquals(setOf(PatternAction.DISMISSED), loaded.availableActions)

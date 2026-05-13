@@ -31,7 +31,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
 import dev.anchildress1.vestige.ui.motion.VestigeMotion
-import dev.anchildress1.vestige.ui.motion.rememberSbPulse
+import dev.anchildress1.vestige.ui.motion.rememberSbBlink
 import dev.anchildress1.vestige.ui.theme.Coral
 import dev.anchildress1.vestige.ui.theme.Deep
 import dev.anchildress1.vestige.ui.theme.Dim
@@ -84,7 +84,7 @@ fun EyebrowE(text: String, modifier: Modifier = Modifier, color: Color = Dim) {
     Text(text = text, modifier = modifier, style = VestigeTextStyles.Eyebrow, color = color)
 }
 
-/** Status dot, optionally pulsing. Default lime; coral when recording. */
+/** Status dot, optionally blinking. Default lime; coral when recording. */
 @Composable
 fun StatusDot(
     modifier: Modifier = Modifier,
@@ -92,11 +92,11 @@ fun StatusDot(
     blink: Boolean = false,
     size: Dp = DefaultStatusDotSize,
 ) {
-    val alpha = if (blink) rememberSbPulse(periodMs = VestigeMotion.PULSE_MS).value else 1f
+    val alpha = if (blink) rememberSbBlink(periodMs = VestigeMotion.BLINK_MS).value else 1f
     Box(
         modifier = modifier
             .size(size)
-            .alpha(STATUS_DOT_MIN_ALPHA + (1f - STATUS_DOT_MIN_ALPHA) * alpha)
+            .alpha(alpha)
             .drawBehind {
                 drawRect(
                     brush = Brush.radialGradient(
@@ -111,7 +111,6 @@ fun StatusDot(
 }
 
 internal val DefaultStatusDotSize: Dp = 7.dp
-private const val STATUS_DOT_MIN_ALPHA: Float = 0.40f
 private const val STATUS_DOT_GLOW_ALPHA: Float = 0.55f
 
 /**

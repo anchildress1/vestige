@@ -8,6 +8,7 @@ import androidx.compose.animation.core.LinearOutSlowInEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.keyframes
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.runtime.Composable
@@ -74,12 +75,19 @@ fun rememberSbPulse(periodMs: Int = VestigeMotion.PULSE_MS): State<Float> {
 @Composable
 fun rememberSbBlink(periodMs: Int = VestigeMotion.BLINK_MS): State<Float> {
     require(periodMs > 0) { "periodMs must be positive (was $periodMs)" }
+    val halfPeriodMs = periodMs / 2
     val transition = rememberInfiniteTransition(label = "sbBlink")
     return transition.animateFloat(
         initialValue = 0f,
         targetValue = 1f,
         animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = periodMs, easing = LinearEasing),
+            animation = keyframes {
+                durationMillis = periodMs
+                0f at 0
+                0f at halfPeriodMs
+                1f at (halfPeriodMs + 1).coerceAtMost(periodMs)
+                1f at periodMs
+            },
             repeatMode = RepeatMode.Restart,
         ),
         label = "sbBlinkFraction",

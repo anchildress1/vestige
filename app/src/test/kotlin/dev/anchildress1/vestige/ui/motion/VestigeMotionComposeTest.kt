@@ -16,7 +16,11 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [34], manifest = Config.NONE)
+@Config(
+    sdk = [34],
+    manifest = Config.NONE,
+    application = android.app.Application::class,
+)
 class VestigeMotionComposeTest {
 
     @get:Rule
@@ -42,6 +46,29 @@ class VestigeMotionComposeTest {
             }
         }
         composeRule.onNodeWithText("btrue").assertIsDisplayed()
+    }
+
+    @Test
+    fun `blink helper holds a step waveform across the cycle`() {
+        composeRule.mainClock.autoAdvance = false
+        composeRule.setContent {
+            val fraction by rememberSbBlink(periodMs = VestigeMotion.BLINK_MS)
+            Box(modifier = Modifier.size(40.dp)) {
+                Text(text = if (fraction < 0.5f) "off" else "on")
+            }
+        }
+
+        composeRule.onNodeWithText("off").assertIsDisplayed()
+
+        composeRule.mainClock.advanceTimeBy((VestigeMotion.BLINK_MS * 3L) / 4L)
+        composeRule.waitForIdle()
+        composeRule.onNodeWithText("on").assertIsDisplayed()
+
+        composeRule.mainClock.advanceTimeBy((VestigeMotion.BLINK_MS / 2).toLong())
+        composeRule.waitForIdle()
+        composeRule.onNodeWithText("off").assertIsDisplayed()
+
+        composeRule.mainClock.autoAdvance = true
     }
 
     @Test

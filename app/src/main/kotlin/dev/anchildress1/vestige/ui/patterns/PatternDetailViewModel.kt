@@ -122,6 +122,7 @@ class PatternDetailViewModel(
         lastSeenLabel = formatShortDate(lastSeenTimestamp),
         sources = sources,
         traceHits = traceHits,
+        state = state,
         isTerminal = isTerminalState(state),
         terminalLabel = terminalLabelFor(state, stateChangedTimestamp),
         availableActions = availableActionsFor(state),

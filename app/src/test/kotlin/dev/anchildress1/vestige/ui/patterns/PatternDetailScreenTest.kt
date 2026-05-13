@@ -8,7 +8,6 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
-import androidx.test.core.app.ApplicationProvider
 import dev.anchildress1.vestige.model.ExtractionStatus
 import dev.anchildress1.vestige.model.PatternKind
 import dev.anchildress1.vestige.model.PatternState
@@ -45,6 +44,7 @@ class PatternDetailScreenTest {
     val composeRule = createComposeRule()
 
     private lateinit var dataDir: File
+    private lateinit var markdownDir: File
     private lateinit var boxStore: BoxStore
     private lateinit var entryStore: EntryStore
     private lateinit var patternStore: PatternStore
@@ -54,12 +54,13 @@ class PatternDetailScreenTest {
     @Before
     fun setUp() {
         Dispatchers.setMain(testDispatcher)
-        val context = ApplicationProvider.getApplicationContext<android.content.Context>()
-        dataDir = File(context.filesDir, "ob-detail-screen-${System.nanoTime()}")
+        val tempRoot = File("/private/tmp/vestige-pattern-detail-screen-tests").apply { mkdirs() }
+        dataDir = File(tempRoot, "ob-detail-screen-${System.nanoTime()}").apply { mkdirs() }
+        markdownDir = File(tempRoot, "md-${System.nanoTime()}").apply { mkdirs() }
         boxStore = VestigeBoxStore.openAt(dataDir)
         entryStore = EntryStore(
             boxStore,
-            MarkdownEntryStore(File(context.filesDir, "md-${System.nanoTime()}")),
+            MarkdownEntryStore(markdownDir),
         )
         patternStore = PatternStore(boxStore)
         patternRepo = PatternRepo(patternStore)
@@ -70,6 +71,7 @@ class PatternDetailScreenTest {
         Dispatchers.resetMain()
         boxStore.close()
         dataDir.deleteRecursively()
+        markdownDir.deleteRecursively()
     }
 
     @Test

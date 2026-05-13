@@ -88,6 +88,71 @@ class OnboardingScreensTest {
     }
 
     @Test
+    fun `local explainer continue fires when Got it is tapped`() {
+        var tapped = false
+        composeRule.activity.setContent {
+            VestigeTheme {
+                LocalExplainerScreen(onContinue = { tapped = true })
+            }
+        }
+
+        composeRule.onNodeWithText("Got it").performClick()
+        assertTrue(tapped)
+    }
+
+    @Test
+    fun `mic permission primary and secondary actions fire their callbacks`() {
+        var allowed = false
+        var skipped = false
+        composeRule.activity.setContent {
+            VestigeTheme {
+                MicPermissionScreen(
+                    showDeniedNotice = false,
+                    onAllow = { allowed = true },
+                    onSkip = { skipped = true },
+                )
+            }
+        }
+
+        composeRule.onNodeWithText("Allow microphone").performClick()
+        composeRule.onNodeWithText("Skip — I'll type instead").performClick()
+        assertTrue(allowed)
+        assertTrue(skipped)
+    }
+
+    @Test
+    fun `notification permission primary and secondary actions fire their callbacks`() {
+        var allowed = false
+        var skipped = false
+        composeRule.activity.setContent {
+            VestigeTheme {
+                NotificationPermissionScreen(
+                    onAllow = { allowed = true },
+                    onSkip = { skipped = true },
+                )
+            }
+        }
+
+        composeRule.onNodeWithText("Allow notifications").performClick()
+        composeRule.onNodeWithText("Skip — watch the app work").performClick()
+        assertTrue(allowed)
+        assertTrue(skipped)
+    }
+
+    @Test
+    fun `typed fallback continue fires when Continue is tapped`() {
+        var tapped = false
+        composeRule.activity.setContent {
+            VestigeTheme {
+                TypedFallbackScreen(onContinue = { tapped = true })
+            }
+        }
+
+        composeRule.onNodeWithText("Continue").performClick()
+        assertTrue(tapped)
+    }
+
+    @Test
     fun `Ready screen interpolates the selected persona name`() {
         composeRule.activity.setContent {
             VestigeTheme {
@@ -139,6 +204,24 @@ class OnboardingScreensTest {
     }
 
     @Test
+    fun `model download placeholder keeps generic downloading pill for Corrupt state`() {
+        composeRule.activity.setContent {
+            VestigeTheme {
+                ModelDownloadPlaceholderScreen(
+                    modelState = ModelArtifactState.Corrupt(
+                        expectedSha256 = "expected",
+                        actualSha256 = "actual",
+                    ),
+                    onContinue = {},
+                )
+            }
+        }
+
+        composeRule.onNodeWithText("DOWNLOADING").assertIsDisplayed()
+        composeRule.onNodeWithText("DOWNLOADING 47%").assertDoesNotExist()
+    }
+
+    @Test
     fun `model download placeholder swaps to ready pill once the artifact lands`() {
         composeRule.activity.setContent {
             VestigeTheme {
@@ -165,6 +248,22 @@ class OnboardingScreensTest {
     }
 
     @Test
+    fun `model download placeholder fires Continue only when enabled`() {
+        var tapped = false
+        composeRule.activity.setContent {
+            VestigeTheme {
+                ModelDownloadPlaceholderScreen(
+                    modelState = ModelArtifactState.Complete,
+                    onContinue = { tapped = true },
+                )
+            }
+        }
+
+        composeRule.onNodeWithText("Continue").performClick()
+        assertTrue(tapped)
+    }
+
+    @Test
     fun `notification permission screen warns that skipping limits work to foreground`() {
         composeRule.activity.setContent {
             VestigeTheme {
@@ -175,5 +274,46 @@ class OnboardingScreensTest {
         val expected = "Skipping is fine. Without the notification, Vestige can only finish " +
             "reading an entry while the app is open — keep it foregrounded until the transcript lands."
         composeRule.onNodeWithText(expected).assertIsDisplayed()
+    }
+
+    @Test
+    fun `wifi check uses connected copy and callback when wifi is available`() {
+        var continued = false
+        composeRule.activity.setContent {
+            VestigeTheme {
+                WifiCheckScreen(
+                    isWifiConnected = true,
+                    onContinue = { continued = true },
+                    onOpenWifiSettings = {},
+                    onComeBackLater = {},
+                )
+            }
+        }
+
+        composeRule.onNodeWithText("Wi-Fi connected.").assertIsDisplayed()
+        composeRule.onNodeWithText("Download model").performClick()
+        assertTrue(continued)
+    }
+
+    @Test
+    fun `wifi check uses missing copy and both callbacks when wifi is unavailable`() {
+        var openedSettings = false
+        var cameBackLater = false
+        composeRule.activity.setContent {
+            VestigeTheme {
+                WifiCheckScreen(
+                    isWifiConnected = false,
+                    onContinue = {},
+                    onOpenWifiSettings = { openedSettings = true },
+                    onComeBackLater = { cameBackLater = true },
+                )
+            }
+        }
+
+        composeRule.onNodeWithText("Wi-Fi required.").assertIsDisplayed()
+        composeRule.onNodeWithText("Open Wi-Fi settings").performClick()
+        composeRule.onNodeWithText("I'll come back").performClick()
+        assertTrue(openedSettings)
+        assertTrue(cameBackLater)
     }
 }

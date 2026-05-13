@@ -66,6 +66,15 @@ class OnboardingPrefsTest {
     }
 
     @Test
+    fun `unknown onboarding step string falls back to PersonaPick without throwing`() {
+        val ctx = ApplicationProvider.getApplicationContext<Context>()
+        ctx.getSharedPreferences(OnboardingPrefs.PREFS_NAME, Context.MODE_PRIVATE)
+            .edit().putString("current_step", "NOT_A_STEP").commit()
+        val reopened = OnboardingPrefs.from(ctx)
+        assertEquals(OnboardingStep.PersonaPick, reopened.currentStep)
+    }
+
+    @Test
     fun `markComplete clears the stored onboarding step`() {
         prefs.setCurrentStep(OnboardingStep.Ready)
         prefs.markComplete()

@@ -34,17 +34,13 @@ private const val ALPHA_CHANNEL_SHIFT: Int = 24
  * surface with [BlendMode.Overlay]. Opacity is clamped to the documented 0.05–0.18 band so
  * callers can't drift toward visible noise.
  */
-fun Modifier.noiseGrain(
-    opacity: Float = 0.10f,
-    seed: Int = NOISE_DEFAULT_SEED,
-): Modifier = composed {
+fun Modifier.noiseGrain(opacity: Float = 0.10f, seed: Int = NOISE_DEFAULT_SEED): Modifier = composed {
     val clamped = clampGrainOpacity(opacity)
     val tile = remember(seed) { buildNoiseTile(seed) }
     drawBehind { drawNoiseOverlay(tile, clamped) }
 }
 
-internal fun clampGrainOpacity(raw: Float): Float =
-    raw.coerceIn(NOISE_GRAIN_MIN_OPACITY, NOISE_GRAIN_MAX_OPACITY)
+internal fun clampGrainOpacity(raw: Float): Float = raw.coerceIn(NOISE_GRAIN_MIN_OPACITY, NOISE_GRAIN_MAX_OPACITY)
 
 /** Deterministic alpha noise pixels packed as `0xAA000000`. Pure Kotlin so JVM tests can assert. */
 internal fun noiseAlphaPixels(seed: Int): IntArray {

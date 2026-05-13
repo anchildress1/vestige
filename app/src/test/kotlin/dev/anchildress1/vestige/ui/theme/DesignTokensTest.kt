@@ -12,16 +12,27 @@ import org.junit.Test
 class DesignTokensTest {
 
     @Test fun `void matches spec`() = assertEquals(Color(0xFF0A0E1A), Void)
+
     @Test fun `deep aliases void`() = assertEquals(Void, Deep)
+
     @Test fun `bg matches spec`() = assertEquals(Color(0xFF0E1124), Bg)
+
     @Test fun `s1 matches spec`() = assertEquals(Color(0xFF161A2E), S1)
+
     @Test fun `s2 matches spec`() = assertEquals(Color(0xFF1E2238), S2)
+
     @Test fun `s3 matches spec`() = assertEquals(Color(0xFF2A2E48), S3)
+
     @Test fun `ink matches spec`() = assertEquals(Color(0xFFE8ECF4), Ink)
+
     @Test fun `mist matches spec`() = assertEquals(Color(0xFF7B8497), Mist)
+
     @Test fun `glow matches spec`() = assertEquals(Color(0xFFA855F7), Glow)
+
     @Test fun `vapor matches spec`() = assertEquals(Color(0xFF2563EB), Vapor)
+
     @Test fun `pulse matches spec`() = assertEquals(Color(0xFF38A169), Pulse)
+
     @Test fun `error matches spec`() = assertEquals(Color(0xFFB3261E), ErrorRed)
 
     @Test

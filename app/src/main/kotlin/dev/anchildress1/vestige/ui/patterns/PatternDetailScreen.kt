@@ -18,7 +18,6 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SnackbarResult
@@ -42,6 +41,7 @@ import androidx.compose.ui.unit.dp
 import dev.anchildress1.vestige.R
 import dev.anchildress1.vestige.model.PatternState
 import dev.anchildress1.vestige.ui.components.VestigeListCard
+import dev.anchildress1.vestige.ui.components.VestigeScaffold
 import dev.anchildress1.vestige.ui.components.VestigeSurface
 import dev.anchildress1.vestige.ui.theme.VestigeTheme
 
@@ -83,8 +83,7 @@ fun PatternDetailScreen(
     }
 
     val backDescription = stringResource(R.string.pattern_back_description)
-    // Theme-owned colors — M3 default `colorScheme.background` + `onBackground`.
-    Scaffold(
+    VestigeScaffold(
         modifier = modifier,
         topBar = {
             TopAppBar(

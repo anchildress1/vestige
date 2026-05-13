@@ -34,6 +34,8 @@ Demo-impact test before accepting any feature or polish: *Does this visibly impr
 24. **Open PRs only on explicit instruction.** Branch, commit, push are autonomous. `gh pr create` (or equivalent) needs a direct user instruction in the current turn. Default: push, surface, wait. The user decides when a PR opens, what gets bundled, and what stays on the side.
 25. **No UI patching.** Screen-level color / contrast / spacing / type overrides used to "just fix this one surface" are quick fixes and are forbidden. If a UX bug appears in multiple places or can recur through shared composition, fix the owning theme token, shared primitive, or common style element instead.
 26. **Foreground color must come from shared UI primitives.** Readable text / icon color is owned by common theme style elements (`VestigeSurface`, shared chrome primitives, theme tokens, scaffold defaults when required by transparent containers), not by ad-hoc per-screen rescue colors. If a surface goes dark-on-dark, stop and repair the shared color-propagation path first.
+27. **No unnecessary overdocumentation.** Redundant comments, duplicate docs, and prose that restates obvious code are defects. Document only the hidden constraint, operator decision, or onboarding fact a reader would not recover from the code or existing docs.
+28. **Test coverage shape must be explicit.** Any touched test suite declares its pos / neg / err / edge scope; user-visible UI suites also assert a11y semantics and tap-target behavior where feasible. If automated accessibility checks are blocked by Robolectric or unavailable device runtime, say so and keep the JVM suite honest with semantics coverage instead of hand-waving.
 
 ## Build Order
 

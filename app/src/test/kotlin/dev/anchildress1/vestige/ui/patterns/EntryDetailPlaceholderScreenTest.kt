@@ -1,5 +1,6 @@
 package dev.anchildress1.vestige.ui.patterns
 
+import androidx.compose.ui.test.assertHasClickAction
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
@@ -28,6 +29,12 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import java.io.File
 
+/**
+ * Pos / neg + a11y coverage for the entry placeholder screen.
+ *
+ * Err-state behavior is equivalent to the not-found branch because the screen only consumes the
+ * store read result; storage failure mechanics are covered below this layer.
+ */
 @OptIn(ExperimentalCoroutinesApi::class)
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34], manifest = Config.NONE, application = PatternsTestApplication::class)
@@ -110,6 +117,19 @@ class EntryDetailPlaceholderScreenTest {
         }
         composeRule.onNodeWithContentDescription("Back").performClick()
         assertTrue("back callback fired", backFired)
+    }
+
+    @Test
+    fun `Back navigation icon exposes an accessible click target (a11y)`() {
+        composeRule.setContent {
+            EntryDetailPlaceholderScreen(
+                entryId = 9_999L,
+                entryStore = entryStore,
+                onBack = {},
+                ioDispatcher = testDispatcher,
+            )
+        }
+        composeRule.onNodeWithContentDescription("Back").assertHasClickAction()
     }
 
     private fun persistEntry(text: String, timestamp: Long): Long {

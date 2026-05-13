@@ -18,7 +18,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Button
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -40,6 +39,7 @@ import androidx.core.content.ContextCompat
 import dev.anchildress1.vestige.debug.DebugPatternSeeder
 import dev.anchildress1.vestige.ui.components.AppTop
 import dev.anchildress1.vestige.ui.components.AppTopStatus
+import dev.anchildress1.vestige.ui.components.VestigeScaffold
 import dev.anchildress1.vestige.ui.components.VestigeSurface
 import dev.anchildress1.vestige.ui.patterns.PatternsHost
 import dev.anchildress1.vestige.ui.theme.VestigeTheme
@@ -65,9 +65,7 @@ class MainActivity : ComponentActivity() {
                     )
                 } else {
                     val isDebuggable = (applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE) != 0
-                    // Default `containerColor` = `colorScheme.background` (= Floor) and default
-                    // `contentColor` = `onBackground` (= Ink) flow from VestigeTheme. No overrides.
-                    Scaffold(modifier = Modifier.fillMaxSize()) { padding ->
+                    VestigeScaffold(modifier = Modifier.fillMaxSize()) { padding ->
                         PhaseOneShell(
                             onOpenPatterns = { showPatterns = true },
                             onDebugSeed = if (isDebuggable) {

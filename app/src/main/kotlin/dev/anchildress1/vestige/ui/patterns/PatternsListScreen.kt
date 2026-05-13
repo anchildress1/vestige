@@ -17,7 +17,6 @@ import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SnackbarResult
@@ -40,6 +39,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import dev.anchildress1.vestige.R
 import dev.anchildress1.vestige.ui.components.VestigeListCard
+import dev.anchildress1.vestige.ui.components.VestigeScaffold
 import dev.anchildress1.vestige.ui.components.limeLeftRuleForActive
 import dev.anchildress1.vestige.ui.theme.VestigeTheme
 
@@ -80,9 +80,7 @@ fun PatternsListScreen(
         }
     }
 
-    // No containerColor override: M3 defaults to `colorScheme.background` (= Floor) and
-    // `contentColor` flows from `onBackground` (= Ink). Theme owns it.
-    Scaffold(
+    VestigeScaffold(
         modifier = modifier,
         topBar = { TopAppBar(title = { Text(stringResource(R.string.patterns_title)) }) },
         snackbarHost = { PatternSnackbarHost(snackbarHostState) },

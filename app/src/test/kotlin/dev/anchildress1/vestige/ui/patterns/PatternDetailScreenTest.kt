@@ -1,6 +1,7 @@
 package dev.anchildress1.vestige.ui.patterns
 
 import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.assertHasClickAction
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
@@ -35,6 +36,12 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import java.io.File
 
+/**
+ * Pos / neg / edge + a11y coverage for the detail screen.
+ *
+ * Err-state handling stays in repo / viewmodel tests; this composable only renders resolved UI
+ * state plus callback wiring.
+ */
 @OptIn(ExperimentalCoroutinesApi::class)
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34], manifest = Config.NONE, application = PatternsTestApplication::class)
@@ -172,6 +179,17 @@ class PatternDetailScreenTest {
         }
         composeRule.onNodeWithContentDescription("Back").performClick()
         assertTrue("back callback fired", backFired)
+    }
+
+    @Test
+    fun `Back navigation icon exposes an accessible click target (a11y)`() {
+        composeRule.setContent {
+            PatternDetailScreen(
+                viewModel = newViewModel("missing"),
+                onBack = {},
+            )
+        }
+        composeRule.onNodeWithContentDescription("Back").assertHasClickAction()
     }
 
     @Test

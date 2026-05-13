@@ -1,6 +1,7 @@
 package dev.anchildress1.vestige.ui.patterns
 
 import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.assertHasClickAction
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithContentDescription
@@ -35,6 +36,12 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import java.io.File
 
+/**
+ * Pos / neg / edge + a11y coverage for the list screen.
+ *
+ * Err-state handling lives below this layer in the store / repo / viewmodel tests; the screen
+ * contract itself receives only stable UI state and action callbacks.
+ */
 @OptIn(ExperimentalCoroutinesApi::class)
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34], manifest = Config.NONE, application = PatternsTestApplication::class)
@@ -132,6 +139,17 @@ class PatternsListScreenTest {
 
         composeRule.onNodeWithText("Tuesday Meetings").performClick()
         assertEquals("p-tap", opened)
+    }
+
+    @Test
+    fun `loaded card and overflow affordance expose click semantics and labels (a11y)`() {
+        val supporting = listOf(seedEntry("crashed", ExtractionStatus.COMPLETED))
+        seedActivePattern("p-a11y", "Tuesday Meetings", "Aftermath", "Callout.", supporting)
+
+        composeRule.setContent { PatternsListScreen(viewModel = newViewModel(), onOpenPattern = {}) }
+
+        composeRule.onNodeWithText("Tuesday Meetings").assertHasClickAction()
+        composeRule.onNodeWithContentDescription("Pattern actions").assertHasClickAction()
     }
 
     @Test

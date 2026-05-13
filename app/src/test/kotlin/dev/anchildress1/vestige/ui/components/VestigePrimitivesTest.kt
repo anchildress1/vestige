@@ -5,6 +5,8 @@ import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.Text
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.test.assertHasClickAction
+import androidx.compose.ui.test.assertHasNoClickAction
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
@@ -19,6 +21,12 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 
+/**
+ * Pos / neg / err / edge + a11y coverage for shared Vestige surface/scaffold primitives.
+ *
+ * Err coverage lives on the accent modifiers that clamp or reject invalid draw inputs; the
+ * surface wrappers themselves expose no throw-path API.
+ */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34], manifest = Config.NONE, application = android.app.Application::class)
 class VestigePrimitivesTest {
@@ -50,6 +58,19 @@ class VestigePrimitivesTest {
     }
 
     @Test
+    fun `VestigeScaffold provides Ink as the default content color (a11y + theme)`() {
+        var contentColor: Color? = null
+        composeRule.setContent {
+            VestigeScaffold {
+                contentColor = LocalContentColor.current
+                Text(text = "scaffold-ink")
+            }
+        }
+        composeRule.onNodeWithText("scaffold-ink").assertIsDisplayed()
+        composeRule.runOnIdle { assertEquals(Ink, contentColor) }
+    }
+
+    @Test
     fun `VestigeRow renders label and value`() {
         composeRule.setContent {
             VestigeRow(label = "VERSION", value = "1.0.0")
@@ -71,6 +92,16 @@ class VestigePrimitivesTest {
     }
 
     @Test
+    fun `VestigeListCard with onClick exposes click semantics (a11y, pos)`() {
+        composeRule.setContent {
+            VestigeListCard(modifier = Modifier.size(160.dp, 60.dp), onClick = {}) {
+                Text(text = "clickable-card")
+            }
+        }
+        composeRule.onNodeWithText("clickable-card").assertHasClickAction()
+    }
+
+    @Test
     fun `VestigeListCard renders without onClick`() {
         composeRule.setContent {
             VestigeListCard(modifier = Modifier.size(160.dp, 60.dp)) {
@@ -78,6 +109,16 @@ class VestigePrimitivesTest {
             }
         }
         composeRule.onNodeWithText("static-card").assertIsDisplayed()
+    }
+
+    @Test
+    fun `VestigeListCard without onClick stays non-interactive (a11y, neg)`() {
+        composeRule.setContent {
+            VestigeListCard(modifier = Modifier.size(160.dp, 60.dp)) {
+                Text(text = "static-card-a11y")
+            }
+        }
+        composeRule.onNodeWithText("static-card-a11y").assertHasNoClickAction()
     }
 
     @Test

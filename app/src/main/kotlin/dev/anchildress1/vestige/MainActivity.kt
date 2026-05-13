@@ -38,6 +38,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import dev.anchildress1.vestige.debug.DebugPatternSeeder
+import dev.anchildress1.vestige.ui.components.AppTop
 import dev.anchildress1.vestige.ui.components.VestigeSurface
 import dev.anchildress1.vestige.ui.patterns.PatternsHost
 import dev.anchildress1.vestige.ui.theme.Floor
@@ -69,6 +70,7 @@ class MainActivity : ComponentActivity() {
                         Scaffold(
                             modifier = Modifier.fillMaxSize(),
                             containerColor = androidx.compose.ui.graphics.Color.Transparent,
+                            topBar = { AppTop(persona = "WITNESS") },
                         ) { padding ->
                             PhaseOneShell(
                                 onOpenPatterns = { showPatterns = true },

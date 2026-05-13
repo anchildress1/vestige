@@ -70,6 +70,10 @@ class MainActivity : ComponentActivity() {
                         Scaffold(
                             modifier = Modifier.fillMaxSize(),
                             containerColor = androidx.compose.ui.graphics.Color.Transparent,
+                            // Scaffold derives LocalContentColor via contentColorFor(containerColor);
+                            // with Transparent it falls through to Color.Black and every M3 Text
+                            // inside the content lambda paints dark-on-dark on Floor. Pin it to Ink.
+                            contentColor = dev.anchildress1.vestige.ui.theme.Ink,
                             topBar = { AppTop(persona = "WITNESS") },
                         ) { padding ->
                             PhaseOneShell(

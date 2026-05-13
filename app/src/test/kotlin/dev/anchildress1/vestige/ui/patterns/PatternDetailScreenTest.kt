@@ -104,8 +104,8 @@ class PatternDetailScreenTest {
         composeRule.onNodeWithText("Fourth entry mentions Tuesday meetings.").assertIsDisplayed()
         // Action row + sources live below the new card stack; scrolling brings them into view.
         composeRule.onNodeWithText("crashed after standup").performScrollTo().assertIsDisplayed()
-        composeRule.onNodeWithText("Dismiss").performScrollTo().assertIsDisplayed()
-        composeRule.onNodeWithText("Snooze 7 days").performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithText("Drop").performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithText("Snooze").performScrollTo().assertIsDisplayed()
         composeRule.onNodeWithText("Mark resolved").performScrollTo().assertIsDisplayed()
     }
 
@@ -119,9 +119,9 @@ class PatternDetailScreenTest {
             PatternDetailScreen(viewModel = newViewModel("p-terminal"), onBack = {})
         }
 
-        composeRule.onNodeWithText("Dismissed", substring = true).performScrollTo().assertIsDisplayed()
-        composeRule.onAllNodesWithText("Dismiss").assertCountEquals(0)
-        composeRule.onAllNodesWithText("Snooze 7 days").assertCountEquals(0)
+        composeRule.onNodeWithText("Dropped", substring = true).performScrollTo().assertIsDisplayed()
+        composeRule.onAllNodesWithText("Drop").assertCountEquals(0)
+        composeRule.onAllNodesWithText("Snooze").assertCountEquals(0)
         composeRule.onAllNodesWithText("Mark resolved").assertCountEquals(0)
     }
 
@@ -135,8 +135,8 @@ class PatternDetailScreenTest {
             PatternDetailScreen(viewModel = newViewModel("p-snoozed-detail"), onBack = {})
         }
 
-        composeRule.onNodeWithText("Dismiss").performScrollTo().assertIsDisplayed()
-        composeRule.onAllNodesWithText("Snooze 7 days").assertCountEquals(0)
+        composeRule.onNodeWithText("Drop").performScrollTo().assertIsDisplayed()
+        composeRule.onAllNodesWithText("Snooze").assertCountEquals(0)
         composeRule.onAllNodesWithText("Mark resolved").assertCountEquals(0)
     }
 

@@ -114,10 +114,10 @@ class PatternsListScreenTest {
         composeRule.setContent { PatternsListScreen(viewModel = newViewModel(), onOpenPattern = {}) }
 
         composeRule.onNodeWithText("ACTIVE").assertIsDisplayed()
-        composeRule.onNodeWithText("DISMISSED").assertIsDisplayed()
-        // No snoozed or resolved cards in this seed, so those headers must stay hidden.
-        composeRule.onAllNodesWithText("SNOOZED · STILL DRIFTING").assertCountEquals(0)
-        composeRule.onAllNodesWithText("RESOLVED · FADED").assertCountEquals(0)
+        composeRule.onNodeWithText("DROPPED").assertIsDisplayed()
+        // No snoozed or closed cards in this seed, so those headers must stay hidden.
+        composeRule.onAllNodesWithText("SNOOZED · ON HOLD").assertCountEquals(0)
+        composeRule.onAllNodesWithText("CLOSED · DONE").assertCountEquals(0)
     }
 
     @Test
@@ -142,7 +142,7 @@ class PatternsListScreenTest {
         composeRule.setContent { PatternsListScreen(viewModel = newViewModel(), onOpenPattern = {}) }
 
         composeRule.onNodeWithContentDescription("Pattern actions").performClick()
-        composeRule.onNodeWithText("Dismiss").performClick()
+        composeRule.onNodeWithText("Drop").performClick()
         composeRule.waitForIdle()
         // Snackbar surfaces with Undo while the pattern is in DISMISSED state.
         assertEquals(PatternState.DISMISSED, patternStore.findByPatternId("p-undo")?.state)
@@ -159,7 +159,7 @@ class PatternsListScreenTest {
         composeRule.setContent { PatternsListScreen(viewModel = newViewModel(), onOpenPattern = {}) }
 
         composeRule.onNodeWithContentDescription("Pattern actions").performClick()
-        composeRule.onNodeWithText("Dismiss").performClick()
+        composeRule.onNodeWithText("Drop").performClick()
         composeRule.waitForIdle()
 
         assertEquals(PatternState.DISMISSED, patternStore.findByPatternId("p-dismiss")?.state)
@@ -174,8 +174,8 @@ class PatternsListScreenTest {
         composeRule.setContent { PatternsListScreen(viewModel = newViewModel(), onOpenPattern = {}) }
 
         composeRule.onNodeWithContentDescription("Pattern actions").performClick()
-        composeRule.onNodeWithText("Dismiss").assertIsDisplayed()
-        composeRule.onAllNodesWithText("Snooze 7 days").assertCountEquals(0)
+        composeRule.onNodeWithText("Drop").assertIsDisplayed()
+        composeRule.onAllNodesWithText("Snooze").assertCountEquals(0)
         composeRule.onAllNodesWithText("Mark resolved").assertCountEquals(0)
     }
 

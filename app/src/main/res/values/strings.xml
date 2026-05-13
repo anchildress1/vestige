@@ -54,7 +54,7 @@
     <!-- Patterns list section headers per docs/ux-copy.md §"Pattern List / Section headers". -->
     <string name="patterns_section_active">ACTIVE</string>
     <string name="patterns_section_snoozed">SKIPPED · ON HOLD</string>
-    <string name="patterns_section_resolved">DONE</string>
+    <string name="patterns_section_resolved">CLOSED · DONE</string>
     <string name="patterns_section_dismissed">DROPPED</string>
 
     <!-- Pattern card source-count + last-seen meta line. Phase 4 can localise the date format. -->

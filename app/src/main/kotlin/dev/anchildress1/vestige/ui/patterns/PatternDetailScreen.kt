@@ -236,38 +236,6 @@ private fun PatternIntensityCard(state: PatternState, traceHits: Set<Int>) {
 
 internal data class PatternIntensityStyle(val accent: Color, val peak: Boolean)
 
-/**
- * Tone variants kept enum-shaped so the lifecycle → tone mapping stays pure-Kotlin and trivially
- * testable; the concrete color binding happens in [themedStyle], which pulls from the active
- * `VestigeTheme.colors`. One source of truth — `themed*Style` is the only place that resolves
- * tone → color.
- */
-internal enum class IntensityTone(val peak: Boolean) {
-    ACTIVE_PEAK(peak = true),
-    SNOOZED(peak = false),
-    SETTLED(peak = false),
-    FROZEN(peak = false),
-}
-
-internal fun intensityToneFor(state: PatternState): IntensityTone = when (state) {
-    PatternState.ACTIVE -> IntensityTone.ACTIVE_PEAK
-    PatternState.SNOOZED -> IntensityTone.SNOOZED
-    PatternState.RESOLVED, PatternState.DISMISSED -> IntensityTone.SETTLED
-    PatternState.BELOW_THRESHOLD -> IntensityTone.FROZEN
-}
-
-@Composable
-internal fun IntensityTone.themedStyle(): PatternIntensityStyle {
-    val colors = VestigeTheme.colors
-    val accent = when (this) {
-        IntensityTone.ACTIVE_PEAK -> colors.lime
-        IntensityTone.SNOOZED -> colors.ember
-        IntensityTone.SETTLED -> colors.teal
-        IntensityTone.FROZEN -> colors.tealDim
-    }
-    return PatternIntensityStyle(accent = accent, peak = peak)
-}
-
 @Composable
 private fun PatternSourcesCard(sources: List<PatternSourceUi>, onOpenEntry: (Long) -> Unit) {
     VestigeSurface(contentPadding = PaddingValues(16.dp)) {

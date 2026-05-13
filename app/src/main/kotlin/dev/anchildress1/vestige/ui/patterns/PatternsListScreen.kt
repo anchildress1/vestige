@@ -235,12 +235,6 @@ private fun PatternCard(
     }
 }
 
-internal fun cardSectionToneFor(section: PatternSection): IntensityTone = when (section) {
-    PatternSection.ACTIVE -> IntensityTone.ACTIVE_PEAK
-    PatternSection.SNOOZED -> IntensityTone.SNOOZED
-    PatternSection.RESOLVED, PatternSection.DISMISSED -> IntensityTone.SETTLED
-}
-
 @Composable
 @Suppress("LongParameterList") // primitive UI dispatch — one callback per action.
 private fun OverflowMenu(

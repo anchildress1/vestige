@@ -225,7 +225,7 @@ class VestigePrimitivesTest {
     }
 
     @Test
-    fun `lime dot draws halo plus inner circle`() {
+    fun `lime dot draws halo plus inner disc and rim`() {
         composeRule.setContent {
             VestigeSurface(modifier = Modifier.limeDotForReady()) {}
         }

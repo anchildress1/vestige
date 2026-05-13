@@ -32,22 +32,29 @@ internal const val TAPE_GRAIN_PERIOD_PX: Float = 4f
  * Horizontal printed-receipt grain per ADR-011 §"Surface texture". 1px line every 4px, low alpha.
  * Color resolves from `VestigeTheme.colors.tapeGrain`; the optional override is the only seam
  * for tests / one-off visual demos and is not called from production code.
+ *
+ * The line geometry is cached by `drawWithCache` keyed on size — the per-frame `onDrawBehind`
+ * just replays the cached y-positions, so static cards don't pay the line-loop cost every frame.
  */
 @Composable
 fun Modifier.tapeGrain(color: Color = VestigeTheme.colors.tapeGrain): Modifier = drawWithCache {
+    val h = size.height
+    val w = size.width
+    val yPositions: FloatArray = if (h > 0f && w > 0f) {
+        val count = ((h / TAPE_GRAIN_PERIOD_PX).toInt() + 1).coerceAtLeast(0)
+        FloatArray(count) { it * TAPE_GRAIN_PERIOD_PX }
+    } else {
+        FloatArray(0)
+    }
     onDrawBehind {
-        val h = size.height
-        val w = size.width
-        if (h <= 0f || w <= 0f) return@onDrawBehind
-        var y = 0f
-        while (y < h) {
+        for (y in yPositions) {
+            if (y >= h) break
             drawLine(
                 color = color,
                 start = Offset(0f, y),
                 end = Offset(w, y),
                 strokeWidth = 1f,
             )
-            y += TAPE_GRAIN_PERIOD_PX
         }
     }
 }

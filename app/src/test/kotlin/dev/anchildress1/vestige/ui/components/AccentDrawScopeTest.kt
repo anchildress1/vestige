@@ -84,7 +84,7 @@ class AccentDrawScopeTest {
         assertTrue("clamped level still draws", bm.alphaAt(30, 30) > 0f)
     }
 
-    // limeDotForReady — halo + inner.
+    // limeDotForReady — halo gradient + inner disc + rim stroke.
 
     @Test
     fun `drawStatusDot paints inner disc near the center`() {

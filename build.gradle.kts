@@ -57,6 +57,12 @@ kover {
                         "dev.anchildress1.vestige.ui.patterns.TraceBarKt",
                         "dev.anchildress1.vestige.ui.patterns.TraceBarKt*",
                         "dev.anchildress1.vestige.ui.patterns.*TraceBarKt*",
+                        "dev.anchildress1.vestige.ui.patterns.TraceBarEKt",
+                        "dev.anchildress1.vestige.ui.patterns.TraceBarEKt*",
+                        "dev.anchildress1.vestige.ui.patterns.*TraceBarEKt*",
+                        "dev.anchildress1.vestige.ui.components.ScoreboardPrimitivesKt",
+                        "dev.anchildress1.vestige.ui.components.ScoreboardPrimitivesKt*",
+                        "dev.anchildress1.vestige.ui.components.*ScoreboardPrimitivesKt*",
                         // Debug-only fixture seeder for on-device manual verification.
                         // FLAG_DEBUGGABLE-gated at the call site; not on any release path.
                         "dev.anchildress1.vestige.debug.*",
@@ -140,6 +146,8 @@ sonar {
                 "**/ui/patterns/PatternsHost.kt",
                 "**/ui/patterns/EntryDetailPlaceholderScreen.kt",
                 "**/ui/patterns/TraceBar.kt",
+                "**/ui/patterns/TraceBarE.kt",
+                "**/ui/components/ScoreboardPrimitives.kt",
                 // Debug-only fixture seeder, FLAG_DEBUGGABLE-gated; never on a release path.
                 "**/debug/**",
             ).joinToString(","),

@@ -129,6 +129,32 @@ fun StatusDot(
 internal val DefaultStatusDotSize: Dp = 7.dp
 private const val STATUS_DOT_GLOW_ALPHA: Float = 0.55f
 
+data class AppTopStatus(
+    val text: String,
+    val contentDescription: String,
+    val color: Color,
+    val dot: Boolean = true,
+    val blink: Boolean = false,
+)
+
+object AppTopStatuses {
+    val Ready: AppTopStatus = AppTopStatus(
+        text = "LOCAL · GEMMA 4",
+        contentDescription = "Local model ready: Gemma 4.",
+        color = Lime,
+        dot = true,
+        blink = true,
+    )
+
+    val Recording: AppTopStatus = AppTopStatus(
+        text = "ON AIR · LIVE",
+        contentDescription = "Recording. Local model active.",
+        color = Coral,
+        dot = true,
+        blink = true,
+    )
+}
+
 /**
  * Capsule pill with optional [dot] and mono label. Filled when [fill] is true (used for ON AIR);
  * outlined otherwise. Colors default to the lime "signal" semantic.
@@ -297,9 +323,9 @@ private val MinTapTarget: Dp = 48.dp
 fun AppTop(
     persona: String,
     modifier: Modifier = Modifier,
-    recording: Boolean = false,
-    onPersonaTap: () -> Unit = {},
-    onStatusTap: () -> Unit = {},
+    status: AppTopStatus = AppTopStatuses.Ready,
+    onPersonaTap: (() -> Unit)? = null,
+    onStatusTap: (() -> Unit)? = null,
 ) {
     Row(
         modifier = modifier
@@ -318,22 +344,22 @@ fun AppTop(
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        val statusLabel = if (recording) "Recording. Local model active." else "Local model ready: Gemma 4."
-        TappableChrome(
+        ChromePill(
             onClick = onStatusTap,
             alignment = Alignment.CenterStart,
-            a11yLabel = statusLabel,
+            a11yLabel = status.contentDescription,
         ) {
-            if (recording) {
-                Pill(text = "ON AIR · LIVE", color = Coral, dot = true, blink = true, fill = false)
-            } else {
-                Pill(text = "LOCAL · GEMMA 4", color = Lime, dot = true, blink = true, fill = false)
-            }
+            Pill(text = status.text, color = status.color, dot = status.dot, blink = status.blink, fill = false)
         }
-        TappableChrome(
+        val personaA11yLabel = if (onPersonaTap != null) {
+            "Active persona $persona. Change persona."
+        } else {
+            "Active persona $persona."
+        }
+        ChromePill(
             onClick = onPersonaTap,
             alignment = Alignment.CenterEnd,
-            a11yLabel = "Active persona $persona. Change persona.",
+            a11yLabel = personaA11yLabel,
         ) {
             Pill(text = "$persona ▾", color = Ink, fill = false)
         }
@@ -347,31 +373,49 @@ fun AppTop(
  * tap anywhere in the slop animates the pill-shaped ripple.
  */
 @Composable
-private fun TappableChrome(
-    onClick: () -> Unit,
+private fun ChromePill(
+    onClick: (() -> Unit)?,
     alignment: Alignment,
     a11yLabel: String,
     content: @Composable () -> Unit,
 ) {
     val interactionSource = remember { MutableInteractionSource() }
+    val semanticsModifier = if (onClick != null) {
+        Modifier.semantics(mergeDescendants = true) {
+            role = Role.Button
+            contentDescription = a11yLabel
+        }
+    } else {
+        Modifier.semantics(mergeDescendants = true) {
+            contentDescription = a11yLabel
+        }
+    }
+    val actionModifier = if (onClick != null) {
+        Modifier.clickable(
+            interactionSource = interactionSource,
+            indication = null,
+            onClick = onClick,
+        )
+    } else {
+        Modifier
+    }
     Box(
         modifier = Modifier
             .sizeIn(minHeight = MinTapTarget)
-            .semantics(mergeDescendants = true) {
-                role = Role.Button
-                contentDescription = a11yLabel
-            }
-            .clickable(
-                interactionSource = interactionSource,
-                indication = null,
-                onClick = onClick,
-            ),
+            .then(semanticsModifier)
+            .then(actionModifier),
         contentAlignment = alignment,
     ) {
         Box(
             modifier = Modifier
                 .clip(RadiusTokens.Pill)
-                .indication(interactionSource, ripple(bounded = true)),
+                .then(
+                    if (onClick != null) {
+                        Modifier.indication(interactionSource, ripple(bounded = true))
+                    } else {
+                        Modifier
+                    },
+                ),
         ) {
             content()
         }

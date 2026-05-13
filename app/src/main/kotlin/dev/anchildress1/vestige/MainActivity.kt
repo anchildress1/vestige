@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Button
 import androidx.compose.material3.Scaffold
@@ -39,9 +40,13 @@ import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import dev.anchildress1.vestige.debug.DebugPatternSeeder
 import dev.anchildress1.vestige.ui.components.AppTop
+import dev.anchildress1.vestige.ui.components.AppTopStatus
 import dev.anchildress1.vestige.ui.components.VestigeSurface
 import dev.anchildress1.vestige.ui.patterns.PatternsHost
+import dev.anchildress1.vestige.ui.theme.Coral
+import dev.anchildress1.vestige.ui.theme.Ember
 import dev.anchildress1.vestige.ui.theme.Floor
+import dev.anchildress1.vestige.ui.theme.Lime
 import dev.anchildress1.vestige.ui.theme.VestigeTextStyles
 import dev.anchildress1.vestige.ui.theme.VestigeTheme
 
@@ -70,11 +75,6 @@ class MainActivity : ComponentActivity() {
                         Scaffold(
                             modifier = Modifier.fillMaxSize(),
                             containerColor = androidx.compose.ui.graphics.Color.Transparent,
-                            // Scaffold derives LocalContentColor via contentColorFor(containerColor);
-                            // with Transparent it falls through to Color.Black and every M3 Text
-                            // inside the content lambda paints dark-on-dark on Floor. Pin it to Ink.
-                            contentColor = dev.anchildress1.vestige.ui.theme.Ink,
-                            topBar = { AppTop(persona = "WITNESS") },
                         ) { padding ->
                             PhaseOneShell(
                                 onOpenPatterns = { showPatterns = true },
@@ -127,45 +127,101 @@ private fun PhaseOneShell(
         }
     }
 
-    Column(
-        modifier = modifier
-            .fillMaxSize()
-            .padding(horizontal = 24.dp, vertical = 24.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp, Alignment.CenterVertically),
-        horizontalAlignment = Alignment.Start,
-    ) {
-        VestigeSurface(contentPadding = PaddingValues(20.dp)) {
-            Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                Text(text = stringResource(id = R.string.app_name), style = VestigeTextStyles.H1)
+    Column(modifier = modifier.fillMaxSize()) {
+        AppTop(
+            persona = "WITNESS",
+            status = phaseOneTopStatus(
+                permissionGranted = permissionGranted,
+                lastRequestDenied = lastRequestDenied,
+            ),
+        )
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 24.dp, vertical = 24.dp),
+            contentAlignment = Alignment.CenterStart,
+        ) {
+            VestigeSurface(
+                modifier = Modifier.fillMaxWidth(),
+                contentPadding = PaddingValues(20.dp),
+            ) {
+                PhaseOneShellCard(
+                    permissionGranted = permissionGranted,
+                    lastRequestDenied = lastRequestDenied,
+                    onRequestMicPermission = { launcher.launch(Manifest.permission.RECORD_AUDIO) },
+                    onOpenPatterns = onOpenPatterns,
+                    onDebugSeed = onDebugSeed,
+                )
+            }
+        }
+    }
+}
 
-                when {
-                    permissionGranted -> Text(text = stringResource(id = R.string.mic_permission_granted))
-                    lastRequestDenied -> Text(text = stringResource(id = R.string.mic_permission_denied))
-                }
+@Composable
+private fun phaseOneTopStatus(permissionGranted: Boolean, lastRequestDenied: Boolean): AppTopStatus =
+    when (phaseOneAppStatus(permissionGranted, lastRequestDenied)) {
+        PhaseOneAppStatus.LOADING -> AppTopStatus(
+            text = stringResource(R.string.app_top_loading),
+            contentDescription = stringResource(R.string.app_top_loading_description),
+            color = Ember,
+            dot = false,
+            blink = false,
+        )
 
-                Button(
-                    onClick = { launcher.launch(Manifest.permission.RECORD_AUDIO) },
-                    enabled = !permissionGranted,
-                    modifier = Modifier.semantics { role = Role.Button },
-                ) {
-                    Text(text = stringResource(id = R.string.mic_permission_request))
-                }
+        PhaseOneAppStatus.READY -> AppTopStatus(
+            text = stringResource(R.string.app_top_ready),
+            contentDescription = stringResource(R.string.app_top_ready_description),
+            color = Lime,
+            dot = true,
+            blink = false,
+        )
 
-                Button(
-                    onClick = onOpenPatterns,
-                    modifier = Modifier.semantics { role = Role.Button },
-                ) {
-                    Text(text = stringResource(id = R.string.open_patterns))
-                }
+        PhaseOneAppStatus.MIC_REQUIRED -> AppTopStatus(
+            text = stringResource(R.string.app_top_mic_required),
+            contentDescription = stringResource(R.string.mic_permission_denied),
+            color = Coral,
+            dot = false,
+            blink = false,
+        )
+    }
 
-                onDebugSeed?.let { seed ->
-                    Button(
-                        onClick = seed,
-                        modifier = Modifier.semantics { role = Role.Button },
-                    ) {
-                        Text(text = stringResource(id = R.string.debug_seed_patterns))
-                    }
-                }
+@Composable
+private fun PhaseOneShellCard(
+    permissionGranted: Boolean,
+    lastRequestDenied: Boolean,
+    onRequestMicPermission: () -> Unit,
+    onOpenPatterns: () -> Unit,
+    onDebugSeed: (() -> Unit)?,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        Text(text = stringResource(id = R.string.app_name), style = VestigeTextStyles.H1)
+
+        when {
+            permissionGranted -> Text(text = stringResource(id = R.string.mic_permission_granted))
+            lastRequestDenied -> Text(text = stringResource(id = R.string.mic_permission_denied))
+        }
+
+        Button(
+            onClick = onRequestMicPermission,
+            enabled = !permissionGranted,
+            modifier = Modifier.semantics { role = Role.Button },
+        ) {
+            Text(text = stringResource(id = R.string.mic_permission_request))
+        }
+
+        Button(
+            onClick = onOpenPatterns,
+            modifier = Modifier.semantics { role = Role.Button },
+        ) {
+            Text(text = stringResource(id = R.string.open_patterns))
+        }
+
+        onDebugSeed?.let { seed ->
+            Button(
+                onClick = seed,
+                modifier = Modifier.semantics { role = Role.Button },
+            ) {
+                Text(text = stringResource(id = R.string.debug_seed_patterns))
             }
         }
     }
@@ -177,4 +233,16 @@ private fun PhaseOneShellPreview() {
     VestigeTheme {
         PhaseOneShell()
     }
+}
+
+internal enum class PhaseOneAppStatus {
+    LOADING,
+    READY,
+    MIC_REQUIRED,
+}
+
+internal fun phaseOneAppStatus(permissionGranted: Boolean, lastRequestDenied: Boolean): PhaseOneAppStatus = when {
+    permissionGranted -> PhaseOneAppStatus.READY
+    lastRequestDenied -> PhaseOneAppStatus.MIC_REQUIRED
+    else -> PhaseOneAppStatus.LOADING
 }

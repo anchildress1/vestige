@@ -4,11 +4,10 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.Text
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertHasClickAction
+import androidx.compose.ui.test.assertHasNoClickAction
 import androidx.compose.ui.test.assertHeightIsAtLeast
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.v2.createComposeRule
@@ -247,20 +246,19 @@ class ScoreboardPrimitivesTest {
     // ─── AppTop (a11y, recording vs idle, tap targets) ──────────────────────
 
     @Test
-    fun `AppTop idle status pill announces local-model-ready (a11y + role)`() {
+    fun `AppTop idle status pill announces local-model-ready (a11y)`() {
         composeRule.setContent { AppTop(persona = "WITNESS") }
         composeRule.onNodeWithContentDescription("Local model ready: Gemma 4.")
             .assertIsDisplayed()
-            .assert(SemanticsMatcher.expectValue(androidx.compose.ui.semantics.SemanticsProperties.Role, Role.Button))
-            .assertHasClickAction()
+            .assertHasNoClickAction()
     }
 
     @Test
     fun `AppTop recording status pill announces recording (a11y, pos)`() {
-        composeRule.setContent { AppTop(persona = "HARDASS", recording = true) }
+        composeRule.setContent { AppTop(persona = "HARDASS", status = AppTopStatuses.Recording) }
         composeRule.onNodeWithContentDescription("Recording. Local model active.")
             .assertIsDisplayed()
-            .assertHasClickAction()
+            .assertHasNoClickAction()
     }
 
     @Test
@@ -268,7 +266,25 @@ class ScoreboardPrimitivesTest {
         composeRule.setContent { AppTop(persona = "EDITOR") }
         composeRule.onNodeWithContentDescription(label = "EDITOR", substring = true)
             .assertIsDisplayed()
-            .assertHasClickAction()
+            .assertHasNoClickAction()
+    }
+
+    @Test
+    fun `AppTop loading status renders caller-provided chrome text`() {
+        composeRule.setContent {
+            AppTop(
+                persona = "WITNESS",
+                status = AppTopStatus(
+                    text = "APP · LOADING",
+                    contentDescription = "App loading.",
+                    color = dev.anchildress1.vestige.ui.theme.Ember,
+                    dot = false,
+                    blink = false,
+                ),
+            )
+        }
+        composeRule.onNodeWithText("APP · LOADING").assertIsDisplayed()
+        composeRule.onNodeWithContentDescription("App loading.").assertIsDisplayed()
     }
 
     @Test
@@ -289,7 +305,13 @@ class ScoreboardPrimitivesTest {
 
     @Test
     fun `AppTop chrome controls meet the 48dp tap target floor (a11y)`() {
-        composeRule.setContent { AppTop(persona = "WITNESS") }
+        composeRule.setContent {
+            AppTop(
+                persona = "WITNESS",
+                onStatusTap = {},
+                onPersonaTap = {},
+            )
+        }
         composeRule.onNodeWithContentDescription("Local model ready: Gemma 4.")
             .assertHeightIsAtLeast(48.dp)
         composeRule.onNodeWithContentDescription(label = "WITNESS", substring = true)
@@ -298,7 +320,7 @@ class ScoreboardPrimitivesTest {
 
     @Test
     fun `AppTop a11y descriptions swap on recording toggle (edge — state-dependent label)`() {
-        composeRule.setContent { AppTop(persona = "WITNESS", recording = true) }
+        composeRule.setContent { AppTop(persona = "WITNESS", status = AppTopStatuses.Recording) }
         composeRule.onNodeWithContentDescription("Recording. Local model active.").assertIsDisplayed()
         // The idle label must not appear simultaneously.
         composeRule.onAllNodesWithText("LOCAL · GEMMA 4").assertCountEquals(0)
@@ -313,7 +335,7 @@ class ScoreboardPrimitivesTest {
 
     @Test
     fun `AppTop persona pill label includes a11y change affordance (a11y)`() {
-        composeRule.setContent { AppTop(persona = "HARDASS") }
+        composeRule.setContent { AppTop(persona = "HARDASS", onPersonaTap = {}) }
         composeRule.onNodeWithContentDescription(label = "Change persona", substring = true)
             .assertIsDisplayed()
     }

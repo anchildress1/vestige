@@ -10,7 +10,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import dev.anchildress1.vestige.inference.AudioChunk
+import dev.anchildress1.vestige.model.ModelArtifactState
 import dev.anchildress1.vestige.model.PatternState
 import dev.anchildress1.vestige.model.Persona
 import dev.anchildress1.vestige.ui.capture.CaptureMeta
@@ -19,8 +19,8 @@ import dev.anchildress1.vestige.ui.capture.CaptureStats
 import dev.anchildress1.vestige.ui.capture.CaptureViewModel
 import dev.anchildress1.vestige.ui.capture.ForegroundInferenceCall
 import dev.anchildress1.vestige.ui.capture.ModelReadiness
+import dev.anchildress1.vestige.ui.capture.RealVoiceCapture
 import dev.anchildress1.vestige.ui.capture.SaveAndExtract
-import dev.anchildress1.vestige.ui.capture.VoiceCapture
 import dev.anchildress1.vestige.ui.onboarding.ModelAvailability
 import dev.anchildress1.vestige.ui.onboarding.OnboardingHost
 import dev.anchildress1.vestige.ui.onboarding.OnboardingPrefs
@@ -73,20 +73,28 @@ private fun CaptureRoute(container: AppContainer, persona: Persona, clock: Clock
     val viewModel = remember(container, persona) {
         CaptureViewModel(
             initialPersona = persona,
-            // Voice path is stubbed in this commit; commit 5 swaps in the real AudioCapture +
-            // ForegroundInference wiring against AppContainer. The stub returns null so the
-            // recording job completes cleanly without reaching the inference call.
-            recordVoice = VoiceCapture { _, _ -> null as AudioChunk? },
-            foregroundInference = ForegroundInferenceCall { _, _ ->
-                // Unreachable while the voice path is stubbed — type-only saves bypass this.
-                error("ForegroundInference is not wired yet — commit 5 plumbs the real engine.")
+            recordVoice = RealVoiceCapture(),
+            foregroundInference = ForegroundInferenceCall { audio, sel ->
+                container.runForegroundCall(audio = audio, persona = sel)
             },
             saveAndExtract = SaveAndExtract { text, capturedAt, personaSel ->
                 container.saveAndExtract(entryText = text, capturedAt = capturedAt, persona = personaSel)
             },
             clock = clock,
             zoneId = zoneId,
-            initialReadiness = ModelReadiness.Ready,
+            // Loading on cold start; the LaunchedEffect below flips to Ready as soon as the
+            // artifact-store probe returns Complete. Real-time observation of Downloading /
+            // Paused states lands with the error chrome in commit 6.
+            initialReadiness = ModelReadiness.Loading,
+        )
+    }
+    androidx.compose.runtime.LaunchedEffect(container, viewModel) {
+        val state = container.mainModelArtifactStore.currentState()
+        viewModel.setModelReadiness(
+            when (state) {
+                is ModelArtifactState.Complete -> ModelReadiness.Ready
+                else -> ModelReadiness.Loading
+            },
         )
     }
     val stats = remember(container) { deriveStats(container) }

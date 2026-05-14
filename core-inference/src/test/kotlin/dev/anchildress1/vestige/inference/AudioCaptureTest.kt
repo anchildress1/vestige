@@ -189,6 +189,72 @@ class AudioCaptureTest {
     }
 
     @Test
+    fun `onLevel callback fires for every non-empty read`() = runTest {
+        val levels = mutableListOf<Float>()
+        val capture = AudioCapture(
+            sampleRateHz = 16_000,
+            chunkDurationMs = 30_000L,
+            onLevel = { levels += it },
+        )
+        val builder = ChunkBuilder(samplesPerChunk = 4)
+        val readBuffer = FloatArray(4)
+        val record = mockk<AudioRecord>()
+        every {
+            record.read(readBuffer, 0, readBuffer.size, AudioRecord.READ_BLOCKING)
+        } answers {
+            readBuffer[0] = 0.5f
+            readBuffer[1] = 0.5f
+            readBuffer[2] = 0.5f
+            readBuffer[3] = 0.5f
+            4
+        }
+
+        capture.readUntilCapOrStop(record, readBuffer, builder)
+
+        assertTrue(levels.size == 1, "onLevel should fire once per non-empty read (was ${levels.size})")
+        // RMS of constant 0.5 ≈ 0.5; allow generous tolerance for the float-to-double round-trip.
+        assertTrue(levels[0] > 0.4f && levels[0] < 0.6f, "Expected ~0.5 RMS, was ${levels[0]}")
+    }
+
+    @Test
+    fun `onLevel callback is skipped for zero-byte reads`() = runTest {
+        val levels = mutableListOf<Float>()
+        val capture = AudioCapture(
+            sampleRateHz = 16_000,
+            chunkDurationMs = 30_000L,
+            onLevel = { levels += it },
+        )
+        val builder = ChunkBuilder(samplesPerChunk = 1_000)
+        val readBuffer = FloatArray(8)
+        val record = mockk<AudioRecord>()
+        var reads = 0
+        every {
+            record.read(readBuffer, 0, readBuffer.size, AudioRecord.READ_BLOCKING)
+        } answers {
+            reads += 1
+            if (reads >= 2) capture.requestStop()
+            0
+        }
+
+        capture.readUntilCapOrStop(record, readBuffer, builder)
+
+        assertTrue(levels.isEmpty(), "Zero-read iterations must not emit a level (was ${levels.size})")
+    }
+
+    @Test
+    fun `rmsLevel clamps to range and returns 0 for empty input`() {
+        val capture = AudioCapture()
+        assertEquals(0f, capture.rmsLevel(FloatArray(0), 0))
+        assertEquals(0f, capture.rmsLevel(FloatArray(4) { 0f }, 4))
+        // Constant 0.5 → RMS 0.5 within tolerance.
+        val mid = capture.rmsLevel(FloatArray(8) { 0.5f }, 8)
+        assertTrue(mid > 0.49f && mid < 0.51f, "Expected ~0.5 RMS, was $mid")
+        // Out-of-range samples → clamped to 1.
+        val clipped = capture.rmsLevel(FloatArray(4) { 5f }, 4)
+        assertEquals(1f, clipped)
+    }
+
+    @Test
     fun `readUntilCapOrStop returns null when read produces 0 samples and stop fires later`() = runTest {
         // AudioRecord.READ_BLOCKING can legitimately return 0; the loop must not synthesize a chunk.
         val capture = AudioCapture(sampleRateHz = 16_000, chunkDurationMs = 30_000L)

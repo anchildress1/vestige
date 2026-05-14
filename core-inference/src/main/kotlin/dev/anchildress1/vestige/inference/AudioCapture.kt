@@ -16,10 +16,16 @@ import java.util.concurrent.atomic.AtomicBoolean
  * Mono 16 kHz PCM_FLOAT capture, hard-capped at 30 s per recording. The flow emits exactly one
  * `isFinal=true` chunk on either [requestStop] or the cap, then completes; hard cancellation
  * skips the emission. Never persists audio.
+ *
+ * [onLevel] (optional) receives a 0..1 RMS level for every successful `AudioRecord.read` so the
+ * UI can drive a live meter while a recording is in flight. The callback is invoked synchronously
+ * on the capture coroutine; consumers must keep it fast (no allocations / no IO). Samples are not
+ * exposed past this callback — even the RMS hand-off is a one-way derivation.
  */
 class AudioCapture(
     private val sampleRateHz: Int = SAMPLE_RATE_HZ,
     private val chunkDurationMs: Long = CHUNK_DURATION_MS,
+    private val onLevel: ((Float) -> Unit)? = null,
 ) {
     private val stopRequested = AtomicBoolean(false)
 
@@ -56,10 +62,26 @@ class AudioCapture(
         while (!stopRequested.get() && currentCoroutineContext().isActive) {
             val read = record.read(readBuffer, 0, readBuffer.size, AudioRecord.READ_BLOCKING)
             if (read < 0) error("AudioRecord.read returned error code $read")
-            val chunk = if (read > 0) tryBuildCapChunk(builder, readBuffer, read) else null
-            if (chunk != null) return chunk
+            if (read > 0) {
+                onLevel?.invoke(rmsLevel(readBuffer, read))
+                val chunk = tryBuildCapChunk(builder, readBuffer, read)
+                if (chunk != null) return chunk
+            }
         }
         return null
+    }
+
+    // `internal` for JVM testability. RMS over the just-read window, clamped to [0, 1].
+    internal fun rmsLevel(samples: FloatArray, count: Int): Float {
+        if (count <= 0) return 0f
+        val limit = if (count > samples.size) samples.size else count
+        var sumSq = 0.0
+        for (i in 0 until limit) {
+            val s = samples[i]
+            sumSq += (s * s).toDouble()
+        }
+        val raw = kotlin.math.sqrt(sumSq / limit).toFloat()
+        return raw.coerceIn(0f, 1f)
     }
 
     // `internal` for JVM testability. Multi-chunk readouts past the cap are dropped with a WARN.

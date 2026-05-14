@@ -3,10 +3,13 @@ package dev.anchildress1.vestige
 import android.content.Context
 import android.content.Intent
 import android.util.Log
+import dev.anchildress1.vestige.inference.AudioChunk
 import dev.anchildress1.vestige.inference.BackgroundExtractionWorker
 import dev.anchildress1.vestige.inference.DefaultConvergenceResolver
 import dev.anchildress1.vestige.inference.Embedder
 import dev.anchildress1.vestige.inference.ExtractionStatusListener
+import dev.anchildress1.vestige.inference.ForegroundInference
+import dev.anchildress1.vestige.inference.ForegroundResult
 import dev.anchildress1.vestige.inference.GemmaTextEmbedder
 import dev.anchildress1.vestige.inference.HistoryChunk
 import dev.anchildress1.vestige.inference.LiteRtLmEngine
@@ -205,6 +208,30 @@ class AppContainer(
             engine = backgroundEngine,
             resolver = DefaultConvergenceResolver(),
         )
+    }
+
+    /**
+     * Single-turn foreground inference path consumed by the capture screen. Shares the engine
+     * handle with background extraction — LiteRT-LM is single-threaded, so v1 sequences the
+     * foreground call ahead of any background pass against the same engine. A second recording
+     * launched while a prior `saveAndExtract` background job is still running will block until
+     * the engine handle frees up; that's the documented v1 trade-off per ADR-002.
+     */
+    val foregroundInference: ForegroundInference by lazy {
+        ForegroundInference(
+            engine = backgroundEngine,
+            cacheDir = applicationContext.cacheDir,
+        )
+    }
+
+    /**
+     * Two-tier-aware adapter for the capture screen's voice path. Ensures the engine is
+     * initialized before the call so the screen doesn't have to thread an init step into its
+     * recording lifecycle.
+     */
+    suspend fun runForegroundCall(audio: AudioChunk, persona: Persona): ForegroundResult {
+        ensureBackgroundEngineInitialized()
+        return foregroundInference.runForegroundCall(audio, persona)
     }
 
     val observationGenerator: ObservationGenerator by lazy {

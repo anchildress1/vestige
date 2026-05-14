@@ -36,7 +36,10 @@ fun openInMemoryBoxStore(directory: File): BoxStore = MyObjectBox.builder().dire
  */
 fun cleanupObjectBoxTempRoot(root: File, dataDir: File) {
     val isInMemory = dataDir.path.startsWith(BoxStore.IN_MEMORY_PREFIX)
-    require(isInMemory || dataDir.canonicalPath.startsWith(root.canonicalPath)) {
+    // Path-element-aware containment, not string prefix — `/tmp/foo` does not contain `/tmp/foobar`.
+    val isDescendant = !isInMemory &&
+        dataDir.canonicalFile.toPath().startsWith(root.canonicalFile.toPath())
+    require(isInMemory || isDescendant) {
         "cleanupObjectBoxTempRoot: dataDir ($dataDir) must be in-memory or live under root ($root)"
     }
     try {

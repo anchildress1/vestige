@@ -43,7 +43,7 @@ logcat:
 		[ -n "$$pid" ] && break; sleep 1; \
 	done; \
 	if [ -z "$$pid" ]; then \
-		echo "⚠ could not resolve app PID — falling back to package-name filter"; \
+		echo "⚠ could not resolve app PID — tailing entire device log (Ctrl-C, then narrow with EXTRA=...)"; \
 		adb logcat -v color -T 1 $(EXTRA); \
 	else \
 		echo "📱 tailing pid=$$pid (Ctrl-C to stop)"; \

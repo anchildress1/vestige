@@ -41,28 +41,34 @@
     <string name="onboarding_persona_editor_tag">TIGHTENS VOCAB</string>
     <string name="onboarding_persona_editor_desc">Cuts vague words until they confess.</string>
 
-    <!-- Screen 2 — Wiring (merges old Mic / Notif / Local / Typed fallback into one switchboard) -->
+    <!-- Screen 2 — Wiring hub. Persona + Local + Mic + Notif + Type switches. -->
     <string name="onboarding_wiring_eyebrow">PRE-FLIGHT</string>
     <string name="onboarding_wiring_header">WIRING THIS UP.</string>
-    <string name="onboarding_wiring_body">Four switches. Two are already on. Flip the rest if you want voice.</string>
+    <string name="onboarding_wiring_persona_number">#01</string>
+    <string name="onboarding_wiring_persona_title">PERSONA · %1$s</string>
+    <string name="onboarding_wiring_persona_desc">Voice picked on the previous screen. Change it later in Settings if %1$s doesn\'t fit.</string>
     <string name="onboarding_wiring_next">Next</string>
-    <string name="onboarding_wiring_footer">FINISH 2 MORE TO CONTINUE · OR SKIP</string>
+    <string name="onboarding_wiring_pending">%1$d MORE TO TURN ON</string>
+    <string name="onboarding_wiring_blocked">%1$d BLOCKED · ADDRESS BEFORE OPENING</string>
+    <string name="onboarding_wiring_local_pending_hint">DOWNLOAD STILL RUNNING · BACK UP TO RESUME</string>
+    <string name="onboarding_wiring_local_blocked_hint">NETWORK DOWN · RECONNECT TO DOWNLOAD</string>
+    <string name="onboarding_wiring_mic_blocked_hint">DENIED · TAP AGAIN OR SETTINGS → PERMISSIONS</string>
 
-    <string name="onboarding_wiring_local_number">#01</string>
+    <string name="onboarding_wiring_local_number">#02</string>
     <string name="onboarding_wiring_local_title">LOCAL · GEMMA 4</string>
     <string name="onboarding_wiring_local_desc">No cloud. No servers. No telemetry. Voice never leaves the device.</string>
 
-    <string name="onboarding_wiring_mic_number">#02</string>
+    <string name="onboarding_wiring_mic_number">#03</string>
     <string name="onboarding_wiring_mic_title">MIC · INPUT</string>
     <string name="onboarding_wiring_mic_desc">Records dumps. Audio is read locally, then discarded. Transcription stays as text.</string>
     <string name="onboarding_wiring_mic_hint">REQUIRED FOR VOICE · OPTIONAL OTHERWISE</string>
 
-    <string name="onboarding_wiring_notif_number">#03</string>
+    <string name="onboarding_wiring_notif_number">#04</string>
     <string name="onboarding_wiring_notif_title">NOTIFY · STATUS</string>
     <string name="onboarding_wiring_notif_desc">One line, posted while the model reads an entry. Disappears when work is done.</string>
     <string name="onboarding_wiring_notif_hint">SINGLE-STATUS ONLY · NOTHING ELSE, EVER</string>
 
-    <string name="onboarding_wiring_type_number">#04</string>
+    <string name="onboarding_wiring_type_number">#05</string>
     <string name="onboarding_wiring_type_title">TYPE · FALLBACK</string>
     <string name="onboarding_wiring_type_desc">Voice is the default. Typing works the same. Same patterns. Same persona.</string>
 

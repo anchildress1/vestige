@@ -50,10 +50,10 @@ class OnboardingPrefsTest {
 
     @Test
     fun `setCurrentStep round-trips the onboarding step`() {
-        prefs.setCurrentStep(OnboardingStep.WifiCheck)
+        prefs.setCurrentStep(OnboardingStep.Wiring)
         val ctx = ApplicationProvider.getApplicationContext<Context>()
         val reopened = OnboardingPrefs.from(ctx)
-        assertEquals(OnboardingStep.WifiCheck, reopened.currentStep)
+        assertEquals(OnboardingStep.Wiring, reopened.currentStep)
     }
 
     @Test

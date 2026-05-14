@@ -11,7 +11,6 @@ import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
-import androidx.lifecycle.Lifecycle
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.espresso.Espresso
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -57,7 +56,6 @@ class OnboardingHostTest {
         startHost()
         composeRule.onNodeWithText("PICK A PERSONA.").assertIsDisplayed()
         composeRule.onNodeWithText("WITNESS").assertIsDisplayed()
-        // Hardass + Editor live further down the scroll on smaller test viewports.
         composeRule.onNodeWithText("HARDASS").performScrollTo().assertIsDisplayed()
         composeRule.onNodeWithText("EDITOR").performScrollTo().assertIsDisplayed()
     }
@@ -65,8 +63,6 @@ class OnboardingHostTest {
     @Test
     fun `selecting Hardass persists default persona to prefs`() {
         startHost()
-        // Click the persona card, not just the inner Text — `hasClickAction` filters to the
-        // semantics node that owns the RadioButton role + onSelect handler.
         composeRule.onNode(hasText("HARDASS") and hasClickAction()).performScrollTo().performClick()
         composeRule.waitForIdle()
         tapPrimary("CONTINUE")
@@ -74,44 +70,33 @@ class OnboardingHostTest {
     }
 
     @Test
-    fun `full flow auto-skips Wi-Fi + Download when the model is already on disk`() {
-        var completed = false
-        startHost(
-            onComplete = { completed = true },
-            wifiAvailability = { true },
-            modelAvailability = fakeModelAvailability(ModelArtifactState.Complete),
-        )
-
-        tapPrimary("CONTINUE") // Persona → Wiring
-        tapPrimary("NEXT") // Wiring → Wi-Fi (auto-skipped) → Download (auto-skipped) → Ready
-        tapPrimary("OPEN VESTIGE") // Ready → onComplete
-
-        assertTrue(completed)
-        assertTrue(prefs.isComplete)
-    }
-
-    @Test
-    fun `Wi-Fi missing branch shows open settings + come back actions`() {
-        startHost(wifiAvailability = { false })
-        tapPrimary("CONTINUE") // Persona → Wiring
-        tapPrimary("NEXT") // Wiring → Wi-Fi
-
-        composeRule.onNodeWithText("WI-FI REQUIRED.").assertIsDisplayed()
-        composeRule.onNodeWithText("OPEN WI-FI SETTINGS").assertIsDisplayed()
-        composeRule.onNodeWithText("I'll come back").assertIsDisplayed()
-    }
-
-    @Test
-    fun `does not mark complete until final Open Vestige tap`() {
-        startHost(wifiAvailability = { true }, modelAvailability = fakeModelAvailability(ModelArtifactState.Complete))
-        tapPrimary("CONTINUE") // Persona → Wiring
-        assertFalse(prefs.isComplete)
-    }
-
-    @Test
-    fun `system back walks the step pointer back through prior screens`() {
+    fun `persona Continue advances to the Wiring hub`() {
         startHost()
-        tapPrimary("CONTINUE") // → Wiring
+        tapPrimary("CONTINUE")
+        composeRule.onNodeWithText("WIRING THIS UP.").assertIsDisplayed()
+    }
+
+    @Test
+    fun `Wiring Next is disabled while permissions still pending`() {
+        prefs.setCurrentStep(OnboardingStep.Wiring)
+        startHost(modelAvailability = fakeModelAvailability(ModelArtifactState.Complete))
+        // Robolectric does not auto-grant RECORD_AUDIO / POST_NOTIFICATIONS, so the Wiring
+        // gate keeps Next disabled even when the model is on disk.
+        composeRule.onNodeWithText("NEXT").assertIsNotEnabled()
+    }
+
+    @Test
+    fun `current onboarding step survives host recreation`() {
+        startHost()
+        tapPrimary("CONTINUE")
+        startHost()
+        composeRule.onNodeWithText("WIRING THIS UP.").assertIsDisplayed()
+    }
+
+    @Test
+    fun `system back from Wiring returns to PersonaPick`() {
+        startHost()
+        tapPrimary("CONTINUE")
         composeRule.onNodeWithText("WIRING THIS UP.").assertIsDisplayed()
         Espresso.pressBack()
         composeRule.waitForIdle()
@@ -119,32 +104,7 @@ class OnboardingHostTest {
     }
 
     @Test
-    fun `current onboarding step survives host recreation`() {
-        startHost()
-        tapPrimary("CONTINUE") // → Wiring
-        startHost()
-        composeRule.onNodeWithText("WIRING THIS UP.").assertIsDisplayed()
-    }
-
-    @Test
-    fun `Wi-Fi branch refreshes after returning from settings`() {
-        var wifiConnected = false
-        startHost(wifiAvailability = { wifiConnected })
-        tapPrimary("CONTINUE")
-        tapPrimary("NEXT")
-
-        composeRule.onNodeWithText("WI-FI REQUIRED.").assertIsDisplayed()
-
-        wifiConnected = true
-        composeRule.activityRule.scenario.moveToState(Lifecycle.State.CREATED)
-        composeRule.activityRule.scenario.moveToState(Lifecycle.State.RESUMED)
-        composeRule.waitForIdle()
-
-        composeRule.onNodeWithText("WI-FI CONNECTED.").assertIsDisplayed()
-    }
-
-    @Test
-    fun `download screen keeps Continue disabled until model is ready`() {
+    fun `download screen keeps Continue disabled while model is Absent`() {
         prefs.setCurrentStep(OnboardingStep.ModelDownload)
         startHost(
             wifiAvailability = { true },
@@ -154,14 +114,6 @@ class OnboardingHostTest {
         composeRule.onNodeWithText("DOWNLOADING").assertIsDisplayed()
         composeRule.onNodeWithText("CONTINUE").assertIsNotEnabled()
         assertFalse(prefs.isComplete)
-    }
-
-    @Test
-    fun `model-ready Wi-Fi + Download steps auto-skip straight to Ready`() {
-        prefs.setCurrentStep(OnboardingStep.WifiCheck)
-        startHost(modelAvailability = fakeModelAvailability(ModelArtifactState.Complete))
-        composeRule.waitForIdle()
-        composeRule.onNodeWithText("READY.").assertIsDisplayed()
     }
 
     @Test

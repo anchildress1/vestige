@@ -40,7 +40,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-/** Hosts the 8-screen onboarding flow. Step + persona survive process death via SharedPreferences. */
+/** Hosts the onboarding hub flow. Step + persona survive process death via SharedPreferences. */
+@Suppress("LongMethod") // Orchestration root — wiring is intentionally co-located.
 @Composable
 fun OnboardingHost(
     prefs: OnboardingPrefs,
@@ -59,18 +60,16 @@ fun OnboardingHost(
     var micPermissionDenied by rememberSaveable { mutableStateOf(false) }
 
     val advance: () -> Unit = { step = step.next() ?: step }
+    // Launchers now only flip permission state — the Wiring hub stays put after each grant.
     val launchers = rememberPermissionLaunchers(
-        onMicResult = { granted ->
-            micPermissionDenied = !granted
-            if (granted) advance()
-        },
-        onNotificationResult = { advance() },
+        onMicResult = { granted -> micPermissionDenied = !granted },
+        onNotificationResult = { /* no-op; switch state observes runtime flag */ },
     )
 
     BackHandler(enabled = step != OnboardingStep.PersonaPick) {
         // Re-entering Wiring via Back clears any stale mic-denied notice — the user can
         // re-tap the toggle to re-ask.
-        if (step == OnboardingStep.WifiCheck) micPermissionDenied = false
+        if (step == OnboardingStep.Wiring) micPermissionDenied = false
         step = step.previous() ?: step
     }
     LaunchedEffect(persona) { prefs.setDefaultPersona(persona) }
@@ -90,27 +89,26 @@ fun OnboardingHost(
         onAdvance = advance,
     )
 
-    val callbacks = OnboardingStepCallbacks(
-        onPersonaChange = { persona = it },
+    val callbacks = buildCallbacks(
+        context = context,
+        scope = scope,
+        prefs = prefs,
+        launchers = launchers,
+        setStep = { step = it },
+        setPersona = { persona = it },
         advance = advance,
-        onMicAllow = { requestMic(context, launchers.mic, advance) },
-        onNotificationAllow = { requestNotifications(launchers.notification, advance) },
-        onOpenWifiSettings = { openWifiSettings(context) },
-        onComeBackLater = { moveTaskToBack(context) },
-        onOpenApp = {
-            // Trust the upstream gate: AutoSkipAlreadySatisfied only advances past
-            // ModelDownload when state.isReady, and the download screen keeps Continue
-            // disabled until then. Re-running modelAvailability.status() here would
-            // re-SHA the 3.66 GB artifact on every tap — that was the "first-tap
-            // takes forever" symptom.
-            scope.launch {
-                prefs.markComplete()
-                onComplete()
-            }
-        },
+        onComplete = onComplete,
     )
-    val state =
-        OnboardingStepState(step, persona, micPermissionDenied, environment.wifiConnected, environment.modelState)
+    val state = OnboardingStepState(
+        step = step,
+        persona = persona,
+        micPermissionDenied = micPermissionDenied,
+        wifiConnected = environment.wifiConnected,
+        modelState = environment.modelState,
+        micGranted = hasRecordAudio(context),
+        notifGranted = hasNotificationPermission(context),
+        downloadMbps = environment.downloadMbps,
+    )
     // VestigeScaffold owns floor/ink color propagation per AGENTS rule 26.
     VestigeScaffold(modifier = modifier) { padding ->
         OnboardingStepContent(
@@ -122,7 +120,46 @@ fun OnboardingHost(
     }
 }
 
-private data class OnboardingEnvironment(val wifiConnected: Boolean, val modelState: ModelArtifactState)
+@Suppress("LongParameterList") // Builder helper — collects the orchestration handles.
+private fun buildCallbacks(
+    context: Context,
+    scope: kotlinx.coroutines.CoroutineScope,
+    prefs: OnboardingPrefs,
+    launchers: PermissionLaunchers,
+    setStep: (OnboardingStep) -> Unit,
+    setPersona: (Persona) -> Unit,
+    advance: () -> Unit,
+    onComplete: () -> Unit,
+): OnboardingStepCallbacks = OnboardingStepCallbacks(
+    onPersonaChange = setPersona,
+    advance = advance,
+    onMicAllow = {
+        if (!hasRecordAudio(context)) launchers.mic.launch(Manifest.permission.RECORD_AUDIO)
+    },
+    onNotificationAllow = {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            launchers.notification.launch(Manifest.permission.POST_NOTIFICATIONS)
+        }
+    },
+    onOpenWifiSettings = { openWifiSettings(context) },
+    onComeBackLater = { moveTaskToBack(context) },
+    onOpenApp = {
+        // Trust the Wiring gate — re-running modelAvailability.status() would re-SHA the
+        // 3.66 GB artifact and stall the button for tens of seconds.
+        scope.launch {
+            prefs.markComplete()
+            onComplete()
+        }
+    },
+    onOpenModelDownload = { setStep(OnboardingStep.ModelDownload) },
+    onDownloadReturn = { setStep(OnboardingStep.Wiring) },
+)
+
+private data class OnboardingEnvironment(
+    val wifiConnected: Boolean,
+    val modelState: ModelArtifactState,
+    val downloadMbps: Float?,
+)
 
 @Composable
 private fun rememberOnboardingEnvironment(
@@ -135,6 +172,7 @@ private fun rememberOnboardingEnvironment(
     val scope = rememberCoroutineScope()
     var wifiConnected by remember { mutableStateOf(wifiAvailability.isWifiConnected()) }
     var modelState by remember { mutableStateOf<ModelArtifactState>(ModelArtifactState.Absent) }
+    var downloadMbps by remember { mutableStateOf<Float?>(null) }
 
     // Cheap per-step disk write — persist resume point + refresh the Wi-Fi snapshot.
     LaunchedEffect(step) {
@@ -154,7 +192,12 @@ private fun rememberOnboardingEnvironment(
     // download — leaving the .part file on disk for HTTP-Range resume on re-entry. Story 4.3
     // owns retry / pause / stall handling; this just gets the percent moving.
     LaunchedEffect(step) {
-        runDownloadIfNeeded(step, modelAvailability) { modelState = it }
+        runDownloadIfNeeded(
+            step = step,
+            modelAvailability = modelAvailability,
+            onState = { modelState = it },
+            onSpeed = { downloadMbps = it },
+        )
     }
     DisposableEffect(lifecycleOwner, wifiAvailability, modelAvailability) {
         val observer = LifecycleEventObserver { _, event ->
@@ -172,15 +215,17 @@ private fun rememberOnboardingEnvironment(
     return OnboardingEnvironment(
         wifiConnected = wifiConnected,
         modelState = modelState,
+        downloadMbps = downloadMbps,
     )
 }
 
-// Runs the download with diagnostic logs at each phase. `onState` is the assignment back to the
-// host's modelState; we keep it as a callback so this helper can stay out of @Composable scope.
+// Runs the download with diagnostic logs + live MB/s sampling.
+@Suppress("LongParameterList")
 private suspend fun runDownloadIfNeeded(
     step: OnboardingStep,
     modelAvailability: ModelAvailability,
     onState: (ModelArtifactState) -> Unit,
+    onSpeed: (Float?) -> Unit,
 ) {
     if (step != OnboardingStep.ModelDownload) return
     val current = modelAvailability.status()
@@ -193,9 +238,20 @@ private suspend fun runDownloadIfNeeded(
     try {
         Log.i(ONBOARDING_TAG, "Starting download()...")
         var lastPct = -1
+        var sampleBytes = 0L
+        var sampleTimeMs = System.currentTimeMillis()
         val terminal = withContext(Dispatchers.IO) {
             modelAvailability.download { currentBytes, expectedBytes ->
                 onState(ModelArtifactState.Partial(currentBytes, expectedBytes))
+                val now = System.currentTimeMillis()
+                val elapsed = now - sampleTimeMs
+                if (elapsed >= SPEED_SAMPLE_INTERVAL_MS) {
+                    val deltaBytes = currentBytes - sampleBytes
+                    val mbps = (deltaBytes.toFloat() / BYTES_PER_MB) / (elapsed.toFloat() / MS_PER_SECOND)
+                    onSpeed(mbps.coerceAtLeast(0f))
+                    sampleBytes = currentBytes
+                    sampleTimeMs = now
+                }
                 val pct = if (expectedBytes > 0L) {
                     ((currentBytes * PERCENT_LOG_SCALE) / expectedBytes).toInt()
                 } else {
@@ -207,28 +263,11 @@ private suspend fun runDownloadIfNeeded(
                 }
             }
         }
+        onSpeed(null)
         Log.i(ONBOARDING_TAG, "download() finished. terminalState=$terminal")
         onState(terminal)
     } catch (@Suppress("TooGenericExceptionCaught") error: Exception) {
         Log.e(ONBOARDING_TAG, "Model download failed", error)
-    }
-}
-
-private fun requestMic(context: Context, launcher: ActivityResultLauncher<String>, advance: () -> Unit) {
-    if (hasRecordAudio(context)) {
-        advance()
-    } else {
-        launcher.launch(Manifest.permission.RECORD_AUDIO)
-    }
-}
-
-private fun requestNotifications(launcher: ActivityResultLauncher<String>, advance: () -> Unit) {
-    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-        launcher.launch(Manifest.permission.POST_NOTIFICATIONS)
-    } else {
-        // Pre-API 33 has no runtime permission for notifications — channels register
-        // unconditionally in VestigeApplication. Treat as a no-op success.
-        advance()
     }
 }
 

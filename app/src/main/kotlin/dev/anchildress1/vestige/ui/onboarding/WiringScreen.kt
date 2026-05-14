@@ -23,8 +23,13 @@ import dev.anchildress1.vestige.ui.components.VestigeListCard
 import dev.anchildress1.vestige.ui.components.limeLeftRuleForActive
 import dev.anchildress1.vestige.ui.theme.VestigeTheme
 
-/** State of one of the four wiring switches. ALWAYS_ON / OFF_USER_ACTION / ON_USER_ACTION. */
-internal enum class WiringSwitchState { AlwaysOn, Pending, Granted }
+/**
+ * State of one wiring switch.
+ * - [Granted]: ready, green.
+ * - [Pending]: not yet acted on (e.g. permission untouched, model still downloading).
+ * - [Blocked]: actively prevented — denied permission, airplane mode, corrupt artifact.
+ */
+internal enum class WiringSwitchState { Granted, Pending, Blocked }
 
 @Immutable
 internal data class WiringSwitch(
@@ -38,21 +43,21 @@ internal data class WiringSwitch(
 
 @Composable
 internal fun WiringScreen(switches: List<WiringSwitch>, modifier: Modifier = Modifier) {
-    val live = switches.count { it.state != WiringSwitchState.Pending }
+    val colors = VestigeTheme.colors
+    val granted = switches.count { it.state == WiringSwitchState.Granted }
     val pending = switches.count { it.state == WiringSwitchState.Pending }
+    val blocked = switches.count { it.state == WiringSwitchState.Blocked }
     Column(
         modifier = modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         EyebrowE(text = stringResource(id = R.string.onboarding_wiring_eyebrow))
         OnboardingHeadline(text = stringResource(id = R.string.onboarding_wiring_header))
-        BodyParagraph(text = stringResource(id = R.string.onboarding_wiring_body))
         StatRibbon(
             items = listOf(
-                StatItem(value = live.toString(), label = "LIVE", color = VestigeTheme.colors.lime),
-                StatItem(value = pending.toString(), label = "PENDING", color = VestigeTheme.colors.ink),
-                StatItem(value = "0", label = "BLOCKED", color = VestigeTheme.colors.dim),
-                StatItem(value = "0", label = "CLOUD", color = VestigeTheme.colors.coral),
+                StatItem(value = granted.toString(), label = "LIVE", color = colors.lime),
+                StatItem(value = pending.toString(), label = "PENDING", color = colors.ink),
+                StatItem(value = blocked.toString(), label = "BLOCKED", color = colors.coral),
             ),
         )
         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -61,15 +66,26 @@ internal fun WiringScreen(switches: List<WiringSwitch>, modifier: Modifier = Mod
     }
 }
 
+private data class SwitchVisuals(
+    val pillText: String,
+    val pillColor: androidx.compose.ui.graphics.Color,
+    val showDot: Boolean,
+    val showAccent: Boolean,
+)
+
 @Composable
 private fun WiringSwitchCard(switch: WiringSwitch) {
     val colors = VestigeTheme.colors
-    val live = switch.state != WiringSwitchState.Pending
+    val visuals = when (switch.state) {
+        WiringSwitchState.Granted -> SwitchVisuals("ON", colors.lime, showDot = true, showAccent = true)
+        WiringSwitchState.Pending -> SwitchVisuals("OFF", colors.dim, showDot = false, showAccent = false)
+        WiringSwitchState.Blocked -> SwitchVisuals("BLOCKED", colors.coral, showDot = true, showAccent = false)
+    }
     VestigeListCard(
         modifier = Modifier.fillMaxWidth(),
         onClick = switch.onTap,
         role = Role.Switch,
-        accentModifier = if (live) Modifier.limeLeftRuleForActive() else Modifier,
+        accentModifier = if (visuals.showAccent) Modifier.limeLeftRuleForActive() else Modifier,
         contentPadding = PaddingValues(horizontal = 16.dp, vertical = 14.dp),
     ) {
         Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -80,25 +96,22 @@ private fun WiringSwitchCard(switch: WiringSwitch) {
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     EyebrowE(text = switch.number)
-                    Text(
-                        text = "  " + switch.title,
-                        style = VestigeTheme.typography.title,
-                    )
+                    Text(text = "  " + switch.title, style = VestigeTheme.typography.title)
                 }
                 Pill(
-                    text = if (live) "ON" else "OFF",
-                    color = if (live) colors.lime else colors.dim,
-                    fill = live,
-                    dot = live,
-                    blink = false,
+                    text = visuals.pillText,
+                    color = visuals.pillColor,
+                    fill = switch.state == WiringSwitchState.Granted,
+                    dot = visuals.showDot,
+                    blink = switch.state == WiringSwitchState.Blocked,
                 )
             }
             Text(text = switch.description, style = VestigeTheme.typography.p, color = colors.ink)
-            if (switch.state == WiringSwitchState.Pending && switch.pendingHint != null) {
+            if (switch.state != WiringSwitchState.Granted && switch.pendingHint != null) {
                 Text(
                     text = switch.pendingHint,
                     style = VestigeTheme.typography.eyebrow,
-                    color = colors.dim,
+                    color = if (switch.state == WiringSwitchState.Blocked) colors.coral else colors.dim,
                     modifier = Modifier.padding(top = 2.dp),
                 )
             }

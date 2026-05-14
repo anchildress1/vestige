@@ -84,45 +84,6 @@ class OnboardingScreensTest {
 
     // endregion
 
-    // region Wi-Fi
-
-    @Test
-    fun `Wi-Fi connected screen shows the package card and Download primary`() {
-        composeRule.activity.setContent {
-            VestigeTheme {
-                WifiCheckScreen(
-                    isWifiConnected = true,
-                    onContinue = {},
-                    onOpenWifiSettings = {},
-                    onComeBackLater = {},
-                )
-            }
-        }
-        composeRule.onNodeWithText("WI-FI CONNECTED.").assertIsDisplayed()
-        composeRule.onNodeWithText("PACKAGE").performScrollTo().assertIsDisplayed()
-        composeRule.onNodeWithText("3.66").performScrollTo().assertIsDisplayed()
-        composeRule.onNodeWithText("DOWNLOAD MODEL").assertIsDisplayed()
-    }
-
-    @Test
-    fun `Wi-Fi missing branch shows open settings + come back actions`() {
-        composeRule.activity.setContent {
-            VestigeTheme {
-                WifiCheckScreen(
-                    isWifiConnected = false,
-                    onContinue = {},
-                    onOpenWifiSettings = {},
-                    onComeBackLater = {},
-                )
-            }
-        }
-        composeRule.onNodeWithText("WI-FI REQUIRED.").assertIsDisplayed()
-        composeRule.onNodeWithText("OPEN WI-FI SETTINGS").assertIsDisplayed()
-        composeRule.onNodeWithText("I'll come back").assertIsDisplayed()
-    }
-
-    // endregion
-
     // region Download
 
     @Test

@@ -11,6 +11,9 @@ import dev.anchildress1.vestige.model.ModelArtifactState
 
 internal const val ONBOARDING_TAG = "Onboarding"
 internal const val PERCENT_LOG_SCALE: Long = 100L
+internal const val SPEED_SAMPLE_INTERVAL_MS: Long = 1_000L
+internal const val BYTES_PER_MB: Float = 1_048_576f // 1024 * 1024
+internal const val MS_PER_SECOND: Float = 1_000f
 
 internal fun hasRecordAudio(context: Context): Boolean =
     ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) ==
@@ -36,14 +39,9 @@ internal fun AutoSkipAlreadySatisfied(
     modelState: ModelArtifactState,
     onAdvance: () -> Unit,
 ) {
-    LaunchedEffect(step, modelState) {
-        val skip = when (step) {
-            // Wiring is interactive: the user toggles permissions in-place and taps Next.
-            // Wi-Fi + ModelDownload skip when the artifact is already on disk.
-            OnboardingStep.WifiCheck, OnboardingStep.ModelDownload -> modelState.isReady
-
-            else -> false
-        }
-        if (skip) onAdvance()
-    }
+    // Wiring is the hub — the user advances explicitly via Next once every switch is green.
+    // ModelDownload is a drill-in *from* Wiring; it returns through onDownloadReturn, not
+    // through advance. No automatic forward skipping remains in the new flow.
+    @Suppress("UNUSED_VARIABLE")
+    val unused = step to modelState to onAdvance
 }

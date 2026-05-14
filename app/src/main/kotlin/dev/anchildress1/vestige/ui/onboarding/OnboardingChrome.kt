@@ -22,27 +22,24 @@ import dev.anchildress1.vestige.ui.components.TickRule
 import dev.anchildress1.vestige.ui.theme.VestigeFonts
 import dev.anchildress1.vestige.ui.theme.VestigeTheme
 
-internal const val TOTAL_ONBOARDING_STEPS = 5
-
-private val OnboardingStep.displayNumber: Int
-    get() = ordinal + 1
-
-private val OnboardingStep.leftEyebrow: String
-    get() = if (this == OnboardingStep.Ready) {
-        "ALL SET · 05 OF 0$TOTAL_ONBOARDING_STEPS"
-    } else {
-        "SETUP · 0$displayNumber OF 0$TOTAL_ONBOARDING_STEPS"
-    }
-
 /**
- * Persistent top chrome shared by every onboarding screen: the SETUP eyebrow on the left
- * (with the active-step lime dot), an optional status string on the right (e.g.
- * `WI-FI · GOOD`, `PULLING · LIVE`), and a 5-cell tick rule beneath that fills as the user
- * advances. Matches `poc/screenshots/onboarding-*.png`.
+ * Persistent top chrome shared by every onboarding screen. The left eyebrow reads
+ * `SETUP · NN OF 05` (or `ALL SET · 05 OF 05` on Ready) where `NN` is the count of *enabled
+ * wiring switches*, not the screen ordinal. The tick rule fills proportionally.
  */
 @Composable
-internal fun OnboardingChrome(step: OnboardingStep, rightStatus: String? = null) {
+internal fun OnboardingChrome(
+    enabledCount: Int,
+    totalCount: Int = TOTAL_WIRING_SWITCHES,
+    rightStatus: String? = null,
+) {
     val colors = VestigeTheme.colors
+    val allEnabled = enabledCount >= totalCount
+    val leftEyebrow = if (allEnabled) {
+        "ALL SET · 0$totalCount OF 0$totalCount"
+    } else {
+        "SETUP · ${enabledCount.toString().padStart(2, '0')} OF 0$totalCount"
+    }
     Column(
         modifier = Modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -53,8 +50,8 @@ internal fun OnboardingChrome(step: OnboardingStep, rightStatus: String? = null)
             horizontalArrangement = Arrangement.SpaceBetween,
         ) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                StatusDot(color = colors.lime, blink = step != OnboardingStep.Ready)
-                EyebrowE(text = step.leftEyebrow)
+                StatusDot(color = colors.lime, blink = !allEnabled)
+                EyebrowE(text = leftEyebrow)
             }
             if (rightStatus != null) {
                 Row(
@@ -66,8 +63,8 @@ internal fun OnboardingChrome(step: OnboardingStep, rightStatus: String? = null)
                 }
             }
         }
-        val marks = (0 until step.displayNumber.coerceIn(0, TOTAL_ONBOARDING_STEPS)).toSet()
-        TickRule(count = TOTAL_ONBOARDING_STEPS * TICK_DENSITY, marks = marks.expandTo(TICK_DENSITY))
+        val marks = (0 until enabledCount.coerceIn(0, totalCount)).toSet()
+        TickRule(count = totalCount * TICK_DENSITY, marks = marks.expandTo(TICK_DENSITY))
     }
 }
 

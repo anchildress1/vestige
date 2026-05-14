@@ -28,10 +28,11 @@ internal fun PersonaPickScreen(
     onSelect: (Persona) -> Unit,
     onContinue: () -> Unit,
     modifier: Modifier = Modifier,
+    enabledCount: Int = 2,
 ) {
     val selectedName = stringResource(id = personaNameRes(selected)).uppercase()
     OnboardingScaffold(
-        step = OnboardingStep.PersonaPick,
+        enabledCount = enabledCount,
         modifier = modifier,
         rightStatus = "SKIP NONE",
         primary = OnboardingAction(

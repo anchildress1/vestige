@@ -7,11 +7,10 @@ import org.junit.jupiter.api.Test
 class OnboardingStepTest {
 
     @Test
-    fun `step order matches the locked 5-screen sequence`() {
+    fun `step order matches the 4-screen hub flow`() {
         val expected = listOf(
             OnboardingStep.PersonaPick,
             OnboardingStep.Wiring,
-            OnboardingStep.WifiCheck,
             OnboardingStep.ModelDownload,
             OnboardingStep.Ready,
         )

@@ -35,7 +35,7 @@ import dev.anchildress1.vestige.ui.theme.VestigeTheme
 @Suppress("LongParameterList") // Scaffold primitive — wide by design.
 @Composable
 internal fun OnboardingScaffold(
-    step: OnboardingStep,
+    enabledCount: Int,
     primary: OnboardingAction,
     modifier: Modifier = Modifier,
     rightStatus: String? = null,
@@ -51,7 +51,7 @@ internal fun OnboardingScaffold(
                 .padding(horizontal = 24.dp, vertical = 24.dp),
             verticalArrangement = Arrangement.spacedBy(20.dp),
         ) {
-            OnboardingChrome(step = step, rightStatus = rightStatus)
+            OnboardingChrome(enabledCount = enabledCount, rightStatus = rightStatus)
             content()
             Spacer(modifier = Modifier.height(16.dp))
         }
@@ -80,7 +80,10 @@ private fun OnboardingPrimaryBar(primary: OnboardingAction, secondary: Onboardin
                 .semantics { role = Role.Button },
             contentPadding = PaddingValues(vertical = 18.dp, horizontal = 20.dp),
             colors = ButtonDefaults.buttonColors(
-                containerColor = colors.lime,
+                // Coral primary per the user's call — brighter than lime read as harsh on
+                // device; coral is the same "live work" accent used by the capture-screen
+                // ON AIR pill and the download percent hero.
+                containerColor = colors.coral,
                 contentColor = colors.deep,
                 disabledContainerColor = colors.s2,
                 disabledContentColor = colors.dim,

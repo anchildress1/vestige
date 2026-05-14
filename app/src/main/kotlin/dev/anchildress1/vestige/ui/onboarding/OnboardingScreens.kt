@@ -20,86 +20,22 @@ import dev.anchildress1.vestige.ui.components.StatRibbon
 import dev.anchildress1.vestige.ui.components.VestigeListCard
 import dev.anchildress1.vestige.ui.theme.VestigeTheme
 
-@Composable
-internal fun WifiCheckScreen(
-    isWifiConnected: Boolean,
-    onContinue: () -> Unit,
-    onOpenWifiSettings: () -> Unit,
-    onComeBackLater: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    if (isWifiConnected) {
-        OnboardingScaffold(
-            step = OnboardingStep.WifiCheck,
-            modifier = modifier,
-            rightStatus = "WI-FI · GOOD",
-            primary = OnboardingAction(stringResource(id = R.string.onboarding_wifi_ok_action), onContinue),
-            secondary = OnboardingAction(stringResource(id = R.string.onboarding_wifi_come_back), onComeBackLater),
-        ) {
-            EyebrowE(text = stringResource(id = R.string.onboarding_wifi_ok_eyebrow))
-            OnboardingHeadline(text = stringResource(id = R.string.onboarding_wifi_ok_header))
-            BodyParagraph(text = stringResource(id = R.string.onboarding_wifi_ok_body))
-            ArtifactPackageCard()
-        }
-    } else {
-        OnboardingScaffold(
-            step = OnboardingStep.WifiCheck,
-            modifier = modifier,
-            rightStatus = "WI-FI · DOWN",
-            primary = OnboardingAction(
-                stringResource(id = R.string.onboarding_wifi_open_settings),
-                onOpenWifiSettings,
-            ),
-            secondary = OnboardingAction(
-                stringResource(id = R.string.onboarding_wifi_come_back),
-                onComeBackLater,
-            ),
-        ) {
-            EyebrowE(text = stringResource(id = R.string.onboarding_wifi_missing_eyebrow))
-            OnboardingHeadline(text = stringResource(id = R.string.onboarding_wifi_missing_header))
-            BodyParagraph(text = stringResource(id = R.string.onboarding_wifi_missing_body))
-        }
-    }
-}
+// Persona + Type are always enabled = 2. Adding Local (model) when Complete = 3.
+private const val PREVIEW_ENABLED_WITHOUT_MODEL = 2
+private const val PREVIEW_ENABLED_WITH_MODEL = 3
 
 @Composable
-private fun ArtifactPackageCard() {
-    val colors = VestigeTheme.colors
-    VestigeListCard(
-        modifier = Modifier.fillMaxWidth(),
-        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 14.dp),
-    ) {
-        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                EyebrowE(text = "PACKAGE")
-                EyebrowE(text = "VERIFIED")
-            }
-            Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text(text = "3.66", style = VestigeTheme.typography.displayBig)
-                Text(
-                    text = "GB",
-                    style = VestigeTheme.typography.title,
-                    color = colors.dim,
-                    modifier = Modifier,
-                )
-            }
-            EyebrowE(text = "GEMMA 4 E4B · INT4 · ON-DEVICE")
-        }
-    }
-}
-
-@Composable
+@Suppress("LongParameterList") // Optional preview defaults — screen-host call site only passes 3.
 internal fun ModelDownloadPlaceholderScreen(
     modelState: ModelArtifactState,
     onContinue: () -> Unit,
     modifier: Modifier = Modifier,
+    downloadMbps: Float? = null,
+    wifiConnected: Boolean = true,
+    enabledCount: Int = if (modelState.isReady) PREVIEW_ENABLED_WITH_MODEL else PREVIEW_ENABLED_WITHOUT_MODEL,
 ) {
     OnboardingScaffold(
-        step = OnboardingStep.ModelDownload,
+        enabledCount = enabledCount,
         modifier = modifier,
         rightStatus = if (modelState.isReady) "PULLED · DONE" else "PULLING · LIVE",
         primary = OnboardingAction(
@@ -109,32 +45,49 @@ internal fun ModelDownloadPlaceholderScreen(
         ),
     ) {
         ModelReadinessBanner(modelState = modelState)
-        DownloadStatsRibbon(modelState = modelState)
+        DownloadStatsRibbon(
+            modelState = modelState,
+            downloadMbps = downloadMbps,
+            wifiConnected = wifiConnected,
+        )
     }
 }
 
 @Composable
-private fun DownloadStatsRibbon(modelState: ModelArtifactState) {
+private fun DownloadStatsRibbon(modelState: ModelArtifactState, downloadMbps: Float?, wifiConnected: Boolean) {
     val isPartial = modelState is ModelArtifactState.Partial
+    val mbpsValue = when {
+        modelState.isReady -> "✓"
+        !isPartial -> "—"
+        downloadMbps == null -> "—"
+        downloadMbps < 0.1f -> "0"
+        downloadMbps < 10f -> "%.1f".format(downloadMbps)
+        else -> downloadMbps.toInt().toString()
+    }
     StatRibbon(
         items = listOf(
-            StatItem(
-                value = if (isPartial) "—" else "0",
-                label = "MB/S",
-                color = VestigeTheme.colors.lime,
-            ),
+            StatItem(value = mbpsValue, label = "MB/S", color = VestigeTheme.colors.lime),
             StatItem(value = "1", label = "STREAM", color = VestigeTheme.colors.ink),
             StatItem(value = "0", label = "STALLS", color = VestigeTheme.colors.ink),
-            StatItem(value = "✓", label = "WI-FI", color = VestigeTheme.colors.lime),
+            StatItem(
+                value = if (wifiConnected) "✓" else "✗",
+                label = "WI-FI",
+                color = if (wifiConnected) VestigeTheme.colors.lime else VestigeTheme.colors.coral,
+            ),
         ),
     )
 }
 
 @Composable
-internal fun ReadyScreen(persona: Persona, onOpenApp: () -> Unit, modifier: Modifier = Modifier) {
+internal fun ReadyScreen(
+    persona: Persona,
+    onOpenApp: () -> Unit,
+    modifier: Modifier = Modifier,
+    enabledCount: Int = TOTAL_WIRING_SWITCHES,
+) {
     val personaName = stringResource(id = personaNameRes(persona))
     OnboardingScaffold(
-        step = OnboardingStep.Ready,
+        enabledCount = enabledCount,
         modifier = modifier,
         rightStatus = "DAY 00",
         primary = OnboardingAction(stringResource(id = R.string.onboarding_ready_action), onOpenApp),

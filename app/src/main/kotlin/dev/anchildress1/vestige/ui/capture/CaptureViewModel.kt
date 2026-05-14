@@ -131,15 +131,20 @@ class CaptureViewModel(
         val current = _state.value
         if (current !is CaptureUiState.Idle || current.modelReadiness !is ModelReadiness.Ready) return
 
-        val persona = current.persona
-        val readiness = current.modelReadiness
+        val inferencePersona = current.persona
         val meter = AudioLevelMeter(windowSize = levelWindowSize)
-        _state.value = CaptureUiState.Recording(
-            persona = persona,
-            modelReadiness = readiness,
-            elapsedMs = 0L,
-            recentLevels = meter.levels,
-        )
+        _state.update { c ->
+            if (c is CaptureUiState.Idle) {
+                CaptureUiState.Recording(
+                    persona = c.persona,
+                    modelReadiness = c.modelReadiness,
+                    elapsedMs = 0L,
+                    recentLevels = meter.levels,
+                )
+            } else {
+                c
+            }
+        }
         limitWarningFired = false
         val startedAtMs = clock.millis()
         recordingJob = viewModelScope.launch {
@@ -149,20 +154,32 @@ class CaptureViewModel(
                     stopFlow = stopSignal,
                 )
                 if (audio == null) {
-                    _state.value = CaptureUiState.Idle(persona = persona, modelReadiness = readiness)
+                    _state.update { c ->
+                        if (c is CaptureUiState.Recording) {
+                            CaptureUiState.Idle(persona = c.persona, modelReadiness = c.modelReadiness)
+                        } else {
+                            c
+                        }
+                    }
                     return@launch
                 }
-                _state.value = CaptureUiState.Inferring(
-                    persona = persona,
-                    modelReadiness = readiness,
-                    startedAtEpochMs = clock.millis(),
-                )
-                runInference(audio, persona, readiness)
+                _state.update { c ->
+                    if (c is CaptureUiState.Recording) {
+                        CaptureUiState.Inferring(
+                            persona = c.persona,
+                            modelReadiness = c.modelReadiness,
+                            startedAtEpochMs = clock.millis(),
+                        )
+                    } else {
+                        c
+                    }
+                }
+                runInference(audio, inferencePersona)
             } catch (cancel: CancellationException) {
                 throw cancel
             } catch (@Suppress("TooGenericExceptionCaught") error: Exception) {
                 Log.e(TAG, "Recording job failed", error)
-                emitInferenceError(persona, readiness, CaptureError.InferenceFailed.Reason.ENGINE_FAILED)
+                emitInferenceError(CaptureError.InferenceFailed.Reason.ENGINE_FAILED)
             }
         }
     }
@@ -188,10 +205,13 @@ class CaptureViewModel(
             try {
                 job.cancelAndJoin()
             } finally {
-                _state.value = CaptureUiState.Idle(
-                    persona = current.persona,
-                    modelReadiness = current.modelReadiness,
-                )
+                _state.update { c ->
+                    if (c is CaptureUiState.Recording) {
+                        CaptureUiState.Idle(persona = c.persona, modelReadiness = c.modelReadiness)
+                    } else {
+                        c
+                    }
+                }
             }
         }
     }
@@ -202,33 +222,42 @@ class CaptureViewModel(
         if (trimmed.length < MIN_TYPED_LENGTH) return
         val current = _state.value
         if (current !is CaptureUiState.Idle) return
+        val savePersona = current.persona
         viewModelScope.launch {
-            _state.value = CaptureUiState.Inferring(
-                persona = current.persona,
-                modelReadiness = current.modelReadiness,
-                startedAtEpochMs = clock.millis(),
-            )
+            _state.update { c ->
+                if (c is CaptureUiState.Idle) {
+                    CaptureUiState.Inferring(
+                        persona = c.persona,
+                        modelReadiness = c.modelReadiness,
+                        startedAtEpochMs = clock.millis(),
+                    )
+                } else {
+                    c
+                }
+            }
             try {
-                saveTypedEntry(trimmed, ZonedDateTime.now(clock.withZone(zoneId)), current.persona)
-                _state.value = CaptureUiState.Reviewing(
-                    persona = current.persona,
-                    modelReadiness = current.modelReadiness,
-                    review = ReviewState(
-                        transcription = trimmed,
-                        followUp = "",
-                        persona = current.persona,
-                        elapsedMs = 0L,
-                    ),
-                )
+                saveTypedEntry(trimmed, ZonedDateTime.now(clock.withZone(zoneId)), savePersona)
+                _state.update { c ->
+                    when (c) {
+                        is CaptureUiState.Inferring -> CaptureUiState.Reviewing(
+                            persona = c.persona,
+                            modelReadiness = c.modelReadiness,
+                            review = ReviewState(
+                                transcription = trimmed,
+                                followUp = "",
+                                persona = c.persona,
+                                elapsedMs = 0L,
+                            ),
+                        )
+
+                        else -> c
+                    }
+                }
             } catch (cancel: CancellationException) {
                 throw cancel
             } catch (@Suppress("TooGenericExceptionCaught") error: Exception) {
                 Log.e(TAG, "submitTyped save failed", error)
-                emitInferenceError(
-                    current.persona,
-                    current.modelReadiness,
-                    CaptureError.InferenceFailed.Reason.ENGINE_FAILED,
-                )
+                emitInferenceError(CaptureError.InferenceFailed.Reason.ENGINE_FAILED)
             }
         }
     }
@@ -253,51 +282,49 @@ class CaptureViewModel(
         }
     }
 
-    private suspend fun runInference(audio: AudioChunk, persona: Persona, readiness: ModelReadiness) {
+    private suspend fun runInference(audio: AudioChunk, persona: Persona) {
         try {
             val result = foregroundInference(audio, persona)
             when (result) {
                 is ForegroundResult.Success -> {
                     saveAndExtract(result.transcription, ZonedDateTime.now(clock.withZone(zoneId)), persona)
-                    _state.value = CaptureUiState.Reviewing(
-                        persona = persona,
-                        modelReadiness = readiness,
-                        review = ReviewState(
-                            transcription = result.transcription,
-                            followUp = result.followUp,
-                            persona = persona,
-                            elapsedMs = result.elapsedMs,
-                        ),
-                    )
+                    _state.update { c ->
+                        CaptureUiState.Reviewing(
+                            persona = c.persona,
+                            modelReadiness = c.modelReadiness,
+                            review = ReviewState(
+                                transcription = result.transcription,
+                                followUp = result.followUp,
+                                persona = c.persona,
+                                elapsedMs = result.elapsedMs,
+                            ),
+                        )
+                    }
                 }
 
                 is ForegroundResult.ParseFailure -> emitInferenceError(
-                    persona,
-                    readiness,
                     CaptureError.InferenceFailed.Reason.PARSE_FAILED,
                 )
             }
         } catch (timeout: TimeoutCancellationException) {
             Log.w(TAG, "Foreground inference timed out", timeout)
-            emitInferenceError(persona, readiness, CaptureError.InferenceFailed.Reason.TIMED_OUT)
+            emitInferenceError(CaptureError.InferenceFailed.Reason.TIMED_OUT)
         } catch (cancel: CancellationException) {
             throw cancel
         } catch (@Suppress("TooGenericExceptionCaught") error: Exception) {
             Log.e(TAG, "Foreground inference failed", error)
-            emitInferenceError(persona, readiness, CaptureError.InferenceFailed.Reason.ENGINE_FAILED)
+            emitInferenceError(CaptureError.InferenceFailed.Reason.ENGINE_FAILED)
         }
     }
 
-    private fun emitInferenceError(
-        persona: Persona,
-        readiness: ModelReadiness,
-        reason: CaptureError.InferenceFailed.Reason,
-    ) {
-        _state.value = CaptureUiState.Idle(
-            persona = persona,
-            modelReadiness = readiness,
-            error = CaptureError.InferenceFailed(reason),
-        )
+    private fun emitInferenceError(reason: CaptureError.InferenceFailed.Reason) {
+        _state.update { c ->
+            CaptureUiState.Idle(
+                persona = c.persona,
+                modelReadiness = c.modelReadiness,
+                error = CaptureError.InferenceFailed(reason),
+            )
+        }
     }
 
     override fun onCleared() {

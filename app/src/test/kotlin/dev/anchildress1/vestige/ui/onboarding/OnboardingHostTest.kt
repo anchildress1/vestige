@@ -18,6 +18,8 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import dev.anchildress1.vestige.model.ModelArtifactState
 import dev.anchildress1.vestige.model.Persona
 import dev.anchildress1.vestige.ui.theme.VestigeTheme
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.Dispatchers
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -152,6 +154,52 @@ class OnboardingHostTest {
     }
 
     @Test
+    fun `download progress drives Partial state ticks and final Complete state`() {
+        prefs.setCurrentStep(OnboardingStep.ModelDownload)
+        // Three onProgress ticks exercise the sampler's first-call init branch, the
+        // expectedBytes > 0 percent branch, and the unknown-total branch where pct collapses
+        // to -1. Same-tick clock means MB/s never emits — that branch is intentionally left
+        // for a separate timed test in a future story. The terminal Partial(4MB, 0) keeps
+        // the host on ModelDownload (no auto-return) so the assertion can confirm the
+        // download body actually ran.
+        val ticks = mutableListOf<Pair<Long, Long>>()
+        val availability = object : ModelAvailability {
+            override suspend fun status(): ModelArtifactState = ModelArtifactState.Absent
+            override suspend fun download(onProgress: (Long, Long) -> Unit): ModelArtifactState {
+                onProgress(2L * 1_048_576L, 4L * 1_048_576L)
+                onProgress(3L * 1_048_576L, 4L * 1_048_576L)
+                onProgress(4L * 1_048_576L, 0L)
+                ticks += 2L * 1_048_576L to 4L * 1_048_576L
+                ticks += 3L * 1_048_576L to 4L * 1_048_576L
+                ticks += 4L * 1_048_576L to 0L
+                return ModelArtifactState.Partial(currentBytes = 4L * 1_048_576L, expectedBytes = 0L)
+            }
+        }
+        startHost(wifiAvailability = { true }, modelAvailability = availability)
+        composeRule.waitForIdle()
+        // The screen stays on ModelDownload's DOWNLOADING pill because the terminal state is
+        // not Complete; the sampler branches above all fired during the suspending body.
+        composeRule.onNodeWithText("DOWNLOADING").assertIsDisplayed()
+        assertEquals(3, ticks.size)
+    }
+
+    @Test
+    fun `download failure logs and leaves the Continue button disabled`() {
+        prefs.setCurrentStep(OnboardingStep.ModelDownload)
+        // Generic Exception path: runDownloadIfNeeded catches and logs without bubbling.
+        val availability = object : ModelAvailability {
+            override suspend fun status(): ModelArtifactState = ModelArtifactState.Absent
+            override suspend fun download(onProgress: (Long, Long) -> Unit): ModelArtifactState {
+                error("simulated network drop")
+            }
+        }
+        startHost(wifiAvailability = { true }, modelAvailability = availability)
+        composeRule.waitForIdle()
+        composeRule.onNodeWithText("CONTINUE").assertIsNotEnabled()
+        assertFalse(prefs.isComplete)
+    }
+
+    @Test
     fun `Open Vestige does not re-SHA the artifact on tap`() {
         prefs.setCurrentStep(OnboardingStep.Wiring)
         var statusCalls = 0
@@ -190,7 +238,10 @@ class OnboardingHostTest {
         onComplete: () -> Unit = {},
         wifiAvailability: WifiAvailability = WifiAvailability { false },
         modelAvailability: ModelAvailability = fakeModelAvailability(ModelArtifactState.Absent),
+        downloadDispatcher: CoroutineDispatcher = Dispatchers.Unconfined,
     ) {
+        // Test default is `Unconfined` so `withContext(downloadDispatcher)` runs the download
+        // body on the calling thread — `composeRule.waitForIdle()` then drains it deterministically.
         composeRule.activity.setContent {
             VestigeTheme {
                 OnboardingHost(
@@ -198,6 +249,7 @@ class OnboardingHostTest {
                     onComplete = onComplete,
                     modelAvailability = modelAvailability,
                     wifiAvailability = wifiAvailability,
+                    downloadDispatcher = downloadDispatcher,
                 )
             }
         }

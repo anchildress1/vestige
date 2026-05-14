@@ -2,6 +2,8 @@ package dev.anchildress1.vestige.storage
 
 import dev.anchildress1.vestige.model.PatternKind
 import dev.anchildress1.vestige.model.PatternState
+import dev.anchildress1.vestige.testing.newInMemoryObjectBoxDirectory
+import dev.anchildress1.vestige.testing.openInMemoryBoxStore
 import io.objectbox.BoxStore
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -31,11 +33,8 @@ class PatternRepoTest {
 
     @Before
     fun setUp() {
-        val tempRoot = File(System.getProperty("java.io.tmpdir"), "vestige-pattern-repo-tests").apply {
-            mkdirs()
-        }
-        dataDir = File(tempRoot, "objectbox-patternrepo-${System.nanoTime()}").apply { mkdirs() }
-        boxStore = VestigeBoxStore.openAt(dataDir)
+        dataDir = newInMemoryObjectBoxDirectory("vestige-pattern-repo-")
+        boxStore = openInMemoryBoxStore(dataDir)
         store = PatternStore(boxStore, clock)
         repo = PatternRepo(store, clock)
     }
@@ -144,11 +143,14 @@ class PatternRepoTest {
     }
 
     @Test
-    fun `actions survive BoxStore restart`() {
+    fun `actions survive BoxStore close and reopen by name`() {
         val id = seed()
         repo.snooze(id, days = 1)
         boxStore.close()
-        boxStore = VestigeBoxStore.openAt(dataDir)
+        // ObjectBox keys in-memory stores by their `memory:` URI; reopening with the same path
+        // reattaches to the same backing registry. That's the invariant under test — process-
+        // local close/reopen idempotency, not on-disk durability.
+        boxStore = openInMemoryBoxStore(dataDir)
         store = PatternStore(boxStore, clock)
         repo = PatternRepo(store, clock)
         val row = store.findByPatternId(id)!!

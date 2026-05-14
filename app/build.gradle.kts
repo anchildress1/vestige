@@ -150,6 +150,8 @@ dependencies {
     implementation(libs.bundles.compose.ui)
     debugImplementation(libs.bundles.compose.debug)
 
+    testImplementation(testFixtures(project(":core-storage")))
+
     testImplementation(libs.junit.jupiter.api)
     testRuntimeOnly(libs.junit.jupiter.engine)
     testRuntimeOnly(libs.junit.platform.launcher)

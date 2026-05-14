@@ -8,6 +8,8 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -18,6 +20,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -110,27 +113,77 @@ fun VestigeRow(
     }
 }
 
-/** Selectable [VestigeSurface] variant. With [onClick] the fill raises to `colors.s2`. */
+/**
+ * Interaction contract for [VestigeListCard].
+ *
+ * The variants encode the card's semantic model directly instead of exposing loosely-related
+ * click, role, selected, and checked knobs that can drift out of sync at call sites.
+ */
+sealed interface VestigeListCardInteraction {
+    data object Static : VestigeListCardInteraction
+
+    data class Click(val onClick: () -> Unit, val role: Role = Role.Button) : VestigeListCardInteraction
+
+    data class Selectable(val selected: Boolean, val onClick: () -> Unit, val role: Role = Role.Button) :
+        VestigeListCardInteraction
+
+    data class Toggleable(val checked: Boolean, val onToggle: (() -> Unit)? = null, val role: Role = Role.Switch) :
+        VestigeListCardInteraction
+}
+
+private val VestigeListCardInteraction.isInteractive: Boolean
+    get() = when (this) {
+        VestigeListCardInteraction.Static -> false
+        is VestigeListCardInteraction.Click -> true
+        is VestigeListCardInteraction.Selectable -> true
+        is VestigeListCardInteraction.Toggleable -> onToggle != null
+    }
+
+/**
+ * Selectable [VestigeSurface] variant. Interactive variants raise the fill to `colors.s2`.
+ *
+ * `Selectable` routes through `Modifier.selectable` — the correct Compose primitive for
+ * radio-button / checkbox card patterns. `Toggleable` uses `Modifier.toggleable`, including
+ * disabled checked-state semantics when the row is informative but not currently tappable.
+ */
 @Composable
-@Suppress("LongParameterList") // Same primitive tradeoff: fewer wrappers, clearer call sites.
 fun VestigeListCard(
     modifier: Modifier = Modifier,
-    onClick: (() -> Unit)? = null,
+    interaction: VestigeListCardInteraction = VestigeListCardInteraction.Static,
     accentModifier: Modifier = Modifier,
-    shape: Shape = VestigeTheme.shapes.xl,
     contentPadding: PaddingValues = PaddingValues(horizontal = 16.dp, vertical = 14.dp),
     content: @Composable () -> Unit,
 ) {
     val colors = VestigeTheme.colors
-    val rootModifier = if (onClick != null) {
-        modifier.clickable(role = Role.Button, onClick = onClick)
-    } else {
-        modifier
+    val rootModifier = when (interaction) {
+        VestigeListCardInteraction.Static -> modifier
+
+        is VestigeListCardInteraction.Click -> modifier.clickable(
+            role = interaction.role,
+            onClick = interaction.onClick,
+        )
+
+        is VestigeListCardInteraction.Selectable -> modifier.selectable(
+            selected = interaction.selected,
+            role = interaction.role,
+            onClick = interaction.onClick,
+        )
+
+        is VestigeListCardInteraction.Toggleable -> {
+            modifier
+                .semantics(mergeDescendants = true) {}
+                .toggleable(
+                    value = interaction.checked,
+                    enabled = interaction.onToggle != null,
+                    role = interaction.role,
+                    onValueChange = { interaction.onToggle?.invoke() },
+                )
+        }
     }
     Surface(
         modifier = rootModifier,
-        shape = shape,
-        color = if (onClick != null) colors.s2 else colors.s1,
+        shape = VestigeTheme.shapes.xl,
+        color = if (interaction.isInteractive) colors.s2 else colors.s1,
         contentColor = colors.ink,
         border = BorderStroke(SurfaceHairline, colors.hair),
     ) {

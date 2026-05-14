@@ -1,6 +1,7 @@
 package dev.anchildress1.vestige.storage
 
-import androidx.test.core.app.ApplicationProvider
+import dev.anchildress1.vestige.testing.newInMemoryObjectBoxDirectory
+import dev.anchildress1.vestige.testing.openInMemoryBoxStore
 import io.objectbox.BoxStore
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -24,9 +25,8 @@ class CalloutCooldownStoreTest {
 
     @Before
     fun setUp() {
-        val context = ApplicationProvider.getApplicationContext<android.content.Context>()
-        dataDir = File(context.filesDir, "objectbox-cooldown-${System.nanoTime()}")
-        boxStore = VestigeBoxStore.openAt(dataDir)
+        dataDir = newInMemoryObjectBoxDirectory("objectbox-cooldown-")
+        boxStore = openInMemoryBoxStore(dataDir)
         store = CalloutCooldownStore(boxStore)
     }
 
@@ -62,11 +62,14 @@ class CalloutCooldownStoreTest {
     }
 
     @Test
-    fun `cooldown survives BoxStore restart`() {
+    fun `cooldown survives BoxStore close and reopen by name`() {
         store.recordFired(entryId = 9L, timestampMs = 1_000L)
         store.consumeOneEntry()
         boxStore.close()
-        boxStore = VestigeBoxStore.openAt(dataDir)
+        // Reopening the same `memory:` URI reattaches to ObjectBox's in-process registry — that's
+        // process-local idempotency, not on-disk durability. Disk persistence is covered by the
+        // production wiring's open(Context) test.
+        boxStore = openInMemoryBoxStore(dataDir)
         store = CalloutCooldownStore(boxStore)
         assertEquals(2, store.snapshot().remainingSuppression)
         assertEquals(9L, store.snapshot().lastCalloutEntryId)
@@ -128,7 +131,7 @@ class CalloutCooldownStoreTest {
         // for the rest of the install.
         store.tryReserveCallout(42L)
         boxStore.close()
-        boxStore = VestigeBoxStore.openAt(dataDir)
+        boxStore = openInMemoryBoxStore(dataDir)
         store = CalloutCooldownStore(boxStore)
         assertEquals(42L, store.snapshot().pendingCalloutEntryId)
 

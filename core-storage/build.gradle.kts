@@ -35,6 +35,13 @@ android {
             isReturnDefaultValues = true
         }
     }
+
+    // ObjectBox test helpers (in-memory store factory) are consumed by both core-storage tests
+    // and :app tests. testFixtures keeps a single source of truth instead of stamping copies
+    // into each module's src/test/ tree.
+    testFixtures {
+        enable = true
+    }
 }
 
 dependencies {
@@ -45,6 +52,8 @@ dependencies {
     api(libs.objectbox.android)
     implementation(libs.objectbox.kotlin)
     implementation(libs.kotlinx.coroutines.core)
+
+    testImplementation(testFixtures(project(":core-storage")))
 
     testImplementation(libs.junit) // Robolectric runner is JUnit 4
     testImplementation(libs.junit.jupiter.api)

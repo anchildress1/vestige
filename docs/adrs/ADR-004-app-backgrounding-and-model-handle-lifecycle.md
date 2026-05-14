@@ -168,6 +168,28 @@ Insert one screen between mic permission (current onboarding screen 3) and typed
 
 ---
 
+### Addendum (2026-05-14) — Onboarding Hub Supersedes Dedicated Notification Screen
+
+Story 4.2 shipped onboarding as a 3-screen hub:
+1. Persona pick
+2. Wiring hub (`Persona`, `Local`, `Mic`, `Notify`, `Type`)
+3. Model download
+
+The historical "Screen 3.5" section above remains part of the ADR record for why notification permission exists at all, but it is **not** the current onboarding contract.
+
+Current rule:
+- Notification permission is requested from the optional `Notify` switch inside Wiring.
+- Skipping or denying notification permission never blocks app entry.
+- The `Local` row owns Wi-Fi gating and download entry. Restored no-Wi-Fi download states unwind back to Wiring instead of presenting a dead-end download screen.
+
+Cross-doc sources of truth updated alongside this addendum:
+- `ux-copy.md` §Onboarding
+- `design-guidelines.md` §First-Run Onboarding
+- `PRD.md` §Must-Have / §Acceptance Criteria
+- `stories/phase-4-ux-surface.md` §Story 4.2 / §Story 4.3
+
+---
+
 ## Fallback Trigger (Option 4 → Option 1)
 
 **Trigger condition:** End of Phase 4 day 1, if any of:

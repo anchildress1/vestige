@@ -7,12 +7,14 @@ import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
-import androidx.test.core.app.ApplicationProvider
 import dev.anchildress1.vestige.model.ExtractionStatus
 import dev.anchildress1.vestige.storage.EntryEntity
 import dev.anchildress1.vestige.storage.EntryStore
 import dev.anchildress1.vestige.storage.MarkdownEntryStore
-import dev.anchildress1.vestige.storage.VestigeBoxStore
+import dev.anchildress1.vestige.testing.cleanupObjectBoxTempRoot
+import dev.anchildress1.vestige.testing.newInMemoryObjectBoxDirectory
+import dev.anchildress1.vestige.testing.newModuleTempRoot
+import dev.anchildress1.vestige.testing.openInMemoryBoxStore
 import io.objectbox.BoxStore
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -43,7 +45,9 @@ class EntryDetailPlaceholderScreenTest {
     @get:Rule
     val composeRule = createComposeRule()
 
+    private lateinit var tempRoot: File
     private lateinit var dataDir: File
+    private lateinit var markdownDir: File
     private lateinit var boxStore: BoxStore
     private lateinit var entryStore: EntryStore
     private val testDispatcher = UnconfinedTestDispatcher()
@@ -51,12 +55,13 @@ class EntryDetailPlaceholderScreenTest {
     @Before
     fun setUp() {
         Dispatchers.setMain(testDispatcher)
-        val context = ApplicationProvider.getApplicationContext<android.content.Context>()
-        dataDir = File(context.filesDir, "ob-entry-detail-${System.nanoTime()}")
-        boxStore = VestigeBoxStore.openAt(dataDir)
+        tempRoot = newModuleTempRoot("vestige-entry-detail-")
+        dataDir = newInMemoryObjectBoxDirectory("ob-entry-detail-")
+        markdownDir = File(tempRoot, "md-${System.nanoTime()}").apply { mkdirs() }
+        boxStore = openInMemoryBoxStore(dataDir)
         entryStore = EntryStore(
             boxStore,
-            MarkdownEntryStore(File(context.filesDir, "md-${System.nanoTime()}")),
+            MarkdownEntryStore(markdownDir),
         )
     }
 
@@ -64,7 +69,7 @@ class EntryDetailPlaceholderScreenTest {
     fun tearDown() {
         Dispatchers.resetMain()
         boxStore.close()
-        dataDir.deleteRecursively()
+        cleanupObjectBoxTempRoot(tempRoot, dataDir)
     }
 
     @Test

@@ -19,7 +19,7 @@ Wrap the app in a coherent, dark, atmospheric UX that meets the 10-second judge 
 ## Phase-level acceptance criteria
 
 - [ ] Design language pass complete per ADR-011 §"Token additions": Scoreboard palette (`floor` / `deep` / `s1` / `s2` / `s3` / `ink` / `dim` / `faint` / `ghost` / `hair` / `lime` / `coral` / `teal` / `ember` + soft variants), three-font system (`Anton` display / `Space Grotesk` body / `JetBrains Mono` forensic), `sb*` motion keyframes, tape-grain surface texture on cards (halftone on call-outs), Scoreboard primitives (`BigStat` / `Pill` / `Delta` / `TraceBarE` / `StatRibbon` / `TickRule` / `EyebrowE` / `StatusDot` / `AppTop`) applied across all screens. Mist symbols deleted from `:app`. Contrast targets unchanged: body ≥4.5:1 (WCAG AA), primary content ≥7:1 (AAA).
-- [ ] Onboarding 8-screen flow per `ux-copy.md` §Onboarding (includes Screen 3.5 notification permission per `adrs/ADR-004-app-backgrounding-and-model-handle-lifecycle.md` §"Permission Flow") works end-to-end on a fresh install on the reference S24 Ultra.
+- [ ] Onboarding 3-screen hub flow per `ux-copy.md` §Onboarding works end-to-end on a fresh install on the reference S24 Ultra.
 - [ ] Model download UX handles Wi-Fi gating, real progress, retry on stall/failure, and survives app restart mid-download.
 - [ ] Persistent Local Model Status surface exists and is reachable from app shell or settings; status is accurate.
 - [ ] Capture screen polished per `poc/Energy Direction.html` capture frames + `poc/screenshots/{capture-still,capture-running}.png` — `AppTop` shell with `LOCAL · GEMMA 4` ↔ `ON AIR · LIVE` swap, big "ON AIR" record button (idle: outline; recording: coral fill + pulsing `StatusDot` + live timer + `TickRule` 30s countdown), `sbBars` audio meter primitive while recording, transcription appearing post-inference (latency budget per `adrs/ADR-002-multi-lens-extraction-pattern.md` §"Latency budget" — 1–5 s target unmet on E4B CPU, currently ~24–33 s per `docs/stories/phase-2-core-loop.md` §Story 2.3 device record), entry transcript with muted user transcription + primary model follow-up (single-turn-per-capture per the STT-B v1 scope choice; see `adrs/ADR-005-stt-b-scope-and-v1-single-turn.md`). The Mist `MistHero` / `AudioMeter` halo composition is **not** built — superseded by ADR-011.
@@ -27,7 +27,7 @@ Wrap the app in a coherent, dark, atmospheric UX that meets the 10-second judge 
 - [ ] Settings screen P0 scope works: persona default, export all entries (zip of markdown), delete all data, model status / re-download / delete.
 - [ ] Empty states across major screens use the locked microcopy from `ux-copy.md` §"Empty states".
 - [ ] Top three error states polished: download fail/stall, inference timeout/fail, mic permission denied/unavailable.
-- [ ] Notification permission flow ships in onboarding (Screen 3.5 per ADR-004 §"Permission Flow"); notification tap target lands on the entry detail of the most-recent-in-flight extraction. Lifecycle fallback evaluation per ADR-004 §"Fallback Trigger" recorded by end of Phase 4 day 1 if invoked.
+- [ ] Notification permission flow ships in onboarding as the optional Wiring switch; notification tap target lands on the entry detail of the most-recent-in-flight extraction. Lifecycle fallback evaluation per ADR-004 §"Fallback Trigger" recorded by end of Phase 4 day 1 if invoked.
 - [ ] P1 stories shipped or explicitly punted to v1.5 with a recorded reason (scope held / didn't hold).
 
 ---
@@ -81,22 +81,18 @@ Checked bullets above are the historical record that the Mist tokens shipped to 
 
 ### Story 4.2 — Onboarding flow
 
-**As** a first-time user, **I need** to walk through the 8 onboarding screens per `ux-copy.md` §Onboarding without dead-ends, **so that** I can pick a persona, grant mic and notification permissions, see a typed-fallback affordance, and start the model download — and so that judges installing the APK have a credible first 60 seconds.
+**As** a first-time user, **I need** to walk through the 3-screen onboarding hub per `ux-copy.md` §Onboarding without dead-ends, **so that** I can pick a persona, wire optional capabilities, get the local model on disk, and give judges installing the APK a credible first 60 seconds.
 
 **Done when:**
-- [ ] Screen 1 — Persona pick: three persona cards (Witness default highlighted, Hardass, Editor) with the locked one-line descriptions per `ux-copy.md`. Tap-to-select + Continue.
-- [ ] Screen 2 — Local processing explainer: copy from `ux-copy.md` §"Screen 2". One primary action.
-- [ ] Screen 3 — Microphone permission: copy from `ux-copy.md` §"Screen 3". Allow + Skip-typing affordance. Denied path lands on the correct error state (Story 4.11).
-- [ ] Screen 3.5 — Notification permission per ADR-004 §"Permission Flow." Copy from `ux-copy.md` §"Screen 3.5" (added alongside this story). On Android 13+, requests `POST_NOTIFICATIONS` runtime permission. Allow + Skip affordances. Skip path is supported: extractions only complete while the app is in the foreground; cold-start sweep from ADR-001 Q3 recovers the rest. No degraded copy on skip.
-- [ ] Screen 4 — Typed fallback explainer: copy from `ux-copy.md` §"Screen 4".
-- [ ] Screen 5 — Wi-Fi check: branches per `ux-copy.md` §"Screen 5" based on connectivity.
-- [ ] Screen 6 — Model download: hands off to Story 4.3.
-- [ ] Screen 7 — First entry scaffold: copy from `ux-copy.md` §"Screen 7". Lands on the polished Capture screen (Story 4.5).
-- [ ] Each onboarding screen uses one primary action and the design tokens from Story 4.1.
-- [ ] Onboarding state survives backgrounding — closing the app between screens resumes at the same step.
-- [ ] After completion, opening the app skips onboarding and lands directly on Capture.
+- [x] Screen 1 — Persona pick: three persona cards (Witness default highlighted, Hardass, Editor) with the locked one-line descriptions per `ux-copy.md`. Tap-to-select + Continue. (`PersonaPickScreen`; selection persists via `OnboardingPrefs.setDefaultPersona` on every change; a11y selection asserted in `OnboardingScreensTest`.)
+- [x] Screen 2 — Wiring hub: five rows (`Persona`, `Local`, `Mic`, `Notify`, `Type`) with the locked copy from `ux-copy.md` §Onboarding. Persona re-opens Screen 1; Local drills into download or opens Wi-Fi settings; Mic and Notify request their permissions inline; Type is always granted. (`WiringScreen`; `OnboardingStepContent`; `OnboardingHost`.)
+- [x] Notification permission ships as the optional `Notify` switch in Wiring, not as a dedicated screen. On Android 13+, tapping the row requests `POST_NOTIFICATIONS`; skipping leaves the row pending without blocking app entry. (`OnboardingHost` permission launcher + `notifSwitch`; pre-API-33 short-circuits to granted because channel registration in `VestigeApplication` covers older devices.)
+- [x] Screen 3 — Model download: hands off to Story 4.3. The screen is entered only for active/resumable downloads, auto-returns to Wiring when the artifact verifies, and restored no-Wi-Fi entries unwind back to Wiring instead of presenting a dead end. (`ModelDownloadPlaceholderScreen`; `OnboardingHost`; `OnboardingHostTest`.)
+- [x] Each onboarding screen uses one primary action and the design tokens from Story 4.1. (Shared `OnboardingScaffold`; `PersonaCard` uses `VestigeListCard` + `limeLeftRuleForActive` per ADR-011 — no per-screen color or shape overrides.)
+- [ ] Onboarding state survives backgrounding — closing the app between screens resumes at the same step. (Code: `OnboardingPrefs` now persists the current `OnboardingStep` synchronously on every transition; `OnboardingHost` rehydrates from prefs and refreshes Wi-Fi / model readiness on `ON_RESUME`. Verify on-device by backgrounding mid-flow and re-opening.)
+- [ ] After completion, opening the app skips onboarding and lands directly on Capture. (Code: `MainActivity` reads `OnboardingPrefs.isComplete` on every `setContent` and routes to the post-onboarding shell when true; the post-onboarding shell stays at `PhaseOneShell` until Story 4.5 polishes Capture. Verify on-device by completing onboarding once, force-stopping, and re-launching.)
 
-**Notes / risks:** No "Welcome to your journey" copy anywhere, ever. `ux-copy.md` §"Things to NEVER Write" is the litmus test. Screen 3.5 copy must clear the same bar — single-status framing, not "we'll keep you posted." The notification permission and channel registration plumbing land in Phase 2 Story 2.6.5; this story owns the user-facing ask flow only.
+**Notes / risks:** No "Welcome to your journey" copy anywhere, ever. `ux-copy.md` §"Things to NEVER Write" is the litmus test. The notification permission and channel registration plumbing land in Phase 2 Story 2.6.5; this story owns the user-facing Wiring switch only.
 
 ---
 
@@ -107,12 +103,12 @@ Checked bullets above are the historical record that the Mist tokens shipped to 
 **Done when:**
 - [ ] Model download screen uses the `ModelArtifactStore` contract from Story 1.9 (download, SHA-256 verify, retry policy).
 - [ ] Real progress: bytes-downloaded / bytes-total, real ETA, current download speed.
-- [ ] Wi-Fi gate: if the device is not on Wi-Fi, the download does not start; the user is shown the "Open Wi-Fi settings" affordance per `ux-copy.md` §"Screen 5" — without Wi-Fi.
+- [ ] Wi-Fi gate: if the device is not on Wi-Fi, the download does not start; the user is returned to Wiring and the Local row opens Wi-Fi settings instead of starting a dead-end download screen.
 - [ ] Stalled state: if no bytes flow for >30 seconds, show stalled state with retry per `ux-copy.md` §"Loading — first-run model download".
 - [ ] Resume: if the artifact host supports HTTP `Range`, resume from the last byte after retry. Otherwise restart with confirmation.
 - [ ] Backgrounding: closing the app mid-download pauses; reopening shows the partial state and the user can resume.
 - [ ] On corrupt artifact (SHA-256 mismatch on load), the download is invalidated and re-triggered automatically with a one-time visible message ("Model file unreadable. Re-downloading.").
-- [ ] Download success transitions to onboarding Screen 7.
+- [ ] Download success returns to Wiring with the Local row green and `Open Vestige` enabled.
 
 **Notes / risks:** No spinner with "Preparing your experience". `ux-copy.md` §"Loading" enforces functional copy ("Quiet for a minute. ~2.5 GB downloading on Wi-Fi.") — it's "~3.66 GB" in v1 since that's the actual artifact size; update the copy if it's still showing 2.5.
 
@@ -145,8 +141,8 @@ Checked bullets above are the historical record that the Mist tokens shipped to 
 - [ ] If any trigger criterion fires: record `Trigger recorded: invoked {date}, reason: {one-line reason}` inline in ADR-004 and apply the §"Fallback action" steps:
   - Replace conditional state machine with `startForeground()` in `Application.onCreate()`.
   - Replace `stopForeground()` calls with no-ops.
-  - Update notification text to `Local model active.` (and update `ux-copy.md` §"Loading States" + Screen 3.5 onboarding copy in the same change).
-- [ ] If the fallback fires, also update Story 4.2 Screen 3.5 done-when bullet copy and `ux-copy.md` §"Screen 3.5" to match the always-on framing.
+  - Update notification text to `Local model active.` (and update `ux-copy.md` §"Loading States" + the Wiring `Notify` row copy in the same change).
+- [ ] If the fallback fires, also update Story 4.2's Wiring `Notify` done-when bullet and `ux-copy.md` §Onboarding to match the always-on framing.
 - [ ] Phase 4 day 1 ends with the lifecycle decision recorded one way or the other — no third state of "we'll figure it out later."
 
 **Notes / risks:** This is a small but mandatory gate. The point is to prevent the state-machine implementation from quietly slipping into Phase 4 day 3 while UI work waits. If it's broken, switch fast and ship with the simpler model. ADR-004 explicitly designed for this fallback — using it is on-brand, not a regression.
@@ -362,7 +358,7 @@ Checked bullets above are the historical record that the Mist tokens shipped to 
 - No demo storyboard work — Phase 5 owns it.
 - No agentic tool-calling beat anywhere — cut entirely.
 - No light theme — dark only.
-- No notifications beyond the single ADR-004 `vestige.local_processing` channel from Phase 2 Story 2.6.5 (Story 4.2 Screen 3.5 owns the user-facing permission ask). Reminders, scheduled-pattern surfaces, and any other notification channels are `backlog.md` candidates.
+- No notifications beyond the single ADR-004 `vestige.local_processing` channel from Phase 2 Story 2.6.5 (Story 4.2's Wiring `Notify` switch owns the user-facing permission ask). Reminders, scheduled-pattern surfaces, and any other notification channels are `backlog.md` candidates.
 - No filter chips on history list — v1 has chronological only; filter by tag/template/date is P2.
 - No vocabulary chip cloud on entry detail unless STT-E passed (Story 3.4) and Story 4.13 ships.
 - No advanced settings (pattern threshold, cooldown tuning, default-input toggle, transcription-visibility toggle). Per the PRD note, these are removed from v1 `ux-copy.md`.

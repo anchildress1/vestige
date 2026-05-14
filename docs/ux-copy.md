@@ -21,7 +21,7 @@ Keep these consistent. Don't mix.
 
 ---
 
-## Onboarding (8 screens, sequential)
+## Onboarding (3 screens, hub flow)
 
 ### Screen 1 — Pick a persona
 
@@ -44,57 +44,36 @@ Footer link:
 
 ---
 
-### Screen 2 — Local processing explainer
+### Screen 2 — Wiring hub
 
 Header:
-> **Everything stays on your phone.**
+> **Wiring.**
 
-Body:
-> Vestige runs Gemma 4 directly on this device. No cloud processing, no servers for your entries, no telemetry. Your voice never leaves the device.
+Rows:
+- **Persona** — `Voice picked on the previous screen. Change it later in Settings if {persona} doesn't fit.`
+- **Local** — `No cloud. No servers. No telemetry. Voice never leaves the device.`
+- **Mic** — `Records dumps. Audio is read locally, then discarded. Transcription stays as text.`
+- **Notify** — `One line, posted while the model reads an entry. Disappears when work is done.`
+- **Type** — `Voice is the default. Typing works the same. Same patterns. Same persona.`
 
-Subhead detail:
-> The model is ~3.7 GB. We download it once, on Wi-Fi, in the next few steps.
+Local row helper states:
+- Absent on Wi-Fi: `Tap Local to start download`
+- Partial on Wi-Fi: `Download still running · back up to resume`
+- Corrupt on Wi-Fi: `Artifact corrupt · tap to retry`
+- No Wi-Fi: `Network down · tap for Wi-Fi settings`
 
-Primary action:
-> **Got it**
+Mic row helper states:
+- Pending: `Required for voice · optional otherwise`
+- Denied: `Denied · tap again or Settings → Permissions`
 
----
-
-### Screen 3 — Microphone permission
-
-Header:
-> **Mic permission.**
-
-Body:
-> Vestige needs the microphone to record your dumps. Audio is processed by Gemma 4 on this device, then discarded. The transcription stays as text — like any other note.
-
-Primary action:
-> **Allow microphone**
-
-Secondary action:
-> **Skip — I'll type instead**
-
-If denied:
-> Mic permission required to record. Settings → Permissions.
-
----
-
-### Screen 3.5 — Notification permission
-
-Header:
-> **One status notification.**
-
-Body:
-> Vestige briefly shows a status when it's working locally on an entry. That's the only notification it will ever send. It disappears when work is done.
+Notify row helper state:
+- Pending: `Single-status only · nothing else, ever`
 
 Primary action:
-> **Allow notifications**
+> **Open Vestige**
 
-Secondary action:
-> **Skip — work runs in foreground only**
-
-If skipped:
-> *(no error state — extractions only complete while the app is in the foreground; the cold-start sweep recovers the rest)*
+Gate:
+> Enabled only when the Local row is green.
 
 Notification text when posted (per `adrs/ADR-004-app-backgrounding-and-model-handle-lifecycle.md` §"Notification Contract"):
 > Reading the entry.
@@ -103,49 +82,7 @@ This string is the same one used for mid-capture inference loading copy (see §"
 
 ---
 
-### Screen 4 — Typed fallback
-
-Header:
-> **Or type.**
-
-Body:
-> Voice is the default. Typing works the same way. Same patterns, same persona. Pick whichever the day is asking for.
-
-Primary action:
-> **Continue**
-
----
-
-### Screen 5 — Wi-Fi check
-
-If on Wi-Fi:
-
-Header:
-> **Wi-Fi connected.**
-
-Body:
-> Ready to download the model. ~3.7 GB.
-
-Primary action:
-> **Download model**
-
-If not on Wi-Fi:
-
-Header:
-> **Wi-Fi required.**
-
-Body:
-> The model is ~3.7 GB. Connect to Wi-Fi to download. We'll wait.
-
-Primary action:
-> **Open Wi-Fi settings**
-
-Secondary action:
-> **I'll come back**
-
----
-
-### Screen 6 — Model download (in progress)
+### Screen 3 — Model download
 
 Header:
 > **Downloading model.**
@@ -171,16 +108,13 @@ If failed:
 
 ---
 
-### Screen 7 — First entry scaffold
-
-Header:
-> **Ready.**
-
-Body:
-> Everything's local. The model's loaded. Talk into the mic when you've got something to dump, or type. Witness is selected.
-
 Primary action:
-> **Open Vestige**
+> **Continue**
+
+Behavior:
+- Disabled until the artifact verifies.
+- Auto-returns to **Wiring** once complete.
+- If restored without Wi-Fi, return to **Wiring** and use the Local row's Wi-Fi-settings affordance instead of starting a dead-end download screen.
 
 ---
 

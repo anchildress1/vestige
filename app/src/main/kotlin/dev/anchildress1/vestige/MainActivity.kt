@@ -20,7 +20,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Button
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -37,9 +36,13 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import dev.anchildress1.vestige.debug.DebugPatternSeeder
+import dev.anchildress1.vestige.model.Persona
 import dev.anchildress1.vestige.ui.components.AppTop
 import dev.anchildress1.vestige.ui.components.VestigeScaffold
 import dev.anchildress1.vestige.ui.components.VestigeSurface
+import dev.anchildress1.vestige.ui.onboarding.ModelAvailability
+import dev.anchildress1.vestige.ui.onboarding.OnboardingHost
+import dev.anchildress1.vestige.ui.onboarding.OnboardingPrefs
 import dev.anchildress1.vestige.ui.patterns.PatternsHost
 import dev.anchildress1.vestige.ui.theme.VestigeTheme
 
@@ -48,8 +51,28 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         val container = (application as VestigeApplication).appContainer
+        val onboardingPrefs = OnboardingPrefs.from(this)
         setContent {
             VestigeTheme {
+                // SharedPreferences is the durable source of truth — process death re-reads
+                // it on cold start, so a plain `mutableStateOf` is enough for in-process flips.
+                var onboardingComplete by remember { mutableStateOf(onboardingPrefs.isComplete) }
+                var selectedPersona by remember { mutableStateOf(onboardingPrefs.defaultPersona) }
+                if (!onboardingComplete) {
+                    OnboardingHost(
+                        prefs = onboardingPrefs,
+                        onComplete = { persona ->
+                            selectedPersona = persona
+                            onboardingComplete = true
+                        },
+                        modelAvailability = ModelAvailability.Default(
+                            artifactStore = container.mainModelArtifactStore,
+                            networkGate = container.networkGate,
+                        ),
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                    return@VestigeTheme
+                }
                 var showPatterns by rememberSaveable { mutableStateOf(false) }
                 if (showPatterns) {
                     // Back unwinds patterns→shell; without this the activity exits and the user
@@ -72,6 +95,7 @@ class MainActivity : ComponentActivity() {
                             } else {
                                 null
                             },
+                            persona = selectedPersona,
                             modifier = Modifier.padding(padding),
                         )
                     }
@@ -89,6 +113,7 @@ class MainActivity : ComponentActivity() {
  */
 @Composable
 private fun PhaseOneShell(
+    persona: Persona,
     onOpenPatterns: () -> Unit = {},
     onDebugSeed: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
@@ -109,15 +134,9 @@ private fun PhaseOneShell(
         lastRequestDenied = !granted
     }
 
-    LaunchedEffect(Unit) {
-        if (!permissionGranted) {
-            launcher.launch(Manifest.permission.RECORD_AUDIO)
-        }
-    }
-
     Column(modifier = modifier.fillMaxSize()) {
         AppTop(
-            persona = "WITNESS",
+            persona = persona.name,
             onPersonaTap = { toastTap(context, "persona tap") },
             onStatusTap = { toastTap(context, "status tap") },
         )
@@ -189,7 +208,7 @@ private fun PhaseOneShellCard(
 @Composable
 private fun PhaseOneShellPreview() {
     VestigeTheme {
-        PhaseOneShell()
+        PhaseOneShell(persona = Persona.WITNESS)
     }
 }
 

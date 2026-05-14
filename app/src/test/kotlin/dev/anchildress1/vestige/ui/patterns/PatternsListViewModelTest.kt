@@ -10,7 +10,10 @@ import dev.anchildress1.vestige.storage.MarkdownEntryStore
 import dev.anchildress1.vestige.storage.PatternEntity
 import dev.anchildress1.vestige.storage.PatternRepo
 import dev.anchildress1.vestige.storage.PatternStore
-import dev.anchildress1.vestige.storage.VestigeBoxStore
+import dev.anchildress1.vestige.testing.cleanupObjectBoxTempRoot
+import dev.anchildress1.vestige.testing.newInMemoryObjectBoxDirectory
+import dev.anchildress1.vestige.testing.newModuleTempRoot
+import dev.anchildress1.vestige.testing.openInMemoryBoxStore
 import io.objectbox.BoxStore
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -35,9 +38,10 @@ import java.time.ZoneOffset
 
 @OptIn(ExperimentalCoroutinesApi::class)
 @RunWith(RobolectricTestRunner::class)
-@Config(manifest = Config.NONE)
+@Config(manifest = Config.NONE, application = PatternsTestApplication::class)
 class PatternsListViewModelTest {
 
+    private lateinit var tempRoot: File
     private lateinit var dataDir: File
     private lateinit var boxStore: BoxStore
     private lateinit var entryStore: EntryStore
@@ -49,11 +53,9 @@ class PatternsListViewModelTest {
     @Before
     fun setUp() {
         Dispatchers.setMain(testDispatcher)
-        val tempRoot = File(System.getProperty("java.io.tmpdir"), "vestige-patterns-list-viewmodel-tests").apply {
-            mkdirs()
-        }
-        dataDir = File(tempRoot, "ob-patterns-list-${System.nanoTime()}").apply { mkdirs() }
-        boxStore = VestigeBoxStore.openAt(dataDir)
+        tempRoot = newModuleTempRoot("vestige-patterns-list-viewmodel-")
+        dataDir = newInMemoryObjectBoxDirectory("ob-patterns-list-")
+        boxStore = openInMemoryBoxStore(dataDir)
         entryStore = EntryStore(
             boxStore,
             MarkdownEntryStore(File(tempRoot, "md-${System.nanoTime()}").apply { mkdirs() }),
@@ -66,7 +68,7 @@ class PatternsListViewModelTest {
     fun tearDown() {
         Dispatchers.resetMain()
         boxStore.close()
-        dataDir.deleteRecursively()
+        cleanupObjectBoxTempRoot(tempRoot, dataDir)
     }
 
     @Test

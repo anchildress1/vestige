@@ -68,6 +68,18 @@ class AppContainer(
         LiteRtLmEngine(modelPath = modelPath, cacheDir = cacheDir)
     },
     private val networkGateFactory: () -> NetworkGate = { DefaultNetworkGate() },
+    private val mainModelArtifactStoreFactory: (
+        ModelManifest,
+        File,
+        NetworkGate,
+    ) -> ModelArtifactStore =
+        { manifest, baseDir, networkGate ->
+            DefaultModelArtifactStore(
+                manifest = manifest,
+                baseDir = baseDir,
+                httpClient = ArtifactHttpClient(manifest.allowedHosts, networkGate),
+            )
+        },
     private val embeddingModelArtifactStoreFactory: (
         EmbeddingArtifactManifest,
         File,
@@ -150,7 +162,8 @@ class AppContainer(
     @Volatile
     private var embedderInstance: Embedder? = null
 
-    private val networkGate: NetworkGate = networkGateFactory()
+    val networkGate: NetworkGate = networkGateFactory()
+    private val mainModelManifest: ModelManifest by lazy(ModelManifest::loadDefault)
     private val embeddingArtifactsDir: File by lazy { File(applicationContext.filesDir, MODEL_ARTIFACTS_SUBDIR) }
     private val embeddingArtifactManifest: EmbeddingArtifactManifest by lazy(embeddingArtifactManifestLoader)
 
@@ -161,6 +174,15 @@ class AppContainer(
         )
     }
     val backgroundEngine: LiteRtLmEngine by backgroundEngineDelegate
+
+    val mainModelArtifactStore: ModelArtifactStore by lazy {
+        // Derive baseDir from the same `modelPathLoader` the engine uses so tests that override
+        // the loader to point at a fixture file get the artifact store reading the same path —
+        // otherwise the readiness gate can disagree with the engine about where the model lives.
+        val modelFile = File(modelPathLoader(applicationContext))
+        val baseDir = modelFile.parentFile ?: File(applicationContext.filesDir, MODEL_ARTIFACTS_SUBDIR)
+        mainModelArtifactStoreFactory(mainModelManifest, baseDir, networkGate)
+    }
 
     val embeddingModelArtifactStore: ModelArtifactStore by lazy {
         embeddingModelArtifactStoreFactory(

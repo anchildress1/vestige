@@ -1,8 +1,9 @@
 package dev.anchildress1.vestige.storage
 
-import androidx.test.core.app.ApplicationProvider
 import dev.anchildress1.vestige.model.PatternKind
 import dev.anchildress1.vestige.model.PatternState
+import dev.anchildress1.vestige.testing.newInMemoryObjectBoxDirectory
+import dev.anchildress1.vestige.testing.openInMemoryBoxStore
 import io.objectbox.BoxStore
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -31,9 +32,8 @@ class PatternStoreTest {
 
     @Before
     fun setUp() {
-        val context = ApplicationProvider.getApplicationContext<android.content.Context>()
-        dataDir = File(context.filesDir, "objectbox-pattern-${System.nanoTime()}")
-        boxStore = VestigeBoxStore.openAt(dataDir)
+        dataDir = newInMemoryObjectBoxDirectory("objectbox-pattern-")
+        boxStore = openInMemoryBoxStore(dataDir)
         store = PatternStore(boxStore, clock)
     }
 
@@ -223,11 +223,13 @@ class PatternStoreTest {
     }
 
     @Test
-    fun `state survives BoxStore restart`() {
+    fun `state survives BoxStore close and reopen by name`() {
         val seeded = seed()
         store.transitionState(seeded.patternId, PatternState.SNOOZED, snoozedUntilMs = now.toEpochMilli() + 1_000)
         boxStore.close()
-        boxStore = VestigeBoxStore.openAt(dataDir)
+        // In-memory stores are keyed by their `memory:` URI — reopening with the same path
+        // reattaches to the same registry. Disk durability lives in VestigeBoxStoreOpenTest.
+        boxStore = openInMemoryBoxStore(dataDir)
         store = PatternStore(boxStore, clock)
         val readBack = store.findByPatternId(seeded.patternId)!!
         assertEquals(PatternState.SNOOZED, readBack.state)

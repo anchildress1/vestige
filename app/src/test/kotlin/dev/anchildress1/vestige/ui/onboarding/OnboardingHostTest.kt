@@ -54,7 +54,7 @@ class OnboardingHostTest {
     @Test
     fun `lands on persona pick with Witness default`() {
         startHost()
-        composeRule.onNodeWithText("PICK A PERSONA.").assertIsDisplayed()
+        composeRule.onNodeWithText("PERSONA").assertIsDisplayed()
         composeRule.onNodeWithText("WITNESS").assertIsDisplayed()
         composeRule.onNodeWithText("HARDASS").performScrollTo().assertIsDisplayed()
         composeRule.onNodeWithText("EDITOR").performScrollTo().assertIsDisplayed()
@@ -73,7 +73,7 @@ class OnboardingHostTest {
     fun `persona Continue advances to the Wiring hub`() {
         startHost()
         tapPrimary("CONTINUE")
-        composeRule.onNodeWithText("WIRING THIS UP.").assertIsDisplayed()
+        composeRule.onNodeWithText("WIRING").assertIsDisplayed()
     }
 
     @Test
@@ -90,17 +90,17 @@ class OnboardingHostTest {
         startHost()
         tapPrimary("CONTINUE")
         startHost()
-        composeRule.onNodeWithText("WIRING THIS UP.").assertIsDisplayed()
+        composeRule.onNodeWithText("WIRING").assertIsDisplayed()
     }
 
     @Test
     fun `system back from Wiring returns to PersonaPick`() {
         startHost()
         tapPrimary("CONTINUE")
-        composeRule.onNodeWithText("WIRING THIS UP.").assertIsDisplayed()
+        composeRule.onNodeWithText("WIRING").assertIsDisplayed()
         Espresso.pressBack()
         composeRule.waitForIdle()
-        composeRule.onNodeWithText("PICK A PERSONA.").assertIsDisplayed()
+        composeRule.onNodeWithText("PERSONA").assertIsDisplayed()
     }
 
     @Test

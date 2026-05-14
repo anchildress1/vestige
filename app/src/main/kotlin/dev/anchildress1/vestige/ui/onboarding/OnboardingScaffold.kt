@@ -81,11 +81,11 @@ private fun OnboardingPrimaryBar(primary: OnboardingAction, secondary: Onboardin
                 .semantics { role = Role.Button },
             contentPadding = PaddingValues(vertical = 18.dp, horizontal = 20.dp),
             colors = ButtonDefaults.buttonColors(
-                // Muted lime — pure `colors.lime` reads as screaming neon on device. `limeSoft`
-                // is the same hue at 55% alpha; composited over `floor` it sits as a pastel
-                // lime that still owns the brand-green semantic without burning out the screen.
-                containerColor = colors.limeSoft.compositeOver(colors.floor),
-                contentColor = colors.ink,
+                // Calibrated lime — pure `colors.lime` reads as screaming neon on device,
+                // `limeSoft` (55% alpha) reads as dark olive. 85% alpha composited over the
+                // floor sits between: clearly lime, clearly bright, no retina burn.
+                containerColor = colors.lime.copy(alpha = LIME_BAR_ALPHA).compositeOver(colors.floor),
+                contentColor = colors.deep,
                 disabledContainerColor = colors.s2,
                 disabledContentColor = colors.dim,
             ),
@@ -132,3 +132,5 @@ internal fun OnboardingFooterLink(text: String, modifier: Modifier = Modifier) {
 
 @Composable
 internal fun onboardingDefaultBack(): String = stringResource(id = R.string.onboarding_back)
+
+private const val LIME_BAR_ALPHA: Float = 0.85f

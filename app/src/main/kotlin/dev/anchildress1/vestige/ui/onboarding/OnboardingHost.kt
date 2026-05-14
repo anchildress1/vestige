@@ -238,19 +238,28 @@ private suspend fun runDownloadIfNeeded(
     try {
         Log.i(ONBOARDING_TAG, "Starting download()...")
         var lastPct = -1
-        var sampleBytes = 0L
-        var sampleTimeMs = System.currentTimeMillis()
+        // Baseline the speed sampler on the FIRST progress callback, not before — on resume
+        // (HTTP Range), the first reported `currentBytes` is the .part file's existing length,
+        // not 0. Initializing sampleBytes to 0 turned that initial value into a fake gigantic
+        // delta and flashed an absurd MB/s number before the next chunk arrived.
+        var sampleBytes = -1L
+        var sampleTimeMs = 0L
         val terminal = withContext(Dispatchers.IO) {
             modelAvailability.download { currentBytes, expectedBytes ->
                 onState(ModelArtifactState.Partial(currentBytes, expectedBytes))
                 val now = System.currentTimeMillis()
-                val elapsed = now - sampleTimeMs
-                if (elapsed >= SPEED_SAMPLE_INTERVAL_MS) {
-                    val deltaBytes = currentBytes - sampleBytes
-                    val mbps = (deltaBytes.toFloat() / BYTES_PER_MB) / (elapsed.toFloat() / MS_PER_SECOND)
-                    onSpeed(mbps.coerceAtLeast(0f))
+                if (sampleBytes < 0L) {
                     sampleBytes = currentBytes
                     sampleTimeMs = now
+                } else {
+                    val elapsed = now - sampleTimeMs
+                    if (elapsed >= SPEED_SAMPLE_INTERVAL_MS) {
+                        val deltaBytes = (currentBytes - sampleBytes).coerceAtLeast(0L)
+                        val mbps = (deltaBytes.toFloat() / BYTES_PER_MB) / (elapsed.toFloat() / MS_PER_SECOND)
+                        onSpeed(mbps.coerceAtLeast(0f))
+                        sampleBytes = currentBytes
+                        sampleTimeMs = now
+                    }
                 }
                 val pct = if (expectedBytes > 0L) {
                     ((currentBytes * PERCENT_LOG_SCALE) / expectedBytes).toInt()

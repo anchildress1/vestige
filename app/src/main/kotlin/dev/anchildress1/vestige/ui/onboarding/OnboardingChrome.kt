@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Text
@@ -74,17 +75,23 @@ private fun Set<Int>.expandTo(density: Int): Set<Int> =
     flatMap { step -> (step * density until (step + 1) * density) }.toSet()
 
 /**
- * Anton-condensed poster headline ending in a period and (optionally) a small lime accent
- * square. Used as the hero on every onboarding screen.
+ * Anton-condensed poster headline. The headline string's trailing period — if any — is replaced
+ * with a small lime square sitting at the baseline. Matches `poc/screenshots/onboarding-*.png`
+ * where the period IS the lime accent block, not a separate glyph next to one.
  */
 @Composable
 internal fun OnboardingHeadline(text: String, modifier: Modifier = Modifier, accentSquare: Boolean = true) {
+    val (body, periodIsSquare) = if (accentSquare && text.endsWith(".")) {
+        text.dropLast(1) to true
+    } else {
+        text to false
+    }
     Row(
         modifier = modifier.fillMaxWidth(),
         verticalAlignment = Alignment.Bottom,
     ) {
         Text(
-            text = text,
+            text = body,
             style = TextStyle(
                 fontFamily = VestigeFonts.Display,
                 fontSize = HEADLINE_SP.sp,
@@ -93,23 +100,21 @@ internal fun OnboardingHeadline(text: String, modifier: Modifier = Modifier, acc
             ),
             color = VestigeTheme.colors.ink,
         )
-        if (accentSquare) {
-            Box(modifier = Modifier.width(6.dp))
+        if (periodIsSquare) {
+            // 3dp gap is tight enough that the square reads as the period, not a separate
+            // accent. 12dp square sits at the text baseline thanks to the Row's bottom align.
+            Box(modifier = Modifier.width(3.dp))
             Box(
                 modifier = Modifier
-                    .size(width = ACCENT_SIZE.dp, height = ACCENT_SIZE.dp),
-                contentAlignment = Alignment.BottomStart,
-            ) {
-                Box(
-                    modifier = Modifier
-                        .size(ACCENT_SIZE.dp)
-                        .background(VestigeTheme.colors.lime),
-                )
-            }
+                    .padding(bottom = ACCENT_BASELINE_OFFSET.dp)
+                    .size(ACCENT_SIZE.dp)
+                    .background(VestigeTheme.colors.lime),
+            )
         }
     }
 }
 
 private const val HEADLINE_SP = 56
 private const val HEADLINE_LINE_HEIGHT_SP = 56
-private const val ACCENT_SIZE = 10
+private const val ACCENT_SIZE = 12
+private const val ACCENT_BASELINE_OFFSET = 4

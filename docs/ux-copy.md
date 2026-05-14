@@ -122,7 +122,7 @@ Behavior:
 
 ### Status row (top)
 
-- Local model status indicator: `LOCAL · GEMMA 4` (when idle, model loaded) / `ON AIR · LIVE` (when recording) — per ADR-011
+- Local model status indicator: `GEMMA 4 · LOCAL ONLY` (when idle, model loaded) / `GEMMA 4 · LISTENING LIVE` (when recording) — pill color stays lime in both states per ADR-011 Addendum 2026-05-14; coral is reserved for the REC button heat + destructive flows
 - Persona dropdown label: `WITNESS ▾` (or active persona)
 
 ### Patterns peek (below status)

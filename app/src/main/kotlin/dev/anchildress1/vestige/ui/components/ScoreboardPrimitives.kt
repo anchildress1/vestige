@@ -140,8 +140,8 @@ data class AppTopStatus(
 object AppTopStatuses {
     val Ready: AppTopStatus
         @Composable get() = AppTopStatus(
-            text = "LOCAL · GEMMA 4",
-            contentDescription = "Local model ready: Gemma 4.",
+            text = "GEMMA 4 · LOCAL ONLY",
+            contentDescription = "Gemma 4 local model. Local only.",
             color = VestigeTheme.colors.lime,
             dot = true,
             blink = true,
@@ -149,17 +149,18 @@ object AppTopStatuses {
 
     val Recording: AppTopStatus
         @Composable get() = AppTopStatus(
-            text = "ON AIR · LIVE",
-            contentDescription = "Recording. Local model active.",
-            color = VestigeTheme.colors.coral,
+            text = "GEMMA 4 · LISTENING LIVE",
+            contentDescription = "Gemma 4 local model. Listening live.",
+            color = VestigeTheme.colors.lime,
             dot = true,
             blink = true,
         )
 }
 
 /**
- * Capsule pill with optional [dot] and mono label. Filled when [fill] is true (used for ON AIR);
- * outlined otherwise. Colors default to the lime "signal" semantic.
+ * Capsule pill with optional [dot] and mono label. Filled when [fill] is true; outlined
+ * otherwise. Colors default to the lime "signal" semantic — the AppTop status pill stays lime
+ * in both idle and recording states (per ADR-011 Addendum 2026-05-14).
  */
 @Composable
 @Suppress("LongParameterList") // primitive
@@ -321,8 +322,10 @@ private const val TICK_RAIL_HEIGHT: Float = 0.40f
 private val MinTapTarget: Dp = 48.dp
 
 /**
- * App shell top — LOCAL · GEMMA 4 status pill (or ON AIR · LIVE while recording) on the left,
- * persona switcher chrome on the right. Used by Capture and any screen that wants the chrome.
+ * App shell top — GEMMA 4 · LOCAL ONLY status pill (or GEMMA 4 · LISTENING LIVE while recording)
+ * on the left, persona switcher chrome on the right. Pill stays lime in both states; coral is
+ * reserved for REC button heat + destructive flows. Used by Capture and any screen that wants
+ * the chrome.
  */
 @Composable
 @Suppress("LongParameterList") // primitive

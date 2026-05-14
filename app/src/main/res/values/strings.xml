@@ -45,7 +45,7 @@
     <string name="onboarding_wiring_mic_blocked_hint">DENIED · TAP AGAIN OR SETTINGS → PERMISSIONS</string>
 
     <string name="onboarding_wiring_local_number">#02</string>
-    <string name="onboarding_wiring_local_title">LOCAL · GEMMA 4</string>
+    <string name="onboarding_wiring_local_title">GEMMA 4 · LOCAL ONLY</string>
     <string name="onboarding_wiring_local_desc">No cloud. No servers. No telemetry. Voice never leaves the device.</string>
 
     <string name="onboarding_wiring_mic_number">#03</string>

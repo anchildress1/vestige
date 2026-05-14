@@ -182,3 +182,18 @@ Story 4.1.5 lands **before** Story 4.2 onboarding implementation begins. Onboard
 ### Future revisits
 
 If Scoreboard reads as "loud" in the wrong way on device — i.e., judges read it as marketing-app, not forensic-app — the lever is to **tone the lime accent only**, not to roll back to Mist. The Mist palette is gone for v1.
+
+### Addendum (2026-05-14) — AppTop status pill narrows coral semantic
+
+On-device review of Story 4.5 surfaced that `ON AIR · LIVE` (coral) reading on the AppTop pill during recording landed as "alarm / error" instead of "we are listening." The pill chrome and the REC button were sharing the coral atom, which collapsed two distinct semantics — "the machine is hot" (REC button heat, halo, fill) vs. "the system is operational" (status chrome).
+
+**Change:**
+
+- `AppTopStatuses.Ready` text flips from `LOCAL · GEMMA 4` to `GEMMA 4 · LOCAL ONLY`. Pill color stays `colors.lime`.
+- `AppTopStatuses.Recording` text flips from `ON AIR · LIVE` to `GEMMA 4 · LISTENING LIVE`. Pill color flips from `colors.coral` to `colors.lime`.
+- Coral semantic narrows to: REC button (idle outline → recording fill), REC button halo (`coralHaloOnRecording`), destructive fill (`errorFillForDestructive`), and the `errorRed` alias for M3 `colorScheme.error`. Anywhere else previously labeled "recording = coral" reads as "REC button = coral."
+- Contrast / readability: both pill states keep the lime / dim / hair / s1 contrast story unchanged. AA / AAA targets unaffected.
+
+**Why this is an addendum, not a new ADR:** the broader design pivot is unchanged — Scoreboard primitives, token table, type stack, motion keyframes all hold. This refines one atom assignment without re-opening the pivot itself (per AGENTS.md rule 23).
+
+**Affected files:** `ScoreboardPrimitives.kt` (AppTopStatuses Ready/Recording + KDoc), `AccentModifiers.kt` (KDoc for `coralHaloOnRecording` + `limeDotForReady`), `Color.kt` (Lime / Coral comment scopes), `strings.xml` (`onboarding_wiring_local_title`), `ux-copy.md` §"Capture Screen / Status row", `phase-4-ux-surface.md` Story 4.1 capture-screen bullet. Tests: `ScoreboardPrimitivesTest`, `OnboardingStepContentTest`.

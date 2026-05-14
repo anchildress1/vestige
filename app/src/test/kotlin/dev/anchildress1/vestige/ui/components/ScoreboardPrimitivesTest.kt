@@ -110,14 +110,14 @@ class ScoreboardPrimitivesTest {
 
     @Test
     fun `Pill renders its label (pos — outline)`() {
-        composeRule.setContent { Pill(text = "LOCAL · GEMMA 4") }
-        composeRule.onNodeWithText("LOCAL · GEMMA 4").assertIsDisplayed()
+        composeRule.setContent { Pill(text = "GEMMA 4 · LOCAL ONLY") }
+        composeRule.onNodeWithText("GEMMA 4 · LOCAL ONLY").assertIsDisplayed()
     }
 
     @Test
     fun `Pill renders its label (pos — filled)`() {
-        composeRule.setContent { Pill(text = "ON AIR · LIVE", fill = true) }
-        composeRule.onNodeWithText("ON AIR · LIVE").assertIsDisplayed()
+        composeRule.setContent { Pill(text = "GEMMA 4 · LISTENING LIVE", fill = true) }
+        composeRule.onNodeWithText("GEMMA 4 · LISTENING LIVE").assertIsDisplayed()
     }
 
     @Test
@@ -246,17 +246,17 @@ class ScoreboardPrimitivesTest {
     // ─── AppTop (a11y, recording vs idle, tap targets) ──────────────────────
 
     @Test
-    fun `AppTop idle status pill announces local-model-ready (a11y)`() {
+    fun `AppTop idle status pill announces local-only (a11y)`() {
         composeRule.setContent { AppTop(persona = "WITNESS") }
-        composeRule.onNodeWithContentDescription("Local model ready: Gemma 4.")
+        composeRule.onNodeWithContentDescription("Gemma 4 local model. Local only.")
             .assertIsDisplayed()
             .assertHasNoClickAction()
     }
 
     @Test
-    fun `AppTop recording status pill announces recording (a11y, pos)`() {
+    fun `AppTop recording status pill announces listening live (a11y, pos)`() {
         composeRule.setContent { AppTop(persona = "HARDASS", status = AppTopStatuses.Recording) }
-        composeRule.onNodeWithContentDescription("Recording. Local model active.")
+        composeRule.onNodeWithContentDescription("Gemma 4 local model. Listening live.")
             .assertIsDisplayed()
             .assertHasNoClickAction()
     }
@@ -291,7 +291,7 @@ class ScoreboardPrimitivesTest {
     fun `AppTop status pill fires onStatusTap when tapped (pos)`() {
         var statusTapped = 0
         composeRule.setContent { AppTop(persona = "WITNESS", onStatusTap = { statusTapped++ }) }
-        composeRule.onNodeWithContentDescription("Local model ready: Gemma 4.").performClick()
+        composeRule.onNodeWithContentDescription("Gemma 4 local model. Local only.").performClick()
         assert(statusTapped == 1) { "onStatusTap should fire exactly once (was $statusTapped)" }
     }
 
@@ -312,7 +312,7 @@ class ScoreboardPrimitivesTest {
                 onPersonaTap = {},
             )
         }
-        composeRule.onNodeWithContentDescription("Local model ready: Gemma 4.")
+        composeRule.onNodeWithContentDescription("Gemma 4 local model. Local only.")
             .assertHeightIsAtLeast(48.dp)
         composeRule.onNodeWithContentDescription(label = "WITNESS", substring = true)
             .assertHeightIsAtLeast(48.dp)
@@ -321,9 +321,8 @@ class ScoreboardPrimitivesTest {
     @Test
     fun `AppTop a11y descriptions swap on recording toggle (edge — state-dependent label)`() {
         composeRule.setContent { AppTop(persona = "WITNESS", status = AppTopStatuses.Recording) }
-        composeRule.onNodeWithContentDescription("Recording. Local model active.").assertIsDisplayed()
-        // The idle label must not appear simultaneously.
-        composeRule.onAllNodesWithText("LOCAL · GEMMA 4").assertCountEquals(0)
+        composeRule.onNodeWithContentDescription("Gemma 4 local model. Listening live.").assertIsDisplayed()
+        composeRule.onAllNodesWithText("GEMMA 4 · LOCAL ONLY").assertCountEquals(0)
     }
 
     @Test

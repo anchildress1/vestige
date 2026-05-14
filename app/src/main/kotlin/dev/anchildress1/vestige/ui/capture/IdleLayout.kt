@@ -42,24 +42,23 @@ import dev.anchildress1.vestige.ui.theme.VestigeTheme
  * deferred patterns peek + footer (out of scope this branch — see plan).
  */
 @Composable
-@Suppress("LongParameterList") // Top-level layout; each callback is a distinct host event.
+@Suppress("LongParameterList") // Top-level Compose layout; chrome already bundled.
 fun IdleLayout(
     state: CaptureUiState.Idle,
     stats: CaptureStats,
     meta: CaptureMeta,
     onRecTap: () -> Unit,
     onTypeTap: () -> Unit,
-    onPersonaTap: (() -> Unit)? = null,
-    onStatusTap: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
+    chrome: IdleChromeCallbacks = IdleChromeCallbacks(),
 ) {
     val colors = VestigeTheme.colors
     Column(modifier = modifier.fillMaxSize().background(colors.floor)) {
         AppTop(
             persona = state.persona.name,
             status = AppTopStatuses.Ready,
-            onPersonaTap = onPersonaTap,
-            onStatusTap = onStatusTap,
+            onPersonaTap = chrome.onPersonaTap,
+            onStatusTap = chrome.onStatusTap,
         )
         DateStrip(meta = meta)
         Box(modifier = Modifier.padding(horizontal = 18.dp, vertical = 12.dp)) {
@@ -91,6 +90,36 @@ fun IdleLayout(
             OrTypeButton(onClick = onTypeTap)
         }
         Spacer(modifier = Modifier.weight(1f))
+        chrome.onPatternsTap?.let { onTap ->
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 18.dp, vertical = 18.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                PatternsLink(onClick = onTap)
+            }
+        }
+    }
+}
+
+@Composable
+private fun PatternsLink(onClick: () -> Unit) {
+    val colors = VestigeTheme.colors
+    Box(
+        modifier = Modifier
+            .clickable(onClick = onClick)
+            .semantics(mergeDescendants = true) {
+                role = Role.Button
+                contentDescription = CaptureCopy.PATTERNS_LINK
+            }
+            .padding(horizontal = 12.dp, vertical = 8.dp),
+    ) {
+        Text(
+            text = CaptureCopy.PATTERNS_LINK,
+            style = VestigeTheme.typography.personaLabel,
+            color = colors.dim,
+        )
     }
 }
 

@@ -6,13 +6,18 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.compose.LifecycleEventEffect
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import dev.anchildress1.vestige.model.Persona
 import dev.anchildress1.vestige.ui.capture.CaptureScreen
@@ -23,12 +28,12 @@ import dev.anchildress1.vestige.ui.capture.RealVoiceCapture
 import dev.anchildress1.vestige.ui.capture.SaveAndExtract
 import dev.anchildress1.vestige.ui.capture.SaveTypedEntry
 import dev.anchildress1.vestige.ui.capture.ToneGeneratorLimitWarningCue
-import dev.anchildress1.vestige.ui.capture.deriveInitialReadiness
 import dev.anchildress1.vestige.ui.capture.deriveMeta
 import dev.anchildress1.vestige.ui.capture.deriveStats
 import dev.anchildress1.vestige.ui.onboarding.ModelAvailability
 import dev.anchildress1.vestige.ui.onboarding.OnboardingHost
 import dev.anchildress1.vestige.ui.onboarding.OnboardingPrefs
+import dev.anchildress1.vestige.ui.patterns.PatternsHost
 import dev.anchildress1.vestige.ui.theme.VestigeTheme
 import java.time.Clock
 import java.time.ZoneId
@@ -60,23 +65,45 @@ class MainActivity : ComponentActivity() {
                     )
                     return@VestigeTheme
                 }
-                CaptureRoute(
-                    container = container,
-                    persona = selectedPersona,
-                    clock = clock,
-                    zoneId = zoneId,
-                )
+                var screen by rememberSaveable { mutableStateOf(PostOnboardingScreen.Capture) }
+                when (screen) {
+                    PostOnboardingScreen.Capture -> CaptureRoute(
+                        container = container,
+                        persona = selectedPersona,
+                        clock = clock,
+                        zoneId = zoneId,
+                        onOpenPatterns = { screen = PostOnboardingScreen.Patterns },
+                    )
+
+                    PostOnboardingScreen.Patterns -> PatternsHost(
+                        patternStore = container.patternStore,
+                        patternRepo = container.patternRepo,
+                        entryStore = container.entryStore,
+                        onExit = { screen = PostOnboardingScreen.Capture },
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                }
             }
         }
     }
 }
 
+private enum class PostOnboardingScreen { Capture, Patterns }
+
 @androidx.compose.runtime.Composable
-private fun CaptureRoute(container: AppContainer, persona: Persona, clock: Clock, zoneId: ZoneId) {
+private fun CaptureRoute(
+    container: AppContainer,
+    persona: Persona,
+    clock: Clock,
+    zoneId: ZoneId,
+    onOpenPatterns: () -> Unit,
+) {
     val limitWarningCue = remember { ToneGeneratorLimitWarningCue() }
     DisposableEffect(limitWarningCue) {
         onDispose { limitWarningCue.release() }
     }
+    val modelReadiness by container.modelReadinessFlow.collectAsStateWithLifecycle()
+    val dataRevision by container.dataRevision.collectAsStateWithLifecycle()
     val factory = remember(container, persona, limitWarningCue) {
         CaptureViewModelFactory(
             initialPersona = persona,
@@ -92,22 +119,29 @@ private fun CaptureRoute(container: AppContainer, persona: Persona, clock: Clock
             },
             clock = clock,
             zoneId = zoneId,
-            // Fast presence + size check at composition; the engine's own load verifies
-            // integrity at first use, so the UI gate doesn't need the full SHA-256 hash of a
-            // 3.66 GB file to enable REC. Real-time observation of Downloading / Paused states
-            // lands with the error chrome in commit 6.
-            initialReadiness = deriveInitialReadiness(container),
+            initialReadiness = container.modelReadinessFlow.value,
             limitWarningCue = limitWarningCue,
         )
     }
     val viewModel: CaptureViewModel = viewModel(factory = factory)
-    val stats = remember(container) { deriveStats(container) }
+    // Pipe live model-readiness changes into the VM so REC enablement, the error band, and
+    // the inferring-vs-loading chrome stay in sync if the artifact transitions during the
+    // session (download completes, pauses, or is removed via Settings).
+    LaunchedEffect(viewModel, modelReadiness) { viewModel.setModelReadiness(modelReadiness) }
+    // Re-probe on ON_RESUME so a download that completed in another activity / process is
+    // reflected when the user returns. AppContainer no-ops if nothing changed.
+    LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { container.refreshModelReadiness() }
+    // `dataRevision` as a remember key forces re-derivation whenever AppContainer increments
+    // it (entry write / pattern write / recovery sweep). Cheap — entryStore.countCompleted +
+    // patternStore.findVisibleSortedByLastSeen are indexed reads.
+    val stats = remember(container, dataRevision) { deriveStats(container) }
     val meta = remember(clock, zoneId) { deriveMeta(clock, zoneId) }
     CaptureScreen(
         viewModel = viewModel,
         stats = stats,
         meta = meta,
         modifier = Modifier.fillMaxSize(),
+        onOpenPatterns = onOpenPatterns,
     )
 }
 

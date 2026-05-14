@@ -57,11 +57,19 @@ class CaptureViewModel(
     )
     val state: StateFlow<CaptureUiState> = _state.asStateFlow()
 
+    // replay=1 + DROP_OLDEST: a STOP/DISCARD tap fired before `RealVoiceCapture` subscribes to
+    // `stopFlow.first()` is buffered and delivered on subscribe. Without the replay slot, fast
+    // taps race the subscriber and silently fall on the floor, leaving the recording to run to
+    // the 30s cap.
     private val stopSignal: MutableSharedFlow<Unit> = MutableSharedFlow(
-        replay = 0,
-        extraBufferCapacity = 1,
+        replay = 1,
+        extraBufferCapacity = 0,
         onBufferOverflow = BufferOverflow.DROP_OLDEST,
     )
+
+    private fun primeStopSignal() {
+        stopSignal.resetReplayCache()
+    }
 
     private var recordingJob: Job? = null
     private var limitWarningFired: Boolean = false
@@ -133,6 +141,7 @@ class CaptureViewModel(
 
         val inferencePersona = current.persona
         val meter = AudioLevelMeter(windowSize = levelWindowSize)
+        primeStopSignal()
         _state.update { c ->
             if (c is CaptureUiState.Idle) {
                 CaptureUiState.Recording(

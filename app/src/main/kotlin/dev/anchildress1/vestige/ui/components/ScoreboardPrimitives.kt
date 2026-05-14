@@ -160,7 +160,7 @@ object AppTopStatuses {
 /**
  * Capsule pill with optional [dot] and mono label. Filled when [fill] is true; outlined
  * otherwise. Colors default to the lime "signal" semantic — the AppTop status pill stays lime
- * in both idle and recording states (per ADR-011 Addendum 2026-05-14).
+ * in both idle and recording states.
  */
 @Composable
 @Suppress("LongParameterList") // primitive

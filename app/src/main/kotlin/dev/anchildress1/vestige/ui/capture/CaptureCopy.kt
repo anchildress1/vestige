@@ -51,6 +51,8 @@ object CaptureCopy {
     const val READING_PLACEHOLDER: String = "Reading the entry."
 
     const val YOU_LABEL: String = "YOU"
+
+    const val PATTERNS_LINK: String = "PATTERNS →"
 }
 
 /** Demo / on-device summary stats consumed by the date strip + StatRibbon. */

@@ -30,13 +30,13 @@ val TapeGrain: Color = Color(red = HAIR_R, green = HAIR_G, blue = HAIR_B, alpha 
 
 // Accents — ONE per element. Lime and Coral never co-occur on the same atom.
 // Lime: signal — live / active / "on" (model ready or listening, pattern active, AppTop status
-// pill in both idle and recording states per ADR-011 Addendum 2026-05-14).
+// pill in both idle and recording states).
 val Lime: Color = Color(0xFFD8E830) // oklch(89% 0.19 115)
 val LimeDim: Color = Lime.copy(alpha = 0.20f)
 val LimeSoft: Color = Lime.copy(alpha = 0.55f)
 
-// Coral: heat — REC button on-air, roast, danger / destructive. AppTop status pill stays lime
-// per ADR-011 Addendum 2026-05-14. The Mist `ErrorRed` collapses into coral.
+// Coral: heat — REC button on-air, roast, danger / destructive. AppTop status pill stays lime.
+// The Mist `ErrorRed` collapses into coral.
 val Coral: Color = Color(0xFFFF6254) // oklch(72% 0.21 28)
 val CoralDim: Color = Coral.copy(alpha = 0.20f)
 val CoralSoft: Color = Coral.copy(alpha = 0.55f)

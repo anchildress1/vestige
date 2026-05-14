@@ -44,8 +44,8 @@ internal val RuleWidth: Dp = 3.dp
  * the capture session is on-air. Idle (or NaN / negative) draws nothing.
  *
  * Replaces the Mist `vaporHaloOnRecording` halo. Halo color is coral because the REC button
- * carries the "heat" semantic during recording (per ADR-011). The AppTop status pill stays lime
- * — coral is reserved for REC button + destructive flows (ADR-011 Addendum 2026-05-14).
+ * carries the "heat" semantic during recording. The AppTop status pill stays lime — coral is
+ * reserved for REC button + destructive flows.
  */
 @Composable
 fun Modifier.coralHaloOnRecording(level: Float, color: Color = VestigeTheme.colors.coral): Modifier = drawWithContent {

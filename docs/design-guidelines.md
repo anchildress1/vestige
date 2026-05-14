@@ -283,10 +283,13 @@ Forbidden across all personas: "thank you for sharing," "how does that make you 
 7. **Footer metadata strip**
    - Small dim text — last entry timestamp + duration + `PATTERNS` link. Strings per `ux-copy.md` §"Footer metadata."
 
+**AppTop status pill (idle + recording).** Both states render lime — `GEMMA 4 · LOCAL ONLY` (idle) and `GEMMA 4 · LISTENING LIVE` (recording). Coral never appears on the pill. Coral is reserved for REC button heat (idle outline → recording fill), REC button halo, destructive fills (`Delete entry`, `Wipe everything`, `Delete model`), and the `errorRed` token. The "pill stays lime" rule decouples chrome operability ("the system is up") from action heat ("the machine is hot"), which the earlier coral-during-recording pill collapsed and read as alarm.
+
 **Recording-state changes to the stack:**
-- The persona dropdown pill is **replaced** by a chunk-timer pill (`00:04`-style — counts up, `vapor`-tinted, accent only on the indicator dot). The persona is fixed for the duration of a recording; switching mid-recording is forbidden.
+- The AppTop right slot is empty during recording — no persona switcher mid-take, no duplicate timer pill. The persona is fixed for the duration of a recording; switching mid-recording is forbidden. The canonical recording timer is the in-content 96sp display + remaining-seconds countdown, not a chrome pill.
 - The patterns peek card and footer metadata can dim or fade out during active recording — capture is the only surface that matters in that state. Do not collapse the layout; just lower contrast.
 - The hero title can swap to a recording-state line per `ux-copy.md`, or stay; do not invent here.
+- 30s cap pre-warn at 28s elapsed: single-fire system tone on the notification stream (not a bundled chime). Minimum-viable signal so the user knows the cap is firing — no cap-moment cue, the screen flip to Inferring carries that.
 
 **Capture Screen / Discard.** During recording, a secondary `DISCARD · NO SAVE` text link sits below the primary `STOP · FILE IT` pill. Visual register: muted secondary text — *not* destructive accent — because the buffer is gone instantly on tap and a destructive treatment would over-signal the action. Per ADR-001 Q8: single-tap, no confirmation dialog, no long-press, no `Undo` snackbar; the screen returns to idle and the layout resumes. The destructive accent (`coral` under Scoreboard, per ADR-011) stays reserved for `Delete entry` / `Wipe everything` / `Delete model` confirmations. Contract: `adrs/ADR-001-stack-and-build-infra.md` §Q8 (audio byte lifecycle, state machine, no-silent-save guarantees). Copy: `ux-copy.md` §"Capture Screen — Discard."
 

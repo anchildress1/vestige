@@ -122,7 +122,7 @@ Behavior:
 
 ### Status row (top)
 
-- Local model status indicator: `GEMMA 4 · LOCAL ONLY` (when idle, model loaded) / `GEMMA 4 · LISTENING LIVE` (when recording) — pill color stays lime in both states per ADR-011 Addendum 2026-05-14; coral is reserved for the REC button heat + destructive flows
+- Local model status indicator: `GEMMA 4 · LOCAL ONLY` (when idle, model loaded) / `GEMMA 4 · LISTENING LIVE` (when recording) — pill color stays lime in both states; coral is reserved for the REC button heat + destructive flows (see `design-guidelines.md` §"Capture Screen / AppTop status pill")
 - Persona dropdown label: `WITNESS ▾` (or active persona)
 
 ### Patterns peek (below status)

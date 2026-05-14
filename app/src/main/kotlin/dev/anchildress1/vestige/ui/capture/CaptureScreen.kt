@@ -48,15 +48,15 @@ import dev.anchildress1.vestige.ui.theme.VestigeTheme
  * from `AppContainer.entryStore.countCompleted()` + similar reads.
  */
 @Composable
-@Suppress("LongParameterList") // Route-level entry; each param is a distinct host concern.
+@Suppress("LongParameterList") // Route-level Compose entry; bundled callbacks already.
 @OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 fun CaptureScreen(
     viewModel: CaptureViewModel,
     stats: CaptureStats,
     meta: CaptureMeta,
     modifier: Modifier = Modifier,
-    onPersonaTap: (() -> Unit)? = null,
-    onStatusTap: (() -> Unit)? = null,
+    chrome: IdleChromeCallbacks = IdleChromeCallbacks(),
+    onOpenPatterns: (() -> Unit)? = null,
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val context = LocalContext.current
@@ -81,9 +81,8 @@ fun CaptureScreen(
             meta = meta,
             onRecTap = onRecTap,
             onTypeTap = { showTypeSheet = true },
-            onPersonaTap = onPersonaTap,
-            onStatusTap = onStatusTap,
             modifier = modifier,
+            chrome = chrome.copy(onPatternsTap = onOpenPatterns ?: chrome.onPatternsTap),
         )
 
         is CaptureUiState.Recording -> LiveLayout(

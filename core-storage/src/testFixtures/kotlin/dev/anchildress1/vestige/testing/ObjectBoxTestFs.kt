@@ -29,8 +29,16 @@ fun openInMemoryBoxStore(directory: File): BoxStore = MyObjectBox.builder().dire
  * Releases [dataDir] (no-op for in-memory paths — BoxStore handles the registry teardown via
  * `close()`) and recursively deletes [root]. Always invokes the recursive delete, even if the
  * BoxStore-side cleanup throws, so a partial failure can't leak the temp tree.
+ *
+ * Requires [dataDir] to be either an in-memory sentinel or a descendant of [root]; a real
+ * on-disk path outside [root] would survive the recursive delete and leak. Failing fast here
+ * keeps the invariant honest at the call site rather than the next test that notices the leak.
  */
 fun cleanupObjectBoxTempRoot(root: File, dataDir: File) {
+    val isInMemory = dataDir.path.startsWith(BoxStore.IN_MEMORY_PREFIX)
+    require(isInMemory || dataDir.canonicalPath.startsWith(root.canonicalPath)) {
+        "cleanupObjectBoxTempRoot: dataDir ($dataDir) must be in-memory or live under root ($root)"
+    }
     try {
         if (dataDir.exists()) {
             BoxStore.deleteAllFiles(dataDir)

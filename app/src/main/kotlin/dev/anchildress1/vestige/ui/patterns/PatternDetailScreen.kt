@@ -41,6 +41,7 @@ import androidx.compose.ui.unit.dp
 import dev.anchildress1.vestige.R
 import dev.anchildress1.vestige.model.PatternState
 import dev.anchildress1.vestige.ui.components.VestigeListCard
+import dev.anchildress1.vestige.ui.components.VestigeListCardInteraction
 import dev.anchildress1.vestige.ui.components.VestigeScaffold
 import dev.anchildress1.vestige.ui.components.VestigeSurface
 import dev.anchildress1.vestige.ui.theme.VestigeTheme
@@ -264,7 +265,7 @@ private fun SourceRow(source: PatternSourceUi, onClick: () -> Unit) {
         modifier = Modifier
             .semantics { role = Role.Button }
             .padding(vertical = 2.dp),
-        onClick = onClick,
+        interaction = VestigeListCardInteraction.Click(onClick = onClick),
     ) {
         Row(
             modifier = Modifier.fillMaxWidth(),

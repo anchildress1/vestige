@@ -83,7 +83,10 @@ class VestigePrimitivesTest {
     fun `VestigeListCard invokes onClick`() {
         var clicked = 0
         composeRule.setContent {
-            VestigeListCard(modifier = Modifier.size(160.dp, 60.dp), onClick = { clicked++ }) {
+            VestigeListCard(
+                modifier = Modifier.size(160.dp, 60.dp),
+                interaction = VestigeListCardInteraction.Click(onClick = { clicked++ }),
+            ) {
                 Text(text = "list-card")
             }
         }
@@ -94,7 +97,10 @@ class VestigePrimitivesTest {
     @Test
     fun `VestigeListCard with onClick exposes click semantics (a11y, pos)`() {
         composeRule.setContent {
-            VestigeListCard(modifier = Modifier.size(160.dp, 60.dp), onClick = {}) {
+            VestigeListCard(
+                modifier = Modifier.size(160.dp, 60.dp),
+                interaction = VestigeListCardInteraction.Click(onClick = {}),
+            ) {
                 Text(text = "clickable-card")
             }
         }

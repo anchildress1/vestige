@@ -19,6 +19,7 @@ import dev.anchildress1.vestige.R
 import dev.anchildress1.vestige.model.Persona
 import dev.anchildress1.vestige.ui.components.EyebrowE
 import dev.anchildress1.vestige.ui.components.VestigeListCard
+import dev.anchildress1.vestige.ui.components.VestigeListCardInteraction
 import dev.anchildress1.vestige.ui.components.limeLeftRuleForActive
 import dev.anchildress1.vestige.ui.theme.VestigeTheme
 
@@ -61,12 +62,14 @@ private fun PersonaCard(option: PersonaOption, isSelected: Boolean, onSelect: ()
     val colors = VestigeTheme.colors
     VestigeListCard(
         modifier = Modifier.fillMaxWidth(),
-        onClick = onSelect,
         // `selected != null` routes through `Modifier.selectable` — the Compose primitive for
         // radio cards. Merges descendant semantics, dispatches taps on the persona name Text
         // to the card's onClick, and announces "radio button, selected" to TalkBack.
-        selected = isSelected,
-        role = Role.RadioButton,
+        interaction = VestigeListCardInteraction.Selectable(
+            selected = isSelected,
+            onClick = onSelect,
+            role = Role.RadioButton,
+        ),
         accentModifier = if (isSelected) Modifier.limeLeftRuleForActive() else Modifier,
         contentPadding = PaddingValues(horizontal = 16.dp, vertical = 14.dp),
     ) {

@@ -18,6 +18,7 @@ import dev.anchildress1.vestige.R
 import dev.anchildress1.vestige.ui.components.EyebrowE
 import dev.anchildress1.vestige.ui.components.Pill
 import dev.anchildress1.vestige.ui.components.VestigeListCard
+import dev.anchildress1.vestige.ui.components.VestigeListCardInteraction
 import dev.anchildress1.vestige.ui.components.limeLeftRuleForActive
 import dev.anchildress1.vestige.ui.theme.VestigeTheme
 
@@ -63,6 +64,20 @@ private data class SwitchVisuals(
     val showAccent: Boolean,
 )
 
+private fun WiringSwitch.toCardInteraction(): VestigeListCardInteraction = when (role) {
+    Role.Switch -> VestigeListCardInteraction.Toggleable(
+        checked = state == WiringSwitchState.Granted,
+        onToggle = onTap,
+        role = role,
+    )
+
+    else -> if (onTap != null) {
+        VestigeListCardInteraction.Click(onClick = onTap, role = role)
+    } else {
+        VestigeListCardInteraction.Static
+    }
+}
+
 @Composable
 private fun WiringSwitchCard(switch: WiringSwitch) {
     val colors = VestigeTheme.colors
@@ -73,13 +88,7 @@ private fun WiringSwitchCard(switch: WiringSwitch) {
     }
     VestigeListCard(
         modifier = Modifier.fillMaxWidth(),
-        onClick = switch.onTap,
-        role = switch.role,
-        checked = if (switch.role == Role.Switch) {
-            switch.state == WiringSwitchState.Granted
-        } else {
-            null
-        },
+        interaction = switch.toCardInteraction(),
         accentModifier = if (visuals.showAccent) Modifier.limeLeftRuleForActive() else Modifier,
         contentPadding = PaddingValues(horizontal = 16.dp, vertical = 14.dp),
     ) {

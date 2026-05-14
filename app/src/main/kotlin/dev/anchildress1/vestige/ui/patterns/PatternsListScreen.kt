@@ -39,6 +39,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import dev.anchildress1.vestige.R
 import dev.anchildress1.vestige.ui.components.VestigeListCard
+import dev.anchildress1.vestige.ui.components.VestigeListCardInteraction
 import dev.anchildress1.vestige.ui.components.VestigeScaffold
 import dev.anchildress1.vestige.ui.components.limeLeftRuleForActive
 import dev.anchildress1.vestige.ui.theme.VestigeTheme
@@ -181,7 +182,7 @@ private fun PatternCard(
                 role = Role.Button
                 contentDescription = "${card.title}. ${card.observation}"
             },
-        onClick = onClick,
+        interaction = VestigeListCardInteraction.Click(onClick = onClick),
         accentModifier = if (card.section == PatternSection.ACTIVE) {
             Modifier.limeLeftRuleForActive(color = VestigeTheme.colors.lime)
         } else {

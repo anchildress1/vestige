@@ -114,54 +114,76 @@ fun VestigeRow(
 }
 
 /**
- * Selectable [VestigeSurface] variant. With [onClick] the fill raises to `colors.s2`.
+ * Interaction contract for [VestigeListCard].
  *
- * `selected != null` switches the click semantics from `clickable` to `selectable` — the
- * correct Compose primitive for radio-button / checkbox card patterns. `selectable` merges
- * descendant semantics so `onNodeWithText(...).performClick()` dispatches the onClick to the
- * card, which `clickable` alone does not guarantee. `checked != null` does the same for switch-
- * like rows via `toggleable`, including disabled checked-state semantics when the row is
- * informative but not currently tappable.
+ * The variants encode the card's semantic model directly instead of exposing loosely-related
+ * click, role, selected, and checked knobs that can drift out of sync at call sites.
+ */
+sealed interface VestigeListCardInteraction {
+    data object Static : VestigeListCardInteraction
+
+    data class Click(val onClick: () -> Unit, val role: Role = Role.Button) : VestigeListCardInteraction
+
+    data class Selectable(val selected: Boolean, val onClick: () -> Unit, val role: Role = Role.Button) :
+        VestigeListCardInteraction
+
+    data class Toggleable(val checked: Boolean, val onToggle: (() -> Unit)? = null, val role: Role = Role.Switch) :
+        VestigeListCardInteraction
+}
+
+private val VestigeListCardInteraction.isInteractive: Boolean
+    get() = when (this) {
+        VestigeListCardInteraction.Static -> false
+        is VestigeListCardInteraction.Click -> true
+        is VestigeListCardInteraction.Selectable -> true
+        is VestigeListCardInteraction.Toggleable -> onToggle != null
+    }
+
+/**
+ * Selectable [VestigeSurface] variant. Interactive variants raise the fill to `colors.s2`.
+ *
+ * `Selectable` routes through `Modifier.selectable` — the correct Compose primitive for
+ * radio-button / checkbox card patterns. `Toggleable` uses `Modifier.toggleable`, including
+ * disabled checked-state semantics when the row is informative but not currently tappable.
  */
 @Composable
-@Suppress("LongParameterList") // Primitive shape — defaults beat wrapper proliferation at call sites.
 fun VestigeListCard(
     modifier: Modifier = Modifier,
-    onClick: (() -> Unit)? = null,
-    role: Role = Role.Button,
-    selected: Boolean? = null,
-    checked: Boolean? = null,
+    interaction: VestigeListCardInteraction = VestigeListCardInteraction.Static,
     accentModifier: Modifier = Modifier,
     contentPadding: PaddingValues = PaddingValues(horizontal = 16.dp, vertical = 14.dp),
     content: @Composable () -> Unit,
 ) {
     val colors = VestigeTheme.colors
-    val rootModifier = when {
-        checked != null -> {
+    val rootModifier = when (interaction) {
+        VestigeListCardInteraction.Static -> modifier
+
+        is VestigeListCardInteraction.Click -> modifier.clickable(
+            role = interaction.role,
+            onClick = interaction.onClick,
+        )
+
+        is VestigeListCardInteraction.Selectable -> modifier.selectable(
+            selected = interaction.selected,
+            role = interaction.role,
+            onClick = interaction.onClick,
+        )
+
+        is VestigeListCardInteraction.Toggleable -> {
             modifier
                 .semantics(mergeDescendants = true) {}
                 .toggleable(
-                    value = checked,
-                    enabled = onClick != null,
-                    role = role,
-                    onValueChange = { onClick?.invoke() },
+                    value = interaction.checked,
+                    enabled = interaction.onToggle != null,
+                    role = interaction.role,
+                    onValueChange = { interaction.onToggle?.invoke() },
                 )
         }
-
-        onClick == null -> modifier
-
-        selected != null -> modifier.selectable(
-            selected = selected,
-            role = role,
-            onClick = onClick,
-        )
-
-        else -> modifier.clickable(role = role, onClick = onClick)
     }
     Surface(
         modifier = rootModifier,
         shape = VestigeTheme.shapes.xl,
-        color = if (onClick != null) colors.s2 else colors.s1,
+        color = if (interaction.isInteractive) colors.s2 else colors.s1,
         contentColor = colors.ink,
         border = BorderStroke(SurfaceHairline, colors.hair),
     ) {

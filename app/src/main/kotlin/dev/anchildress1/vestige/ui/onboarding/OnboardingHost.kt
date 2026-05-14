@@ -116,10 +116,12 @@ fun OnboardingHost(
         context = context,
         prefs = prefs,
         launchers = launchers,
-        setStep = { step = it },
-        setPersona = { persona = it },
-        currentPersona = { persona },
-        advance = advance,
+        handles = OnboardingStateHandles(
+            setStep = { step = it },
+            setPersona = { persona = it },
+            currentPersona = { persona },
+            advance = advance,
+        ),
         onComplete = onComplete,
     )
     val state = OnboardingStepState(
@@ -143,19 +145,23 @@ fun OnboardingHost(
     }
 }
 
-@Suppress("LongParameterList") // Builder helper — collects the orchestration handles.
+/** Bundles the host's mutable state seam so [buildCallbacks] stays under S107's parameter cap. */
+private data class OnboardingStateHandles(
+    val setStep: (OnboardingStep) -> Unit,
+    val setPersona: (Persona) -> Unit,
+    val currentPersona: () -> Persona,
+    val advance: () -> Unit,
+)
+
 private fun buildCallbacks(
     context: Context,
     prefs: OnboardingPrefs,
     launchers: PermissionLaunchers,
-    setStep: (OnboardingStep) -> Unit,
-    setPersona: (Persona) -> Unit,
-    currentPersona: () -> Persona,
-    advance: () -> Unit,
+    handles: OnboardingStateHandles,
     onComplete: (Persona) -> Unit,
 ): OnboardingStepCallbacks = OnboardingStepCallbacks(
-    onPersonaChange = setPersona,
-    advance = advance,
+    onPersonaChange = handles.setPersona,
+    advance = handles.advance,
     onMicAllow = {
         if (!hasRecordAudio(context)) launchers.mic.launch(Manifest.permission.RECORD_AUDIO)
     },
@@ -170,12 +176,12 @@ private fun buildCallbacks(
         // Trust the Wiring gate — re-running modelAvailability.status() would re-SHA the
         // 3.66 GB artifact and stall the button for tens of seconds.
         if (prefs.markComplete()) {
-            onComplete(currentPersona())
+            onComplete(handles.currentPersona())
         }
     },
-    onOpenModelDownload = { setStep(OnboardingStep.ModelDownload) },
-    onDownloadReturn = { setStep(OnboardingStep.Wiring) },
-    onChangePersona = { setStep(OnboardingStep.PersonaPick) },
+    onOpenModelDownload = { handles.setStep(OnboardingStep.ModelDownload) },
+    onDownloadReturn = { handles.setStep(OnboardingStep.Wiring) },
+    onChangePersona = { handles.setStep(OnboardingStep.PersonaPick) },
 )
 
 private data class OnboardingEnvironment(
@@ -268,42 +274,11 @@ private suspend fun runDownloadIfNeeded(
     // ticks it back to the actual byte count. Result: percent appears to flash. Letting the
     // prior `state` ride keeps the screen showing the last known progress until the resumed
     // bytes arrive.
+    val tracker = DownloadProgressTracker(onState, onSpeed)
     try {
         Log.i(ONBOARDING_TAG, "Starting download()...")
-        var lastPct = -1
-        // Baseline the speed sampler on the FIRST progress callback, not before — on resume
-        // (HTTP Range), the first reported `currentBytes` is the .part file's existing length,
-        // not 0. Initializing sampleBytes to 0 turned that initial value into a fake gigantic
-        // delta and flashed an absurd MB/s number before the next chunk arrived.
-        var sampleBytes = -1L
-        var sampleTimeMs = 0L
         val terminal = withContext(downloadDispatcher) {
-            modelAvailability.download { currentBytes, expectedBytes ->
-                onState(ModelArtifactState.Partial(currentBytes, expectedBytes))
-                val now = System.currentTimeMillis()
-                if (sampleBytes < 0L) {
-                    sampleBytes = currentBytes
-                    sampleTimeMs = now
-                } else {
-                    val elapsed = now - sampleTimeMs
-                    if (elapsed >= SPEED_SAMPLE_INTERVAL_MS) {
-                        val deltaBytes = (currentBytes - sampleBytes).coerceAtLeast(0L)
-                        val mbps = (deltaBytes.toFloat() / BYTES_PER_MB) / (elapsed.toFloat() / MS_PER_SECOND)
-                        onSpeed(mbps.coerceAtLeast(0f))
-                        sampleBytes = currentBytes
-                        sampleTimeMs = now
-                    }
-                }
-                val pct = if (expectedBytes > 0L) {
-                    ((currentBytes * PERCENT_LOG_SCALE) / expectedBytes).toInt()
-                } else {
-                    -1
-                }
-                if (pct != lastPct) {
-                    lastPct = pct
-                    Log.d(ONBOARDING_TAG, "download progress $currentBytes/$expectedBytes ($pct%)")
-                }
-            }
+            modelAvailability.download(tracker::onProgress)
         }
         onSpeed(null)
         Log.i(ONBOARDING_TAG, "download() finished. terminalState=$terminal")
@@ -316,6 +291,59 @@ private suspend fun runDownloadIfNeeded(
         throw cancel
     } catch (@Suppress("TooGenericExceptionCaught") error: Exception) {
         Log.e(ONBOARDING_TAG, "Model download failed", error)
+    }
+}
+
+/**
+ * Wraps the per-tick progress bookkeeping for [runDownloadIfNeeded]. Splitting speed sampling
+ * and pct logging into their own methods keeps the orchestrator's cognitive complexity within
+ * S3776's limit and lets each helper be reasoned about in isolation.
+ *
+ * The sample baseline is set on the FIRST `onProgress` callback (not zero-initialised) because
+ * HTTP-Range resume reports the .part file's existing length as the first `currentBytes` — a
+ * zero baseline would emit an absurd MB/s spike before the next chunk arrives.
+ */
+internal class DownloadProgressTracker(
+    private val onState: (ModelArtifactState) -> Unit,
+    private val onSpeed: (Float?) -> Unit,
+    private val nowMillis: () -> Long = System::currentTimeMillis,
+) {
+    private var lastPct = -1
+    private var sampleBytes = -1L
+    private var sampleTimeMs = 0L
+
+    fun onProgress(currentBytes: Long, expectedBytes: Long) {
+        onState(ModelArtifactState.Partial(currentBytes, expectedBytes))
+        sampleSpeed(currentBytes)
+        logPercent(currentBytes, expectedBytes)
+    }
+
+    private fun sampleSpeed(currentBytes: Long) {
+        val now = nowMillis()
+        if (sampleBytes < 0L) {
+            sampleBytes = currentBytes
+            sampleTimeMs = now
+            return
+        }
+        val elapsed = now - sampleTimeMs
+        if (elapsed < SPEED_SAMPLE_INTERVAL_MS) return
+        val deltaBytes = (currentBytes - sampleBytes).coerceAtLeast(0L)
+        val mbps = (deltaBytes.toFloat() / BYTES_PER_MB) / (elapsed.toFloat() / MS_PER_SECOND)
+        onSpeed(mbps.coerceAtLeast(0f))
+        sampleBytes = currentBytes
+        sampleTimeMs = now
+    }
+
+    private fun logPercent(currentBytes: Long, expectedBytes: Long) {
+        val pct = if (expectedBytes > 0L) {
+            ((currentBytes * PERCENT_LOG_SCALE) / expectedBytes).toInt()
+        } else {
+            -1
+        }
+        if (pct != lastPct) {
+            lastPct = pct
+            Log.d(ONBOARDING_TAG, "download progress $currentBytes/$expectedBytes ($pct%)")
+        }
     }
 }
 

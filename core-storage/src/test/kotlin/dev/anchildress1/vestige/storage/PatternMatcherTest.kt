@@ -1,8 +1,9 @@
 package dev.anchildress1.vestige.storage
 
-import androidx.test.core.app.ApplicationProvider
 import dev.anchildress1.vestige.model.PatternKind
 import dev.anchildress1.vestige.model.TemplateLabel
+import dev.anchildress1.vestige.testing.newInMemoryObjectBoxDirectory
+import dev.anchildress1.vestige.testing.openInMemoryBoxStore
 import io.objectbox.BoxStore
 import io.objectbox.kotlin.boxFor
 import org.junit.After
@@ -26,9 +27,8 @@ class PatternMatcherTest {
 
     @Before
     fun setUp() {
-        val context = ApplicationProvider.getApplicationContext<android.content.Context>()
-        dataDir = File(context.filesDir, "objectbox-matcher-${System.nanoTime()}")
-        boxStore = VestigeBoxStore.openAt(dataDir)
+        dataDir = newInMemoryObjectBoxDirectory("objectbox-matcher-")
+        boxStore = openInMemoryBoxStore(dataDir)
     }
 
     @After

@@ -1,6 +1,7 @@
 package dev.anchildress1.vestige.storage
 
-import androidx.test.core.app.ApplicationProvider
+import dev.anchildress1.vestige.testing.newInMemoryObjectBoxDirectory
+import dev.anchildress1.vestige.testing.openInMemoryBoxStore
 import io.objectbox.BoxStore
 import io.objectbox.kotlin.boxFor
 import kotlinx.coroutines.runBlocking
@@ -35,9 +36,8 @@ class RetrievalRepoTest {
 
     @Before
     fun setUp() {
-        val context = ApplicationProvider.getApplicationContext<android.content.Context>()
-        dataDir = File(context.filesDir, "objectbox-retrieval-${System.nanoTime()}")
-        boxStore = VestigeBoxStore.openAt(dataDir)
+        dataDir = newInMemoryObjectBoxDirectory("objectbox-retrieval-")
+        boxStore = openInMemoryBoxStore(dataDir)
         repo = RetrievalRepo(boxStore, zeroEmbedder, clock)
     }
 

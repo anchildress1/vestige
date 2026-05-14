@@ -2,6 +2,9 @@ package dev.anchildress1.vestige.storage
 
 import dev.anchildress1.vestige.model.PatternKind
 import dev.anchildress1.vestige.model.PatternState
+import dev.anchildress1.vestige.testing.cleanupObjectBoxTempRoot
+import dev.anchildress1.vestige.testing.newInMemoryObjectBoxDirectory
+import dev.anchildress1.vestige.testing.openInMemoryBoxStore
 import io.objectbox.BoxStore
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -31,11 +34,8 @@ class PatternRepoTest {
 
     @Before
     fun setUp() {
-        val tempRoot = File(System.getProperty("java.io.tmpdir"), "vestige-pattern-repo-tests").apply {
-            mkdirs()
-        }
-        dataDir = File(tempRoot, "objectbox-patternrepo-${System.nanoTime()}").apply { mkdirs() }
-        boxStore = VestigeBoxStore.openAt(dataDir)
+        dataDir = newInMemoryObjectBoxDirectory("vestige-pattern-repo-")
+        boxStore = openInMemoryBoxStore(dataDir)
         store = PatternStore(boxStore, clock)
         repo = PatternRepo(store, clock)
     }

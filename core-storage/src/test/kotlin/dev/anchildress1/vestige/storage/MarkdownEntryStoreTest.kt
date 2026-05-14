@@ -1,8 +1,11 @@
 package dev.anchildress1.vestige.storage
 
-import androidx.test.core.app.ApplicationProvider
 import dev.anchildress1.vestige.model.ExtractionStatus
 import dev.anchildress1.vestige.model.TemplateLabel
+import dev.anchildress1.vestige.testing.cleanupObjectBoxTempRoot
+import dev.anchildress1.vestige.testing.newInMemoryObjectBoxDirectory
+import dev.anchildress1.vestige.testing.newModuleTempRoot
+import dev.anchildress1.vestige.testing.openInMemoryBoxStore
 import io.objectbox.BoxStore
 import io.objectbox.kotlin.boxFor
 import org.junit.After
@@ -28,6 +31,7 @@ import java.time.Instant
 @Config(manifest = Config.NONE)
 class MarkdownEntryStoreTest {
 
+    private lateinit var tempRoot: File
     private lateinit var boxStore: BoxStore
     private lateinit var dataDir: File
     private lateinit var markdownDir: File
@@ -35,18 +39,17 @@ class MarkdownEntryStoreTest {
 
     @Before
     fun setUp() {
-        val context = ApplicationProvider.getApplicationContext<android.content.Context>()
-        dataDir = File(context.filesDir, "objectbox-md-${System.nanoTime()}")
-        markdownDir = File(context.filesDir, "markdown-${System.nanoTime()}")
-        boxStore = VestigeBoxStore.openAt(dataDir)
+        tempRoot = newModuleTempRoot("markdown-entry-store-")
+        dataDir = newInMemoryObjectBoxDirectory("objectbox-md-")
+        markdownDir = File(tempRoot, "markdown-${System.nanoTime()}").apply { mkdirs() }
+        boxStore = openInMemoryBoxStore(dataDir)
         store = MarkdownEntryStore(markdownDir)
     }
 
     @After
     fun tearDown() {
         boxStore.close()
-        BoxStore.deleteAllFiles(dataDir)
-        markdownDir.deleteRecursively()
+        cleanupObjectBoxTempRoot(tempRoot, dataDir)
     }
 
     @Test

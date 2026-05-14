@@ -1,6 +1,5 @@
 package dev.anchildress1.vestige.storage
 
-import androidx.test.core.app.ApplicationProvider
 import dev.anchildress1.vestige.model.ConfidenceVerdict
 import dev.anchildress1.vestige.model.EntryObservation
 import dev.anchildress1.vestige.model.ExtractionStatus
@@ -9,6 +8,10 @@ import dev.anchildress1.vestige.model.ObservationEvidence
 import dev.anchildress1.vestige.model.ResolvedExtraction
 import dev.anchildress1.vestige.model.ResolvedField
 import dev.anchildress1.vestige.model.TemplateLabel
+import dev.anchildress1.vestige.testing.cleanupObjectBoxTempRoot
+import dev.anchildress1.vestige.testing.newInMemoryObjectBoxDirectory
+import dev.anchildress1.vestige.testing.newModuleTempRoot
+import dev.anchildress1.vestige.testing.openInMemoryBoxStore
 import io.objectbox.BoxStore
 import io.objectbox.kotlin.boxFor
 import org.json.JSONArray
@@ -33,6 +36,7 @@ import java.time.Instant
 @Config(manifest = Config.NONE)
 class EntryStoreTest {
 
+    private lateinit var tempRoot: File
     private lateinit var boxStore: BoxStore
     private lateinit var dataDir: File
     private lateinit var markdownDir: File
@@ -41,10 +45,10 @@ class EntryStoreTest {
 
     @Before
     fun setUp() {
-        val context = ApplicationProvider.getApplicationContext<android.content.Context>()
-        dataDir = File(context.filesDir, "objectbox-${System.nanoTime()}")
-        markdownDir = File(context.filesDir, "markdown-${System.nanoTime()}")
-        boxStore = VestigeBoxStore.openAt(dataDir)
+        tempRoot = newModuleTempRoot("entry-store-")
+        dataDir = newInMemoryObjectBoxDirectory("objectbox-")
+        markdownDir = File(tempRoot, "markdown-${System.nanoTime()}").apply { mkdirs() }
+        boxStore = openInMemoryBoxStore(dataDir)
         markdownStore = MarkdownEntryStore(markdownDir)
         entryStore = EntryStore(boxStore, markdownStore)
     }
@@ -52,8 +56,7 @@ class EntryStoreTest {
     @After
     fun tearDown() {
         boxStore.close()
-        BoxStore.deleteAllFiles(dataDir)
-        markdownDir.deleteRecursively()
+        cleanupObjectBoxTempRoot(tempRoot, dataDir)
     }
 
     @Test

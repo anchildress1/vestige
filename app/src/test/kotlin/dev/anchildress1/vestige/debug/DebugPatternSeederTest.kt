@@ -1,10 +1,12 @@
 package dev.anchildress1.vestige.debug
 
-import androidx.test.core.app.ApplicationProvider
 import dev.anchildress1.vestige.storage.EntryStore
 import dev.anchildress1.vestige.storage.MarkdownEntryStore
 import dev.anchildress1.vestige.storage.PatternStore
-import dev.anchildress1.vestige.storage.VestigeBoxStore
+import dev.anchildress1.vestige.testing.cleanupObjectBoxTempRoot
+import dev.anchildress1.vestige.testing.newInMemoryObjectBoxDirectory
+import dev.anchildress1.vestige.testing.newModuleTempRoot
+import dev.anchildress1.vestige.testing.openInMemoryBoxStore
 import io.objectbox.BoxStore
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -16,10 +18,11 @@ import org.robolectric.annotation.Config
 import java.io.File
 
 @RunWith(RobolectricTestRunner::class)
-@Config(manifest = Config.NONE)
+@Config(manifest = Config.NONE, application = android.app.Application::class)
 class DebugPatternSeederTest {
 
     private lateinit var filesDir: File
+    private lateinit var dataDir: File
     private lateinit var boxStore: BoxStore
     private lateinit var entryStore: EntryStore
     private lateinit var patternStore: PatternStore
@@ -27,9 +30,9 @@ class DebugPatternSeederTest {
 
     @Before
     fun setUp() {
-        val context = ApplicationProvider.getApplicationContext<android.content.Context>()
-        filesDir = File(context.filesDir, "debug-seed-${System.nanoTime()}").also(File::mkdirs)
-        boxStore = VestigeBoxStore.openAt(File(filesDir, "objectbox"))
+        filesDir = newModuleTempRoot("debug-seed-")
+        dataDir = newInMemoryObjectBoxDirectory("debug-seed-objectbox-")
+        boxStore = openInMemoryBoxStore(dataDir)
         markdownStore = MarkdownEntryStore(filesDir)
         entryStore = EntryStore(boxStore, markdownStore)
         patternStore = PatternStore(boxStore)
@@ -38,7 +41,7 @@ class DebugPatternSeederTest {
     @After
     fun tearDown() {
         boxStore.close()
-        filesDir.deleteRecursively()
+        cleanupObjectBoxTempRoot(filesDir, dataDir)
     }
 
     @Test

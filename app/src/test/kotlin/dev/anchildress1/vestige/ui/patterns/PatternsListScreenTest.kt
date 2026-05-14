@@ -9,7 +9,6 @@ import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
-import androidx.test.core.app.ApplicationProvider
 import dev.anchildress1.vestige.model.ExtractionStatus
 import dev.anchildress1.vestige.model.PatternKind
 import dev.anchildress1.vestige.model.PatternState
@@ -19,7 +18,10 @@ import dev.anchildress1.vestige.storage.MarkdownEntryStore
 import dev.anchildress1.vestige.storage.PatternEntity
 import dev.anchildress1.vestige.storage.PatternRepo
 import dev.anchildress1.vestige.storage.PatternStore
-import dev.anchildress1.vestige.storage.VestigeBoxStore
+import dev.anchildress1.vestige.testing.cleanupObjectBoxTempRoot
+import dev.anchildress1.vestige.testing.newInMemoryObjectBoxDirectory
+import dev.anchildress1.vestige.testing.newModuleTempRoot
+import dev.anchildress1.vestige.testing.openInMemoryBoxStore
 import io.objectbox.BoxStore
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -50,7 +52,9 @@ class PatternsListScreenTest {
     @get:Rule
     val composeRule = createComposeRule()
 
+    private lateinit var tempRoot: File
     private lateinit var dataDir: File
+    private lateinit var markdownDir: File
     private lateinit var boxStore: BoxStore
     private lateinit var entryStore: EntryStore
     private lateinit var patternStore: PatternStore
@@ -60,12 +64,13 @@ class PatternsListScreenTest {
     @Before
     fun setUp() {
         Dispatchers.setMain(testDispatcher)
-        val context = ApplicationProvider.getApplicationContext<android.content.Context>()
-        dataDir = File(context.filesDir, "ob-list-screen-${System.nanoTime()}")
-        boxStore = VestigeBoxStore.openAt(dataDir)
+        tempRoot = newModuleTempRoot("vestige-patterns-list-screen-")
+        dataDir = newInMemoryObjectBoxDirectory("ob-list-screen-")
+        markdownDir = File(tempRoot, "md-${System.nanoTime()}").apply { mkdirs() }
+        boxStore = openInMemoryBoxStore(dataDir)
         entryStore = EntryStore(
             boxStore,
-            MarkdownEntryStore(File(context.filesDir, "md-${System.nanoTime()}")),
+            MarkdownEntryStore(markdownDir),
         )
         patternStore = PatternStore(boxStore)
         patternRepo = PatternRepo(patternStore)
@@ -75,7 +80,7 @@ class PatternsListScreenTest {
     fun tearDown() {
         Dispatchers.resetMain()
         boxStore.close()
-        dataDir.deleteRecursively()
+        cleanupObjectBoxTempRoot(tempRoot, dataDir)
     }
 
     @Test

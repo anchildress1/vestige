@@ -18,7 +18,10 @@ import dev.anchildress1.vestige.storage.MarkdownEntryStore
 import dev.anchildress1.vestige.storage.PatternEntity
 import dev.anchildress1.vestige.storage.PatternRepo
 import dev.anchildress1.vestige.storage.PatternStore
-import dev.anchildress1.vestige.storage.VestigeBoxStore
+import dev.anchildress1.vestige.testing.cleanupObjectBoxTempRoot
+import dev.anchildress1.vestige.testing.newInMemoryObjectBoxDirectory
+import dev.anchildress1.vestige.testing.newModuleTempRoot
+import dev.anchildress1.vestige.testing.openInMemoryBoxStore
 import io.objectbox.BoxStore
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -50,6 +53,7 @@ class PatternDetailScreenTest {
     @get:Rule
     val composeRule = createComposeRule()
 
+    private lateinit var tempRoot: File
     private lateinit var dataDir: File
     private lateinit var markdownDir: File
     private lateinit var boxStore: BoxStore
@@ -61,12 +65,10 @@ class PatternDetailScreenTest {
     @Before
     fun setUp() {
         Dispatchers.setMain(testDispatcher)
-        val tempRoot = File(System.getProperty("java.io.tmpdir"), "vestige-pattern-detail-screen-tests").apply {
-            mkdirs()
-        }
-        dataDir = File(tempRoot, "ob-detail-screen-${System.nanoTime()}").apply { mkdirs() }
+        tempRoot = newModuleTempRoot("vestige-pattern-detail-screen-")
+        dataDir = newInMemoryObjectBoxDirectory("ob-detail-screen-")
         markdownDir = File(tempRoot, "md-${System.nanoTime()}").apply { mkdirs() }
-        boxStore = VestigeBoxStore.openAt(dataDir)
+        boxStore = openInMemoryBoxStore(dataDir)
         entryStore = EntryStore(
             boxStore,
             MarkdownEntryStore(markdownDir),
@@ -79,8 +81,7 @@ class PatternDetailScreenTest {
     fun tearDown() {
         Dispatchers.resetMain()
         boxStore.close()
-        dataDir.deleteRecursively()
-        markdownDir.deleteRecursively()
+        cleanupObjectBoxTempRoot(tempRoot, dataDir)
     }
 
     @Test

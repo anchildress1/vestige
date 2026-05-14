@@ -37,6 +37,12 @@ class OnboardingHostPlatformTest {
         verify { activity.moveTaskToBack(true) }
     }
 
+    @Test
+    fun `moveTaskToBack no-ops when the context is not backed by an activity`() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        invokeMoveTaskToBack(context)
+    }
+
     private fun invokeMoveTaskToBack(context: Context) {
         method("moveTaskToBack", Context::class.java).invoke(null, context)
     }

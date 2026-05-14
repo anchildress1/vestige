@@ -4,6 +4,7 @@ import android.app.Application
 import android.content.Intent
 import androidx.test.core.app.ApplicationProvider
 import dev.anchildress1.vestige.AppContainer
+import dev.anchildress1.vestige.TestVestigeApplication
 import dev.anchildress1.vestige.VestigeApplication
 import dev.anchildress1.vestige.model.ExtractionStatus
 import org.junit.After
@@ -16,6 +17,7 @@ import org.robolectric.Robolectric
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.android.controller.ServiceController
+import org.robolectric.annotation.Config
 import org.robolectric.shadows.ShadowApplication
 
 /**
@@ -25,6 +27,7 @@ import org.robolectric.shadows.ShadowApplication
  * "unit tests pass, the Android lifecycle disagrees" class of bug.
  */
 @RunWith(RobolectricTestRunner::class)
+@Config(application = TestVestigeApplication::class)
 class BackgroundExtractionServiceIntegrationTest {
 
     private lateinit var app: VestigeApplication

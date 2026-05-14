@@ -1,6 +1,5 @@
 package dev.anchildress1.vestige.patterns
 
-import androidx.test.core.app.ApplicationProvider
 import dev.anchildress1.vestige.inference.LiteRtLmEngine
 import dev.anchildress1.vestige.inference.PatternTitleGenerator
 import dev.anchildress1.vestige.model.DetectedPattern
@@ -17,7 +16,8 @@ import dev.anchildress1.vestige.storage.PatternDetector
 import dev.anchildress1.vestige.storage.PatternEntity
 import dev.anchildress1.vestige.storage.PatternStore
 import dev.anchildress1.vestige.storage.TagEntity
-import dev.anchildress1.vestige.storage.VestigeBoxStore
+import dev.anchildress1.vestige.testing.newInMemoryObjectBoxDirectory
+import dev.anchildress1.vestige.testing.openInMemoryBoxStore
 import io.mockk.coEvery
 import io.mockk.every
 import io.mockk.mockk
@@ -42,7 +42,7 @@ import java.time.ZoneOffset
 
 @OptIn(ExperimentalCoroutinesApi::class)
 @RunWith(RobolectricTestRunner::class)
-@Config(manifest = Config.NONE)
+@Config(manifest = Config.NONE, application = android.app.Application::class)
 class PatternDetectionOrchestratorTest {
 
     private lateinit var boxStore: BoxStore
@@ -56,9 +56,8 @@ class PatternDetectionOrchestratorTest {
 
     @Before
     fun setUp() {
-        val context = ApplicationProvider.getApplicationContext<android.content.Context>()
-        dataDir = File(context.filesDir, "objectbox-orch-${System.nanoTime()}")
-        boxStore = VestigeBoxStore.openAt(dataDir)
+        dataDir = newInMemoryObjectBoxDirectory("objectbox-orch-")
+        boxStore = openInMemoryBoxStore(dataDir)
         patternStore = PatternStore(boxStore, clock)
         cooldownStore = CalloutCooldownStore(boxStore)
         val detector = PatternDetector(boxStore, clock, ZoneOffset.UTC)

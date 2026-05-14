@@ -6,7 +6,7 @@ import android.os.StrictMode
 import dev.anchildress1.vestige.lifecycle.LocalProcessingNotification
 
 /** Application entry point: wires StrictMode (debug only), AppContainer, and notification channel. */
-class VestigeApplication : Application() {
+open class VestigeApplication : Application() {
 
     lateinit var appContainer: AppContainer
         private set
@@ -15,9 +15,11 @@ class VestigeApplication : Application() {
         super.onCreate()
         installStrictModeOnDebugBuilds()
         LocalProcessingNotification.registerChannel(this)
-        appContainer = AppContainer(this)
+        appContainer = createAppContainer()
         appContainer.launchVectorBackfillIfReady()
     }
+
+    protected open fun createAppContainer(): AppContainer = AppContainer(this)
 
     private fun installStrictModeOnDebugBuilds() {
         val isDebuggable = (applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE) != 0

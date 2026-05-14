@@ -4,23 +4,26 @@ import dev.anchildress1.vestige.model.Persona
 import java.time.Clock
 
 /**
- * Single-use turn-by-turn state for one capture. After RESPONDED (or ERROR) the instance is
- * terminal — the next recording requires a fresh session.
+ * Single-use turn-by-turn state for one capture. After RESPONDED, DISCARDED, or ERROR the
+ * instance is terminal — the next recording requires a fresh session.
  *
  * ```
  *   IDLE ──startRecording──▶ RECORDING ──submitForInference──▶ INFERRING
- *                                                                  │
- *                                                                  ▼
- *                                          RESPONDED ◀──recordModelResponse── TRANSCRIBED
+ *                                │                                 │
+ *                                │ discard                         ▼
+ *                                ▼          RESPONDED ◀──recordModelResponse── TRANSCRIBED
+ *                            DISCARDED
  *
  *   any ──fail──▶ ERROR
  * ```
  *
- * Illegal transitions throw. The transcript stores text only — no audio bytes.
+ * Illegal transitions throw. The transcript stores text only — no audio bytes. `DISCARDED` is
+ * the user-initiated cancel path per ADR-001 §Q8 — reachable only from `RECORDING`, terminal,
+ * persists nothing, no `Undo`.
  */
 class CaptureSession(private val clock: Clock = Clock.systemUTC(), defaultPersona: Persona = Persona.WITNESS) {
 
-    enum class State { IDLE, RECORDING, INFERRING, TRANSCRIBED, RESPONDED, ERROR }
+    enum class State { IDLE, RECORDING, INFERRING, TRANSCRIBED, RESPONDED, DISCARDED, ERROR }
 
     val transcript: Transcript = Transcript()
 
@@ -54,6 +57,11 @@ class CaptureSession(private val clock: Clock = Clock.systemUTC(), defaultPerson
         requireState("recordModelResponse", State.TRANSCRIBED)
         transcript.append(Turn(Speaker.MODEL, modelText, clock.instant(), persona))
         state = State.RESPONDED
+    }
+
+    fun discard() {
+        requireState("discard", State.RECORDING)
+        state = State.DISCARDED
     }
 
     fun fail(error: Throwable) {

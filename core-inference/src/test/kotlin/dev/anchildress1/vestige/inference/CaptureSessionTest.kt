@@ -270,6 +270,83 @@ class CaptureSessionTest {
         assertEquals("model replied", snapshot[1].text)
     }
 
+    // ─── discard (Q8 — recording cancellation contract) ─────────────────────
+
+    @Test
+    fun `discard from RECORDING transitions to DISCARDED (pos)`() {
+        val session = CaptureSession()
+        session.startRecording()
+        session.discard()
+        assertEquals(CaptureSession.State.DISCARDED, session.state)
+    }
+
+    @Test
+    fun `discard preserves transcript emptiness — no user or model turn lands (pos)`() {
+        val session = CaptureSession()
+        session.startRecording()
+        session.discard()
+        assertTrue(session.transcript.isEmpty())
+    }
+
+    @Test
+    fun `discard from IDLE throws — only reachable from RECORDING (err)`() {
+        val session = CaptureSession()
+        val ex = assertThrows(IllegalStateException::class.java) { session.discard() }
+        assertTrue(ex.message!!.contains("discard"))
+        assertTrue(ex.message!!.contains("IDLE"))
+    }
+
+    @Test
+    fun `discard from INFERRING throws — STOP already fired (err)`() {
+        val session = CaptureSession()
+        session.startRecording()
+        session.submitForInference()
+        assertThrows(IllegalStateException::class.java) { session.discard() }
+    }
+
+    @Test
+    fun `discard from TRANSCRIBED throws — model reply already in flight (err)`() {
+        val session = CaptureSession()
+        session.startRecording()
+        session.submitForInference()
+        session.recordTranscription("u")
+        assertThrows(IllegalStateException::class.java) { session.discard() }
+    }
+
+    @Test
+    fun `setPersona is allowed on a DISCARDED session — state-agnostic per existing contract`() {
+        val session = CaptureSession()
+        session.startRecording()
+        session.discard()
+        session.setPersona(Persona.HARDASS)
+        assertEquals(CaptureSession.State.DISCARDED, session.state)
+        assertEquals(Persona.HARDASS, session.activePersona)
+    }
+
+    @Test
+    fun `fail from DISCARDED still moves to ERROR — fail is the universal escape hatch`() {
+        val session = CaptureSession()
+        session.startRecording()
+        session.discard()
+        val cause = RuntimeException("post-discard cleanup blew up")
+        session.fail(cause)
+        assertEquals(CaptureSession.State.ERROR, session.state)
+        assertSame(cause, session.lastError)
+    }
+
+    @Test
+    fun `DISCARDED is terminal — discard, startRecording, submitForInference all throw (edge)`() {
+        val session = CaptureSession()
+        session.startRecording()
+        session.discard()
+
+        assertThrows(IllegalStateException::class.java) { session.discard() }
+        assertThrows(IllegalStateException::class.java) { session.startRecording() }
+        assertThrows(IllegalStateException::class.java) { session.submitForInference() }
+        assertThrows(IllegalStateException::class.java) { session.recordTranscription("u") }
+        assertThrows(IllegalStateException::class.java) { session.recordModelResponse("m", Persona.WITNESS) }
+    }
+
     @Test
     fun `setPersona is allowed in every state including the terminal RESPONDED and ERROR states`() {
         val transcriptionAt = Instant.parse("2026-05-09T08:30:00Z")

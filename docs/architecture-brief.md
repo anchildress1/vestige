@@ -39,7 +39,7 @@ No extra modules in v1 unless they remove a real compile or ownership problem. D
 | `PatternStore` | process-scoped | ObjectBox pattern persistence, lifecycle state machine, and pattern detection algorithm per `adrs/ADR-003-pattern-detection-and-persistence.md` |
 | `RetrievalRepo` | process-scoped | keyword + tag + recency retrieval; vector only if STT-E passes |
 | `InferenceCoordinator` | process-scoped | Foreground call, background extraction scheduling, prompt composition, resolver. Lens calls run **sequentially** per `adrs/ADR-002-multi-lens-extraction-pattern.md` §"Background pass (3 lens calls, sequential)" — restored as the v1 rule by `adrs/ADR-009-litertlm-kotlin-session-clone-unavailable.md` (supersedes ADR-008). |
-| `SessionState` | per-capture (single-use, terminates with the capture) | active persona for this capture + the in-flight `CaptureSession` instance (one USER turn + one MODEL turn under the v1 single-turn lifecycle per `adrs/ADR-005-stt-b-scope-and-v1-single-turn.md`, which amends `adrs/ADR-002-multi-lens-extraction-pattern.md` §"Multi-turn behavior"). The "last turns" + "chunk counter" fields the original spec described are moot under the 30 s hard cap + RESPONDED-is-terminal lifecycle and have been retired. |
+| `SessionState` | per-capture (single-use, terminates with the capture) | active persona for this capture + the in-flight `CaptureSession` instance (one USER turn + one MODEL turn under the v1 single-turn lifecycle per `adrs/ADR-005-stt-b-scope-and-v1-single-turn.md`, which amends `adrs/ADR-002-multi-lens-extraction-pattern.md` §"Multi-turn behavior"). Terminals: `RESPONDED`, `ERROR`, `DISCARDED` (user-initiated cancel during RECORDING per `adrs/ADR-001-stack-and-build-infra.md` §Q8 — no rehydration, no Undo). The "last turns" + "chunk counter" fields the original spec described are moot under the 30 s hard cap and have been retired. |
 
 Use manual constructor injection. No Hilt in v1.
 
@@ -55,7 +55,7 @@ Use manual constructor injection. No Hilt in v1.
 8. Convergence resolver writes canonical/candidate/ambiguous fields plus `entry_observations`.
 9. Pattern detection runs after the configured threshold and persists sourced patterns.
 
-Audio bytes are never product data. If temp audio files are required for LiteRT-LM, delete them immediately after the call.
+Audio bytes are never product data. If temp audio files are required for LiteRT-LM, delete them immediately after the call. User-initiated cancel during RECORDING (the `DISCARD · NO SAVE` affordance) destroys the in-flight buffer synchronously with the tap — `AudioRecord` is stopped + released, no Gemma 4 call fires, no `Entry` row lands, no markdown is written, the session terminates `DISCARDED`. Contract: `adrs/ADR-001-stack-and-build-infra.md` §Q8.
 
 ## ObjectBox Entry Shape
 

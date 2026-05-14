@@ -275,6 +275,12 @@ private suspend fun runDownloadIfNeeded(
         onSpeed(null)
         Log.i(ONBOARDING_TAG, "download() finished. terminalState=$terminal")
         onState(terminal)
+    } catch (cancel: kotlinx.coroutines.CancellationException) {
+        // Normal coroutine teardown when the user navigates away from ModelDownload. The
+        // .part file persists; HTTP-Range resume picks up where we left off on re-entry.
+        // Re-throw so structured concurrency keeps working — never swallow cancellation.
+        Log.i(ONBOARDING_TAG, "download() cancelled (user navigated away)")
+        throw cancel
     } catch (@Suppress("TooGenericExceptionCaught") error: Exception) {
         Log.e(ONBOARDING_TAG, "Model download failed", error)
     }

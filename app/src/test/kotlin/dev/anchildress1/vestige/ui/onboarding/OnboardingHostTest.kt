@@ -69,7 +69,7 @@ class OnboardingHostTest {
     }
 
     @Test
-    fun `full flow advances through all eight screens and marks complete on Open Vestige`() {
+    fun `full flow advances and auto-skips Wi-Fi + Download once the model is already on disk`() {
         var completed = false
         startHost(
             onComplete = { completed = true },
@@ -81,9 +81,7 @@ class OnboardingHostTest {
         tapPrimary("Got it") // Screen 2
         tapPrimary("Skip — I'll type instead") // Screen 3
         tapPrimary("Skip — watch the app work") // Screen 3.5
-        tapPrimary("Continue") // Screen 4
-        tapPrimary("Download model") // Screen 5 (Wi-Fi connected)
-        tapPrimary("Continue") // Screen 6 (model download placeholder)
+        tapPrimary("Continue") // Screen 4 → Wi-Fi + Download auto-skipped (model already Complete)
         tapPrimary("Open Vestige") // Screen 7
 
         assertTrue(completed)
@@ -192,6 +190,15 @@ class OnboardingHostTest {
         composeRule.onNodeWithText("Continue").assertIsNotEnabled()
         assertFalse(completed)
         assertFalse(prefs.isComplete)
+    }
+
+    @Test
+    fun `model-ready Wi-Fi + Download steps auto-skip straight to Ready`() {
+        prefs.setCurrentStep(OnboardingStep.WifiCheck)
+        startHost(modelAvailability = fakeModelAvailability(ModelArtifactState.Complete))
+
+        composeRule.waitForIdle()
+        composeRule.onNodeWithText("Ready.").assertIsDisplayed()
     }
 
     @Test

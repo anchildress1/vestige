@@ -8,6 +8,7 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
 import android.provider.Settings
+import android.util.Log
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.ActivityResultLauncher
@@ -32,7 +33,9 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import dev.anchildress1.vestige.model.ModelArtifactState
 import dev.anchildress1.vestige.model.Persona
 import dev.anchildress1.vestige.ui.components.VestigeScaffold
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 /** Hosts the 8-screen onboarding flow. Step + persona survive process death via SharedPreferences. */
 @Composable
@@ -53,15 +56,13 @@ fun OnboardingHost(
     var micPermissionDenied by rememberSaveable { mutableStateOf(false) }
 
     val advance: () -> Unit = { step = step.next() ?: step }
-    val micLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.RequestPermission(),
-    ) { granted ->
-        micPermissionDenied = !granted
-        if (granted) advance()
-    }
-    val notifLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.RequestPermission(),
-    ) { _ -> advance() }
+    val launchers = rememberPermissionLaunchers(
+        onMicResult = { granted ->
+            micPermissionDenied = !granted
+            if (granted) advance()
+        },
+        onNotificationResult = { advance() },
+    )
 
     BackHandler(enabled = step != OnboardingStep.PersonaPick) {
         // Re-entering the mic screen via Back should not show a stale denied notice — the user
@@ -77,6 +78,15 @@ fun OnboardingHost(
         modelAvailability = modelAvailability,
     )
 
+    // Auto-skip screens whose precondition is already satisfied. Material-3 / Android UX
+    // convention: don't gate flow on a re-confirmation of a decision the user already made.
+    AutoSkipAlreadySatisfied(
+        step = step,
+        context = context,
+        modelState = environment.modelState,
+        onAdvance = advance,
+    )
+
     // VestigeScaffold owns floor/ink color propagation — onboarding screens render plain
     // composables (no per-screen Surface), so the scaffold is the only thing that keeps
     // foreground readable on the floor background. Per AGENTS rule 26.
@@ -89,8 +99,8 @@ fun OnboardingHost(
             wifiConnected = environment.wifiConnected,
             modelState = environment.modelState,
             advance = advance,
-            onMicAllow = { requestMic(context, micLauncher, advance) },
-            onNotificationAllow = { requestNotifications(notifLauncher, advance) },
+            onMicAllow = { requestMic(context, launchers.mic, advance) },
+            onNotificationAllow = { requestNotifications(launchers.notification, advance) },
             onOpenWifiSettings = { openWifiSettings(context) },
             onComeBackLater = { moveTaskToBack(context) },
             onOpenApp = {
@@ -127,12 +137,21 @@ private fun rememberOnboardingEnvironment(
         // Auto-trigger the download when the user lands on Screen 6 with a non-Complete artifact.
         // LaunchedEffect(step) is cancelled when the user navigates away, which also cancels the
         // download — leaving the file on disk for a later resume. Story 4.3 owns retry / pause /
-        // stall handling; this just gets the percent moving.
+        // stall handling; this just gets the percent moving. withContext(IO) so the network call
+        // doesn't trip StrictMode's penaltyDeathOnNetwork in debug builds.
         if (step == OnboardingStep.ModelDownload && initial !is ModelArtifactState.Complete) {
-            val terminal = modelAvailability.download { currentBytes, expectedBytes ->
-                modelState = ModelArtifactState.Partial(currentBytes, expectedBytes)
+            try {
+                val terminal = withContext(Dispatchers.IO) {
+                    modelAvailability.download { currentBytes, expectedBytes ->
+                        modelState = ModelArtifactState.Partial(currentBytes, expectedBytes)
+                    }
+                }
+                modelState = terminal
+            } catch (@Suppress("TooGenericExceptionCaught") error: Exception) {
+                Log.e(ONBOARDING_TAG, "Model download failed", error)
+                // Keep modelState at its last reported value — the user sees the partial pill /
+                // bar and can tap Back. Story 4.3 will own the polished retry / error UI.
             }
-            modelState = terminal
         }
     }
     DisposableEffect(lifecycleOwner, wifiAvailability, modelAvailability) {
@@ -254,6 +273,20 @@ private tailrec fun Context.findActivity(): Activity? = when (this) {
     else -> null
 }
 
-private fun hasRecordAudio(context: Context): Boolean =
-    ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) ==
-        PackageManager.PERMISSION_GRANTED
+private data class PermissionLaunchers(
+    val mic: ActivityResultLauncher<String>,
+    val notification: ActivityResultLauncher<String>,
+)
+
+@Composable
+private fun rememberPermissionLaunchers(
+    onMicResult: (Boolean) -> Unit,
+    onNotificationResult: (Boolean) -> Unit,
+): PermissionLaunchers {
+    val mic = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission(), onMicResult)
+    val notif = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission(),
+        onNotificationResult,
+    )
+    return PermissionLaunchers(mic = mic, notification = notif)
+}

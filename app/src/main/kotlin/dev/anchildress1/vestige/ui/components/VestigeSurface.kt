@@ -116,6 +116,7 @@ fun VestigeRow(
 fun VestigeListCard(
     modifier: Modifier = Modifier,
     onClick: (() -> Unit)? = null,
+    role: Role = Role.Button,
     accentModifier: Modifier = Modifier,
     shape: Shape = VestigeTheme.shapes.xl,
     contentPadding: PaddingValues = PaddingValues(horizontal = 16.dp, vertical = 14.dp),
@@ -123,7 +124,7 @@ fun VestigeListCard(
 ) {
     val colors = VestigeTheme.colors
     val rootModifier = if (onClick != null) {
-        modifier.clickable(role = Role.Button, onClick = onClick)
+        modifier.clickable(role = role, onClick = onClick)
     } else {
         modifier
     }

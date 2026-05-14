@@ -9,7 +9,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
@@ -51,11 +50,9 @@ private fun PersonaCard(option: PersonaOption, isSelected: Boolean, onSelect: ()
     VestigeListCard(
         modifier = Modifier
             .fillMaxWidth()
-            .semantics {
-                role = Role.RadioButton
-                selected = isSelected
-            },
+            .semantics { selected = isSelected },
         onClick = onSelect,
+        role = Role.RadioButton,
         accentModifier = if (isSelected) Modifier.limeLeftRuleForActive() else Modifier,
         contentPadding = PaddingValues(horizontal = 16.dp, vertical = 14.dp),
     ) {

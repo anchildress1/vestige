@@ -129,29 +129,41 @@ private fun rememberOnboardingEnvironment(
     var wifiConnected by remember { mutableStateOf(wifiAvailability.isWifiConnected()) }
     var modelState by remember { mutableStateOf<ModelArtifactState>(ModelArtifactState.Absent) }
 
+    // Cheap per-step disk write — persist resume point + refresh the Wi-Fi snapshot.
     LaunchedEffect(step) {
         prefs.setCurrentStep(step)
         wifiConnected = wifiAvailability.isWifiConnected()
-        val initial = modelAvailability.status()
-        modelState = initial
-        // Auto-trigger the download when the user lands on Screen 6 with a non-Complete artifact.
-        // LaunchedEffect(step) is cancelled when the user navigates away, which also cancels the
-        // download — leaving the file on disk for a later resume. Story 4.3 owns retry / pause /
-        // stall handling; this just gets the percent moving. withContext(IO) so the network call
-        // doesn't trip StrictMode's penaltyDeathOnNetwork in debug builds.
-        if (step == OnboardingStep.ModelDownload && initial !is ModelArtifactState.Complete) {
-            try {
-                val terminal = withContext(Dispatchers.IO) {
-                    modelAvailability.download { currentBytes, expectedBytes ->
-                        modelState = ModelArtifactState.Partial(currentBytes, expectedBytes)
-                    }
+    }
+
+    // Snapshot the model state ONCE on mount. `modelAvailability.status()` runs a full SHA-256
+    // over the ~3.7 GB artifact when the file is complete — re-firing it on every step
+    // transition would re-hash for every screen change.
+    LaunchedEffect(Unit) {
+        modelState = modelAvailability.status()
+    }
+
+    // Trigger the download only when the user reaches Screen 6 with a non-Complete artifact.
+    // LaunchedEffect(step) is cancelled when the user navigates away, which also cancels the
+    // download — leaving the .part file on disk for HTTP-Range resume on re-entry. Story 4.3
+    // owns retry / pause / stall handling; this just gets the percent moving.
+    LaunchedEffect(step) {
+        if (step != OnboardingStep.ModelDownload) return@LaunchedEffect
+        val current = modelAvailability.status()
+        modelState = current
+        if (current is ModelArtifactState.Complete) return@LaunchedEffect
+        try {
+            // withContext(IO) so the network call doesn't trip StrictMode's
+            // penaltyDeathOnNetwork in debug builds.
+            val terminal = withContext(Dispatchers.IO) {
+                modelAvailability.download { currentBytes, expectedBytes ->
+                    modelState = ModelArtifactState.Partial(currentBytes, expectedBytes)
                 }
-                modelState = terminal
-            } catch (@Suppress("TooGenericExceptionCaught") error: Exception) {
-                Log.e(ONBOARDING_TAG, "Model download failed", error)
-                // Keep modelState at its last reported value — the user sees the partial pill /
-                // bar and can tap Back. Story 4.3 will own the polished retry / error UI.
             }
+            modelState = terminal
+        } catch (@Suppress("TooGenericExceptionCaught") error: Exception) {
+            Log.e(ONBOARDING_TAG, "Model download failed", error)
+            // Keep modelState at its last reported value — the user sees the partial pill /
+            // bar and can tap Back. Story 4.3 will own the polished retry / error UI.
         }
     }
     DisposableEffect(lifecycleOwner, wifiAvailability, modelAvailability) {

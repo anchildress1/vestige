@@ -20,7 +20,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Button
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -123,12 +122,6 @@ private fun PhaseOneShell(
     val launcher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         permissionGranted = granted
         lastRequestDenied = !granted
-    }
-
-    LaunchedEffect(Unit) {
-        if (!permissionGranted) {
-            launcher.launch(Manifest.permission.RECORD_AUDIO)
-        }
     }
 
     Column(modifier = modifier.fillMaxSize()) {

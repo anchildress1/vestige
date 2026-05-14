@@ -49,35 +49,37 @@ class WifiAvailabilityTest {
 
     @Test
     fun `default returns false when Wi-Fi lacks internet capability`() {
-        val availability = availabilityWith(
-            hasWifi = true,
-            hasInternet = false,
-        )
+        val availability = availabilityWith(hasWifi = true, hasInternet = false)
 
         assertFalse(availability.isWifiConnected())
     }
 
     @Test
     fun `default returns false when internet is present on non Wi-Fi transport`() {
-        val availability = availabilityWith(
-            hasWifi = false,
-            hasInternet = true,
-        )
+        val availability = availabilityWith(hasWifi = false, hasInternet = true)
 
         assertFalse(availability.isWifiConnected())
     }
 
     @Test
-    fun `default returns true only when Wi-Fi also has internet capability`() {
-        val availability = availabilityWith(
-            hasWifi = true,
-            hasInternet = true,
-        )
+    fun `default returns false when Wi-Fi internet is not validated (captive portal)`() {
+        val availability = availabilityWith(hasWifi = true, hasInternet = true, hasValidated = false)
+
+        assertFalse(availability.isWifiConnected())
+    }
+
+    @Test
+    fun `default returns true only when Wi-Fi has internet and is validated`() {
+        val availability = availabilityWith(hasWifi = true, hasInternet = true, hasValidated = true)
 
         assertTrue(availability.isWifiConnected())
     }
 
-    private fun availabilityWith(hasWifi: Boolean, hasInternet: Boolean): WifiAvailability {
+    private fun availabilityWith(
+        hasWifi: Boolean,
+        hasInternet: Boolean,
+        hasValidated: Boolean = true,
+    ): WifiAvailability {
         val context = mockk<Context>()
         val connectivityManager = mockk<ConnectivityManager>()
         val network = mockk<Network>()
@@ -87,6 +89,7 @@ class WifiAvailabilityTest {
         every { connectivityManager.getNetworkCapabilities(network) } returns caps
         every { caps.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) } returns hasWifi
         every { caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) } returns hasInternet
+        every { caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED) } returns hasValidated
         return WifiAvailability.Default(context)
     }
 }

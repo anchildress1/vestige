@@ -2,7 +2,6 @@ package dev.anchildress1.vestige.ui.onboarding
 
 import dev.anchildress1.vestige.model.ModelArtifactState
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNull
 import org.junit.Test
 
 class DownloadProgressTrackerTest {
@@ -70,13 +69,21 @@ class DownloadProgressTrackerTest {
 
     @Test
     fun `unchanged percent does not re-log between ticks`() {
-        // Same pct on two consecutive ticks — second tick must early-exit the log branch.
+        // Same pct on two consecutive ticks — second tick must early-exit the log branch and not
+        // emit a MB/s sample (within-window suppress + identical bytes = zero delta).
         val states = mutableListOf<ModelArtifactState>()
-        val tracker = DownloadProgressTracker(onState = { states += it }, onSpeed = {})
+        val speeds = mutableListOf<Float?>()
+        var clock = 1_000L
+        val tracker = DownloadProgressTracker(
+            onState = { states += it },
+            onSpeed = { speeds += it },
+            nowMillis = { clock },
+        )
         tracker.onProgress(currentBytes = 100, expectedBytes = 1_000)
+        clock += 200L
         tracker.onProgress(currentBytes = 100, expectedBytes = 1_000)
 
         assertEquals(2, states.size)
-        assertNull("no MB/s expected with default real clock and identical bytes", null)
+        assertEquals(emptyList<Float?>(), speeds)
     }
 }

@@ -5,7 +5,6 @@ import android.app.Activity
 import android.content.Context
 import android.content.ContextWrapper
 import android.content.Intent
-import android.content.pm.PackageManager
 import android.os.Build
 import android.provider.Settings
 import android.util.Log
@@ -27,12 +26,9 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.stringResource
-import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
-import dev.anchildress1.vestige.R
 import dev.anchildress1.vestige.model.ModelArtifactState
 import dev.anchildress1.vestige.model.Persona
 import dev.anchildress1.vestige.ui.components.VestigeScaffold
@@ -50,7 +46,7 @@ fun OnboardingHost(
     modelAvailability: ModelAvailability,
     modifier: Modifier = Modifier,
     wifiAvailability: WifiAvailability? = null,
-    downloadDispatcher: CoroutineDispatcher = Dispatchers.IO,
+    ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -81,14 +77,14 @@ fun OnboardingHost(
     LaunchedEffect(persona) {
         // commit() on IO — durable across process kill; off main so StrictMode's
         // detectDiskWrites (debug) doesn't fire on every persona toggle.
-        withContext(Dispatchers.IO) { prefs.setDefaultPersona(persona) }
+        withContext(ioDispatcher) { prefs.setDefaultPersona(persona) }
     }
     val environment = rememberOnboardingEnvironment(
         prefs = prefs,
         step = step,
         wifiAvailability = resolvedWifi,
         modelAvailability = modelAvailability,
-        downloadDispatcher = downloadDispatcher,
+        ioDispatcher = ioDispatcher,
     )
 
     // Once the model lands while the user is on the download screen, hop back to Wiring —
@@ -112,17 +108,24 @@ fun OnboardingHost(
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
+    val completionScope = rememberCoroutineScope()
     val callbacks = buildCallbacks(
         context = context,
-        prefs = prefs,
         launchers = launchers,
         handles = OnboardingStateHandles(
             setStep = { step = it },
             setPersona = { persona = it },
-            currentPersona = { persona },
             advance = advance,
         ),
-        onComplete = onComplete,
+        onOpenApp = {
+            // Hop to IO for the markComplete commit() — staying on main would block the click
+            // handler and trip StrictMode's detectDiskWrites. Only flip the gate on success.
+            completionScope.launch {
+                if (withContext(ioDispatcher) { prefs.markComplete() }) {
+                    onComplete(persona)
+                }
+            }
+        },
     )
     val state = OnboardingStepState(
         step = step,
@@ -134,7 +137,9 @@ fun OnboardingHost(
         notifGranted = notifGranted,
         downloadMbps = environment.downloadMbps,
     )
-    // VestigeScaffold owns floor/ink color propagation per AGENTS rule 26.
+    // VestigeScaffold owns floor/ink propagation + system-bar insets — onboarding never paints
+    // its own background or applies its own padding, so it stays in lockstep with the rest of
+    // the app shell instead of drifting per surface.
     VestigeScaffold(modifier = modifier) { padding ->
         OnboardingStepContent(
             state = state,
@@ -149,16 +154,14 @@ fun OnboardingHost(
 private data class OnboardingStateHandles(
     val setStep: (OnboardingStep) -> Unit,
     val setPersona: (Persona) -> Unit,
-    val currentPersona: () -> Persona,
     val advance: () -> Unit,
 )
 
 private fun buildCallbacks(
     context: Context,
-    prefs: OnboardingPrefs,
     launchers: PermissionLaunchers,
     handles: OnboardingStateHandles,
-    onComplete: (Persona) -> Unit,
+    onOpenApp: () -> Unit,
 ): OnboardingStepCallbacks = OnboardingStepCallbacks(
     onPersonaChange = handles.setPersona,
     advance = handles.advance,
@@ -172,13 +175,7 @@ private fun buildCallbacks(
     },
     onOpenWifiSettings = { openWifiSettings(context) },
     onComeBackLater = { moveTaskToBack(context) },
-    onOpenApp = {
-        // Trust the Wiring gate — re-running modelAvailability.status() would re-SHA the
-        // 3.66 GB artifact and stall the button for tens of seconds.
-        if (prefs.markComplete()) {
-            onComplete(handles.currentPersona())
-        }
-    },
+    onOpenApp = onOpenApp,
     onOpenModelDownload = { handles.setStep(OnboardingStep.ModelDownload) },
     onDownloadReturn = { handles.setStep(OnboardingStep.Wiring) },
     onChangePersona = { handles.setStep(OnboardingStep.PersonaPick) },
@@ -196,7 +193,7 @@ private fun rememberOnboardingEnvironment(
     step: OnboardingStep,
     wifiAvailability: WifiAvailability,
     modelAvailability: ModelAvailability,
-    downloadDispatcher: CoroutineDispatcher,
+    ioDispatcher: CoroutineDispatcher,
 ): OnboardingEnvironment {
     val lifecycleOwner = LocalLifecycleOwner.current
     val scope = rememberCoroutineScope()
@@ -207,7 +204,7 @@ private fun rememberOnboardingEnvironment(
     // Persist resume point + refresh the Wi-Fi snapshot. commit() runs on IO so the durability
     // guarantee survives a process kill mid-step without blocking the main thread.
     LaunchedEffect(step) {
-        withContext(Dispatchers.IO) { prefs.setCurrentStep(step) }
+        withContext(ioDispatcher) { prefs.setCurrentStep(step) }
         wifiConnected = wifiAvailability.isWifiConnected()
     }
 
@@ -226,7 +223,7 @@ private fun rememberOnboardingEnvironment(
         runDownloadIfNeeded(
             step = step,
             modelAvailability = modelAvailability,
-            downloadDispatcher = downloadDispatcher,
+            ioDispatcher = ioDispatcher,
             onState = { modelState = it },
             onSpeed = { downloadMbps = it },
         )
@@ -256,7 +253,7 @@ private fun rememberOnboardingEnvironment(
 private suspend fun runDownloadIfNeeded(
     step: OnboardingStep,
     modelAvailability: ModelAvailability,
-    downloadDispatcher: CoroutineDispatcher,
+    ioDispatcher: CoroutineDispatcher,
     onState: (ModelArtifactState) -> Unit,
     onSpeed: (Float?) -> Unit,
 ) {
@@ -277,7 +274,7 @@ private suspend fun runDownloadIfNeeded(
     val tracker = DownloadProgressTracker(onState, onSpeed)
     try {
         Log.i(ONBOARDING_TAG, "Starting download()...")
-        val terminal = withContext(downloadDispatcher) {
+        val terminal = withContext(ioDispatcher) {
             modelAvailability.download(tracker::onProgress)
         }
         onSpeed(null)
@@ -291,59 +288,6 @@ private suspend fun runDownloadIfNeeded(
         throw cancel
     } catch (@Suppress("TooGenericExceptionCaught") error: Exception) {
         Log.e(ONBOARDING_TAG, "Model download failed", error)
-    }
-}
-
-/**
- * Wraps the per-tick progress bookkeeping for [runDownloadIfNeeded]. Splitting speed sampling
- * and pct logging into their own methods keeps the orchestrator's cognitive complexity within
- * S3776's limit and lets each helper be reasoned about in isolation.
- *
- * The sample baseline is set on the FIRST `onProgress` callback (not zero-initialised) because
- * HTTP-Range resume reports the .part file's existing length as the first `currentBytes` — a
- * zero baseline would emit an absurd MB/s spike before the next chunk arrives.
- */
-internal class DownloadProgressTracker(
-    private val onState: (ModelArtifactState) -> Unit,
-    private val onSpeed: (Float?) -> Unit,
-    private val nowMillis: () -> Long = System::currentTimeMillis,
-) {
-    private var lastPct = -1
-    private var sampleBytes = -1L
-    private var sampleTimeMs = 0L
-
-    fun onProgress(currentBytes: Long, expectedBytes: Long) {
-        onState(ModelArtifactState.Partial(currentBytes, expectedBytes))
-        sampleSpeed(currentBytes)
-        logPercent(currentBytes, expectedBytes)
-    }
-
-    private fun sampleSpeed(currentBytes: Long) {
-        val now = nowMillis()
-        if (sampleBytes < 0L) {
-            sampleBytes = currentBytes
-            sampleTimeMs = now
-            return
-        }
-        val elapsed = now - sampleTimeMs
-        if (elapsed < SPEED_SAMPLE_INTERVAL_MS) return
-        val deltaBytes = (currentBytes - sampleBytes).coerceAtLeast(0L)
-        val mbps = (deltaBytes.toFloat() / BYTES_PER_MB) / (elapsed.toFloat() / MS_PER_SECOND)
-        onSpeed(mbps.coerceAtLeast(0f))
-        sampleBytes = currentBytes
-        sampleTimeMs = now
-    }
-
-    private fun logPercent(currentBytes: Long, expectedBytes: Long) {
-        val pct = if (expectedBytes > 0L) {
-            ((currentBytes * PERCENT_LOG_SCALE) / expectedBytes).toInt()
-        } else {
-            -1
-        }
-        if (pct != lastPct) {
-            lastPct = pct
-            Log.d(ONBOARDING_TAG, "download progress $currentBytes/$expectedBytes ($pct%)")
-        }
     }
 }
 

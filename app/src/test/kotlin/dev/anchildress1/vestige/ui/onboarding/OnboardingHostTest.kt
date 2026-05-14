@@ -1,6 +1,7 @@
 package dev.anchildress1.vestige.ui.onboarding
 
 import android.content.Context
+import android.content.SharedPreferences
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.ui.test.assertIsDisplayed
@@ -18,6 +19,8 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import dev.anchildress1.vestige.model.ModelArtifactState
 import dev.anchildress1.vestige.model.Persona
 import dev.anchildress1.vestige.ui.theme.VestigeTheme
+import io.mockk.every
+import io.mockk.mockk
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import org.junit.After
@@ -223,6 +226,46 @@ class OnboardingHostTest {
         assertEquals(baseline, statusCalls)
     }
 
+    @Test
+    fun `Open Vestige forwards the selected persona to completion`() {
+        prefs.setDefaultPersona(Persona.HARDASS)
+        prefs.setCurrentStep(OnboardingStep.Wiring)
+        var completedPersona: Persona? = null
+
+        startHost(
+            onComplete = { completedPersona = it },
+            modelAvailability = fakeModelAvailability(ModelArtifactState.Complete),
+        )
+        tapPrimary("OPEN VESTIGE")
+
+        assertEquals(Persona.HARDASS, completedPersona)
+    }
+
+    @Test
+    fun `Open Vestige stays on onboarding when markComplete fails`() {
+        val editor = mockk<SharedPreferences.Editor>()
+        every { editor.putBoolean(any(), any()) } returns editor
+        every { editor.remove(any()) } returns editor
+        every { editor.putString(any(), any()) } returns editor
+        every { editor.commit() } returns false
+        val sharedPrefs = mockk<SharedPreferences>()
+        every { sharedPrefs.getBoolean("complete", false) } returns false
+        every { sharedPrefs.getString("default_persona", null) } returns Persona.EDITOR.name
+        every { sharedPrefs.getString("current_step", null) } returns OnboardingStep.Wiring.name
+        every { sharedPrefs.edit() } returns editor
+
+        var completed = false
+        startHost(
+            prefs = OnboardingPrefs(sharedPrefs),
+            onComplete = { completed = true },
+            modelAvailability = fakeModelAvailability(ModelArtifactState.Complete),
+        )
+        tapPrimary("OPEN VESTIGE")
+
+        assertFalse(completed)
+        composeRule.onNodeWithText("WIRING", substring = true).assertIsDisplayed()
+    }
+
     private fun tapPrimary(label: String) {
         // Primary action bar is pinned at the bottom of the scaffold (outside the scroll region),
         // so it's always visible — no performScrollTo needed.
@@ -235,7 +278,8 @@ class OnboardingHostTest {
     }
 
     private fun startHost(
-        onComplete: () -> Unit = {},
+        prefs: OnboardingPrefs = this.prefs,
+        onComplete: (Persona) -> Unit = {},
         wifiAvailability: WifiAvailability = WifiAvailability { false },
         modelAvailability: ModelAvailability = fakeModelAvailability(ModelArtifactState.Absent),
         downloadDispatcher: CoroutineDispatcher = Dispatchers.Unconfined,

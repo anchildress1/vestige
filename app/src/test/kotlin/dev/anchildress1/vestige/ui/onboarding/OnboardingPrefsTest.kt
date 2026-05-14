@@ -34,7 +34,7 @@ class OnboardingPrefsTest {
 
     @Test
     fun `markComplete flips the completion flag and survives a fresh instance`() {
-        prefs.markComplete()
+        assertTrue(prefs.markComplete())
         val ctx = ApplicationProvider.getApplicationContext<Context>()
         val reopened = OnboardingPrefs.from(ctx)
         assertTrue(reopened.isComplete)
@@ -42,7 +42,7 @@ class OnboardingPrefsTest {
 
     @Test
     fun `setDefaultPersona round-trips the persona`() {
-        prefs.setDefaultPersona(Persona.HARDASS)
+        assertTrue(prefs.setDefaultPersona(Persona.HARDASS))
         val ctx = ApplicationProvider.getApplicationContext<Context>()
         val reopened = OnboardingPrefs.from(ctx)
         assertEquals(Persona.HARDASS, reopened.defaultPersona)
@@ -50,7 +50,7 @@ class OnboardingPrefsTest {
 
     @Test
     fun `setCurrentStep round-trips the onboarding step`() {
-        prefs.setCurrentStep(OnboardingStep.Wiring)
+        assertTrue(prefs.setCurrentStep(OnboardingStep.Wiring))
         val ctx = ApplicationProvider.getApplicationContext<Context>()
         val reopened = OnboardingPrefs.from(ctx)
         assertEquals(OnboardingStep.Wiring, reopened.currentStep)
@@ -76,8 +76,8 @@ class OnboardingPrefsTest {
 
     @Test
     fun `markComplete clears the stored onboarding step`() {
-        prefs.setCurrentStep(OnboardingStep.ModelDownload)
-        prefs.markComplete()
+        assertTrue(prefs.setCurrentStep(OnboardingStep.ModelDownload))
+        assertTrue(prefs.markComplete())
         val ctx = ApplicationProvider.getApplicationContext<Context>()
         val reopened = OnboardingPrefs.from(ctx)
         assertEquals(OnboardingStep.PersonaPick, reopened.currentStep)

@@ -46,7 +46,7 @@ import kotlinx.coroutines.withContext
 @Composable
 fun OnboardingHost(
     prefs: OnboardingPrefs,
-    onComplete: () -> Unit,
+    onComplete: (Persona) -> Unit,
     modelAvailability: ModelAvailability,
     modifier: Modifier = Modifier,
     wifiAvailability: WifiAvailability? = null,
@@ -54,7 +54,6 @@ fun OnboardingHost(
 ) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
-    val scope = rememberCoroutineScope()
     val resolvedWifi = remember(context, wifiAvailability) {
         wifiAvailability ?: WifiAvailability.Default(context)
     }
@@ -111,11 +110,11 @@ fun OnboardingHost(
 
     val callbacks = buildCallbacks(
         context = context,
-        scope = scope,
         prefs = prefs,
         launchers = launchers,
         setStep = { step = it },
         setPersona = { persona = it },
+        currentPersona = { persona },
         advance = advance,
         onComplete = onComplete,
     )
@@ -143,13 +142,13 @@ fun OnboardingHost(
 @Suppress("LongParameterList") // Builder helper — collects the orchestration handles.
 private fun buildCallbacks(
     context: Context,
-    scope: kotlinx.coroutines.CoroutineScope,
     prefs: OnboardingPrefs,
     launchers: PermissionLaunchers,
     setStep: (OnboardingStep) -> Unit,
     setPersona: (Persona) -> Unit,
+    currentPersona: () -> Persona,
     advance: () -> Unit,
-    onComplete: () -> Unit,
+    onComplete: (Persona) -> Unit,
 ): OnboardingStepCallbacks = OnboardingStepCallbacks(
     onPersonaChange = setPersona,
     advance = advance,
@@ -166,9 +165,8 @@ private fun buildCallbacks(
     onOpenApp = {
         // Trust the Wiring gate — re-running modelAvailability.status() would re-SHA the
         // 3.66 GB artifact and stall the button for tens of seconds.
-        scope.launch {
-            prefs.markComplete()
-            onComplete()
+        if (prefs.markComplete()) {
+            onComplete(currentPersona())
         }
     },
     onOpenModelDownload = { setStep(OnboardingStep.ModelDownload) },

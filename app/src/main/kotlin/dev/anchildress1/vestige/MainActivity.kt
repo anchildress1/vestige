@@ -36,6 +36,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import dev.anchildress1.vestige.debug.DebugPatternSeeder
+import dev.anchildress1.vestige.model.Persona
 import dev.anchildress1.vestige.ui.components.AppTop
 import dev.anchildress1.vestige.ui.components.VestigeScaffold
 import dev.anchildress1.vestige.ui.components.VestigeSurface
@@ -56,10 +57,14 @@ class MainActivity : ComponentActivity() {
                 // SharedPreferences is the durable source of truth — process death re-reads
                 // it on cold start, so a plain `mutableStateOf` is enough for in-process flips.
                 var onboardingComplete by remember { mutableStateOf(onboardingPrefs.isComplete) }
+                var selectedPersona by remember { mutableStateOf(onboardingPrefs.defaultPersona) }
                 if (!onboardingComplete) {
                     OnboardingHost(
                         prefs = onboardingPrefs,
-                        onComplete = { onboardingComplete = true },
+                        onComplete = { persona ->
+                            selectedPersona = persona
+                            onboardingComplete = true
+                        },
                         modelAvailability = ModelAvailability.Default(
                             artifactStore = container.mainModelArtifactStore,
                             networkGate = container.networkGate,
@@ -90,6 +95,7 @@ class MainActivity : ComponentActivity() {
                             } else {
                                 null
                             },
+                            persona = selectedPersona,
                             modifier = Modifier.padding(padding),
                         )
                     }
@@ -109,6 +115,7 @@ class MainActivity : ComponentActivity() {
 private fun PhaseOneShell(
     onOpenPatterns: () -> Unit = {},
     onDebugSeed: (() -> Unit)? = null,
+    persona: Persona = Persona.WITNESS,
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
@@ -129,7 +136,7 @@ private fun PhaseOneShell(
 
     Column(modifier = modifier.fillMaxSize()) {
         AppTop(
-            persona = "WITNESS",
+            persona = persona.name,
             onPersonaTap = { toastTap(context, "persona tap") },
             onStatusTap = { toastTap(context, "status tap") },
         )

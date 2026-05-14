@@ -21,8 +21,11 @@ class OnboardingPrefs(private val prefs: SharedPreferences) {
             ?.let { runCatching { OnboardingStep.valueOf(it) }.getOrNull() }
             ?: OnboardingStep.PersonaPick
 
-    fun setDefaultPersona(persona: Persona) {
-        prefs.edit().putString(KEY_PERSONA, persona.name).apply()
+    /** Returns true on successful flush. Persona must survive process death between steps. */
+    fun setDefaultPersona(persona: Persona): Boolean {
+        val ok = prefs.edit().putString(KEY_PERSONA, persona.name).commit()
+        if (!ok) Log.w(TAG, "setDefaultPersona($persona) did not flush — persona may revert on restart")
+        return ok
     }
 
     /** Returns true on successful flush. Caller decides whether a missed write is worth surfacing. */

@@ -5,8 +5,16 @@ import android.content.SharedPreferences
 import android.util.Log
 import dev.anchildress1.vestige.model.Persona
 
-/** Onboarding completion flag + default persona. SharedPreferences-backed; durable across cold starts. */
-class OnboardingPrefs(private val prefs: SharedPreferences) {
+/**
+ * Onboarding completion flag + default persona. SharedPreferences-backed; durable across cold
+ * starts and process kills. Every mutator uses `commit()` — apply()'s async queue can be lost
+ * if the process is killed before the flush lands, which would silently replay onboarding in
+ * the wrong state. Callers on the main thread must hop to [kotlinx.coroutines.Dispatchers.IO]
+ * to keep these writes off the UI thread (StrictMode `detectDiskWrites`).
+ *
+ * Open to support a test fake that fails [markComplete] in isolation.
+ */
+open class OnboardingPrefs(private val prefs: SharedPreferences) {
 
     val isComplete: Boolean
         get() = prefs.getBoolean(KEY_COMPLETE, false)
@@ -21,22 +29,23 @@ class OnboardingPrefs(private val prefs: SharedPreferences) {
             ?.let { runCatching { OnboardingStep.valueOf(it) }.getOrNull() }
             ?: OnboardingStep.PersonaPick
 
-    // Async flush — Android guarantees apply() lands before the process dies under normal teardown,
-    // and these run from a Compose LaunchedEffect on main where commit() would trip StrictMode's
-    // detectDiskWrites. markComplete is the only write that truly needs synchronous fail-closed.
     fun setDefaultPersona(persona: Persona) {
-        prefs.edit().putString(KEY_PERSONA, persona.name).apply()
+        if (!prefs.edit().putString(KEY_PERSONA, persona.name).commit()) {
+            Log.w(TAG, "setDefaultPersona($persona) did not flush — persona may revert on restart")
+        }
     }
 
     fun setCurrentStep(step: OnboardingStep) {
-        prefs.edit().putString(KEY_STEP, step.name).apply()
+        if (!prefs.edit().putString(KEY_STEP, step.name).commit()) {
+            Log.w(TAG, "setCurrentStep($step) did not flush — resume point may be lost")
+        }
     }
 
     /**
      * Returns true on successful flush. Synchronous commit because a missed flush replays the
      * entire flow on the next cold start; the caller can refuse to advance if it returns false.
      */
-    fun markComplete(): Boolean {
+    open fun markComplete(): Boolean {
         val ok = prefs.edit()
             .putBoolean(KEY_COMPLETE, true)
             .remove(KEY_STEP)

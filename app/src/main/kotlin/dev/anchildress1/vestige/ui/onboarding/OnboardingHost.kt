@@ -78,7 +78,11 @@ fun OnboardingHost(
         if (step == OnboardingStep.Wiring) micPermissionDenied = false
         step = step.previous() ?: step
     }
-    LaunchedEffect(persona) { prefs.setDefaultPersona(persona) }
+    LaunchedEffect(persona) {
+        // commit() on IO — durable across process kill; off main so StrictMode's
+        // detectDiskWrites (debug) doesn't fire on every persona toggle.
+        withContext(Dispatchers.IO) { prefs.setDefaultPersona(persona) }
+    }
     val environment = rememberOnboardingEnvironment(
         prefs = prefs,
         step = step,
@@ -194,9 +198,10 @@ private fun rememberOnboardingEnvironment(
     var modelState by remember { mutableStateOf<ModelArtifactState>(ModelArtifactState.Absent) }
     var downloadMbps by remember { mutableStateOf<Float?>(null) }
 
-    // Cheap per-step disk write — persist resume point + refresh the Wi-Fi snapshot.
+    // Persist resume point + refresh the Wi-Fi snapshot. commit() runs on IO so the durability
+    // guarantee survives a process kill mid-step without blocking the main thread.
     LaunchedEffect(step) {
-        prefs.setCurrentStep(step)
+        withContext(Dispatchers.IO) { prefs.setCurrentStep(step) }
         wifiConnected = wifiAvailability.isWifiConnected()
     }
 

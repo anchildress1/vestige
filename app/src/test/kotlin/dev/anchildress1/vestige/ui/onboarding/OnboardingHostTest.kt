@@ -19,8 +19,6 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import dev.anchildress1.vestige.model.ModelArtifactState
 import dev.anchildress1.vestige.model.Persona
 import dev.anchildress1.vestige.ui.theme.VestigeTheme
-import io.mockk.every
-import io.mockk.mockk
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import org.junit.After
@@ -243,23 +241,15 @@ class OnboardingHostTest {
 
     @Test
     fun `Open Vestige stays on onboarding when markComplete fails`() {
-        // Only commit() fails — apply() is stubbed to succeed so setDefaultPersona and
-        // setCurrentStep don't also short-circuit. That isolates the assertion to markComplete.
-        val editor = mockk<SharedPreferences.Editor>()
-        every { editor.putBoolean(any(), any()) } returns editor
-        every { editor.remove(any()) } returns editor
-        every { editor.putString(any(), any()) } returns editor
-        every { editor.apply() } returns Unit
-        every { editor.commit() } returns false
-        val sharedPrefs = mockk<SharedPreferences>()
-        every { sharedPrefs.getBoolean("complete", false) } returns false
-        every { sharedPrefs.getString("default_persona", null) } returns Persona.EDITOR.name
-        every { sharedPrefs.getString("current_step", null) } returns OnboardingStep.Wiring.name
-        every { sharedPrefs.edit() } returns editor
-
+        prefs.setDefaultPersona(Persona.EDITOR)
+        prefs.setCurrentStep(OnboardingStep.Wiring)
+        val failingPrefs = FailingMarkCompletePrefs(
+            ApplicationProvider.getApplicationContext<Context>()
+                .getSharedPreferences(OnboardingPrefs.PREFS_NAME, Context.MODE_PRIVATE),
+        )
         var completed = false
         startHost(
-            prefs = OnboardingPrefs(sharedPrefs),
+            prefs = failingPrefs,
             onComplete = { completed = true },
             modelAvailability = fakeModelAvailability(ModelArtifactState.Complete),
         )
@@ -267,6 +257,11 @@ class OnboardingHostTest {
 
         assertFalse(completed)
         composeRule.onNodeWithText("WIRING", substring = true).assertIsDisplayed()
+    }
+
+    /** Real prefs for read paths and side-effect writes; only markComplete is forced to fail. */
+    private class FailingMarkCompletePrefs(prefs: SharedPreferences) : OnboardingPrefs(prefs) {
+        override fun markComplete(): Boolean = false
     }
 
     private fun tapPrimary(label: String) {

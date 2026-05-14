@@ -9,6 +9,7 @@ import dev.anchildress1.vestige.model.Persona
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -164,12 +165,27 @@ class CaptureViewModel(
         stopSignal.tryEmit(Unit)
     }
 
-    /** Called by host on DISCARD tap. Cancels mid-flight recording or inference. */
+    /**
+     * Called by host on DISCARD tap. Only valid during RECORDING — after STOP the foreground
+     * call is in flight and cancellation is out of scope per ADR-001 §Q8. Awaits the recording
+     * job's cancellation (cancelAndJoin) so `AudioCapture`'s `finally` block — which stops and
+     * releases the `AudioRecord` JNI handle — completes before the UI surfaces Idle.
+     */
     fun discard() {
-        recordingJob?.cancel()
-        recordingJob = null
         val current = _state.value
-        _state.value = CaptureUiState.Idle(persona = current.persona, modelReadiness = current.modelReadiness)
+        if (current !is CaptureUiState.Recording) return
+        val job = recordingJob ?: return
+        recordingJob = null
+        viewModelScope.launch {
+            try {
+                job.cancelAndJoin()
+            } finally {
+                _state.value = CaptureUiState.Idle(
+                    persona = current.persona,
+                    modelReadiness = current.modelReadiness,
+                )
+            }
+        }
     }
 
     /** Type-fallback path: save the typed entry text and route through the background extraction pipeline. */

@@ -207,7 +207,7 @@ class CaptureViewModelTest {
     }
 
     @Test
-    fun `discard cancels mid-flight recording and returns to Idle`() = runTest(dispatcher) {
+    fun `discard cancels mid-flight recording and returns to Idle (pos)`() = runTest(dispatcher) {
         val voice = FakeVoiceCapture(result = AudioChunk(FloatArray(16), 16_000, isFinal = true))
         val vm = newViewModel(
             voice = voice,
@@ -227,7 +227,63 @@ class CaptureViewModelTest {
         vm.startRecording()
         assertTrue(vm.state.value is CaptureUiState.Recording)
         vm.discard()
+        advanceUntilIdle()
         assertTrue(vm.state.value is CaptureUiState.Idle)
+    }
+
+    @Test
+    fun `discard from Idle is a no-op (neg — only available during RECORDING)`() = runTest(dispatcher) {
+        val voice = FakeVoiceCapture(result = null)
+        val vm = newViewModel(
+            voice = voice,
+            inference = FakeForegroundInference(
+                ForegroundResult.Success(
+                    persona = Persona.WITNESS,
+                    rawResponse = "",
+                    elapsedMs = 0,
+                    completedAt = clock.instant(),
+                    transcription = "",
+                    followUp = "",
+                ),
+            ),
+            save = RecordingSaveAndExtract(),
+            initialReadiness = ModelReadiness.Ready,
+        )
+        val before = vm.state.value
+        vm.discard()
+        advanceUntilIdle()
+        assertEquals(before, vm.state.value)
+    }
+
+    @Test
+    fun `discard from Inferring is a no-op (neg — out of scope after STOP)`() = runTest(dispatcher) {
+        val voice = FakeVoiceCapture(result = AudioChunk(FloatArray(16), 16_000, isFinal = true))
+        val pending = CompletableDeferred<ForegroundResult>()
+        val vm = newViewModel(
+            voice = voice,
+            inference = SuspendingForegroundInference(pending),
+            save = RecordingSaveAndExtract(),
+            initialReadiness = ModelReadiness.Ready,
+        )
+        vm.startRecording()
+        voice.completeWithResult()
+        advanceUntilIdle()
+        assertTrue(vm.state.value is CaptureUiState.Inferring)
+
+        vm.discard()
+        advanceUntilIdle()
+        assertTrue(vm.state.value is CaptureUiState.Inferring)
+        pending.complete(
+            ForegroundResult.Success(
+                persona = Persona.WITNESS,
+                rawResponse = "",
+                elapsedMs = 0,
+                completedAt = clock.instant(),
+                transcription = "",
+                followUp = "",
+            ),
+        )
+        advanceUntilIdle()
     }
 
     @Test
@@ -314,6 +370,11 @@ class CaptureViewModelTest {
 
     private class FakeForegroundInference(private val result: ForegroundResult) : ForegroundInferenceCall {
         override suspend fun invoke(audio: AudioChunk, persona: Persona): ForegroundResult = result
+    }
+
+    private class SuspendingForegroundInference(private val pending: CompletableDeferred<ForegroundResult>) :
+        ForegroundInferenceCall {
+        override suspend fun invoke(audio: AudioChunk, persona: Persona): ForegroundResult = pending.await()
     }
 
     private class RecordingSaveAndExtract : SaveAndExtract {

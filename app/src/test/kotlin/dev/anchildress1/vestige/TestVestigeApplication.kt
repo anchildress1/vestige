@@ -6,13 +6,20 @@ import dev.anchildress1.vestige.testing.newModuleTempRoot
 import dev.anchildress1.vestige.testing.openInMemoryBoxStore
 import java.io.File
 
+/**
+ * Robolectric `@Config(application = ...)` stand-in. Production `VestigeApplication.onCreate`
+ * builds a real `AppContainer` against the host filesystem; under JVM tests we need an in-memory
+ * BoxStore and a temp markdown root so suites stay hermetic and parallel-safe. Robolectric
+ * instantiates the application class itself, so a subclass override is the only seam — there is
+ * no constructor we can inject through.
+ */
 class TestVestigeApplication : VestigeApplication() {
 
     private val tempRoot: File by lazy { newModuleTempRoot("vestige-application-") }
 
     override fun createAppContainer(): AppContainer = AppContainer(
         applicationContext = this,
-        boxStoreFactory = { openInMemoryBoxStore(newInMemoryObjectBoxDirectory("vestige-app-container-")) },
-        markdownStoreFactory = { MarkdownEntryStore(File(tempRoot, "markdown").apply { mkdirs() }) },
+        boxStoreFactory = { _ -> openInMemoryBoxStore(newInMemoryObjectBoxDirectory("vestige-app-container-")) },
+        markdownStoreFactory = { _ -> MarkdownEntryStore(File(tempRoot, "markdown").apply { mkdirs() }) },
     )
 }

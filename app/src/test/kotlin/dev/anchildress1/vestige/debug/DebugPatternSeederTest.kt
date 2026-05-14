@@ -18,6 +18,8 @@ import org.robolectric.annotation.Config
 import java.io.File
 
 @RunWith(RobolectricTestRunner::class)
+// VestigeApplication.onCreate builds a real AppContainer — we don't need that here since the
+// seeder is exercised against hand-built stores. Bare android.app.Application skips the bootstrap.
 @Config(manifest = Config.NONE, application = android.app.Application::class)
 class DebugPatternSeederTest {
 

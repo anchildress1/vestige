@@ -13,12 +13,15 @@ open class VestigeApplication : Application() {
 
     override fun onCreate() {
         super.onCreate()
+        // Container first: if construction throws, StrictMode and the notification channel stay
+        // unarmed so Robolectric's reused process doesn't inherit half-installed global state.
+        appContainer = createAppContainer()
         installStrictModeOnDebugBuilds()
         LocalProcessingNotification.registerChannel(this)
-        appContainer = createAppContainer()
         appContainer.launchVectorBackfillIfReady()
     }
 
+    /** Test seam: subclasses inject in-memory factories. Production has no reason to override. */
     protected open fun createAppContainer(): AppContainer = AppContainer(this)
 
     private fun installStrictModeOnDebugBuilds() {

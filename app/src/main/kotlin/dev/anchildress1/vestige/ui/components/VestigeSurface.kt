@@ -120,14 +120,13 @@ fun VestigeRow(
  * card, which `clickable` alone does not guarantee.
  */
 @Composable
-@Suppress("LongParameterList") // Same primitive tradeoff: fewer wrappers, clearer call sites.
+@Suppress("LongParameterList") // Primitive shape — defaults beat wrapper proliferation at call sites.
 fun VestigeListCard(
     modifier: Modifier = Modifier,
     onClick: (() -> Unit)? = null,
     role: Role = Role.Button,
     selected: Boolean? = null,
     accentModifier: Modifier = Modifier,
-    shape: Shape = VestigeTheme.shapes.xl,
     contentPadding: PaddingValues = PaddingValues(horizontal = 16.dp, vertical = 14.dp),
     content: @Composable () -> Unit,
 ) {
@@ -145,7 +144,7 @@ fun VestigeListCard(
     }
     Surface(
         modifier = rootModifier,
-        shape = shape,
+        shape = VestigeTheme.shapes.xl,
         color = if (onClick != null) colors.s2 else colors.s1,
         contentColor = colors.ink,
         border = BorderStroke(SurfaceHairline, colors.hair),

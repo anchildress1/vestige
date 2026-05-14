@@ -2,23 +2,12 @@
 <resources>
     <string name="app_name">Vestige</string>
 
-    <!-- Phase 1 dev-only mic permission strings. Phase 4 ships polished onboarding copy from ux-copy.md §"Mic permission". -->
-    <string name="mic_permission_request">Allow microphone</string>
-    <string name="mic_permission_granted">Mic permission granted.</string>
-    <string name="mic_permission_denied">Mic permission required to record. Settings → Permissions.</string>
-
     <!-- Background extraction notification copy. Single source of truth = ux-copy.md §"Loading States" /
          mid-session inference. Mirrored on the in-app placeholder so the system notification and the
          transcript spinner stay in lockstep (ADR-004 §"Notification Contract"). -->
     <string name="notification_channel_local_processing_name">Local processing</string>
     <string name="notification_channel_local_processing_description">Status notification while Vestige reads an entry locally.</string>
     <string name="notification_local_processing_text">Reading the entry.</string>
-
-    <!-- Phase 3 rough nav: in-app entry point into the Patterns surface. Phase 4 replaces with a real nav graph. -->
-    <string name="open_patterns">View details</string>
-
-    <!-- Debug-only fixture seeder for Stories 3.9 / 3.10 manual verification. Hidden in release per FLAG_DEBUGGABLE gate. -->
-    <string name="debug_seed_patterns">[DEBUG] Seed sample</string>
 
     <!-- Onboarding copy — single source of truth is docs/ux-copy.md §Onboarding. Edit there first. -->
     <string name="onboarding_continue">Continue</string>

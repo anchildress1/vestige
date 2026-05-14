@@ -10,6 +10,7 @@ import androidx.core.content.ContextCompat
 import dev.anchildress1.vestige.model.ModelArtifactState
 
 internal const val ONBOARDING_TAG = "Onboarding"
+internal const val PERCENT_LOG_SCALE: Long = 100L
 
 internal fun hasRecordAudio(context: Context): Boolean =
     ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) ==

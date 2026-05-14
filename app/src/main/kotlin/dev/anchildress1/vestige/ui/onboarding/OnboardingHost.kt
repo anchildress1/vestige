@@ -167,24 +167,7 @@ private fun rememberOnboardingEnvironment(
     // download — leaving the .part file on disk for HTTP-Range resume on re-entry. Story 4.3
     // owns retry / pause / stall handling; this just gets the percent moving.
     LaunchedEffect(step) {
-        if (step != OnboardingStep.ModelDownload) return@LaunchedEffect
-        val current = modelAvailability.status()
-        modelState = current
-        if (current is ModelArtifactState.Complete) return@LaunchedEffect
-        try {
-            // withContext(IO) so the network call doesn't trip StrictMode's
-            // penaltyDeathOnNetwork in debug builds.
-            val terminal = withContext(Dispatchers.IO) {
-                modelAvailability.download { currentBytes, expectedBytes ->
-                    modelState = ModelArtifactState.Partial(currentBytes, expectedBytes)
-                }
-            }
-            modelState = terminal
-        } catch (@Suppress("TooGenericExceptionCaught") error: Exception) {
-            Log.e(ONBOARDING_TAG, "Model download failed", error)
-            // Keep modelState at its last reported value — the user sees the partial pill /
-            // bar and can tap Back. Story 4.3 will own the polished retry / error UI.
-        }
+        runDownloadIfNeeded(step, modelAvailability) { modelState = it }
     }
     DisposableEffect(lifecycleOwner, wifiAvailability, modelAvailability) {
         val observer = LifecycleEventObserver { _, event ->
@@ -251,6 +234,45 @@ private fun OnboardingStepContent(state: OnboardingStepState, callbacks: Onboard
             persona = state.persona,
             onOpenApp = callbacks.onOpenApp,
         )
+    }
+}
+
+// Runs the download with diagnostic logs at each phase. `onState` is the assignment back to the
+// host's modelState; we keep it as a callback so this helper can stay out of @Composable scope.
+private suspend fun runDownloadIfNeeded(
+    step: OnboardingStep,
+    modelAvailability: ModelAvailability,
+    onState: (ModelArtifactState) -> Unit,
+) {
+    if (step != OnboardingStep.ModelDownload) return
+    val current = modelAvailability.status()
+    Log.i(ONBOARDING_TAG, "ModelDownload entered. currentState=$current")
+    onState(current)
+    if (current is ModelArtifactState.Complete) {
+        Log.i(ONBOARDING_TAG, "Model already complete; skipping download.")
+        return
+    }
+    try {
+        Log.i(ONBOARDING_TAG, "Starting download()...")
+        var lastPct = -1
+        val terminal = withContext(Dispatchers.IO) {
+            modelAvailability.download { currentBytes, expectedBytes ->
+                onState(ModelArtifactState.Partial(currentBytes, expectedBytes))
+                val pct = if (expectedBytes > 0L) {
+                    ((currentBytes * PERCENT_LOG_SCALE) / expectedBytes).toInt()
+                } else {
+                    -1
+                }
+                if (pct != lastPct) {
+                    lastPct = pct
+                    Log.d(ONBOARDING_TAG, "download progress $currentBytes/$expectedBytes ($pct%)")
+                }
+            }
+        }
+        Log.i(ONBOARDING_TAG, "download() finished. terminalState=$terminal")
+        onState(terminal)
+    } catch (@Suppress("TooGenericExceptionCaught") error: Exception) {
+        Log.e(ONBOARDING_TAG, "Model download failed", error)
     }
 }
 

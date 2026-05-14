@@ -1,4 +1,4 @@
-.PHONY: install bootstrap-wrapper doctor build assemble reinstall reinstall-tail logcat test lint format ktlint-format ktlint-check detekt android-lint secret-scan commitlint verify-no-telemetry verify ci clean
+.PHONY: install bootstrap-wrapper doctor build assemble reinstall reinstall-tail reinstall-with-model reinstall-with-model-tail push-model logcat test lint format ktlint-format ktlint-check detekt android-lint secret-scan commitlint verify-no-telemetry verify ci clean
 
 GRADLE := ./gradlew
 KTLINT := $(or $(shell command -v ktlint 2>/dev/null), $(HOME)/.local/bin/ktlint)
@@ -33,6 +33,47 @@ reinstall:
 # app only; the inline retry handles the brief window between install and process start. Ctrl-C
 # to stop. Add EXTRA="..." to append filters, e.g. `make reinstall-tail EXTRA='*:W'`.
 reinstall-tail: reinstall logcat
+
+# ── Dev model-file workflow ────────────────────────────────────────────────────
+# `adb uninstall` wipes the app's filesDir, so a normal `make reinstall` forces every cold
+# iteration through the 3.66 GB onboarding download. The targets below push a local copy of
+# the Gemma 4 E4B artifact into the freshly-installed app's data dir via `run-as`, which only
+# works on debuggable APKs — so this is strictly a dev workflow. Production users continue
+# through the normal onboarding flow.
+#
+# Set VESTIGE_MODEL_FILE to a local path; defaults to ~/vestige-dev/gemma-4-E4B-it.litertlm.
+# The filename + expected SHA-256 must match `core-model/.../manifest.properties` exactly or
+# the artifact store will mark the file Corrupt and re-download anyway.
+VESTIGE_PACKAGE := dev.anchildress1.vestige
+VESTIGE_MODEL_FILENAME := gemma-4-E4B-it.litertlm
+VESTIGE_MODEL_FILE ?= $(HOME)/vestige-dev/$(VESTIGE_MODEL_FILENAME)
+
+push-model:
+	@command -v adb >/dev/null 2>&1 || { echo "❌ adb not found. Install Android platform-tools."; exit 1; }
+	@adb get-state >/dev/null 2>&1 || { echo "❌ no device connected. Run 'adb devices' to check."; exit 1; }
+	@test -f "$(VESTIGE_MODEL_FILE)" || { \
+		echo "❌ Model file not found: $(VESTIGE_MODEL_FILE)"; \
+		echo "   Set VESTIGE_MODEL_FILE=/path/to/$(VESTIGE_MODEL_FILENAME) or place the file at the default."; \
+		echo "   The SHA-256 must match core-model/src/main/resources/model/manifest.properties."; \
+		exit 1; \
+	}
+	@adb shell "pm list packages $(VESTIGE_PACKAGE)" | grep -q "$(VESTIGE_PACKAGE)" || { \
+		echo "❌ $(VESTIGE_PACKAGE) is not installed. Run 'make reinstall' first."; \
+		exit 1; \
+	}
+	@echo "→ Pushing $(VESTIGE_MODEL_FILENAME) to /data/local/tmp/ (intermediate)..."
+	adb push "$(VESTIGE_MODEL_FILE)" /data/local/tmp/vestige-model-push
+	@echo "→ Streaming into $(VESTIGE_PACKAGE) files/models/ via run-as..."
+	adb shell "cat /data/local/tmp/vestige-model-push | run-as $(VESTIGE_PACKAGE) sh -c 'mkdir -p files/models && cat > files/models/$(VESTIGE_MODEL_FILENAME)'"
+	adb shell "rm /data/local/tmp/vestige-model-push"
+	@echo "✅ Model installed. Restart the app — onboarding should skip the download step."
+
+# `make reinstall-with-model` — full debug iteration: uninstall, install, push model. Run
+# after the first model download so subsequent reinstalls don't re-download the 3.66 GB file.
+reinstall-with-model: reinstall push-model
+
+reinstall-with-model-tail: reinstall push-model logcat
+# ───────────────────────────────────────────────────────────────────────────────
 
 logcat:
 	@command -v adb >/dev/null 2>&1 || { echo "❌ adb not found. Install Android platform-tools."; exit 1; }

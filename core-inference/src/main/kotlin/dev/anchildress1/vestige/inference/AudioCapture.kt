@@ -6,9 +6,12 @@ import android.media.AudioRecord
 import android.media.MediaRecorder
 import android.util.Log
 import androidx.annotation.RequiresPermission
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.isActive
 import java.util.concurrent.atomic.AtomicBoolean
 
@@ -26,6 +29,7 @@ class AudioCapture(
     private val sampleRateHz: Int = SAMPLE_RATE_HZ,
     private val chunkDurationMs: Long = CHUNK_DURATION_MS,
     private val onLevel: ((Float) -> Unit)? = null,
+    private val captureDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) {
     private val stopRequested = AtomicBoolean(false)
 
@@ -50,7 +54,11 @@ class AudioCapture(
             runCatching { record.stop() }.onFailure { Log.w(TAG, "stop() on un-started AudioRecord") }
             record.release()
         }
-    }
+    }.flowOn(captureDispatcher)
+    // `flowOn` is non-negotiable here: `AudioRecord.read(... READ_BLOCKING)` parks the calling
+    // thread between buffer fills. Collected on Main, the read loop ANRs the UI within seconds
+    // and Android force-stops the process. The dispatcher seam stays injectable so JVM tests
+    // can pin a TestDispatcher without needing a real `AudioRecord`.
 
     // `internal` for JVM testability. Returns the cap chunk if the window fills; null on stop
     // or cancellation (caller drains the partial buffer).

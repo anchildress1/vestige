@@ -44,6 +44,7 @@ class BackgroundExtractionServiceIntegrationTest {
     @After
     fun tearDown() {
         runCatching { serviceController.destroy() }
+        (app as? TestVestigeApplication)?.releaseTempStorage()
     }
 
     @Test

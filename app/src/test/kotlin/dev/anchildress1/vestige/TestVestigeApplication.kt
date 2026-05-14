@@ -22,4 +22,11 @@ class TestVestigeApplication : VestigeApplication() {
         boxStoreFactory = { _ -> openInMemoryBoxStore(newInMemoryObjectBoxDirectory("vestige-app-container-")) },
         markdownStoreFactory = { _ -> MarkdownEntryStore(File(tempRoot, "markdown").apply { mkdirs() }) },
     )
+
+    /** Test hook — Robolectric reuses the JVM, so callers must release the lazy temp root or it leaks. */
+    fun releaseTempStorage() {
+        if (tempRoot.exists()) {
+            check(tempRoot.deleteRecursively()) { "Failed to delete test temp root: $tempRoot" }
+        }
+    }
 }

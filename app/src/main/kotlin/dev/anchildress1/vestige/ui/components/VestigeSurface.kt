@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.selection.selectable
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -110,23 +111,37 @@ fun VestigeRow(
     }
 }
 
-/** Selectable [VestigeSurface] variant. With [onClick] the fill raises to `colors.s2`. */
+/**
+ * Selectable [VestigeSurface] variant. With [onClick] the fill raises to `colors.s2`.
+ *
+ * `selected != null` switches the click semantics from `clickable` to `selectable` — the
+ * correct Compose primitive for radio-button / checkbox card patterns. `selectable` merges
+ * descendant semantics so `onNodeWithText(...).performClick()` dispatches the onClick to the
+ * card, which `clickable` alone does not guarantee.
+ */
 @Composable
 @Suppress("LongParameterList") // Same primitive tradeoff: fewer wrappers, clearer call sites.
 fun VestigeListCard(
     modifier: Modifier = Modifier,
     onClick: (() -> Unit)? = null,
     role: Role = Role.Button,
+    selected: Boolean? = null,
     accentModifier: Modifier = Modifier,
     shape: Shape = VestigeTheme.shapes.xl,
     contentPadding: PaddingValues = PaddingValues(horizontal = 16.dp, vertical = 14.dp),
     content: @Composable () -> Unit,
 ) {
     val colors = VestigeTheme.colors
-    val rootModifier = if (onClick != null) {
-        modifier.clickable(role = role, onClick = onClick)
-    } else {
-        modifier
+    val rootModifier = when {
+        onClick == null -> modifier
+
+        selected != null -> modifier.selectable(
+            selected = selected,
+            role = role,
+            onClick = onClick,
+        )
+
+        else -> modifier.clickable(role = role, onClick = onClick)
     }
     Surface(
         modifier = rootModifier,

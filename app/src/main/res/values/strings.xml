@@ -26,49 +26,60 @@
     <string name="onboarding_back">Back</string>
 
     <!-- Screen 1 — Persona pick -->
-    <string name="onboarding_persona_header">Pick a persona.</string>
+    <string name="onboarding_persona_eyebrow">VOICE · PICK ONE</string>
+    <string name="onboarding_persona_header">PICK A PERSONA.</string>
     <string name="onboarding_persona_subhead">Three voices. Same product. Pick the one that fits today. You can switch.</string>
+    <string name="onboarding_persona_continue">Continue</string>
     <string name="onboarding_persona_footer">Change later in settings.</string>
     <string name="onboarding_persona_witness_name">Witness</string>
+    <string name="onboarding_persona_witness_tag">DEFAULT · QUIET</string>
     <string name="onboarding_persona_witness_desc">Observes. Names the pattern. Keeps quiet otherwise.</string>
     <string name="onboarding_persona_hardass_name">Hardass</string>
+    <string name="onboarding_persona_hardass_tag">LESS PADDING</string>
     <string name="onboarding_persona_hardass_desc">Sharper. Less padding. More action.</string>
     <string name="onboarding_persona_editor_name">Editor</string>
+    <string name="onboarding_persona_editor_tag">TIGHTENS VOCAB</string>
     <string name="onboarding_persona_editor_desc">Cuts vague words until they confess.</string>
 
-    <!-- Screen 2 — Local processing -->
-    <string name="onboarding_local_header">Everything stays on your phone.</string>
-    <string name="onboarding_local_body">Vestige runs Gemma 4 directly on this device. No cloud processing, no servers for your entries, no telemetry. Your voice never leaves the device.</string>
-    <string name="onboarding_local_detail">The model is ~3.7 GB. We download it once, on Wi-Fi, in the next few steps.</string>
+    <!-- Screen 2 — Wiring (merges old Mic / Notif / Local / Typed fallback into one switchboard) -->
+    <string name="onboarding_wiring_eyebrow">PRE-FLIGHT</string>
+    <string name="onboarding_wiring_header">WIRING THIS UP.</string>
+    <string name="onboarding_wiring_body">Four switches. Two are already on. Flip the rest if you want voice.</string>
+    <string name="onboarding_wiring_next">Next</string>
+    <string name="onboarding_wiring_footer">FINISH 2 MORE TO CONTINUE · OR SKIP</string>
 
-    <!-- Screen 3 — Mic permission -->
-    <string name="onboarding_mic_header">Mic permission.</string>
-    <string name="onboarding_mic_body">Vestige needs the microphone to record your dumps. Audio is processed by Gemma 4 on this device, then discarded. The transcription stays as text — like any other note.</string>
-    <string name="onboarding_mic_allow">Allow microphone</string>
-    <string name="onboarding_mic_skip">Skip — I\'ll type instead</string>
+    <string name="onboarding_wiring_local_number">#01</string>
+    <string name="onboarding_wiring_local_title">LOCAL · GEMMA 4</string>
+    <string name="onboarding_wiring_local_desc">No cloud. No servers. No telemetry. Voice never leaves the device.</string>
+
+    <string name="onboarding_wiring_mic_number">#02</string>
+    <string name="onboarding_wiring_mic_title">MIC · INPUT</string>
+    <string name="onboarding_wiring_mic_desc">Records dumps. Audio is read locally, then discarded. Transcription stays as text.</string>
+    <string name="onboarding_wiring_mic_hint">REQUIRED FOR VOICE · OPTIONAL OTHERWISE</string>
+
+    <string name="onboarding_wiring_notif_number">#03</string>
+    <string name="onboarding_wiring_notif_title">NOTIFY · STATUS</string>
+    <string name="onboarding_wiring_notif_desc">One line, posted while the model reads an entry. Disappears when work is done.</string>
+    <string name="onboarding_wiring_notif_hint">SINGLE-STATUS ONLY · NOTHING ELSE, EVER</string>
+
+    <string name="onboarding_wiring_type_number">#04</string>
+    <string name="onboarding_wiring_type_title">TYPE · FALLBACK</string>
+    <string name="onboarding_wiring_type_desc">Voice is the default. Typing works the same. Same patterns. Same persona.</string>
+
     <string name="onboarding_mic_denied">Mic permission required to record. Settings → Permissions.</string>
 
-    <!-- Screen 3.5 — Notification permission -->
-    <string name="onboarding_notif_header">One status notification.</string>
-    <string name="onboarding_notif_body">Vestige briefly shows a status when it\'s working locally on an entry. That\'s the only notification it will ever send. It disappears when work is done.</string>
-    <string name="onboarding_notif_allow">Allow notifications</string>
-    <string name="onboarding_notif_skip">Skip — watch the app work</string>
-    <string name="onboarding_notif_skip_note">Skipping is fine. Without the notification, Vestige can only finish reading an entry while the app is open — keep it foregrounded until the transcript lands.</string>
-
-    <!-- Screen 4 — Typed fallback -->
-    <string name="onboarding_type_header">Or type.</string>
-    <string name="onboarding_type_body">Voice is the default. Typing works the same way. Same patterns, same persona. Pick whichever the day is asking for.</string>
-
-    <!-- Screen 5 — Wi-Fi check -->
-    <string name="onboarding_wifi_ok_header">Wi-Fi connected.</string>
-    <string name="onboarding_wifi_ok_body">Ready to download the model. ~3.7 GB.</string>
+    <!-- Screen 3 — Wi-Fi check -->
+    <string name="onboarding_wifi_ok_eyebrow">READY TO PULL</string>
+    <string name="onboarding_wifi_ok_header">WI-FI CONNECTED.</string>
+    <string name="onboarding_wifi_ok_body">One file. Pulled once. Stays on the device after.</string>
     <string name="onboarding_wifi_ok_action">Download model</string>
-    <string name="onboarding_wifi_missing_header">Wi-Fi required.</string>
+    <string name="onboarding_wifi_missing_eyebrow">NO SIGNAL</string>
+    <string name="onboarding_wifi_missing_header">WI-FI REQUIRED.</string>
     <string name="onboarding_wifi_missing_body">The model is ~3.7 GB. Connect to Wi-Fi to download. We\'ll wait.</string>
     <string name="onboarding_wifi_open_settings">Open Wi-Fi settings</string>
     <string name="onboarding_wifi_come_back">I\'ll come back</string>
 
-    <!-- Screen 6 — Model download. Real progress, retry, and Wi-Fi gating live in the next story. -->
+    <!-- Screen 4 — Model download -->
     <string name="onboarding_download_header">Downloading model.</string>
     <string name="onboarding_download_body">Quiet for a minute. This takes a while.</string>
     <string name="onboarding_download_loading_pill">DOWNLOADING</string>
@@ -76,10 +87,13 @@
     <string name="onboarding_download_loading_note">Model file is still landing. Keep Vestige open — this is the one network event in the app\'s life.</string>
     <string name="onboarding_download_ready_pill">MODEL READY</string>
 
-    <!-- Screen 7 — Ready -->
-    <string name="onboarding_ready_header">Ready.</string>
+    <!-- Screen 5 — Ready -->
+    <string name="onboarding_ready_eyebrow">MODEL LOADED · %1$s ARMED</string>
+    <string name="onboarding_ready_header">READY.</string>
     <string name="onboarding_ready_body">Everything\'s local. The model\'s loaded. Talk into the mic when you\'ve got something to dump, or type. %1$s is selected.</string>
+    <string name="onboarding_ready_first_prompt">WHAT JUST HAPPENED?</string>
     <string name="onboarding_ready_action">Open Vestige</string>
+    <string name="onboarding_ready_footer">NO TUTORIAL · YOU FIGURE IT OUT</string>
 
     <!-- Phase 3 placeholder source-entry surface. Phase 4 replaces this with the real history detail screen. -->
     <string name="entry_detail_placeholder_title">Entry</string>

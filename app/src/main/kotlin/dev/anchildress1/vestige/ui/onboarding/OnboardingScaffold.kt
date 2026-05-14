@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -23,66 +24,92 @@ import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import dev.anchildress1.vestige.R
+import dev.anchildress1.vestige.ui.components.EyebrowE
 import dev.anchildress1.vestige.ui.theme.VestigeTheme
 
 /**
- * Shared scaffold for the 8 onboarding screens: scrollable column with header, optional
- * subhead, slot for body content, and 1–2 footer actions. Screens are intentionally not boxed
- * inside `VestigeSurface` — onboarding is full-bleed prose, not a card stack.
+ * Shared scaffold for the 5 onboarding screens. Persistent top chrome (SETUP eyebrow + step
+ * dots + tick rule), scrollable content slot, and a sticky lime primary action bar pinned to
+ * the bottom. Matches `poc/screenshots/onboarding-*.png` layout.
  */
-@Suppress("LongParameterList") // Scaffold primitive — wide by design, no further bundling helps.
+@Suppress("LongParameterList") // Scaffold primitive — wide by design.
 @Composable
 internal fun OnboardingScaffold(
-    header: String,
+    step: OnboardingStep,
     primary: OnboardingAction,
     modifier: Modifier = Modifier,
-    subhead: String? = null,
+    rightStatus: String? = null,
     secondary: OnboardingAction? = null,
+    footerHelper: String? = null,
     content: @Composable () -> Unit = {},
 ) {
-    Column(
-        modifier = modifier
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .padding(horizontal = 24.dp, vertical = 32.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
-    ) {
-        Text(text = header, style = VestigeTheme.typography.h1)
-        if (subhead != null) {
-            Text(
-                text = subhead,
-                style = VestigeTheme.typography.p,
-                color = VestigeTheme.colors.dim,
-            )
+    Column(modifier = modifier.fillMaxSize()) {
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 24.dp, vertical = 24.dp),
+            verticalArrangement = Arrangement.spacedBy(20.dp),
+        ) {
+            OnboardingChrome(step = step, rightStatus = rightStatus)
+            content()
+            Spacer(modifier = Modifier.height(16.dp))
         }
-        content()
-        Spacer(modifier = Modifier.height(8.dp))
-        OnboardingActionRow(primary = primary, secondary = secondary)
+        OnboardingPrimaryBar(
+            primary = primary,
+            secondary = secondary,
+            footerHelper = footerHelper,
+        )
     }
 }
 
 @Composable
-private fun OnboardingActionRow(primary: OnboardingAction, secondary: OnboardingAction?) {
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+private fun OnboardingPrimaryBar(primary: OnboardingAction, secondary: OnboardingAction?, footerHelper: String?) {
+    val colors = VestigeTheme.colors
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 16.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
         Button(
             onClick = primary.onAction,
             enabled = primary.enabled,
             modifier = Modifier
                 .fillMaxWidth()
                 .semantics { role = Role.Button },
-            contentPadding = PaddingValues(vertical = 14.dp),
+            contentPadding = PaddingValues(vertical = 18.dp, horizontal = 20.dp),
+            colors = ButtonDefaults.buttonColors(
+                containerColor = colors.lime,
+                contentColor = colors.deep,
+                disabledContainerColor = colors.s2,
+                disabledContentColor = colors.dim,
+            ),
         ) {
-            Text(text = primary.label)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
+                Text(text = primary.label.uppercase(), style = VestigeTheme.typography.title)
+                Text(text = "→", style = VestigeTheme.typography.title)
+            }
         }
         if (secondary != null) {
             OutlinedButton(
                 onClick = secondary.onAction,
+                enabled = secondary.enabled,
                 modifier = Modifier
                     .fillMaxWidth()
                     .semantics { role = Role.Button },
                 contentPadding = PaddingValues(vertical = 14.dp),
             ) {
                 Text(text = secondary.label)
+            }
+        }
+        if (footerHelper != null) {
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
+                EyebrowE(text = footerHelper)
             }
         }
     }

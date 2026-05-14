@@ -27,10 +27,12 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import dev.anchildress1.vestige.R
 import dev.anchildress1.vestige.model.ModelArtifactState
 import dev.anchildress1.vestige.model.Persona
 import dev.anchildress1.vestige.ui.components.VestigeScaffold
@@ -66,9 +68,9 @@ fun OnboardingHost(
     )
 
     BackHandler(enabled = step != OnboardingStep.PersonaPick) {
-        // Re-entering the mic screen via Back should not show a stale denied notice — the user
-        // is about to be re-asked.
-        if (step == OnboardingStep.NotificationPermission) micPermissionDenied = false
+        // Re-entering Wiring via Back clears any stale mic-denied notice — the user can
+        // re-tap the toggle to re-ask.
+        if (step == OnboardingStep.WifiCheck) micPermissionDenied = false
         step = step.previous() ?: step
     }
     LaunchedEffect(persona) { prefs.setDefaultPersona(persona) }
@@ -114,30 +116,11 @@ fun OnboardingHost(
         OnboardingStepContent(
             state = state,
             callbacks = callbacks,
+            context = context,
             modifier = Modifier.fillMaxSize().padding(padding),
         )
     }
 }
-
-@Immutable
-private data class OnboardingStepState(
-    val step: OnboardingStep,
-    val persona: Persona,
-    val micPermissionDenied: Boolean,
-    val wifiConnected: Boolean,
-    val modelState: ModelArtifactState,
-)
-
-@Immutable
-private data class OnboardingStepCallbacks(
-    val onPersonaChange: (Persona) -> Unit,
-    val advance: () -> Unit,
-    val onMicAllow: () -> Unit,
-    val onNotificationAllow: () -> Unit,
-    val onOpenWifiSettings: () -> Unit,
-    val onComeBackLater: () -> Unit,
-    val onOpenApp: () -> Unit,
-)
 
 private data class OnboardingEnvironment(val wifiConnected: Boolean, val modelState: ModelArtifactState)
 
@@ -190,55 +173,6 @@ private fun rememberOnboardingEnvironment(
         wifiConnected = wifiConnected,
         modelState = modelState,
     )
-}
-
-@Composable
-private fun OnboardingStepContent(state: OnboardingStepState, callbacks: OnboardingStepCallbacks, modifier: Modifier) {
-    when (state.step) {
-        OnboardingStep.PersonaPick -> PersonaPickScreen(
-            modifier = modifier,
-            selected = state.persona,
-            onSelect = callbacks.onPersonaChange,
-            onContinue = callbacks.advance,
-        )
-
-        OnboardingStep.LocalExplainer -> LocalExplainerScreen(modifier = modifier, onContinue = callbacks.advance)
-
-        OnboardingStep.MicPermission -> MicPermissionScreen(
-            modifier = modifier,
-            showDeniedNotice = state.micPermissionDenied,
-            onAllow = callbacks.onMicAllow,
-            onSkip = callbacks.advance,
-        )
-
-        OnboardingStep.NotificationPermission -> NotificationPermissionScreen(
-            modifier = modifier,
-            onAllow = callbacks.onNotificationAllow,
-            onSkip = callbacks.advance,
-        )
-
-        OnboardingStep.TypedFallback -> TypedFallbackScreen(modifier = modifier, onContinue = callbacks.advance)
-
-        OnboardingStep.WifiCheck -> WifiCheckScreen(
-            modifier = modifier,
-            isWifiConnected = state.wifiConnected,
-            onContinue = callbacks.advance,
-            onOpenWifiSettings = callbacks.onOpenWifiSettings,
-            onComeBackLater = callbacks.onComeBackLater,
-        )
-
-        OnboardingStep.ModelDownload -> ModelDownloadPlaceholderScreen(
-            modifier = modifier,
-            modelState = state.modelState,
-            onContinue = callbacks.advance,
-        )
-
-        OnboardingStep.Ready -> ReadyScreen(
-            modifier = modifier,
-            persona = state.persona,
-            onOpenApp = callbacks.onOpenApp,
-        )
-    }
 }
 
 // Runs the download with diagnostic logs at each phase. `onState` is the assignment back to the

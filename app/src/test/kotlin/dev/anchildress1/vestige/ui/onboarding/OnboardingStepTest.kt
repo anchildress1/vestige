@@ -7,13 +7,10 @@ import org.junit.jupiter.api.Test
 class OnboardingStepTest {
 
     @Test
-    fun `step order matches the locked 8-screen ux-copy sequence`() {
+    fun `step order matches the locked 5-screen sequence`() {
         val expected = listOf(
             OnboardingStep.PersonaPick,
-            OnboardingStep.LocalExplainer,
-            OnboardingStep.MicPermission,
-            OnboardingStep.NotificationPermission,
-            OnboardingStep.TypedFallback,
+            OnboardingStep.Wiring,
             OnboardingStep.WifiCheck,
             OnboardingStep.ModelDownload,
             OnboardingStep.Ready,
@@ -23,7 +20,7 @@ class OnboardingStepTest {
 
     @Test
     fun `next walks forward and stops past Ready`() {
-        assertEquals(OnboardingStep.LocalExplainer, OnboardingStep.PersonaPick.next())
+        assertEquals(OnboardingStep.Wiring, OnboardingStep.PersonaPick.next())
         assertEquals(OnboardingStep.Ready, OnboardingStep.ModelDownload.next())
         assertNull(OnboardingStep.Ready.next())
     }
@@ -31,7 +28,7 @@ class OnboardingStepTest {
     @Test
     fun `previous walks back and stops before PersonaPick`() {
         assertNull(OnboardingStep.PersonaPick.previous())
-        assertEquals(OnboardingStep.PersonaPick, OnboardingStep.LocalExplainer.previous())
+        assertEquals(OnboardingStep.PersonaPick, OnboardingStep.Wiring.previous())
         assertEquals(OnboardingStep.ModelDownload, OnboardingStep.Ready.previous())
     }
 }

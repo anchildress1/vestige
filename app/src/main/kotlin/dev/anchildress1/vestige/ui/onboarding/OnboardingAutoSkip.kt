@@ -32,15 +32,16 @@ internal fun hasNotificationPermission(context: Context): Boolean {
 @Composable
 internal fun AutoSkipAlreadySatisfied(
     step: OnboardingStep,
-    context: Context,
+    @Suppress("UNUSED_PARAMETER") context: Context,
     modelState: ModelArtifactState,
     onAdvance: () -> Unit,
 ) {
     LaunchedEffect(step, modelState) {
         val skip = when (step) {
-            OnboardingStep.MicPermission -> hasRecordAudio(context)
-            OnboardingStep.NotificationPermission -> hasNotificationPermission(context)
+            // Wiring is interactive: the user toggles permissions in-place and taps Next.
+            // Wi-Fi + ModelDownload skip when the artifact is already on disk.
             OnboardingStep.WifiCheck, OnboardingStep.ModelDownload -> modelState.isReady
+
             else -> false
         }
         if (skip) onAdvance()

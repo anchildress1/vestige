@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.Intent
 import android.util.Log
 import dev.anchildress1.vestige.inference.AudioChunk
+import dev.anchildress1.vestige.inference.BackendChoice
 import dev.anchildress1.vestige.inference.BackgroundExtractionWorker
 import dev.anchildress1.vestige.inference.DefaultConvergenceResolver
 import dev.anchildress1.vestige.inference.Embedder
@@ -67,8 +68,16 @@ class AppContainer(
     },
     private val embeddingArtifactManifestLoader: () -> EmbeddingArtifactManifest =
         EmbeddingArtifactManifest::loadDefault,
+    // `audioBackend = Cpu` is non-negotiable for the foreground voice path — without it the
+    // engine accepts a `Content.AudioFile` handoff and immediately SIGSEGVs in `mel_filterbank.cc`
+    // because no audio backend was attached at EngineConfig time. The reference STT-A test
+    // (`SttAAudioPlumbingTest`) enables the same backend; production must match.
     private val backgroundEngineFactory: (String, String) -> LiteRtLmEngine = { modelPath, cacheDir ->
-        LiteRtLmEngine(modelPath = modelPath, cacheDir = cacheDir)
+        LiteRtLmEngine(
+            modelPath = modelPath,
+            audioBackend = BackendChoice.Cpu,
+            cacheDir = cacheDir,
+        )
     },
     private val networkGateFactory: () -> NetworkGate = { DefaultNetworkGate() },
     private val mainModelArtifactStoreFactory: (

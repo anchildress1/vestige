@@ -10,7 +10,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import dev.anchildress1.vestige.model.ModelArtifactState
 import dev.anchildress1.vestige.model.PatternState
 import dev.anchildress1.vestige.model.Persona
 import dev.anchildress1.vestige.ui.capture.CaptureMeta
@@ -82,19 +81,11 @@ private fun CaptureRoute(container: AppContainer, persona: Persona, clock: Clock
             },
             clock = clock,
             zoneId = zoneId,
-            // Loading on cold start; the LaunchedEffect below flips to Ready as soon as the
-            // artifact-store probe returns Complete. Real-time observation of Downloading /
-            // Paused states lands with the error chrome in commit 6.
-            initialReadiness = ModelReadiness.Loading,
-        )
-    }
-    androidx.compose.runtime.LaunchedEffect(container, viewModel) {
-        val state = container.mainModelArtifactStore.currentState()
-        viewModel.setModelReadiness(
-            when (state) {
-                is ModelArtifactState.Complete -> ModelReadiness.Ready
-                else -> ModelReadiness.Loading
-            },
+            // Fast presence + size check at composition; the engine's own load verifies
+            // integrity at first use, so the UI gate doesn't need the full SHA-256 hash of a
+            // 3.66 GB file to enable REC. Real-time observation of Downloading / Paused states
+            // lands with the error chrome in commit 6.
+            initialReadiness = deriveInitialReadiness(container),
         )
     }
     val stats = remember(container) { deriveStats(container) }
@@ -105,6 +96,16 @@ private fun CaptureRoute(container: AppContainer, persona: Persona, clock: Clock
         meta = meta,
         modifier = Modifier.fillMaxSize(),
     )
+}
+
+private fun deriveInitialReadiness(container: AppContainer): ModelReadiness {
+    // Synchronous presence + size check — no SHA-256 hashing of a 3.66 GB file blocking REC.
+    // The engine's own `initialize()` rejects a corrupt artifact at first foreground call, so
+    // the corruption case surfaces as `InferenceFailed` rather than a multi-second UI gate.
+    val store = container.mainModelArtifactStore
+    val file = store.artifactFile
+    val ready = runCatching { file.exists() && file.length() == store.manifest.expectedByteSize }.getOrDefault(false)
+    return if (ready) ModelReadiness.Ready else ModelReadiness.Loading
 }
 
 private fun deriveStats(container: AppContainer): CaptureStats {

@@ -36,12 +36,13 @@ import dev.anchildress1.vestige.R
 import dev.anchildress1.vestige.model.ModelArtifactState
 import dev.anchildress1.vestige.model.Persona
 import dev.anchildress1.vestige.ui.components.VestigeScaffold
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 /** Hosts the onboarding hub flow. Step + persona survive process death via SharedPreferences. */
-@Suppress("LongMethod") // Orchestration root — wiring is intentionally co-located.
+@Suppress("LongMethod", "LongParameterList") // Orchestration root — wiring is intentionally co-located.
 @Composable
 fun OnboardingHost(
     prefs: OnboardingPrefs,
@@ -49,6 +50,7 @@ fun OnboardingHost(
     modelAvailability: ModelAvailability,
     modifier: Modifier = Modifier,
     wifiAvailability: WifiAvailability? = null,
+    downloadDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -83,6 +85,7 @@ fun OnboardingHost(
         step = step,
         wifiAvailability = resolvedWifi,
         modelAvailability = modelAvailability,
+        downloadDispatcher = downloadDispatcher,
     )
 
     // Once the model lands while the user is on the download screen, hop back to Wiring —
@@ -185,6 +188,7 @@ private fun rememberOnboardingEnvironment(
     step: OnboardingStep,
     wifiAvailability: WifiAvailability,
     modelAvailability: ModelAvailability,
+    downloadDispatcher: CoroutineDispatcher,
 ): OnboardingEnvironment {
     val lifecycleOwner = LocalLifecycleOwner.current
     val scope = rememberCoroutineScope()
@@ -213,6 +217,7 @@ private fun rememberOnboardingEnvironment(
         runDownloadIfNeeded(
             step = step,
             modelAvailability = modelAvailability,
+            downloadDispatcher = downloadDispatcher,
             onState = { modelState = it },
             onSpeed = { downloadMbps = it },
         )
@@ -242,6 +247,7 @@ private fun rememberOnboardingEnvironment(
 private suspend fun runDownloadIfNeeded(
     step: OnboardingStep,
     modelAvailability: ModelAvailability,
+    downloadDispatcher: CoroutineDispatcher,
     onState: (ModelArtifactState) -> Unit,
     onSpeed: (Float?) -> Unit,
 ) {
@@ -268,7 +274,7 @@ private suspend fun runDownloadIfNeeded(
         // delta and flashed an absurd MB/s number before the next chunk arrived.
         var sampleBytes = -1L
         var sampleTimeMs = 0L
-        val terminal = withContext(Dispatchers.IO) {
+        val terminal = withContext(downloadDispatcher) {
             modelAvailability.download { currentBytes, expectedBytes ->
                 onState(ModelArtifactState.Partial(currentBytes, expectedBytes))
                 val now = System.currentTimeMillis()

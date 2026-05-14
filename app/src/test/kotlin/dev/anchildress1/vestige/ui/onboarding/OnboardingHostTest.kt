@@ -126,6 +126,32 @@ class OnboardingHostTest {
     }
 
     @Test
+    fun `tapping the persona card on Wiring returns to PersonaPick`() {
+        prefs.setCurrentStep(OnboardingStep.Wiring)
+        startHost(modelAvailability = fakeModelAvailability(ModelArtifactState.Absent))
+        // The persona switch sits at the top of the Wiring switch list; its title carries
+        // the selected persona's name in uppercase. Tapping the card re-opens PersonaPick.
+        composeRule.onNodeWithText("PERSONA · WITNESS", substring = true).performClick()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithText("PERSONA", substring = true).assertIsDisplayed()
+        composeRule.onNodeWithText("WITNESS").assertIsDisplayed()
+    }
+
+    @Test
+    fun `ModelDownload auto-returns to Wiring once the artifact lands as Complete`() {
+        prefs.setCurrentStep(OnboardingStep.ModelDownload)
+        startHost(
+            wifiAvailability = { true },
+            modelAvailability = fakeModelAvailability(ModelArtifactState.Complete),
+        )
+        // Auto-return is driven by LaunchedEffect(step, modelState): the moment status() reports
+        // Complete on the ModelDownload screen, the host hops back to Wiring without a tap.
+        composeRule.waitForIdle()
+        composeRule.onNodeWithText("WIRING", substring = true).assertIsDisplayed()
+        composeRule.onNodeWithText("OPEN VESTIGE").assertIsEnabled()
+    }
+
+    @Test
     fun `Open Vestige does not re-SHA the artifact on tap`() {
         prefs.setCurrentStep(OnboardingStep.Wiring)
         var statusCalls = 0

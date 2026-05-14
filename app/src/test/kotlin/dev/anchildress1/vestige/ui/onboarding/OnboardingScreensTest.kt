@@ -391,10 +391,8 @@ class OnboardingScreensTest {
                 OnboardingScaffold(
                     header = "Header",
                     subhead = "Subhead",
-                    primaryActionLabel = "Primary",
-                    onPrimary = { primaryTapped = true },
-                    secondaryActionLabel = "Secondary",
-                    onSecondary = { secondaryTapped = true },
+                    primary = OnboardingAction("Primary", onAction = { primaryTapped = true }),
+                    secondary = OnboardingAction("Secondary", onAction = { secondaryTapped = true }),
                 )
             }
         }
@@ -413,8 +411,7 @@ class OnboardingScreensTest {
             VestigeTheme {
                 OnboardingScaffold(
                     header = "Header",
-                    primaryActionLabel = "Primary",
-                    onPrimary = { primaryTapped = true },
+                    primary = OnboardingAction("Primary", onAction = { primaryTapped = true }),
                 )
             }
         }
@@ -431,11 +428,8 @@ class OnboardingScreensTest {
             VestigeTheme {
                 OnboardingScaffold(
                     header = "Header",
-                    primaryActionLabel = "Primary",
-                    onPrimary = {},
-                    primaryEnabled = false,
-                    secondaryActionLabel = "Secondary",
-                    onSecondary = null,
+                    primary = OnboardingAction("Primary", onAction = {}, enabled = false),
+                    secondary = null,
                     content = { BodyParagraph(text = "Body copy") },
                 )
             }
@@ -443,22 +437,6 @@ class OnboardingScreensTest {
 
         composeRule.onNodeWithText("Body copy").assertIsDisplayed()
         composeRule.onNodeWithText("Primary").assertIsNotEnabled()
-        composeRule.onNodeWithText("Secondary").assertDoesNotExist()
-    }
-
-    @Test
-    fun `onboarding scaffold suppresses orphan secondary callback when label is missing`() {
-        composeRule.activity.setContent {
-            VestigeTheme {
-                OnboardingScaffold(
-                    header = "Header",
-                    primaryActionLabel = "Primary",
-                    onPrimary = {},
-                    onSecondary = {},
-                )
-            }
-        }
-
         composeRule.onNodeWithText("Secondary").assertDoesNotExist()
     }
 

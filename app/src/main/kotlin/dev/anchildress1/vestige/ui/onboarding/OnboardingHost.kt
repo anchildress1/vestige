@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -87,33 +88,52 @@ fun OnboardingHost(
         onAdvance = advance,
     )
 
-    // VestigeScaffold owns floor/ink color propagation — onboarding screens render plain
-    // composables (no per-screen Surface), so the scaffold is the only thing that keeps
-    // foreground readable on the floor background. Per AGENTS rule 26.
+    val callbacks = OnboardingStepCallbacks(
+        onPersonaChange = { persona = it },
+        advance = advance,
+        onMicAllow = { requestMic(context, launchers.mic, advance) },
+        onNotificationAllow = { requestNotifications(launchers.notification, advance) },
+        onOpenWifiSettings = { openWifiSettings(context) },
+        onComeBackLater = { moveTaskToBack(context) },
+        onOpenApp = {
+            scope.launch {
+                if (!modelAvailability.status().isReady) return@launch
+                prefs.markComplete()
+                onComplete()
+            }
+        },
+    )
+    val state =
+        OnboardingStepState(step, persona, micPermissionDenied, environment.wifiConnected, environment.modelState)
+    // VestigeScaffold owns floor/ink color propagation per AGENTS rule 26.
     VestigeScaffold(modifier = modifier) { padding ->
         OnboardingStepContent(
-            step = step,
-            persona = persona,
-            onPersonaChange = { persona = it },
-            micPermissionDenied = micPermissionDenied,
-            wifiConnected = environment.wifiConnected,
-            modelState = environment.modelState,
-            advance = advance,
-            onMicAllow = { requestMic(context, launchers.mic, advance) },
-            onNotificationAllow = { requestNotifications(launchers.notification, advance) },
-            onOpenWifiSettings = { openWifiSettings(context) },
-            onComeBackLater = { moveTaskToBack(context) },
-            onOpenApp = {
-                scope.launch {
-                    if (!modelAvailability.status().isReady) return@launch
-                    prefs.markComplete()
-                    onComplete()
-                }
-            },
+            state = state,
+            callbacks = callbacks,
             modifier = Modifier.fillMaxSize().padding(padding),
         )
     }
 }
+
+@Immutable
+private data class OnboardingStepState(
+    val step: OnboardingStep,
+    val persona: Persona,
+    val micPermissionDenied: Boolean,
+    val wifiConnected: Boolean,
+    val modelState: ModelArtifactState,
+)
+
+@Immutable
+private data class OnboardingStepCallbacks(
+    val onPersonaChange: (Persona) -> Unit,
+    val advance: () -> Unit,
+    val onMicAllow: () -> Unit,
+    val onNotificationAllow: () -> Unit,
+    val onOpenWifiSettings: () -> Unit,
+    val onComeBackLater: () -> Unit,
+    val onOpenApp: () -> Unit,
+)
 
 private data class OnboardingEnvironment(val wifiConnected: Boolean, val modelState: ModelArtifactState)
 
@@ -185,66 +205,51 @@ private fun rememberOnboardingEnvironment(
     )
 }
 
-@Suppress("LongParameterList") // Step content takes the full set of orchestrated callbacks.
 @Composable
-private fun OnboardingStepContent(
-    step: OnboardingStep,
-    persona: Persona,
-    onPersonaChange: (Persona) -> Unit,
-    micPermissionDenied: Boolean,
-    wifiConnected: Boolean,
-    modelState: ModelArtifactState,
-    advance: () -> Unit,
-    onMicAllow: () -> Unit,
-    onNotificationAllow: () -> Unit,
-    onOpenWifiSettings: () -> Unit,
-    onComeBackLater: () -> Unit,
-    onOpenApp: () -> Unit,
-    modifier: Modifier,
-) {
-    when (step) {
+private fun OnboardingStepContent(state: OnboardingStepState, callbacks: OnboardingStepCallbacks, modifier: Modifier) {
+    when (state.step) {
         OnboardingStep.PersonaPick -> PersonaPickScreen(
             modifier = modifier,
-            selected = persona,
-            onSelect = onPersonaChange,
-            onContinue = advance,
+            selected = state.persona,
+            onSelect = callbacks.onPersonaChange,
+            onContinue = callbacks.advance,
         )
 
-        OnboardingStep.LocalExplainer -> LocalExplainerScreen(modifier = modifier, onContinue = advance)
+        OnboardingStep.LocalExplainer -> LocalExplainerScreen(modifier = modifier, onContinue = callbacks.advance)
 
         OnboardingStep.MicPermission -> MicPermissionScreen(
             modifier = modifier,
-            showDeniedNotice = micPermissionDenied,
-            onAllow = onMicAllow,
-            onSkip = advance,
+            showDeniedNotice = state.micPermissionDenied,
+            onAllow = callbacks.onMicAllow,
+            onSkip = callbacks.advance,
         )
 
         OnboardingStep.NotificationPermission -> NotificationPermissionScreen(
             modifier = modifier,
-            onAllow = onNotificationAllow,
-            onSkip = advance,
+            onAllow = callbacks.onNotificationAllow,
+            onSkip = callbacks.advance,
         )
 
-        OnboardingStep.TypedFallback -> TypedFallbackScreen(modifier = modifier, onContinue = advance)
+        OnboardingStep.TypedFallback -> TypedFallbackScreen(modifier = modifier, onContinue = callbacks.advance)
 
         OnboardingStep.WifiCheck -> WifiCheckScreen(
             modifier = modifier,
-            isWifiConnected = wifiConnected,
-            onContinue = advance,
-            onOpenWifiSettings = onOpenWifiSettings,
-            onComeBackLater = onComeBackLater,
+            isWifiConnected = state.wifiConnected,
+            onContinue = callbacks.advance,
+            onOpenWifiSettings = callbacks.onOpenWifiSettings,
+            onComeBackLater = callbacks.onComeBackLater,
         )
 
         OnboardingStep.ModelDownload -> ModelDownloadPlaceholderScreen(
             modifier = modifier,
-            modelState = modelState,
-            onContinue = advance,
+            modelState = state.modelState,
+            onContinue = callbacks.advance,
         )
 
         OnboardingStep.Ready -> ReadyScreen(
             modifier = modifier,
-            persona = persona,
-            onOpenApp = onOpenApp,
+            persona = state.persona,
+            onOpenApp = callbacks.onOpenApp,
         )
     }
 }

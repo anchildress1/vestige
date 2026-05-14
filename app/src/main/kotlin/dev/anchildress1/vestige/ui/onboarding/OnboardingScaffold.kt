@@ -30,17 +30,14 @@ import dev.anchildress1.vestige.ui.theme.VestigeTheme
  * subhead, slot for body content, and 1–2 footer actions. Screens are intentionally not boxed
  * inside `VestigeSurface` — onboarding is full-bleed prose, not a card stack.
  */
-@Suppress("LongParameterList") // Scaffold primitive — wide by design.
+@Suppress("LongParameterList") // Scaffold primitive — wide by design, no further bundling helps.
 @Composable
 internal fun OnboardingScaffold(
     header: String,
-    primaryActionLabel: String,
-    onPrimary: () -> Unit,
+    primary: OnboardingAction,
     modifier: Modifier = Modifier,
     subhead: String? = null,
-    primaryEnabled: Boolean = true,
-    secondaryActionLabel: String? = null,
-    onSecondary: (() -> Unit)? = null,
+    secondary: OnboardingAction? = null,
     content: @Composable () -> Unit = {},
 ) {
     Column(
@@ -60,44 +57,32 @@ internal fun OnboardingScaffold(
         }
         content()
         Spacer(modifier = Modifier.height(8.dp))
-        OnboardingActionRow(
-            primaryLabel = primaryActionLabel,
-            onPrimary = onPrimary,
-            primaryEnabled = primaryEnabled,
-            secondaryLabel = secondaryActionLabel,
-            onSecondary = onSecondary,
-        )
+        OnboardingActionRow(primary = primary, secondary = secondary)
     }
 }
 
 @Composable
-private fun OnboardingActionRow(
-    primaryLabel: String,
-    onPrimary: () -> Unit,
-    primaryEnabled: Boolean,
-    secondaryLabel: String?,
-    onSecondary: (() -> Unit)?,
-) {
+private fun OnboardingActionRow(primary: OnboardingAction, secondary: OnboardingAction?) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Button(
-            onClick = onPrimary,
-            enabled = primaryEnabled,
+            onClick = primary.onAction,
+            enabled = primary.enabled,
             modifier = Modifier
                 .fillMaxWidth()
                 .semantics { role = Role.Button },
             contentPadding = PaddingValues(vertical = 14.dp),
         ) {
-            Text(text = primaryLabel)
+            Text(text = primary.label)
         }
-        if (secondaryLabel != null && onSecondary != null) {
+        if (secondary != null) {
             OutlinedButton(
-                onClick = onSecondary,
+                onClick = secondary.onAction,
                 modifier = Modifier
                     .fillMaxWidth()
                     .semantics { role = Role.Button },
                 contentPadding = PaddingValues(vertical = 14.dp),
             ) {
-                Text(text = secondaryLabel)
+                Text(text = secondary.label)
             }
         }
     }

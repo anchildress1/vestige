@@ -16,14 +16,10 @@ internal fun LocalExplainerScreen(onContinue: () -> Unit, modifier: Modifier = M
     OnboardingScaffold(
         modifier = modifier,
         header = stringResource(id = R.string.onboarding_local_header),
-        primaryActionLabel = stringResource(id = R.string.onboarding_got_it),
-        onPrimary = onContinue,
+        primary = OnboardingAction(stringResource(id = R.string.onboarding_got_it), onContinue),
     ) {
         BodyParagraph(text = stringResource(id = R.string.onboarding_local_body))
-        BodyParagraph(
-            text = stringResource(id = R.string.onboarding_local_detail),
-            dim = true,
-        )
+        BodyParagraph(text = stringResource(id = R.string.onboarding_local_detail), dim = true)
     }
 }
 
@@ -37,17 +33,12 @@ internal fun MicPermissionScreen(
     OnboardingScaffold(
         modifier = modifier,
         header = stringResource(id = R.string.onboarding_mic_header),
-        primaryActionLabel = stringResource(id = R.string.onboarding_mic_allow),
-        onPrimary = onAllow,
-        secondaryActionLabel = stringResource(id = R.string.onboarding_mic_skip),
-        onSecondary = onSkip,
+        primary = OnboardingAction(stringResource(id = R.string.onboarding_mic_allow), onAllow),
+        secondary = OnboardingAction(stringResource(id = R.string.onboarding_mic_skip), onSkip),
     ) {
         BodyParagraph(text = stringResource(id = R.string.onboarding_mic_body))
         if (showDeniedNotice) {
-            BodyParagraph(
-                text = stringResource(id = R.string.onboarding_mic_denied),
-                dim = false,
-            )
+            BodyParagraph(text = stringResource(id = R.string.onboarding_mic_denied))
         }
     }
 }
@@ -57,15 +48,13 @@ internal fun NotificationPermissionScreen(onAllow: () -> Unit, onSkip: () -> Uni
     OnboardingScaffold(
         modifier = modifier,
         header = stringResource(id = R.string.onboarding_notif_header),
-        primaryActionLabel = stringResource(id = R.string.onboarding_notif_allow),
-        onPrimary = onAllow,
-        secondaryActionLabel = stringResource(id = R.string.onboarding_notif_skip),
-        onSecondary = onSkip,
+        primary = OnboardingAction(stringResource(id = R.string.onboarding_notif_allow), onAllow),
+        secondary = OnboardingAction(stringResource(id = R.string.onboarding_notif_skip), onSkip),
     ) {
         BodyParagraph(text = stringResource(id = R.string.onboarding_notif_body))
-        // Skip consequence note — the app keeps reading entries only while foregrounded
-        // without the status notification. Spec leans toward "no degraded copy on skip" but
-        // a quiet operational note clears the surprise on the first long-running entry.
+        // Skip consequence note — the app keeps reading entries only while foregrounded without
+        // the status notification. Spec leans toward "no degraded copy on skip" but a quiet
+        // operational note clears the surprise on the first long-running entry.
         BodyParagraph(text = stringResource(id = R.string.onboarding_notif_skip_note), dim = true)
     }
 }
@@ -75,8 +64,7 @@ internal fun TypedFallbackScreen(onContinue: () -> Unit, modifier: Modifier = Mo
     OnboardingScaffold(
         modifier = modifier,
         header = stringResource(id = R.string.onboarding_type_header),
-        primaryActionLabel = stringResource(id = R.string.onboarding_continue),
-        onPrimary = onContinue,
+        primary = OnboardingAction(stringResource(id = R.string.onboarding_continue), onContinue),
     ) {
         BodyParagraph(text = stringResource(id = R.string.onboarding_type_body))
     }
@@ -94,8 +82,7 @@ internal fun WifiCheckScreen(
         OnboardingScaffold(
             modifier = modifier,
             header = stringResource(id = R.string.onboarding_wifi_ok_header),
-            primaryActionLabel = stringResource(id = R.string.onboarding_wifi_ok_action),
-            onPrimary = onContinue,
+            primary = OnboardingAction(stringResource(id = R.string.onboarding_wifi_ok_action), onContinue),
         ) {
             BodyParagraph(text = stringResource(id = R.string.onboarding_wifi_ok_body))
         }
@@ -103,10 +90,14 @@ internal fun WifiCheckScreen(
         OnboardingScaffold(
             modifier = modifier,
             header = stringResource(id = R.string.onboarding_wifi_missing_header),
-            primaryActionLabel = stringResource(id = R.string.onboarding_wifi_open_settings),
-            onPrimary = onOpenWifiSettings,
-            secondaryActionLabel = stringResource(id = R.string.onboarding_wifi_come_back),
-            onSecondary = onComeBackLater,
+            primary = OnboardingAction(
+                stringResource(id = R.string.onboarding_wifi_open_settings),
+                onOpenWifiSettings,
+            ),
+            secondary = OnboardingAction(
+                stringResource(id = R.string.onboarding_wifi_come_back),
+                onComeBackLater,
+            ),
         ) {
             BodyParagraph(text = stringResource(id = R.string.onboarding_wifi_missing_body))
         }
@@ -122,9 +113,11 @@ internal fun ModelDownloadPlaceholderScreen(
     OnboardingScaffold(
         modifier = modifier,
         header = stringResource(id = R.string.onboarding_download_header),
-        primaryActionLabel = stringResource(id = R.string.onboarding_continue),
-        onPrimary = onContinue,
-        primaryEnabled = modelState.isReady,
+        primary = OnboardingAction(
+            label = stringResource(id = R.string.onboarding_continue),
+            onAction = onContinue,
+            enabled = modelState.isReady,
+        ),
     ) {
         BodyParagraph(text = stringResource(id = R.string.onboarding_download_body))
         ModelReadinessBanner(modelState = modelState)
@@ -137,8 +130,7 @@ internal fun ReadyScreen(persona: Persona, onOpenApp: () -> Unit, modifier: Modi
     OnboardingScaffold(
         modifier = modifier,
         header = stringResource(id = R.string.onboarding_ready_header),
-        primaryActionLabel = stringResource(id = R.string.onboarding_ready_action),
-        onPrimary = onOpenApp,
+        primary = OnboardingAction(stringResource(id = R.string.onboarding_ready_action), onOpenApp),
     ) {
         BodyParagraph(text = stringResource(id = R.string.onboarding_ready_body, personaName))
     }

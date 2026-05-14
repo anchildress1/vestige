@@ -29,8 +29,7 @@ internal fun PersonaPickScreen(
         modifier = modifier,
         header = stringResource(id = R.string.onboarding_persona_header),
         subhead = stringResource(id = R.string.onboarding_persona_subhead),
-        primaryActionLabel = stringResource(id = R.string.onboarding_continue),
-        onPrimary = onContinue,
+        primary = OnboardingAction(stringResource(id = R.string.onboarding_continue), onContinue),
     ) {
         Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
             personaOptions().forEach { option ->

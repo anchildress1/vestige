@@ -113,9 +113,9 @@ class MainActivity : ComponentActivity() {
  */
 @Composable
 private fun PhaseOneShell(
+    persona: Persona,
     onOpenPatterns: () -> Unit = {},
     onDebugSeed: (() -> Unit)? = null,
-    persona: Persona = Persona.WITNESS,
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
@@ -208,7 +208,7 @@ private fun PhaseOneShellCard(
 @Composable
 private fun PhaseOneShellPreview() {
     VestigeTheme {
-        PhaseOneShell()
+        PhaseOneShell(persona = Persona.WITNESS)
     }
 }
 

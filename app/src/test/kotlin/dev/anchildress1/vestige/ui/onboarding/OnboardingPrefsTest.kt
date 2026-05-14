@@ -1,9 +1,12 @@
 package dev.anchildress1.vestige.ui.onboarding
 
 import android.content.Context
+import android.content.SharedPreferences
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import dev.anchildress1.vestige.model.Persona
+import io.mockk.every
+import io.mockk.mockk
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -42,7 +45,7 @@ class OnboardingPrefsTest {
 
     @Test
     fun `setDefaultPersona round-trips the persona`() {
-        assertTrue(prefs.setDefaultPersona(Persona.HARDASS))
+        prefs.setDefaultPersona(Persona.HARDASS)
         val ctx = ApplicationProvider.getApplicationContext<Context>()
         val reopened = OnboardingPrefs.from(ctx)
         assertEquals(Persona.HARDASS, reopened.defaultPersona)
@@ -50,7 +53,7 @@ class OnboardingPrefsTest {
 
     @Test
     fun `setCurrentStep round-trips the onboarding step`() {
-        assertTrue(prefs.setCurrentStep(OnboardingStep.Wiring))
+        prefs.setCurrentStep(OnboardingStep.Wiring)
         val ctx = ApplicationProvider.getApplicationContext<Context>()
         val reopened = OnboardingPrefs.from(ctx)
         assertEquals(OnboardingStep.Wiring, reopened.currentStep)
@@ -76,10 +79,23 @@ class OnboardingPrefsTest {
 
     @Test
     fun `markComplete clears the stored onboarding step`() {
-        assertTrue(prefs.setCurrentStep(OnboardingStep.ModelDownload))
+        prefs.setCurrentStep(OnboardingStep.ModelDownload)
         assertTrue(prefs.markComplete())
         val ctx = ApplicationProvider.getApplicationContext<Context>()
         val reopened = OnboardingPrefs.from(ctx)
         assertEquals(OnboardingStep.PersonaPick, reopened.currentStep)
+    }
+
+    @Test
+    fun `markComplete returns false when SharedPreferences flush fails`() {
+        val editor = mockk<SharedPreferences.Editor>()
+        every { editor.putBoolean(any(), any()) } returns editor
+        every { editor.remove(any()) } returns editor
+        every { editor.commit() } returns false
+        val sharedPrefs = mockk<SharedPreferences> {
+            every { edit() } returns editor
+        }
+
+        assertFalse(OnboardingPrefs(sharedPrefs).markComplete())
     }
 }

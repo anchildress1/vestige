@@ -243,10 +243,13 @@ class OnboardingHostTest {
 
     @Test
     fun `Open Vestige stays on onboarding when markComplete fails`() {
+        // Only commit() fails — apply() is stubbed to succeed so setDefaultPersona and
+        // setCurrentStep don't also short-circuit. That isolates the assertion to markComplete.
         val editor = mockk<SharedPreferences.Editor>()
         every { editor.putBoolean(any(), any()) } returns editor
         every { editor.remove(any()) } returns editor
         every { editor.putString(any(), any()) } returns editor
+        every { editor.apply() } returns Unit
         every { editor.commit() } returns false
         val sharedPrefs = mockk<SharedPreferences>()
         every { sharedPrefs.getBoolean("complete", false) } returns false

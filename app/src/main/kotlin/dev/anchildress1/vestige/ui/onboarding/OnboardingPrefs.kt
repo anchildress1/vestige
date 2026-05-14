@@ -21,18 +21,15 @@ class OnboardingPrefs(private val prefs: SharedPreferences) {
             ?.let { runCatching { OnboardingStep.valueOf(it) }.getOrNull() }
             ?: OnboardingStep.PersonaPick
 
-    /** Returns true on successful flush. Persona must survive process death between steps. */
-    fun setDefaultPersona(persona: Persona): Boolean {
-        val ok = prefs.edit().putString(KEY_PERSONA, persona.name).commit()
-        if (!ok) Log.w(TAG, "setDefaultPersona($persona) did not flush — persona may revert on restart")
-        return ok
+    // Async flush — Android guarantees apply() lands before the process dies under normal teardown,
+    // and these run from a Compose LaunchedEffect on main where commit() would trip StrictMode's
+    // detectDiskWrites. markComplete is the only write that truly needs synchronous fail-closed.
+    fun setDefaultPersona(persona: Persona) {
+        prefs.edit().putString(KEY_PERSONA, persona.name).apply()
     }
 
-    /** Returns true on successful flush. Caller decides whether a missed write is worth surfacing. */
-    fun setCurrentStep(step: OnboardingStep): Boolean {
-        val ok = prefs.edit().putString(KEY_STEP, step.name).commit()
-        if (!ok) Log.w(TAG, "setCurrentStep($step) did not flush — resume point may be lost")
-        return ok
+    fun setCurrentStep(step: OnboardingStep) {
+        prefs.edit().putString(KEY_STEP, step.name).apply()
     }
 
     /**

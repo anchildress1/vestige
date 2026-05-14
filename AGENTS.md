@@ -41,7 +41,7 @@ Demo-impact test before accepting any feature or polish: *Does this visibly impr
 
 Build per `docs/PRD.md` §"Build philosophy: build first, test at failure zones." No upfront Phase-0 validation — risk is mitigated via five stop-and-test points (STT-A–E) in phases 1–3.
 
-STT-A (audio plumbing, Phase 1) is existential — time-box hard. Spec rewrites supersede via ADR.
+You MUST update checkboxes in `docs/stories/` as you work.
 
 # Android Compose Agent Rules
 

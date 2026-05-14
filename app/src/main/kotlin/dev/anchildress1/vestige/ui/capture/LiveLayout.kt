@@ -26,7 +26,6 @@ import androidx.compose.ui.unit.sp
 import dev.anchildress1.vestige.ui.components.AppTop
 import dev.anchildress1.vestige.ui.components.AppTopStatuses
 import dev.anchildress1.vestige.ui.components.EyebrowE
-import dev.anchildress1.vestige.ui.components.Pill
 import dev.anchildress1.vestige.ui.theme.VestigeTheme
 
 /**
@@ -55,7 +54,7 @@ fun LiveLayout(
         AppTop(
             persona = state.persona.name,
             status = AppTopStatuses.Recording,
-            rightContent = { TimerPill(timerLabel) },
+            rightContent = {},
         )
         TimerHeader(timerLabel = timerLabel, remainSec = remainSec)
         Box(modifier = Modifier.padding(horizontal = 18.dp, vertical = 14.dp)) {
@@ -83,15 +82,6 @@ fun LiveLayout(
             DiscardLink(onClick = onDiscardTap)
         }
     }
-}
-
-@Composable
-private fun TimerPill(label: String) {
-    Pill(
-        text = label,
-        color = VestigeTheme.colors.coral,
-        fill = true,
-    )
 }
 
 @Composable

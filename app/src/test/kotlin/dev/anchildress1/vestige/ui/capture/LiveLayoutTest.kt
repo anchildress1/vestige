@@ -33,10 +33,9 @@ class LiveLayoutTest {
     }
 
     @Test
-    fun `timer renders mm colon ss for the elapsed value in chrome and hero`() {
+    fun `timer renders mm colon ss in the hero — single canonical source`() {
         composeRule.setContent { VestigeTheme { liveLayout(elapsedMs = 15_000L) } }
-        // The timer label appears twice: in the top-right pill and in the big hero timer.
-        composeRule.onAllNodesWithText("00:15").assertCountEquals(2)
+        composeRule.onAllNodesWithText("00:15").assertCountEquals(1)
     }
 
     @Test

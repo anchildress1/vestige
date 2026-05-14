@@ -197,3 +197,24 @@ On-device review of Story 4.5 surfaced that `ON AIR · LIVE` (coral) reading on 
 **Why this is an addendum, not a new ADR:** the broader design pivot is unchanged — Scoreboard primitives, token table, type stack, motion keyframes all hold. This refines one atom assignment without re-opening the pivot itself (per AGENTS.md rule 23).
 
 **Affected files:** `ScoreboardPrimitives.kt` (AppTopStatuses Ready/Recording + KDoc), `AccentModifiers.kt` (KDoc for `coralHaloOnRecording` + `limeDotForReady`), `Color.kt` (Lime / Coral comment scopes), `strings.xml` (`onboarding_wiring_local_title`), `ux-copy.md` §"Capture Screen / Status row", `phase-4-ux-surface.md` Story 4.1 capture-screen bullet. Tests: `ScoreboardPrimitivesTest`, `OnboardingStepContentTest`.
+
+### Addendum (2026-05-14) — Capture surface verified end-to-end; LiveLayout polish
+
+On-device round-trip for Story 4.5 lands: REC tap → record → STOP → foreground call → transcript + persona follow-up render in `ReviewingPane`. The voice path is fully exercised against E4B CPU at the documented 24–33 s wall-clock per `docs/stories/phase-2-core-loop.md` §Story 2.3. Inference placeholder + Success transition match `ux-copy.md` §"Capture Screen / Center — record action."
+
+**Verified:**
+
+- Voice path: `Idle → Recording → Inferring → Reviewing` runs end-to-end on the reference device.
+- Entry transcript: muted user transcription + primary persona follow-up in single-turn shape per ADR-005.
+- Error chrome band (commit 6 of branch) makes `Idle(error=InferenceFailed)` visible — previously silent.
+- AppTop pill stays lime in both states (per the 2026-05-14 addendum above).
+- Discard contract (ADR-001 §Q8): no model bytes leak; `cancelAndJoin` semantics confirmed by the VM test suite.
+
+**LiveLayout polish:**
+
+- **Duplicate timer pill** — `AppTop.rightContent` was rendering a `TimerPill` with `mm:ss` while `TimerHeader` immediately below it carried the canonical 96sp display timer + the `REMAIN · N · SECONDS` countdown. Three time-related elements at the top of the recording surface. The `AppTop` right-slot pill is removed; the in-content timer header is the single source of recording duration. `AppTop` right-slot stays empty during recording — no persona switcher during a take (Story 4.12 fixes persona before the next capture, never mid-recording per `design-guidelines.md` §"Capture Screen / Recording-state changes").
+- **30 s cap audio cue** — the 30-second hard cap currently fires silently (chunk completes in `ChunkBuilder`, recording job resolves the final chunk, UI flips to `Inferring`). The user needs an audible signal at cap so they know the recording closed without watching the countdown. Out of scope for this addendum to specify the audio asset — tracked as a follow-up commit with the asset choice (system tone vs. bundled chime) called out on landing.
+
+**Why this is an addendum, not a new ADR:** the design pivot itself is unchanged; this records the verification result + the live-surface refinements that fell out of on-device review. Per AGENTS.md rule 23.
+
+**Affected files (this addendum's scope):** `LiveLayout.kt` (TimerPill removal from `AppTop.rightContent`), `LiveLayoutTest.kt` (drop the duplicate-timer assertion if it was pinned), follow-up commit for 30 s audio cue. Story 4.5 done-when bullets tick the verified items.

@@ -88,6 +88,7 @@ fun OnboardingHost(
         wifiAvailability = resolvedWifi,
         modelAvailability = modelAvailability,
         persistedStateWriteLane = persistedStateWriteLane,
+        onDownloadBlockedByWifi = { step = OnboardingStep.Wiring },
     )
 
     // Once the model lands while the user is on the download screen, hop back to Wiring —
@@ -192,6 +193,7 @@ private fun rememberOnboardingEnvironment(
     wifiAvailability: WifiAvailability,
     modelAvailability: ModelAvailability,
     persistedStateWriteLane: PersistedStateWriteLane,
+    onDownloadBlockedByWifi: () -> Unit,
 ): OnboardingEnvironment {
     val scope = rememberCoroutineScope()
     var wifiConnected by remember { mutableStateOf(wifiAvailability.isWifiConnected()) }
@@ -214,17 +216,21 @@ private fun rememberOnboardingEnvironment(
         }
     }
 
-    // Trigger the download only when the user reaches Screen 6 with a non-Complete artifact.
-    // LaunchedEffect(step) is cancelled when the user navigates away, which also cancels the
-    // download — leaving the .part file on disk for HTTP-Range resume on re-entry. Story 4.3
-    // owns retry / pause / stall handling; this just gets the percent moving.
-    LaunchedEffect(step) {
-        runDownloadIfNeeded(
-            step = step,
-            modelAvailability = modelAvailability,
-            onState = { modelState = it },
-            onSpeed = { downloadMbps = it },
-        )
+    // ModelDownload is only for active/resumable transfers. If the artifact is already complete,
+    // or Wi-Fi is unavailable on entry/restoration, resolve that once and unwind back to Wiring.
+    LaunchedEffect(step, wifiConnected) {
+        when (
+            runDownloadIfNeeded(
+                step = step,
+                wifiConnected = wifiConnected,
+                modelAvailability = modelAvailability,
+                onState = { modelState = it },
+                onSpeed = { downloadMbps = it },
+            )
+        ) {
+            ModelDownloadEntryResult.BlockedByWifi -> onDownloadBlockedByWifi()
+            else -> Unit
+        }
     }
     ObserveBackgroundResume {
         scope.launch {
@@ -281,21 +287,48 @@ private fun ObserveBackgroundResume(onResumeFromBackground: () -> Unit) {
     }
 }
 
-// Runs the download with diagnostic logs + live MB/s sampling.
+private enum class ModelDownloadEntryResult {
+    NotOnDownloadScreen,
+    BlockedByWifi,
+    CompletedAlready,
+    DownloadRan,
+}
+
+// Resolves a ModelDownload entry exactly once: complete artifacts unwind immediately, Wi-Fi-
+// blocked entries bounce back to Wiring, and only active/resumable states start download().
 private suspend fun runDownloadIfNeeded(
     step: OnboardingStep,
+    wifiConnected: Boolean,
     modelAvailability: ModelAvailability,
     onState: (ModelArtifactState) -> Unit,
     onSpeed: (Float?) -> Unit,
-) {
-    if (step != OnboardingStep.ModelDownload) return
+): ModelDownloadEntryResult {
+    if (step != OnboardingStep.ModelDownload) return ModelDownloadEntryResult.NotOnDownloadScreen
     val current = modelAvailability.status()
     Log.i(ONBOARDING_TAG, "ModelDownload entered. currentState=$current")
-    if (current is ModelArtifactState.Complete) {
-        onState(current)
-        Log.i(ONBOARDING_TAG, "Model already complete; skipping download.")
-        return
+    return when {
+        current is ModelArtifactState.Complete -> {
+            onState(current)
+            Log.i(ONBOARDING_TAG, "Model already complete; skipping download.")
+            ModelDownloadEntryResult.CompletedAlready
+        }
+
+        !wifiConnected -> {
+            onState(current)
+            onSpeed(null)
+            Log.i(ONBOARDING_TAG, "Wi-Fi unavailable; returning to Wiring instead of starting download.")
+            ModelDownloadEntryResult.BlockedByWifi
+        }
+
+        else -> performModelDownload(modelAvailability = modelAvailability, onState = onState, onSpeed = onSpeed)
     }
+}
+
+private suspend fun performModelDownload(
+    modelAvailability: ModelAvailability,
+    onState: (ModelArtifactState) -> Unit,
+    onSpeed: (Float?) -> Unit,
+): ModelDownloadEntryResult {
     // For Absent / Partial / Corrupt: don't publish `current` to state. `currentState()` reports
     // Absent any time the .part file exists but the final artifact doesn't — publishing that
     // on re-entry collapses the percent to 0 before the resumed download's first onProgress
@@ -303,7 +336,7 @@ private suspend fun runDownloadIfNeeded(
     // prior `state` ride keeps the screen showing the last known progress until the resumed
     // bytes arrive.
     val tracker = DownloadProgressTracker(onState, onSpeed)
-    try {
+    return try {
         Log.i(ONBOARDING_TAG, "Starting download()...")
         // `ModelAvailability.download` is a suspend fun and main-safe by convention
         // (`DefaultModelArtifactStore.download` already wraps its blocking I/O in
@@ -313,6 +346,7 @@ private suspend fun runDownloadIfNeeded(
         onSpeed(null)
         Log.i(ONBOARDING_TAG, "download() finished. terminalState=$terminal")
         onState(terminal)
+        ModelDownloadEntryResult.DownloadRan
     } catch (cancel: kotlinx.coroutines.CancellationException) {
         // Normal coroutine teardown when the user navigates away from ModelDownload. The
         // .part file persists; HTTP-Range resume picks up where we left off on re-entry.
@@ -321,6 +355,7 @@ private suspend fun runDownloadIfNeeded(
         throw cancel
     } catch (@Suppress("TooGenericExceptionCaught") error: Exception) {
         Log.e(ONBOARDING_TAG, "Model download failed", error)
+        ModelDownloadEntryResult.DownloadRan
     }
 }
 

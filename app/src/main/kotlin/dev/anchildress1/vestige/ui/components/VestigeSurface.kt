@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -19,6 +20,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -117,7 +119,9 @@ fun VestigeRow(
  * `selected != null` switches the click semantics from `clickable` to `selectable` — the
  * correct Compose primitive for radio-button / checkbox card patterns. `selectable` merges
  * descendant semantics so `onNodeWithText(...).performClick()` dispatches the onClick to the
- * card, which `clickable` alone does not guarantee.
+ * card, which `clickable` alone does not guarantee. `checked != null` does the same for switch-
+ * like rows via `toggleable`, including disabled checked-state semantics when the row is
+ * informative but not currently tappable.
  */
 @Composable
 @Suppress("LongParameterList") // Primitive shape — defaults beat wrapper proliferation at call sites.
@@ -126,12 +130,24 @@ fun VestigeListCard(
     onClick: (() -> Unit)? = null,
     role: Role = Role.Button,
     selected: Boolean? = null,
+    checked: Boolean? = null,
     accentModifier: Modifier = Modifier,
     contentPadding: PaddingValues = PaddingValues(horizontal = 16.dp, vertical = 14.dp),
     content: @Composable () -> Unit,
 ) {
     val colors = VestigeTheme.colors
     val rootModifier = when {
+        checked != null -> {
+            modifier
+                .semantics(mergeDescendants = true) {}
+                .toggleable(
+                    value = checked,
+                    enabled = onClick != null,
+                    role = role,
+                    onValueChange = { onClick?.invoke() },
+                )
+        }
+
         onClick == null -> modifier
 
         selected != null -> modifier.selectable(

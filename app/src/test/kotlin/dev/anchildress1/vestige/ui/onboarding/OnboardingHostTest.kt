@@ -129,6 +129,29 @@ class OnboardingHostTest {
     }
 
     @Test
+    fun `restored ModelDownload with wifi down returns to Wiring without starting download`() {
+        prefs.setCurrentStep(OnboardingStep.ModelDownload)
+        var downloadCalls = 0
+        val availability = object : ModelAvailability {
+            override suspend fun status(): ModelArtifactState = ModelArtifactState.Absent
+
+            override suspend fun download(onProgress: (Long, Long) -> Unit): ModelArtifactState {
+                downloadCalls += 1
+                return ModelArtifactState.Partial(currentBytes = 1L, expectedBytes = 2L)
+            }
+        }
+
+        startHost(
+            wifiAvailability = { false },
+            modelAvailability = availability,
+        )
+
+        composeRule.onNodeWithText("WIRING", substring = true).assertIsDisplayed()
+        composeRule.onNodeWithText("OPEN VESTIGE").assertIsNotEnabled()
+        assertEquals(0, downloadCalls)
+    }
+
+    @Test
     fun `tapping the persona card on Wiring returns to PersonaPick`() {
         prefs.setCurrentStep(OnboardingStep.Wiring)
         startHost(modelAvailability = fakeModelAvailability(ModelArtifactState.Absent))

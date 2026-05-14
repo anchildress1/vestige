@@ -86,7 +86,7 @@ Edge cases:
 
 **UX shell:**
 - Dark mode default, intentional design language
-- Onboarding flow handles persona pick → mic permission → notification permission (per ADR-004 §"Permission Flow") → typed-fallback explainer → Wi-Fi check → model download → first-dump scaffold. Eight screens total per `ux-copy.md` §Onboarding.
+- Onboarding flow is a 3-screen hub: persona pick → Wiring (Persona / Local / Mic / Notify / Type) → model download. Local model readiness gates entry; Mic and Notify remain optional capability switches.
 - **Persistent local model status indicator/screen visible from app shell or settings.** A judge should understand within 10 seconds that this is a local AI app; the indicator carries that signal alongside the capture screen.
 
 **Submission package:**
@@ -126,7 +126,7 @@ Edge cases:
 ### Acceptance Criteria
 
 **Onboarding:**
-- Given a fresh install, when the user first opens the app, then they walk through persona pick → mic permission → notification permission (per ADR-004) → typed-fallback explainer → Wi-Fi check → model download with progress → first-dump scaffold without dead ends.
+- Given a fresh install, when the user first opens the app, then they walk through persona pick → Wiring → model download without dead ends, with the Local row opening Wi-Fi settings instead of starting download when Wi-Fi is unavailable.
 
 **Voice capture:**
 - Given the user is on the capture screen, when they tap record and speak ≤30s then stop, then audio is sent to E4B, model returns transcription + a contextually appropriate follow-up in a single response, transcription is shown alongside the model response and saved as `entry_text`, and audio bytes are discarded immediately after the model call completes.

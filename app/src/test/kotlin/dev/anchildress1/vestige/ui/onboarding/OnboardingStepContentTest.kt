@@ -7,14 +7,18 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.assertIsOff
+import androidx.compose.ui.test.assertIsOn
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performClick
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import dev.anchildress1.vestige.model.ModelArtifactState
 import dev.anchildress1.vestige.model.Persona
 import dev.anchildress1.vestige.ui.theme.VestigeTheme
+import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -26,19 +30,6 @@ class OnboardingStepContentTest {
 
     @get:Rule
     val composeRule = createAndroidComposeRule<ComponentActivity>()
-
-    private val callbacks = OnboardingStepCallbacks(
-        onPersonaChange = {},
-        advance = {},
-        onMicAllow = {},
-        onNotificationAllow = {},
-        onOpenWifiSettings = {},
-        onComeBackLater = {},
-        onOpenApp = {},
-        onOpenModelDownload = {},
-        onDownloadReturn = {},
-        onChangePersona = {},
-    )
 
     @Test
     fun `wiring shows corrupt-local and denied-mic blocked hints`() {
@@ -118,9 +109,71 @@ class OnboardingStepContentTest {
             ),
         )
 
-        composeRule.onAllNodesWithText("NETWORK DOWN · RECONNECT TO DOWNLOAD").assertCountEquals(1)
+        composeRule.onAllNodesWithText("NETWORK DOWN · TAP FOR WI-FI SETTINGS").assertCountEquals(1)
         composeRule.onAllNodesWithText("DOWNLOAD STILL RUNNING · BACK UP TO RESUME").assertCountEquals(0)
         composeRule.onAllNodesWithText("TAP LOCAL TO START DOWNLOAD").assertCountEquals(0)
+    }
+
+    @Test
+    fun `wiring prefers wifi guidance over corrupt retry when local model is corrupt and offline`() {
+        renderWiring(
+            OnboardingStepState(
+                step = OnboardingStep.Wiring,
+                persona = Persona.WITNESS,
+                micPermissionDenied = false,
+                wifiConnected = false,
+                modelState = ModelArtifactState.Corrupt(
+                    expectedSha256 = "expected",
+                    actualSha256 = "actual",
+                ),
+                micGranted = false,
+                notifGranted = false,
+            ),
+        )
+
+        composeRule.onAllNodesWithText("NETWORK DOWN · TAP FOR WI-FI SETTINGS").assertCountEquals(1)
+        composeRule.onAllNodesWithText("ARTIFACT CORRUPT · TAP TO RETRY").assertCountEquals(0)
+    }
+
+    @Test
+    fun `wiring local row opens wifi settings when download is blocked by missing wifi`() {
+        var wifiSettingsOpens = 0
+        renderWiring(
+            state = OnboardingStepState(
+                step = OnboardingStep.Wiring,
+                persona = Persona.WITNESS,
+                micPermissionDenied = false,
+                wifiConnected = false,
+                modelState = ModelArtifactState.Absent,
+                micGranted = false,
+                notifGranted = false,
+            ),
+            callbacks = callbacks(
+                onOpenWifiSettings = { wifiSettingsOpens += 1 },
+            ),
+        )
+
+        composeRule.onNodeWithText("LOCAL · GEMMA 4", substring = true).performClick()
+        assertEquals(1, wifiSettingsOpens)
+    }
+
+    @Test
+    fun `wiring switch rows expose checked semantics`() {
+        renderWiring(
+            OnboardingStepState(
+                step = OnboardingStep.Wiring,
+                persona = Persona.WITNESS,
+                micPermissionDenied = false,
+                wifiConnected = true,
+                modelState = ModelArtifactState.Complete,
+                micGranted = false,
+                notifGranted = true,
+            ),
+        )
+
+        composeRule.onNodeWithText("MIC · INPUT", substring = true).assertIsOff()
+        composeRule.onNodeWithText("NOTIFY · STATUS", substring = true).assertIsOn()
+        composeRule.onNodeWithText("TYPE · FALLBACK", substring = true).assertIsOn()
     }
 
     @Test
@@ -143,7 +196,7 @@ class OnboardingStepContentTest {
         composeRule.onNodeWithText("OPEN VESTIGE").assertIsEnabled()
     }
 
-    private fun renderWiring(state: OnboardingStepState) {
+    private fun renderWiring(state: OnboardingStepState, callbacks: OnboardingStepCallbacks = callbacks()) {
         val context = ApplicationProvider.getApplicationContext<Context>()
         composeRule.activity.setContent {
             VestigeTheme {
@@ -157,4 +210,20 @@ class OnboardingStepContentTest {
         }
         composeRule.waitForIdle()
     }
+
+    private fun callbacks(
+        onOpenWifiSettings: () -> Unit = {},
+        onOpenModelDownload: () -> Unit = {},
+    ): OnboardingStepCallbacks = OnboardingStepCallbacks(
+        onPersonaChange = {},
+        advance = {},
+        onMicAllow = {},
+        onNotificationAllow = {},
+        onOpenWifiSettings = onOpenWifiSettings,
+        onComeBackLater = {},
+        onOpenApp = {},
+        onOpenModelDownload = onOpenModelDownload,
+        onDownloadReturn = {},
+        onChangePersona = {},
+    )
 }

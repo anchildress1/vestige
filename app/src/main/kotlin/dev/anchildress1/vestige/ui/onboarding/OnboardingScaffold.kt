@@ -28,11 +28,7 @@ import dev.anchildress1.vestige.R
 import dev.anchildress1.vestige.ui.components.EyebrowE
 import dev.anchildress1.vestige.ui.theme.VestigeTheme
 
-/**
- * Shared scaffold for the 5 onboarding screens. Persistent top chrome (SETUP eyebrow + step
- * dots + tick rule), scrollable content slot, and a sticky lime primary action bar pinned to
- * the bottom. Matches `poc/screenshots/onboarding-*.png` layout.
- */
+/** Shared scaffold for the 3-screen onboarding hub flow. */
 @Suppress("LongParameterList") // Scaffold primitive — wide by design.
 @Composable
 internal fun OnboardingScaffold(

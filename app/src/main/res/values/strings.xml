@@ -52,7 +52,7 @@
     <string name="onboarding_wiring_local_absent_hint">TAP LOCAL TO START DOWNLOAD</string>
     <string name="onboarding_wiring_local_partial_hint">DOWNLOAD STILL RUNNING · BACK UP TO RESUME</string>
     <string name="onboarding_wiring_local_corrupt_hint">ARTIFACT CORRUPT · TAP TO RETRY</string>
-    <string name="onboarding_wiring_local_blocked_hint">NETWORK DOWN · RECONNECT TO DOWNLOAD</string>
+    <string name="onboarding_wiring_local_blocked_hint">NETWORK DOWN · TAP FOR WI-FI SETTINGS</string>
     <string name="onboarding_wiring_mic_blocked_hint">DENIED · TAP AGAIN OR SETTINGS → PERMISSIONS</string>
 
     <string name="onboarding_wiring_local_number">#02</string>
@@ -75,18 +75,7 @@
 
     <string name="onboarding_mic_denied">Mic permission required to record. Settings → Permissions.</string>
 
-    <!-- Screen 3 — Wi-Fi check -->
-    <string name="onboarding_wifi_ok_eyebrow">READY TO PULL</string>
-    <string name="onboarding_wifi_ok_header">WI-FI CONNECTED.</string>
-    <string name="onboarding_wifi_ok_body">One file. Pulled once. Stays on the device after.</string>
-    <string name="onboarding_wifi_ok_action">Download model</string>
-    <string name="onboarding_wifi_missing_eyebrow">NO SIGNAL</string>
-    <string name="onboarding_wifi_missing_header">WI-FI REQUIRED.</string>
-    <string name="onboarding_wifi_missing_body">The model is ~3.7 GB. Connect to Wi-Fi to download. We\'ll wait.</string>
-    <string name="onboarding_wifi_open_settings">Open Wi-Fi settings</string>
-    <string name="onboarding_wifi_come_back">I\'ll come back</string>
-
-    <!-- Screen 4 — Model download -->
+    <!-- Screen 3 — Model download -->
     <string name="onboarding_download_header">DOWNLOAD.</string>
     <string name="onboarding_download_body">Quiet for a minute. This takes a while.</string>
     <string name="onboarding_download_loading_pill">DOWNLOADING</string>

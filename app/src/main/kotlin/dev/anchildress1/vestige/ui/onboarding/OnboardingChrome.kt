@@ -22,9 +22,8 @@ import dev.anchildress1.vestige.ui.theme.VestigeFonts
 import dev.anchildress1.vestige.ui.theme.VestigeTheme
 
 /**
- * Persistent top chrome shared by every onboarding screen. The left eyebrow reads
- * `SETUP · NN OF 05` (or `ALL SET · 05 OF 05` on Ready) where `NN` is the count of *enabled
- * wiring switches*, not the screen ordinal. The tick rule fills proportionally.
+ * Persistent top chrome shared by every onboarding screen. The left eyebrow tracks enabled
+ * wiring switches, not a screen ordinal; `ALL SET` simply means all five switches read ready.
  */
 @Composable
 internal fun OnboardingChrome(

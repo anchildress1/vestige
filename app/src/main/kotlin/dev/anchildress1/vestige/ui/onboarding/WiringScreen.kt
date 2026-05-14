@@ -25,7 +25,7 @@ import dev.anchildress1.vestige.ui.theme.VestigeTheme
  * State of one wiring switch.
  * - [Granted]: ready, green.
  * - [Pending]: not yet acted on (e.g. permission untouched, model still downloading).
- * - [Blocked]: actively prevented — denied permission, airplane mode, corrupt artifact.
+ * - [Blocked]: actively prevented — denied permission, Wi-Fi unavailable, corrupt artifact.
  */
 internal enum class WiringSwitchState { Granted, Pending, Blocked }
 
@@ -75,6 +75,11 @@ private fun WiringSwitchCard(switch: WiringSwitch) {
         modifier = Modifier.fillMaxWidth(),
         onClick = switch.onTap,
         role = switch.role,
+        checked = if (switch.role == Role.Switch) {
+            switch.state == WiringSwitchState.Granted
+        } else {
+            null
+        },
         accentModifier = if (visuals.showAccent) Modifier.limeLeftRuleForActive() else Modifier,
         contentPadding = PaddingValues(horizontal = 16.dp, vertical = 14.dp),
     ) {

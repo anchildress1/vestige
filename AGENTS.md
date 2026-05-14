@@ -30,10 +30,9 @@ Demo-impact test before accepting any feature or polish: *Does this visibly impr
 20. **Stick to the plan.** Story file is the contract. No "while we're here" refactors or new abstraction layers — N lines means N lines.
 21. **Stop on manual checks.** When a spec calls for a check the agent can't run (on-device install, real-keystore signing, mic permission, STT-A round-trip, `tcpdump` privacy clip, etc.), stop on the first one and surface it. Do not skip past — a failed check may invalidate later work and breaks atomic-commit discipline. Wait for the user's outcome, record it, then proceed. Don't check the box yourself. Don't fake "looks correct."
 22. **Tests and docs ship with the change.** Every code change: pos / neg / err / edge coverage at unit / integration / perf / a11y tiers as applicable. Same commit updates relevant docs (README, ADRs, stories, architecture-brief, design-guidelines, ux-copy) and any diagrams it invalidates. Green tests alone are not "done" — missing scenarios or stale docs / diagrams are unfinished.
-23. **ADR amendments.** ADRs are historical; prior decision sections never rewritten. Minor refinement → dated `### Addendum (YYYY-MM-DD) — short title` block, additive only. Architecture pivot, runtime swap, premise change → new ADR superseding the prior by number. Judgment: refines an existing rule → addendum; changes what the ADR is *about* → new ADR.
+23. **ADR amendments.** ADRs are historical; prior decision sections never rewritten after they are on main. Minor refinement → dated `### Addendum (YYYY-MM-DD) — short title` block, additive only. Architecture pivot, runtime swap, premise change → new ADR superseding the prior by number. Judgment: refines an existing rule → addendum; changes what the ADR is *about* → new ADR.
 24. **Open PRs only on explicit instruction.** Branch, commit, push are autonomous. `gh pr create` (or equivalent) needs a direct user instruction in the current turn. Default: push, surface, wait. The user decides when a PR opens, what gets bundled, and what stays on the side.
 25. **No UI patching.** Screen-level color / contrast / spacing / type overrides used to "just fix this one surface" are quick fixes and are forbidden. If a UX bug appears in multiple places or can recur through shared composition, fix the owning theme token, shared primitive, or common style element instead.
-26. **Foreground color must come from shared UI primitives.** Readable text / icon color is owned by common theme style elements (`VestigeSurface`, shared chrome primitives, theme tokens, scaffold defaults when required by transparent containers), not by ad-hoc per-screen rescue colors. If a surface goes dark-on-dark, stop and repair the shared color-propagation path first.
 27. **No unnecessary overdocumentation.** Redundant comments, duplicate docs, and prose that restates obvious code are defects. Document only the hidden constraint, operator decision, or onboarding fact a reader would not recover from the code or existing docs.
 28. **Test coverage shape must be explicit.** Any touched test suite declares its pos / neg / err / edge scope; user-visible UI suites also assert a11y semantics and tap-target behavior where feasible. If automated accessibility checks are blocked by Robolectric or unavailable device runtime, say so and keep the JVM suite honest with semantics coverage instead of hand-waving.
 
@@ -42,3 +41,18 @@ Demo-impact test before accepting any feature or polish: *Does this visibly impr
 Build per `docs/PRD.md` §"Build philosophy: build first, test at failure zones." No upfront Phase-0 validation — risk is mitigated via five stop-and-test points (STT-A–E) in phases 1–3.
 
 STT-A (audio plumbing, Phase 1) is existential — time-box hard. Spec rewrites supersede via ADR.
+
+# Android Frontend Project Rules
+
+This project is Android-only unless explicitly told otherwise.
+Use Kotlin, Jetpack Compose, Material 3, AndroidX lifecycle/ViewModel, and existing Gradle version catalog dependencies.
+
+Do not introduce Compose Multiplatform, KMP source sets, or new architectural frameworks unless asked.
+
+Follow existing project conventions:
+- app module uses Compose
+- JVM target is 17
+- JDK toolchain may be newer
+- tests include JVM/Robolectric Compose UI tests
+- respect the no-telemetry/privacy guardrails
+- keep UI state stable, explicit, and testable

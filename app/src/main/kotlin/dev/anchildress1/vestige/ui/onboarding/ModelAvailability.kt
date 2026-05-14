@@ -2,6 +2,7 @@ package dev.anchildress1.vestige.ui.onboarding
 
 import dev.anchildress1.vestige.model.ModelArtifactState
 import dev.anchildress1.vestige.model.ModelArtifactStore
+import dev.anchildress1.vestige.model.NetworkGate
 
 /**
  * Onboarding-side projection of main-model status + the download trigger that drives `Partial`
@@ -14,11 +15,23 @@ interface ModelAvailability {
     /** Default: no-op trigger that returns current status. `Default` overrides to do real I/O. */
     suspend fun download(onProgress: (Long, Long) -> Unit = { _, _ -> }): ModelArtifactState = status()
 
-    class Default(private val artifactStore: ModelArtifactStore) : ModelAvailability {
+    class Default(private val artifactStore: ModelArtifactStore, private val networkGate: NetworkGate) :
+        ModelAvailability {
         override suspend fun status(): ModelArtifactState = artifactStore.currentState()
 
-        override suspend fun download(onProgress: (Long, Long) -> Unit): ModelArtifactState =
-            artifactStore.download(onProgress)
+        /**
+         * Opens the [NetworkGate] for the duration of the download — every outbound HTTP primitive
+         * checks the gate before dialing, and `Sealed` is the default. The `finally` reseals even
+         * if `download()` throws so the privacy posture matches `concept-locked.md` §"Local-only".
+         */
+        override suspend fun download(onProgress: (Long, Long) -> Unit): ModelArtifactState {
+            networkGate.openForDownload(reason = "Onboarding Screen 6 — Gemma 4 E4B artifact")
+            return try {
+                artifactStore.download(onProgress)
+            } finally {
+                networkGate.seal()
+            }
+        }
     }
 }
 

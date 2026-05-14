@@ -60,7 +60,10 @@ class MainActivity : ComponentActivity() {
                     OnboardingHost(
                         prefs = onboardingPrefs,
                         onComplete = { onboardingComplete = true },
-                        modelAvailability = ModelAvailability.Default(container.mainModelArtifactStore),
+                        modelAvailability = ModelAvailability.Default(
+                            artifactStore = container.mainModelArtifactStore,
+                            networkGate = container.networkGate,
+                        ),
                         modifier = Modifier.fillMaxSize(),
                     )
                     return@VestigeTheme

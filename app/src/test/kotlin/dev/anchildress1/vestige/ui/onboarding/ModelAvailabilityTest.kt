@@ -1,5 +1,6 @@
 package dev.anchildress1.vestige.ui.onboarding
 
+import dev.anchildress1.vestige.model.DefaultNetworkGate
 import dev.anchildress1.vestige.model.ModelArtifactState
 import dev.anchildress1.vestige.model.ModelArtifactStore
 import dev.anchildress1.vestige.model.ModelManifest
@@ -65,6 +66,7 @@ class ModelAvailabilityTest {
 
                 override suspend fun requireComplete(): File = artifactFile
             },
+            networkGate = DefaultNetworkGate.ALWAYS_OPEN_FOR_TESTS,
         )
 
         assertEquals(

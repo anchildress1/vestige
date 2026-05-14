@@ -40,10 +40,12 @@ internal data class OnboardingStepCallbacks(
     val onOpenWifiSettings: () -> Unit,
     val onComeBackLater: () -> Unit,
     val onOpenApp: () -> Unit,
-    /** Wiring → ModelDownload drill-in. ModelDownload's Continue then unwinds back to Wiring. */
+    /** Wiring → ModelDownload drill-in. The download screen auto-unwinds back to Wiring. */
     val onOpenModelDownload: () -> Unit,
-    /** ModelDownload → Wiring return path. */
+    /** ModelDownload → Wiring return path (fired automatically once state goes Complete). */
     val onDownloadReturn: () -> Unit,
+    /** Wiring persona card → PersonaPick. Lets the user change their voice mid-flow. */
+    val onChangePersona: () -> Unit,
 )
 
 @Composable
@@ -74,16 +76,8 @@ internal fun OnboardingStepContent(
             downloadMbps = state.downloadMbps,
             wifiConnected = state.wifiConnected,
             enabledCount = state.enabledCount,
-            // Continue returns to Wiring (the hub). Auto-skip on Ready handles the case where
-            // user arrives with model already Complete.
+            // Auto-unwinds back to Wiring once Complete; the screen is intentionally not a stop.
             onContinue = callbacks.onDownloadReturn,
-        )
-
-        OnboardingStep.Ready -> ReadyScreen(
-            modifier = modifier,
-            persona = state.persona,
-            enabledCount = state.enabledCount,
-            onOpenApp = callbacks.onOpenApp,
         )
     }
 }
@@ -91,7 +85,7 @@ internal fun OnboardingStepContent(
 @Composable
 private fun WiringHostScreen(modifier: Modifier, state: OnboardingStepState, callbacks: OnboardingStepCallbacks) {
     val switches = listOf(
-        personaSwitch(persona = state.persona),
+        personaSwitch(persona = state.persona, onTap = callbacks.onChangePersona),
         localSwitch(
             modelState = state.modelState,
             wifiConnected = state.wifiConnected,
@@ -106,26 +100,23 @@ private fun WiringHostScreen(modifier: Modifier, state: OnboardingStepState, cal
         typedFallbackSwitch(),
     )
     val granted = switches.count { it.state == WiringSwitchState.Granted }
-    val blocked = switches.count { it.state == WiringSwitchState.Blocked }
     val readyToAdvance = isWiringReadyToAdvance(state)
     OnboardingScaffold(
         enabledCount = state.enabledCount,
         modifier = modifier,
         rightStatus = "$granted / ${switches.size} LIVE",
+        // Wiring is the terminal hub — Next opens the app once the model is on disk. Mic +
+        // Notify stay optional per the design (granted, pending, or blocked all let the user
+        // proceed; only `modelState.isReady` gates Next).
         primary = OnboardingAction(
-            label = stringResource(id = R.string.onboarding_wiring_next),
-            onAction = callbacks.advance,
+            label = stringResource(id = R.string.onboarding_open_vestige),
+            onAction = callbacks.onOpenApp,
             enabled = readyToAdvance,
         ),
-        footerHelper = when {
-            readyToAdvance -> null
-
-            blocked > 0 -> stringResource(id = R.string.onboarding_wiring_blocked, blocked)
-
-            else -> stringResource(
-                id = R.string.onboarding_wiring_pending,
-                switches.size - granted,
-            )
+        footerHelper = if (readyToAdvance) {
+            null
+        } else {
+            stringResource(id = R.string.onboarding_wiring_waiting_on_model)
         },
     ) {
         WiringScreen(switches = switches)
@@ -136,13 +127,14 @@ internal fun isWiringReadyToAdvance(state: OnboardingStepState): Boolean =
     state.modelState is ModelArtifactState.Complete
 
 @Composable
-private fun personaSwitch(persona: Persona): WiringSwitch {
+private fun personaSwitch(persona: Persona, onTap: () -> Unit): WiringSwitch {
     val name = stringResource(id = personaNameRes(persona))
     return WiringSwitch(
         number = stringResource(id = R.string.onboarding_wiring_persona_number),
         title = stringResource(id = R.string.onboarding_wiring_persona_title, name.uppercase()),
         description = stringResource(id = R.string.onboarding_wiring_persona_desc, name),
         state = WiringSwitchState.Granted,
+        onTap = onTap,
     )
 }
 

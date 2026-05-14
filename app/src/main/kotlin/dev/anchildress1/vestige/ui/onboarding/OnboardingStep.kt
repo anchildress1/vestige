@@ -1,16 +1,16 @@
 package dev.anchildress1.vestige.ui.onboarding
 
 /**
- * 4-screen flow. Wiring is the hub: it shows 5 switches (Persona, Local, Mic, Notify, Type)
- * and is gated on all 5 being green before advancing to Ready. Tapping the Local switch
- * navigates forward to [ModelDownload], whose Continue action returns to [Wiring]. The "X OF 05"
- * chrome counter is the enabled-switch tally, not the screen ordinal.
+ * 3-screen flow. Wiring is the hub: it shows 5 switches (Persona, Local, Mic, Notify, Type).
+ * Next is gated only on the model being downloaded — mic + notify are optional. Tapping Local
+ * navigates forward to [ModelDownload]; the download screen auto-returns to Wiring when the
+ * artifact verifies. There is no separate "Ready" screen — Wiring's Next is the open-the-app
+ * action once the model is on disk.
  */
 enum class OnboardingStep {
     PersonaPick,
     Wiring,
     ModelDownload,
-    Ready,
     ;
 
     fun next(): OnboardingStep? = entries.getOrNull(ordinal + 1)

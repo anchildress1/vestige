@@ -76,7 +76,7 @@ class OnboardingPrefsTest {
 
     @Test
     fun `markComplete clears the stored onboarding step`() {
-        prefs.setCurrentStep(OnboardingStep.Ready)
+        prefs.setCurrentStep(OnboardingStep.ModelDownload)
         prefs.markComplete()
         val ctx = ApplicationProvider.getApplicationContext<Context>()
         val reopened = OnboardingPrefs.from(ctx)

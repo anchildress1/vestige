@@ -78,20 +78,20 @@ class OnboardingHostTest {
     }
 
     @Test
-    fun `Wiring Next is enabled while optional permissions are still pending`() {
+    fun `Wiring Open Vestige is enabled while optional permissions are still pending`() {
         prefs.setCurrentStep(OnboardingStep.Wiring)
         startHost(modelAvailability = fakeModelAvailability(ModelArtifactState.Complete))
         // Mic + notification are optional in the hub flow. Once the local model is ready,
         // onboarding can proceed even if those permissions are still pending.
-        composeRule.onNodeWithText("NEXT").assertIsEnabled()
+        composeRule.onNodeWithText("OPEN VESTIGE").assertIsEnabled()
     }
 
     @Test
-    fun `Wiring Next stays disabled while required local setup is missing`() {
+    fun `Wiring Open Vestige stays disabled while the local model is missing`() {
         prefs.setCurrentStep(OnboardingStep.Wiring)
         startHost(modelAvailability = fakeModelAvailability(ModelArtifactState.Absent))
 
-        composeRule.onNodeWithText("NEXT").assertIsNotEnabled()
+        composeRule.onNodeWithText("OPEN VESTIGE").assertIsNotEnabled()
     }
 
     @Test
@@ -127,7 +127,7 @@ class OnboardingHostTest {
 
     @Test
     fun `Open Vestige does not re-SHA the artifact on tap`() {
-        prefs.setCurrentStep(OnboardingStep.Ready)
+        prefs.setCurrentStep(OnboardingStep.Wiring)
         var statusCalls = 0
         var completed = false
         val availability = object : ModelAvailability {

@@ -7,8 +7,6 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertIsNotSelected
 import androidx.compose.ui.test.assertIsSelected
-import androidx.compose.ui.test.hasClickAction
-import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
@@ -19,8 +17,6 @@ import dev.anchildress1.vestige.model.ModelArtifactState
 import dev.anchildress1.vestige.model.Persona
 import dev.anchildress1.vestige.ui.theme.VestigeTheme
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
-import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -133,36 +129,7 @@ class OnboardingScreensTest {
                 ModelDownloadPlaceholderScreen(modelState = ModelArtifactState.Complete, onContinue = {})
             }
         }
-        composeRule.onNodeWithText("MODEL READY").assertIsDisplayed()
-    }
-
-    // endregion
-
-    // region Ready
-
-    @Test
-    fun `Ready screen renders headline + persona name + first prompt card`() {
-        composeRule.activity.setContent {
-            VestigeTheme {
-                ReadyScreen(persona = Persona.HARDASS, onOpenApp = {})
-            }
-        }
-        composeRule.onNodeWithText("READY", substring = true).assertIsDisplayed()
-        composeRule.onNodeWithText("PROMPT 01").performScrollTo().assertIsDisplayed()
-        composeRule.onNodeWithText("WHAT JUST HAPPENED?").performScrollTo().assertIsDisplayed()
-    }
-
-    @Test
-    fun `Ready screen onOpenApp fires when the primary action is tapped`() {
-        var tapped = false
-        composeRule.activity.setContent {
-            VestigeTheme {
-                ReadyScreen(persona = Persona.WITNESS, onOpenApp = { tapped = true })
-            }
-        }
-        assertFalse(tapped)
-        composeRule.onNodeWithText("OPEN VESTIGE").performClick()
-        assertTrue(tapped)
+        composeRule.onNodeWithText("GEMMA READY").assertIsDisplayed()
     }
 
     // endregion

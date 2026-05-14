@@ -85,14 +85,15 @@ fun OnboardingHost(
         modelAvailability = modelAvailability,
     )
 
-    // Auto-skip screens whose precondition is already satisfied. Material-3 / Android UX
-    // convention: don't gate flow on a re-confirmation of a decision the user already made.
-    AutoSkipAlreadySatisfied(
-        step = step,
-        context = context,
-        modelState = environment.modelState,
-        onAdvance = advance,
-    )
+    // Once the model lands while the user is on the download screen, hop back to Wiring —
+    // there's nothing left to do here, and Wiring's Next opens the app directly.
+    LaunchedEffect(step, environment.modelState) {
+        if (step == OnboardingStep.ModelDownload &&
+            environment.modelState is ModelArtifactState.Complete
+        ) {
+            step = OnboardingStep.Wiring
+        }
+    }
 
     DisposableEffect(lifecycleOwner, context) {
         val observer = LifecycleEventObserver { _, event ->
@@ -169,6 +170,7 @@ private fun buildCallbacks(
     },
     onOpenModelDownload = { setStep(OnboardingStep.ModelDownload) },
     onDownloadReturn = { setStep(OnboardingStep.Wiring) },
+    onChangePersona = { setStep(OnboardingStep.PersonaPick) },
 )
 
 private data class OnboardingEnvironment(

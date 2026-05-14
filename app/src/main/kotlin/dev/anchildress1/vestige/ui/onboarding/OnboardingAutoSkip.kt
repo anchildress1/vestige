@@ -4,10 +4,7 @@ import android.Manifest
 import android.content.Context
 import android.content.pm.PackageManager
 import android.os.Build
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.core.content.ContextCompat
-import dev.anchildress1.vestige.model.ModelArtifactState
 
 internal const val ONBOARDING_TAG = "Onboarding"
 internal const val PERCENT_LOG_SCALE: Long = 100L
@@ -25,23 +22,4 @@ internal fun hasNotificationPermission(context: Context): Boolean {
     if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return true
     return ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) ==
         PackageManager.PERMISSION_GRANTED
-}
-
-/**
- * Material-3 / Android UX convention: don't gate the flow on re-confirming a decision the user
- * already made. If the runtime permission for the current step is already granted, advance
- * silently. Same idea for Wi-Fi + Download steps when the model is already on disk.
- */
-@Composable
-internal fun AutoSkipAlreadySatisfied(
-    step: OnboardingStep,
-    @Suppress("UNUSED_PARAMETER") context: Context,
-    modelState: ModelArtifactState,
-    onAdvance: () -> Unit,
-) {
-    // Wiring is the hub — the user advances explicitly via Next once every switch is green.
-    // ModelDownload is a drill-in *from* Wiring; it returns through onDownloadReturn, not
-    // through advance. No automatic forward skipping remains in the new flow.
-    @Suppress("UNUSED_VARIABLE")
-    val unused = step to modelState to onAdvance
 }

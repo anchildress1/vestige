@@ -47,9 +47,8 @@
     <string name="onboarding_wiring_persona_number">#01</string>
     <string name="onboarding_wiring_persona_title">PERSONA · %1$s</string>
     <string name="onboarding_wiring_persona_desc">Voice picked on the previous screen. Change it later in Settings if %1$s doesn\'t fit.</string>
-    <string name="onboarding_wiring_next">Next</string>
-    <string name="onboarding_wiring_pending">%1$d MORE TO TURN ON</string>
-    <string name="onboarding_wiring_blocked">%1$d BLOCKED · ADDRESS BEFORE OPENING</string>
+    <string name="onboarding_open_vestige">Open Vestige</string>
+    <string name="onboarding_wiring_waiting_on_model">WAITING ON MODEL · TAP LOCAL TO START</string>
     <string name="onboarding_wiring_local_pending_hint">DOWNLOAD STILL RUNNING · BACK UP TO RESUME</string>
     <string name="onboarding_wiring_local_blocked_hint">NETWORK DOWN · RECONNECT TO DOWNLOAD</string>
     <string name="onboarding_wiring_mic_blocked_hint">DENIED · TAP AGAIN OR SETTINGS → PERMISSIONS</string>
@@ -91,17 +90,9 @@
     <string name="onboarding_download_loading_pill">DOWNLOADING</string>
     <string name="onboarding_download_loading_pill_percent">DOWNLOADING %1$d%%</string>
     <string name="onboarding_download_loading_note">Model file is still landing. Keep Vestige open — this is the one network event in the app\'s life.</string>
-    <string name="onboarding_download_ready_pill">MODEL READY</string>
+    <string name="onboarding_download_ready_pill">GEMMA READY</string>
 
-    <!-- Screen 5 — Ready -->
-    <string name="onboarding_ready_eyebrow">MODEL LOADED · %1$s ARMED</string>
-    <string name="onboarding_ready_header">READY.</string>
-    <string name="onboarding_ready_body">Everything\'s local. The model\'s loaded. Talk into the mic when you\'ve got something to dump, or type. %1$s is selected.</string>
-    <string name="onboarding_ready_first_prompt">WHAT JUST HAPPENED?</string>
-    <string name="onboarding_ready_action">Open Vestige</string>
-    <string name="onboarding_ready_footer">NO TUTORIAL · YOU FIGURE IT OUT</string>
-
-    <!-- Phase 3 placeholder source-entry surface. Phase 4 replaces this with the real history detail screen. -->
+<!-- Phase 3 placeholder source-entry surface. Phase 4 replaces this with the real history detail screen. -->
     <string name="entry_detail_placeholder_title">Entry</string>
     <string name="entry_detail_placeholder_notice">History detail ships in Phase 4. For now, this proves the source link is live.</string>
     <string name="entry_detail_placeholder_not_found">Entry not found.</string>

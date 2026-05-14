@@ -62,10 +62,13 @@ class CalloutCooldownStoreTest {
     }
 
     @Test
-    fun `cooldown survives BoxStore restart`() {
+    fun `cooldown survives BoxStore close and reopen by name`() {
         store.recordFired(entryId = 9L, timestampMs = 1_000L)
         store.consumeOneEntry()
         boxStore.close()
+        // Reopening the same `memory:` URI reattaches to ObjectBox's in-process registry — that's
+        // process-local idempotency, not on-disk durability. Disk persistence is covered by the
+        // production wiring's open(Context) test.
         boxStore = openInMemoryBoxStore(dataDir)
         store = CalloutCooldownStore(boxStore)
         assertEquals(2, store.snapshot().remainingSuppression)

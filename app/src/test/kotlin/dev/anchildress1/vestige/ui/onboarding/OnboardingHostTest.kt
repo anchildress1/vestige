@@ -202,19 +202,28 @@ class OnboardingHostTest {
     }
 
     @Test
-    fun `ready screen re-checks model availability before marking onboarding complete`() {
+    fun `Open Vestige does not re-SHA the artifact on tap`() {
         prefs.setCurrentStep(OnboardingStep.Ready)
+        var statusCalls = 0
         var completed = false
-
-        startHost(
-            onComplete = { completed = true },
-            modelAvailability = fakeModelAvailability(ModelArtifactState.Absent),
-        )
+        val availability = object : ModelAvailability {
+            override suspend fun status(): ModelArtifactState {
+                statusCalls += 1
+                return ModelArtifactState.Complete
+            }
+        }
+        startHost(onComplete = { completed = true }, modelAvailability = availability)
+        // Allow the initial status snapshot to land before we measure the tap path.
+        composeRule.waitForIdle()
+        val baseline = statusCalls
 
         tapPrimary("Open Vestige")
 
-        assertFalse(completed)
-        assertFalse(prefs.isComplete)
+        assertTrue(completed)
+        assertTrue(prefs.isComplete)
+        // The tap path must not trigger another status() call — that would re-SHA the
+        // 3.66 GB artifact and stall the button for tens of seconds.
+        assertEquals(baseline, statusCalls)
     }
 
     private fun tapPrimary(label: String) {

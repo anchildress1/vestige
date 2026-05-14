@@ -96,8 +96,12 @@ fun OnboardingHost(
         onOpenWifiSettings = { openWifiSettings(context) },
         onComeBackLater = { moveTaskToBack(context) },
         onOpenApp = {
+            // Trust the upstream gate: AutoSkipAlreadySatisfied only advances past
+            // ModelDownload when state.isReady, and the download screen keeps Continue
+            // disabled until then. Re-running modelAvailability.status() here would
+            // re-SHA the 3.66 GB artifact on every tap — that was the "first-tap
+            // takes forever" symptom.
             scope.launch {
-                if (!modelAvailability.status().isReady) return@launch
                 prefs.markComplete()
                 onComplete()
             }

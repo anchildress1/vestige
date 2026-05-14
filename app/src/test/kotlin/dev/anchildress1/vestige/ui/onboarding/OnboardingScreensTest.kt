@@ -237,11 +237,10 @@ class OnboardingScreensTest {
         }
 
         composeRule.onNodeWithText("DOWNLOADING").assertIsDisplayed()
-        composeRule.onNodeWithText("DOWNLOADING 47%").assertDoesNotExist()
     }
 
     @Test
-    fun `model download placeholder uses generic downloading pill when Partial total is unknown`() {
+    fun `model download placeholder shows placeholder dash when Partial total is unknown`() {
         composeRule.activity.setContent {
             VestigeTheme {
                 ModelDownloadPlaceholderScreen(
@@ -252,7 +251,7 @@ class OnboardingScreensTest {
         }
 
         composeRule.onNodeWithText("DOWNLOADING").assertIsDisplayed()
-        composeRule.onNodeWithText("DOWNLOADING 1%").assertDoesNotExist()
+        composeRule.onNodeWithText("—").assertIsDisplayed()
     }
 
     @Test
@@ -268,7 +267,7 @@ class OnboardingScreensTest {
     }
 
     @Test
-    fun `model download placeholder interpolates percent into the pill on Partial state`() {
+    fun `model download placeholder renders huge percent number and percent sign on Partial state`() {
         composeRule.activity.setContent {
             VestigeTheme {
                 ModelDownloadPlaceholderScreen(
@@ -278,7 +277,11 @@ class OnboardingScreensTest {
             }
         }
 
-        composeRule.onNodeWithText("DOWNLOADING 47%").assertIsDisplayed()
+        // Hero rendering: number ("47") and "%" sign are separate text nodes; eyebrow says
+        // "DOWNLOADING". The old single-pill "DOWNLOADING 47%" label is gone.
+        composeRule.onNodeWithText("47").assertIsDisplayed()
+        composeRule.onNodeWithText("%").assertIsDisplayed()
+        composeRule.onNodeWithText("DOWNLOADING").assertIsDisplayed()
     }
 
     @Test

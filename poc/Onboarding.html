@@ -1,0 +1,256 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Vestige · Onboarding</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Anton&family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet" />
+<style>
+  html, body {
+    margin: 0; padding: 0;
+    background: oklch(11% 0.010 55);
+    font-family: 'Space Grotesk', system-ui, sans-serif;
+    color: oklch(95% 0.015 85);
+    min-height: 100vh;
+    -webkit-font-smoothing: antialiased;
+  }
+  *, *::before, *::after { box-sizing: border-box; }
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: oklch(35% 0.012 55); }
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+
+<script type="text/babel" src="data.jsx"></script>
+<script type="text/babel" src="energy-tokens.jsx"></script>
+<script type="text/babel" src="onboarding-energy.jsx"></script>
+
+<script type="text/babel">
+function OnboardingCanvas() {
+  return (
+    <div data-screen-label="Onboarding canvas" style={{
+      padding: '36px 32px 80px',
+      minHeight: '100vh',
+      background: `
+        radial-gradient(900px 600px at 10% -10%, oklch(20% 0.04 115 / 0.18), transparent 60%),
+        radial-gradient(800px 700px at 110% 10%, oklch(20% 0.05 28 / 0.14), transparent 60%),
+        oklch(11% 0.010 55)
+      `,
+    }}>
+      {/* ─── Header ─────────────────────────────────────────────── */}
+      <div style={{ maxWidth: 1100, margin: '0 auto 36px' }}>
+        <div style={{
+          display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start',
+          gap: 24, flexWrap: 'wrap',
+        }}>
+          <div style={{ maxWidth: 720 }}>
+            <div style={{
+              fontFamily: ET.mono, fontSize: 10, fontWeight: 700,
+              letterSpacing: '0.24em', textTransform: 'uppercase',
+              color: E.lime,
+            }}>● STORY 4.2 · ONBOARDING · SCOREBOARD</div>
+            <h1 style={{
+              margin: '10px 0 0', fontFamily: ET.display, fontSize: 96,
+              lineHeight: 0.85, color: E.ink, letterSpacing: '-0.005em',
+              textTransform: 'uppercase',
+            }}>FIRST 60<br />SECONDS<span style={{ color: E.lime }}>.</span></h1>
+            <p style={{
+              margin: '20px 0 0', maxWidth: 580,
+              fontFamily: ET.sans, fontSize: 15, lineHeight: 1.55, color: E.dim,
+            }}>
+              ux-copy.md asks for 8 onboarding screens. <span style={{ color: E.ink }}>This compresses
+              to 5 by treating onboarding as a how-to.</span> The middle screen — "wiring" — is a single
+              pre-flight board that collapses local-processing + mic + notification + typed-fallback into
+              one scoreboard with row-level actions. No "next next next" through redundant chrome.
+              Every screen is shown in its post-action state so the judge can read it cold.
+            </p>
+          </div>
+
+          {/* Compression table */}
+          <div style={{
+            display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 0,
+            border: `1px solid ${E.hair}`, minWidth: 260,
+            fontFamily: ET.mono, fontSize: 10, fontWeight: 600,
+            textTransform: 'uppercase', letterSpacing: '0.16em',
+          }}>
+            {[
+              ['ux-copy 01',     'persona',    E.ink],
+              ['→ screen 01',    'persona',    E.lime],
+              ['ux-copy 02–04',  'local + mic + notif + typed', E.ink],
+              ['→ screen 02',    'wiring · 1 board', E.lime],
+              ['ux-copy 05',     'wi-fi check', E.ink],
+              ['→ screen 03',    'wi-fi check', E.lime],
+              ['ux-copy 06',     'model download', E.ink],
+              ['→ screen 04',    'downloading · live', E.lime],
+              ['ux-copy 07',     'first entry', E.ink],
+              ['→ screen 05',    'ready · w/ primer', E.lime],
+            ].map(([k, v, c], i) => (
+              <div key={i} style={{
+                padding: '7px 10px',
+                borderRight: i % 2 === 0 ? `1px solid ${E.hair}` : 'none',
+                borderBottom: i < 8 ? `1px solid ${E.hair}` : 'none',
+                display: 'flex', flexDirection: 'column', gap: 2,
+                background: i % 4 < 2 ? 'transparent' : 'oklch(15% 0.012 55 / 0.5)',
+              }}>
+                <span style={{ color: E.faint, fontSize: 8.5 }}>{k}</span>
+                <span style={{ color: c, fontSize: 10 }}>{v}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* "Decisions" strip */}
+        <div style={{
+          marginTop: 28, padding: '14px 18px',
+          border: `1px solid ${E.hair}`,
+          background: 'oklch(15% 0.012 55)',
+          backgroundImage: TAPE_BG,
+          display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 0,
+        }}>
+          {[
+            { from: '8 screens · linear',  to: '5 screens · 1 is a board', why: 'fewer dead-ends · denser explainers' },
+            { from: 'screens 2/3/3.5/4',   to: 'one PRE-FLIGHT page',      why: 'permissions are a scoreboard, not a wizard' },
+            { from: '"Welcome to Vestige"',to: 'no welcome anywhere',      why: 'ux-copy §"things to NEVER write"' },
+            { from: 'progress as dots',    to: 'tick rule that fills',     why: 'matches capture timer · same vocab' },
+          ].map((row, i) => (
+            <div key={i} style={{
+              padding: '4px 14px',
+              borderRight: i < 3 ? `1px solid ${E.hair}` : 'none',
+              display: 'flex', flexDirection: 'column', gap: 4,
+            }}>
+              <div style={{
+                fontFamily: ET.mono, fontSize: 8.5, fontWeight: 600,
+                letterSpacing: '0.20em', textTransform: 'uppercase', color: E.faint,
+                textDecoration: 'line-through',
+              }}>{row.from}</div>
+              <div style={{
+                fontFamily: ET.mono, fontSize: 10, fontWeight: 700,
+                letterSpacing: '0.16em', textTransform: 'uppercase', color: E.lime,
+              }}>↓ {row.to}</div>
+              <div style={{
+                fontFamily: ET.sans, fontSize: 11, color: E.dim, lineHeight: 1.4,
+                marginTop: 2,
+              }}>{row.why}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* ─── Phones row ─────────────────────────────────────────── */}
+      <div style={{
+        display: 'flex', gap: 32, overflowX: 'auto', padding: '0 0 24px',
+        scrollSnapType: 'x mandatory',
+      }}>
+        <div style={{ flexShrink: 0, width: 32 }} />
+        <div style={{ scrollSnapAlign: 'start' }} data-screen-label="01 Persona">
+          <PhoneE label="01 · PERSONA" sub="WITNESS HIGHLIGHTED" accent={E.lime}>
+            <OnbPersona selected="WITNESS" />
+          </PhoneE>
+        </div>
+        <div style={{ scrollSnapAlign: 'start' }} data-screen-label="02 Wiring">
+          <PhoneE label="02 · WIRING" sub="THE HOW-TO" accent={E.ink}>
+            <OnbWiring />
+          </PhoneE>
+        </div>
+        <div style={{ scrollSnapAlign: 'start' }} data-screen-label="03 Wi-Fi">
+          <PhoneE label="03 · WI-FI" sub="READY TO PULL" accent={E.ink}>
+            <OnbWifi />
+          </PhoneE>
+        </div>
+        <div style={{ scrollSnapAlign: 'start' }} data-screen-label="04 Download">
+          <PhoneE label="04 · DOWNLOAD" sub="LIVE · 38%" accent={E.lime}>
+            <OnbDownload />
+          </PhoneE>
+        </div>
+        <div style={{ scrollSnapAlign: 'start' }} data-screen-label="05 Ready">
+          <PhoneE label="05 · READY" sub="PRIMER" accent={E.lime}>
+            <OnbReady />
+          </PhoneE>
+        </div>
+        <div style={{ flexShrink: 0, width: 32 }} />
+      </div>
+
+      {/* ─── Bottom annotations ────────────────────────────────── */}
+      <div style={{ maxWidth: 1100, margin: '40px auto 0' }}>
+        <div style={{
+          fontFamily: ET.mono, fontSize: 10, fontWeight: 700,
+          letterSpacing: '0.24em', textTransform: 'uppercase', color: E.lime,
+        }}>● DESIGN NOTES</div>
+        <div style={{
+          marginTop: 16,
+          display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16,
+        }}>
+          {[
+            ['TICK RULE PROGRESS', 'A 30-tick ruler at the top of every screen fills as you advance — same vocabulary the chunk timer in Capture uses. No dots, no fractions. The thing chunks.'],
+            ['WIRING IS A BOARD',  'Permissions are not a wizard. They are switches on a single scoreboard: LOCAL · MIC · NOTIFY · TYPE. Two start green (locked), two start pending. The screen explains itself by listing what is and is not happening.'],
+            ['SKIP IS A FIRST-CLASS PEER', 'On MIC and NOTIFY, the "skip" button sits inline with "allow" — same row, same weight. No degraded copy if you skip. The ux-copy.md note is explicit on this.'],
+            ['NO WELCOME · NO JOURNEY', 'Forbidden-copy litmus test passes: no "welcome," no "journey," no "let\'s reflect." Every header is a noun or a verb. The strongest reassurance is the locked LOCAL row — copy says what is true, not what feels nice.'],
+            ['WI-FI SHOWS THE PACKAGE', 'Before the download starts, we show the literal package: 3.66 GB, model name, integer-quantized, the 4-step sequence (PULL · VERIFY · UNPACK · IDLE). Judges installing the APK see the contract before they tap.'],
+            ['READY IS A PRIMER', 'Screen 5 is not a "you\'re all set" pat-on-the-back. It\'s the first prompt — "WHAT JUST HAPPENED?" — already on screen behind a halftone scrim, with a 3-cell box score teaching the rules: 30s chunks, 10 entries to pattern, 0 cloud.'],
+          ].map(([k, v]) => (
+            <div key={k} style={{
+              padding: '12px 14px', border: `1px solid ${E.hair}`,
+              background: 'oklch(15% 0.012 55)',
+            }}>
+              <div style={{
+                fontFamily: ET.mono, fontSize: 9.5, fontWeight: 700,
+                letterSpacing: '0.20em', textTransform: 'uppercase', color: E.ink,
+              }}>{k}</div>
+              <div style={{
+                marginTop: 6, fontFamily: ET.sans, fontSize: 12, lineHeight: 1.45,
+                color: E.dim,
+              }}>{v}</div>
+            </div>
+          ))}
+        </div>
+
+        {/* Backlog of what's still open */}
+        <div style={{
+          marginTop: 36, padding: '16px 18px',
+          border: `1px solid ${E.coralSoft}`,
+          background: 'oklch(20% 0.08 28 / 0.12)',
+        }}>
+          <div style={{
+            fontFamily: ET.mono, fontSize: 10, fontWeight: 700,
+            letterSpacing: '0.20em', textTransform: 'uppercase', color: E.coral,
+          }}>● OPEN QUESTIONS · BEFORE CODE</div>
+          <div style={{
+            marginTop: 10, fontFamily: ET.sans, fontSize: 13, lineHeight: 1.6,
+            color: E.ink,
+          }}>
+            <span style={{ color: E.coral, fontWeight: 600 }}>1.</span> The
+            WIRING screen lets users tap "ALLOW" on MIC and NOTIFY independently —
+            but ADR-004 wants notification permission requested only after mic
+            resolves. Do we serialize the OS dialogs, or fire them on tap and let
+            Android queue? <span style={{ color: E.dim }}>Probably: fire on tap. The
+            OS already serializes.</span>
+            <br /><br />
+            <span style={{ color: E.coral, fontWeight: 600 }}>2.</span> Denied-mic
+            flow: this comp shows the happy path. Story 4.11 owns the polished
+            denied surface. The WIRING row swaps to status "BLOCKED" in coral with
+            a "SETTINGS" inline action — sketch lives in the dev notes, not here.
+            <br /><br />
+            <span style={{ color: E.coral, fontWeight: 600 }}>3.</span> Pre-API-33
+            Android: the WIRING screen should auto-mark NOTIFY as "LOCKED · CHANNEL"
+            and skip the dialog. The post-action state in this comp assumes API-33+.
+            <span style={{ color: E.dim }}> If you like this direction, tell me
+            which states need their own phone and I'll add them.</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<OnboardingCanvas />);
+</script>
+</body>
+</html>

@@ -11,6 +11,7 @@ import io.mockk.confirmVerified
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
+import org.junit.After
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertSame
@@ -22,6 +23,15 @@ import org.robolectric.annotation.Config
 
 @RunWith(RobolectricTestRunner::class)
 class VestigeApplicationTest {
+
+    @After
+    fun resetStrictMode() {
+        // StrictMode thread/VM policy is process-global. Robolectric reuses the JVM, so the
+        // debuggable test's armed policy would leak into the release-path assertion if it ran
+        // first. Restore LAX before the next test enters.
+        StrictMode.setThreadPolicy(StrictMode.ThreadPolicy.LAX)
+        StrictMode.setVmPolicy(StrictMode.VmPolicy.LAX)
+    }
 
     @Test
     @Config(manifest = Config.NONE, application = ReleaseVestigeApplicationTestApp::class)

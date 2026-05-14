@@ -280,9 +280,9 @@ class OnboardingHostTest {
         onComplete: (Persona) -> Unit = {},
         wifiAvailability: WifiAvailability = WifiAvailability { false },
         modelAvailability: ModelAvailability = fakeModelAvailability(ModelArtifactState.Absent),
-        downloadDispatcher: CoroutineDispatcher = Dispatchers.Unconfined,
+        ioDispatcher: CoroutineDispatcher = Dispatchers.Unconfined,
     ) {
-        // Test default is `Unconfined` so `withContext(downloadDispatcher)` runs the download
+        // Test default is `Unconfined` so `withContext(ioDispatcher)` runs the download
         // body on the calling thread — `composeRule.waitForIdle()` then drains it deterministically.
         composeRule.activity.setContent {
             VestigeTheme {
@@ -291,7 +291,7 @@ class OnboardingHostTest {
                     onComplete = onComplete,
                     modelAvailability = modelAvailability,
                     wifiAvailability = wifiAvailability,
-                    downloadDispatcher = downloadDispatcher,
+                    ioDispatcher = ioDispatcher,
                 )
             }
         }

@@ -23,8 +23,14 @@ class TestVestigeApplication : VestigeApplication() {
         markdownStoreFactory = { _ -> MarkdownEntryStore(File(tempRoot, "markdown").apply { mkdirs() }) },
     )
 
-    /** Test hook — Robolectric reuses the JVM, so callers must release the lazy temp root or it leaks. */
+    /**
+     * Test hook — Robolectric reuses the JVM, so callers must release both the in-memory BoxStore
+     * (native registry, leaks into the next suite otherwise) and the lazy markdown temp root.
+     */
     fun releaseTempStorage() {
+        // appContainer is `lateinit var` with `private set` — `::appContainer.isInitialized` isn't
+        // accessible from a subclass, so swallow the UninitializedPropertyAccessException instead.
+        runCatching { appContainer.boxStore.close() }
         if (tempRoot.exists()) {
             check(tempRoot.deleteRecursively()) { "Failed to delete test temp root: $tempRoot" }
         }

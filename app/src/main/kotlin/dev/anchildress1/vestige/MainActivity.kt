@@ -5,6 +5,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -20,6 +21,7 @@ import dev.anchildress1.vestige.ui.capture.ForegroundInferenceCall
 import dev.anchildress1.vestige.ui.capture.ModelReadiness
 import dev.anchildress1.vestige.ui.capture.RealVoiceCapture
 import dev.anchildress1.vestige.ui.capture.SaveAndExtract
+import dev.anchildress1.vestige.ui.capture.ToneGeneratorLimitWarningCue
 import dev.anchildress1.vestige.ui.onboarding.ModelAvailability
 import dev.anchildress1.vestige.ui.onboarding.OnboardingHost
 import dev.anchildress1.vestige.ui.onboarding.OnboardingPrefs
@@ -69,7 +71,11 @@ class MainActivity : ComponentActivity() {
 
 @androidx.compose.runtime.Composable
 private fun CaptureRoute(container: AppContainer, persona: Persona, clock: Clock, zoneId: ZoneId) {
-    val viewModel = remember(container, persona) {
+    val limitWarningCue = remember { ToneGeneratorLimitWarningCue() }
+    DisposableEffect(limitWarningCue) {
+        onDispose { limitWarningCue.release() }
+    }
+    val viewModel = remember(container, persona, limitWarningCue) {
         CaptureViewModel(
             initialPersona = persona,
             recordVoice = RealVoiceCapture(),
@@ -86,6 +92,7 @@ private fun CaptureRoute(container: AppContainer, persona: Persona, clock: Clock
             // 3.66 GB file to enable REC. Real-time observation of Downloading / Paused states
             // lands with the error chrome in commit 6.
             initialReadiness = deriveInitialReadiness(container),
+            limitWarningCue = limitWarningCue,
         )
     }
     val stats = remember(container) { deriveStats(container) }

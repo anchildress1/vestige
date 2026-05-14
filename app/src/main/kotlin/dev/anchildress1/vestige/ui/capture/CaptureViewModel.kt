@@ -44,6 +44,8 @@ class CaptureViewModel(
     private val initialReadiness: ModelReadiness = ModelReadiness.Loading,
     private val maxDurationMs: Long = MAX_DURATION_MS,
     private val levelWindowSize: Int = LEVEL_WINDOW_SIZE,
+    private val limitWarningCue: LimitWarningCue = LimitWarningCue {},
+    private val limitWarningThresholdMs: Long = LIMIT_WARNING_THRESHOLD_MS,
 ) : ViewModel() {
 
     private val _state: MutableStateFlow<CaptureUiState> = MutableStateFlow(
@@ -58,6 +60,7 @@ class CaptureViewModel(
     )
 
     private var recordingJob: Job? = null
+    private var limitWarningFired: Boolean = false
 
     fun setModelReadiness(readiness: ModelReadiness) {
         _state.update { current ->
@@ -133,6 +136,7 @@ class CaptureViewModel(
             elapsedMs = 0L,
             recentLevels = meter.levels,
         )
+        limitWarningFired = false
         val startedAtMs = clock.millis()
         recordingJob = viewModelScope.launch {
             try {
@@ -231,6 +235,10 @@ class CaptureViewModel(
         val clamped = level.coerceIn(0f, 1f)
         meter.push(samples = floatArrayOf(clamped), count = 1)
         val elapsed = clock.millis() - startedAtMs
+        if (!limitWarningFired && elapsed >= limitWarningThresholdMs) {
+            limitWarningFired = true
+            limitWarningCue.fire()
+        }
         _state.update { current ->
             if (current is CaptureUiState.Recording) {
                 current.copy(elapsedMs = elapsed.coerceAtMost(maxDurationMs), recentLevels = meter.levels)
@@ -293,6 +301,7 @@ class CaptureViewModel(
     companion object {
         const val MAX_DURATION_MS: Long = 30_000L
         const val LEVEL_WINDOW_SIZE: Int = 42
+        const val LIMIT_WARNING_THRESHOLD_MS: Long = 28_000L
         private const val MIN_TYPED_LENGTH: Int = 3
         private const val TAG = "CaptureVM"
     }

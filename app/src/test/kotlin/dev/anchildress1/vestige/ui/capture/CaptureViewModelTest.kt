@@ -349,6 +349,102 @@ class CaptureViewModelTest {
         assertEquals(Persona.EDITOR, vm.state.value.persona)
     }
 
+    // ─── 30s cap audio cue (pre-warn at 28s, single fire) ────────────────────
+
+    @Test
+    fun `limit warning cue fires once when elapsed crosses 28s (pos)`() = runTest(dispatcher) {
+        val voice = FakeVoiceCapture(result = AudioChunk(FloatArray(16), 16_000, isFinal = true))
+        val cue = CountingLimitWarningCue()
+        val advancing = AdvancingClock()
+        val vm = newViewModel(
+            voice = voice,
+            initialReadiness = ModelReadiness.Ready,
+            clockOverride = advancing,
+            limitWarningCue = cue,
+        )
+        voice.queueLevels(0.1f, 0.2f, 0.3f)
+
+        vm.startRecording()
+        advancing.offsetMs = 5_000L
+        voice.emitNextLevel()
+        assertEquals("no cue before threshold", 0, cue.fireCount.get())
+
+        advancing.offsetMs = 28_001L
+        voice.emitNextLevel()
+        assertEquals("first cross of the 28s line fires the cue", 1, cue.fireCount.get())
+
+        advancing.offsetMs = 29_500L
+        voice.emitNextLevel()
+        assertEquals("subsequent level updates past the threshold do not re-fire", 1, cue.fireCount.get())
+    }
+
+    @Test
+    fun `limit warning cue does not fire when recording stops before 28s (neg)`() = runTest(dispatcher) {
+        val voice = FakeVoiceCapture(result = AudioChunk(FloatArray(16), 16_000, isFinal = true))
+        val cue = CountingLimitWarningCue()
+        val advancing = AdvancingClock()
+        val vm = newViewModel(
+            voice = voice,
+            initialReadiness = ModelReadiness.Ready,
+            clockOverride = advancing,
+            limitWarningCue = cue,
+        )
+        voice.queueLevels(0.1f, 0.2f)
+
+        vm.startRecording()
+        advancing.offsetMs = 10_000L
+        voice.emitNextLevel()
+        advancing.offsetMs = 27_999L
+        voice.emitNextLevel()
+
+        assertEquals(0, cue.fireCount.get())
+    }
+
+    @Test
+    fun `limit warning cue resets between recordings (edge — fresh session re-arms)`() = runTest(dispatcher) {
+        val voiceA = FakeVoiceCapture(result = AudioChunk(FloatArray(16), 16_000, isFinal = true))
+        val voiceB = FakeVoiceCapture(result = AudioChunk(FloatArray(16), 16_000, isFinal = true))
+        val cue = CountingLimitWarningCue()
+        val advancing = AdvancingClock()
+        var active: FakeVoiceCapture = voiceA
+        val routing = VoiceCapture { onLevel, stopFlow -> active.invoke(onLevel, stopFlow) }
+        val vm = newViewModel(
+            voice = routing,
+            inference = FakeForegroundInference(
+                ForegroundResult.Success(
+                    persona = Persona.WITNESS,
+                    rawResponse = "",
+                    elapsedMs = 0,
+                    completedAt = clock.instant(),
+                    transcription = "",
+                    followUp = "",
+                ),
+            ),
+            save = RecordingSaveAndExtract(),
+            initialReadiness = ModelReadiness.Ready,
+            clockOverride = advancing,
+            limitWarningCue = cue,
+        )
+
+        voiceA.queueLevels(0.1f)
+        vm.startRecording()
+        advancing.offsetMs = 28_500L
+        voiceA.emitNextLevel()
+        assertEquals(1, cue.fireCount.get())
+
+        voiceA.completeWithResult()
+        advanceUntilIdle()
+        vm.acknowledgeReview()
+
+        active = voiceB
+        voiceB.queueLevels(0.1f)
+        advancing.offsetMs = 50_000L
+        vm.startRecording()
+        advancing.offsetMs = 78_500L
+        voiceB.emitNextLevel()
+        assertEquals("second recording must re-arm and fire again past its own threshold", 2, cue.fireCount.get())
+    }
+
     @Suppress("LongParameterList")
     private fun newViewModel(
         persona: Persona = Persona.WITNESS,
@@ -358,14 +454,17 @@ class CaptureViewModelTest {
         },
         save: SaveAndExtract = SaveAndExtract { _, _, _ -> },
         initialReadiness: ModelReadiness = ModelReadiness.Loading,
+        clockOverride: Clock = clock,
+        limitWarningCue: LimitWarningCue = LimitWarningCue {},
     ): CaptureViewModel = CaptureViewModel(
         initialPersona = persona,
         recordVoice = voice,
         foregroundInference = inference,
         saveAndExtract = save,
-        clock = clock,
+        clock = clockOverride,
         zoneId = ZoneOffset.UTC,
         initialReadiness = initialReadiness,
+        limitWarningCue = limitWarningCue,
     )
 
     private class FakeForegroundInference(private val result: ForegroundResult) : ForegroundInferenceCall {
@@ -375,6 +474,21 @@ class CaptureViewModelTest {
     private class SuspendingForegroundInference(private val pending: CompletableDeferred<ForegroundResult>) :
         ForegroundInferenceCall {
         override suspend fun invoke(audio: AudioChunk, persona: Persona): ForegroundResult = pending.await()
+    }
+
+    private class CountingLimitWarningCue : LimitWarningCue {
+        val fireCount: AtomicInteger = AtomicInteger(0)
+        override fun fire() {
+            fireCount.incrementAndGet()
+        }
+    }
+
+    private class AdvancingClock(start: Instant = Instant.parse("2026-05-14T09:41:00Z")) : Clock() {
+        private val baseline: Instant = start
+        var offsetMs: Long = 0L
+        override fun getZone(): java.time.ZoneId = ZoneOffset.UTC
+        override fun withZone(zone: java.time.ZoneId?): Clock = this
+        override fun instant(): Instant = baseline.plusMillis(offsetMs)
     }
 
     private class RecordingSaveAndExtract : SaveAndExtract {

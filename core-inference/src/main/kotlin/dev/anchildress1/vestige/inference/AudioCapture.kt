@@ -143,10 +143,9 @@ class AudioCapture(
             .onFailure { Log.w(TAG, "stop() during requestStop failed: ${it.message}") }
     }
 
-    // Release the JNI handle and zero the read + builder buffers so accumulated PCM samples
-    // don't linger past cleanup. ADR-001 §Q8 budgets 100ms for release; we measure and log if
-    // exceeded — Android's AudioRecord has no force-release API, so the log is the actionable
-    // signal for a stuck device.
+    // Release the JNI handle and zero the Kotlin-side buffers so accumulated PCM samples don't
+    // linger past cleanup. Measures release against the 100ms budget; Android's AudioRecord
+    // has no force-release API, so the log is the only actionable signal on a stuck device.
     internal fun releaseAndOverwrite(record: AudioRecord, readBuffer: FloatArray, builder: ChunkBuilder) {
         val releaseStartNs = System.nanoTime()
         record.release()

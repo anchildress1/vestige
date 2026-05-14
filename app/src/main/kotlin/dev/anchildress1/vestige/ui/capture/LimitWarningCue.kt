@@ -14,16 +14,20 @@ fun interface LimitWarningCue {
 
 /**
  * Android implementation. Uses [ToneGenerator] on the notification stream so the cue respects
- * the user's notification volume (not media volume — playback isn't the right semantic). The
- * generator is constructed lazily on first fire and reused; release on host teardown.
+ * the user's notification volume (not media volume — playback isn't the right semantic).
  */
 class ToneGeneratorLimitWarningCue : LimitWarningCue {
 
     private var tone: ToneGenerator? = null
+    private var initFailed: Boolean = false
 
     override fun fire() {
+        if (initFailed) return
         val gen = tone ?: runCatching { ToneGenerator(AudioManager.STREAM_NOTIFICATION, VOLUME) }
-            .onFailure { Log.w(TAG, "ToneGenerator init failed; skipping limit cue", it) }
+            .onFailure {
+                Log.w(TAG, "ToneGenerator init failed; limit cue silenced for this session", it)
+                initFailed = true
+            }
             .getOrNull()
             ?.also { tone = it }
             ?: return

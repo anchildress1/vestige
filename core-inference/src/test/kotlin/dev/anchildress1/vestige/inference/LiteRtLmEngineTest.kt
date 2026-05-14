@@ -1,5 +1,7 @@
 package dev.anchildress1.vestige.inference
 
+import com.google.ai.edge.litertlm.Content
+import io.mockk.mockk
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertThrows
@@ -21,7 +23,7 @@ class LiteRtLmEngineTest {
             runTest { engine.generateText("hello") }
         }
         assertEquals(
-            "LiteRtLmEngine.generateText called before initialize().",
+            "LiteRtLmEngine.generateText called before initialize() (or after close()).",
             error.message,
         )
     }
@@ -30,10 +32,10 @@ class LiteRtLmEngineTest {
     fun `sendMessageContents before initialize throws IllegalStateException`() {
         val engine = LiteRtLmEngine(modelPath = NOT_USED_PATH)
         val error = assertThrows(IllegalStateException::class.java) {
-            runTest { engine.sendMessageContents(emptyList()) }
+            runTest { engine.sendMessageContents(listOf(mockk<Content>())) }
         }
         assertEquals(
-            "LiteRtLmEngine.sendMessageContents called before initialize().",
+            "LiteRtLmEngine.sendMessageContents called before initialize() (or after close()).",
             error.message,
         )
     }

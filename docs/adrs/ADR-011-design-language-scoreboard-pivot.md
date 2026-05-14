@@ -218,3 +218,7 @@ On-device round-trip for Story 4.5 lands: REC tap → record → STOP → foregr
 **Why this is an addendum, not a new ADR:** the design pivot itself is unchanged; this records the verification result + the live-surface refinements that fell out of on-device review. Per AGENTS.md rule 23.
 
 **Affected files (this addendum's scope):** `LiveLayout.kt` (TimerPill removal from `AppTop.rightContent`), `LiveLayoutTest.kt` (drop the duplicate-timer assertion if it was pinned), follow-up commit for 30 s audio cue. Story 4.5 done-when bullets tick the verified items.
+
+### Addendum (2026-05-14) — 30 s cap audio cue landed
+
+The pre-warn cue from the prior addendum landed as a single-fire system tone (`ToneGenerator.TONE_PROP_BEEP`, 150 ms, notification stream, volume 60) at 28 s elapsed — pre-warn only, no cap-moment cue. Implementation: `LimitWarningCue` fun interface + `ToneGeneratorLimitWarningCue` Android impl; VM resets the one-shot flag on each new recording so consecutive takes each fire their own cue. No chime asset bundled. Rationale for the system-tone approach over a bundled chime: ships zero-asset, respects the user's notification volume, and the design wanted "minimum viable signal" before the cap fires — not a branded chime.

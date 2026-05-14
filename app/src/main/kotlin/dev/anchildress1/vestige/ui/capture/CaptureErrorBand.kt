@@ -25,10 +25,8 @@ import androidx.compose.ui.unit.dp
 import dev.anchildress1.vestige.ui.theme.VestigeTheme
 
 /**
- * Inline diagnostic band on the Idle layout. Renders when the user needs to know why REC is not
- * usable (mic denied, model warming / paused / downloading) or why the last inference attempt
- * dropped (`ForegroundResult.ParseFailure`, timeout, engine throw). Read-only — recovery is
- * always REC-tap, which transitions out of Idle and clears the band via state shape.
+ * Idle-state diagnostic band. Read-only — REC-tap clears the underlying state, which clears
+ * the band. `resolveBandKind` enumerates the rendered conditions.
  */
 @Composable
 fun CaptureErrorBand(error: CaptureError?, readiness: ModelReadiness, modifier: Modifier = Modifier) {
@@ -126,10 +124,18 @@ internal sealed interface BandKind {
     }
 
     data class ModelDownloading(val percent: Int) : BandKind {
+        init {
+            require(percent in PERCENT_RANGE) { "Downloading percent must be in 0..100 (got $percent)" }
+        }
+
         override val eyebrow: String = CaptureCopy.BAND_LABEL_MODEL_DOWNLOADING_FMT.format(percent)
         override val body: String = CaptureCopy.MODEL_DOWNLOADING_LINE_FMT.format(percent)
         override val isError = false
         override val contentDescription: String = "Model downloading $percent percent."
+
+        private companion object {
+            val PERCENT_RANGE = 0..100
+        }
     }
 }
 

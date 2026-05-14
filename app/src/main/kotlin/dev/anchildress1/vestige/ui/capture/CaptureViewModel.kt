@@ -8,6 +8,7 @@ import dev.anchildress1.vestige.inference.ForegroundResult
 import dev.anchildress1.vestige.model.Persona
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.channels.BufferOverflow
@@ -28,7 +29,7 @@ import java.time.ZonedDateTime
  * fun-interfaces so the JVM unit suite drives the full state machine without Android dependencies.
  *
  * Audio bytes never enter this VM — only RMS levels (0..1) and the final `AudioChunk` that the
- * foreground call consumes once and discards (see `ForegroundInference.discardTempWav`).
+ * foreground call consumes once.
  */
 @Suppress(
     "LongParameterList", // Constructor seams: 3 collaborators + clock + zone + readiness + windows.
@@ -174,9 +175,8 @@ class CaptureViewModel(
 
     /**
      * Called by host on DISCARD tap. Only valid during RECORDING — after STOP the foreground
-     * call is in flight and cancellation is out of scope per ADR-001 §Q8. Awaits the recording
-     * job's cancellation (cancelAndJoin) so `AudioCapture`'s `finally` block — which stops and
-     * releases the `AudioRecord` JNI handle — completes before the UI surfaces Idle.
+     * call is in flight and not cancellable. Awaits the recording job's cancellation so
+     * `AudioCapture` releases the JNI handle and zeroes buffers before the UI surfaces Idle.
      */
     fun discard() {
         val current = _state.value
@@ -201,6 +201,7 @@ class CaptureViewModel(
         val trimmed = text.trim()
         if (trimmed.length < MIN_TYPED_LENGTH) return
         val current = _state.value
+        if (current !is CaptureUiState.Idle) return
         viewModelScope.launch {
             _state.value = CaptureUiState.Inferring(
                 persona = current.persona,
@@ -276,6 +277,9 @@ class CaptureViewModel(
                     CaptureError.InferenceFailed.Reason.PARSE_FAILED,
                 )
             }
+        } catch (timeout: TimeoutCancellationException) {
+            Log.w(TAG, "Foreground inference timed out", timeout)
+            emitInferenceError(persona, readiness, CaptureError.InferenceFailed.Reason.TIMED_OUT)
         } catch (cancel: CancellationException) {
             throw cancel
         } catch (@Suppress("TooGenericExceptionCaught") error: Exception) {

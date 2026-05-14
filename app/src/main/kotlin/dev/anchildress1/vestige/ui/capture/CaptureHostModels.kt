@@ -1,5 +1,6 @@
 package dev.anchildress1.vestige.ui.capture
 
+import android.util.Log
 import dev.anchildress1.vestige.AppContainer
 import dev.anchildress1.vestige.model.PatternState
 import java.time.Clock
@@ -17,7 +18,8 @@ internal fun deriveInitialReadiness(container: AppContainer): ModelReadiness {
             actualBytes = file.length(),
             expectedBytes = store.manifest.expectedByteSize,
         )
-    }.getOrDefault(ModelReadiness.Loading)
+    }.onFailure { Log.e(TAG, "Failed to probe model artifact at ${file.path}; defaulting to Loading", it) }
+        .getOrDefault(ModelReadiness.Loading)
 }
 
 internal fun deriveModelReadiness(fileExists: Boolean, actualBytes: Long, expectedBytes: Long): ModelReadiness =
@@ -49,5 +51,6 @@ internal fun deriveMeta(clock: Clock, zoneId: ZoneId): CaptureMeta {
 
 internal data class CapturePatternSummary(val state: PatternState, val sourceCount: Int)
 
+private const val TAG = "VestigeCaptureHost"
 private val MONTH_DAY_FORMATTER: DateTimeFormatter = DateTimeFormatter.ofPattern("MMM d", Locale.US)
 private val TIME_FORMATTER: DateTimeFormatter = DateTimeFormatter.ofPattern("h:mm a", Locale.US)

@@ -346,6 +346,7 @@ class AppContainer(
         val store = mainModelArtifactStore
         val file = store.artifactFile
         return runCatching { file.exists() && file.length() == store.manifest.expectedByteSize }
+            .onFailure { Log.e(TAG, "Failed to probe main model artifact at ${file.path}", it) }
             .getOrDefault(false)
     }
 

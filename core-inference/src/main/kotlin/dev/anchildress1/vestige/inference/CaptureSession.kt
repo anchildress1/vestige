@@ -4,8 +4,8 @@ import dev.anchildress1.vestige.model.Persona
 import java.time.Clock
 
 /**
- * Single-use turn-by-turn state for one capture. After RESPONDED, DISCARDED, or ERROR the
- * instance is terminal — the next recording requires a fresh session.
+ * Single-use turn-by-turn state for one capture. RESPONDED, DISCARDED, and ERROR are terminal —
+ * the next recording requires a fresh session.
  *
  * ```
  *   IDLE ──startRecording──▶ RECORDING ──submitForInference──▶ INFERRING
@@ -14,12 +14,10 @@ import java.time.Clock
  *                                ▼          RESPONDED ◀──recordModelResponse── TRANSCRIBED
  *                            DISCARDED
  *
- *   any ──fail──▶ ERROR
+ *   non-terminal ──fail──▶ ERROR
  * ```
  *
- * Illegal transitions throw. The transcript stores text only — no audio bytes. `DISCARDED` is
- * the user-initiated cancel path per ADR-001 §Q8 — reachable only from `RECORDING`, terminal,
- * persists nothing, no `Undo`.
+ * Illegal transitions throw. The transcript stores text only — no audio bytes.
  */
 class CaptureSession(private val clock: Clock = Clock.systemUTC(), defaultPersona: Persona = Persona.WITNESS) {
 
@@ -65,6 +63,13 @@ class CaptureSession(private val clock: Clock = Clock.systemUTC(), defaultPerson
     }
 
     fun fail(error: Throwable) {
+        requireState(
+            "fail",
+            State.IDLE,
+            State.RECORDING,
+            State.INFERRING,
+            State.TRANSCRIBED,
+        )
         lastError = error
         state = State.ERROR
     }

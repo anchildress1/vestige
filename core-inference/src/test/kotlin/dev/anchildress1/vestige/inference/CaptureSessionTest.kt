@@ -159,7 +159,7 @@ class CaptureSessionTest {
     }
 
     @Test
-    fun `fail from any state moves to ERROR and stores the cause`() {
+    fun `fail from a non-terminal state moves to ERROR and stores the cause`() {
         val session = CaptureSession()
         val cause = IllegalArgumentException("model exploded")
         session.fail(cause)
@@ -189,14 +189,14 @@ class CaptureSessionTest {
     }
 
     @Test
-    fun `repeated fail calls overwrite lastError with the latest cause`() {
+    fun `fail from a terminal state throws — ERROR is itself terminal`() {
         val session = CaptureSession()
-        val first = RuntimeException("first")
-        val second = RuntimeException("second")
-        session.fail(first)
-        session.fail(second)
-        assertEquals(CaptureSession.State.ERROR, session.state)
-        assertSame(second, session.lastError)
+        session.fail(RuntimeException("first"))
+        val ex = assertThrows(IllegalStateException::class.java) {
+            session.fail(RuntimeException("second"))
+        }
+        assertTrue(ex.message!!.contains("fail"))
+        assertTrue(ex.message!!.contains("ERROR"))
     }
 
     @Test
@@ -324,14 +324,15 @@ class CaptureSessionTest {
     }
 
     @Test
-    fun `fail from DISCARDED still moves to ERROR — fail is the universal escape hatch`() {
+    fun `fail from DISCARDED throws — DISCARDED is terminal`() {
         val session = CaptureSession()
         session.startRecording()
         session.discard()
-        val cause = RuntimeException("post-discard cleanup blew up")
-        session.fail(cause)
-        assertEquals(CaptureSession.State.ERROR, session.state)
-        assertSame(cause, session.lastError)
+        val ex = assertThrows(IllegalStateException::class.java) {
+            session.fail(RuntimeException("post-discard cleanup blew up"))
+        }
+        assertTrue(ex.message!!.contains("fail"))
+        assertTrue(ex.message!!.contains("DISCARDED"))
     }
 
     @Test
@@ -374,9 +375,12 @@ class CaptureSessionTest {
         assertEquals(CaptureSession.State.RESPONDED, session.state)
         assertEquals(Persona.EDITOR, session.activePersona)
 
-        session.fail(RuntimeException("boom"))
-        session.setPersona(Persona.HARDASS)
-        assertEquals(CaptureSession.State.ERROR, session.state)
-        assertEquals(Persona.HARDASS, session.activePersona)
+        // ERROR is terminal too — drive a separate session into ERROR directly so the assertion
+        // doesn't lean on the (now forbidden) RESPONDED -> ERROR transition.
+        val errorSession = CaptureSession()
+        errorSession.fail(RuntimeException("boom"))
+        errorSession.setPersona(Persona.HARDASS)
+        assertEquals(CaptureSession.State.ERROR, errorSession.state)
+        assertEquals(Persona.HARDASS, errorSession.activePersona)
     }
 }

@@ -52,7 +52,7 @@ class AudioCapture(
             }
         } finally {
             runCatching { record.stop() }.onFailure { Log.w(TAG, "stop() on un-started AudioRecord") }
-            record.release()
+            releaseAndOverwrite(record, readBuffer, builder)
         }
     }.flowOn(captureDispatcher)
     // `flowOn` is non-negotiable here: `AudioRecord.read(... READ_BLOCKING)` parks the calling
@@ -134,11 +134,28 @@ class AudioCapture(
         stopRequested.set(true)
     }
 
+    // Release the JNI handle and zero the read + builder buffers so accumulated PCM samples
+    // don't linger past cleanup. ADR-001 §Q8 budgets 100ms for release; we measure and log if
+    // exceeded — Android's AudioRecord has no force-release API, so the log is the actionable
+    // signal for a stuck device.
+    internal fun releaseAndOverwrite(record: AudioRecord, readBuffer: FloatArray, builder: ChunkBuilder) {
+        val releaseStartNs = System.nanoTime()
+        record.release()
+        val releaseMs = (System.nanoTime() - releaseStartNs) / NANOS_PER_MILLI
+        if (releaseMs > JNI_RELEASE_BUDGET_MS) {
+            Log.w(TAG, "AudioRecord.release() took ${releaseMs}ms (budget ${JNI_RELEASE_BUDGET_MS}ms)")
+        }
+        readBuffer.fill(0f)
+        builder.clear()
+    }
+
     companion object {
         const val SAMPLE_RATE_HZ: Int = 16_000
         const val CHUNK_DURATION_MS: Long = 30_000L
         private const val BYTES_PER_FLOAT: Int = 4
         private const val MS_PER_SECOND: Long = 1_000L
+        private const val JNI_RELEASE_BUDGET_MS: Long = 100L
+        private const val NANOS_PER_MILLI: Long = 1_000_000L
         private const val TAG = "VestigeAudioCapture"
     }
 }

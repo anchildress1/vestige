@@ -51,4 +51,14 @@ internal class ChunkBuilder(val samplesPerChunk: Int) {
         pos = 0
         return tail
     }
+
+    /**
+     * Zero the in-progress buffer and reset the write head. Used by `AudioCapture`'s cleanup
+     * path on cancellation / discard so accumulated PCM samples don't linger in process memory
+     * past the synchronous-destruction window in ADR-001 §Q8.
+     */
+    fun clear() {
+        current.fill(0f)
+        pos = 0
+    }
 }

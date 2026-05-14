@@ -254,6 +254,49 @@ class AudioCaptureTest {
         assertEquals(1f, clipped)
     }
 
+    // ─── releaseAndOverwrite (Q8 — synchronous cleanup) ─────────────────────
+
+    @Test
+    fun `releaseAndOverwrite zeroes the read buffer and clears the builder (pos)`() {
+        val capture = AudioCapture()
+        val record = mockk<AudioRecord>(relaxed = true)
+        val readBuffer = FloatArray(8) { (it + 1).toFloat() }
+        val builder = ChunkBuilder(samplesPerChunk = 16).apply {
+            append(floatArrayOf(0.1f, 0.2f, 0.3f), count = 3)
+        }
+
+        capture.releaseAndOverwrite(record, readBuffer, builder)
+
+        verify { record.release() }
+        assertTrue(readBuffer.all { it == 0f }, "read buffer must be zeroed after cleanup")
+        assertNull(builder.drainFinal(), "builder must be cleared after cleanup")
+    }
+
+    @Test
+    fun `releaseAndOverwrite logs a warning when release exceeds the 100ms budget (edge — slow JNI)`() {
+        val capture = AudioCapture()
+        val record = mockk<AudioRecord>()
+        every { record.release() } answers { Thread.sleep(120) }
+        val readBuffer = FloatArray(4)
+        val builder = ChunkBuilder(samplesPerChunk = 4)
+
+        capture.releaseAndOverwrite(record, readBuffer, builder)
+
+        verify { Log.w(tag, match<String> { it.contains("release()") && it.contains("budget") }) }
+    }
+
+    @Test
+    fun `releaseAndOverwrite does not log when release completes inside the budget (neg)`() {
+        val capture = AudioCapture()
+        val record = mockk<AudioRecord>(relaxed = true)
+        val readBuffer = FloatArray(4)
+        val builder = ChunkBuilder(samplesPerChunk = 4)
+
+        capture.releaseAndOverwrite(record, readBuffer, builder)
+
+        verify(exactly = 0) { Log.w(tag, match<String> { it.contains("budget") }) }
+    }
+
     @Test
     fun `readUntilCapOrStop returns null when read produces 0 samples and stop fires later`() = runTest {
         // AudioRecord.READ_BLOCKING can legitimately return 0; the loop must not synthesize a chunk.

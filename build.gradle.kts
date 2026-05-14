@@ -118,6 +118,9 @@ kover {
                         "dev.anchildress1.vestige.ui.capture.CaptureScreenKt",
                         "dev.anchildress1.vestige.ui.capture.CaptureScreenKt*",
                         "dev.anchildress1.vestige.ui.capture.*CaptureScreenKt*",
+                        "dev.anchildress1.vestige.ui.capture.TypeEntrySheetKt",
+                        "dev.anchildress1.vestige.ui.capture.TypeEntrySheetKt*",
+                        "dev.anchildress1.vestige.ui.capture.*TypeEntrySheetKt*",
                         // Debug-only fixture seeder for on-device manual verification.
                         // FLAG_DEBUGGABLE-gated at the call site; not on any release path.
                         "dev.anchildress1.vestige.debug.*",
@@ -212,6 +215,7 @@ sonar {
                 "**/ui/capture/LiveLevelBars.kt",
                 "**/ui/capture/ChunkProgressBar.kt",
                 "**/ui/capture/CaptureScreen.kt",
+                "**/ui/capture/TypeEntrySheet.kt",
                 // Debug-only fixture seeder, FLAG_DEBUGGABLE-gated; never on a release path.
                 "**/debug/**",
             ).joinToString(","),

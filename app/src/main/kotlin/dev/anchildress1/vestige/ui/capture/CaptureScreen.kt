@@ -17,7 +17,10 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -46,6 +49,7 @@ import dev.anchildress1.vestige.ui.theme.VestigeTheme
  */
 @Composable
 @Suppress("LongParameterList") // Route-level entry; each param is a distinct host concern.
+@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 fun CaptureScreen(
     viewModel: CaptureViewModel,
     stats: CaptureStats,
@@ -68,6 +72,7 @@ fun CaptureScreen(
             if (granted) viewModel.startRecording() else launcher.launch(Manifest.permission.RECORD_AUDIO)
         }
     }
+    var showTypeSheet by rememberSaveable { mutableStateOf(false) }
 
     when (val current = state) {
         is CaptureUiState.Idle -> IdleLayout(
@@ -75,7 +80,7 @@ fun CaptureScreen(
             stats = stats,
             meta = meta,
             onRecTap = onRecTap,
-            onTypeTap = { /* type sheet wires in a later commit */ },
+            onTypeTap = { showTypeSheet = true },
             onPersonaTap = onPersonaTap,
             onStatusTap = onStatusTap,
             modifier = modifier,
@@ -97,6 +102,16 @@ fun CaptureScreen(
             state = current,
             onAcknowledge = viewModel::acknowledgeReview,
             modifier = modifier,
+        )
+    }
+
+    if (showTypeSheet) {
+        TypeEntrySheet(
+            onDismiss = { showTypeSheet = false },
+            onSubmit = { text ->
+                viewModel.submitTyped(text)
+                showTypeSheet = false
+            },
         )
     }
 }

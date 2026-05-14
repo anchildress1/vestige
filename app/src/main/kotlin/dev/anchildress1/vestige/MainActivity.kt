@@ -121,4 +121,8 @@ private fun deriveMeta(clock: Clock, zoneId: ZoneId): CaptureMeta {
 }
 
 private val MONTH_DAY_FORMATTER: DateTimeFormatter = DateTimeFormatter.ofPattern("MMM d", Locale.US)
-private val TIME_FORMATTER: DateTimeFormatter = DateTimeFormatter.ofPattern("HH:mm", Locale.US)
+
+// 12-hour clock with AM/PM marker — "9:41 AM" / "9:41 PM". The Scoreboard date strip leans on
+// tabular nums in the display style so the AM/PM suffix lands as legible chrome without throwing
+// the column alignment.
+private val TIME_FORMATTER: DateTimeFormatter = DateTimeFormatter.ofPattern("h:mm a", Locale.US)

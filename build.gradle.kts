@@ -97,6 +97,24 @@ kover {
                         "dev.anchildress1.vestige.ui.components.AccentModifiersKt",
                         "dev.anchildress1.vestige.ui.components.AccentModifiersKt*",
                         "dev.anchildress1.vestige.ui.components.*AccentModifiersKt*",
+                        // Capture screen Composables — same Composer / $changed branch tax.
+                        // Behavior is covered by IdleLayoutTest / LiveLayoutTest / *PrimitivesTest
+                        // through Robolectric semantics + click assertions.
+                        "dev.anchildress1.vestige.ui.capture.IdleLayoutKt",
+                        "dev.anchildress1.vestige.ui.capture.IdleLayoutKt*",
+                        "dev.anchildress1.vestige.ui.capture.*IdleLayoutKt*",
+                        "dev.anchildress1.vestige.ui.capture.LiveLayoutKt",
+                        "dev.anchildress1.vestige.ui.capture.LiveLayoutKt*",
+                        "dev.anchildress1.vestige.ui.capture.*LiveLayoutKt*",
+                        "dev.anchildress1.vestige.ui.capture.RecButtonKt",
+                        "dev.anchildress1.vestige.ui.capture.RecButtonKt*",
+                        "dev.anchildress1.vestige.ui.capture.*RecButtonKt*",
+                        "dev.anchildress1.vestige.ui.capture.LiveLevelBarsKt",
+                        "dev.anchildress1.vestige.ui.capture.LiveLevelBarsKt*",
+                        "dev.anchildress1.vestige.ui.capture.*LiveLevelBarsKt*",
+                        "dev.anchildress1.vestige.ui.capture.ChunkProgressBarKt",
+                        "dev.anchildress1.vestige.ui.capture.ChunkProgressBarKt*",
+                        "dev.anchildress1.vestige.ui.capture.*ChunkProgressBarKt*",
                         // Debug-only fixture seeder for on-device manual verification.
                         // FLAG_DEBUGGABLE-gated at the call site; not on any release path.
                         "dev.anchildress1.vestige.debug.*",
@@ -185,6 +203,11 @@ sonar {
                 "**/ui/components/VestigeSurface.kt",
                 "**/ui/components/VestigeScaffold.kt",
                 "**/ui/components/AccentModifiers.kt",
+                "**/ui/capture/IdleLayout.kt",
+                "**/ui/capture/LiveLayout.kt",
+                "**/ui/capture/RecButton.kt",
+                "**/ui/capture/LiveLevelBars.kt",
+                "**/ui/capture/ChunkProgressBar.kt",
                 // Debug-only fixture seeder, FLAG_DEBUGGABLE-gated; never on a release path.
                 "**/debug/**",
             ).joinToString(","),

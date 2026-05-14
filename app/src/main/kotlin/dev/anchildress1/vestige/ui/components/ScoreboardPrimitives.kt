@@ -332,6 +332,7 @@ fun AppTop(
     status: AppTopStatus = AppTopStatuses.Ready,
     onPersonaTap: (() -> Unit)? = null,
     onStatusTap: (() -> Unit)? = null,
+    rightContent: (@Composable () -> Unit)? = null,
 ) {
     val hairlineColor = VestigeTheme.colors.hair
     Row(
@@ -358,17 +359,21 @@ fun AppTop(
         ) {
             Pill(text = status.text, color = status.color, dot = status.dot, blink = status.blink, fill = false)
         }
-        val personaA11yLabel = if (onPersonaTap != null) {
-            "Active persona $persona. Change persona."
+        if (rightContent != null) {
+            rightContent()
         } else {
-            "Active persona $persona."
-        }
-        ChromePill(
-            onClick = onPersonaTap,
-            alignment = Alignment.CenterEnd,
-            a11yLabel = personaA11yLabel,
-        ) {
-            Pill(text = "$persona ▾", color = VestigeTheme.colors.ink, fill = false)
+            val personaA11yLabel = if (onPersonaTap != null) {
+                "Active persona $persona. Change persona."
+            } else {
+                "Active persona $persona."
+            }
+            ChromePill(
+                onClick = onPersonaTap,
+                alignment = Alignment.CenterEnd,
+                a11yLabel = personaA11yLabel,
+            ) {
+                Pill(text = "$persona ▾", color = VestigeTheme.colors.ink, fill = false)
+            }
         }
     }
 }

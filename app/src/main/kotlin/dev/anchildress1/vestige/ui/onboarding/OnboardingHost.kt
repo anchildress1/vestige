@@ -35,6 +35,8 @@ import dev.anchildress1.vestige.ui.components.VestigeScaffold
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 
 /** Hosts the onboarding hub flow. Step + persona survive process death via SharedPreferences. */
@@ -53,6 +55,7 @@ fun OnboardingHost(
     val resolvedWifi = remember(context, wifiAvailability) {
         wifiAvailability ?: WifiAvailability.Default(context)
     }
+    val persistedStateWriteLane = remember(ioDispatcher) { PersistedStateWriteLane(ioDispatcher) }
     var step by rememberSaveable { mutableStateOf(prefs.currentStep) }
     var persona by rememberSaveable { mutableStateOf(prefs.defaultPersona) }
     var micGranted by rememberSaveable { mutableStateOf(hasRecordAudio(context)) }
@@ -75,16 +78,16 @@ fun OnboardingHost(
         step = step.previous() ?: step
     }
     LaunchedEffect(persona) {
-        // commit() on IO — durable across process kill; off main so StrictMode's
-        // detectDiskWrites (debug) doesn't fire on every persona toggle.
-        withContext(ioDispatcher) { prefs.setDefaultPersona(persona) }
+        persistedStateWriteLane.run {
+            prefs.setDefaultPersona(persona)
+        }
     }
     val environment = rememberOnboardingEnvironment(
         prefs = prefs,
         step = step,
         wifiAvailability = resolvedWifi,
         modelAvailability = modelAvailability,
-        ioDispatcher = ioDispatcher,
+        persistedStateWriteLane = persistedStateWriteLane,
     )
 
     // Once the model lands while the user is on the download screen, hop back to Wiring —
@@ -121,7 +124,7 @@ fun OnboardingHost(
             // Hop to IO for the markComplete commit() — staying on main would block the click
             // handler and trip StrictMode's detectDiskWrites. Only flip the gate on success.
             completionScope.launch {
-                if (withContext(ioDispatcher) { prefs.markComplete() }) {
+                if (persistedStateWriteLane.run { prefs.markComplete() }) {
                     onComplete(persona)
                 }
             }
@@ -188,12 +191,13 @@ private data class OnboardingEnvironment(
 )
 
 @Composable
+@Suppress("LongParameterList") // Environment builder needs the live host seams in one place.
 private fun rememberOnboardingEnvironment(
     prefs: OnboardingPrefs,
     step: OnboardingStep,
     wifiAvailability: WifiAvailability,
     modelAvailability: ModelAvailability,
-    ioDispatcher: CoroutineDispatcher,
+    persistedStateWriteLane: PersistedStateWriteLane,
 ): OnboardingEnvironment {
     val lifecycleOwner = LocalLifecycleOwner.current
     val scope = rememberCoroutineScope()
@@ -204,7 +208,7 @@ private fun rememberOnboardingEnvironment(
     // Persist resume point + refresh the Wi-Fi snapshot. commit() runs on IO so the durability
     // guarantee survives a process kill mid-step without blocking the main thread.
     LaunchedEffect(step) {
-        withContext(ioDispatcher) { prefs.setCurrentStep(step) }
+        persistedStateWriteLane.run { prefs.setCurrentStep(step) }
         wifiConnected = wifiAvailability.isWifiConnected()
     }
 
@@ -223,7 +227,6 @@ private fun rememberOnboardingEnvironment(
         runDownloadIfNeeded(
             step = step,
             modelAvailability = modelAvailability,
-            ioDispatcher = ioDispatcher,
             onState = { modelState = it },
             onSpeed = { downloadMbps = it },
         )
@@ -248,12 +251,26 @@ private fun rememberOnboardingEnvironment(
     )
 }
 
+/**
+ * Serializes durable SharedPreferences commits onto a single IO lane so stale persona/step
+ * writes cannot overtake newer ones. Off-main execution avoids StrictMode disk-write hits;
+ * the mutex preserves arrival order across independent LaunchedEffects and completion writes.
+ */
+internal class PersistedStateWriteLane(
+    private val dispatcher: CoroutineDispatcher,
+    private val mutex: Mutex = Mutex(),
+) {
+    suspend fun <T> run(block: suspend () -> T): T = withContext(dispatcher) {
+        mutex.withLock {
+            block()
+        }
+    }
+}
+
 // Runs the download with diagnostic logs + live MB/s sampling.
-@Suppress("LongParameterList")
 private suspend fun runDownloadIfNeeded(
     step: OnboardingStep,
     modelAvailability: ModelAvailability,
-    ioDispatcher: CoroutineDispatcher,
     onState: (ModelArtifactState) -> Unit,
     onSpeed: (Float?) -> Unit,
 ) {
@@ -274,9 +291,11 @@ private suspend fun runDownloadIfNeeded(
     val tracker = DownloadProgressTracker(onState, onSpeed)
     try {
         Log.i(ONBOARDING_TAG, "Starting download()...")
-        val terminal = withContext(ioDispatcher) {
-            modelAvailability.download(tracker::onProgress)
-        }
+        // `ModelAvailability.download` is a suspend fun and main-safe by convention
+        // (`DefaultModelArtifactStore.download` already wraps its blocking I/O in
+        // `withContext(ioDispatcher)`). Wrapping again here would be redundant and trips
+        // Sonar S6311.
+        val terminal = modelAvailability.download(tracker::onProgress)
         onSpeed(null)
         Log.i(ONBOARDING_TAG, "download() finished. terminalState=$terminal")
         onState(terminal)

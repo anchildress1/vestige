@@ -35,11 +35,18 @@ object CaptureCopy {
 
     const val MODEL_LOADING_LINE: String = "Model loading. Typed entries work now."
     const val MODEL_PAUSED_LINE: String = "Reconnect to Wi-Fi to resume. Typed entries work now."
+    const val MODEL_DOWNLOADING_LINE_FMT: String = "Downloading model · %d%%"
     const val MIC_DENIED_LINE: String = "Mic permission required to record. Settings → Permissions."
     const val MIC_UNAVAILABLE_LINE: String = "Mic unavailable. Try typing."
     const val INFERENCE_PARSE_FAILED_LINE: String = "Model couldn't read that. Try again."
     const val INFERENCE_TIMED_OUT_LINE: String = "Model timed out. Try a shorter chunk."
     const val INFERENCE_ENGINE_FAILED_LINE: String = "Reading failed. Try again."
+
+    const val BAND_LABEL_MIC: String = "MIC"
+    const val BAND_LABEL_MODEL: String = "MODEL"
+    const val BAND_LABEL_MODEL_LOADING: String = "MODEL · WARMING"
+    const val BAND_LABEL_MODEL_PAUSED: String = "MODEL · PAUSED"
+    const val BAND_LABEL_MODEL_DOWNLOADING_FMT: String = "MODEL · %d%%"
 
     const val READING_PLACEHOLDER: String = "Reading the entry."
 

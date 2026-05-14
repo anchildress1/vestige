@@ -65,6 +65,11 @@ fun IdleLayout(
         Box(modifier = Modifier.padding(horizontal = 18.dp, vertical = 12.dp)) {
             StatRibbon(items = stats.toRibbonItems(colors.lime, colors.coral))
         }
+        CaptureErrorBand(
+            error = state.error,
+            readiness = state.modelReadiness,
+            modifier = Modifier.padding(horizontal = 18.dp),
+        )
         HeroBlock()
         Spacer(modifier = Modifier.height(8.dp))
         Box(

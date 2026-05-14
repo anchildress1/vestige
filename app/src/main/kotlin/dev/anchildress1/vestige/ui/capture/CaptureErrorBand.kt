@@ -1,0 +1,150 @@
+package dev.anchildress1.vestige.ui.capture
+
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.IntrinsicSize
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.unit.dp
+import dev.anchildress1.vestige.ui.theme.VestigeTheme
+
+/**
+ * Inline diagnostic band on the Idle layout. Renders when the user needs to know why REC is not
+ * usable (mic denied, model warming / paused / downloading) or why the last inference attempt
+ * dropped (`ForegroundResult.ParseFailure`, timeout, engine throw). Read-only — recovery is
+ * always REC-tap, which transitions out of Idle and clears the band via state shape.
+ */
+@Composable
+fun CaptureErrorBand(error: CaptureError?, readiness: ModelReadiness, modifier: Modifier = Modifier) {
+    val kind = resolveBandKind(error = error, readiness = readiness) ?: return
+    val colors = VestigeTheme.colors
+    val accent = if (kind.isError) colors.coral else colors.dim
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .height(IntrinsicSize.Min)
+            .border(width = 1.dp, color = colors.hair)
+            .background(colors.s1)
+            .semantics(mergeDescendants = true) {
+                liveRegion = LiveRegionMode.Polite
+                contentDescription = kind.contentDescription
+            },
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        AccentRule(color = accent)
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 12.dp, vertical = 10.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            Text(
+                text = kind.eyebrow,
+                style = VestigeTheme.typography.eyebrow,
+                color = accent,
+            )
+            Text(
+                text = kind.body,
+                style = VestigeTheme.typography.p,
+                color = colors.ink,
+            )
+        }
+    }
+}
+
+@Composable
+private fun AccentRule(color: Color) {
+    Box(
+        modifier = Modifier
+            .width(AccentRuleWidth)
+            .fillMaxHeight()
+            .background(color),
+    )
+}
+
+private val AccentRuleWidth = 3.dp
+
+internal sealed interface BandKind {
+    val eyebrow: String
+    val body: String
+    val isError: Boolean
+    val contentDescription: String
+
+    data object MicDenied : BandKind {
+        override val eyebrow = CaptureCopy.BAND_LABEL_MIC
+        override val body = CaptureCopy.MIC_DENIED_LINE
+        override val isError = true
+        override val contentDescription = "Mic permission denied. $body"
+    }
+
+    data object MicUnavailable : BandKind {
+        override val eyebrow = CaptureCopy.BAND_LABEL_MIC
+        override val body = CaptureCopy.MIC_UNAVAILABLE_LINE
+        override val isError = true
+        override val contentDescription = "Mic unavailable. $body"
+    }
+
+    data class Inference(val reason: CaptureError.InferenceFailed.Reason) : BandKind {
+        override val eyebrow: String = CaptureCopy.BAND_LABEL_MODEL
+        override val body: String = when (reason) {
+            CaptureError.InferenceFailed.Reason.PARSE_FAILED -> CaptureCopy.INFERENCE_PARSE_FAILED_LINE
+            CaptureError.InferenceFailed.Reason.TIMED_OUT -> CaptureCopy.INFERENCE_TIMED_OUT_LINE
+            CaptureError.InferenceFailed.Reason.ENGINE_FAILED -> CaptureCopy.INFERENCE_ENGINE_FAILED_LINE
+        }
+        override val isError = true
+        override val contentDescription: String = "Last reading failed. $body"
+    }
+
+    data object ModelLoading : BandKind {
+        override val eyebrow = CaptureCopy.BAND_LABEL_MODEL_LOADING
+        override val body = CaptureCopy.MODEL_LOADING_LINE
+        override val isError = false
+        override val contentDescription = "Model warming up. $body"
+    }
+
+    data object ModelPaused : BandKind {
+        override val eyebrow = CaptureCopy.BAND_LABEL_MODEL_PAUSED
+        override val body = CaptureCopy.MODEL_PAUSED_LINE
+        override val isError = false
+        override val contentDescription = "Model paused. $body"
+    }
+
+    data class ModelDownloading(val percent: Int) : BandKind {
+        override val eyebrow: String = CaptureCopy.BAND_LABEL_MODEL_DOWNLOADING_FMT.format(percent)
+        override val body: String = CaptureCopy.MODEL_DOWNLOADING_LINE_FMT.format(percent)
+        override val isError = false
+        override val contentDescription: String = "Model downloading $percent percent."
+    }
+}
+
+internal fun resolveBandKind(error: CaptureError?, readiness: ModelReadiness): BandKind? {
+    if (error != null) {
+        return when (error) {
+            CaptureError.MicDenied -> BandKind.MicDenied
+            CaptureError.MicUnavailable -> BandKind.MicUnavailable
+            is CaptureError.InferenceFailed -> BandKind.Inference(error.reason)
+        }
+    }
+    return when (readiness) {
+        ModelReadiness.Loading -> BandKind.ModelLoading
+        ModelReadiness.Paused -> BandKind.ModelPaused
+        is ModelReadiness.Downloading -> BandKind.ModelDownloading(readiness.percent)
+        ModelReadiness.Ready -> null
+    }
+}

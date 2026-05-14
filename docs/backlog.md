@@ -46,16 +46,80 @@ stt-N : conditional on stop-and-test outcome (see PRD §"Build philosophy: build
 | ~~`embeddings-fallback`~~ | — | — | **Resolved 2026-05-12 — STT-E passed.** Hybrid (tag + keyword + recency + EmbeddingGemma cosine) beat tag-only on 3 of 4 cohort queries against the 18-entry STT-E corpus on the reference S24 Ultra. EmbeddingGemma ships in v1 per ADR-001 §"Addendum (2026-05-12)". No v1.5 fallback remains. | n/a — closed |
 | `mic-perm-resume-recheck` | v1.5 | permissions | Phase 1 shell checks mic permission once at startup via `rememberSaveable`; revoking in Settings and returning leaves UI showing stale "granted" state. Fix is a `LifecycleEventEffect(ON_RESUME)` re-check, but Phase 4 replaces the shell entirely | Phase 4 onboarding UX ships — wire into the real permission gate there |
 | ~~`gpu-model-artifact`~~ | — | — | **Resolved 2026-05-10 — wrong premise.** Artifact was GPU-capable; manifest missed `<uses-native-library>` for `libOpenCL.so` + `libvndksupport.so` (Android 12+ namespace). Fix in `AndroidManifest.xml`. Latency record in ADR-001 §Q3 addendum. | n/a — closed |
-| `multi-chunk-foreground` | stt-A | inference | v1 `AudioCapture` is hard-capped at 30 s and emits one `isFinal=true` chunk; `ForegroundInference.runForegroundCall` rejects non-final chunks. The >30 s orchestration (stripped-down transcription-only call per intermediate chunk + concatenated transcript-so-far injected on the final chunk per ADR-002 §"For >30s captures") is unwritten. Single-narrative recordings cover the demo's 90 s pitch + 5 min walkthrough; long-dump pathway is not on the critical path | user gives a >30 s entry attempt and it fails / `docs/sample-data-scenarios.md` §STT-A chunk-boundary script gets exercised end-to-end. To reproduce the chunk-boundary fixture, record the §STT-A "Read as one long capture" script forcing a 30 s split at `[CUT]` (or pre-split into two halves), transcode to PCM_S16LE 16 kHz mono per the STT-A §Q4 device-test record, then drive both halves through whatever multi-chunk orchestration ships at that point |
+| `multi-chunk-foreground` | **v1.5 — HIGH** | inference | **Promoted 2026-05-14** from stt-A tier after on-device STT-A round-trip verified end-to-end. v1 `AudioCapture` is hard-capped at 30 s and emits one `isFinal=true` chunk; `ForegroundInference.runForegroundCall` rejects non-final chunks. The >30 s orchestration (stripped-down transcription-only call per intermediate chunk + concatenated transcript-so-far injected on the final chunk per ADR-002 §"For >30s captures") is unwritten. Single-narrative recordings cover the demo's 90 s pitch + 5 min walkthrough; long-dump pathway is the most-asked-for follow-up | Post-submission v1.5 work — the audio cue at 28 s tells the user the cap is firing but does not address the underlying length limit. To reproduce the chunk-boundary fixture, record the `docs/sample-data-scenarios.md` §STT-A "Read as one long capture" script forcing a 30 s split at `[CUT]` (or pre-split into two halves), transcode to PCM_S16LE 16 kHz mono per the STT-A §Q4 device-test record, then drive both halves through whatever multi-chunk orchestration ships at that point. See detail block below |
 | ~~`smart-turn-boundaries`~~ | — | — | **Collapsed 2026-05-09** when v1 scoped to single-turn-per-capture (after the STT-B prompt-stuffing pattern produced retention=0.0; the SDK's stateful Conversation path was not measured — see `adrs/ADR-005-stt-b-scope-and-v1-single-turn.md` (amends `adrs/ADR-002-multi-lens-extraction-pattern.md` §"Multi-turn behavior")). With each tap of record producing a fresh `CaptureSession` and no prior-turn context threaded into the prompt, there is no session boundary to be smart about under v1. | A future revival of multi-turn (post-v1, exercising the SDK stateful path) would re-open this row before Phase 4 history UI lands |
 | `parallel-lens-execution-via-clone` | v1.5 | inference | **Deferred 2026-05-11** after the ADR-008 feasibility probe confirmed `litertlm-android:0.11.0` does not expose `Session.clone()` or any parent-Session API. JNI bridge inspected — `nativeCreateSession(engineHandle, samplerConfig)` has no parent reference. Upstream PR #1515 (Kotlin clone surface) was closed unmerged 2026-03-09; upstream Issue #1226 ("Session Advanced" Android support) is open with no shipped timeline. Story 2.6.6 superseded; v1 ships ADR-002's original sequential 3-lens rule. Full evidence in `adrs/ADR-009-litertlm-kotlin-session-clone-unavailable.md`. | One of: a new `com.google.ai.edge.litertlm:litertlm-android` artifact >0.11.0 publishes; upstream `main` HEAD adds `Session.clone()` or parent-Session `SessionConfig`; Issue #1226 closes "shipped"; a Google-authored Kotlin clone PR merges. See ADR-009 §"Revival triggers" |
 | `retrieval-indexed-prefilter` | v1.5 | memory | **Deferred 2026-05-11.** Story 3.1 `RetrievalRepo.query` loads `entryBox.all` + `tagBox.all` per call. At v1 scale (ADR-003 sizes Phase 3 to ≤1000 entries with detection cost in tens of ms) the in-memory scan is fast and trivially deterministic. ObjectBox prefilter (keyword `contains` + tag join) + stem-key index trades complexity for a future scale problem. PR #19 Copilot review flagged. | Measured retrieval latency degrades on the reference S24U beyond the foreground budget, *or* entry count crosses ~1000 in real usage |
 | ~~`backfill-on-artifact-complete`~~ | — | — | **Resolved 2026-05-12.** `AppContainer.launchVectorBackfillIfReady()` now keeps one bounded in-process drain loop alive: if backlog exists before artifacts are complete, it retries for up to 12 delayed passes (60 s budget at 5 s intervals), then exits cleanly. A later save or cold start retriggers the worker. No Phase 4 download-complete event hook is required for correctness. | n/a — closed |
 | `pattern-auto-close` | v1.5 | patterns | PatternEngine detects and updates patterns forward but has no staleness scan; nothing currently transitions a pattern from active → Closed; demo scenario doesn't require auto-removal; v1 user actions are Snooze and Drop only (Closed is model-detected per ADR-011 UX direction) | post-v1 usage data shows patterns accumulating without removal; or Phase 5 UX audit surfaces the missing lifecycle transition |
+| `vm-session-wiring` | v1.5 | capture | **Deferred 2026-05-14** during Story 4.5 PR review. `CaptureSession.DISCARDED` terminal state exists at the inference layer per ADR-001 §Q8, but `CaptureViewModel` does not construct or drive a `CaptureSession` during RECORDING — the session is only constructed inside the foreground inference call after STOP. The Q8 invariant (audio bytes gone before Idle) currently rests on `cancelAndJoin` + `AudioCapture.releaseAndOverwrite` alone; the documented state-machine transition is correct but unobservable | v1.5 capture-layer refactor that owns a `CaptureSession` through RECORDING so the state diagram is the source of truth, not the ad-hoc VM job ownership |
+| `cue-lifecycle-interface` | v1.5 | capture | **Deferred 2026-05-14** during Story 4.5 PR review. `LimitWarningCue` is a `fun interface` that lies about its lifecycle — `ToneGeneratorLimitWarningCue.release()` is a side door not on the interface, and the route wires its disposal manually via `DisposableEffect`. Caller must remember impl-specific teardown | Refactor to `interface LimitWarningCue : AutoCloseable` or split `Cue` + `CueHandle`; ship with the next capture-layer revision |
+| `save-typed-distinct` | v1.5 | capture | **Deferred 2026-05-14** during Story 4.5 PR review. `SaveTypedEntry` and `SaveAndExtract` have identical signatures with different preconditions; the distinction is documentation-only. A lambda satisfying one trivially satisfies the other — invites call-site confusion | Pick one and absorb the other, or encode the readiness-bypass guarantee in the signature so the type carries the contract |
+| `idle-illegal-states` | v1.5 | capture | **Deferred 2026-05-14** during Story 4.5 PR review. `CaptureUiState.Idle` now has four nullable combinations of `error` + `lastReview`. Some combinations are illegal but representable. A future refactor splits into `Idle.Fresh` / `Idle.AfterReview(review)` / `Idle.AfterError(error, review?)` | Future composition or test pressure makes the illegal-state issue concrete |
+| `litertlm-mutex-test-seam` | v1.5 | inference | **Deferred 2026-05-14** during Story 4.5 PR review. `LiteRtLmEngine.callMutex` serialization is correct by inspection but has no direct unit test — `Engine` is a private `var` with no injection seam, so concurrent-entry tests would need reflection or a constructor refactor. The mutex now also guards `close()` against in-flight reads | Either add a `@VisibleForTesting` engine seam or a thin engine-port interface that lets a fake stand in for serialization tests |
+| `inference-log-context` | v1.5 | observability | **Deferred 2026-05-14** during Story 4.5 PR review. `CaptureViewModel.runInference` / `submitTyped` / `startRecording` log errors without persona, readiness, or elapsed-ms context. AGENTS.md #4 forbids telemetry; the only diagnostic surface is logcat, and the current messages don't carry enough state for the user to self-report | A user surfaces a real bug report against this code path |
+| `band-a11y-coverage` | v1.5 | capture | **Deferred 2026-05-14** during Story 4.5 PR review. `CaptureErrorBandTest` covers `contentDescription` and the visible text but not tap-target absence (the band has no click action by design) or live-region behavior under TalkBack. Per AGENTS.md #27 — JVM-tier semantic assertions where on-device a11y isn't reachable | Add `assertHasNoClickAction` + `liveRegion` semantic checks in the next Compose-test pass |
+| `discard-after-stop` | v2 | capture | **Out of scope per ADR-001 §Q8.** Once STOP fires, the foreground inference call is in flight and not cancellable. Q8 explicitly defers in-flight-call cancellation; streaming would reopen the contract and require a new ADR | A streaming inference path lands AND user research shows accidental-STOP as a real pain point |
 
 ## Detail blocks
 
 Only items where the index row drops information needed to disambiguate.
+
+### `multi-chunk-foreground` (high priority — first v1.5 input-path work)
+
+```
+why-high-pri:
+  STT-A verified end-to-end on 2026-05-14 (REC → 30s cap → transcript + persona follow-up).
+  The 30s hard cap is now the most-visible product limit. Audio cue at 28s informs the user
+  but does not relieve the limit. Multi-chunk is the unblock; everything else on the input
+  path (streaming, retries, longer captures) builds on this.
+
+mechanism:
+  Per ADR-002 §"For >30s captures":
+  - Intermediate chunks: stripped-down transcription-only call (no persona follow-up); the
+    foreground inference call must accept `isFinal=false` and return transcript text only.
+  - Final chunk: the running concatenated transcript-so-far is injected into the prompt
+    alongside the final audio chunk; the model returns the full transcription + the single
+    persona follow-up for the entire session.
+  - `CaptureSession.recordTranscription` is called once with the assembled transcript,
+    not per chunk — the single-turn lifecycle (ADR-005) is preserved.
+
+audio-cue-behavior-during-chunking:
+  Per-chunk cap cue fires at the same 28s pre-warn threshold. Multi-chunk sessions hear
+  the cue at 28s of each chunk window, not at 28s of the cumulative session. Verify the
+  cue's one-shot flag resets at chunk boundaries, not only at session start.
+
+ui-state-during-chunking:
+  Recording state stays through chunk transitions. ChunkProgressBar resets per chunk; the
+  elapsed timer in TimerHeader continues cumulative (user perception is "how long have I
+  been talking", not "how full is this chunk").
+
+discard-during-multi-chunk:
+  Per ADR-001 §Q8: tapping discard on the current chunk discards the in-flight chunk audio
+  AND the accumulated transcription from prior chunks in the same session AND the entire
+  CaptureSession. Session terminates DISCARDED. No partial save.
+
+ux-during-stop-on-non-final-chunk:
+  Tapping STOP mid-multi-chunk-session: the current chunk closes (returns up the flow),
+  the orchestrator detects no further chunks pending, and routes the final-chunk path
+  (transcript-so-far injection) with whatever audio the current chunk has captured.
+  Even if that chunk is only 4 seconds, it's the "final" for orchestrator purposes.
+
+what-this-does-NOT-include:
+  - Streaming token output. ADR-002 §Q1 — separate gate.
+  - Audio retention. Backlog `audio-retention`.
+  - Foreground call cancellation after STOP. Backlog `discard-after-stop`.
+
+unblock-condition:
+  Post-submission v1.5 work. The demo scenario stays within 30 s; the long-dump pathway
+  is the first thing users will request after the hackathon.
+
+spec-ref:
+  - docs/adrs/ADR-001-stack-and-build-infra.md §Q4 (audio chunking)
+  - docs/adrs/ADR-002-multi-lens-extraction-pattern.md §"For >30s captures"
+  - docs/sample-data-scenarios.md §STT-A chunk-boundary script
+  - core-inference/.../AudioCapture.kt (`tryBuildCapChunk` currently drops past-cap chunks with WARN)
+```
 
 ### `pattern-auto-close`
 

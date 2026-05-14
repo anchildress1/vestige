@@ -33,6 +33,9 @@ class AudioCapture(
 ) {
     private val stopRequested = AtomicBoolean(false)
 
+    @Volatile
+    private var activeRecord: AudioRecord? = null
+
     @RequiresPermission(Manifest.permission.RECORD_AUDIO)
     fun captureChunks(): Flow<AudioChunk> = flow {
         stopRequested.set(false)
@@ -41,6 +44,7 @@ class AudioCapture(
         val readBuffer = FloatArray(bufferBytes / BYTES_PER_FLOAT)
         val record = openAudioRecord(bufferBytes)
         val builder = ChunkBuilder(samplesPerChunk)
+        activeRecord = record
         try {
             record.startRecording()
             val capChunk = readUntilCapOrStop(record, readBuffer, builder)
@@ -53,6 +57,7 @@ class AudioCapture(
         } finally {
             runCatching { record.stop() }.onFailure { Log.w(TAG, "stop() on un-started AudioRecord") }
             releaseAndOverwrite(record, readBuffer, builder)
+            activeRecord = null
         }
     }.flowOn(captureDispatcher)
     // `flowOn` is non-negotiable here: `AudioRecord.read(... READ_BLOCKING)` parks the calling
@@ -69,7 +74,9 @@ class AudioCapture(
     ): AudioChunk? {
         while (!stopRequested.get() && currentCoroutineContext().isActive) {
             val read = record.read(readBuffer, 0, readBuffer.size, AudioRecord.READ_BLOCKING)
-            if (read < 0) error("AudioRecord.read returned error code $read")
+            if (read < 0) {
+                check(stopRequested.get()) { "AudioRecord.read returned error code $read" }
+            }
             if (read > 0) {
                 onLevel?.invoke(rmsLevel(readBuffer, read))
                 val chunk = tryBuildCapChunk(builder, readBuffer, read)
@@ -132,6 +139,8 @@ class AudioCapture(
 
     fun requestStop() {
         stopRequested.set(true)
+        runCatching { activeRecord?.stop() }
+            .onFailure { Log.w(TAG, "stop() during requestStop failed: ${it.message}") }
     }
 
     // Release the JNI handle and zero the read + builder buffers so accumulated PCM samples

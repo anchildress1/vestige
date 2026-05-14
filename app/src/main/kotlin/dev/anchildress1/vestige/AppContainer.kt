@@ -44,6 +44,7 @@ import io.objectbox.BoxStore
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -325,6 +326,27 @@ class AppContainer(
         )
         launchVectorBackfillIfReady()
         return outcome
+    }
+
+    suspend fun saveTypedEntry(
+        entryText: String,
+        capturedAt: ZonedDateTime,
+        persona: Persona = Persona.WITNESS,
+    ): SaveOutcome.Pending {
+        if (mainModelArtifactLooksPresent()) {
+            return saveAndExtract(entryText = entryText, capturedAt = capturedAt, persona = persona)
+        }
+        val entryId = entryStore.createPendingEntry(entryText, capturedAt.toInstant())
+        reportExtractionStatus(entryId, ExtractionStatus.PENDING)
+        val completedJob = Job().also { it.complete() }
+        return SaveOutcome.Pending(entryId, completedJob)
+    }
+
+    private fun mainModelArtifactLooksPresent(): Boolean {
+        val store = mainModelArtifactStore
+        val file = store.artifactFile
+        return runCatching { file.exists() && file.length() == store.manifest.expectedByteSize }
+            .getOrDefault(false)
     }
 
     internal suspend fun ensureBackgroundEngineInitialized() {

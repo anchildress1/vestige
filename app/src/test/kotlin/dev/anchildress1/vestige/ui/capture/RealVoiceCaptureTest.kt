@@ -2,10 +2,14 @@ package dev.anchildress1.vestige.ui.capture
 
 import dev.anchildress1.vestige.inference.AudioChunk
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
@@ -77,11 +81,28 @@ class RealVoiceCaptureTest {
         assertTrue(ex!!.message!!.contains("mic failure"))
     }
 
-    // The stopFlow → requestStop integration is covered by the on-device STT-A check (the
-    // adapter's stopJob.launch + first() pattern is straight kotlinx.coroutines wiring with no
-    // adapter-specific logic to verify). Carving it out from the JVM suite avoids the SharedFlow
-    // replay-0 vs late-collector race that runTest's virtual dispatcher exposes when the emit
-    // races the stopJob.launch.
+    @Test
+    fun `stopFlow requests source stop while capture is active`() = runTest {
+        val stopRequests = AtomicInteger(0)
+        val stopFlow = MutableSharedFlow<Unit>(replay = 1)
+        val sut = RealVoiceCapture(
+            sourceFactory = { _ ->
+                FakeAudioSource(
+                    onCaptureChunks = flow { awaitCancellation() },
+                    onRequestStop = { stopRequests.incrementAndGet() },
+                )
+            },
+        )
+
+        val capture = async {
+            sut.invoke(onLevel = {}, stopFlow = stopFlow.asSharedFlow())
+        }
+        stopFlow.emit(Unit)
+        advanceUntilIdle()
+
+        assertEquals(1, stopRequests.get())
+        capture.cancelAndJoin()
+    }
 
     private class FakeAudioSource(
         private val onCaptureChunks: Flow<AudioChunk>,

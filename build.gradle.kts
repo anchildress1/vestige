@@ -26,13 +26,16 @@ kover {
                     // top-level classes AND their Compose / coroutine / FileKt synthetics are
                     // excluded together. Leading `*` on `*MainActivityKt*` catches Compose's
                     // `ComposableSingletons$MainActivityKt` lambda holder, which lives in the
-                    // root package alongside MainActivity.
+                    // root package alongside MainActivity. `CaptureViewModelFactory` is lifecycle
+                    // factory glue; tested business derivations live in `CaptureHostModels.kt`.
                     classes(
                         "dev.anchildress1.vestige.MainActivity",
                         "dev.anchildress1.vestige.MainActivity*",
                         "dev.anchildress1.vestige.MainActivityKt",
                         "dev.anchildress1.vestige.MainActivityKt*",
                         "dev.anchildress1.vestige.*MainActivityKt*",
+                        "dev.anchildress1.vestige.CaptureViewModelFactory",
+                        "dev.anchildress1.vestige.CaptureViewModelFactory*",
                         "dev.anchildress1.vestige.VestigeApplication",
                         "dev.anchildress1.vestige.VestigeApplication*",
                         "dev.anchildress1.vestige.ui.theme.*",

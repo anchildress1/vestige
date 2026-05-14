@@ -14,6 +14,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 
 /** Backend selection. NPU needs the host's `nativeLibraryDir` — only Android `Context` has it. */
@@ -41,6 +43,7 @@ class LiteRtLmEngine(
 ) : AutoCloseable {
 
     private var engine: Engine? = null
+    private val callMutex = Mutex()
 
     suspend fun initialize() = withContext(ioDispatcher) {
         check(engine == null) { "LiteRtLmEngine already initialized; close() before re-init." }
@@ -87,8 +90,10 @@ class LiteRtLmEngine(
             "LiteRtLmEngine.generateText called before initialize()."
         }
         val started = System.nanoTime()
-        val response = active.createConversation(conversationConfig()).use { conversation ->
-            conversation.sendMessage(prompt).toString()
+        val response = callMutex.withLock {
+            active.createConversation(conversationConfig()).use { conversation ->
+                conversation.sendMessage(prompt).toString()
+            }
         }
         val elapsedMs = (System.nanoTime() - started) / NANOS_PER_MILLI
         Log.d(
@@ -104,33 +109,35 @@ class LiteRtLmEngine(
             "LiteRtLmEngine.streamText called before initialize()."
         }
         return flow {
-            val conversation = active.createConversation(conversationConfig())
-            val started = System.nanoTime()
-            var charsEmitted = 0
-            try {
-                conversation.sendMessageAsync(prompt).collect { message ->
-                    val chunk = message.toString()
-                    charsEmitted += chunk.length
-                    emit(chunk)
+            callMutex.withLock {
+                val conversation = active.createConversation(conversationConfig())
+                val started = System.nanoTime()
+                var charsEmitted = 0
+                try {
+                    conversation.sendMessageAsync(prompt).collect { message ->
+                        val chunk = message.toString()
+                        charsEmitted += chunk.length
+                        emit(chunk)
+                    }
+                    val elapsedMs = (System.nanoTime() - started) / NANOS_PER_MILLI
+                    Log.d(
+                        TAG,
+                        "streamText completed in ${elapsedMs}ms (prompt=${prompt.length}c, " +
+                            "emitted=${charsEmitted}c)",
+                    )
+                } catch (@Suppress("TooGenericExceptionCaught") error: Throwable) {
+                    // Log-and-rethrow: native SDK + coroutine cancellation share no exception
+                    // hierarchy worth enumerating; partial-emission state is the only thing we own.
+                    val elapsedMs = (System.nanoTime() - started) / NANOS_PER_MILLI
+                    Log.d(
+                        TAG,
+                        "streamText failed (${error.javaClass.simpleName}) in ${elapsedMs}ms " +
+                            "(prompt=${prompt.length}c, emitted=${charsEmitted}c)",
+                    )
+                    throw error
+                } finally {
+                    conversation.close()
                 }
-                val elapsedMs = (System.nanoTime() - started) / NANOS_PER_MILLI
-                Log.d(
-                    TAG,
-                    "streamText completed in ${elapsedMs}ms (prompt=${prompt.length}c, " +
-                        "emitted=${charsEmitted}c)",
-                )
-            } catch (@Suppress("TooGenericExceptionCaught") error: Throwable) {
-                // Log-and-rethrow: native SDK + coroutine cancellation share no exception
-                // hierarchy worth enumerating; partial-emission state is the only thing we own.
-                val elapsedMs = (System.nanoTime() - started) / NANOS_PER_MILLI
-                Log.d(
-                    TAG,
-                    "streamText failed (${error.javaClass.simpleName}) in ${elapsedMs}ms " +
-                        "(prompt=${prompt.length}c, emitted=${charsEmitted}c)",
-                )
-                throw error
-            } finally {
-                conversation.close()
             }
         }.flowOn(ioDispatcher)
     }
@@ -147,8 +154,10 @@ class LiteRtLmEngine(
         val started = System.nanoTime()
 
         @Suppress("SpreadOperator") // Contents.of is a vararg factory; no List-accepting overload.
-        val response = active.createConversation(conversationConfig()).use { conversation ->
-            conversation.sendMessage(Contents.of(*parts.toTypedArray())).toString()
+        val response = callMutex.withLock {
+            active.createConversation(conversationConfig()).use { conversation ->
+                conversation.sendMessage(Contents.of(*parts.toTypedArray())).toString()
+            }
         }
         val elapsedMs = (System.nanoTime() - started) / NANOS_PER_MILLI
         Log.d(

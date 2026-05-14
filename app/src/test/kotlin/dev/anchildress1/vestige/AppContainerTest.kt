@@ -11,10 +11,14 @@ import dev.anchildress1.vestige.model.EmbeddingArtifactManifest
 import dev.anchildress1.vestige.model.ExtractionStatus
 import dev.anchildress1.vestige.model.ModelArtifactState
 import dev.anchildress1.vestige.model.ModelArtifactStore
+import dev.anchildress1.vestige.model.ModelManifest
 import dev.anchildress1.vestige.save.BackgroundExtractionSaveFlow
 import dev.anchildress1.vestige.save.SaveOutcome
 import dev.anchildress1.vestige.storage.MarkdownEntryStore
 import dev.anchildress1.vestige.storage.VectorBackfillWorker
+import dev.anchildress1.vestige.testing.cleanupObjectBoxTempRoot
+import dev.anchildress1.vestige.testing.newInMemoryObjectBoxDirectory
+import dev.anchildress1.vestige.testing.openInMemoryBoxStore
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.coVerifyOrder
@@ -28,6 +32,8 @@ import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNotNull
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.io.TempDir
+import java.io.File
 import java.time.ZoneId
 import java.time.ZonedDateTime
 
@@ -317,6 +323,102 @@ class AppContainerTest {
     }
 
     @Test
+    fun `saveTypedEntry persists pending text without initializing engine when model file is absent`(
+        @TempDir tempRoot: File,
+    ) = runTest {
+        val dataDir = newInMemoryObjectBoxDirectory("typed-entry-missing-model-")
+        val markdownDir = File(tempRoot, "markdown").apply { mkdirs() }
+        val boxStore = openInMemoryBoxStore(dataDir)
+        val engine = mockk<LiteRtLmEngine>(relaxed = true)
+        val artifactStore = fakeArtifactStore(
+            artifactFile = File(tempRoot, "missing-model.litertlm"),
+            expectedByteSize = 1L,
+        )
+        val context = mockk<Context>(relaxed = true) {
+            every { filesDir } returns tempRoot
+            every { cacheDir } returns File(tempRoot, "cache").apply { mkdirs() }
+        }
+        val container = AppContainer(
+            applicationContext = context,
+            boxStoreFactory = { boxStore },
+            markdownStoreFactory = { MarkdownEntryStore(markdownDir) },
+            modelPathLoader = { File(tempRoot, "missing-model.litertlm").absolutePath },
+            backgroundEngineFactory = { _, _ -> engine },
+            mainModelArtifactStoreFactory = { _, _, _ -> artifactStore },
+            recoveredEntryIdsLoader = { emptyList() },
+            foregroundServiceIntentFactory = { Intent("dev.anchildress1.vestige.TEST_START") },
+            foregroundServiceStarter = {},
+            scope = backgroundScope,
+        )
+
+        try {
+            val outcome = container.saveTypedEntry("typed fallback survives", CAPTURED_AT)
+
+            assertEquals(1L, outcome.entryId)
+            val row = container.entryStore.readEntry(outcome.entryId)!!
+            assertEquals("typed fallback survives", row.entryText)
+            assertEquals(ExtractionStatus.PENDING, row.extractionStatus)
+            coVerify(exactly = 0) { engine.initialize() }
+        } finally {
+            container.close()
+            cleanupObjectBoxTempRoot(tempRoot, dataDir)
+        }
+    }
+
+    @Test
+    fun `saveTypedEntry delegates to saveAndExtract when the model file looks present`(@TempDir tempRoot: File) =
+        runTest {
+            val engine = mockk<LiteRtLmEngine>(relaxed = true)
+            val saveFlow = mockk<BackgroundExtractionSaveFlow>()
+            val modelFile = File(tempRoot, "ready-model.litertlm").apply { writeText("x") }
+            val artifactStore = fakeArtifactStore(artifactFile = modelFile, expectedByteSize = 1L)
+            val expected = SaveOutcome.Pending(entryId = 77L, extractionJob = kotlinx.coroutines.Job())
+            coEvery {
+                saveFlow.saveAndExtract(
+                    entryText = "typed with model",
+                    capturedAt = CAPTURED_AT,
+                    retrievedHistory = emptyList(),
+                    timeoutMs = null,
+                    persona = dev.anchildress1.vestige.model.Persona.EDITOR,
+                )
+            } returns expected
+            val context = mockk<Context>(relaxed = true) {
+                every { filesDir } returns tempRoot
+                every { cacheDir } returns File(tempRoot, "cache").apply { mkdirs() }
+            }
+            val container = AppContainer(
+                applicationContext = context,
+                boxStoreFactory = { mockk<BoxStore>(relaxed = true) },
+                markdownStoreFactory = { mockk<MarkdownEntryStore>(relaxed = true) },
+                modelPathLoader = { modelFile.absolutePath },
+                backgroundEngineFactory = { _, _ -> engine },
+                mainModelArtifactStoreFactory = { _, _, _ -> artifactStore },
+                backgroundExtractionSaveFlowFactory = { _, _, _, _, _, _ -> saveFlow },
+                recoveredEntryIdsLoader = { emptyList() },
+                foregroundServiceIntentFactory = { Intent("dev.anchildress1.vestige.TEST_START") },
+                foregroundServiceStarter = {},
+            )
+
+            val actual = container.saveTypedEntry(
+                entryText = "typed with model",
+                capturedAt = CAPTURED_AT,
+                persona = dev.anchildress1.vestige.model.Persona.EDITOR,
+            )
+
+            assertEquals(expected, actual)
+            coVerifyOrder {
+                engine.initialize()
+                saveFlow.saveAndExtract(
+                    entryText = "typed with model",
+                    capturedAt = CAPTURED_AT,
+                    retrievedHistory = emptyList(),
+                    timeoutMs = null,
+                    persona = dev.anchildress1.vestige.model.Persona.EDITOR,
+                )
+            }
+        }
+
+    @Test
     fun `launchVectorBackfillIfReady retries the real pass after artifact states turn complete`() = runTest {
         val modelStore = mockk<ModelArtifactStore>()
         val tokenizerStore = mockk<ModelArtifactStore>()
@@ -355,6 +457,26 @@ class AppContainerTest {
         coVerify(exactly = 1) { worker.backfill() }
         coVerify(exactly = 2) { modelStore.currentState() }
         coVerify(exactly = 2) { tokenizerStore.currentState() }
+    }
+
+    private fun fakeArtifactStore(artifactFile: File, expectedByteSize: Long): ModelArtifactStore {
+        val manifest = ModelManifest(
+            schemaVersion = ModelManifest.SUPPORTED_SCHEMA_VERSION,
+            artifactRepo = "test",
+            filename = artifactFile.name,
+            downloadUrl = "https://example.invalid/${artifactFile.name}",
+            expectedByteSize = expectedByteSize,
+            sha256 = "test",
+            allowedHosts = listOf("example.invalid"),
+        )
+        return mockk<ModelArtifactStore>(relaxed = true) {
+            every { this@mockk.artifactFile } returns artifactFile
+            every { this@mockk.manifest } returns manifest
+        }
+    }
+
+    private companion object {
+        val CAPTURED_AT: ZonedDateTime = ZonedDateTime.of(2026, 5, 11, 7, 21, 24, 0, ZoneId.of("America/New_York"))
     }
 
     @Test

@@ -189,6 +189,24 @@ class AudioCaptureTest {
     }
 
     @Test
+    fun `readUntilCapOrStop returns null when stop interrupts a blocking read`() = runTest {
+        val capture = AudioCapture(sampleRateHz = 16_000, chunkDurationMs = 30_000L)
+        val builder = ChunkBuilder(samplesPerChunk = 1_000)
+        val readBuffer = FloatArray(8)
+        val record = mockk<AudioRecord>()
+        every {
+            record.read(readBuffer, 0, readBuffer.size, AudioRecord.READ_BLOCKING)
+        } answers {
+            capture.requestStop()
+            AudioRecord.ERROR_INVALID_OPERATION
+        }
+
+        val chunk = capture.readUntilCapOrStop(record, readBuffer, builder)
+
+        assertNull(chunk, "Stop-triggered AudioRecord interruption must finish cleanly")
+    }
+
+    @Test
     fun `onLevel callback fires for every non-empty read`() = runTest {
         val levels = mutableListOf<Float>()
         val capture = AudioCapture(

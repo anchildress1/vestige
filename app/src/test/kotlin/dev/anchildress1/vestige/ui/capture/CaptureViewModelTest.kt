@@ -8,6 +8,7 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
@@ -232,6 +233,39 @@ class CaptureViewModelTest {
     }
 
     @Test
+    fun `discard emits stop signal before cancelling capture (edge — real AudioRecord gets interrupted)`() =
+        runTest(dispatcher) {
+            val stopSeen = CompletableDeferred<Unit>()
+            val voice = VoiceCapture { _, stopFlow ->
+                stopFlow.first()
+                stopSeen.complete(Unit)
+                null
+            }
+            val vm = newViewModel(
+                voice = voice,
+                inference = FakeForegroundInference(
+                    ForegroundResult.Success(
+                        persona = Persona.WITNESS,
+                        rawResponse = "",
+                        elapsedMs = 100,
+                        completedAt = clock.instant(),
+                        transcription = "",
+                        followUp = "",
+                    ),
+                ),
+                save = RecordingSaveAndExtract(),
+                initialReadiness = ModelReadiness.Ready,
+            )
+
+            vm.startRecording()
+            vm.discard()
+            advanceUntilIdle()
+
+            assertTrue("discard must notify the capture adapter before cancellation", stopSeen.isCompleted)
+            assertTrue(vm.state.value is CaptureUiState.Idle)
+        }
+
+    @Test
     fun `discard from Idle is a no-op (neg — only available during RECORDING)`() = runTest(dispatcher) {
         val voice = FakeVoiceCapture(result = null)
         val vm = newViewModel(
@@ -336,6 +370,29 @@ class CaptureViewModelTest {
     }
 
     @Test
+    fun `submitTyped uses typed saver while model readiness is Loading`() = runTest(dispatcher) {
+        val fallbackSaves = AtomicInteger(0)
+        val save = RecordingSaveAndExtract()
+        val vm = newViewModel(
+            save = save,
+            saveTyped = SaveTypedEntry { text, _, persona ->
+                assertEquals("just typed it", text)
+                assertEquals(Persona.WITNESS, persona)
+                fallbackSaves.incrementAndGet()
+            },
+            initialReadiness = ModelReadiness.Loading,
+        )
+
+        vm.submitTyped("just typed it")
+        advanceUntilIdle()
+
+        assertEquals(0, save.invocations.get())
+        assertEquals(1, fallbackSaves.get())
+        val reviewing = vm.state.value as CaptureUiState.Reviewing
+        assertEquals("just typed it", reviewing.review.transcription)
+    }
+
+    @Test
     fun `setModelReadiness flips chrome across phases without losing other slots`() {
         val vm = newViewModel(initialReadiness = ModelReadiness.Loading)
         vm.setModelReadiness(ModelReadiness.Ready)
@@ -343,10 +400,82 @@ class CaptureViewModelTest {
     }
 
     @Test
+    fun `setModelReadiness updates Recording Inferring and Reviewing phases`() = runTest(dispatcher) {
+        val recordingVoice = FakeVoiceCapture(result = AudioChunk(FloatArray(16), 16_000, isFinal = true))
+        val recordingVm = newViewModel(voice = recordingVoice, initialReadiness = ModelReadiness.Ready)
+        recordingVm.startRecording()
+        recordingVm.setModelReadiness(ModelReadiness.Paused)
+        assertEquals(ModelReadiness.Paused, recordingVm.state.value.modelReadiness)
+        recordingVm.discard()
+        advanceUntilIdle()
+
+        val pending = CompletableDeferred<ForegroundResult>()
+        val inferringVoice = FakeVoiceCapture(result = AudioChunk(FloatArray(16), 16_000, isFinal = true))
+        val inferringVm = newViewModel(
+            voice = inferringVoice,
+            inference = SuspendingForegroundInference(pending),
+            initialReadiness = ModelReadiness.Ready,
+        )
+        inferringVm.startRecording()
+        inferringVoice.completeWithResult()
+        advanceUntilIdle()
+        inferringVm.setModelReadiness(ModelReadiness.Downloading(25))
+        assertEquals(ModelReadiness.Downloading(25), inferringVm.state.value.modelReadiness)
+        pending.complete(parseFailure())
+        advanceUntilIdle()
+
+        val reviewingVm = reviewedViewModel()
+        reviewingVm.setModelReadiness(ModelReadiness.Loading)
+        assertEquals(ModelReadiness.Loading, reviewingVm.state.value.modelReadiness)
+    }
+
+    @Test
     fun `setPersona is reflected across phases`() {
         val vm = newViewModel(persona = Persona.WITNESS, initialReadiness = ModelReadiness.Ready)
         vm.setPersona(Persona.EDITOR)
         assertEquals(Persona.EDITOR, vm.state.value.persona)
+    }
+
+    @Test
+    fun `setPersona updates Recording Inferring and Reviewing phases`() = runTest(dispatcher) {
+        val recordingVoice = FakeVoiceCapture(result = AudioChunk(FloatArray(16), 16_000, isFinal = true))
+        val recordingVm = newViewModel(voice = recordingVoice, initialReadiness = ModelReadiness.Ready)
+        recordingVm.startRecording()
+        recordingVm.setPersona(Persona.HARDASS)
+        assertEquals(Persona.HARDASS, recordingVm.state.value.persona)
+        recordingVm.discard()
+        advanceUntilIdle()
+
+        val pending = CompletableDeferred<ForegroundResult>()
+        val inferringVoice = FakeVoiceCapture(result = AudioChunk(FloatArray(16), 16_000, isFinal = true))
+        val inferringVm = newViewModel(
+            voice = inferringVoice,
+            inference = SuspendingForegroundInference(pending),
+            initialReadiness = ModelReadiness.Ready,
+        )
+        inferringVm.startRecording()
+        inferringVoice.completeWithResult()
+        advanceUntilIdle()
+        inferringVm.setPersona(Persona.EDITOR)
+        assertEquals(Persona.EDITOR, inferringVm.state.value.persona)
+        pending.complete(parseFailure())
+        advanceUntilIdle()
+
+        val reviewingVm = reviewedViewModel()
+        reviewingVm.setPersona(Persona.HARDASS)
+        assertEquals(Persona.HARDASS, reviewingVm.state.value.persona)
+    }
+
+    @Test
+    fun `Idle-only events ignore non-idle phases`() = runTest(dispatcher) {
+        val vm = reviewedViewModel()
+
+        vm.dismissError()
+        vm.acknowledgeReview()
+        vm.onMicDenied()
+
+        val idle = vm.state.value as CaptureUiState.Idle
+        assertEquals(CaptureError.MicDenied, idle.error)
     }
 
     // ─── 30s cap audio cue (pre-warn at 28s, single fire) ────────────────────
@@ -453,6 +582,9 @@ class CaptureViewModelTest {
             error("inference call not expected in this test")
         },
         save: SaveAndExtract = SaveAndExtract { _, _, _ -> },
+        saveTyped: SaveTypedEntry = SaveTypedEntry { text, capturedAt, persona ->
+            save(text, capturedAt, persona)
+        },
         initialReadiness: ModelReadiness = ModelReadiness.Loading,
         clockOverride: Clock = clock,
         limitWarningCue: LimitWarningCue = LimitWarningCue {},
@@ -461,6 +593,7 @@ class CaptureViewModelTest {
         recordVoice = voice,
         foregroundInference = inference,
         saveAndExtract = save,
+        saveTypedEntry = saveTyped,
         clock = clockOverride,
         zoneId = ZoneOffset.UTC,
         initialReadiness = initialReadiness,
@@ -497,6 +630,36 @@ class CaptureViewModelTest {
             invocations.incrementAndGet()
         }
     }
+
+    private fun reviewedViewModel(): CaptureViewModel {
+        val voice = FakeVoiceCapture(result = AudioChunk(FloatArray(16), 16_000, isFinal = true))
+        val vm = newViewModel(
+            voice = voice,
+            inference = FakeForegroundInference(
+                ForegroundResult.Success(
+                    persona = Persona.WITNESS,
+                    rawResponse = "",
+                    elapsedMs = 100,
+                    completedAt = clock.instant(),
+                    transcription = "review me",
+                    followUp = "already reviewed",
+                ),
+            ),
+            save = RecordingSaveAndExtract(),
+            initialReadiness = ModelReadiness.Ready,
+        )
+        vm.startRecording()
+        voice.completeWithResult()
+        return vm
+    }
+
+    private fun parseFailure(): ForegroundResult.ParseFailure = ForegroundResult.ParseFailure(
+        persona = Persona.WITNESS,
+        rawResponse = "",
+        elapsedMs = 0,
+        completedAt = clock.instant(),
+        reason = ForegroundResult.ParseReason.EMPTY_RESPONSE,
+    )
 
     /**
      * Drives the VM's recording job deterministically: tests call [emitNextLevel] to push pending

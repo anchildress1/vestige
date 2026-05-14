@@ -74,7 +74,7 @@ class OnboardingHostTest {
         startHost(
             onComplete = { completed = true },
             wifiAvailability = { true },
-            modelAvailability = ModelAvailability { ModelArtifactState.Complete },
+            modelAvailability = fakeModelAvailability(ModelArtifactState.Complete),
         )
 
         tapPrimary("Continue") // Screen 1
@@ -106,7 +106,7 @@ class OnboardingHostTest {
 
     @Test
     fun `does not mark complete until final Open Vestige tap`() {
-        startHost(wifiAvailability = { true }, modelAvailability = ModelAvailability { ModelArtifactState.Complete })
+        startHost(wifiAvailability = { true }, modelAvailability = fakeModelAvailability(ModelArtifactState.Complete))
         tapPrimary("Continue")
         tapPrimary("Got it")
         assertFalse(prefs.isComplete)
@@ -179,7 +179,7 @@ class OnboardingHostTest {
         startHost(
             onComplete = { completed = true },
             wifiAvailability = { true },
-            modelAvailability = ModelAvailability { ModelArtifactState.Absent },
+            modelAvailability = fakeModelAvailability(ModelArtifactState.Absent),
         )
         tapPrimary("Continue")
         tapPrimary("Got it")
@@ -201,7 +201,7 @@ class OnboardingHostTest {
 
         startHost(
             onComplete = { completed = true },
-            modelAvailability = ModelAvailability { ModelArtifactState.Absent },
+            modelAvailability = fakeModelAvailability(ModelArtifactState.Absent),
         )
 
         tapPrimary("Open Vestige")
@@ -215,10 +215,14 @@ class OnboardingHostTest {
         composeRule.waitForIdle()
     }
 
+    private fun fakeModelAvailability(state: ModelArtifactState) = object : ModelAvailability {
+        override suspend fun status(): ModelArtifactState = state
+    }
+
     private fun startHost(
         onComplete: () -> Unit = {},
         wifiAvailability: WifiAvailability = WifiAvailability { false },
-        modelAvailability: ModelAvailability = ModelAvailability { ModelArtifactState.Absent },
+        modelAvailability: ModelAvailability = fakeModelAvailability(ModelArtifactState.Absent),
     ) {
         composeRule.activity.setContent {
             VestigeTheme {

@@ -122,7 +122,18 @@ private fun rememberOnboardingEnvironment(
     LaunchedEffect(step) {
         prefs.setCurrentStep(step)
         wifiConnected = wifiAvailability.isWifiConnected()
-        modelState = modelAvailability.status()
+        val initial = modelAvailability.status()
+        modelState = initial
+        // Auto-trigger the download when the user lands on Screen 6 with a non-Complete artifact.
+        // LaunchedEffect(step) is cancelled when the user navigates away, which also cancels the
+        // download — leaving the file on disk for a later resume. Story 4.3 owns retry / pause /
+        // stall handling; this just gets the percent moving.
+        if (step == OnboardingStep.ModelDownload && initial !is ModelArtifactState.Complete) {
+            val terminal = modelAvailability.download { currentBytes, expectedBytes ->
+                modelState = ModelArtifactState.Partial(currentBytes, expectedBytes)
+            }
+            modelState = terminal
+        }
     }
     DisposableEffect(lifecycleOwner, wifiAvailability, modelAvailability) {
         val observer = LifecycleEventObserver { _, event ->

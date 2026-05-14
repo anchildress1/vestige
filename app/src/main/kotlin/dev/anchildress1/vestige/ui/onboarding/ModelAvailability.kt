@@ -3,12 +3,22 @@ package dev.anchildress1.vestige.ui.onboarding
 import dev.anchildress1.vestige.model.ModelArtifactState
 import dev.anchildress1.vestige.model.ModelArtifactStore
 
-/** Onboarding-side projection of main-model status. Tests fake it; screens read percentage off it. */
-fun interface ModelAvailability {
+/**
+ * Onboarding-side projection of main-model status + the download trigger that drives `Partial`
+ * state transitions. Screen 6 needs both: a snapshot read on entry/resume, and an active
+ * download whose progress callback ticks the UI.
+ */
+interface ModelAvailability {
     suspend fun status(): ModelArtifactState
+
+    /** Default: no-op trigger that returns current status. `Default` overrides to do real I/O. */
+    suspend fun download(onProgress: (Long, Long) -> Unit = { _, _ -> }): ModelArtifactState = status()
 
     class Default(private val artifactStore: ModelArtifactStore) : ModelAvailability {
         override suspend fun status(): ModelArtifactState = artifactStore.currentState()
+
+        override suspend fun download(onProgress: (Long, Long) -> Unit): ModelArtifactState =
+            artifactStore.download(onProgress)
     }
 }
 

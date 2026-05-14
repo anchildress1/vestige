@@ -22,6 +22,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
@@ -51,7 +52,6 @@ fun OnboardingHost(
     ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) {
     val context = LocalContext.current
-    val lifecycleOwner = LocalLifecycleOwner.current
     val resolvedWifi = remember(context, wifiAvailability) {
         wifiAvailability ?: WifiAvailability.Default(context)
     }
@@ -100,15 +100,9 @@ fun OnboardingHost(
         }
     }
 
-    DisposableEffect(lifecycleOwner, context) {
-        val observer = LifecycleEventObserver { _, event ->
-            if (event == Lifecycle.Event.ON_RESUME) {
-                micGranted = hasRecordAudio(context)
-                notifGranted = hasNotificationPermission(context)
-            }
-        }
-        lifecycleOwner.lifecycle.addObserver(observer)
-        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    ObserveBackgroundResume {
+        micGranted = hasRecordAudio(context)
+        notifGranted = hasNotificationPermission(context)
     }
 
     val completionScope = rememberCoroutineScope()
@@ -199,7 +193,6 @@ private fun rememberOnboardingEnvironment(
     modelAvailability: ModelAvailability,
     persistedStateWriteLane: PersistedStateWriteLane,
 ): OnboardingEnvironment {
-    val lifecycleOwner = LocalLifecycleOwner.current
     val scope = rememberCoroutineScope()
     var wifiConnected by remember { mutableStateOf(wifiAvailability.isWifiConnected()) }
     var modelState by remember { mutableStateOf<ModelArtifactState>(ModelArtifactState.Absent) }
@@ -212,11 +205,13 @@ private fun rememberOnboardingEnvironment(
         wifiConnected = wifiAvailability.isWifiConnected()
     }
 
-    // Snapshot the model state ONCE on mount. `modelAvailability.status()` runs a full SHA-256
-    // over the ~3.7 GB artifact when the file is complete — re-firing it on every step
-    // transition would re-hash for every screen change.
+    // Snapshot the model state ONCE on mount for every screen except ModelDownload. Screen 6
+    // immediately calls runDownloadIfNeeded(), which begins with its own status() read; doing
+    // both on a cold start would SHA the full ~3.7 GB artifact twice before auto-return.
     LaunchedEffect(Unit) {
-        modelState = modelAvailability.status()
+        if (step != OnboardingStep.ModelDownload) {
+            modelState = modelAvailability.status()
+        }
     }
 
     // Trigger the download only when the user reaches Screen 6 with a non-Complete artifact.
@@ -231,17 +226,11 @@ private fun rememberOnboardingEnvironment(
             onSpeed = { downloadMbps = it },
         )
     }
-    DisposableEffect(lifecycleOwner, wifiAvailability, modelAvailability) {
-        val observer = LifecycleEventObserver { _, event ->
-            if (event == Lifecycle.Event.ON_RESUME) {
-                scope.launch {
-                    wifiConnected = wifiAvailability.isWifiConnected()
-                    modelState = modelAvailability.status()
-                }
-            }
+    ObserveBackgroundResume {
+        scope.launch {
+            wifiConnected = wifiAvailability.isWifiConnected()
+            modelState = modelAvailability.status()
         }
-        lifecycleOwner.lifecycle.addObserver(observer)
-        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
     return OnboardingEnvironment(
@@ -264,6 +253,31 @@ internal class PersistedStateWriteLane(
         mutex.withLock {
             block()
         }
+    }
+}
+
+@Composable
+private fun ObserveBackgroundResume(onResumeFromBackground: () -> Unit) {
+    val lifecycleOwner = LocalLifecycleOwner.current
+    val currentOnResumeFromBackground by rememberUpdatedState(onResumeFromBackground)
+    DisposableEffect(lifecycleOwner) {
+        var enteredBackground = false
+        val observer = LifecycleEventObserver { _, event ->
+            when (event) {
+                Lifecycle.Event.ON_STOP -> enteredBackground = true
+
+                Lifecycle.Event.ON_RESUME -> {
+                    if (enteredBackground) {
+                        enteredBackground = false
+                        currentOnResumeFromBackground()
+                    }
+                }
+
+                else -> Unit
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 }
 

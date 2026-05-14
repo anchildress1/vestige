@@ -155,6 +155,26 @@ class OnboardingHostTest {
     }
 
     @Test
+    fun `ModelDownload cold start checks model status only once before auto-return`() {
+        prefs.setCurrentStep(OnboardingStep.ModelDownload)
+        var statusCalls = 0
+        val availability = object : ModelAvailability {
+            override suspend fun status(): ModelArtifactState {
+                statusCalls += 1
+                return ModelArtifactState.Complete
+            }
+        }
+
+        startHost(
+            wifiAvailability = { true },
+            modelAvailability = availability,
+        )
+
+        composeRule.onNodeWithText("WIRING", substring = true).assertIsDisplayed()
+        assertEquals(1, statusCalls)
+    }
+
+    @Test
     fun `download progress drives Partial state ticks and final Complete state`() {
         prefs.setCurrentStep(OnboardingStep.ModelDownload)
         // Three onProgress ticks exercise the sampler's first-call init branch, the

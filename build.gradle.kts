@@ -185,13 +185,6 @@ sonar {
                 "**/ui/components/VestigeSurface.kt",
                 "**/ui/components/VestigeScaffold.kt",
                 "**/ui/components/AccentModifiers.kt",
-                "**/ui/onboarding/OnboardingHost.kt",
-                "**/ui/onboarding/OnboardingStepContent.kt",
-                "**/ui/onboarding/OnboardingScaffold.kt",
-                "**/ui/onboarding/OnboardingScreens.kt",
-                "**/ui/onboarding/PersonaPickScreen.kt",
-                "**/ui/onboarding/WiringScreen.kt",
-                "**/ui/onboarding/ModelDownloadPlaceholderScreen.kt",
                 // Debug-only fixture seeder, FLAG_DEBUGGABLE-gated; never on a release path.
                 "**/debug/**",
             ).joinToString(","),

@@ -42,17 +42,36 @@ Build per `docs/PRD.md` §"Build philosophy: build first, test at failure zones.
 
 STT-A (audio plumbing, Phase 1) is existential — time-box hard. Spec rewrites supersede via ADR.
 
-# Android Frontend Project Rules
+# Android Compose Agent Rules
 
-This project is Android-only unless explicitly told otherwise.
-Use Kotlin, Jetpack Compose, Material 3, AndroidX lifecycle/ViewModel, and existing Gradle version catalog dependencies.
+This repository is Android-only unless explicitly instructed otherwise.
 
-Do not introduce Compose Multiplatform, KMP source sets, or new architectural frameworks unless asked.
+Use Jetpack Compose, Kotlin, Material 3, AndroidX lifecycle/ViewModel, and the existing Gradle version catalog.
 
-Follow existing project conventions:
-- app module uses Compose
-- JVM target is 17
-- JDK toolchain may be newer
-- tests include JVM/Robolectric Compose UI tests
-- respect the no-telemetry/privacy guardrails
-- keep UI state stable, explicit, and testable
+Do not introduce:
+- Kotlin Multiplatform
+- Compose Multiplatform
+- commonMain / iosMain source sets
+- expect/actual patterns
+- CMP resources
+- Navigation 3 migration
+- new architecture frameworks
+
+Preserve existing architecture unless explicitly asked to migrate.
+Do not force MVI/MVVM changes if current project conventions are coherent.
+
+Before editing Gradle:
+- inspect libs.versions.toml
+- verify AGP, Kotlin, Compose compiler, and dependency versions
+- reuse existing aliases
+- do not guess Maven coordinates
+
+Testing defaults:
+- use existing JVM/Robolectric Compose test setup
+- use Turbine for Flow/ViewModel tests when already available
+- prefer semantic UI assertions over screenshot tests
+
+Respect project guardrails:
+- no telemetry dependencies
+- no privacy-invasive SDKs
+- no broad dependency changes without explaining why

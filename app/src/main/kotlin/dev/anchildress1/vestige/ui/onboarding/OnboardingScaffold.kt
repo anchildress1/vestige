@@ -18,6 +18,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.role
@@ -80,11 +81,11 @@ private fun OnboardingPrimaryBar(primary: OnboardingAction, secondary: Onboardin
                 .semantics { role = Role.Button },
             contentPadding = PaddingValues(vertical = 18.dp, horizontal = 20.dp),
             colors = ButtonDefaults.buttonColors(
-                // Coral primary per the user's call — brighter than lime read as harsh on
-                // device; coral is the same "live work" accent used by the capture-screen
-                // ON AIR pill and the download percent hero.
-                containerColor = colors.coral,
-                contentColor = colors.deep,
+                // Muted lime — pure `colors.lime` reads as screaming neon on device. `limeSoft`
+                // is the same hue at 55% alpha; composited over `floor` it sits as a pastel
+                // lime that still owns the brand-green semantic without burning out the screen.
+                containerColor = colors.limeSoft.compositeOver(colors.floor),
+                contentColor = colors.ink,
                 disabledContainerColor = colors.s2,
                 disabledContentColor = colors.dim,
             ),

@@ -133,4 +133,6 @@ internal fun OnboardingFooterLink(text: String, modifier: Modifier = Modifier) {
 @Composable
 internal fun onboardingDefaultBack(): String = stringResource(id = R.string.onboarding_back)
 
-private const val LIME_BAR_ALPHA: Float = 0.85f
+// Tuned by hand on device. Pure lime (1.0) burns; limeSoft (0.55) looks olive; 0.85 reads
+// flat; 0.92 keeps most of the lime's intensity while still trimming the neon edge.
+private const val LIME_BAR_ALPHA: Float = 0.92f

@@ -51,19 +51,24 @@ fun OnboardingHost(
     wifiAvailability: WifiAvailability? = null,
 ) {
     val context = LocalContext.current
+    val lifecycleOwner = LocalLifecycleOwner.current
     val scope = rememberCoroutineScope()
     val resolvedWifi = remember(context, wifiAvailability) {
         wifiAvailability ?: WifiAvailability.Default(context)
     }
     var step by rememberSaveable { mutableStateOf(prefs.currentStep) }
     var persona by rememberSaveable { mutableStateOf(prefs.defaultPersona) }
+    var micGranted by rememberSaveable { mutableStateOf(hasRecordAudio(context)) }
+    var notifGranted by rememberSaveable { mutableStateOf(hasNotificationPermission(context)) }
     var micPermissionDenied by rememberSaveable { mutableStateOf(false) }
 
     val advance: () -> Unit = { step = step.next() ?: step }
-    // Launchers now only flip permission state — the Wiring hub stays put after each grant.
     val launchers = rememberPermissionLaunchers(
-        onMicResult = { granted -> micPermissionDenied = !granted },
-        onNotificationResult = { /* no-op; switch state observes runtime flag */ },
+        onMicResult = { granted ->
+            micGranted = granted
+            micPermissionDenied = !granted
+        },
+        onNotificationResult = { granted -> notifGranted = granted },
     )
 
     BackHandler(enabled = step != OnboardingStep.PersonaPick) {
@@ -89,6 +94,17 @@ fun OnboardingHost(
         onAdvance = advance,
     )
 
+    DisposableEffect(lifecycleOwner, context) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                micGranted = hasRecordAudio(context)
+                notifGranted = hasNotificationPermission(context)
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+
     val callbacks = buildCallbacks(
         context = context,
         scope = scope,
@@ -105,8 +121,8 @@ fun OnboardingHost(
         micPermissionDenied = micPermissionDenied,
         wifiConnected = environment.wifiConnected,
         modelState = environment.modelState,
-        micGranted = hasRecordAudio(context),
-        notifGranted = hasNotificationPermission(context),
+        micGranted = micGranted,
+        notifGranted = notifGranted,
         downloadMbps = environment.downloadMbps,
     )
     // VestigeScaffold owns floor/ink color propagation per AGENTS rule 26.
@@ -230,11 +246,17 @@ private suspend fun runDownloadIfNeeded(
     if (step != OnboardingStep.ModelDownload) return
     val current = modelAvailability.status()
     Log.i(ONBOARDING_TAG, "ModelDownload entered. currentState=$current")
-    onState(current)
     if (current is ModelArtifactState.Complete) {
+        onState(current)
         Log.i(ONBOARDING_TAG, "Model already complete; skipping download.")
         return
     }
+    // For Absent / Partial / Corrupt: don't publish `current` to state. `currentState()` reports
+    // Absent any time the .part file exists but the final artifact doesn't — publishing that
+    // on re-entry collapses the percent to 0 before the resumed download's first onProgress
+    // ticks it back to the actual byte count. Result: percent appears to flash. Letting the
+    // prior `state` ride keeps the screen showing the last known progress until the resumed
+    // bytes arrive.
     try {
         Log.i(ONBOARDING_TAG, "Starting download()...")
         var lastPct = -1

@@ -107,7 +107,7 @@ private fun WiringHostScreen(modifier: Modifier, state: OnboardingStepState, cal
     )
     val granted = switches.count { it.state == WiringSwitchState.Granted }
     val blocked = switches.count { it.state == WiringSwitchState.Blocked }
-    val allGreen = granted == switches.size
+    val readyToAdvance = isWiringReadyToAdvance(state)
     OnboardingScaffold(
         enabledCount = state.enabledCount,
         modifier = modifier,
@@ -115,10 +115,10 @@ private fun WiringHostScreen(modifier: Modifier, state: OnboardingStepState, cal
         primary = OnboardingAction(
             label = stringResource(id = R.string.onboarding_wiring_next),
             onAction = callbacks.advance,
-            enabled = allGreen,
+            enabled = readyToAdvance,
         ),
         footerHelper = when {
-            allGreen -> null
+            readyToAdvance -> null
 
             blocked > 0 -> stringResource(id = R.string.onboarding_wiring_blocked, blocked)
 
@@ -131,6 +131,9 @@ private fun WiringHostScreen(modifier: Modifier, state: OnboardingStepState, cal
         WiringScreen(switches = switches)
     }
 }
+
+internal fun isWiringReadyToAdvance(state: OnboardingStepState): Boolean =
+    state.modelState is ModelArtifactState.Complete
 
 @Composable
 private fun personaSwitch(persona: Persona): WiringSwitch {

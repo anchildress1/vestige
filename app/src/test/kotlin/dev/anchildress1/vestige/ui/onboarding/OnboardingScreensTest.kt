@@ -42,7 +42,7 @@ class OnboardingScreensTest {
                 PersonaPickScreen(selected = Persona.WITNESS, onSelect = {}, onContinue = {})
             }
         }
-        composeRule.onNodeWithText("PERSONA").assertIsDisplayed()
+        composeRule.onNodeWithText("PERSONA", substring = true).assertIsDisplayed()
         composeRule.onNodeWithText("Observes. Names the pattern. Keeps quiet otherwise.").assertIsDisplayed()
         composeRule.onNodeWithText("Sharper. Less padding. More action.").performScrollTo().assertIsDisplayed()
         composeRule.onNodeWithText("Cuts vague words until they confess.").performScrollTo().assertIsDisplayed()
@@ -147,7 +147,7 @@ class OnboardingScreensTest {
                 ReadyScreen(persona = Persona.HARDASS, onOpenApp = {})
             }
         }
-        composeRule.onNodeWithText("READY").assertIsDisplayed()
+        composeRule.onNodeWithText("READY", substring = true).assertIsDisplayed()
         composeRule.onNodeWithText("PROMPT 01").performScrollTo().assertIsDisplayed()
         composeRule.onNodeWithText("WHAT JUST HAPPENED?").performScrollTo().assertIsDisplayed()
     }

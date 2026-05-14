@@ -1,19 +1,17 @@
 package dev.anchildress1.vestige.ui.onboarding
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
@@ -75,46 +73,49 @@ private fun Set<Int>.expandTo(density: Int): Set<Int> =
     flatMap { step -> (step * density until (step + 1) * density) }.toSet()
 
 /**
- * Anton-condensed poster headline. The headline string's trailing period — if any — is replaced
- * with a small lime square sitting at the baseline. Matches `poc/screenshots/onboarding-*.png`
- * where the period IS the lime accent block, not a separate glyph next to one.
+ * Anton-condensed poster headline. The headline string's trailing period — if any — is
+ * rendered as a lime square character (`■`) at a smaller size, replacing the period glyph.
+ * Because the square is a *real text character*, it sits on the baseline by definition —
+ * no Placeholder, no padding offsets, no font-metrics math.
  */
 @Composable
 internal fun OnboardingHeadline(text: String, modifier: Modifier = Modifier, accentSquare: Boolean = true) {
-    val (body, periodIsSquare) = if (accentSquare && text.endsWith(".")) {
+    val (body, replacePeriod) = if (accentSquare && text.endsWith(".")) {
         text.dropLast(1) to true
     } else {
         text to false
     }
-    Row(
-        modifier = modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.Bottom,
-    ) {
-        Text(
-            text = body,
-            style = TextStyle(
-                fontFamily = VestigeFonts.Display,
-                fontSize = HEADLINE_SP.sp,
-                lineHeight = HEADLINE_LINE_HEIGHT_SP.sp,
-                letterSpacing = (-0.02).em,
-            ),
-            color = VestigeTheme.colors.ink,
-        )
-        if (periodIsSquare) {
-            // 3dp gap is tight enough that the square reads as the period, not a separate
-            // accent. 12dp square sits at the text baseline thanks to the Row's bottom align.
-            Box(modifier = Modifier.width(3.dp))
-            Box(
-                modifier = Modifier
-                    .padding(bottom = ACCENT_BASELINE_OFFSET.dp)
-                    .size(ACCENT_SIZE.dp)
-                    .background(VestigeTheme.colors.lime),
-            )
+    val annotated = buildAnnotatedString {
+        append(body)
+        if (replacePeriod) {
+            withStyle(
+                SpanStyle(
+                    color = VestigeTheme.colors.lime,
+                    fontSize = ACCENT_GLYPH_SP.sp,
+                    letterSpacing = (-0.04).em,
+                ),
+            ) {
+                // U+25A0 BLACK SQUARE. Sits on the baseline like any glyph.
+                append("■")
+            }
         }
     }
+    Text(
+        text = annotated,
+        modifier = modifier.fillMaxWidth(),
+        style = TextStyle(
+            fontFamily = VestigeFonts.Display,
+            fontSize = HEADLINE_SP.sp,
+            lineHeight = HEADLINE_LINE_HEIGHT_SP.sp,
+            letterSpacing = (-0.02).em,
+        ),
+        color = VestigeTheme.colors.ink,
+    )
 }
 
 private const val HEADLINE_SP = 56
 private const val HEADLINE_LINE_HEIGHT_SP = 56
-private const val ACCENT_SIZE = 12
-private const val ACCENT_BASELINE_OFFSET = 4
+
+// Square glyph (U+25A0) at this sp value reads as a chunky period: ~30% of the headline
+// cap height. Glyph is text so it inherits baseline alignment from the layout, no padding.
+private const val ACCENT_GLYPH_SP = 28

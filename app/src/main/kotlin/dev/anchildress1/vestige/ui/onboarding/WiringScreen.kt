@@ -17,8 +17,6 @@ import androidx.compose.ui.unit.dp
 import dev.anchildress1.vestige.R
 import dev.anchildress1.vestige.ui.components.EyebrowE
 import dev.anchildress1.vestige.ui.components.Pill
-import dev.anchildress1.vestige.ui.components.StatItem
-import dev.anchildress1.vestige.ui.components.StatRibbon
 import dev.anchildress1.vestige.ui.components.VestigeListCard
 import dev.anchildress1.vestige.ui.components.limeLeftRuleForActive
 import dev.anchildress1.vestige.ui.theme.VestigeTheme
@@ -43,23 +41,12 @@ internal data class WiringSwitch(
 
 @Composable
 internal fun WiringScreen(switches: List<WiringSwitch>, modifier: Modifier = Modifier) {
-    val colors = VestigeTheme.colors
-    val granted = switches.count { it.state == WiringSwitchState.Granted }
-    val pending = switches.count { it.state == WiringSwitchState.Pending }
-    val blocked = switches.count { it.state == WiringSwitchState.Blocked }
     Column(
         modifier = modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         EyebrowE(text = stringResource(id = R.string.onboarding_wiring_eyebrow))
         OnboardingHeadline(text = stringResource(id = R.string.onboarding_wiring_header))
-        StatRibbon(
-            items = listOf(
-                StatItem(value = granted.toString(), label = "LIVE", color = colors.lime),
-                StatItem(value = pending.toString(), label = "PENDING", color = colors.ink),
-                StatItem(value = blocked.toString(), label = "BLOCKED", color = colors.coral),
-            ),
-        )
         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
             switches.forEach { switch -> WiringSwitchCard(switch = switch) }
         }

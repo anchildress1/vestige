@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasText
@@ -54,7 +55,7 @@ class OnboardingHostTest {
     @Test
     fun `lands on persona pick with Witness default`() {
         startHost()
-        composeRule.onNodeWithText("PERSONA").assertIsDisplayed()
+        composeRule.onNodeWithText("PERSONA", substring = true).assertIsDisplayed()
         composeRule.onNodeWithText("WITNESS").assertIsDisplayed()
         composeRule.onNodeWithText("HARDASS").performScrollTo().assertIsDisplayed()
         composeRule.onNodeWithText("EDITOR").performScrollTo().assertIsDisplayed()
@@ -73,15 +74,23 @@ class OnboardingHostTest {
     fun `persona Continue advances to the Wiring hub`() {
         startHost()
         tapPrimary("CONTINUE")
-        composeRule.onNodeWithText("WIRING").assertIsDisplayed()
+        composeRule.onNodeWithText("WIRING", substring = true).assertIsDisplayed()
     }
 
     @Test
-    fun `Wiring Next is disabled while permissions still pending`() {
+    fun `Wiring Next is enabled while optional permissions are still pending`() {
         prefs.setCurrentStep(OnboardingStep.Wiring)
         startHost(modelAvailability = fakeModelAvailability(ModelArtifactState.Complete))
-        // Robolectric does not auto-grant RECORD_AUDIO / POST_NOTIFICATIONS, so the Wiring
-        // gate keeps Next disabled even when the model is on disk.
+        // Mic + notification are optional in the hub flow. Once the local model is ready,
+        // onboarding can proceed even if those permissions are still pending.
+        composeRule.onNodeWithText("NEXT").assertIsEnabled()
+    }
+
+    @Test
+    fun `Wiring Next stays disabled while required local setup is missing`() {
+        prefs.setCurrentStep(OnboardingStep.Wiring)
+        startHost(modelAvailability = fakeModelAvailability(ModelArtifactState.Absent))
+
         composeRule.onNodeWithText("NEXT").assertIsNotEnabled()
     }
 
@@ -90,17 +99,17 @@ class OnboardingHostTest {
         startHost()
         tapPrimary("CONTINUE")
         startHost()
-        composeRule.onNodeWithText("WIRING").assertIsDisplayed()
+        composeRule.onNodeWithText("WIRING", substring = true).assertIsDisplayed()
     }
 
     @Test
     fun `system back from Wiring returns to PersonaPick`() {
         startHost()
         tapPrimary("CONTINUE")
-        composeRule.onNodeWithText("WIRING").assertIsDisplayed()
+        composeRule.onNodeWithText("WIRING", substring = true).assertIsDisplayed()
         Espresso.pressBack()
         composeRule.waitForIdle()
-        composeRule.onNodeWithText("PERSONA").assertIsDisplayed()
+        composeRule.onNodeWithText("PERSONA", substring = true).assertIsDisplayed()
     }
 
     @Test

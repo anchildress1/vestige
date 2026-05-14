@@ -1,47 +1,54 @@
 package dev.anchildress1.vestige.ui.onboarding
 
-import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.asCoroutineDispatcher
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
-import kotlinx.coroutines.test.StandardTestDispatcher
-import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.util.Collections
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
 
 class PersistedStateWriteLaneTest {
 
     @Test
-    fun `run serializes overlapping writes in arrival order`() = runTest {
-        val dispatcher = StandardTestDispatcher(testScheduler)
-        val lane = PersistedStateWriteLane(dispatcher)
-        val order = mutableListOf<String>()
-        val firstEntered = CompletableDeferred<Unit>()
-        val releaseFirst = CompletableDeferred<Unit>()
+    fun `run serializes overlapping writes in arrival order`() = runBlocking {
+        Executors.newFixedThreadPool(2).asCoroutineDispatcher().use { dispatcher ->
+            val lane = PersistedStateWriteLane(dispatcher)
+            val order = Collections.synchronizedList(mutableListOf<String>())
+            val firstEntered = CountDownLatch(1)
+            val releaseFirst = CountDownLatch(1)
 
-        val first = async {
-            lane.run {
-                order += "first-start"
-                firstEntered.complete(Unit)
-                releaseFirst.await()
-                order += "first-end"
+            val first = async(dispatcher) {
+                lane.run {
+                    order += "first-start"
+                    firstEntered.countDown()
+                    assertTrue(releaseFirst.await(1, TimeUnit.SECONDS))
+                    order += "first-end"
+                }
             }
-        }
-        firstEntered.await()
-        val second = async {
-            lane.run {
-                order += "second"
+            assertTrue(firstEntered.await(1, TimeUnit.SECONDS))
+
+            val second = async(dispatcher) {
+                lane.run {
+                    order += "second"
+                }
             }
+
+            delay(50)
+            assertEquals(listOf("first-start"), order)
+
+            releaseFirst.countDown()
+            awaitAll(first, second)
+
+            assertEquals(
+                listOf("first-start", "first-end", "second"),
+                order,
+            )
         }
-
-        testScheduler.runCurrent()
-        assertEquals(listOf("first-start"), order)
-
-        releaseFirst.complete(Unit)
-        awaitAll(first, second)
-
-        assertEquals(
-            listOf("first-start", "first-end", "second"),
-            order,
-        )
     }
 }

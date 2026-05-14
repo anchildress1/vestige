@@ -249,7 +249,7 @@ internal class PersistedStateWriteLane(
     private val dispatcher: CoroutineDispatcher,
     private val mutex: Mutex = Mutex(),
 ) {
-    suspend fun <T> run(block: suspend () -> T): T = withContext(dispatcher) {
+    suspend fun <T> run(block: () -> T): T = withContext(dispatcher) {
         mutex.withLock {
             block()
         }

@@ -162,6 +162,20 @@ Approaching chunk boundary (~25s):
 After tap-stop, while transcribing (1-5 sec target per ADR-002 §"Latency budget" — measurement-driven, not a contractual promise):
 > Reading the entry.
 
+### Capture Screen — Discard
+
+Recording-state secondary affordance — sits below `STOP · FILE IT` per `design-guidelines.md` §"Capture Screen / Discard."
+
+Button label:
+> DISCARD · NO SAVE
+
+Behavior (per `adrs/ADR-001-stack-and-build-infra.md` §Q8):
+- Single tap. No confirmation dialog, no long-press, no two-tap arming.
+- Screen returns to idle immediately. No snackbar, no `Discarded.` confirmation, no `Undo` affordance.
+- Visible only while `CaptureSession.state == RECORDING`. Hidden once the user has tapped `STOP · FILE IT` (foreground call is in flight).
+
+There is no error copy, no destructive confirmation copy, no post-discard toast. Silent dismissal is the contract.
+
 ### Type affordance (bottom)
 
 Button:

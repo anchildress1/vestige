@@ -288,6 +288,8 @@ Forbidden across all personas: "thank you for sharing," "how does that make you 
 - The patterns peek card and footer metadata can dim or fade out during active recording — capture is the only surface that matters in that state. Do not collapse the layout; just lower contrast.
 - The hero title can swap to a recording-state line per `ux-copy.md`, or stay; do not invent here.
 
+**Capture Screen / Discard.** During recording, a secondary `DISCARD · NO SAVE` text link sits below the primary `STOP · FILE IT` pill. Visual register: muted secondary text — *not* destructive accent — because the buffer is gone instantly on tap and a destructive treatment would over-signal the action. Per ADR-001 Q8: single-tap, no confirmation dialog, no long-press, no `Undo` snackbar; the screen returns to idle and the layout resumes. The destructive accent (`coral` under Scoreboard, per ADR-011) stays reserved for `Delete entry` / `Wipe everything` / `Delete model` confirmations. Contract: `adrs/ADR-001-stack-and-build-infra.md` §Q8 (audio byte lifecycle, state machine, no-silent-save guarantees). Copy: `ux-copy.md` §"Capture Screen — Discard."
+
 **Transcription appears after inference returns** (Phase 1/2 measures the real S24 Ultra latency; target 1-5 seconds per `adrs/ADR-002-multi-lens-extraction-pattern.md` §"Latency budget" — not a guarantee). Until it arrives, the placeholder copy from `ux-copy.md` sits in the user-turn slot. Streaming-as-you-speak transcription is v2; not in this design.
 
 **Forbidden on capture:**

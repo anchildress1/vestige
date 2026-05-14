@@ -49,7 +49,9 @@
     <string name="onboarding_wiring_persona_desc">Voice picked on the previous screen. Change it later in Settings if %1$s doesn\'t fit.</string>
     <string name="onboarding_open_vestige">Open Vestige</string>
     <string name="onboarding_wiring_waiting_on_model">WAITING ON MODEL · TAP LOCAL TO START</string>
-    <string name="onboarding_wiring_local_pending_hint">DOWNLOAD STILL RUNNING · BACK UP TO RESUME</string>
+    <string name="onboarding_wiring_local_absent_hint">TAP LOCAL TO START DOWNLOAD</string>
+    <string name="onboarding_wiring_local_partial_hint">DOWNLOAD STILL RUNNING · BACK UP TO RESUME</string>
+    <string name="onboarding_wiring_local_corrupt_hint">ARTIFACT CORRUPT · TAP TO RETRY</string>
     <string name="onboarding_wiring_local_blocked_hint">NETWORK DOWN · RECONNECT TO DOWNLOAD</string>
     <string name="onboarding_wiring_mic_blocked_hint">DENIED · TAP AGAIN OR SETTINGS → PERMISSIONS</string>
 

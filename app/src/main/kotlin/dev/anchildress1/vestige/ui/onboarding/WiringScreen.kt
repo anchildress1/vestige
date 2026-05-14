@@ -37,6 +37,9 @@ internal data class WiringSwitch(
     val state: WiringSwitchState,
     val pendingHint: String? = null,
     val onTap: (() -> Unit)? = null,
+    // Navigation rows (persona swap, model drill-in) read as "button" to screen readers;
+    // toggles (mic, notify) keep Role.Switch because tapping them flips a binary permission.
+    val role: Role = Role.Switch,
 )
 
 @Composable
@@ -71,7 +74,7 @@ private fun WiringSwitchCard(switch: WiringSwitch) {
     VestigeListCard(
         modifier = Modifier.fillMaxWidth(),
         onClick = switch.onTap,
-        role = Role.Switch,
+        role = switch.role,
         accentModifier = if (visuals.showAccent) Modifier.limeLeftRuleForActive() else Modifier,
         contentPadding = PaddingValues(horizontal = 16.dp, vertical = 14.dp),
     ) {

@@ -57,14 +57,37 @@ class OnboardingStepContentTest {
             ),
         )
 
-        composeRule.onAllNodesWithText("NETWORK DOWN · RECONNECT TO DOWNLOAD").assertCountEquals(1)
+        // Corrupt artifact gets its own retry-framed hint, not the network-down message — the
+        // user can re-tap to re-download, the network is fine.
+        composeRule.onAllNodesWithText("ARTIFACT CORRUPT · TAP TO RETRY").assertCountEquals(1)
         composeRule.onAllNodesWithText("DENIED · TAP AGAIN OR SETTINGS → PERMISSIONS").assertCountEquals(1)
         composeRule.onAllNodesWithText("SINGLE-STATUS ONLY · NOTHING ELSE, EVER").assertCountEquals(1)
         composeRule.onNodeWithText("OPEN VESTIGE").assertIsNotEnabled()
     }
 
     @Test
-    fun `wiring shows pending hints while model download is still running`() {
+    fun `wiring shows partial-download hint while model is mid-flight`() {
+        renderWiring(
+            OnboardingStepState(
+                step = OnboardingStep.Wiring,
+                persona = Persona.WITNESS,
+                micPermissionDenied = false,
+                wifiConnected = true,
+                modelState = ModelArtifactState.Partial(currentBytes = 100, expectedBytes = 1_000),
+                micGranted = false,
+                notifGranted = false,
+            ),
+        )
+
+        composeRule.onAllNodesWithText("DOWNLOAD STILL RUNNING · BACK UP TO RESUME").assertCountEquals(1)
+        composeRule.onAllNodesWithText("REQUIRED FOR VOICE · OPTIONAL OTHERWISE").assertCountEquals(1)
+        composeRule.onAllNodesWithText("SINGLE-STATUS ONLY · NOTHING ELSE, EVER").assertCountEquals(1)
+        composeRule.onAllNodesWithText("WAITING ON MODEL · TAP LOCAL TO START").assertCountEquals(1)
+        composeRule.onNodeWithText("OPEN VESTIGE").assertIsNotEnabled()
+    }
+
+    @Test
+    fun `wiring shows start-here hint when model is Absent and wifi is up`() {
         renderWiring(
             OnboardingStepState(
                 step = OnboardingStep.Wiring,
@@ -77,11 +100,8 @@ class OnboardingStepContentTest {
             ),
         )
 
-        composeRule.onAllNodesWithText("DOWNLOAD STILL RUNNING · BACK UP TO RESUME").assertCountEquals(1)
-        composeRule.onAllNodesWithText("REQUIRED FOR VOICE · OPTIONAL OTHERWISE").assertCountEquals(1)
-        composeRule.onAllNodesWithText("SINGLE-STATUS ONLY · NOTHING ELSE, EVER").assertCountEquals(1)
-        composeRule.onAllNodesWithText("WAITING ON MODEL · TAP LOCAL TO START").assertCountEquals(1)
-        composeRule.onNodeWithText("OPEN VESTIGE").assertIsNotEnabled()
+        composeRule.onAllNodesWithText("TAP LOCAL TO START DOWNLOAD").assertCountEquals(1)
+        composeRule.onAllNodesWithText("DOWNLOAD STILL RUNNING · BACK UP TO RESUME").assertCountEquals(0)
     }
 
     @Test
@@ -100,6 +120,7 @@ class OnboardingStepContentTest {
 
         composeRule.onAllNodesWithText("NETWORK DOWN · RECONNECT TO DOWNLOAD").assertCountEquals(1)
         composeRule.onAllNodesWithText("DOWNLOAD STILL RUNNING · BACK UP TO RESUME").assertCountEquals(0)
+        composeRule.onAllNodesWithText("TAP LOCAL TO START DOWNLOAD").assertCountEquals(0)
     }
 
     @Test

@@ -5,6 +5,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import dev.anchildress1.vestige.R
 import dev.anchildress1.vestige.model.ModelArtifactState
 import dev.anchildress1.vestige.model.Persona
@@ -135,6 +136,7 @@ private fun personaSwitch(persona: Persona, onTap: () -> Unit): WiringSwitch {
         description = stringResource(id = R.string.onboarding_wiring_persona_desc, name),
         state = WiringSwitchState.Granted,
         onTap = onTap,
+        role = Role.Button, // Navigation back to persona pick — not a toggle.
     )
 }
 
@@ -146,23 +148,36 @@ private fun personaNameRes(persona: Persona): Int = when (persona) {
 
 @Composable
 private fun localSwitch(modelState: ModelArtifactState, wifiConnected: Boolean, onTap: () -> Unit): WiringSwitch {
-    val state = when {
-        modelState is ModelArtifactState.Complete -> WiringSwitchState.Granted
-        modelState is ModelArtifactState.Corrupt -> WiringSwitchState.Blocked
-        !wifiConnected && modelState !is ModelArtifactState.Complete -> WiringSwitchState.Blocked
-        else -> WiringSwitchState.Pending
+    val (state, hint) = when {
+        modelState is ModelArtifactState.Complete ->
+            WiringSwitchState.Granted to null
+
+        modelState is ModelArtifactState.Corrupt ->
+            // Corrupt is retryable — let the user tap to re-download. "Network down" is the wrong
+            // hint here because the artifact itself, not the network, is the blocker.
+            WiringSwitchState.Blocked to stringResource(id = R.string.onboarding_wiring_local_corrupt_hint)
+
+        !wifiConnected ->
+            WiringSwitchState.Blocked to stringResource(id = R.string.onboarding_wiring_local_blocked_hint)
+
+        modelState is ModelArtifactState.Partial ->
+            WiringSwitchState.Pending to stringResource(id = R.string.onboarding_wiring_local_partial_hint)
+
+        else -> // Absent — download hasn't started yet
+            WiringSwitchState.Pending to stringResource(id = R.string.onboarding_wiring_local_absent_hint)
     }
+    // Network-blocked tap would route into ModelDownload and start a 3.66 GB fetch on an invalid
+    // network path; only Corrupt + Pending are tappable. Granted needs no tap.
+    val tapEnabled = state == WiringSwitchState.Pending ||
+        (state == WiringSwitchState.Blocked && modelState is ModelArtifactState.Corrupt)
     return WiringSwitch(
         number = stringResource(id = R.string.onboarding_wiring_local_number),
         title = stringResource(id = R.string.onboarding_wiring_local_title),
         description = stringResource(id = R.string.onboarding_wiring_local_desc),
         state = state,
-        pendingHint = when (state) {
-            WiringSwitchState.Blocked -> stringResource(id = R.string.onboarding_wiring_local_blocked_hint)
-            WiringSwitchState.Pending -> stringResource(id = R.string.onboarding_wiring_local_pending_hint)
-            else -> null
-        },
-        onTap = if (state == WiringSwitchState.Granted) null else onTap,
+        pendingHint = hint,
+        onTap = if (tapEnabled) onTap else null,
+        role = Role.Button, // Drill-in to ModelDownload — not a toggle.
     )
 }
 

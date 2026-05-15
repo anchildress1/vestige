@@ -650,6 +650,27 @@ class BackgroundExtractionSaveFlowTest {
         ),
     )
 
+    @Test
+    fun `recoverEntry runs the detached pipeline against the existing entry id without creating a new row`() = runTest {
+        val resolved = canonicalSample()
+        coEvery { worker.extract(any(), any()) } returns BackgroundExtractionResult.Success(
+            totalElapsedMs = 12L,
+            lensResults = emptyList(),
+            modelCallCount = 0,
+            resolved = resolved,
+            templateLabel = TemplateLabel.AFTERMATH,
+        )
+        coEvery { observationGenerator.generate(any(), any(), any()) } returns emptyList()
+
+        flow.recoverEntry(ENTRY_ID, "recovered text", SAMPLE_TIMESTAMP).join()
+
+        // No new pending entry: recoverEntry attaches to an existing row.
+        verify(exactly = 0) { entryStore.createPendingEntry(any(), any()) }
+        // Listener relays PENDING then COMPLETED for the recovery run.
+        assertEquals(ExtractionStatus.PENDING, listenerEvents.first())
+        assertTrue(listenerEvents.contains(ExtractionStatus.COMPLETED))
+    }
+
     private companion object {
         private const val ENTRY_ID: Long = 42L
         private val SAMPLE_TIMESTAMP: ZonedDateTime = ZonedDateTime.of(

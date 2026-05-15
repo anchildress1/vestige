@@ -55,6 +55,8 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import java.io.File
+import java.time.Instant
+import java.time.ZoneId
 import java.time.ZonedDateTime
 import java.util.concurrent.atomic.AtomicBoolean
 
@@ -320,6 +322,9 @@ class AppContainer(
 
     fun extractionStatusListener(entryId: Long): ExtractionStatusListener = ExtractionStatusListener { status, _, _ ->
         reportExtractionStatus(entryId, status)
+        if (status.isTerminal()) {
+            _dataRevision.value += 1
+        }
     }
 
     /**
@@ -344,7 +349,6 @@ class AppContainer(
             persona = persona,
         )
         launchVectorBackfillIfReady()
-        _dataRevision.value += 1
         return outcome
     }
 
@@ -392,18 +396,28 @@ class AppContainer(
             .getOrDefault(emptyList())
         if (ids.isEmpty()) return
         ensureBackgroundEngineInitialized()
-        ids.asSequence()
-            .mapNotNull { entryId -> runCatching { entryStore.readEntry(entryId) }.getOrNull() }
-            .filter { it.extractionStatus == ExtractionStatus.PENDING }
-            .forEach { entry -> recoverOneEntry(entry.id, entry.entryText) }
+        ids.forEach { entryId ->
+            val entry = entryStore.readEntry(entryId)
+            if (entry != null && entry.extractionStatus == ExtractionStatus.PENDING) {
+                recoverOneEntry(
+                    entryId = entry.id,
+                    entryText = entry.entryText,
+                    capturedAt = ZonedDateTime.ofInstant(
+                        Instant.ofEpochMilli(entry.timestampEpochMs),
+                        ZoneId.systemDefault(),
+                    ),
+                )
+            }
+        }
         _dataRevision.value += 1
     }
 
-    private suspend fun recoverOneEntry(entryId: Long, entryText: String) {
+    private suspend fun recoverOneEntry(entryId: Long, entryText: String, capturedAt: ZonedDateTime) {
         runCatching {
             backgroundExtractionSaveFlow.recoverEntry(
                 entryId = entryId,
                 entryText = entryText,
+                capturedAt = capturedAt,
                 persona = Persona.WITNESS,
             )
         }.onFailure { Log.e(TAG, "Recovery extraction failed for entry $entryId", it) }
@@ -563,6 +577,11 @@ class AppContainer(
                 Log.e(TAG, "AppContainer scope coroutine failed", error)
             }
             return CoroutineScope(SupervisorJob() + Dispatchers.Default + exceptionHandler)
+        }
+
+        fun ExtractionStatus.isTerminal(): Boolean = when (this) {
+            ExtractionStatus.COMPLETED, ExtractionStatus.TIMED_OUT, ExtractionStatus.FAILED -> true
+            ExtractionStatus.PENDING, ExtractionStatus.RUNNING -> false
         }
     }
 

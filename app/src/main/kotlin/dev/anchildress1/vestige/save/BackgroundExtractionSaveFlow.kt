@@ -84,10 +84,14 @@ class BackgroundExtractionSaveFlow(
      * `AppContainer.recoverPendingExtractions` so typed entries persisted while the model was
      * absent get extracted once it becomes Ready, without duplicating the entry row.
      */
-    suspend fun recoverEntry(entryId: Long, entryText: String, persona: Persona = Persona.WITNESS): Job {
+    suspend fun recoverEntry(
+        entryId: Long,
+        entryText: String,
+        capturedAt: ZonedDateTime,
+        persona: Persona = Persona.WITNESS,
+    ): Job {
         val terminalRelay = DeferredTerminalRelay(listenerFactory(entryId))
         terminalRelay.workerListener.onUpdate(ExtractionStatus.PENDING, 0, null)
-        val capturedAt = ZonedDateTime.now()
         val request = BackgroundExtractionRequest(
             entryText = entryText,
             capturedAt = capturedAt,

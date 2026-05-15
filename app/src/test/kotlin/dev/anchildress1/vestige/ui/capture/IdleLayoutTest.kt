@@ -113,13 +113,39 @@ class IdleLayoutTest {
         composeRule.onAllNodesWithText(CaptureCopy.MIC_DENIED_LINE).assertCountEquals(0)
     }
 
+    @Test
+    fun `patterns link is hidden when no callback is provided (neg)`() {
+        composeRule.setContent { VestigeTheme { idleLayout() } }
+        composeRule.onAllNodesWithText(CaptureCopy.PATTERNS_LINK).assertCountEquals(0)
+    }
+
+    @Test
+    fun `patterns link is announced and fires onPatternsTap when wired (pos)`() {
+        var patternsTaps = 0
+        composeRule.setContent {
+            VestigeTheme {
+                idleLayout(chrome = IdleChromeCallbacks(onPatternsTap = { patternsTaps += 1 }))
+            }
+        }
+        // assertExists (not assertIsDisplayed) — the link sits past a Spacer(weight=1f) in the
+        // Column, and Robolectric's headless viewport can clip it off-screen even though the
+        // node is composed.
+        composeRule.onNodeWithContentDescription(CaptureCopy.PATTERNS_LINK)
+            .assertExists()
+            .assertHasClickAction()
+            .performSemanticsAction(SemanticsActions.OnClick)
+        composeRule.runOnIdle { assertEquals(1, patternsTaps) }
+    }
+
     @androidx.compose.runtime.Composable
+    @Suppress("LongParameterList")
     private fun idleLayout(
         persona: Persona = Persona.WITNESS,
         readiness: ModelReadiness = ModelReadiness.Ready,
         error: CaptureError? = null,
         onRecTap: () -> Unit = {},
         onTypeTap: () -> Unit = {},
+        chrome: IdleChromeCallbacks = IdleChromeCallbacks(),
     ) {
         IdleLayout(
             state = CaptureUiState.Idle(persona = persona, modelReadiness = readiness, error = error),
@@ -133,6 +159,7 @@ class IdleLayoutTest {
             ),
             onRecTap = onRecTap,
             onTypeTap = onTypeTap,
+            chrome = chrome,
         )
     }
 }

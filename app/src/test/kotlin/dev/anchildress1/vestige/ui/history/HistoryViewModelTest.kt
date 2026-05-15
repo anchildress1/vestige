@@ -12,6 +12,7 @@ import dev.anchildress1.vestige.testing.openInMemoryBoxStore
 import io.objectbox.BoxStore
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
@@ -130,6 +131,52 @@ class HistoryViewModelTest {
             assertEquals(242_000L, terminal.entries.single().durationMs)
         }
     }
+
+    // pos — dataRevision triggers reload when a new completed entry is added after initial load
+    @Test
+    fun `pos — entry added after initial load appears when dataRevision increments`() = runTest(testDispatcher) {
+        val dataRevision = MutableStateFlow(0L)
+        val vm = HistoryViewModel(entryStore, ioDispatcher = testDispatcher, dataRevision = dataRevision)
+
+        vm.state.test {
+            val initial = expectMostRecentItem()
+            assertFalse(initial.loading)
+            assertEquals(0, initial.entries.size)
+
+            seedEntry("late-entry", timestampEpochMs = 1_000_000L, ExtractionStatus.COMPLETED)
+            dataRevision.value += 1
+
+            val updated = awaitItem()
+            assertFalse(updated.loading)
+            assertEquals(1, updated.entries.size)
+            assertEquals("late-entry", updated.entries[0].snippet)
+        }
+    }
+
+    // pos — pending entry transitions to visible when extraction completes and dataRevision increments
+    // This is the bug scenario: user opens History immediately after recording while extraction is
+    // still in-flight. dataRevision increment on terminal extraction status triggers the reload.
+
+    @Test
+    fun `pos — pending entry becomes visible when extraction completes and dataRevision increments`() =
+        runTest(testDispatcher) {
+            val dataRevision = MutableStateFlow(0L)
+            val pendingEntity = seedEntry("just-recorded", timestampEpochMs = 1_000_000L, ExtractionStatus.PENDING)
+            val vm = HistoryViewModel(entryStore, ioDispatcher = testDispatcher, dataRevision = dataRevision)
+
+            vm.state.test {
+                val initial = expectMostRecentItem()
+                assertFalse(initial.loading)
+                assertEquals(0, initial.entries.size)
+
+                entryStore.completeEntry(pendingEntity.id, emptyResolved, templateLabel = null)
+                dataRevision.value += 1
+
+                val updated = awaitItem()
+                assertEquals(1, updated.entries.size)
+                assertEquals("just-recorded", updated.entries[0].snippet)
+            }
+        }
 
     // err — store failure on load produces empty state without crash
 

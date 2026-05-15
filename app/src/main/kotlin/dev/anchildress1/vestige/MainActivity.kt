@@ -23,6 +23,7 @@ import dev.anchildress1.vestige.model.Persona
 import dev.anchildress1.vestige.ui.capture.CaptureScreen
 import dev.anchildress1.vestige.ui.capture.CaptureViewModel
 import dev.anchildress1.vestige.ui.capture.ForegroundInferenceCall
+import dev.anchildress1.vestige.ui.capture.IdleChromeCallbacks
 import dev.anchildress1.vestige.ui.capture.ModelReadiness
 import dev.anchildress1.vestige.ui.capture.RealVoiceCapture
 import dev.anchildress1.vestige.ui.capture.SaveAndExtract
@@ -161,9 +162,11 @@ private fun CaptureRoute(
         stats = stats,
         meta = meta,
         modifier = Modifier.fillMaxSize(),
-        lastEntryFooter = lastEntryFooter,
-        onOpenPatterns = onOpenPatterns,
-        onOpenHistory = onOpenHistory,
+        chrome = IdleChromeCallbacks(
+            onPatternsTap = onOpenPatterns,
+            onHistoryTap = onOpenHistory,
+            lastEntryFooter = lastEntryFooter,
+        ),
     )
 }
 

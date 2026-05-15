@@ -97,7 +97,7 @@ class CaptureScreenTest {
     @Test
     fun `footer is hidden when lastEntryFooter is null`() {
         val vm = newViewModel(readiness = ModelReadiness.Ready)
-        composeRule.setContent { VestigeTheme { captureScreen(vm, lastEntryFooter = null) } }
+        composeRule.setContent { VestigeTheme { captureScreen(vm) } }
         composeRule.onAllNodesWithText(CaptureCopy.HISTORY_FOOTER_PREFIX).assertCountEquals(0)
         composeRule.onAllNodesWithTag("history_footer_link").assertCountEquals(0)
     }
@@ -106,7 +106,9 @@ class CaptureScreenTest {
     fun `footer renders prefix date and duration when lastEntryFooter is present`() {
         val vm = newViewModel(readiness = ModelReadiness.Ready)
         val footer = LastEntryFooter(monthLabel = "JAN", dayLabel = "27", durationLabel = "4m 02s")
-        composeRule.setContent { VestigeTheme { captureScreen(vm, lastEntryFooter = footer) } }
+        composeRule.setContent {
+            VestigeTheme { captureScreen(vm, chrome = IdleChromeCallbacks(lastEntryFooter = footer)) }
+        }
         // Use count checks: footer is in composition but may be below viewport in test.
         composeRule.onAllNodesWithText(CaptureCopy.HISTORY_FOOTER_PREFIX, substring = true).assertCountEquals(1)
         composeRule.onAllNodesWithText("JAN", substring = true).assertCountEquals(1)
@@ -118,7 +120,11 @@ class CaptureScreenTest {
     fun `History link is clickable with correct contentDescription`() {
         val vm = newViewModel(readiness = ModelReadiness.Ready)
         val footer = LastEntryFooter(monthLabel = "JAN", dayLabel = "27", durationLabel = "4m 02s")
-        composeRule.setContent { VestigeTheme { captureScreen(vm, lastEntryFooter = footer, onOpenHistory = {}) } }
+        composeRule.setContent {
+            VestigeTheme {
+                captureScreen(vm, chrome = IdleChromeCallbacks(lastEntryFooter = footer, onHistoryTap = {}))
+            }
+        }
         composeRule.onNodeWithContentDescription(CaptureCopy.HISTORY_LINK_A11Y).assertHasClickAction()
     }
 
@@ -134,7 +140,9 @@ class CaptureScreenTest {
     @Test
     fun `reviewing state history link present when onOpenHistory provided`() {
         val vm = newReviewingViewModel()
-        composeRule.setContent { VestigeTheme { captureScreen(vm, onOpenHistory = {}) } }
+        composeRule.setContent {
+            VestigeTheme { captureScreen(vm, chrome = IdleChromeCallbacks(onHistoryTap = {})) }
+        }
         composeRule.onNodeWithContentDescription(CaptureCopy.HISTORY_LINK_A11Y).assertHasClickAction()
     }
 
@@ -149,16 +157,16 @@ class CaptureScreenTest {
     fun `History link tap target is at least 48 dp tall`() {
         val vm = newViewModel(readiness = ModelReadiness.Ready)
         val footer = LastEntryFooter(monthLabel = "JAN", dayLabel = "27", durationLabel = "4m 02s")
-        composeRule.setContent { VestigeTheme { captureScreen(vm, lastEntryFooter = footer, onOpenHistory = {}) } }
+        composeRule.setContent {
+            VestigeTheme {
+                captureScreen(vm, chrome = IdleChromeCallbacks(lastEntryFooter = footer, onHistoryTap = {}))
+            }
+        }
         composeRule.onNodeWithTag("history_footer_link").assertHeightIsAtLeast(48.dp)
     }
 
     @Composable
-    private fun captureScreen(
-        vm: CaptureViewModel,
-        lastEntryFooter: LastEntryFooter? = null,
-        onOpenHistory: (() -> Unit)? = null,
-    ) {
+    private fun captureScreen(vm: CaptureViewModel, chrome: IdleChromeCallbacks = IdleChromeCallbacks()) {
         CaptureScreen(
             viewModel = vm,
             stats = CaptureStats(kept = 0, active = 0, hitsThisMonth = 0, cloud = 0),
@@ -169,8 +177,7 @@ class CaptureScreenTest {
                 dayNumber = 1,
                 streakDays = 0,
             ),
-            lastEntryFooter = lastEntryFooter,
-            onOpenHistory = onOpenHistory,
+            chrome = chrome,
         )
     }
 

@@ -54,17 +54,13 @@ import dev.anchildress1.vestige.ui.theme.VestigeTheme
  * from `AppContainer.entryStore.countCompleted()` + similar reads.
  */
 @Composable
-@Suppress("LongParameterList") // Route-level Compose entry; bundled callbacks already.
 @OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 fun CaptureScreen(
     viewModel: CaptureViewModel,
     stats: CaptureStats,
     meta: CaptureMeta,
     modifier: Modifier = Modifier,
-    lastEntryFooter: LastEntryFooter? = null,
     chrome: IdleChromeCallbacks = IdleChromeCallbacks(),
-    onOpenPatterns: (() -> Unit)? = null,
-    onOpenHistory: (() -> Unit)? = null,
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val context = LocalContext.current
@@ -90,11 +86,7 @@ fun CaptureScreen(
             onRecTap = onRecTap,
             onTypeTap = { showTypeSheet = true },
             modifier = modifier,
-            lastEntryFooter = lastEntryFooter,
-            chrome = chrome.copy(
-                onPatternsTap = onOpenPatterns ?: chrome.onPatternsTap,
-                onHistoryTap = onOpenHistory ?: chrome.onHistoryTap,
-            ),
+            chrome = chrome,
         )
 
         is CaptureUiState.Recording -> LiveLayout(
@@ -112,7 +104,7 @@ fun CaptureScreen(
         is CaptureUiState.Reviewing -> ReviewingPane(
             state = current,
             onAcknowledge = viewModel::acknowledgeReview,
-            onOpenHistory = onOpenHistory,
+            onOpenHistory = chrome.onHistoryTap,
             modifier = modifier,
         )
     }

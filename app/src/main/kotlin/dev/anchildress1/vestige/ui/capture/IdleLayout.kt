@@ -54,7 +54,6 @@ fun IdleLayout(
     onRecTap: () -> Unit,
     onTypeTap: () -> Unit,
     modifier: Modifier = Modifier,
-    lastEntryFooter: LastEntryFooter? = null,
     chrome: IdleChromeCallbacks = IdleChromeCallbacks(),
 ) {
     val colors = VestigeTheme.colors
@@ -105,7 +104,7 @@ fun IdleLayout(
                 PatternsLink(onClick = onTap)
             }
         }
-        if (lastEntryFooter != null) {
+        if (chrome.lastEntryFooter != null) {
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -113,7 +112,7 @@ fun IdleLayout(
                 contentAlignment = Alignment.Center,
             ) {
                 HistoryFooter(
-                    footer = lastEntryFooter,
+                    footer = chrome.lastEntryFooter,
                     onHistoryTap = chrome.onHistoryTap,
                 )
             }

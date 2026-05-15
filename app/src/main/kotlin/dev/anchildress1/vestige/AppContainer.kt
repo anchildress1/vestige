@@ -346,6 +346,7 @@ class AppContainer(
         retrievedHistory: List<HistoryChunk> = emptyList(),
         timeoutMs: Long? = null,
         persona: Persona = Persona.WITNESS,
+        durationMs: Long = 0L,
     ): SaveOutcome.Pending {
         ensureBackgroundEngineInitialized()
         val outcome = backgroundExtractionSaveFlow.saveAndExtract(
@@ -354,6 +355,7 @@ class AppContainer(
             retrievedHistory = retrievedHistory,
             timeoutMs = timeoutMs,
             persona = persona,
+            durationMs = durationMs,
         )
         launchVectorBackfillIfReady()
         return outcome
@@ -365,8 +367,10 @@ class AppContainer(
         persona: Persona = Persona.WITNESS,
     ): SaveOutcome.Pending {
         if (mainModelArtifactLooksPresent()) {
-            return saveAndExtract(entryText = entryText, capturedAt = capturedAt, persona = persona)
+            // Typed entries carry no audio duration by definition.
+            return saveAndExtract(entryText = entryText, capturedAt = capturedAt, persona = persona, durationMs = 0L)
         }
+        // Typed entries carry no audio duration. Default 0L is correct — not an omission.
         val entryId = entryStore.createPendingEntry(entryText, capturedAt.toInstant())
         reportExtractionStatus(entryId, ExtractionStatus.PENDING)
         _dataRevision.value += 1

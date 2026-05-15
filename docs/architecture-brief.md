@@ -131,6 +131,7 @@ Standup ran long again. I was fine before it, then completely flattened by 11. O
 |---|---|---|
 | `entry_text` | body | Exactly as captured. No transformation. Trailing newline only. |
 | `timestamp` | frontmatter | UTC, ISO-8601 with seconds, no fractional. |
+| `duration_ms` | frontmatter | Millis of captured audio; `0` for typed entries and rows written before Story 4.6. |
 | `template_label` | frontmatter | Lowercase enum value (one of: aftermath, tunnel-exit, concrete-shoes, decision-spiral, goblin-hours, audit). |
 | `tags` | frontmatter list | Lowercase, kebab-case. Sorted lexicographically on write for diff stability. |
 | `energy_descriptor` | frontmatter | Free string or `null`. |

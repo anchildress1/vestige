@@ -1,5 +1,6 @@
 package dev.anchildress1.vestige.storage
 
+import android.util.Log
 import dev.anchildress1.vestige.model.ExtractionStatus
 import dev.anchildress1.vestige.model.TemplateLabel
 import java.io.File
@@ -35,6 +36,7 @@ class MarkdownEntryStore(private val baseDir: File) {
             append(FRONTMATTER_FENCE).append('\n')
             append("schema_version: ").append(SCHEMA_VERSION).append('\n')
             append("timestamp: ").append(formatIso(entry.timestampEpochMs)).append('\n')
+            append("duration_ms: ").append(entry.durationMs).append('\n')
             append("template_label: ").append(entry.templateLabel?.serial ?: NULL).append('\n')
             append("energy_descriptor: ").append(yamlScalar(entry.energyDescriptor)).append('\n')
             append("recurrence_link: ").append(yamlScalar(entry.recurrenceLink)).append('\n')
@@ -80,6 +82,15 @@ class MarkdownEntryStore(private val baseDir: File) {
         validateSchemaVersion(parsed)
 
         val timestamp = parsed[KEY_TIMESTAMP]?.let { parseIso(it) } ?: 0L
+        val rawDuration = parsed[KEY_DURATION_MS]
+        val durationMs = if (rawDuration != null) {
+            rawDuration.toLongOrNull() ?: run {
+                Log.w(TAG, "duration_ms in ${file.name} is not a valid Long: '$rawDuration'; defaulting to 0")
+                0L
+            }
+        } else {
+            0L
+        }
         val templateLabel = parsed[KEY_TEMPLATE_LABEL]?.takeUnless { it == NULL }
             ?.let { TemplateLabel.fromSerial(it) }
         val energy = parsed[KEY_ENERGY_DESCRIPTOR]?.takeUnless { it == NULL }
@@ -92,6 +103,7 @@ class MarkdownEntryStore(private val baseDir: File) {
             markdownFilename = file.name,
             entryText = body.trimEnd(),
             timestampEpochMs = timestamp,
+            durationMs = durationMs,
             templateLabel = templateLabel,
             energyDescriptor = energy,
             recurrenceLink = recurrence,
@@ -207,6 +219,7 @@ class MarkdownEntryStore(private val baseDir: File) {
 
     companion object {
         const val ENTRIES_SUBDIR = "entries"
+        private const val TAG = "MarkdownEntryStore"
         const val SCHEMA_VERSION = 1
         private const val FRONTMATTER_FENCE = "---"
         private const val NULL = "null"
@@ -214,6 +227,7 @@ class MarkdownEntryStore(private val baseDir: File) {
         private const val YAML_LIST_ITEM_PREFIX = "  - "
         private const val KEY_SCHEMA_VERSION = "schema_version"
         private const val KEY_TIMESTAMP = "timestamp"
+        private const val KEY_DURATION_MS = "duration_ms"
         private const val KEY_TEMPLATE_LABEL = "template_label"
         private const val KEY_ENERGY_DESCRIPTOR = "energy_descriptor"
         private const val KEY_RECURRENCE_LINK = "recurrence_link"

@@ -105,6 +105,36 @@ class CaptureViewModelTest {
     }
 
     @Test
+    fun `voice flow passes audio durationMs to saveAndExtract`() = runTest(dispatcher) {
+        // AudioChunk(FloatArray(16), 16_000) → durationMs = 16 * 1_000 / 16_000 = 1L
+        val audio = AudioChunk(FloatArray(16), sampleRateHz = 16_000, isFinal = true)
+        val voice = FakeVoiceCapture(result = audio)
+        val inference = FakeForegroundInference(
+            ForegroundResult.Success(
+                persona = Persona.WITNESS,
+                rawResponse = "<x/>",
+                elapsedMs = 1_200,
+                completedAt = clock.instant(),
+                transcription = "they asked again",
+                followUp = "what did they want",
+            ),
+        )
+        val save = RecordingSaveAndExtract()
+        val vm = newViewModel(
+            voice = voice,
+            inference = inference,
+            save = save,
+            initialReadiness = ModelReadiness.Ready,
+        )
+
+        vm.startRecording()
+        voice.completeWithResult()
+        dispatcher.scheduler.advanceUntilIdle()
+
+        assertEquals(audio.durationMs, save.lastDurationMs)
+    }
+
+    @Test
     fun `parse failure surfaces InferenceFailed PARSE_FAILED`() = runTest(dispatcher) {
         val audio = AudioChunk(FloatArray(16), 16_000, isFinal = true)
         val voice = FakeVoiceCapture(result = audio)
@@ -604,9 +634,9 @@ class CaptureViewModelTest {
         inference: ForegroundInferenceCall = ForegroundInferenceCall { _, _ ->
             error("inference call not expected in this test")
         },
-        save: SaveAndExtract = SaveAndExtract { _, _, _ -> },
+        save: SaveAndExtract = SaveAndExtract { _, _, _, _ -> },
         saveTyped: SaveTypedEntry = SaveTypedEntry { text, capturedAt, persona ->
-            save(text, capturedAt, persona)
+            save(text, capturedAt, persona, 0L)
         },
         initialReadiness: ModelReadiness = ModelReadiness.Loading,
         clockOverride: Clock = clock,
@@ -649,8 +679,15 @@ class CaptureViewModelTest {
 
     private class RecordingSaveAndExtract : SaveAndExtract {
         val invocations: AtomicInteger = AtomicInteger(0)
-        override suspend fun invoke(text: String, capturedAt: java.time.ZonedDateTime, persona: Persona) {
+        var lastDurationMs: Long = -1L
+        override suspend fun invoke(
+            text: String,
+            capturedAt: java.time.ZonedDateTime,
+            persona: Persona,
+            durationMs: Long,
+        ) {
             invocations.incrementAndGet()
+            lastDurationMs = durationMs
         }
     }
 

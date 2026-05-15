@@ -88,6 +88,20 @@ class EntryStoreTest {
     }
 
     @Test
+    fun `createPendingEntry stores durationMs and it round-trips through markdown`() {
+        val id = entryStore.createPendingEntry(SAMPLE_TEXT, SAMPLE_INSTANT, durationMs = 242_000L)
+
+        val row = boxStore.boxFor<EntryEntity>().get(id)
+        assertEquals(242_000L, row.durationMs)
+
+        val mdFile = File(File(markdownDir, "entries"), row.markdownFilename)
+        assertTrue(
+            "markdown must contain duration_ms: 242000",
+            mdFile.readText().contains("duration_ms: 242000"),
+        )
+    }
+
+    @Test
     fun `completeEntry rewrites markdown with full frontmatter and updates row to COMPLETED`() {
         val id = entryStore.createPendingEntry(SAMPLE_TEXT, SAMPLE_INSTANT)
         val resolved = resolvedSample()

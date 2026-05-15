@@ -111,8 +111,13 @@ private fun CaptureRoute(
             foregroundInference = ForegroundInferenceCall { audio, sel ->
                 container.runForegroundCall(audio = audio, persona = sel)
             },
-            saveAndExtract = SaveAndExtract { text, capturedAt, personaSel ->
-                container.saveAndExtract(entryText = text, capturedAt = capturedAt, persona = personaSel)
+            saveAndExtract = SaveAndExtract { text, capturedAt, personaSel, durationMs ->
+                container.saveAndExtract(
+                    entryText = text,
+                    capturedAt = capturedAt,
+                    persona = personaSel,
+                    durationMs = durationMs,
+                )
             },
             saveTypedEntry = SaveTypedEntry { text, capturedAt, personaSel ->
                 container.saveTypedEntry(entryText = text, capturedAt = capturedAt, persona = personaSel)

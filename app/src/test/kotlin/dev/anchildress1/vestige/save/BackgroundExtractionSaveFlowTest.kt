@@ -37,6 +37,7 @@ import java.time.ZonedDateTime
  * exercised in `:core-storage`'s `EntryStoreTest`; here we mock the store boundary so the JVM
  * unit test stays free of ObjectBox JNI.
  */
+@Suppress("LargeClass") // Shared fixture (entryStore, worker, observationGenerator, flow) requires co-location.
 class BackgroundExtractionSaveFlowTest {
 
     private val entryStore: EntryStore = mockk(relaxed = true)
@@ -67,7 +68,7 @@ class BackgroundExtractionSaveFlowTest {
     @Test
     fun `saveAndExtract emits PENDING to the listener before invoking the worker`() = runTest {
         val resolved = canonicalSample()
-        every { entryStore.createPendingEntry(any(), any()) } returns ENTRY_ID
+        every { entryStore.createPendingEntry(any(), any(), any()) } returns ENTRY_ID
         val listenerSnapshotAtWorkerCall = mutableListOf<ExtractionStatus>()
         coEvery { worker.extract(any(), any()) } coAnswers {
             // Snapshot the listener history at the moment the worker is invoked. If PENDING
@@ -111,7 +112,7 @@ class BackgroundExtractionSaveFlowTest {
             fields = emptyList(),
         )
         val resolved = canonicalSample()
-        every { entryStore.createPendingEntry(any(), any()) } returns ENTRY_ID
+        every { entryStore.createPendingEntry(any(), any(), any()) } returns ENTRY_ID
         every { entryStore.readEntry(ENTRY_ID) } returns storedEntry
         coEvery { worker.extract(any(), any()) } returns BackgroundExtractionResult.Success(
             totalElapsedMs = 25_000L,
@@ -166,7 +167,7 @@ class BackgroundExtractionSaveFlowTest {
             fields = emptyList(),
         )
         val resolved = canonicalSample()
-        every { entryStore.createPendingEntry(any(), any()) } returns ENTRY_ID
+        every { entryStore.createPendingEntry(any(), any(), any()) } returns ENTRY_ID
         every { entryStore.readEntry(ENTRY_ID) } returns storedEntry
         coEvery { worker.extract(any(), any()) } returns BackgroundExtractionResult.Success(
             totalElapsedMs = 25_000L,
@@ -218,7 +219,7 @@ class BackgroundExtractionSaveFlowTest {
             fields = emptyList(),
         )
         val resolved = canonicalSample()
-        every { entryStore.createPendingEntry(any(), any()) } returns ENTRY_ID
+        every { entryStore.createPendingEntry(any(), any(), any()) } returns ENTRY_ID
         every { entryStore.readEntry(ENTRY_ID) } returns storedEntry
         coEvery { worker.extract(any(), any()) } returns BackgroundExtractionResult.Success(
             totalElapsedMs = 25_000L,
@@ -255,7 +256,7 @@ class BackgroundExtractionSaveFlowTest {
             patternOrchestrator = orchestrator,
         )
         val resolved = canonicalSample()
-        every { entryStore.createPendingEntry(any(), any()) } returns ENTRY_ID
+        every { entryStore.createPendingEntry(any(), any(), any()) } returns ENTRY_ID
         every { entryStore.readEntry(ENTRY_ID) } returns dev.anchildress1.vestige.storage.EntryEntity(id = ENTRY_ID)
         coEvery { worker.extract(any(), any()) } returns BackgroundExtractionResult.Success(
             totalElapsedMs = 25_000L,
@@ -275,7 +276,7 @@ class BackgroundExtractionSaveFlowTest {
 
     @Test
     fun `success routes to completeEntry with resolver output, template label, and observations`() = runTest {
-        every { entryStore.createPendingEntry(any(), any()) } returns ENTRY_ID
+        every { entryStore.createPendingEntry(any(), any(), any()) } returns ENTRY_ID
         val resolved = canonicalSample()
         val observations = listOf(SAMPLE_OBSERVATION)
         coEvery {
@@ -297,7 +298,7 @@ class BackgroundExtractionSaveFlowTest {
 
         assertEquals(ENTRY_ID, outcome.entryId)
         coVerifyOrder {
-            entryStore.createPendingEntry(SAMPLE_TEXT, SAMPLE_TIMESTAMP.toInstant())
+            entryStore.createPendingEntry(SAMPLE_TEXT, SAMPLE_TIMESTAMP.toInstant(), 0L)
             worker.extract(any(), any())
             observationGenerator.generate(SAMPLE_TEXT, resolved, SAMPLE_TIMESTAMP)
             entryStore.completeEntry(ENTRY_ID, resolved, TemplateLabel.AFTERMATH, observations)
@@ -307,7 +308,7 @@ class BackgroundExtractionSaveFlowTest {
 
     @Test
     fun `observation generator throwing does not block the save and persists empty list`() = runTest {
-        every { entryStore.createPendingEntry(any(), any()) } returns ENTRY_ID
+        every { entryStore.createPendingEntry(any(), any(), any()) } returns ENTRY_ID
         val resolved = canonicalSample()
         coEvery { worker.extract(any(), any()) } returns BackgroundExtractionResult.Success(
             totalElapsedMs = 25_000L,
@@ -329,7 +330,7 @@ class BackgroundExtractionSaveFlowTest {
 
     @Test
     fun `failure routes to failEntry without running the observation generator`() = runTest {
-        every { entryStore.createPendingEntry(any(), any()) } returns ENTRY_ID
+        every { entryStore.createPendingEntry(any(), any(), any()) } returns ENTRY_ID
         coEvery { worker.extract(any(), any()) } returns BackgroundExtractionResult.Failed(
             totalElapsedMs = 12_000L,
             lensResults = emptyList(),
@@ -351,7 +352,7 @@ class BackgroundExtractionSaveFlowTest {
 
     @Test
     fun `timeout routes to failEntry with TIMED_OUT and the wall-clock cap, no observation call`() = runTest {
-        every { entryStore.createPendingEntry(any(), any()) } returns ENTRY_ID
+        every { entryStore.createPendingEntry(any(), any(), any()) } returns ENTRY_ID
         coEvery { worker.extract(any(), any()) } returns BackgroundExtractionResult.TimedOut(
             totalElapsedMs = 90_000L,
             lensResults = emptyList(),
@@ -377,7 +378,7 @@ class BackgroundExtractionSaveFlowTest {
         }
         val flowWithCapture =
             BackgroundExtractionSaveFlow(entryStore, worker, observationGenerator, capturingFactory, flowScope)
-        every { entryStore.createPendingEntry(any(), any()) } returns ENTRY_ID
+        every { entryStore.createPendingEntry(any(), any(), any()) } returns ENTRY_ID
         coEvery { worker.extract(any(), any()) } returns BackgroundExtractionResult.Success(
             totalElapsedMs = 10L,
             lensResults = emptyList(),
@@ -400,7 +401,7 @@ class BackgroundExtractionSaveFlowTest {
             BackgroundExtractionSaveFlow(entryStore, worker, observationGenerator, listenerFactory = {
                 downstream
             }, scope = flowScope)
-        every { entryStore.createPendingEntry(any(), any()) } returns ENTRY_ID
+        every { entryStore.createPendingEntry(any(), any(), any()) } returns ENTRY_ID
         coEvery {
             worker.extract(any(), capture(capturedListener))
         } coAnswers {
@@ -435,7 +436,7 @@ class BackgroundExtractionSaveFlowTest {
                 downstream
             }, scope = flowScope)
         val resolved = canonicalSample()
-        every { entryStore.createPendingEntry(any(), any()) } returns ENTRY_ID
+        every { entryStore.createPendingEntry(any(), any(), any()) } returns ENTRY_ID
         coEvery {
             worker.extract(any(), capture(capturedListener))
         } coAnswers {
@@ -479,7 +480,7 @@ class BackgroundExtractionSaveFlowTest {
                 downstream
             }, scope = flowScope)
         val failEntryReturned = CompletableDeferred<Unit>()
-        every { entryStore.createPendingEntry(any(), any()) } returns ENTRY_ID
+        every { entryStore.createPendingEntry(any(), any(), any()) } returns ENTRY_ID
         coEvery {
             worker.extract(any(), capture(capturedListener))
         } coAnswers {
@@ -523,7 +524,7 @@ class BackgroundExtractionSaveFlowTest {
                 downstream
             }, scope = flowScope)
         val failEntryReturned = CompletableDeferred<Unit>()
-        every { entryStore.createPendingEntry(any(), any()) } returns ENTRY_ID
+        every { entryStore.createPendingEntry(any(), any(), any()) } returns ENTRY_ID
         coEvery {
             worker.extract(any(), capture(capturedListener))
         } coAnswers {
@@ -566,7 +567,7 @@ class BackgroundExtractionSaveFlowTest {
             BackgroundExtractionSaveFlow(entryStore, worker, observationGenerator, listenerFactory = {
                 downstream
             }, scope = flowScope)
-        every { entryStore.createPendingEntry(any(), any()) } returns ENTRY_ID
+        every { entryStore.createPendingEntry(any(), any(), any()) } returns ENTRY_ID
         coEvery { worker.extract(any(), any()) } returns BackgroundExtractionResult.Failed(
             totalElapsedMs = 12_000L,
             lensResults = emptyList(),
@@ -604,7 +605,7 @@ class BackgroundExtractionSaveFlowTest {
             BackgroundExtractionSaveFlow(entryStore, worker, observationGenerator, listenerFactory = {
                 downstream
             }, scope = flowScope)
-        every { entryStore.createPendingEntry(any(), any()) } returns ENTRY_ID
+        every { entryStore.createPendingEntry(any(), any(), any()) } returns ENTRY_ID
         coEvery { worker.extract(any(), any()) } returns BackgroundExtractionResult.TimedOut(
             totalElapsedMs = 90_000L,
             lensResults = emptyList(),
@@ -640,7 +641,7 @@ class BackgroundExtractionSaveFlowTest {
                 downstream
             }, scope = flowScope)
         val resolved = canonicalSample()
-        every { entryStore.createPendingEntry(any(), any()) } returns ENTRY_ID
+        every { entryStore.createPendingEntry(any(), any(), any()) } returns ENTRY_ID
         coEvery { worker.extract(any(), any()) } returns BackgroundExtractionResult.Success(
             totalElapsedMs = 25_000L,
             lensResults = emptyList(),
@@ -671,7 +672,7 @@ class BackgroundExtractionSaveFlowTest {
 
     @Test
     fun `worker listener events flow through the AppContainer-provided listener`() = runTest {
-        every { entryStore.createPendingEntry(any(), any()) } returns ENTRY_ID
+        every { entryStore.createPendingEntry(any(), any(), any()) } returns ENTRY_ID
         coEvery {
             worker.extract(any(), capture(capturedListener))
         } coAnswers {
@@ -696,6 +697,26 @@ class BackgroundExtractionSaveFlowTest {
         verify(exactly = 0) { entryStore.failEntry(any(), any(), any()) }
     }
 
+    @Test
+    fun `saveAndExtract threads durationMs through to createPendingEntry`() = runTest {
+        val resolved = canonicalSample()
+        every { entryStore.createPendingEntry(any(), any(), any()) } returns ENTRY_ID
+        coEvery { worker.extract(any(), any()) } returns BackgroundExtractionResult.Success(
+            totalElapsedMs = 1L,
+            lensResults = emptyList(),
+            modelCallCount = 0,
+            resolved = resolved,
+            templateLabel = TemplateLabel.AFTERMATH,
+        )
+        coEvery { observationGenerator.generate(any(), any(), any()) } returns emptyList()
+
+        flow.saveAndExtract(SAMPLE_TEXT, SAMPLE_TIMESTAMP, durationMs = 180_000L)
+
+        verify(exactly = 1) {
+            entryStore.createPendingEntry(SAMPLE_TEXT, SAMPLE_TIMESTAMP.toInstant(), 180_000L)
+        }
+    }
+
     private fun canonicalSample() = ResolvedExtraction(
         mapOf(
             "tags" to ResolvedField(listOf("standup", "flattened"), ConfidenceVerdict.CANONICAL),
@@ -718,7 +739,7 @@ class BackgroundExtractionSaveFlowTest {
         flow.recoverEntry(ENTRY_ID, "recovered text", SAMPLE_TIMESTAMP).join()
 
         // No new pending entry: recoverEntry attaches to an existing row.
-        verify(exactly = 0) { entryStore.createPendingEntry(any(), any()) }
+        verify(exactly = 0) { entryStore.createPendingEntry(any(), any(), any()) }
         // Listener relays PENDING then COMPLETED for the recovery run.
         assertEquals(ExtractionStatus.PENDING, listenerEvents.first())
         assertTrue(listenerEvents.contains(ExtractionStatus.COMPLETED))

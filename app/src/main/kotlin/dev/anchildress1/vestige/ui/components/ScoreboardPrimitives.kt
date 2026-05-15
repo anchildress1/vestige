@@ -84,8 +84,8 @@ private const val BIG_STAT_DEFAULT_SP: Int = 56
 private const val BIG_STAT_LINE_HEIGHT_RATIO: Float = 0.85f
 
 /**
- * Mono uppercase eyebrow row — always the `dim` slot. No color override; the theme owns the
- * secondary-text foreground for every eyebrow site.
+ * Mono uppercase eyebrow row — defaults to the `dim` slot. Accepts an optional [color] override
+ * for accent sites; omit to let the theme drive secondary-text foreground.
  */
 @Composable
 fun EyebrowE(text: String, modifier: Modifier = Modifier, color: Color = Color.Unspecified) {

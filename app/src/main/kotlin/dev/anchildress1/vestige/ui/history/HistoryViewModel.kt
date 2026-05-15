@@ -4,6 +4,7 @@ import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dev.anchildress1.vestige.storage.EntryStore
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -13,7 +14,6 @@ import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.time.Instant
-import java.time.LocalDate
 import java.time.ZoneId
 import java.time.ZoneOffset
 import java.time.temporal.ChronoUnit
@@ -26,10 +26,7 @@ data class HistoryStats(
     val densityBuckets: List<Int>,
 )
 
-data class HistoryGroup(
-    val headerLabel: String,
-    val summaries: List<HistorySummary>,
-)
+data class HistoryGroup(val dateKey: String, val headerLabel: String, val summaries: List<HistorySummary>)
 
 data class HistoryUiState(
     val entries: List<HistorySummary> = emptyList(),
@@ -58,8 +55,11 @@ class HistoryViewModel(
         val nowMs = System.currentTimeMillis()
         val rows = runCatching {
             withContext(ioDispatcher) { entryStore.listCompleted(limit = LIST_LIMIT) }
-        }.onFailure { Log.e(TAG, "Failed to load history", it) }
-            .getOrDefault(emptyList())
+        }.getOrElse { e ->
+            if (e is CancellationException) throw e
+            Log.e(TAG, "Failed to load history", e)
+            emptyList()
+        }
         val summaries = rows.map { entity -> HistorySummary.from(entity, zoneId) }
         _state.value = HistoryUiState(
             entries = summaries,
@@ -77,6 +77,7 @@ class HistoryViewModel(
             .sortedByDescending { it.key }
             .map { (date, daySummaries) ->
                 HistoryGroup(
+                    dateKey = date.toString(),
                     headerLabel = HistoryDateFormatter.formatSectionHeader(date, nowDate),
                     summaries = daySummaries.sortedByDescending { it.timestampEpochMs },
                 )
@@ -93,7 +94,9 @@ class HistoryViewModel(
         val totalDurationMs = summaries.sumOf { it.durationMs }
         val avgAudioLabel = when {
             totalDurationMs <= 0L -> "—"
+
             daysTracked <= 0 -> "—"
+
             else -> {
                 val avgMs = totalDurationMs / daysTracked
                 if (avgMs >= 60_000L) "~${avgMs / 60_000L}m" else "~${avgMs / 1_000L}s"

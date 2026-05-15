@@ -9,7 +9,7 @@
     <application>
         <receiver
             android:name=".debug.DebugSeedReceiver"
-            android:exported="true" />
+            android:exported="false" />
     </application>
 
 </manifest>

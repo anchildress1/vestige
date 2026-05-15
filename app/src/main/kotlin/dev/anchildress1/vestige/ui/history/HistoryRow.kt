@@ -14,6 +14,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.anchildress1.vestige.ui.components.EyebrowE
@@ -22,12 +23,7 @@ import dev.anchildress1.vestige.ui.components.VestigeListCardInteraction
 import dev.anchildress1.vestige.ui.theme.VestigeTheme
 
 @Composable
-fun HistoryRow(
-    summary: HistorySummary,
-    durationLabel: String,
-    onClick: (() -> Unit)?,
-    modifier: Modifier = Modifier,
-) {
+fun HistoryRow(summary: HistorySummary, durationLabel: String, onClick: (() -> Unit)?, modifier: Modifier = Modifier) {
     val colors = VestigeTheme.colors
     val badgeText = if (summary.templateLabel != null) {
         "● #${summary.id} · ${summary.templateLabel.uppercase()}"
@@ -35,7 +31,11 @@ fun HistoryRow(
         "● #${summary.id}"
     }
     val dotColor = if (summary.templateLabel != null) colors.coral else colors.lime
-    val a11yDesc = "${summary.timeLabel} · $durationLabel · ${summary.snippet}"
+    val a11yDesc = buildString {
+        append("${summary.timeLabel} · $durationLabel")
+        if (summary.templateLabel != null) append(" · ${summary.templateLabel}")
+        append(" · ${summary.snippet}")
+    }
 
     VestigeListCard(
         modifier = modifier
@@ -79,7 +79,8 @@ fun HistoryRow(
                     text = summary.snippet,
                     style = VestigeTheme.typography.pCompact,
                     color = colors.ink,
-                    maxLines = 2,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
                 )
             }
         }

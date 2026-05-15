@@ -84,7 +84,8 @@ fun HistoryScreen(viewModel: HistoryViewModel, persona: Persona, modifier: Modif
                             modifier = Modifier
                                 .padding(horizontal = 18.dp, vertical = 10.dp)
                                 .semantics(mergeDescendants = true) {
-                                    contentDescription = "${stats.totalEntries} entries, " +
+                                    val entryWord = if (stats.totalEntries == 1) "entry" else "entries"
+                                    contentDescription = "${stats.totalEntries} $entryWord, " +
                                         "${stats.daysTracked} days tracked, " +
                                         "+${stats.thisWeek} this week, " +
                                         "${stats.avgAudioLabel} average per day"
@@ -116,7 +117,7 @@ fun HistoryScreen(viewModel: HistoryViewModel, persona: Persona, modifier: Modif
                 }
 
                 uiState.groups.forEach { group ->
-                    item(key = "header-${group.headerLabel}") {
+                    item(key = "header-${group.dateKey}") {
                         HistorySectionHeader(label = group.headerLabel, count = group.summaries.size)
                     }
                     items(group.summaries, key = { it.id }) { summary ->
@@ -168,7 +169,10 @@ private fun DensityBar(buckets: List<Int>, modifier: Modifier = Modifier) {
     Row(
         modifier = modifier
             .height(32.dp)
-            .semantics { contentDescription = "$totalInWindow entries in the last 30 days" },
+            .semantics(mergeDescendants = true) {
+                val entryWord = if (totalInWindow == 1) "entry" else "entries"
+                contentDescription = "$totalInWindow $entryWord in the last 30 days"
+            },
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(4.dp),
     ) {

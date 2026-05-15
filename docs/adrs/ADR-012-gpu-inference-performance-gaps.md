@@ -74,5 +74,5 @@ The `prebuilt/` directory referenced in the original decision does not exist in 
 ## Consequences
 
 - Engine init stall moves to app-open background (hidden from user on any session where model was already present at launch).
-- GPU sampler path complete for future sampling parameter changes.
+- GPU sampler path deferred — `libLiteRtTopKOpenClSampler.so` absent from SDK v0.11.0 (see Addendum).
 - 7–11s per-call inference latency is GPU-on-E4B baseline — not a gap, not addressed here.

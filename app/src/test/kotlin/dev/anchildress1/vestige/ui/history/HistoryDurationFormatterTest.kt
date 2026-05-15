@@ -22,6 +22,16 @@ class HistoryDurationFormatterTest {
         assertEquals("15s", HistoryDurationFormatter.format(15_000L))
     }
 
+    @Test
+    fun `59 seconds stays in seconds instead of zero minutes`() {
+        assertEquals("59s", HistoryDurationFormatter.format(59_000L))
+    }
+
+    @Test
+    fun `62 seconds formats as 1m 02s`() {
+        assertEquals("1m 02s", HistoryDurationFormatter.format(62_000L))
+    }
+
     // neg — typed entries and zero-duration rows
 
     @Test

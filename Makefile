@@ -80,7 +80,7 @@ push-model:
 	@./scripts/push-vestige-artifact.sh "$(VESTIGE_PACKAGE)" "$(VESTIGE_EMBEDDING_MODEL_FILE)" "$(VESTIGE_EMBEDDING_MODEL_FILENAME)" optional
 	@./scripts/push-vestige-artifact.sh "$(VESTIGE_PACKAGE)" "$(VESTIGE_EMBEDDING_TOKENIZER_FILE)" "$(VESTIGE_EMBEDDING_TOKENIZER_FILENAME)" optional
 # Seed fixture entries + patterns via DebugSeedReceiver (debug builds only).
-# Uses explicit component targeting so the receiver can remain unexported.
+# Uses explicit component targeting (-n); works even with android:exported="false".
 seed-entries:
 	@command -v adb >/dev/null 2>&1 || { echo "❌ adb not found. Install Android platform-tools."; exit 1; }
 	@adb get-state >/dev/null 2>&1 || { echo "❌ no device connected. Run 'adb devices' to check."; exit 1; }
@@ -104,10 +104,10 @@ logcat:
 	done; \
 	if [ -z "$$pid" ]; then \
 		echo "⚠ could not resolve app PID — filtering by tags only (Ctrl-C to stop)"; \
-		adb logcat -v color -T 1 $(EXTRA) | grep --line-buffered -E "$(LOGCAT_TAGS)"; \
+		adb logcat -v color -T 1 $(EXTRA) | grep -E "$(LOGCAT_TAGS)"; \
 	else \
 		echo "📱 tailing pid=$$pid (Ctrl-C to stop)"; \
-		adb logcat -v color -T 1 --pid="$$pid" $(EXTRA) | grep --line-buffered -E "$(LOGCAT_TAGS)"; \
+		adb logcat -v color -T 1 --pid="$$pid" $(EXTRA) | grep -E "$(LOGCAT_TAGS)"; \
 	fi
 
 assemble:

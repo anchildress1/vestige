@@ -11,7 +11,6 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.unit.dp
-import dev.anchildress1.vestige.model.ExtractionStatus
 import dev.anchildress1.vestige.model.Persona
 import dev.anchildress1.vestige.model.ResolvedExtraction
 import dev.anchildress1.vestige.storage.EntryStore
@@ -186,7 +185,7 @@ class HistoryScreenTest {
         seedCompleted("entry one", now - 3_600_000L)
 
         composeRule.setContent { HistoryScreen(viewModel = newViewModel(), persona = Persona.WITNESS) }
-        composeRule.onNodeWithContentDescription("entries in the last 30 days", substring = true)
+        composeRule.onNodeWithContentDescription("in the last 30 days", substring = true)
             .assertHasNoClickAction()
     }
 
@@ -206,7 +205,7 @@ class HistoryScreenTest {
         seedCompleted("entry one", 1_000_000L)
 
         composeRule.setContent { HistoryScreen(viewModel = newViewModel(), persona = Persona.WITNESS) }
-        composeRule.onNodeWithContentDescription("1 entries", substring = true).assertHasNoClickAction()
+        composeRule.onNodeWithContentDescription("1 entry", substring = true).assertHasNoClickAction()
     }
 
     private fun newViewModel() = HistoryViewModel(entryStore, zoneId = ZoneOffset.UTC, ioDispatcher = testDispatcher)

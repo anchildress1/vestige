@@ -20,7 +20,7 @@ data class HistorySummary(
             timestampEpochMs = entity.timestampEpochMs,
             timeLabel = HistoryDateFormatter.formatTimeOnly(entity.timestampEpochMs, zoneId),
             templateLabel = entity.templateLabel?.serial,
-            snippet = entity.entryText.trim().take(SNIPPET_MAX),
+            snippet = entity.entryText.replace('\n', ' ').replace('\r', ' ').trim().take(SNIPPET_MAX),
             durationMs = entity.durationMs,
         )
     }

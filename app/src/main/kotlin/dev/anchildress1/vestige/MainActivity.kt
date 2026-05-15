@@ -23,7 +23,6 @@ import dev.anchildress1.vestige.model.Persona
 import dev.anchildress1.vestige.ui.capture.CaptureScreen
 import dev.anchildress1.vestige.ui.capture.CaptureViewModel
 import dev.anchildress1.vestige.ui.capture.ForegroundInferenceCall
-import dev.anchildress1.vestige.ui.capture.LastEntryFooter
 import dev.anchildress1.vestige.ui.capture.ModelReadiness
 import dev.anchildress1.vestige.ui.capture.RealVoiceCapture
 import dev.anchildress1.vestige.ui.capture.SaveAndExtract

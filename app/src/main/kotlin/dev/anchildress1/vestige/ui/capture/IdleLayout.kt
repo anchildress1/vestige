@@ -9,12 +9,12 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.navigationBars
-import androidx.compose.foundation.layout.windowInsetsBottomHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.windowInsetsBottomHeight
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -116,6 +116,17 @@ fun IdleLayout(
                     footer = lastEntryFooter,
                     onHistoryTap = chrome.onHistoryTap,
                 )
+            }
+        } else {
+            chrome.onHistoryTap?.let { onTap ->
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 18.dp, vertical = 12.dp),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    HistoryLink(onClick = onTap)
+                }
             }
         }
         Spacer(Modifier.windowInsetsBottomHeight(WindowInsets.navigationBars))

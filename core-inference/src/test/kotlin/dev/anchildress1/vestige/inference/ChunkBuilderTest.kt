@@ -2,6 +2,7 @@ package dev.anchildress1.vestige.inference
 
 import org.junit.jupiter.api.Assertions.assertArrayEquals
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Assertions.assertThrows
 import org.junit.jupiter.api.Assertions.assertTrue
@@ -102,8 +103,37 @@ class ChunkBuilderTest {
         val builder = ChunkBuilder(samplesPerChunk = 2)
         val produced = builder.append(floatArrayOf(1f, 2f), 2)
         assertEquals(1, produced.size)
-        // Mutating subsequent input must not bleed into the already-emitted chunk.
         builder.append(floatArrayOf(99f, 99f), 2)
         assertArrayEquals(floatArrayOf(1f, 2f), produced[0])
+    }
+
+    // ─── clear (Q8 — synchronous buffer overwrite on discard) ────────────────
+
+    @Test
+    fun `clear drains accumulated samples — drainFinal returns null afterward (pos)`() {
+        val builder = ChunkBuilder(samplesPerChunk = 100)
+        builder.append(FloatArray(40) { it.toFloat() + 1f }, count = 40)
+        builder.clear()
+        assertNull(builder.drainFinal(), "clear must reset the write head")
+    }
+
+    @Test
+    fun `clear is a no-op on an empty builder (edge)`() {
+        val builder = ChunkBuilder(samplesPerChunk = 8)
+        builder.clear()
+        assertNull(builder.drainFinal())
+        val produced = builder.append(floatArrayOf(1f, 2f), 2)
+        assertTrue(produced.isEmpty())
+    }
+
+    @Test
+    fun `clear resets so subsequent appends start from a fresh window (pos)`() {
+        val builder = ChunkBuilder(samplesPerChunk = 4)
+        builder.append(floatArrayOf(7f, 8f), 2)
+        builder.clear()
+        val produced = builder.append(floatArrayOf(1f, 2f, 3f, 4f), 4)
+        assertEquals(1, produced.size)
+        assertArrayEquals(floatArrayOf(1f, 2f, 3f, 4f), produced[0])
+        assertFalse(produced[0].any { it == 7f || it == 8f }, "stale samples must not bleed through clear")
     }
 }

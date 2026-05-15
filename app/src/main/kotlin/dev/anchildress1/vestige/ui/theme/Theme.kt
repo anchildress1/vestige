@@ -1,5 +1,6 @@
 package dev.anchildress1.vestige.ui.theme
 
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
@@ -58,6 +59,12 @@ object VestigeTheme {
 
 @Composable
 fun VestigeTheme(content: @Composable () -> Unit) {
+    // LocalContentColor is provided inside MaterialTheme so every descendant — whether or not it
+    // routes through M3 Surface / Scaffold — inherits Ink as the default Text color. Without this
+    // provider, Texts that omit an explicit `color` parameter fall through to the M3 default of
+    // Color.Black, which renders black-on-dark against any of the Scoreboard surfaces. Setting it
+    // at the theme root prevents that class of regression by default, so screens are free to
+    // background plain Boxes against `colors.floor` without spawning a contrast bug.
     CompositionLocalProvider(
         LocalVestigeColors provides ScoreboardColors,
         LocalVestigeTypography provides ScoreboardTypography,
@@ -67,7 +74,10 @@ fun VestigeTheme(content: @Composable () -> Unit) {
             colorScheme = VestigeColorScheme,
             typography = M3Typography,
             shapes = M3Shapes,
-            content = content,
-        )
+        ) {
+            CompositionLocalProvider(LocalContentColor provides Ink) {
+                content()
+            }
+        }
     }
 }

@@ -145,6 +145,59 @@ class BackgroundExtractionSaveFlowTest {
     }
 
     @Test
+    fun `pattern orchestration completion bumps visible data after the append path settles`() = runTest {
+        val orchestrator = mockk<dev.anchildress1.vestige.patterns.PatternDetectionOrchestrator>()
+        val downstream: ExtractionStatusListener = mockk(relaxed = true)
+        val flowWithOrch = BackgroundExtractionSaveFlow(
+            entryStore = entryStore,
+            worker = worker,
+            observationGenerator = observationGenerator,
+            listenerFactory = { downstream },
+            scope = flowScope,
+            patternOrchestrator = orchestrator,
+        )
+        val storedEntry = dev.anchildress1.vestige.storage.EntryEntity(
+            id = ENTRY_ID,
+            extractionStatus = ExtractionStatus.COMPLETED,
+        )
+        val callout = dev.anchildress1.vestige.model.EntryObservation(
+            text = "Worth noting.",
+            evidence = dev.anchildress1.vestige.model.ObservationEvidence.PATTERN_CALLOUT,
+            fields = emptyList(),
+        )
+        val resolved = canonicalSample()
+        every { entryStore.createPendingEntry(any(), any()) } returns ENTRY_ID
+        every { entryStore.readEntry(ENTRY_ID) } returns storedEntry
+        coEvery { worker.extract(any(), any()) } returns BackgroundExtractionResult.Success(
+            totalElapsedMs = 25_000L,
+            lensResults = emptyList(),
+            modelCallCount = 3,
+            resolved = resolved,
+            templateLabel = TemplateLabel.AFTERMATH,
+        )
+        coEvery { observationGenerator.generate(any(), any(), any()) } returns emptyList()
+        coEvery {
+            orchestrator.onEntryCommitted(storedEntry, dev.anchildress1.vestige.model.Persona.WITNESS)
+        } returns callout
+        every { orchestrator.settleReservedCallout(storedEntry, fired = true) } returns Unit
+        every { entryStore.appendObservation(ENTRY_ID, callout, any()) } answers {
+            @Suppress("UNCHECKED_CAST")
+            (args[2] as () -> Unit).invoke()
+        }
+
+        flowWithOrch.saveAndExtract(SAMPLE_TEXT, SAMPLE_TIMESTAMP)
+
+        coVerifyOrder {
+            entryStore.completeEntry(ENTRY_ID, resolved, TemplateLabel.AFTERMATH, emptyList())
+            downstream.onUpdate(ExtractionStatus.COMPLETED, 0, null)
+            orchestrator.onEntryCommitted(storedEntry, dev.anchildress1.vestige.model.Persona.WITNESS)
+            entryStore.appendObservation(ENTRY_ID, callout, any())
+            orchestrator.settleReservedCallout(storedEntry, fired = true)
+            downstream.onUpdate(ExtractionStatus.COMPLETED, 0, null)
+        }
+    }
+
+    @Test
     fun `appendObservation failure releases the reservation and skips confirm`() = runTest {
         val orchestrator = mockk<dev.anchildress1.vestige.patterns.PatternDetectionOrchestrator>()
         val flowWithOrch = BackgroundExtractionSaveFlow(
@@ -649,6 +702,27 @@ class BackgroundExtractionSaveFlowTest {
             "energy_descriptor" to ResolvedField("crashed", ConfidenceVerdict.CANONICAL),
         ),
     )
+
+    @Test
+    fun `recoverEntry runs the detached pipeline against the existing entry id without creating a new row`() = runTest {
+        val resolved = canonicalSample()
+        coEvery { worker.extract(any(), any()) } returns BackgroundExtractionResult.Success(
+            totalElapsedMs = 12L,
+            lensResults = emptyList(),
+            modelCallCount = 0,
+            resolved = resolved,
+            templateLabel = TemplateLabel.AFTERMATH,
+        )
+        coEvery { observationGenerator.generate(any(), any(), any()) } returns emptyList()
+
+        flow.recoverEntry(ENTRY_ID, "recovered text", SAMPLE_TIMESTAMP).join()
+
+        // No new pending entry: recoverEntry attaches to an existing row.
+        verify(exactly = 0) { entryStore.createPendingEntry(any(), any()) }
+        // Listener relays PENDING then COMPLETED for the recovery run.
+        assertEquals(ExtractionStatus.PENDING, listenerEvents.first())
+        assertTrue(listenerEvents.contains(ExtractionStatus.COMPLETED))
+    }
 
     private companion object {
         private const val ENTRY_ID: Long = 42L

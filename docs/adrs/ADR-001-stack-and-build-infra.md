@@ -325,6 +325,58 @@ Storage row in §"Locked Stack" now records a ships-in-v1 schema with the HNSW v
 
 These are not optional. The privacy claim *is* the differentiator — failing it on a single Firebase analytics dep would invalidate the entire pitch.
 
+### Q8. Recording cancellation contract
+
+**Context.** The POC design shows a `DISCARD · NO SAVE` secondary affordance on the active-recording screen, sitting under the primary `STOP · FILE IT` action. The capture spec had no formal contract for what tapping it does. Closing this gap now, before Phase 2 wires the capture loop, so the implementation does not invent behavior.
+
+**Decision.** Tapping the discard affordance during an active recording:
+
+1. Stops `AudioRecord` immediately.
+2. Destroys the in-flight audio buffer in the same call stack as the discard action — no deferred cleanup, no staging-buffer escape.
+3. Returns the user to the idle Capture screen.
+4. Persists nothing — no `Entry` row, no markdown file, no transient cache, no retry queue.
+5. Invokes no LiteRT-LM call. The Gemma 4 runtime never sees the bytes.
+6. Provides no undo, no recently-discarded list, no recovery path.
+
+The cost of accidental discard is at most 30 seconds of re-recording. The cost of leaking unwanted audio into the model or persistence layer is the privacy claim. The tradeoff is the right way around.
+
+**UI affordance.** A secondary text link styled per `design-guidelines.md` §"Capture Screen / Discard" appears at the bottom of the recording screen, visually subordinate to the primary `STOP · FILE IT` action:
+
+```
+              [ STOP · FILE IT ]            ← primary, full-width pill
+
+               DISCARD · NO SAVE             ← secondary, muted text link
+```
+
+Single-tap behavior. No confirmation dialog, no long-press, no two-tap arming. Rationale: the affordance is already small, subordinate, and below the primary action. Adding a confirmation flow imposes friction on every cancel for the rare-event case of accidental tap. The buffer is gone the instant the tap registers.
+
+Visual register: muted/mist-gray text (`#7B8497`), no destructive accent color. Discard is calm, not alarming — it's the escape hatch, not the nuclear option. The destructive purple accent stays reserved for `Delete entry` and `Wipe everything`.
+
+**State machine.** `CaptureSession` from Phase 2 Story 2.1 gains a `DISCARDED` terminal state.
+
+```
+RECORDING → DISCARDED → IDLE
+```
+
+`DISCARDED` is terminal for this session — no rehydration path. The only exit is `IDLE`, which clears the session entirely.
+
+**Audio byte lifecycle.** The buffer is destroyed synchronously with the discard tap. The `AudioRecord` instance is stopped, the underlying byte buffer is overwritten or freed, and the JNI hold is released. If JNI release does not complete within 100ms, log the failure and force-release the handle. Audio bytes are gone from process memory before the screen returns to idle.
+
+**No silent saves.** Unlike the foreground-call audio (which lives briefly in `AudioCapture` until the model call returns), discarded audio never reaches the staging buffer used for multi-chunk concatenation (per Q4 Case B). The discard action takes precedence over all in-flight audio handling. A user 25s into a 30s chunk who taps discard does not leak the 25s into a "partial chunk" staging area.
+
+**No toast, no confirmation.** Per `ux-copy.md` §"Capture Screen — Discard": no snackbar after discard, no "Discarded." confirmation, no "Undo" affordance. The screen simply returns to idle and the patterns peek / status row resume their normal state. Silent dismissal is consistent with the non-recoverable contract.
+
+**Availability window.** Discard is only available during the foreground recording state (`CaptureSession.state == RECORDING`). Once the user taps `STOP · FILE IT`, the foreground inference call is in flight and the screen no longer shows the discard affordance. Cancelling the foreground call after it has been issued is out of scope.
+
+**Multi-chunk sessions (>30s).** For a session that has already produced one or more prior chunks (per Q4 Case B), tapping discard on the current chunk discards: the in-flight current chunk's audio buffer, the accumulated transcription text from prior chunks in the same session, and the session's `CaptureSession` object. The session is discarded *as a whole*, not per-chunk.
+
+**Out of scope for this Q.**
+- Cancelling a foreground model call after `STOP · FILE IT` has been tapped (audio already submitted).
+- Cancelling background extraction after the capture loop has saved the entry.
+- Cancelling typed entries — different affordance, separate spec.
+
+**Revisit when:** post-submission, if user research surfaces accidental-discard at meaningful rate → consider a 3-second snackbar with `Undo`. Note: this would change the privacy contract and requires a superseding ADR.
+
 ---
 
 ## Trade-off Analysis

@@ -153,7 +153,7 @@ class OnboardingStepContentTest {
             ),
         )
 
-        composeRule.onNodeWithText("LOCAL · GEMMA 4", substring = true).performClick()
+        composeRule.onNodeWithText("GEMMA 4 · LOCAL ONLY", substring = true).performClick()
         assertEquals(1, wifiSettingsOpens)
     }
 

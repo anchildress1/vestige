@@ -156,6 +156,16 @@ const __TWEAKS_STYLE = `
     filter:drop-shadow(0 1px 1px rgba(0,0,0,.3))}
 `;
 
+const TWEAKS_MESSAGE_ORIGIN = window.location.origin;
+
+function isTrustedTweaksMessage(e) {
+  return e.origin === TWEAKS_MESSAGE_ORIGIN && (e.source === window || e.source === window.parent);
+}
+
+function postTweaksMessage(target, message) {
+  target.postMessage(message, TWEAKS_MESSAGE_ORIGIN);
+}
+
 // ── useTweaks ───────────────────────────────────────────────────────────────
 // Single source of truth for tweak values. setTweak persists via the host
 // (__edit_mode_set_keys → host rewrites the EDITMODE block on disk).
@@ -168,7 +178,7 @@ function useTweaks(defaults) {
     const edits = typeof keyOrEdits === 'object' && keyOrEdits !== null
       ? keyOrEdits : { [keyOrEdits]: val };
     setValues((prev) => ({ ...prev, ...edits }));
-    window.parent.postMessage({ type: '__edit_mode_set_keys', edits }, '*');
+    postTweaksMessage(window.parent, { type: '__edit_mode_set_keys', edits });
     // Same-window signal so in-page listeners (deck-stage rail thumbnails)
     // can react — the parent message only reaches the host, not peers.
     window.dispatchEvent(new CustomEvent('tweakchange', { detail: edits }));
@@ -207,6 +217,7 @@ function TweaksPanel({ title = 'Tweaks', noDeckControls = false, children }) {
   React.useEffect(() => {
     if (!hasDeckStage || railEnabled) return undefined;
     const onMsg = (e) => {
+      if (!isTrustedTweaksMessage(e)) return;
       if (e.data && e.data.type === '__omelette_rail_enabled') setRailEnabled(true);
     };
     window.addEventListener('message', onMsg);
@@ -217,7 +228,7 @@ function TweaksPanel({ title = 'Tweaks', noDeckControls = false, children }) {
   });
   const toggleRail = (on) => {
     setRailVisible(on);
-    window.postMessage({ type: '__deck_rail_visible', on }, '*');
+    postTweaksMessage(window, { type: '__deck_rail_visible', on });
   };
   const offsetRef = React.useRef({ x: 16, y: 16 });
   const PAD = 16;
@@ -250,18 +261,19 @@ function TweaksPanel({ title = 'Tweaks', noDeckControls = false, children }) {
 
   React.useEffect(() => {
     const onMsg = (e) => {
+      if (!isTrustedTweaksMessage(e)) return;
       const t = e?.data?.type;
       if (t === '__activate_edit_mode') setOpen(true);
       else if (t === '__deactivate_edit_mode') setOpen(false);
     };
     window.addEventListener('message', onMsg);
-    window.parent.postMessage({ type: '__edit_mode_available' }, '*');
+    postTweaksMessage(window.parent, { type: '__edit_mode_available' });
     return () => window.removeEventListener('message', onMsg);
   }, []);
 
   const dismiss = () => {
     setOpen(false);
-    window.parent.postMessage({ type: '__edit_mode_dismissed' }, '*');
+    postTweaksMessage(window.parent, { type: '__edit_mode_dismissed' });
   };
 
   const onDragStart = (e) => {

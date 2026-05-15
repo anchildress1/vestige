@@ -1,4 +1,4 @@
-.PHONY: install bootstrap-wrapper doctor build assemble reinstall reinstall-tail logcat test lint format ktlint-format ktlint-check detekt android-lint secret-scan commitlint verify-no-telemetry verify ci clean
+.PHONY: install bootstrap-wrapper doctor build assemble reinstall _reinstall_base push-model logcat test lint format ktlint-format ktlint-check detekt android-lint secret-scan commitlint verify-no-telemetry verify ci clean
 
 GRADLE := ./gradlew
 KTLINT := $(or $(shell command -v ktlint 2>/dev/null), $(HOME)/.local/bin/ktlint)
@@ -26,13 +26,56 @@ bootstrap-wrapper:
 build:
 	$(GRADLE) :app:assembleDebug
 
-reinstall:
-	adb uninstall dev.anchildress1.vestige; $(GRADLE) :app:installDebug
+# ── Reinstall workflow ────────────────────────────────────────────────────────
+# `make reinstall` is the single device-iteration target. It uninstalls, installs the debug
+# APK, runs any environment-specific setup, and tails logcat. Behavior is driven by ENV:
+#
+#   ENV=dev (default)   → adds dev-only setup steps (model push, future fixtures, etc.).
+#   ENV=prod            → no special setup; walks the production onboarding flow.
+#
+# Add new dev-only steps by appending them to `DEV_SETUP_STEPS_dev`. The prod variant stays
+# empty by design so a flipped ENV always reflects the real first-run experience.
+ENV ?= dev
+VESTIGE_PACKAGE := dev.anchildress1.vestige
 
-# Reinstall then tail device logs for the app PID. `--pid=$(adb shell pidof ...)` filters to the
-# app only; the inline retry handles the brief window between install and process start. Ctrl-C
-# to stop. Add EXTRA="..." to append filters, e.g. `make reinstall-tail EXTRA='*:W'`.
-reinstall-tail: reinstall logcat
+# Filenames must match `core-model/src/main/resources/model/manifest.properties` exactly so
+# the artifact store accepts the pushed files without re-downloading. Local source paths
+# default to ~/Downloads/<filename>; override the VESTIGE_*_FILE vars for non-default homes.
+VESTIGE_MAIN_MODEL_FILENAME := gemma-4-E4B-it.litertlm
+VESTIGE_EMBEDDING_MODEL_FILENAME := embeddinggemma-300M_seq512_mixed-precision.tflite
+VESTIGE_EMBEDDING_TOKENIZER_FILENAME := sentencepiece.model
+VESTIGE_MAIN_MODEL_FILE ?= $(HOME)/Downloads/$(VESTIGE_MAIN_MODEL_FILENAME)
+VESTIGE_EMBEDDING_MODEL_FILE ?= $(HOME)/Downloads/$(VESTIGE_EMBEDDING_MODEL_FILENAME)
+VESTIGE_EMBEDDING_TOKENIZER_FILE ?= $(HOME)/Downloads/$(VESTIGE_EMBEDDING_TOKENIZER_FILENAME)
+
+DEV_SETUP_STEPS_dev := push-model
+DEV_SETUP_STEPS_prod :=
+DEV_SETUP_STEPS := $(DEV_SETUP_STEPS_$(ENV))
+
+reinstall: _reinstall_base $(DEV_SETUP_STEPS) logcat
+
+_reinstall_base:
+	@if [ "$(ENV)" != "dev" ] && [ "$(ENV)" != "prod" ]; then \
+		echo "❌ Unknown ENV='$(ENV)'. Set ENV=dev (default) or ENV=prod."; exit 1; \
+	fi
+	@echo "→ ENV=$(ENV); reinstall steps: _reinstall_base $(DEV_SETUP_STEPS) logcat"
+	adb uninstall $(VESTIGE_PACKAGE); $(GRADLE) :app:installDebug
+
+# Stream the on-device artifacts into the freshly-installed app's data dir via `run-as`.
+# `adb uninstall` wipes filesDir on every iteration; this skips the 3.66 GB onboarding
+# download path (main model required; embedding pair optional — Story 3.4 contingent).
+# Debug-only by construction — `run-as` requires a debuggable APK.
+push-model:
+	@command -v adb >/dev/null 2>&1 || { echo "❌ adb not found. Install Android platform-tools."; exit 1; }
+	@adb get-state >/dev/null 2>&1 || { echo "❌ no device connected. Run 'adb devices' to check."; exit 1; }
+	@adb shell "pm list packages $(VESTIGE_PACKAGE)" | grep -q "$(VESTIGE_PACKAGE)" || { \
+		echo "❌ $(VESTIGE_PACKAGE) is not installed. Run 'make reinstall' first."; \
+		exit 1; \
+	}
+	@./scripts/push-vestige-artifact.sh "$(VESTIGE_PACKAGE)" "$(VESTIGE_MAIN_MODEL_FILE)" "$(VESTIGE_MAIN_MODEL_FILENAME)" required
+	@./scripts/push-vestige-artifact.sh "$(VESTIGE_PACKAGE)" "$(VESTIGE_EMBEDDING_MODEL_FILE)" "$(VESTIGE_EMBEDDING_MODEL_FILENAME)" optional
+	@./scripts/push-vestige-artifact.sh "$(VESTIGE_PACKAGE)" "$(VESTIGE_EMBEDDING_TOKENIZER_FILE)" "$(VESTIGE_EMBEDDING_TOKENIZER_FILENAME)" optional
+# ───────────────────────────────────────────────────────────────────────────────
 
 logcat:
 	@command -v adb >/dev/null 2>&1 || { echo "❌ adb not found. Install Android platform-tools."; exit 1; }

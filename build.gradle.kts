@@ -26,13 +26,16 @@ kover {
                     // top-level classes AND their Compose / coroutine / FileKt synthetics are
                     // excluded together. Leading `*` on `*MainActivityKt*` catches Compose's
                     // `ComposableSingletons$MainActivityKt` lambda holder, which lives in the
-                    // root package alongside MainActivity.
+                    // root package alongside MainActivity. `CaptureViewModelFactory` is lifecycle
+                    // factory glue; tested business derivations live in `CaptureHostModels.kt`.
                     classes(
                         "dev.anchildress1.vestige.MainActivity",
                         "dev.anchildress1.vestige.MainActivity*",
                         "dev.anchildress1.vestige.MainActivityKt",
                         "dev.anchildress1.vestige.MainActivityKt*",
                         "dev.anchildress1.vestige.*MainActivityKt*",
+                        "dev.anchildress1.vestige.CaptureViewModelFactory",
+                        "dev.anchildress1.vestige.CaptureViewModelFactory*",
                         "dev.anchildress1.vestige.VestigeApplication",
                         "dev.anchildress1.vestige.VestigeApplication*",
                         "dev.anchildress1.vestige.ui.theme.*",
@@ -97,6 +100,30 @@ kover {
                         "dev.anchildress1.vestige.ui.components.AccentModifiersKt",
                         "dev.anchildress1.vestige.ui.components.AccentModifiersKt*",
                         "dev.anchildress1.vestige.ui.components.*AccentModifiersKt*",
+                        // Capture screen Composables — same Composer / $changed branch tax.
+                        // Behavior is covered by IdleLayoutTest / LiveLayoutTest / *PrimitivesTest
+                        // through Robolectric semantics + click assertions.
+                        "dev.anchildress1.vestige.ui.capture.IdleLayoutKt",
+                        "dev.anchildress1.vestige.ui.capture.IdleLayoutKt*",
+                        "dev.anchildress1.vestige.ui.capture.*IdleLayoutKt*",
+                        "dev.anchildress1.vestige.ui.capture.LiveLayoutKt",
+                        "dev.anchildress1.vestige.ui.capture.LiveLayoutKt*",
+                        "dev.anchildress1.vestige.ui.capture.*LiveLayoutKt*",
+                        "dev.anchildress1.vestige.ui.capture.RecButtonKt",
+                        "dev.anchildress1.vestige.ui.capture.RecButtonKt*",
+                        "dev.anchildress1.vestige.ui.capture.*RecButtonKt*",
+                        "dev.anchildress1.vestige.ui.capture.LiveLevelBarsKt",
+                        "dev.anchildress1.vestige.ui.capture.LiveLevelBarsKt*",
+                        "dev.anchildress1.vestige.ui.capture.*LiveLevelBarsKt*",
+                        "dev.anchildress1.vestige.ui.capture.ChunkProgressBarKt",
+                        "dev.anchildress1.vestige.ui.capture.ChunkProgressBarKt*",
+                        "dev.anchildress1.vestige.ui.capture.*ChunkProgressBarKt*",
+                        "dev.anchildress1.vestige.ui.capture.CaptureScreenKt",
+                        "dev.anchildress1.vestige.ui.capture.CaptureScreenKt*",
+                        "dev.anchildress1.vestige.ui.capture.*CaptureScreenKt*",
+                        "dev.anchildress1.vestige.ui.capture.TypeEntrySheetKt",
+                        "dev.anchildress1.vestige.ui.capture.TypeEntrySheetKt*",
+                        "dev.anchildress1.vestige.ui.capture.*TypeEntrySheetKt*",
                         // Debug-only fixture seeder for on-device manual verification.
                         // FLAG_DEBUGGABLE-gated at the call site; not on any release path.
                         "dev.anchildress1.vestige.debug.*",
@@ -185,6 +212,13 @@ sonar {
                 "**/ui/components/VestigeSurface.kt",
                 "**/ui/components/VestigeScaffold.kt",
                 "**/ui/components/AccentModifiers.kt",
+                "**/ui/capture/IdleLayout.kt",
+                "**/ui/capture/LiveLayout.kt",
+                "**/ui/capture/RecButton.kt",
+                "**/ui/capture/LiveLevelBars.kt",
+                "**/ui/capture/ChunkProgressBar.kt",
+                "**/ui/capture/CaptureScreen.kt",
+                "**/ui/capture/TypeEntrySheet.kt",
                 // Debug-only fixture seeder, FLAG_DEBUGGABLE-gated; never on a release path.
                 "**/debug/**",
             ).joinToString(","),

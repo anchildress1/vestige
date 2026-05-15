@@ -3,10 +3,14 @@ package dev.anchildress1.vestige
 import android.content.Context
 import android.content.Intent
 import android.util.Log
+import dev.anchildress1.vestige.inference.AudioChunk
+import dev.anchildress1.vestige.inference.BackendChoice
 import dev.anchildress1.vestige.inference.BackgroundExtractionWorker
 import dev.anchildress1.vestige.inference.DefaultConvergenceResolver
 import dev.anchildress1.vestige.inference.Embedder
 import dev.anchildress1.vestige.inference.ExtractionStatusListener
+import dev.anchildress1.vestige.inference.ForegroundInference
+import dev.anchildress1.vestige.inference.ForegroundResult
 import dev.anchildress1.vestige.inference.GemmaTextEmbedder
 import dev.anchildress1.vestige.inference.HistoryChunk
 import dev.anchildress1.vestige.inference.LiteRtLmEngine
@@ -36,16 +40,23 @@ import dev.anchildress1.vestige.storage.PatternRepo
 import dev.anchildress1.vestige.storage.PatternStore
 import dev.anchildress1.vestige.storage.VectorBackfillWorker
 import dev.anchildress1.vestige.storage.VestigeBoxStore
+import dev.anchildress1.vestige.ui.capture.ModelReadiness
 import io.objectbox.BoxStore
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import java.io.File
+import java.time.Instant
+import java.time.ZoneId
 import java.time.ZonedDateTime
 import java.util.concurrent.atomic.AtomicBoolean
 
@@ -64,8 +75,16 @@ class AppContainer(
     },
     private val embeddingArtifactManifestLoader: () -> EmbeddingArtifactManifest =
         EmbeddingArtifactManifest::loadDefault,
+    // `audioBackend = Cpu` is non-negotiable for the foreground voice path — without it the
+    // engine accepts a `Content.AudioFile` handoff and immediately SIGSEGVs in `mel_filterbank.cc`
+    // because no audio backend was attached at EngineConfig time. The reference STT-A test
+    // (`SttAAudioPlumbingTest`) enables the same backend; production must match.
     private val backgroundEngineFactory: (String, String) -> LiteRtLmEngine = { modelPath, cacheDir ->
-        LiteRtLmEngine(modelPath = modelPath, cacheDir = cacheDir)
+        LiteRtLmEngine(
+            modelPath = modelPath,
+            audioBackend = BackendChoice.Cpu,
+            cacheDir = cacheDir,
+        )
     },
     private val networkGateFactory: () -> NetworkGate = { DefaultNetworkGate() },
     private val mainModelArtifactStoreFactory: (
@@ -121,7 +140,14 @@ class AppContainer(
         CoroutineScope,
         PatternDetectionOrchestrator?,
     ) -> BackgroundExtractionSaveFlow =
-        { entryStore, worker, observationGenerator, listenerFactory, extractionScope, orchestrator ->
+        {
+                entryStore,
+                worker,
+                observationGenerator,
+                listenerFactory,
+                extractionScope,
+                orchestrator,
+            ->
             BackgroundExtractionSaveFlow(
                 entryStore = entryStore,
                 worker = worker,
@@ -207,6 +233,30 @@ class AppContainer(
         )
     }
 
+    /**
+     * Single-turn foreground inference path consumed by the capture screen. Shares the engine
+     * handle with background extraction — LiteRT-LM is single-threaded, so v1 sequences the
+     * foreground call ahead of any background pass against the same engine. A second recording
+     * launched while a prior `saveAndExtract` background job is still running will block until
+     * the engine handle frees up; that's the documented v1 trade-off per ADR-002.
+     */
+    val foregroundInference: ForegroundInference by lazy {
+        ForegroundInference(
+            engine = backgroundEngine,
+            cacheDir = applicationContext.cacheDir,
+        )
+    }
+
+    /**
+     * Two-tier-aware adapter for the capture screen's voice path. Ensures the engine is
+     * initialized before the call so the screen doesn't have to thread an init step into its
+     * recording lifecycle.
+     */
+    suspend fun runForegroundCall(audio: AudioChunk, persona: Persona): ForegroundResult {
+        ensureBackgroundEngineInitialized()
+        return foregroundInference.runForegroundCall(audio, persona)
+    }
+
     val observationGenerator: ObservationGenerator by lazy {
         ObservationGenerator(engine = backgroundEngine)
     }
@@ -243,6 +293,21 @@ class AppContainer(
 
     private val statusBus: BackgroundExtractionStatusBus = BackgroundExtractionStatusBus()
 
+    // Observable host state — host collects these so MainActivity / CaptureRoute / IdleLayout
+    // re-derive scoreboard stats and model-readiness chrome whenever the underlying state
+    // changes, instead of snapshotting once at composition. Initial value is `Loading`; the
+    // host calls `refreshModelReadiness()` from `LifecycleEventEffect(ON_RESUME)` to seed the
+    // first real probe — avoids eagerly triggering the `mainModelArtifactStore` lazy delegate
+    // during AppContainer construction (the lazy-init isn't safe to fire from arbitrary call
+    // sites; it's keyed on `modelPathLoader(applicationContext)` which production callers
+    // gate to a real `filesDir`).
+    private val _modelReadinessFlow: MutableStateFlow<ModelReadiness> =
+        MutableStateFlow(ModelReadiness.Loading)
+    val modelReadinessFlow: StateFlow<ModelReadiness> = _modelReadinessFlow.asStateFlow()
+
+    private val _dataRevision: MutableStateFlow<Long> = MutableStateFlow(0L)
+    val dataRevision: StateFlow<Long> = _dataRevision.asStateFlow()
+
     val lifecycleStateMachine: BackgroundExtractionLifecycleStateMachine =
         BackgroundExtractionLifecycleStateMachine(
             scope = scope,
@@ -264,6 +329,9 @@ class AppContainer(
 
     fun extractionStatusListener(entryId: Long): ExtractionStatusListener = ExtractionStatusListener { status, _, _ ->
         reportExtractionStatus(entryId, status)
+        if (status.isTerminal()) {
+            _dataRevision.value += 1
+        }
     }
 
     /**
@@ -290,6 +358,86 @@ class AppContainer(
         launchVectorBackfillIfReady()
         return outcome
     }
+
+    suspend fun saveTypedEntry(
+        entryText: String,
+        capturedAt: ZonedDateTime,
+        persona: Persona = Persona.WITNESS,
+    ): SaveOutcome.Pending {
+        if (mainModelArtifactLooksPresent()) {
+            return saveAndExtract(entryText = entryText, capturedAt = capturedAt, persona = persona)
+        }
+        val entryId = entryStore.createPendingEntry(entryText, capturedAt.toInstant())
+        reportExtractionStatus(entryId, ExtractionStatus.PENDING)
+        _dataRevision.value += 1
+        val completedJob = Job().also { it.complete() }
+        return SaveOutcome.Pending(entryId, completedJob)
+    }
+
+    /**
+     * Re-probes the model artifact and emits the latest [ModelReadiness] to [modelReadinessFlow].
+     * Host calls on lifecycle ON_RESUME (or when an action might have changed model state — e.g.
+     * Settings → Delete model, or a Phase-4 download-complete event). If the new readiness is
+     * `Ready`, also kicks the PENDING-extraction recovery sweep so typed entries persisted while
+     * the model was absent get extracted now.
+     */
+    fun refreshModelReadiness() {
+        val previous = _modelReadinessFlow.value
+        val current = probeModelReadiness()
+        if (previous == current) return
+        _modelReadinessFlow.value = current
+        if (current is ModelReadiness.Ready && previous !is ModelReadiness.Ready) {
+            scope.launch { recoverPendingExtractions() }
+        }
+    }
+
+    /**
+     * Scans entries with non-terminal extraction status and re-runs the foreground extraction
+     * pipeline. Called on transition to `Ready` so typed entries that landed during model
+     * Loading don't orphan as PENDING. Idempotent — already-running entries are no-ops.
+     */
+    internal suspend fun recoverPendingExtractions() {
+        if (!mainModelArtifactLooksPresent()) return
+        val ids = runCatching { VestigeBoxStore.findNonTerminalEntryIds(boxStore) }
+            .onFailure { Log.e(TAG, "Failed to scan non-terminal entries for recovery", it) }
+            .getOrDefault(emptyList())
+        if (ids.isEmpty()) return
+        ensureBackgroundEngineInitialized()
+        ids.forEach { entryId ->
+            val entry = entryStore.readEntry(entryId)
+            if (entry != null && entry.extractionStatus == ExtractionStatus.PENDING) {
+                recoverOneEntry(
+                    entryId = entry.id,
+                    entryText = entry.entryText,
+                    capturedAt = ZonedDateTime.ofInstant(
+                        Instant.ofEpochMilli(entry.timestampEpochMs),
+                        ZoneId.systemDefault(),
+                    ),
+                )
+            }
+        }
+    }
+
+    private suspend fun recoverOneEntry(entryId: Long, entryText: String, capturedAt: ZonedDateTime) {
+        runCatching {
+            backgroundExtractionSaveFlow.recoverEntry(
+                entryId = entryId,
+                entryText = entryText,
+                capturedAt = capturedAt,
+                persona = Persona.WITNESS,
+            )
+        }.onFailure { Log.e(TAG, "Recovery extraction failed for entry $entryId", it) }
+    }
+
+    private fun mainModelArtifactLooksPresent(): Boolean = runCatching {
+        val store = mainModelArtifactStore
+        val file = store.artifactFile
+        file.exists() && file.length() == store.manifest.expectedByteSize
+    }.onFailure { Log.e(TAG, "Failed to probe main model artifact", it) }
+        .getOrDefault(false)
+
+    private fun probeModelReadiness(): ModelReadiness =
+        if (mainModelArtifactLooksPresent()) ModelReadiness.Ready else ModelReadiness.Loading
 
     internal suspend fun ensureBackgroundEngineInitialized() {
         if (backgroundEngineInitialized) return
@@ -435,6 +583,11 @@ class AppContainer(
                 Log.e(TAG, "AppContainer scope coroutine failed", error)
             }
             return CoroutineScope(SupervisorJob() + Dispatchers.Default + exceptionHandler)
+        }
+
+        fun ExtractionStatus.isTerminal(): Boolean = when (this) {
+            ExtractionStatus.COMPLETED, ExtractionStatus.TIMED_OUT, ExtractionStatus.FAILED -> true
+            ExtractionStatus.PENDING, ExtractionStatus.RUNNING -> false
         }
     }
 

@@ -4,23 +4,24 @@ import dev.anchildress1.vestige.model.Persona
 import java.time.Clock
 
 /**
- * Single-use turn-by-turn state for one capture. After RESPONDED (or ERROR) the instance is
- * terminal — the next recording requires a fresh session.
+ * Single-use turn-by-turn state for one capture. RESPONDED, DISCARDED, and ERROR are terminal —
+ * the next recording requires a fresh session.
  *
  * ```
  *   IDLE ──startRecording──▶ RECORDING ──submitForInference──▶ INFERRING
- *                                                                  │
- *                                                                  ▼
- *                                          RESPONDED ◀──recordModelResponse── TRANSCRIBED
+ *                                │                                 │
+ *                                │ discard                         ▼
+ *                                ▼          RESPONDED ◀──recordModelResponse── TRANSCRIBED
+ *                            DISCARDED
  *
- *   any ──fail──▶ ERROR
+ *   non-terminal ──fail──▶ ERROR
  * ```
  *
  * Illegal transitions throw. The transcript stores text only — no audio bytes.
  */
 class CaptureSession(private val clock: Clock = Clock.systemUTC(), defaultPersona: Persona = Persona.WITNESS) {
 
-    enum class State { IDLE, RECORDING, INFERRING, TRANSCRIBED, RESPONDED, ERROR }
+    enum class State { IDLE, RECORDING, INFERRING, TRANSCRIBED, RESPONDED, DISCARDED, ERROR }
 
     val transcript: Transcript = Transcript()
 
@@ -56,7 +57,19 @@ class CaptureSession(private val clock: Clock = Clock.systemUTC(), defaultPerson
         state = State.RESPONDED
     }
 
+    fun discard() {
+        requireState("discard", State.RECORDING)
+        state = State.DISCARDED
+    }
+
     fun fail(error: Throwable) {
+        requireState(
+            "fail",
+            State.IDLE,
+            State.RECORDING,
+            State.INFERRING,
+            State.TRANSCRIBED,
+        )
         lastError = error
         state = State.ERROR
     }

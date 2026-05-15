@@ -14,6 +14,9 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 
 /** Backend selection. NPU needs the host's `nativeLibraryDir` — only Android `Context` has it. */
@@ -40,7 +43,9 @@ class LiteRtLmEngine(
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) : AutoCloseable {
 
+    @Volatile
     private var engine: Engine? = null
+    private val callMutex = Mutex()
 
     suspend fun initialize() = withContext(ioDispatcher) {
         check(engine == null) { "LiteRtLmEngine already initialized; close() before re-init." }
@@ -71,9 +76,8 @@ class LiteRtLmEngine(
     /**
      * Pinned `ConversationConfig` for every `createConversation()` — empty system instruction
      * (callers stack system text into the message body for now), no initial history, no tools,
-     * and the engine's deterministic sampler. Without this the SDK falls back to non-greedy
-     * defaults that produce different output across CPU vs GPU on the same prompt — measured
-     * 2026-05-12 on the STT-D corpus, CPU 80% / GPU 53% divergence on identical prompts.
+     * and the engine's deterministic sampler. Without the pinned sampler the SDK defaults pick
+     * a stochastic path that produces different output across CPU vs GPU on the same prompt.
      */
     private fun conversationConfig(): ConversationConfig = ConversationConfig(
         Contents.of(""),
@@ -83,12 +87,14 @@ class LiteRtLmEngine(
     )
 
     suspend fun generateText(prompt: String): String = withContext(ioDispatcher) {
-        val active = checkNotNull(engine) {
-            "LiteRtLmEngine.generateText called before initialize()."
-        }
         val started = System.nanoTime()
-        val response = active.createConversation(conversationConfig()).use { conversation ->
-            conversation.sendMessage(prompt).toString()
+        val response = callMutex.withLock {
+            val active = checkNotNull(engine) {
+                "LiteRtLmEngine.generateText called before initialize() (or after close())."
+            }
+            active.createConversation(conversationConfig()).use { conversation ->
+                conversation.sendMessage(prompt).toString()
+            }
         }
         val elapsedMs = (System.nanoTime() - started) / NANOS_PER_MILLI
         Log.d(
@@ -99,11 +105,11 @@ class LiteRtLmEngine(
     }
 
     /** Streaming counterpart to [generateText]. Closes the conversation on flow completion. */
-    fun streamText(prompt: String): Flow<String> {
-        val active = checkNotNull(engine) {
-            "LiteRtLmEngine.streamText called before initialize()."
-        }
-        return flow {
+    fun streamText(prompt: String): Flow<String> = flow {
+        callMutex.withLock {
+            val active = checkNotNull(engine) {
+                "LiteRtLmEngine.streamText called before initialize() (or after close())."
+            }
             val conversation = active.createConversation(conversationConfig())
             val started = System.nanoTime()
             var charsEmitted = 0
@@ -130,25 +136,28 @@ class LiteRtLmEngine(
                 )
                 throw error
             } finally {
-                conversation.close()
+                runCatching { conversation.close() }
+                    .onFailure { Log.w(TAG, "conversation.close() after streamText failed: ${it.message}") }
             }
-        }.flowOn(ioDispatcher)
-    }
+        }
+    }.flowOn(ioDispatcher)
 
     /**
      * Multimodal one-shot for `Content.AudioBytes` / `Content.AudioFile` alongside a text prompt.
      * Opens and closes a conversation per call.
      */
     suspend fun sendMessageContents(parts: List<Content>): String = withContext(ioDispatcher) {
-        val active = checkNotNull(engine) {
-            "LiteRtLmEngine.sendMessageContents called before initialize()."
-        }
         require(parts.isNotEmpty()) { "sendMessageContents requires at least one Content part." }
         val started = System.nanoTime()
 
         @Suppress("SpreadOperator") // Contents.of is a vararg factory; no List-accepting overload.
-        val response = active.createConversation(conversationConfig()).use { conversation ->
-            conversation.sendMessage(Contents.of(*parts.toTypedArray())).toString()
+        val response = callMutex.withLock {
+            val active = checkNotNull(engine) {
+                "LiteRtLmEngine.sendMessageContents called before initialize() (or after close())."
+            }
+            active.createConversation(conversationConfig()).use { conversation ->
+                conversation.sendMessage(Contents.of(*parts.toTypedArray())).toString()
+            }
         }
         val elapsedMs = (System.nanoTime() - started) / NANOS_PER_MILLI
         Log.d(
@@ -159,8 +168,15 @@ class LiteRtLmEngine(
     }
 
     override fun close() {
-        engine?.close()
-        engine = null
+        // Block on the mutex so an in-flight call's `createConversation` / `sendMessage` finishes
+        // before the native engine handle is freed. Without this guard a concurrent caller could
+        // dereference a closed engine through `active.createConversation(...)`.
+        runBlocking {
+            callMutex.withLock {
+                engine?.close()
+                engine = null
+            }
+        }
     }
 
     private fun BackendChoice.toSdkBackend(): Backend = when (this) {
@@ -192,9 +208,7 @@ class LiteRtLmEngine(
          * Pinned greedy decode. `topK=1` makes generation deterministic regardless of `seed`
          * or `temperature`, but we set the rest explicitly so a future SDK change to defaults
          * doesn't quietly bring back sampling noise. Backend parity (CPU vs GPU producing
-         * identical output for the same prompt) is the contract this constant defends —
-         * measured before this knob existed: CPU 80% / GPU 53% STT-D divergence on identical
-         * prompts (2026-05-12), with backend-conditional parse failures on C2 + D1.
+         * identical output for the same prompt) is the contract this constant defends.
          */
         val DETERMINISTIC_SAMPLER: SamplerConfig = SamplerConfig(
             topK = 1,

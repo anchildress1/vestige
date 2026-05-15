@@ -51,4 +51,13 @@ internal class ChunkBuilder(val samplesPerChunk: Int) {
         pos = 0
         return tail
     }
+
+    /**
+     * Zero the in-progress buffer and reset the write head so accumulated PCM samples don't
+     * linger after cancel / discard.
+     */
+    fun clear() {
+        current.fill(0f)
+        pos = 0
+    }
 }

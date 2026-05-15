@@ -11,10 +11,14 @@ import dev.anchildress1.vestige.model.EmbeddingArtifactManifest
 import dev.anchildress1.vestige.model.ExtractionStatus
 import dev.anchildress1.vestige.model.ModelArtifactState
 import dev.anchildress1.vestige.model.ModelArtifactStore
+import dev.anchildress1.vestige.model.ModelManifest
 import dev.anchildress1.vestige.save.BackgroundExtractionSaveFlow
 import dev.anchildress1.vestige.save.SaveOutcome
 import dev.anchildress1.vestige.storage.MarkdownEntryStore
 import dev.anchildress1.vestige.storage.VectorBackfillWorker
+import dev.anchildress1.vestige.testing.cleanupObjectBoxTempRoot
+import dev.anchildress1.vestige.testing.newInMemoryObjectBoxDirectory
+import dev.anchildress1.vestige.testing.openInMemoryBoxStore
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.coVerifyOrder
@@ -28,10 +32,13 @@ import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNotNull
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.io.TempDir
+import java.io.File
 import java.time.ZoneId
 import java.time.ZonedDateTime
 
 @OptIn(ExperimentalCoroutinesApi::class)
+@Suppress("LargeClass") // Wiring + lifecycle + save + recovery scenarios share one container fixture.
 class AppContainerTest {
 
     @Test
@@ -317,6 +324,102 @@ class AppContainerTest {
     }
 
     @Test
+    fun `saveTypedEntry persists pending text without initializing engine when model file is absent`(
+        @TempDir tempRoot: File,
+    ) = runTest {
+        val dataDir = newInMemoryObjectBoxDirectory("typed-entry-missing-model-")
+        val markdownDir = File(tempRoot, "markdown").apply { mkdirs() }
+        val boxStore = openInMemoryBoxStore(dataDir)
+        val engine = mockk<LiteRtLmEngine>(relaxed = true)
+        val artifactStore = fakeArtifactStore(
+            artifactFile = File(tempRoot, "missing-model.litertlm"),
+            expectedByteSize = 1L,
+        )
+        val context = mockk<Context>(relaxed = true) {
+            every { filesDir } returns tempRoot
+            every { cacheDir } returns File(tempRoot, "cache").apply { mkdirs() }
+        }
+        val container = AppContainer(
+            applicationContext = context,
+            boxStoreFactory = { boxStore },
+            markdownStoreFactory = { MarkdownEntryStore(markdownDir) },
+            modelPathLoader = { File(tempRoot, "missing-model.litertlm").absolutePath },
+            backgroundEngineFactory = { _, _ -> engine },
+            mainModelArtifactStoreFactory = { _, _, _ -> artifactStore },
+            recoveredEntryIdsLoader = { emptyList() },
+            foregroundServiceIntentFactory = { Intent("dev.anchildress1.vestige.TEST_START") },
+            foregroundServiceStarter = {},
+            scope = backgroundScope,
+        )
+
+        try {
+            val outcome = container.saveTypedEntry("typed fallback survives", CAPTURED_AT)
+
+            assertEquals(1L, outcome.entryId)
+            val row = container.entryStore.readEntry(outcome.entryId)!!
+            assertEquals("typed fallback survives", row.entryText)
+            assertEquals(ExtractionStatus.PENDING, row.extractionStatus)
+            coVerify(exactly = 0) { engine.initialize() }
+        } finally {
+            container.close()
+            cleanupObjectBoxTempRoot(tempRoot, dataDir)
+        }
+    }
+
+    @Test
+    fun `saveTypedEntry delegates to saveAndExtract when the model file looks present`(@TempDir tempRoot: File) =
+        runTest {
+            val engine = mockk<LiteRtLmEngine>(relaxed = true)
+            val saveFlow = mockk<BackgroundExtractionSaveFlow>()
+            val modelFile = File(tempRoot, "ready-model.litertlm").apply { writeText("x") }
+            val artifactStore = fakeArtifactStore(artifactFile = modelFile, expectedByteSize = 1L)
+            val expected = SaveOutcome.Pending(entryId = 77L, extractionJob = kotlinx.coroutines.Job())
+            coEvery {
+                saveFlow.saveAndExtract(
+                    entryText = "typed with model",
+                    capturedAt = CAPTURED_AT,
+                    retrievedHistory = emptyList(),
+                    timeoutMs = null,
+                    persona = dev.anchildress1.vestige.model.Persona.EDITOR,
+                )
+            } returns expected
+            val context = mockk<Context>(relaxed = true) {
+                every { filesDir } returns tempRoot
+                every { cacheDir } returns File(tempRoot, "cache").apply { mkdirs() }
+            }
+            val container = AppContainer(
+                applicationContext = context,
+                boxStoreFactory = { mockk<BoxStore>(relaxed = true) },
+                markdownStoreFactory = { mockk<MarkdownEntryStore>(relaxed = true) },
+                modelPathLoader = { modelFile.absolutePath },
+                backgroundEngineFactory = { _, _ -> engine },
+                mainModelArtifactStoreFactory = { _, _, _ -> artifactStore },
+                backgroundExtractionSaveFlowFactory = { _, _, _, _, _, _ -> saveFlow },
+                recoveredEntryIdsLoader = { emptyList() },
+                foregroundServiceIntentFactory = { Intent("dev.anchildress1.vestige.TEST_START") },
+                foregroundServiceStarter = {},
+            )
+
+            val actual = container.saveTypedEntry(
+                entryText = "typed with model",
+                capturedAt = CAPTURED_AT,
+                persona = dev.anchildress1.vestige.model.Persona.EDITOR,
+            )
+
+            assertEquals(expected, actual)
+            coVerifyOrder {
+                engine.initialize()
+                saveFlow.saveAndExtract(
+                    entryText = "typed with model",
+                    capturedAt = CAPTURED_AT,
+                    retrievedHistory = emptyList(),
+                    timeoutMs = null,
+                    persona = dev.anchildress1.vestige.model.Persona.EDITOR,
+                )
+            }
+        }
+
+    @Test
     fun `launchVectorBackfillIfReady retries the real pass after artifact states turn complete`() = runTest {
         val modelStore = mockk<ModelArtifactStore>()
         val tokenizerStore = mockk<ModelArtifactStore>()
@@ -355,6 +458,26 @@ class AppContainerTest {
         coVerify(exactly = 1) { worker.backfill() }
         coVerify(exactly = 2) { modelStore.currentState() }
         coVerify(exactly = 2) { tokenizerStore.currentState() }
+    }
+
+    private fun fakeArtifactStore(artifactFile: File, expectedByteSize: Long): ModelArtifactStore {
+        val manifest = ModelManifest(
+            schemaVersion = ModelManifest.SUPPORTED_SCHEMA_VERSION,
+            artifactRepo = "test",
+            filename = artifactFile.name,
+            downloadUrl = "https://example.invalid/${artifactFile.name}",
+            expectedByteSize = expectedByteSize,
+            sha256 = "test",
+            allowedHosts = listOf("example.invalid"),
+        )
+        return mockk<ModelArtifactStore>(relaxed = true) {
+            every { this@mockk.artifactFile } returns artifactFile
+            every { this@mockk.manifest } returns manifest
+        }
+    }
+
+    private companion object {
+        val CAPTURED_AT: ZonedDateTime = ZonedDateTime.of(2026, 5, 11, 7, 21, 24, 0, ZoneId.of("America/New_York"))
     }
 
     @Test
@@ -552,5 +675,340 @@ class AppContainerTest {
 
         io.mockk.verify(exactly = 1) { engine.close() }
         io.mockk.verify(exactly = 1) { boxStore.close() }
+    }
+
+    @Test
+    fun `modelReadinessFlow starts Loading and flips to Ready after a refresh with a present artifact`(
+        @TempDir tempRoot: File,
+    ) = runTest {
+        val modelFile = File(tempRoot, "ready-model.litertlm").apply { writeText("x") }
+        val artifactStore = fakeArtifactStore(artifactFile = modelFile, expectedByteSize = 1L)
+        val context = mockk<Context>(relaxed = true) {
+            every { filesDir } returns tempRoot
+            every { cacheDir } returns File(tempRoot, "cache").apply { mkdirs() }
+        }
+        val container = AppContainer(
+            applicationContext = context,
+            boxStoreFactory = { mockk<BoxStore>(relaxed = true) },
+            markdownStoreFactory = { mockk<MarkdownEntryStore>(relaxed = true) },
+            modelPathLoader = { modelFile.absolutePath },
+            backgroundEngineFactory = { _, _ -> mockk<LiteRtLmEngine>(relaxed = true) },
+            mainModelArtifactStoreFactory = { _, _, _ -> artifactStore },
+            recoveredEntryIdsLoader = { emptyList() },
+            foregroundServiceIntentFactory = { Intent("dev.anchildress1.vestige.TEST_START") },
+            foregroundServiceStarter = {},
+        )
+
+        assertEquals(
+            dev.anchildress1.vestige.ui.capture.ModelReadiness.Loading,
+            container.modelReadinessFlow.value,
+        )
+        container.refreshModelReadiness()
+        assertEquals(
+            dev.anchildress1.vestige.ui.capture.ModelReadiness.Ready,
+            container.modelReadinessFlow.value,
+        )
+    }
+
+    @Test
+    fun `refreshModelReadiness skips emitting when the readiness has not changed`(@TempDir tempRoot: File) = runTest {
+        val modelFile = File(tempRoot, "absent.litertlm")
+        val artifactStore = fakeArtifactStore(artifactFile = modelFile, expectedByteSize = 1L)
+        val context = mockk<Context>(relaxed = true) {
+            every { filesDir } returns tempRoot
+            every { cacheDir } returns File(tempRoot, "cache").apply { mkdirs() }
+        }
+        val container = AppContainer(
+            applicationContext = context,
+            boxStoreFactory = { mockk<BoxStore>(relaxed = true) },
+            markdownStoreFactory = { mockk<MarkdownEntryStore>(relaxed = true) },
+            modelPathLoader = { modelFile.absolutePath },
+            backgroundEngineFactory = { _, _ -> mockk<LiteRtLmEngine>(relaxed = true) },
+            mainModelArtifactStoreFactory = { _, _, _ -> artifactStore },
+            recoveredEntryIdsLoader = { emptyList() },
+            foregroundServiceIntentFactory = { Intent("dev.anchildress1.vestige.TEST_START") },
+            foregroundServiceStarter = {},
+        )
+
+        // Initial Loading + probe-Loading == same value; flow stays at Loading.
+        container.refreshModelReadiness()
+        assertEquals(
+            dev.anchildress1.vestige.ui.capture.ModelReadiness.Loading,
+            container.modelReadinessFlow.value,
+        )
+    }
+
+    @Test
+    fun `modelReadinessFlow stays Loading when the artifact is present but the wrong size`(@TempDir tempRoot: File) =
+        runTest {
+            val modelFile = File(tempRoot, "wrong-size.litertlm").apply { writeText("x") } // 1 byte
+            val artifactStore = fakeArtifactStore(artifactFile = modelFile, expectedByteSize = 99L)
+            val context = mockk<Context>(relaxed = true) {
+                every { filesDir } returns tempRoot
+                every { cacheDir } returns File(tempRoot, "cache").apply { mkdirs() }
+            }
+            val container = AppContainer(
+                applicationContext = context,
+                boxStoreFactory = { mockk<BoxStore>(relaxed = true) },
+                markdownStoreFactory = { mockk<MarkdownEntryStore>(relaxed = true) },
+                modelPathLoader = { modelFile.absolutePath },
+                backgroundEngineFactory = { _, _ -> mockk<LiteRtLmEngine>(relaxed = true) },
+                mainModelArtifactStoreFactory = { _, _, _ -> artifactStore },
+                recoveredEntryIdsLoader = { emptyList() },
+                foregroundServiceIntentFactory = { Intent("dev.anchildress1.vestige.TEST_START") },
+                foregroundServiceStarter = {},
+            )
+
+            container.refreshModelReadiness()
+            // Size mismatch keeps readiness in Loading — covers the size-check branch of
+            // mainModelArtifactLooksPresent.
+            assertEquals(
+                dev.anchildress1.vestige.ui.capture.ModelReadiness.Loading,
+                container.modelReadinessFlow.value,
+            )
+        }
+
+    @Test
+    fun `refreshModelReadiness flips from Ready to Loading when the artifact disappears`(@TempDir tempRoot: File) =
+        runTest {
+            val modelFile = File(tempRoot, "ready-then-gone.litertlm").apply { writeText("x") }
+            val artifactStore = fakeArtifactStore(artifactFile = modelFile, expectedByteSize = 1L)
+            val context = mockk<Context>(relaxed = true) {
+                every { filesDir } returns tempRoot
+                every { cacheDir } returns File(tempRoot, "cache").apply { mkdirs() }
+            }
+            val container = AppContainer(
+                applicationContext = context,
+                boxStoreFactory = { mockk<BoxStore>(relaxed = true) },
+                markdownStoreFactory = { mockk<MarkdownEntryStore>(relaxed = true) },
+                modelPathLoader = { modelFile.absolutePath },
+                backgroundEngineFactory = { _, _ -> mockk<LiteRtLmEngine>(relaxed = true) },
+                mainModelArtifactStoreFactory = { _, _, _ -> artifactStore },
+                recoveredEntryIdsLoader = { emptyList() },
+                foregroundServiceIntentFactory = { Intent("dev.anchildress1.vestige.TEST_START") },
+                foregroundServiceStarter = {},
+            )
+
+            container.refreshModelReadiness()
+            assertEquals(
+                dev.anchildress1.vestige.ui.capture.ModelReadiness.Ready,
+                container.modelReadinessFlow.value,
+            )
+            // Re-probe with the same state — no transition, no recover sweep.
+            container.refreshModelReadiness()
+            assertEquals(
+                dev.anchildress1.vestige.ui.capture.ModelReadiness.Ready,
+                container.modelReadinessFlow.value,
+            )
+
+            // Artifact removed mid-session — readiness flips back to Loading.
+            modelFile.delete()
+            container.refreshModelReadiness()
+            assertEquals(
+                dev.anchildress1.vestige.ui.capture.ModelReadiness.Loading,
+                container.modelReadinessFlow.value,
+            )
+        }
+
+    @Test
+    fun `recoverPendingExtractions is a no-op when the model artifact is absent`(@TempDir tempRoot: File) = runTest {
+        val saveFlow = mockk<BackgroundExtractionSaveFlow>(relaxed = true)
+        val modelFile = File(tempRoot, "absent.litertlm")
+        val artifactStore = fakeArtifactStore(artifactFile = modelFile, expectedByteSize = 1L)
+        val context = mockk<Context>(relaxed = true) {
+            every { filesDir } returns tempRoot
+            every { cacheDir } returns File(tempRoot, "cache").apply { mkdirs() }
+        }
+        val container = AppContainer(
+            applicationContext = context,
+            boxStoreFactory = { mockk<BoxStore>(relaxed = true) },
+            markdownStoreFactory = { mockk<MarkdownEntryStore>(relaxed = true) },
+            modelPathLoader = { modelFile.absolutePath },
+            backgroundEngineFactory = { _, _ -> mockk<LiteRtLmEngine>(relaxed = true) },
+            mainModelArtifactStoreFactory = { _, _, _ -> artifactStore },
+            backgroundExtractionSaveFlowFactory = { _, _, _, _, _, _ -> saveFlow },
+            recoveredEntryIdsLoader = { emptyList() },
+            foregroundServiceIntentFactory = { Intent("dev.anchildress1.vestige.TEST_START") },
+            foregroundServiceStarter = {},
+            scope = backgroundScope,
+        )
+
+        container.recoverPendingExtractions()
+
+        coVerify(exactly = 0) { saveFlow.recoverEntry(any(), any(), any(), any()) }
+    }
+
+    @Test
+    fun `recoverPendingExtractions skips non-PENDING entries when scanning`(@TempDir tempRoot: File) = runTest {
+        val dataDir = newInMemoryObjectBoxDirectory("recover-pending-skip-")
+        val markdownDir = File(tempRoot, "markdown").apply { mkdirs() }
+        val boxStore = openInMemoryBoxStore(dataDir)
+        val engine = mockk<LiteRtLmEngine>(relaxed = true)
+        val saveFlow = mockk<BackgroundExtractionSaveFlow>(relaxed = true)
+        val modelFile = File(tempRoot, "ready-model.litertlm").apply { writeText("x") }
+        val artifactStore = fakeArtifactStore(artifactFile = modelFile, expectedByteSize = 1L)
+        val context = mockk<Context>(relaxed = true) {
+            every { filesDir } returns tempRoot
+            every { cacheDir } returns File(tempRoot, "cache").apply { mkdirs() }
+        }
+        val container = AppContainer(
+            applicationContext = context,
+            boxStoreFactory = { boxStore },
+            markdownStoreFactory = { MarkdownEntryStore(markdownDir) },
+            modelPathLoader = { modelFile.absolutePath },
+            backgroundEngineFactory = { _, _ -> engine },
+            mainModelArtifactStoreFactory = { _, _, _ -> artifactStore },
+            backgroundExtractionSaveFlowFactory = { _, _, _, _, _, _ -> saveFlow },
+            recoveredEntryIdsLoader = { emptyList() },
+            foregroundServiceIntentFactory = { Intent("dev.anchildress1.vestige.TEST_START") },
+            foregroundServiceStarter = {},
+            scope = backgroundScope,
+        )
+
+        try {
+            val pendingId = container.entryStore.createPendingEntry("typed-pending", CAPTURED_AT.toInstant())
+            // Flip a second row to FAILED in persisted storage so the scan sees it but skips it.
+            // The non-terminal scan (`findNonTerminalEntryIds`) returns both PENDING and RUNNING;
+            // a row with terminal status is filtered upstream and never reaches the recovery loop.
+            // The PENDING-only filter inside `recoverPendingExtractions` is the second-line guard
+            // tested here — flipping to FAILED at the store level isn't enough since FAILED is
+            // already excluded from `findNonTerminalEntryIds`. Instead, force one row to RUNNING
+            // by hand-writing the entity.
+            val runningId = container.entryStore.createPendingEntry("typed-running", CAPTURED_AT.toInstant())
+            val runningEntry = container.entryStore.readEntry(runningId)!!
+            runningEntry.extractionStatus = ExtractionStatus.RUNNING
+            boxStore.boxFor(dev.anchildress1.vestige.storage.EntryEntity::class.java).put(runningEntry)
+
+            container.recoverPendingExtractions()
+
+            coVerify(exactly = 1) { saveFlow.recoverEntry(pendingId, "typed-pending", any(), any()) }
+            coVerify(exactly = 0) { saveFlow.recoverEntry(runningId, any(), any(), any()) }
+        } finally {
+            container.close()
+            cleanupObjectBoxTempRoot(tempRoot, dataDir)
+        }
+    }
+
+    @Test
+    fun `recoverPendingExtractions short-circuits when the non-terminal scan throws`(@TempDir tempRoot: File) =
+        runTest {
+            val saveFlow = mockk<BackgroundExtractionSaveFlow>(relaxed = true)
+            val modelFile = File(tempRoot, "ready-model.litertlm").apply { writeText("x") }
+            val artifactStore = fakeArtifactStore(artifactFile = modelFile, expectedByteSize = 1L)
+            val throwingBoxStore = mockk<BoxStore>(relaxed = true) {
+                // findNonTerminalEntryIds calls boxFor<EntryEntity>(); failing there exercises the
+                // runCatching onFailure branch in recoverPendingExtractions.
+                every { boxFor(any<Class<*>>()) } throws RuntimeException("simulated scan failure")
+            }
+            val context = mockk<Context>(relaxed = true) {
+                every { filesDir } returns tempRoot
+                every { cacheDir } returns File(tempRoot, "cache").apply { mkdirs() }
+            }
+            val container = AppContainer(
+                applicationContext = context,
+                boxStoreFactory = { throwingBoxStore },
+                markdownStoreFactory = { mockk<MarkdownEntryStore>(relaxed = true) },
+                modelPathLoader = { modelFile.absolutePath },
+                backgroundEngineFactory = { _, _ -> mockk<LiteRtLmEngine>(relaxed = true) },
+                mainModelArtifactStoreFactory = { _, _, _ -> artifactStore },
+                backgroundExtractionSaveFlowFactory = { _, _, _, _, _, _ -> saveFlow },
+                recoveredEntryIdsLoader = { emptyList() },
+                foregroundServiceIntentFactory = { Intent("dev.anchildress1.vestige.TEST_START") },
+                foregroundServiceStarter = {},
+                scope = backgroundScope,
+            )
+
+            container.recoverPendingExtractions()
+
+            coVerify(exactly = 0) { saveFlow.recoverEntry(any(), any(), any(), any()) }
+        }
+
+    @Test
+    fun `recoverPendingExtractions logs and continues when one entry's recovery throws`(@TempDir tempRoot: File) =
+        runTest {
+            val dataDir = newInMemoryObjectBoxDirectory("recover-pending-throws-")
+            val markdownDir = File(tempRoot, "markdown").apply { mkdirs() }
+            val boxStore = openInMemoryBoxStore(dataDir)
+            val engine = mockk<LiteRtLmEngine>(relaxed = true)
+            val saveFlow = mockk<BackgroundExtractionSaveFlow>()
+            // First call throws, second succeeds — recovery loop must not bail on the first failure.
+            coEvery { saveFlow.recoverEntry(any(), any(), any(), any()) } throws
+                RuntimeException("simulated recovery failure") andThen
+                mockk<kotlinx.coroutines.Job>(relaxed = true)
+            val modelFile = File(tempRoot, "ready-model.litertlm").apply { writeText("x") }
+            val artifactStore = fakeArtifactStore(artifactFile = modelFile, expectedByteSize = 1L)
+            val context = mockk<Context>(relaxed = true) {
+                every { filesDir } returns tempRoot
+                every { cacheDir } returns File(tempRoot, "cache").apply { mkdirs() }
+            }
+            val container = AppContainer(
+                applicationContext = context,
+                boxStoreFactory = { boxStore },
+                markdownStoreFactory = { MarkdownEntryStore(markdownDir) },
+                modelPathLoader = { modelFile.absolutePath },
+                backgroundEngineFactory = { _, _ -> engine },
+                mainModelArtifactStoreFactory = { _, _, _ -> artifactStore },
+                backgroundExtractionSaveFlowFactory = { _, _, _, _, _, _ -> saveFlow },
+                recoveredEntryIdsLoader = { emptyList() },
+                foregroundServiceIntentFactory = { Intent("dev.anchildress1.vestige.TEST_START") },
+                foregroundServiceStarter = {},
+                scope = backgroundScope,
+            )
+
+            try {
+                val firstId = container.entryStore.createPendingEntry("first", CAPTURED_AT.toInstant())
+                val secondId = container.entryStore.createPendingEntry("second", CAPTURED_AT.toInstant())
+
+                container.recoverPendingExtractions()
+
+                coVerify(exactly = 1) { saveFlow.recoverEntry(firstId, "first", any(), any()) }
+                coVerify(exactly = 1) { saveFlow.recoverEntry(secondId, "second", any(), any()) }
+            } finally {
+                container.close()
+                cleanupObjectBoxTempRoot(tempRoot, dataDir)
+            }
+        }
+
+    @Test
+    fun `recoverPendingExtractions re-runs the save flow for each PENDING entry`(@TempDir tempRoot: File) = runTest {
+        val dataDir = newInMemoryObjectBoxDirectory("recover-pending-")
+        val markdownDir = File(tempRoot, "markdown").apply { mkdirs() }
+        val boxStore = openInMemoryBoxStore(dataDir)
+        val engine = mockk<LiteRtLmEngine>(relaxed = true)
+        val saveFlow = mockk<BackgroundExtractionSaveFlow>(relaxed = true)
+        val modelFile = File(tempRoot, "ready-model.litertlm").apply { writeText("x") }
+        val artifactStore = fakeArtifactStore(artifactFile = modelFile, expectedByteSize = 1L)
+        val context = mockk<Context>(relaxed = true) {
+            every { filesDir } returns tempRoot
+            every { cacheDir } returns File(tempRoot, "cache").apply { mkdirs() }
+        }
+        val container = AppContainer(
+            applicationContext = context,
+            boxStoreFactory = { boxStore },
+            markdownStoreFactory = { MarkdownEntryStore(markdownDir) },
+            modelPathLoader = { modelFile.absolutePath },
+            backgroundEngineFactory = { _, _ -> engine },
+            mainModelArtifactStoreFactory = { _, _, _ -> artifactStore },
+            backgroundExtractionSaveFlowFactory = { _, _, _, _, _, _ -> saveFlow },
+            recoveredEntryIdsLoader = { emptyList() },
+            foregroundServiceIntentFactory = { Intent("dev.anchildress1.vestige.TEST_START") },
+            foregroundServiceStarter = {},
+            scope = backgroundScope,
+        )
+
+        try {
+            // Seed two PENDING entries directly through the live entry store.
+            val firstId = container.entryStore.createPendingEntry("typed-1", CAPTURED_AT.toInstant())
+            val secondId = container.entryStore.createPendingEntry("typed-2", CAPTURED_AT.toInstant())
+
+            container.recoverPendingExtractions()
+
+            coVerify(exactly = 1) { saveFlow.recoverEntry(firstId, "typed-1", any(), any()) }
+            coVerify(exactly = 1) { saveFlow.recoverEntry(secondId, "typed-2", any(), any()) }
+            assertEquals(0L, container.dataRevision.value)
+        } finally {
+            container.close()
+            cleanupObjectBoxTempRoot(tempRoot, dataDir)
+        }
     }
 }

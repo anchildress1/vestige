@@ -1,50 +1,42 @@
 package dev.anchildress1.vestige
 
-import android.Manifest
-import android.content.pm.ApplicationInfo
-import android.content.pm.PackageManager
 import android.os.Bundle
 import androidx.activity.ComponentActivity
-import androidx.activity.compose.BackHandler
-import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Button
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.semantics.role
-import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.tooling.preview.Preview
-import androidx.compose.ui.unit.dp
-import androidx.core.content.ContextCompat
-import dev.anchildress1.vestige.debug.DebugPatternSeeder
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.compose.LifecycleEventEffect
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
 import dev.anchildress1.vestige.model.Persona
-import dev.anchildress1.vestige.ui.components.AppTop
-import dev.anchildress1.vestige.ui.components.VestigeScaffold
-import dev.anchildress1.vestige.ui.components.VestigeSurface
+import dev.anchildress1.vestige.ui.capture.CaptureScreen
+import dev.anchildress1.vestige.ui.capture.CaptureViewModel
+import dev.anchildress1.vestige.ui.capture.ForegroundInferenceCall
+import dev.anchildress1.vestige.ui.capture.ModelReadiness
+import dev.anchildress1.vestige.ui.capture.RealVoiceCapture
+import dev.anchildress1.vestige.ui.capture.SaveAndExtract
+import dev.anchildress1.vestige.ui.capture.SaveTypedEntry
+import dev.anchildress1.vestige.ui.capture.ToneGeneratorLimitWarningCue
+import dev.anchildress1.vestige.ui.capture.deriveMeta
+import dev.anchildress1.vestige.ui.capture.deriveStats
 import dev.anchildress1.vestige.ui.onboarding.ModelAvailability
 import dev.anchildress1.vestige.ui.onboarding.OnboardingHost
 import dev.anchildress1.vestige.ui.onboarding.OnboardingPrefs
 import dev.anchildress1.vestige.ui.patterns.PatternsHost
 import dev.anchildress1.vestige.ui.theme.VestigeTheme
+import java.time.Clock
+import java.time.ZoneId
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -52,10 +44,10 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         val container = (application as VestigeApplication).appContainer
         val onboardingPrefs = OnboardingPrefs.from(this)
+        val clock = Clock.systemDefaultZone()
+        val zoneId: ZoneId = ZoneId.systemDefault()
         setContent {
             VestigeTheme {
-                // SharedPreferences is the durable source of truth — process death re-reads
-                // it on cold start, so a plain `mutableStateOf` is enough for in-process flips.
                 var onboardingComplete by remember { mutableStateOf(onboardingPrefs.isComplete) }
                 var selectedPersona by remember { mutableStateOf(onboardingPrefs.defaultPersona) }
                 if (!onboardingComplete) {
@@ -73,148 +65,113 @@ class MainActivity : ComponentActivity() {
                     )
                     return@VestigeTheme
                 }
-                var showPatterns by rememberSaveable { mutableStateOf(false) }
-                if (showPatterns) {
-                    // Back unwinds patterns→shell; without this the activity exits and the user
-                    // loses their place in the rough Phase-3 nav.
-                    BackHandler { showPatterns = false }
-                    PatternsHost(
+                var screen by rememberSaveable { mutableStateOf(PostOnboardingScreen.Capture) }
+                when (screen) {
+                    PostOnboardingScreen.Capture -> CaptureRoute(
+                        container = container,
+                        persona = selectedPersona,
+                        clock = clock,
+                        zoneId = zoneId,
+                        onOpenPatterns = { screen = PostOnboardingScreen.Patterns },
+                    )
+
+                    PostOnboardingScreen.Patterns -> PatternsHost(
                         patternStore = container.patternStore,
                         patternRepo = container.patternRepo,
                         entryStore = container.entryStore,
-                        onExit = { showPatterns = false },
+                        onExit = { screen = PostOnboardingScreen.Capture },
                         modifier = Modifier.fillMaxSize(),
                     )
-                } else {
-                    val isDebuggable = (applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE) != 0
-                    VestigeScaffold(modifier = Modifier.fillMaxSize()) { padding ->
-                        PhaseOneShell(
-                            onOpenPatterns = { showPatterns = true },
-                            onDebugSeed = if (isDebuggable) {
-                                { DebugPatternSeeder.seed(filesDir, container.boxStore, container.patternStore) }
-                            } else {
-                                null
-                            },
-                            persona = selectedPersona,
-                            modifier = Modifier.padding(padding),
-                        )
-                    }
                 }
             }
         }
     }
 }
 
-/**
- * Phase 1 placeholder shell. Real product UI lands in Phase 4.
- *
- * Wires the mic-permission flow needed for [dev.anchildress1.vestige.inference.AudioCapture]
- * dev runs (Story 1.4). Polished onboarding copy and surfaces ship in Phase 4.
- */
-@Composable
-private fun PhaseOneShell(
+private enum class PostOnboardingScreen { Capture, Patterns }
+
+@androidx.compose.runtime.Composable
+private fun CaptureRoute(
+    container: AppContainer,
     persona: Persona,
-    onOpenPatterns: () -> Unit = {},
-    onDebugSeed: (() -> Unit)? = null,
-    modifier: Modifier = Modifier,
-) {
-    val context = LocalContext.current
-    var permissionGranted by rememberSaveable {
-        mutableStateOf(
-            ContextCompat.checkSelfPermission(
-                context,
-                Manifest.permission.RECORD_AUDIO,
-            ) == PackageManager.PERMISSION_GRANTED,
-        )
-    }
-    var lastRequestDenied by remember { mutableStateOf(false) }
-
-    val launcher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
-        permissionGranted = granted
-        lastRequestDenied = !granted
-    }
-
-    Column(modifier = modifier.fillMaxSize()) {
-        AppTop(
-            persona = persona.name,
-            onPersonaTap = { toastTap(context, "persona tap") },
-            onStatusTap = { toastTap(context, "status tap") },
-        )
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(horizontal = 24.dp, vertical = 24.dp),
-            contentAlignment = Alignment.CenterStart,
-        ) {
-            VestigeSurface(
-                modifier = Modifier.fillMaxWidth(),
-                contentPadding = PaddingValues(20.dp),
-            ) {
-                PhaseOneShellCard(
-                    permissionGranted = permissionGranted,
-                    lastRequestDenied = lastRequestDenied,
-                    onRequestMicPermission = { launcher.launch(Manifest.permission.RECORD_AUDIO) },
-                    onOpenPatterns = onOpenPatterns,
-                    onDebugSeed = onDebugSeed,
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun PhaseOneShellCard(
-    permissionGranted: Boolean,
-    lastRequestDenied: Boolean,
-    onRequestMicPermission: () -> Unit,
+    clock: Clock,
+    zoneId: ZoneId,
     onOpenPatterns: () -> Unit,
-    onDebugSeed: (() -> Unit)?,
 ) {
-    Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-        Text(text = stringResource(id = R.string.app_name), style = VestigeTheme.typography.h1)
-
-        when {
-            permissionGranted -> Text(text = stringResource(id = R.string.mic_permission_granted))
-            lastRequestDenied -> Text(text = stringResource(id = R.string.mic_permission_denied))
-        }
-
-        Button(
-            onClick = onRequestMicPermission,
-            enabled = !permissionGranted,
-            modifier = Modifier.semantics { role = Role.Button },
-        ) {
-            Text(text = stringResource(id = R.string.mic_permission_request))
-        }
-
-        Button(
-            onClick = onOpenPatterns,
-            modifier = Modifier.semantics { role = Role.Button },
-        ) {
-            Text(text = stringResource(id = R.string.open_patterns))
-        }
-
-        onDebugSeed?.let { seed ->
-            Button(
-                onClick = seed,
-                modifier = Modifier.semantics { role = Role.Button },
-            ) {
-                Text(text = stringResource(id = R.string.debug_seed_patterns))
-            }
-        }
+    val limitWarningCue = remember { ToneGeneratorLimitWarningCue() }
+    DisposableEffect(limitWarningCue) {
+        onDispose { limitWarningCue.release() }
     }
+    val modelReadiness by container.modelReadinessFlow.collectAsStateWithLifecycle()
+    val dataRevision by container.dataRevision.collectAsStateWithLifecycle()
+    val factory = remember(container, persona, limitWarningCue) {
+        CaptureViewModelFactory(
+            initialPersona = persona,
+            recordVoice = RealVoiceCapture(),
+            foregroundInference = ForegroundInferenceCall { audio, sel ->
+                container.runForegroundCall(audio = audio, persona = sel)
+            },
+            saveAndExtract = SaveAndExtract { text, capturedAt, personaSel ->
+                container.saveAndExtract(entryText = text, capturedAt = capturedAt, persona = personaSel)
+            },
+            saveTypedEntry = SaveTypedEntry { text, capturedAt, personaSel ->
+                container.saveTypedEntry(entryText = text, capturedAt = capturedAt, persona = personaSel)
+            },
+            clock = clock,
+            zoneId = zoneId,
+            initialReadiness = container.modelReadinessFlow.value,
+            limitWarningCue = limitWarningCue,
+        )
+    }
+    val viewModel: CaptureViewModel = viewModel(factory = factory)
+    // Pipe live model-readiness changes into the VM so REC enablement, the error band, and
+    // the inferring-vs-loading chrome stay in sync if the artifact transitions during the
+    // session (download completes, pauses, or is removed via Settings).
+    LaunchedEffect(viewModel, modelReadiness) { viewModel.setModelReadiness(modelReadiness) }
+    // Re-probe on ON_RESUME so a download that completed in another activity / process is
+    // reflected when the user returns. AppContainer no-ops if nothing changed.
+    LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { container.refreshModelReadiness() }
+    // `dataRevision` as a remember key forces re-derivation whenever AppContainer increments
+    // it (entry write / pattern write / recovery sweep). Cheap — entryStore.countCompleted +
+    // patternStore.findVisibleSortedByLastSeen are indexed reads.
+    val stats = remember(container, dataRevision) { deriveStats(container) }
+    val meta = remember(clock, zoneId) { deriveMeta(clock, zoneId) }
+    CaptureScreen(
+        viewModel = viewModel,
+        stats = stats,
+        meta = meta,
+        modifier = Modifier.fillMaxSize(),
+        onOpenPatterns = onOpenPatterns,
+    )
 }
 
-@Preview
-@Composable
-private fun PhaseOneShellPreview() {
-    VestigeTheme {
-        PhaseOneShell(persona = Persona.WITNESS)
+@Suppress("LongParameterList")
+private class CaptureViewModelFactory(
+    private val initialPersona: Persona,
+    private val recordVoice: RealVoiceCapture,
+    private val foregroundInference: ForegroundInferenceCall,
+    private val saveAndExtract: SaveAndExtract,
+    private val saveTypedEntry: SaveTypedEntry,
+    private val clock: Clock,
+    private val zoneId: ZoneId,
+    private val initialReadiness: ModelReadiness,
+    private val limitWarningCue: ToneGeneratorLimitWarningCue,
+) : ViewModelProvider.Factory {
+    @Suppress("UNCHECKED_CAST")
+    override fun <T : ViewModel> create(modelClass: Class<T>): T {
+        require(modelClass.isAssignableFrom(CaptureViewModel::class.java)) {
+            "Unsupported ViewModel class: ${modelClass.name}"
+        }
+        return CaptureViewModel(
+            initialPersona = initialPersona,
+            recordVoice = recordVoice,
+            foregroundInference = foregroundInference,
+            saveAndExtract = saveAndExtract,
+            saveTypedEntry = saveTypedEntry,
+            clock = clock,
+            zoneId = zoneId,
+            initialReadiness = initialReadiness,
+            limitWarningCue = limitWarningCue,
+        ) as T
     }
-}
-
-// TEMP DEBUG — remove once on-device tap behavior is confirmed. Tests already cover the click
-// wiring; this exists only to surface a visible signal on the device while diagnosing a reported
-// "no click, no highlight" regression on the AppTop chrome pills.
-private fun toastTap(context: android.content.Context, label: String) {
-    android.widget.Toast.makeText(context, label, android.widget.Toast.LENGTH_SHORT).show()
 }

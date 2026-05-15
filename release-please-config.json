@@ -4,7 +4,7 @@
     ".": {
       "release-type": "simple",
       "changelog-path": "CHANGELOG.md",
-      "initial-version": "1.0.0",
+      "initial-version": "0.0.1",
       "include-component-in-tag": false,
       "extra-files": [
         {

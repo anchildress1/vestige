@@ -44,8 +44,9 @@ jobs:
           # source files (LiteRtLmEngine, ModelArtifactState, NetworkGate) still surface because
           # the bytecode lives in the main classpath; those get triaged as false positives per
           # AGENTS.md security-triage rule.
-          paths-ignore: |
-            **/build/generated/**
+          config: |
+            paths-ignore:
+              - '**/build/generated/**'
 
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@50e97c2cd7a37755bbfafc9c5b7cafaece252f6e # v6.1.0

@@ -43,8 +43,9 @@ internal val RuleWidth: Dp = 3.dp
  * Coral halo scaled by audio amplitude [level] (0..1). Drawn behind the record button while
  * the capture session is on-air. Idle (or NaN / negative) draws nothing.
  *
- * Replaces the Mist `vaporHaloOnRecording` halo. Halo color is coral because recording is "heat,"
- * not "ready" — the ON AIR · LIVE state in `poc/Energy Direction.html` is coral throughout.
+ * Replaces the Mist `vaporHaloOnRecording` halo. Halo color is coral because the REC button
+ * carries the "heat" semantic during recording. The AppTop status pill stays lime — coral is
+ * reserved for REC button + destructive flows.
  */
 @Composable
 fun Modifier.coralHaloOnRecording(level: Float, color: Color = VestigeTheme.colors.coral): Modifier = drawWithContent {
@@ -72,8 +73,8 @@ private const val HALO_AMP_SCALE: Float = 0.8f
 private const val HALO_ALPHA: Float = 0.45f
 
 /**
- * LOCAL · GEMMA 4 status dot — lime when the model is ready. Halo stays small; status indicator,
- * not a brand accent. Coral overload comes from the chrome row, not this dot.
+ * GEMMA 4 · LOCAL ONLY status dot — lime when the model is ready. Halo stays small; status
+ * indicator, not a brand accent. Coral is reserved for REC button heat, not this dot.
  */
 @Composable
 fun Modifier.limeDotForReady(diameter: Dp = StatusDotDiameter, color: Color = VestigeTheme.colors.lime): Modifier = this

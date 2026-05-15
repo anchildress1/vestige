@@ -79,6 +79,31 @@ class BackgroundExtractionSaveFlow(
         return SaveOutcome.Pending(entryId, extractionJob)
     }
 
+    /**
+     * Re-run the detached extraction pipeline for an existing PENDING entry. Used by
+     * `AppContainer.recoverPendingExtractions` so typed entries persisted while the model was
+     * absent get extracted once it becomes Ready, without duplicating the entry row.
+     */
+    suspend fun recoverEntry(
+        entryId: Long,
+        entryText: String,
+        capturedAt: ZonedDateTime,
+        persona: Persona = Persona.WITNESS,
+    ): Job {
+        val terminalRelay = DeferredTerminalRelay(listenerFactory(entryId))
+        terminalRelay.workerListener.onUpdate(ExtractionStatus.PENDING, 0, null)
+        val request = BackgroundExtractionRequest(
+            entryText = entryText,
+            capturedAt = capturedAt,
+            retrievedHistory = emptyList(),
+            entryAttemptCount = 0,
+            timeoutMs = null,
+        )
+        return scope.launch {
+            runDetachedExtraction(entryId, entryText, capturedAt, request, terminalRelay, persona)
+        }
+    }
+
     @Suppress("LongParameterList") // Carries the saveAndExtract call's full context.
     private suspend fun runDetachedExtraction(
         entryId: Long,
@@ -154,6 +179,9 @@ class BackgroundExtractionSaveFlow(
         // Runs after the terminal commit so a callout failure can't unwind the resolved
         // entry. Best-effort — failures are swallowed in runPatternOrchestration.
         runPatternOrchestration(entryId, persona)
+        if (patternOrchestrator != null) {
+            terminalRelay.emitTerminal(ExtractionStatus.COMPLETED, entryAttemptCount, null)
+        }
     }
 
     private suspend fun runPatternOrchestration(entryId: Long, persona: Persona): EntryObservation? {

@@ -82,7 +82,8 @@ class AppContainer(
     private val backgroundEngineFactory: (String, String) -> LiteRtLmEngine = { modelPath, cacheDir ->
         LiteRtLmEngine(
             modelPath = modelPath,
-            audioBackend = BackendChoice.Cpu,
+            backend = BackendChoice.Gpu,
+            audioBackend = BackendChoice.Cpu, // GPU audio path SIGSEGVs in mel_filterbank.cc; closest open upstream: https://github.com/google-ai-edge/LiteRT-LM/issues/2056
             cacheDir = cacheDir,
         )
     },

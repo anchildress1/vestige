@@ -6,6 +6,9 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.windowInsetsBottomHeight
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -29,6 +32,7 @@ import androidx.compose.ui.semantics.testTag
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -116,6 +120,7 @@ fun IdleLayout(
                 )
             }
         }
+        Spacer(Modifier.windowInsetsBottomHeight(WindowInsets.navigationBars))
     }
 }
 
@@ -229,13 +234,17 @@ private fun HistoryFooter(footer: LastEntryFooter, onHistoryTap: (() -> Unit)?) 
     val colors = VestigeTheme.colors
     val sep = CaptureCopy.HISTORY_FOOTER_SEPARATOR
     Row(
-        horizontalArrangement = Arrangement.Center,
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(
-            text = "${CaptureCopy.HISTORY_FOOTER_PREFIX}$sep${footer.dateLabel}$sep${footer.durationLabel}$sep",
+            text = "${CaptureCopy.HISTORY_FOOTER_PREFIX}$sep${footer.dateLabel}$sep${footer.durationLabel}",
             style = VestigeTheme.typography.eyebrow,
             color = colors.dim,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f),
         )
         if (onHistoryTap != null) {
             Box(

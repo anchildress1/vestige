@@ -13,6 +13,7 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.unit.dp
 import dev.anchildress1.vestige.inference.AudioChunk
+import dev.anchildress1.vestige.inference.ForegroundResult
 import dev.anchildress1.vestige.model.Persona
 import dev.anchildress1.vestige.ui.theme.VestigeTheme
 import kotlinx.coroutines.Dispatchers
@@ -120,6 +121,29 @@ class CaptureScreenTest {
         composeRule.onNodeWithContentDescription(CaptureCopy.HISTORY_LINK_A11Y).assertHasClickAction()
     }
 
+    // --- Reviewing state tests ---
+
+    @Test
+    fun `reviewing state renders DONE button`() {
+        val vm = newReviewingViewModel()
+        composeRule.setContent { VestigeTheme { captureScreen(vm) } }
+        composeRule.onNodeWithContentDescription("Done").assertIsDisplayed()
+    }
+
+    @Test
+    fun `reviewing state history link present when onOpenHistory provided`() {
+        val vm = newReviewingViewModel()
+        composeRule.setContent { VestigeTheme { captureScreen(vm, onOpenHistory = {}) } }
+        composeRule.onNodeWithContentDescription(CaptureCopy.HISTORY_LINK_A11Y).assertHasClickAction()
+    }
+
+    @Test
+    fun `reviewing state history link absent when onOpenHistory is null`() {
+        val vm = newReviewingViewModel()
+        composeRule.setContent { VestigeTheme { captureScreen(vm) } }
+        composeRule.onAllNodesWithText(CaptureCopy.HISTORY_LINK).assertCountEquals(0)
+    }
+
     @Test
     fun `History link tap target is at least 48 dp tall`() {
         val vm = newViewModel(readiness = ModelReadiness.Ready)
@@ -147,6 +171,28 @@ class CaptureScreenTest {
             lastEntryFooter = lastEntryFooter,
             onOpenHistory = onOpenHistory,
         )
+    }
+
+    private fun newReviewingViewModel(): CaptureViewModel {
+        val audio = AudioChunk(FloatArray(16), sampleRateHz = 16_000, isFinal = true)
+        return CaptureViewModel(
+            initialPersona = Persona.WITNESS,
+            recordVoice = VoiceCapture { _, _ -> audio },
+            foregroundInference = ForegroundInferenceCall { _, _ ->
+                ForegroundResult.Success(
+                    persona = Persona.WITNESS,
+                    rawResponse = "",
+                    elapsedMs = 0L,
+                    completedAt = clock.instant(),
+                    transcription = "something happened",
+                    followUp = "sounds like a pattern",
+                )
+            },
+            saveAndExtract = SaveAndExtract { _, _, _, _ -> },
+            clock = clock,
+            zoneId = ZoneOffset.UTC,
+            initialReadiness = ModelReadiness.Ready,
+        ).also { it.startRecording() }
     }
 
     private fun newViewModel(readiness: ModelReadiness, startInInferringPhase: Boolean = false): CaptureViewModel {

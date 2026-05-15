@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Debug manifest overlay. Merged into the debug APK only — never present in release builds.
+  Registers DebugSeedReceiver so `make seed-entries` (adb am broadcast -n <component>) can
+  preload fixture entries and patterns for dev iteration.
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <application>
+        <receiver
+            android:name=".debug.DebugSeedReceiver"
+            android:exported="true" />
+    </application>
+
+</manifest>

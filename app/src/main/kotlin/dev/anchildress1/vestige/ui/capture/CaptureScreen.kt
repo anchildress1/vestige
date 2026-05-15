@@ -10,10 +10,14 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.requiredHeightIn
+import androidx.compose.foundation.layout.windowInsetsBottomHeight
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -106,6 +110,7 @@ fun CaptureScreen(
         is CaptureUiState.Reviewing -> ReviewingPane(
             state = current,
             onAcknowledge = viewModel::acknowledgeReview,
+            onOpenHistory = onOpenHistory,
             modifier = modifier,
         )
     }
@@ -137,7 +142,12 @@ private fun InferringPane(persona: Persona, modifier: Modifier = Modifier) {
 }
 
 @Composable
-private fun ReviewingPane(state: CaptureUiState.Reviewing, onAcknowledge: () -> Unit, modifier: Modifier = Modifier) {
+private fun ReviewingPane(
+    state: CaptureUiState.Reviewing,
+    onAcknowledge: () -> Unit,
+    onOpenHistory: (() -> Unit)? = null,
+    modifier: Modifier = Modifier,
+) {
     val colors = VestigeTheme.colors
     Column(modifier = modifier.fillMaxSize().background(colors.floor)) {
         AppTop(persona = state.persona.name, status = AppTopStatuses.Ready)
@@ -152,6 +162,17 @@ private fun ReviewingPane(state: CaptureUiState.Reviewing, onAcknowledge: () -> 
         }
         Spacer(modifier = Modifier.weight(1f))
         DoneButton(onClick = onAcknowledge)
+        if (onOpenHistory != null) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 18.dp, vertical = 8.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                HistoryLink(onClick = onOpenHistory)
+            }
+        }
+        Spacer(Modifier.windowInsetsBottomHeight(WindowInsets.navigationBars))
     }
 }
 
@@ -170,6 +191,28 @@ private fun TranscriptTurn(label: String, body: String, bodyColor: Color) {
             text = body.ifBlank { "—" },
             style = VestigeTheme.typography.p,
             color = bodyColor,
+        )
+    }
+}
+
+@Composable
+private fun HistoryLink(onClick: () -> Unit) {
+    val colors = VestigeTheme.colors
+    Box(
+        modifier = Modifier
+            .requiredHeightIn(min = 48.dp)
+            .clickable(onClick = onClick)
+            .semantics(mergeDescendants = true) {
+                role = Role.Button
+                contentDescription = CaptureCopy.HISTORY_LINK_A11Y
+            }
+            .padding(horizontal = 12.dp, vertical = 8.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            text = CaptureCopy.HISTORY_LINK,
+            style = VestigeTheme.typography.personaLabel,
+            color = colors.dim,
         )
     }
 }

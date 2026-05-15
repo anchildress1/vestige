@@ -100,10 +100,9 @@ class HistoryScreenTest {
     // filter / search chrome must be absent (Story 4.6: chronological only)
 
     @Test
-    fun `filter chips do not exist in history screen`() {
+    fun `filter affordance does not exist in history screen`() {
         composeRule.setContent { HistoryScreen(viewModel = newViewModel(), persona = Persona.WITNESS) }
-        composeRule.onAllNodesWithText("All").assertCountEquals(0)
-        composeRule.onAllNodesWithText("Active").assertCountEquals(0)
+        composeRule.onAllNodesWithText("FILTER ▼").assertCountEquals(0)
     }
 
     // forbidden copy check — nothing from ux-copy.md §"Things to NEVER Write"

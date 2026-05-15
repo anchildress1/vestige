@@ -45,19 +45,15 @@ fun HistoryScreen(viewModel: HistoryViewModel, persona: Persona, modifier: Modif
     Column(modifier = modifier.fillMaxSize().background(colors.floor)) {
         AppTop(persona = persona.name, status = AppTopStatuses.Ready)
 
-        // Hero header — TAIL · ALL TIME eyebrow + FILTER button
         Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 18.dp, vertical = 8.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
         ) {
             EyebrowE(
                 text = HistoryCopy.EYEBROW,
                 modifier = Modifier.semantics { contentDescription = HistoryCopy.EYEBROW },
             )
-            EyebrowE(text = HistoryCopy.FILTER)
         }
 
         Text(

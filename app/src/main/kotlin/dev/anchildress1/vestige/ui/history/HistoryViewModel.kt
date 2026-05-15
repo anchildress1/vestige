@@ -9,6 +9,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.time.Instant
@@ -41,6 +42,7 @@ class HistoryViewModel(
     private val entryStore: EntryStore,
     private val zoneId: ZoneId = ZoneOffset.UTC,
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
+    dataRevision: StateFlow<Long> = MutableStateFlow(0L),
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(HistoryUiState())
@@ -48,19 +50,23 @@ class HistoryViewModel(
 
     init {
         viewModelScope.launch {
-            val nowMs = System.currentTimeMillis()
-            val rows = runCatching {
-                withContext(ioDispatcher) { entryStore.listCompleted(limit = LIST_LIMIT) }
-            }.onFailure { Log.e(TAG, "Failed to load history", it) }
-                .getOrDefault(emptyList())
-            val summaries = rows.map { entity -> HistorySummary.from(entity, zoneId) }
-            _state.value = HistoryUiState(
-                entries = summaries,
-                groups = buildGroups(summaries, nowMs),
-                loading = false,
-                stats = if (summaries.isNotEmpty()) buildStats(summaries, nowMs) else null,
-            )
+            dataRevision.collectLatest { load() }
         }
+    }
+
+    private suspend fun load() {
+        val nowMs = System.currentTimeMillis()
+        val rows = runCatching {
+            withContext(ioDispatcher) { entryStore.listCompleted(limit = LIST_LIMIT) }
+        }.onFailure { Log.e(TAG, "Failed to load history", it) }
+            .getOrDefault(emptyList())
+        val summaries = rows.map { entity -> HistorySummary.from(entity, zoneId) }
+        _state.value = HistoryUiState(
+            entries = summaries,
+            groups = buildGroups(summaries, nowMs),
+            loading = false,
+            stats = if (summaries.isNotEmpty()) buildStats(summaries, nowMs) else null,
+        )
     }
 
     private fun buildGroups(summaries: List<HistorySummary>, nowMs: Long): List<HistoryGroup> {

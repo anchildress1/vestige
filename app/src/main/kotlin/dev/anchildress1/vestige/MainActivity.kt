@@ -92,6 +92,7 @@ class MainActivity : ComponentActivity() {
                         persona = selectedPersona,
                         onExit = { screen = PostOnboardingScreen.Capture },
                         zoneId = zoneId,
+                        dataRevision = container.dataRevision,
                         modifier = Modifier.fillMaxSize(),
                     )
                 }

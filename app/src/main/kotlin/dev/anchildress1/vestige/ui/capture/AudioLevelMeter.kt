@@ -32,11 +32,16 @@ class AudioLevelMeter(private val windowSize: Int = DEFAULT_WINDOW_SIZE) {
     /** Push the next chunk; returns the RMS level (clamped to `[0, 1]`). */
     fun push(samples: FloatArray, count: Int = samples.size): Float {
         require(count in 0..samples.size) { "count=$count out of range for samples.size=${samples.size}" }
-        val level = rms(samples, count).coerceIn(0f, 1f)
-        window[nextIndex] = level
+        return pushLevel(rms(samples, count))
+    }
+
+    /** Push one precomputed RMS level; returns the clamped value recorded into the ring. */
+    fun pushLevel(level: Float): Float {
+        val clamped = level.coerceIn(0f, 1f)
+        window[nextIndex] = clamped
         nextIndex = (nextIndex + 1) % windowSize
         if (nextIndex == 0) filled = true
-        return level
+        return clamped
     }
 
     /** True once the ring has rolled over at least once. */

@@ -7,6 +7,7 @@ import dev.anchildress1.vestige.inference.AudioChunk
 import dev.anchildress1.vestige.inference.ForegroundResult
 import dev.anchildress1.vestige.model.Persona
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.cancel
@@ -67,6 +68,7 @@ class CaptureViewModel(
         onBufferOverflow = BufferOverflow.DROP_OLDEST,
     )
 
+    @OptIn(ExperimentalCoroutinesApi::class)
     private fun primeStopSignal() {
         stopSignal.resetReplayCache()
     }
@@ -135,60 +137,82 @@ class CaptureViewModel(
      * already running, the model is not ready, or the screen is already past idle.
      */
     fun startRecording() {
-        if (recordingJob?.isActive == true) return
-        val current = _state.value
-        if (current !is CaptureUiState.Idle || current.modelReadiness !is ModelReadiness.Ready) return
-
-        val inferencePersona = current.persona
+        val current = readyIdleState() ?: return
         val meter = AudioLevelMeter(windowSize = levelWindowSize)
+        val startedAtMs = clock.millis()
+        beginRecording(meter)
+        recordingJob = launchRecordingJob(
+            meter = meter,
+            startedAtMs = startedAtMs,
+            inferencePersona = current.persona,
+        )
+    }
+
+    private fun readyIdleState(): CaptureUiState.Idle? {
+        val current = _state.value as? CaptureUiState.Idle
+        return if (recordingJob?.isActive == true || current?.modelReadiness !is ModelReadiness.Ready) null else current
+    }
+
+    private fun beginRecording(meter: AudioLevelMeter) {
         primeStopSignal()
-        _state.update { c ->
-            if (c is CaptureUiState.Idle) {
+        _state.update { current ->
+            if (current is CaptureUiState.Idle) {
                 CaptureUiState.Recording(
-                    persona = c.persona,
-                    modelReadiness = c.modelReadiness,
+                    persona = current.persona,
+                    modelReadiness = current.modelReadiness,
                     elapsedMs = 0L,
                     recentLevels = meter.levels,
                 )
             } else {
-                c
+                current
             }
         }
         limitWarningFired = false
-        val startedAtMs = clock.millis()
-        recordingJob = viewModelScope.launch {
+    }
+
+    private fun launchRecordingJob(meter: AudioLevelMeter, startedAtMs: Long, inferencePersona: Persona): Job =
+        viewModelScope.launch {
             try {
-                val audio = recordVoice(
-                    onLevel = { level -> onRecordingLevel(meter, level, startedAtMs) },
-                    stopFlow = stopSignal,
-                )
+                val audio = captureAudio(meter, startedAtMs)
                 if (audio == null) {
-                    _state.update { c ->
-                        if (c is CaptureUiState.Recording) {
-                            CaptureUiState.Idle(persona = c.persona, modelReadiness = c.modelReadiness)
-                        } else {
-                            c
-                        }
-                    }
+                    returnToIdleFromRecording()
                     return@launch
                 }
-                _state.update { c ->
-                    if (c is CaptureUiState.Recording) {
-                        CaptureUiState.Inferring(
-                            persona = c.persona,
-                            modelReadiness = c.modelReadiness,
-                            startedAtEpochMs = clock.millis(),
-                        )
-                    } else {
-                        c
-                    }
-                }
+                transitionToInferring()
                 runInference(audio, inferencePersona)
             } catch (cancel: CancellationException) {
                 throw cancel
             } catch (@Suppress("TooGenericExceptionCaught") error: Exception) {
                 Log.e(TAG, "Recording job failed", error)
                 emitInferenceError(CaptureError.InferenceFailed.Reason.ENGINE_FAILED)
+            }
+        }
+
+    private suspend fun captureAudio(meter: AudioLevelMeter, startedAtMs: Long): AudioChunk? = recordVoice(
+        onLevel = { level -> onRecordingLevel(meter, level, startedAtMs) },
+        stopFlow = stopSignal,
+    )
+
+    private fun returnToIdleFromRecording() {
+        _state.update { current ->
+            if (current is CaptureUiState.Recording) {
+                CaptureUiState.Idle(persona = current.persona, modelReadiness = current.modelReadiness)
+            } else {
+                current
+            }
+        }
+    }
+
+    private fun transitionToInferring() {
+        _state.update { current ->
+            if (current is CaptureUiState.Recording) {
+                CaptureUiState.Inferring(
+                    persona = current.persona,
+                    modelReadiness = current.modelReadiness,
+                    startedAtEpochMs = clock.millis(),
+                )
+            } else {
+                current
             }
         }
     }
@@ -275,8 +299,7 @@ class CaptureViewModel(
         // VoiceCapture surfaces 0..1 RMS values directly — meter ring-buffer turns them into a
         // chronological window for the live bar strip. Clamp defensively in case a fake driver
         // overshoots in tests.
-        val clamped = level.coerceIn(0f, 1f)
-        meter.push(samples = floatArrayOf(clamped), count = 1)
+        meter.pushLevel(level)
         val elapsed = clock.millis() - startedAtMs
         if (!limitWarningFired && elapsed >= limitWarningThresholdMs) {
             limitWarningFired = true

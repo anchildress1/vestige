@@ -10,6 +10,7 @@ object CaptureCopy {
 
     const val OR_TYPE: String = "OR TYPE →"
 
+    const val TYPE_FIELD_LABEL: String = "Typed entry text"
     const val TYPE_PLACEHOLDER: String = "What just happened."
     const val TYPE_SUBMIT: String = "Log entry"
 

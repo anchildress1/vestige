@@ -24,6 +24,11 @@ import java.util.concurrent.atomic.AtomicBoolean
  * UI can drive a live meter while a recording is in flight. The callback is invoked synchronously
  * on the capture coroutine; consumers must keep it fast (no allocations / no IO). Samples are not
  * exposed past this callback — even the RMS hand-off is a one-way derivation.
+ *
+ * One [AudioCapture] instance is single-use for exactly one recording session. [requestStop]
+ * stays sticky for that session so an early STOP raised before `captureChunks()` reaches its
+ * read loop cannot be lost; production constructs a fresh instance per recording via
+ * `AudioRecordSource`.
  */
 class AudioCapture(
     private val sampleRateHz: Int = SAMPLE_RATE_HZ,

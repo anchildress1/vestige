@@ -72,6 +72,7 @@ fun TypeEntrySheet(
                     .fillMaxWidth()
                     .height(TEXT_FIELD_HEIGHT)
                     .background(colors.s2)
+                    .semantics { contentDescription = CaptureCopy.TYPE_FIELD_LABEL }
                     .padding(horizontal = 12.dp, vertical = 10.dp),
                 textStyle = VestigeTheme.typography.p.copy(color = colors.ink),
                 cursorBrush = SolidColor(colors.lime),

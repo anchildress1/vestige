@@ -30,6 +30,14 @@ class AudioLevelMeterTest {
     }
 
     @Test
+    fun `pushLevel clamps and records without samples array`() {
+        val meter = AudioLevelMeter(windowSize = 3)
+        val level = meter.pushLevel(1.5f)
+        assertEquals(1f, level, 0f)
+        assertListEquals(listOf(0f, 0f, 1f), meter.levels)
+    }
+
+    @Test
     fun `window rotates FIFO`() {
         val meter = AudioLevelMeter(windowSize = 3)
         meter.push(FloatArray(2) { 0.2f })

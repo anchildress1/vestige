@@ -208,6 +208,29 @@ class CaptureViewModelTest {
     }
 
     @Test
+    fun `null audio returns Recording to Idle without running inference`() = runTest(dispatcher) {
+        val voice = FakeVoiceCapture(result = null)
+        val inferenceCalls = AtomicInteger(0)
+        val vm = newViewModel(
+            voice = voice,
+            inference = ForegroundInferenceCall { _, _ ->
+                inferenceCalls.incrementAndGet()
+                parseFailure()
+            },
+            save = RecordingSaveAndExtract(),
+            initialReadiness = ModelReadiness.Ready,
+        )
+
+        vm.startRecording()
+        assertTrue(vm.state.value is CaptureUiState.Recording)
+        voice.completeWithResult()
+        advanceUntilIdle()
+
+        assertTrue(vm.state.value is CaptureUiState.Idle)
+        assertEquals(0, inferenceCalls.get())
+    }
+
+    @Test
     fun `discard cancels mid-flight recording and returns to Idle (pos)`() = runTest(dispatcher) {
         val voice = FakeVoiceCapture(result = AudioChunk(FloatArray(16), 16_000, isFinal = true))
         val vm = newViewModel(

@@ -5,6 +5,7 @@ import android.content.pm.PackageManager
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -202,6 +203,7 @@ internal fun HistoryLink(onClick: () -> Unit, testTag: String? = null) {
     Box(
         modifier = Modifier
             .requiredHeightIn(min = 48.dp)
+            .border(width = 1.dp, color = colors.hair)
             .clickable(onClick = onClick)
             .semantics(mergeDescendants = true) {
                 role = Role.Button

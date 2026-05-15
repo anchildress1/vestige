@@ -6,11 +6,11 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.windowInsetsBottomHeight
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -232,20 +232,35 @@ private fun heroAnnotated(full: String, highlightSuffix: String, inkColor: Color
 @Composable
 private fun HistoryFooter(footer: LastEntryFooter, onHistoryTap: (() -> Unit)?) {
     val colors = VestigeTheme.colors
-    val sep = CaptureCopy.HISTORY_FOOTER_SEPARATOR
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(
-            text = "${CaptureCopy.HISTORY_FOOTER_PREFIX}$sep${footer.dateLabel}$sep${footer.durationLabel}",
-            style = VestigeTheme.typography.eyebrow,
-            color = colors.dim,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
+        // Left group: prefix + stacked date + duration
+        Row(
             modifier = Modifier.weight(1f),
-        )
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            EyebrowE(text = CaptureCopy.HISTORY_FOOTER_PREFIX)
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                EyebrowE(text = footer.monthLabel, color = colors.faint)
+                Text(
+                    text = footer.dayLabel,
+                    style = VestigeTheme.typography.eyebrow.copy(fontSize = 16.sp),
+                    color = colors.ink,
+                )
+            }
+            Text(
+                text = footer.durationLabel,
+                style = VestigeTheme.typography.eyebrow,
+                color = colors.dim,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f),
+            )
+        }
         if (onHistoryTap != null) {
             Box(
                 modifier = Modifier

@@ -155,7 +155,7 @@ private fun CaptureRoute(
     // patternStore.findVisibleSortedByLastSeen are indexed reads.
     val stats = remember(container, dataRevision) { deriveStats(container) }
     val meta = remember(clock, zoneId) { deriveMeta(clock, zoneId) }
-    val lastEntryFooter = remember(container, dataRevision) { deriveLastEntryFooter(container, clock, zoneId) }
+    val lastEntryFooter = remember(container, dataRevision) { deriveLastEntryFooter(container, zoneId) }
     CaptureScreen(
         viewModel = viewModel,
         stats = stats,

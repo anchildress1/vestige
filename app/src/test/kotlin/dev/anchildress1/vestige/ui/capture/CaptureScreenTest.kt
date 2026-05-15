@@ -105,18 +105,19 @@ class CaptureScreenTest {
     @Test
     fun `footer renders prefix date and duration when lastEntryFooter is present`() {
         val vm = newViewModel(readiness = ModelReadiness.Ready)
-        val footer = LastEntryFooter(dateLabel = "Today · 9:41 AM", durationLabel = "4m 02s")
+        val footer = LastEntryFooter(monthLabel = "JAN", dayLabel = "27", durationLabel = "4m 02s")
         composeRule.setContent { VestigeTheme { captureScreen(vm, lastEntryFooter = footer) } }
         // Use count checks: footer is in composition but may be below viewport in test.
         composeRule.onAllNodesWithText(CaptureCopy.HISTORY_FOOTER_PREFIX, substring = true).assertCountEquals(1)
-        composeRule.onAllNodesWithText("Today · 9:41 AM", substring = true).assertCountEquals(1)
+        composeRule.onAllNodesWithText("JAN", substring = true).assertCountEquals(1)
+        composeRule.onAllNodesWithText("27", substring = true).assertCountEquals(1)
         composeRule.onAllNodesWithText("4m 02s", substring = true).assertCountEquals(1)
     }
 
     @Test
     fun `History link is clickable with correct contentDescription`() {
         val vm = newViewModel(readiness = ModelReadiness.Ready)
-        val footer = LastEntryFooter(dateLabel = "Today · 9:41 AM", durationLabel = "4m 02s")
+        val footer = LastEntryFooter(monthLabel = "JAN", dayLabel = "27", durationLabel = "4m 02s")
         composeRule.setContent { VestigeTheme { captureScreen(vm, lastEntryFooter = footer, onOpenHistory = {}) } }
         composeRule.onNodeWithContentDescription(CaptureCopy.HISTORY_LINK_A11Y).assertHasClickAction()
     }
@@ -147,7 +148,7 @@ class CaptureScreenTest {
     @Test
     fun `History link tap target is at least 48 dp tall`() {
         val vm = newViewModel(readiness = ModelReadiness.Ready)
-        val footer = LastEntryFooter(dateLabel = "Today · 9:41 AM", durationLabel = "4m 02s")
+        val footer = LastEntryFooter(monthLabel = "JAN", dayLabel = "27", durationLabel = "4m 02s")
         composeRule.setContent { VestigeTheme { captureScreen(vm, lastEntryFooter = footer, onOpenHistory = {}) } }
         composeRule.onNodeWithTag("history_footer_link").assertHeightIsAtLeast(48.dp)
     }

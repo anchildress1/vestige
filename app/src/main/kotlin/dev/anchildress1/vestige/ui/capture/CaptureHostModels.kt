@@ -3,9 +3,9 @@ package dev.anchildress1.vestige.ui.capture
 import android.util.Log
 import dev.anchildress1.vestige.AppContainer
 import dev.anchildress1.vestige.model.PatternState
-import dev.anchildress1.vestige.ui.history.HistoryDateFormatter
 import dev.anchildress1.vestige.ui.history.HistoryDurationFormatter
 import java.time.Clock
+import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.time.format.TextStyle
@@ -54,12 +54,14 @@ internal fun deriveMeta(clock: Clock, zoneId: ZoneId): CaptureMeta {
 internal data class CapturePatternSummary(val state: PatternState, val sourceCount: Int)
 
 /** Derived metadata for the Capture footer's "Last entry" strip. Null hides the footer. */
-data class LastEntryFooter(val dateLabel: String, val durationLabel: String)
+data class LastEntryFooter(val monthLabel: String, val dayLabel: String, val durationLabel: String)
 
-internal fun deriveLastEntryFooter(container: AppContainer, clock: Clock, zoneId: ZoneId): LastEntryFooter? {
+internal fun deriveLastEntryFooter(container: AppContainer, zoneId: ZoneId): LastEntryFooter? {
     val last = container.entryStore.lastCompleted() ?: return null
+    val date = Instant.ofEpochMilli(last.timestampEpochMs).atZone(zoneId)
     return LastEntryFooter(
-        dateLabel = HistoryDateFormatter.format(last.timestampEpochMs, clock.millis(), zoneId),
+        monthLabel = date.month.getDisplayName(TextStyle.SHORT, Locale.US).uppercase(Locale.US),
+        dayLabel = date.dayOfMonth.toString(),
         durationLabel = HistoryDurationFormatter.format(last.durationMs),
     )
 }

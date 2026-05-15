@@ -33,9 +33,10 @@ class LiveLayoutTest {
     }
 
     @Test
-    fun `timer renders mm colon ss in the hero — single canonical source`() {
+    fun `timer renders mm colon ss in both the AppTop badge and the hero`() {
         composeRule.setContent { VestigeTheme { liveLayout(elapsedMs = 15_000L) } }
-        composeRule.onAllNodesWithText("00:15").assertCountEquals(1)
+        // Timer appears in the AppTop coral pill and in the hero display — exactly 2 sources.
+        composeRule.onAllNodesWithText("00:15").assertCountEquals(2)
     }
 
     @Test

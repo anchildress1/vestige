@@ -11,7 +11,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.windowInsetsBottomHeight
@@ -29,6 +28,7 @@ import androidx.compose.ui.unit.sp
 import dev.anchildress1.vestige.ui.components.AppTop
 import dev.anchildress1.vestige.ui.components.AppTopStatuses
 import dev.anchildress1.vestige.ui.components.EyebrowE
+import dev.anchildress1.vestige.ui.components.Pill
 import dev.anchildress1.vestige.ui.theme.VestigeTheme
 
 /**
@@ -57,13 +57,13 @@ fun LiveLayout(
         AppTop(
             persona = state.persona.name,
             status = AppTopStatuses.Recording,
-            rightContent = {},
+            rightContent = { Pill(text = timerLabel, color = colors.coral, fill = true) },
         )
         TimerHeader(timerLabel = timerLabel, remainSec = remainSec)
         Box(modifier = Modifier.padding(horizontal = 18.dp, vertical = 14.dp)) {
             ChunkProgressBar(progress = progress, chunkDurationSec = totalSec)
         }
-        Spacer(modifier = Modifier.height(8.dp))
+        Spacer(modifier = Modifier.weight(1f))
         Column(
             modifier = Modifier.padding(horizontal = 18.dp, vertical = 8.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp),

@@ -23,13 +23,16 @@ import dev.anchildress1.vestige.model.Persona
 import dev.anchildress1.vestige.ui.capture.CaptureScreen
 import dev.anchildress1.vestige.ui.capture.CaptureViewModel
 import dev.anchildress1.vestige.ui.capture.ForegroundInferenceCall
+import dev.anchildress1.vestige.ui.capture.LastEntryFooter
 import dev.anchildress1.vestige.ui.capture.ModelReadiness
 import dev.anchildress1.vestige.ui.capture.RealVoiceCapture
 import dev.anchildress1.vestige.ui.capture.SaveAndExtract
 import dev.anchildress1.vestige.ui.capture.SaveTypedEntry
 import dev.anchildress1.vestige.ui.capture.ToneGeneratorLimitWarningCue
+import dev.anchildress1.vestige.ui.capture.deriveLastEntryFooter
 import dev.anchildress1.vestige.ui.capture.deriveMeta
 import dev.anchildress1.vestige.ui.capture.deriveStats
+import dev.anchildress1.vestige.ui.history.HistoryHost
 import dev.anchildress1.vestige.ui.onboarding.ModelAvailability
 import dev.anchildress1.vestige.ui.onboarding.OnboardingHost
 import dev.anchildress1.vestige.ui.onboarding.OnboardingPrefs
@@ -73,6 +76,7 @@ class MainActivity : ComponentActivity() {
                         clock = clock,
                         zoneId = zoneId,
                         onOpenPatterns = { screen = PostOnboardingScreen.Patterns },
+                        onOpenHistory = { screen = PostOnboardingScreen.History },
                     )
 
                     PostOnboardingScreen.Patterns -> PatternsHost(
@@ -82,14 +86,22 @@ class MainActivity : ComponentActivity() {
                         onExit = { screen = PostOnboardingScreen.Capture },
                         modifier = Modifier.fillMaxSize(),
                     )
+
+                    PostOnboardingScreen.History -> HistoryHost(
+                        entryStore = container.entryStore,
+                        onExit = { screen = PostOnboardingScreen.Capture },
+                        zoneId = zoneId,
+                        modifier = Modifier.fillMaxSize(),
+                    )
                 }
             }
         }
     }
 }
 
-private enum class PostOnboardingScreen { Capture, Patterns }
+private enum class PostOnboardingScreen { Capture, Patterns, History }
 
+@Suppress("LongParameterList")
 @androidx.compose.runtime.Composable
 private fun CaptureRoute(
     container: AppContainer,
@@ -97,6 +109,7 @@ private fun CaptureRoute(
     clock: Clock,
     zoneId: ZoneId,
     onOpenPatterns: () -> Unit,
+    onOpenHistory: () -> Unit,
 ) {
     val limitWarningCue = remember { ToneGeneratorLimitWarningCue() }
     DisposableEffect(limitWarningCue) {
@@ -141,12 +154,15 @@ private fun CaptureRoute(
     // patternStore.findVisibleSortedByLastSeen are indexed reads.
     val stats = remember(container, dataRevision) { deriveStats(container) }
     val meta = remember(clock, zoneId) { deriveMeta(clock, zoneId) }
+    val lastEntryFooter = remember(container, dataRevision) { deriveLastEntryFooter(container, clock, zoneId) }
     CaptureScreen(
         viewModel = viewModel,
         stats = stats,
         meta = meta,
         modifier = Modifier.fillMaxSize(),
+        lastEntryFooter = lastEntryFooter,
         onOpenPatterns = onOpenPatterns,
+        onOpenHistory = onOpenHistory,
     )
 }
 

@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.requiredHeightIn
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -24,6 +25,7 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.testTag
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
@@ -41,8 +43,8 @@ import dev.anchildress1.vestige.ui.theme.VestigeTheme
  * Capture screen idle composition. Matches `poc/screenshots/capture-still.png` modulo the
  * deferred patterns peek + footer (out of scope this branch — see plan).
  */
+@Suppress("LongMethod", "LongParameterList") // Top-level Compose layout; chrome already bundled.
 @Composable
-@Suppress("LongParameterList") // Top-level Compose layout; chrome already bundled.
 fun IdleLayout(
     state: CaptureUiState.Idle,
     stats: CaptureStats,
@@ -50,6 +52,7 @@ fun IdleLayout(
     onRecTap: () -> Unit,
     onTypeTap: () -> Unit,
     modifier: Modifier = Modifier,
+    lastEntryFooter: LastEntryFooter? = null,
     chrome: IdleChromeCallbacks = IdleChromeCallbacks(),
 ) {
     val colors = VestigeTheme.colors
@@ -94,10 +97,23 @@ fun IdleLayout(
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 18.dp, vertical = 18.dp),
+                    .padding(horizontal = 18.dp, vertical = 4.dp),
                 contentAlignment = Alignment.Center,
             ) {
                 PatternsLink(onClick = onTap)
+            }
+        }
+        if (lastEntryFooter != null) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 18.dp, vertical = 12.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                HistoryFooter(
+                    footer = lastEntryFooter,
+                    onHistoryTap = chrome.onHistoryTap,
+                )
             }
         }
     }
@@ -205,6 +221,48 @@ private fun heroAnnotated(full: String, highlightSuffix: String, inkColor: Color
             withStyle(SpanStyle(color = inkColor)) { append(full.substring(0, split)) }
         }
         withStyle(SpanStyle(color = accentColor)) { append(highlightSuffix) }
+    }
+}
+
+@Composable
+private fun HistoryFooter(footer: LastEntryFooter, onHistoryTap: (() -> Unit)?) {
+    val colors = VestigeTheme.colors
+    val sep = CaptureCopy.HISTORY_FOOTER_SEPARATOR
+    Row(
+        horizontalArrangement = Arrangement.Center,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = "${CaptureCopy.HISTORY_FOOTER_PREFIX}$sep${footer.dateLabel}$sep${footer.durationLabel}$sep",
+            style = VestigeTheme.typography.eyebrow,
+            color = colors.dim,
+        )
+        if (onHistoryTap != null) {
+            Box(
+                modifier = Modifier
+                    .requiredHeightIn(min = 48.dp)
+                    .clickable(onClick = onHistoryTap)
+                    .semantics(mergeDescendants = true) {
+                        role = Role.Button
+                        contentDescription = CaptureCopy.HISTORY_LINK_A11Y
+                        testTag = "history_footer_link"
+                    }
+                    .padding(horizontal = 4.dp, vertical = 8.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    text = CaptureCopy.HISTORY_LINK,
+                    style = VestigeTheme.typography.eyebrow,
+                    color = colors.ink,
+                )
+            }
+        } else {
+            Text(
+                text = CaptureCopy.HISTORY_LINK,
+                style = VestigeTheme.typography.eyebrow,
+                color = colors.dim,
+            )
+        }
     }
 }
 

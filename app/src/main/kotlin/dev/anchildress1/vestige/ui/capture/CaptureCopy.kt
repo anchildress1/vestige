@@ -54,6 +54,11 @@ object CaptureCopy {
     const val YOU_LABEL: String = "YOU"
 
     const val PATTERNS_LINK: String = "PATTERNS →"
+
+    const val HISTORY_LINK: String = "History"
+    const val HISTORY_LINK_A11Y: String = "Open history"
+    const val HISTORY_FOOTER_SEPARATOR: String = " · "
+    const val HISTORY_FOOTER_PREFIX: String = "Last entry"
 }
 
 /** Demo / on-device summary stats consumed by the date strip + StatRibbon. */

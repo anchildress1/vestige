@@ -3,6 +3,8 @@ package dev.anchildress1.vestige.ui.capture
 import android.util.Log
 import dev.anchildress1.vestige.AppContainer
 import dev.anchildress1.vestige.model.PatternState
+import dev.anchildress1.vestige.ui.history.HistoryDateFormatter
+import dev.anchildress1.vestige.ui.history.HistoryDurationFormatter
 import java.time.Clock
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -50,6 +52,17 @@ internal fun deriveMeta(clock: Clock, zoneId: ZoneId): CaptureMeta {
 }
 
 internal data class CapturePatternSummary(val state: PatternState, val sourceCount: Int)
+
+/** Derived metadata for the Capture footer's "Last entry" strip. Null hides the footer. */
+data class LastEntryFooter(val dateLabel: String, val durationLabel: String)
+
+internal fun deriveLastEntryFooter(container: AppContainer, clock: Clock, zoneId: ZoneId): LastEntryFooter? {
+    val last = container.entryStore.lastCompleted() ?: return null
+    return LastEntryFooter(
+        dateLabel = HistoryDateFormatter.format(last.timestampEpochMs, clock.millis(), zoneId),
+        durationLabel = HistoryDurationFormatter.format(last.durationMs),
+    )
+}
 
 private const val TAG = "VestigeCaptureHost"
 private val MONTH_DAY_FORMATTER: DateTimeFormatter = DateTimeFormatter.ofPattern("MMM d", Locale.US)

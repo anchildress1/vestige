@@ -348,6 +348,71 @@ class EntryStoreTest {
         ),
     )
 
+    // listCompleted tests
+
+    @Test
+    fun `listCompleted returns only COMPLETED rows in newest-first order`() {
+        val id1 = entryStore.createPendingEntry("oldest", SAMPLE_INSTANT)
+        val id2 = entryStore.createPendingEntry("newest", SAMPLE_INSTANT.plusSeconds(60))
+        entryStore.createPendingEntry("pending", SAMPLE_INSTANT.plusSeconds(120))
+        entryStore.completeEntry(id1, emptyResolved, templateLabel = null)
+        entryStore.completeEntry(id2, emptyResolved, templateLabel = null)
+
+        val rows = entryStore.listCompleted()
+        assertEquals(2, rows.size)
+        assertEquals("newest", rows[0].entryText)
+        assertEquals("oldest", rows[1].entryText)
+    }
+
+    @Test
+    fun `listCompleted returns empty list when no completed entries`() {
+        entryStore.createPendingEntry(SAMPLE_TEXT, SAMPLE_INSTANT)
+        assertTrue(entryStore.listCompleted().isEmpty())
+    }
+
+    @Test
+    fun `listCompleted respects the limit parameter`() {
+        repeat(5) { i ->
+            val id = entryStore.createPendingEntry("entry $i", SAMPLE_INSTANT.plusSeconds(i.toLong()))
+            entryStore.completeEntry(id, emptyResolved, templateLabel = null)
+        }
+        val rows = entryStore.listCompleted(limit = 3)
+        assertEquals(3, rows.size)
+    }
+
+    // lastCompleted tests
+
+    @Test
+    fun `lastCompleted returns the most recent completed entry`() {
+        val id1 = entryStore.createPendingEntry("older", SAMPLE_INSTANT)
+        val id2 = entryStore.createPendingEntry("newer", SAMPLE_INSTANT.plusSeconds(60))
+        entryStore.completeEntry(id1, emptyResolved, templateLabel = null)
+        entryStore.completeEntry(id2, emptyResolved, templateLabel = null)
+
+        val last = entryStore.lastCompleted()
+        assertNotNull(last)
+        assertEquals("newer", last!!.entryText)
+    }
+
+    @Test
+    fun `lastCompleted returns null when no completed entries`() {
+        entryStore.createPendingEntry(SAMPLE_TEXT, SAMPLE_INSTANT)
+        assertNull(entryStore.lastCompleted())
+    }
+
+    @Test
+    fun `lastCompleted ignores PENDING entries`() {
+        entryStore.createPendingEntry(SAMPLE_TEXT, SAMPLE_INSTANT.plusSeconds(120))
+        val id = entryStore.createPendingEntry("completed", SAMPLE_INSTANT)
+        entryStore.completeEntry(id, emptyResolved, templateLabel = null)
+
+        val last = entryStore.lastCompleted()
+        assertNotNull(last)
+        assertEquals("completed", last!!.entryText)
+    }
+
+    private val emptyResolved = ResolvedExtraction(emptyMap())
+
     private companion object {
         // 2026-05-11T07:21:24Z — ADR-009 supersede commit timestamp; one neutral fixture date.
         private val SAMPLE_INSTANT: Instant = Instant.ofEpochSecond(1_778_829_684L)

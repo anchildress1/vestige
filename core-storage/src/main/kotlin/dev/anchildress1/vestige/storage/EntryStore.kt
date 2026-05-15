@@ -110,6 +110,22 @@ class EntryStore(private val boxStore: BoxStore, private val markdownStore: Mark
         .build()
         .use { it.count() }
 
+    /** Most-recent completed entries, newest first. [limit] is a guard, not pagination. */
+    fun listCompleted(limit: Int = 100): List<EntryEntity> = boxStore.boxFor<EntryEntity>()
+        .query()
+        .equal(EntryEntity_.extractionStatus, ExtractionStatus.COMPLETED.name, QueryBuilder.StringOrder.CASE_SENSITIVE)
+        .orderDesc(EntryEntity_.timestampEpochMs)
+        .build()
+        .use { it.find(0, limit.toLong()) }
+
+    /** Single most-recent completed entry, or `null` when none exist. */
+    fun lastCompleted(): EntryEntity? = boxStore.boxFor<EntryEntity>()
+        .query()
+        .equal(EntryEntity_.extractionStatus, ExtractionStatus.COMPLETED.name, QueryBuilder.StringOrder.CASE_SENSITIVE)
+        .orderDesc(EntryEntity_.timestampEpochMs)
+        .build()
+        .use { it.find(0, 1).firstOrNull() }
+
     /**
      * Append one observation to an already-completed entry's persisted list. Used by the
      * pattern-detection orchestrator when a callout fires after `completeEntry` has already

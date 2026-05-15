@@ -55,8 +55,10 @@ fun CaptureScreen(
     stats: CaptureStats,
     meta: CaptureMeta,
     modifier: Modifier = Modifier,
+    lastEntryFooter: LastEntryFooter? = null,
     chrome: IdleChromeCallbacks = IdleChromeCallbacks(),
     onOpenPatterns: (() -> Unit)? = null,
+    onOpenHistory: (() -> Unit)? = null,
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val context = LocalContext.current
@@ -82,7 +84,11 @@ fun CaptureScreen(
             onRecTap = onRecTap,
             onTypeTap = { showTypeSheet = true },
             modifier = modifier,
-            chrome = chrome.copy(onPatternsTap = onOpenPatterns ?: chrome.onPatternsTap),
+            lastEntryFooter = lastEntryFooter,
+            chrome = chrome.copy(
+                onPatternsTap = onOpenPatterns ?: chrome.onPatternsTap,
+                onHistoryTap = onOpenHistory ?: chrome.onHistoryTap,
+            ),
         )
 
         is CaptureUiState.Recording -> LiveLayout(

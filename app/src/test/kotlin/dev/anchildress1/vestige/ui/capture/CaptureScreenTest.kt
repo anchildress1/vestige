@@ -1,10 +1,17 @@
 package dev.anchildress1.vestige.ui.capture
 
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.assertHasClickAction
+import androidx.compose.ui.test.assertHeightIsAtLeast
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithTag
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.unit.dp
 import dev.anchildress1.vestige.inference.AudioChunk
 import dev.anchildress1.vestige.model.Persona
 import dev.anchildress1.vestige.ui.theme.VestigeTheme
@@ -84,8 +91,49 @@ class CaptureScreenTest {
         composeRule.onNodeWithText(CaptureCopy.READING_PLACEHOLDER).assertIsDisplayed()
     }
 
+    // --- Capture footer tests ---
+
+    @Test
+    fun `footer is hidden when lastEntryFooter is null`() {
+        val vm = newViewModel(readiness = ModelReadiness.Ready)
+        composeRule.setContent { VestigeTheme { captureScreen(vm, lastEntryFooter = null) } }
+        composeRule.onAllNodesWithText(CaptureCopy.HISTORY_FOOTER_PREFIX).assertCountEquals(0)
+        composeRule.onAllNodesWithTag("history_footer_link").assertCountEquals(0)
+    }
+
+    @Test
+    fun `footer renders prefix date and duration when lastEntryFooter is present`() {
+        val vm = newViewModel(readiness = ModelReadiness.Ready)
+        val footer = LastEntryFooter(dateLabel = "Today · 9:41 AM", durationLabel = "4m 02s")
+        composeRule.setContent { VestigeTheme { captureScreen(vm, lastEntryFooter = footer) } }
+        // Use count checks: footer is in composition but may be below viewport in test.
+        composeRule.onAllNodesWithText(CaptureCopy.HISTORY_FOOTER_PREFIX, substring = true).assertCountEquals(1)
+        composeRule.onAllNodesWithText("Today · 9:41 AM", substring = true).assertCountEquals(1)
+        composeRule.onAllNodesWithText("4m 02s", substring = true).assertCountEquals(1)
+    }
+
+    @Test
+    fun `History link is clickable with correct contentDescription`() {
+        val vm = newViewModel(readiness = ModelReadiness.Ready)
+        val footer = LastEntryFooter(dateLabel = "Today · 9:41 AM", durationLabel = "4m 02s")
+        composeRule.setContent { VestigeTheme { captureScreen(vm, lastEntryFooter = footer, onOpenHistory = {}) } }
+        composeRule.onNodeWithContentDescription(CaptureCopy.HISTORY_LINK_A11Y).assertHasClickAction()
+    }
+
+    @Test
+    fun `History link tap target is at least 48 dp tall`() {
+        val vm = newViewModel(readiness = ModelReadiness.Ready)
+        val footer = LastEntryFooter(dateLabel = "Today · 9:41 AM", durationLabel = "4m 02s")
+        composeRule.setContent { VestigeTheme { captureScreen(vm, lastEntryFooter = footer, onOpenHistory = {}) } }
+        composeRule.onNodeWithTag("history_footer_link").assertHeightIsAtLeast(48.dp)
+    }
+
     @Composable
-    private fun captureScreen(vm: CaptureViewModel) {
+    private fun captureScreen(
+        vm: CaptureViewModel,
+        lastEntryFooter: LastEntryFooter? = null,
+        onOpenHistory: (() -> Unit)? = null,
+    ) {
         CaptureScreen(
             viewModel = vm,
             stats = CaptureStats(kept = 0, active = 0, hitsThisMonth = 0, cloud = 0),
@@ -96,6 +144,8 @@ class CaptureScreenTest {
                 dayNumber = 1,
                 streakDays = 0,
             ),
+            lastEntryFooter = lastEntryFooter,
+            onOpenHistory = onOpenHistory,
         )
     }
 

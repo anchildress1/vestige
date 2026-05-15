@@ -38,6 +38,9 @@ build:
 ENV ?= dev
 VESTIGE_PACKAGE := dev.anchildress1.vestige
 
+# App tags + inference/GPU runtime tags. AndroidRuntime ensures crash stacktraces are never swallowed.
+LOGCAT_TAGS := Vestige|CaptureVM|PatternDetailVM|PatternsListVM|OnboardingPrefs|HistoryViewModel|MarkdownEntryStore|DebugSeedReceiver|litertlm|LiteRt|tflite|TfLite|GpuDelegate|Adreno|Mali|AndroidRuntime|System\.err
+
 # Filenames must match `core-model/src/main/resources/model/manifest.properties` exactly so
 # the artifact store accepts the pushed files without re-downloading. Local source paths
 # default to ~/Downloads/<filename>; override the VESTIGE_*_FILE vars for non-default homes.
@@ -100,11 +103,11 @@ logcat:
 		[ -n "$$pid" ] && break; sleep 1; \
 	done; \
 	if [ -z "$$pid" ]; then \
-		echo "⚠ could not resolve app PID — tailing entire device log (Ctrl-C, then narrow with EXTRA=...)"; \
-		adb logcat -v color -T 1 $(EXTRA); \
+		echo "⚠ could not resolve app PID — filtering by tags only (Ctrl-C to stop)"; \
+		adb logcat -v color -T 1 $(EXTRA) | grep --line-buffered -E "$(LOGCAT_TAGS)"; \
 	else \
 		echo "📱 tailing pid=$$pid (Ctrl-C to stop)"; \
-		adb logcat -v color -T 1 --pid="$$pid" $(EXTRA); \
+		adb logcat -v color -T 1 --pid="$$pid" $(EXTRA) | grep --line-buffered -E "$(LOGCAT_TAGS)"; \
 	fi
 
 assemble:

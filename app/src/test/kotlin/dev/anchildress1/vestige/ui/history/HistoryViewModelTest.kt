@@ -143,7 +143,7 @@ class HistoryViewModelTest {
         )
         errBoxStore.close()
 
-        val vm = HistoryViewModel(errEntryStore, ioDispatcher = testDispatcher)
+        val vm = HistoryViewModel(errEntryStore, zoneId = java.time.ZoneOffset.UTC, ioDispatcher = testDispatcher)
         vm.state.test {
             val terminal = expectMostRecentItem()
             assertFalse(terminal.loading)
@@ -152,6 +152,7 @@ class HistoryViewModelTest {
     }
 
     private fun newViewModel(): HistoryViewModel = HistoryViewModel(entryStore, ioDispatcher = testDispatcher)
+    // Note: zoneId defaults to ZoneOffset.UTC in HistoryViewModel — not passed here to keep tests terse.
 
     private fun seedEntry(
         text: String,

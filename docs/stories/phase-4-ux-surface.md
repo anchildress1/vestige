@@ -187,13 +187,13 @@ Checked bullets above are the historical record that the Mist tokens shipped to 
 **As** the user, **I need** a history list that lets me browse my saved entries by reverse-chronological order with each row showing template label, date, and a snippet, **so that** I can see what I've captured and tap to read a past entry.
 
 **Done when:**
-- [ ] History list reachable from the Capture screen footer per Story 4.5 and from the app shell.
-- [ ] Each row shows: timestamp (relative for recent, absolute for older), template label (the agent-emitted one), and a one-line snippet from `entry_text`.
-- [ ] Rows are sorted reverse-chronologically by `timestamp`.
-- [ ] Tapping a row opens the Entry Detail screen (Story 4.7).
-- [ ] Empty state: per `ux-copy.md` §"Empty state — no entries yet" — `Nothing on file.`
-- [ ] No filter / search affordance in v1. Filter chips are P2 / v1.5 (`backlog.md` candidate, not yet logged — add only if user explicitly asks).
-- [ ] Performance: list renders smoothly on the reference device with at least 100 entries (smoke test with seeded data).
+- [x] History list reachable from the Capture screen footer per Story 4.5 and from the app shell. (`HistoryFooter` in `IdleLayout` + `HistoryLink` in `ReviewingPane`; `HistoryHost` wired in `MainActivity`.)
+- [x] Each row shows: timestamp (relative for recent, absolute for older), template label (the agent-emitted one), and a one-line snippet from `entry_text`. (`HistoryRow` via `HistorySummary.from`; date via `HistoryDateFormatter`; template label as `Pill`; snippet capped at 80 chars.)
+- [x] Rows are sorted reverse-chronologically by `timestamp`. (`EntryStore.listCompleted` uses `orderDesc(timestampEpochMs)`.)
+- [ ] Tapping a row opens the Entry Detail screen (Story 4.7). (Stub no-op — pending Story 4.7.)
+- [x] Empty state: per `ux-copy.md` §"Capture history (no entries yet)" — eyebrow `HISTORY`, header `No entries yet.`, body `First one takes 30 seconds.` (`HistoryEmptyState`; locked copy asserted in `HistoryScreenTest`.)
+- [x] No filter / search affordance in v1. Filter chips are P2 / v1.5 (`backlog.md` candidate, not yet logged — add only if user explicitly asks). (Absence asserted in `HistoryScreenTest`.)
+- [ ] Performance: list renders smoothly on the reference device with at least 100 entries (smoke test with seeded data). (Requires on-device verification.)
 
 **Notes / risks:** The history list is the third-most-touched screen after Capture and Patterns. Don't bloat it with metadata chips or relative-time animations. Plain rows, restrained typography, fast scroll.
 

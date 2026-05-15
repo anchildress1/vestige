@@ -3,6 +3,7 @@ package dev.anchildress1.vestige.ui.history
 import org.junit.Assert.assertEquals
 import org.junit.Test
 import java.time.Instant
+import java.time.LocalDate
 import java.time.ZoneId
 import java.time.ZoneOffset
 
@@ -88,5 +89,53 @@ class HistoryDateFormatterTest {
     fun `PM time formats correctly`() {
         val ts = Instant.parse("2026-05-14T20:02:00Z").toEpochMilli()
         assertEquals("Today · 8:02 PM", HistoryDateFormatter.format(ts, nowMs, zone))
+    }
+
+    // formatSectionHeader
+
+    private val nowDate: LocalDate = LocalDate.of(2026, 5, 14)
+
+    @Test
+    fun `section header same day returns TODAY with month-day uppercase`() {
+        val date = LocalDate.of(2026, 5, 14)
+        assertEquals("TODAY · MAY 14", HistoryDateFormatter.formatSectionHeader(date, nowDate))
+    }
+
+    @Test
+    fun `section header previous day returns YESTERDAY with month-day uppercase`() {
+        val date = LocalDate.of(2026, 5, 13)
+        assertEquals("YESTERDAY · MAY 13", HistoryDateFormatter.formatSectionHeader(date, nowDate))
+    }
+
+    @Test
+    fun `section header older date returns month-day only`() {
+        val date = LocalDate.of(2026, 5, 5)
+        assertEquals("MAY 5", HistoryDateFormatter.formatSectionHeader(date, nowDate))
+    }
+
+    @Test
+    fun `section header month boundary returns correct month-day`() {
+        val date = LocalDate.of(2026, 4, 30)
+        assertEquals("APR 30", HistoryDateFormatter.formatSectionHeader(date, nowDate))
+    }
+
+    // formatTimeOnly
+
+    @Test
+    fun `formatTimeOnly returns 24-hour HH colon mm format`() {
+        val ts = Instant.parse("2026-05-14T09:41:00Z").toEpochMilli()
+        assertEquals("09:41", HistoryDateFormatter.formatTimeOnly(ts, zone))
+    }
+
+    @Test
+    fun `formatTimeOnly afternoon formats correctly`() {
+        val ts = Instant.parse("2026-05-14T22:18:00Z").toEpochMilli()
+        assertEquals("22:18", HistoryDateFormatter.formatTimeOnly(ts, zone))
+    }
+
+    @Test
+    fun `formatTimeOnly midnight formats as 00 colon 00`() {
+        val ts = Instant.parse("2026-05-14T00:00:00Z").toEpochMilli()
+        assertEquals("00:00", HistoryDateFormatter.formatTimeOnly(ts, zone))
     }
 }

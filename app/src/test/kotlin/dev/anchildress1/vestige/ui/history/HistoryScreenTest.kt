@@ -12,6 +12,7 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.unit.dp
 import dev.anchildress1.vestige.model.ExtractionStatus
+import dev.anchildress1.vestige.model.Persona
 import dev.anchildress1.vestige.model.ResolvedExtraction
 import dev.anchildress1.vestige.storage.EntryStore
 import dev.anchildress1.vestige.storage.MarkdownEntryStore
@@ -38,7 +39,7 @@ import java.time.ZoneOffset
 
 @OptIn(ExperimentalCoroutinesApi::class)
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [34], manifest = Config.NONE, application = HistoryTestApplication::class)
+@Config(sdk = [34], manifest = Config.NONE, application = HistoryTestApplication::class, qualifiers = "w360dp-h800dp")
 class HistoryScreenTest {
 
     @get:Rule
@@ -72,26 +73,27 @@ class HistoryScreenTest {
     // empty state
 
     @Test
-    fun `empty state renders locked HISTORY eyebrow`() {
-        composeRule.setContent { HistoryScreen(viewModel = newViewModel(), onBack = {}, zoneId = ZoneOffset.UTC) }
-        composeRule.onNodeWithText("HISTORY").assertIsDisplayed()
+    fun `HISTORY hero heading is always present`() {
+        composeRule.setContent { HistoryScreen(viewModel = newViewModel(), persona = Persona.WITNESS) }
+        // "HISTORY" appears exactly once — the hero display heading (always visible, empty + loaded states)
+        composeRule.onAllNodesWithText("HISTORY").assertCountEquals(1)
     }
 
     @Test
     fun `empty state renders locked header copy`() {
-        composeRule.setContent { HistoryScreen(viewModel = newViewModel(), onBack = {}, zoneId = ZoneOffset.UTC) }
+        composeRule.setContent { HistoryScreen(viewModel = newViewModel(), persona = Persona.WITNESS) }
         composeRule.onNodeWithText("No entries yet.").assertIsDisplayed()
     }
 
     @Test
     fun `empty state renders locked body copy`() {
-        composeRule.setContent { HistoryScreen(viewModel = newViewModel(), onBack = {}, zoneId = ZoneOffset.UTC) }
+        composeRule.setContent { HistoryScreen(viewModel = newViewModel(), persona = Persona.WITNESS) }
         composeRule.onNodeWithText("First one takes 30 seconds.").assertIsDisplayed()
     }
 
     @Test
     fun `empty state has no history row composables`() {
-        composeRule.setContent { HistoryScreen(viewModel = newViewModel(), onBack = {}, zoneId = ZoneOffset.UTC) }
+        composeRule.setContent { HistoryScreen(viewModel = newViewModel(), persona = Persona.WITNESS) }
         composeRule.onAllNodesWithTag("history_row").assertCountEquals(0)
     }
 
@@ -99,7 +101,7 @@ class HistoryScreenTest {
 
     @Test
     fun `filter chips do not exist in history screen`() {
-        composeRule.setContent { HistoryScreen(viewModel = newViewModel(), onBack = {}, zoneId = ZoneOffset.UTC) }
+        composeRule.setContent { HistoryScreen(viewModel = newViewModel(), persona = Persona.WITNESS) }
         composeRule.onAllNodesWithText("All").assertCountEquals(0)
         composeRule.onAllNodesWithText("Active").assertCountEquals(0)
     }
@@ -108,8 +110,7 @@ class HistoryScreenTest {
 
     @Test
     fun `forbidden exclamation mark does not appear in empty state`() {
-        composeRule.setContent { HistoryScreen(viewModel = newViewModel(), onBack = {}, zoneId = ZoneOffset.UTC) }
-        // "No entries yet." ends with a period, not an exclamation mark.
+        composeRule.setContent { HistoryScreen(viewModel = newViewModel(), persona = Persona.WITNESS) }
         composeRule.onAllNodesWithText("No entries yet!").assertCountEquals(0)
     }
 
@@ -120,7 +121,7 @@ class HistoryScreenTest {
         seedCompleted("standup crashed me again", 1_000_000L)
         seedCompleted("woke up fine actually", 2_000_000L)
 
-        composeRule.setContent { HistoryScreen(viewModel = newViewModel(), onBack = {}, zoneId = ZoneOffset.UTC) }
+        composeRule.setContent { HistoryScreen(viewModel = newViewModel(), persona = Persona.WITNESS) }
         composeRule.onAllNodesWithTag("history_row").assertCountEquals(2)
     }
 
@@ -128,7 +129,7 @@ class HistoryScreenTest {
     fun `row snippet text is visible`() {
         seedCompleted("standup crashed me again", 1_000_000L)
 
-        composeRule.setContent { HistoryScreen(viewModel = newViewModel(), onBack = {}, zoneId = ZoneOffset.UTC) }
+        composeRule.setContent { HistoryScreen(viewModel = newViewModel(), persona = Persona.WITNESS) }
         composeRule.onNodeWithText("standup crashed me again", substring = true).assertIsDisplayed()
     }
 
@@ -138,7 +139,7 @@ class HistoryScreenTest {
     fun `history row tap target is at least 48 dp tall`() {
         seedCompleted("something happened today", 1_000_000L)
 
-        composeRule.setContent { HistoryScreen(viewModel = newViewModel(), onBack = {}, zoneId = ZoneOffset.UTC) }
+        composeRule.setContent { HistoryScreen(viewModel = newViewModel(), persona = Persona.WITNESS) }
         composeRule.onNodeWithTag("history_row").assertHeightIsAtLeast(48.dp)
     }
 
@@ -148,7 +149,7 @@ class HistoryScreenTest {
     fun `history row has click action`() {
         seedCompleted("something happened today", 1_000_000L)
 
-        composeRule.setContent { HistoryScreen(viewModel = newViewModel(), onBack = {}, zoneId = ZoneOffset.UTC) }
+        composeRule.setContent { HistoryScreen(viewModel = newViewModel(), persona = Persona.WITNESS) }
         composeRule.onNodeWithTag("history_row").assertHasClickAction()
     }
 
@@ -156,20 +157,19 @@ class HistoryScreenTest {
     fun `history row has non-empty contentDescription`() {
         seedCompleted("something happened today", 1_000_000L)
 
-        composeRule.setContent { HistoryScreen(viewModel = newViewModel(), onBack = {}, zoneId = ZoneOffset.UTC) }
-        // contentDescription includes the snippet; find the row by description substring.
+        composeRule.setContent { HistoryScreen(viewModel = newViewModel(), persona = Persona.WITNESS) }
         composeRule.onNodeWithContentDescription("something happened today", substring = true).assertIsDisplayed()
     }
 
-    // back button
+    // a11y — back navigation is via system BackHandler; no UI back button in this screen
 
     @Test
-    fun `back button has click action`() {
-        composeRule.setContent { HistoryScreen(viewModel = newViewModel(), onBack = {}, zoneId = ZoneOffset.UTC) }
-        composeRule.onNodeWithContentDescription("Back").assertHasClickAction()
+    fun `hero eyebrow TAIL ALL TIME is visible`() {
+        composeRule.setContent { HistoryScreen(viewModel = newViewModel(), persona = Persona.WITNESS) }
+        composeRule.onNodeWithContentDescription("TAIL · ALL TIME", substring = true).assertIsDisplayed()
     }
 
-    private fun newViewModel() = HistoryViewModel(entryStore, ioDispatcher = testDispatcher)
+    private fun newViewModel() = HistoryViewModel(entryStore, zoneId = ZoneOffset.UTC, ioDispatcher = testDispatcher)
 
     private fun seedCompleted(text: String, timestampEpochMs: Long) {
         val id = entryStore.createPendingEntry(text, Instant.ofEpochMilli(timestampEpochMs))

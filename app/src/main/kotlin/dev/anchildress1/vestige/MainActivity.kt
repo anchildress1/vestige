@@ -89,6 +89,7 @@ class MainActivity : ComponentActivity() {
 
                     PostOnboardingScreen.History -> HistoryHost(
                         entryStore = container.entryStore,
+                        persona = selectedPersona,
                         onExit = { screen = PostOnboardingScreen.Capture },
                         zoneId = zoneId,
                         modifier = Modifier.fillMaxSize(),

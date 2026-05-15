@@ -1,94 +1,193 @@
 package dev.anchildress1.vestige.ui.history
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.windowInsetsBottomHeight
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import dev.anchildress1.vestige.model.Persona
+import dev.anchildress1.vestige.ui.components.AppTop
+import dev.anchildress1.vestige.ui.components.AppTopStatuses
 import dev.anchildress1.vestige.ui.components.EyebrowE
-import dev.anchildress1.vestige.ui.components.VestigeScaffold
+import dev.anchildress1.vestige.ui.components.StatItem
+import dev.anchildress1.vestige.ui.components.StatRibbon
 import dev.anchildress1.vestige.ui.theme.VestigeTheme
-import java.time.ZoneId
 
 @Suppress("LongMethod")
-@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
-fun HistoryScreen(viewModel: HistoryViewModel, onBack: () -> Unit, zoneId: ZoneId, modifier: Modifier = Modifier) {
-    val uiState by viewModel.state.collectAsState()
-    val nowEpochMs = System.currentTimeMillis()
+fun HistoryScreen(viewModel: HistoryViewModel, persona: Persona, modifier: Modifier = Modifier) {
+    val uiState by viewModel.state.collectAsStateWithLifecycle()
+    val colors = VestigeTheme.colors
 
-    VestigeScaffold(
-        modifier = modifier,
-        topBar = {
-            TopAppBar(
-                title = {
-                    Text(
-                        text = "History",
-                        style = MaterialTheme.typography.titleMedium,
-                    )
-                },
-                navigationIcon = {
-                    IconButton(
-                        onClick = onBack,
-                        modifier = Modifier.semantics { contentDescription = "Back" },
-                    ) {
-                        Text(
-                            text = "←",
-                            style = MaterialTheme.typography.titleLarge,
-                        )
-                    }
-                },
+    Column(modifier = modifier.fillMaxSize().background(colors.floor)) {
+        AppTop(persona = persona.name, status = AppTopStatuses.Ready)
+
+        // Hero header — TAIL · ALL TIME eyebrow + FILTER button
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 18.dp, vertical = 8.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            EyebrowE(
+                text = HistoryCopy.EYEBROW,
+                modifier = Modifier.semantics { contentDescription = HistoryCopy.EYEBROW },
             )
-        },
-    ) { padding ->
+            EyebrowE(text = HistoryCopy.FILTER)
+        }
+
+        Text(
+            text = HistoryCopy.HEADING,
+            style = VestigeTheme.typography.displayBig,
+            color = colors.ink,
+            modifier = Modifier.padding(horizontal = 18.dp, vertical = 4.dp),
+        )
+
         when {
             uiState.loading -> Unit
 
-            uiState.entries.isEmpty() -> HistoryEmptyState(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(padding)
-                    .padding(horizontal = 20.dp, vertical = 24.dp),
-            )
+            uiState.entries.isEmpty() -> {
+                HistoryEmptyState(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(horizontal = 20.dp, vertical = 24.dp),
+                )
+                Spacer(Modifier.windowInsetsBottomHeight(WindowInsets.navigationBars))
+            }
 
             else -> LazyColumn(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(padding),
-                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(bottom = 16.dp),
             ) {
-                items(uiState.entries, key = { it.id }) { summary ->
-                    val dateLabel = HistoryDateFormatter.format(
-                        timestampEpochMs = summary.timestampEpochMs,
-                        nowEpochMs = nowEpochMs,
-                        zoneId = zoneId,
-                    )
-                    val durationLabel = HistoryDurationFormatter.format(summary.durationMs)
-                    HistoryRow(
-                        summary = summary,
-                        dateLabel = dateLabel,
-                        durationLabel = durationLabel,
-                        onClick = { /* Entry detail is Story 4.7 — no-op stub */ },
-                    )
+                // Stats + density bar scroll with the list — full screen height for items
+                uiState.stats?.let { stats ->
+                    item(key = "stats") {
+                        Box(modifier = Modifier.padding(horizontal = 18.dp, vertical = 10.dp)) {
+                            StatRibbon(
+                                items = listOf(
+                                    StatItem(value = "${stats.totalEntries}", label = "ENTRIES"),
+                                    StatItem(value = "${stats.daysTracked}", label = "DAYS"),
+                                    StatItem(
+                                        value = "${HistoryCopy.THIS_WEEK_PREFIX}${stats.thisWeek}",
+                                        label = "THIS WK",
+                                        color = colors.lime,
+                                    ),
+                                    StatItem(value = stats.avgAudioLabel, label = "AVG/DAY"),
+                                ),
+                            )
+                        }
+                    }
+                    item(key = "density") {
+                        DensityBar(
+                            buckets = stats.densityBuckets,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 18.dp)
+                                .padding(bottom = 8.dp),
+                        )
+                    }
+                }
+
+                uiState.groups.forEach { group ->
+                    item(key = "header-${group.headerLabel}") {
+                        HistorySectionHeader(label = group.headerLabel, count = group.summaries.size)
+                    }
+                    items(group.summaries, key = { it.id }) { summary ->
+                        HistoryRow(
+                            summary = summary,
+                            durationLabel = HistoryDurationFormatter.format(summary.durationMs),
+                            onClick = { /* Story 4.7 — tap-to-detail */ },
+                        )
+                    }
+                }
+
+                item(key = "nav-bar-inset") {
+                    Spacer(Modifier.windowInsetsBottomHeight(WindowInsets.navigationBars))
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun HistorySectionHeader(label: String, count: Int) {
+    val colors = VestigeTheme.colors
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(colors.floor)
+            .border(width = 0.dp, color = Color.Transparent)
+            .padding(horizontal = 18.dp, vertical = 10.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            EyebrowE(text = HistoryCopy.SECTION_COLLAPSE, color = colors.faint)
+            EyebrowE(text = label)
+        }
+        EyebrowE(text = "$count", color = colors.faint)
+    }
+}
+
+private const val DENSITY_BAR_MIN_FRACTION = 0.06f
+
+@Composable
+private fun DensityBar(buckets: List<Int>, modifier: Modifier = Modifier) {
+    val colors = VestigeTheme.colors
+    val maxCount = buckets.maxOrNull()?.coerceAtLeast(1) ?: 1
+    val totalInWindow = buckets.sum()
+    Row(
+        modifier = modifier.height(32.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        EyebrowE(text = HistoryCopy.DENSITY_LABEL, color = colors.faint)
+        Row(
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxHeight()
+                .padding(horizontal = 8.dp),
+            verticalAlignment = Alignment.Bottom,
+            horizontalArrangement = Arrangement.spacedBy(2.dp),
+        ) {
+            buckets.forEach { count ->
+                val fraction = count.toFloat() / maxCount
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxHeight(fraction.coerceAtLeast(DENSITY_BAR_MIN_FRACTION))
+                        .background(if (count > 0) colors.lime else colors.hair),
+                )
+            }
+        }
+        EyebrowE(text = "$totalInWindow ${HistoryCopy.ENTRIES_SUFFIX}", color = colors.faint)
     }
 }
 
@@ -97,14 +196,13 @@ private fun HistoryEmptyState(modifier: Modifier = Modifier) {
     val colors = VestigeTheme.colors
     Box(modifier = modifier, contentAlignment = Alignment.TopStart) {
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            EyebrowE(text = "HISTORY")
             Text(
-                text = "No entries yet.",
+                text = HistoryCopy.EMPTY_HEADER,
                 style = VestigeTheme.typography.h1,
                 color = colors.ink,
             )
             Text(
-                text = "First one takes 30 seconds.",
+                text = HistoryCopy.EMPTY_BODY,
                 style = VestigeTheme.typography.p,
                 color = colors.dim,
             )

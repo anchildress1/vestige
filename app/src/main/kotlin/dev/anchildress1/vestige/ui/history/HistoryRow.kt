@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -14,23 +15,28 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import dev.anchildress1.vestige.ui.components.EyebrowE
-import dev.anchildress1.vestige.ui.components.Pill
 import dev.anchildress1.vestige.ui.components.VestigeListCard
 import dev.anchildress1.vestige.ui.components.VestigeListCardInteraction
 import dev.anchildress1.vestige.ui.theme.VestigeTheme
-import java.util.Locale
 
 @Composable
 fun HistoryRow(
     summary: HistorySummary,
-    dateLabel: String,
     durationLabel: String,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val colors = VestigeTheme.colors
-    val a11yDesc = "$dateLabel · $durationLabel · ${summary.snippet}"
+    val badgeText = if (summary.templateLabel != null) {
+        "● #${summary.id} · ${summary.templateLabel.uppercase()}"
+    } else {
+        "● #${summary.id}"
+    }
+    val dotColor = if (summary.templateLabel != null) colors.coral else colors.lime
+    val a11yDesc = "${summary.timeLabel} · $durationLabel · ${summary.snippet}"
+
     VestigeListCard(
         modifier = modifier
             .fillMaxWidth()
@@ -39,34 +45,39 @@ fun HistoryRow(
         interaction = VestigeListCardInteraction.Click(onClick = onClick),
     ) {
         Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 14.dp, vertical = 12.dp),
             verticalAlignment = Alignment.Top,
         ) {
+            // Left column — time-of-day + duration
+            Column(
+                modifier = Modifier.width(52.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                Text(
+                    text = summary.timeLabel,
+                    style = VestigeTheme.typography.eyebrow.copy(fontSize = 13.sp, letterSpacing = 0.08.sp),
+                    color = colors.ink,
+                )
+                EyebrowE(text = durationLabel)
+            }
+
+            Spacer(modifier = Modifier.width(12.dp))
+
+            // Right column — badge + snippet
             Column(
                 modifier = Modifier.weight(1f),
                 verticalArrangement = Arrangement.spacedBy(4.dp),
             ) {
-                EyebrowE(text = dateLabel)
-                if (summary.templateLabel != null) {
-                    Pill(
-                        text = summary.templateLabel.uppercase(Locale.US),
-                        color = colors.lime,
-                        fill = true,
-                    )
-                }
+                EyebrowE(text = badgeText, color = dotColor)
                 Text(
                     text = summary.snippet,
-                    style = VestigeTheme.typography.p,
+                    style = VestigeTheme.typography.pCompact,
                     color = colors.ink,
+                    maxLines = 2,
                 )
             }
-            Spacer(modifier = Modifier.width(8.dp))
-            Text(
-                text = durationLabel,
-                style = VestigeTheme.typography.eyebrow,
-                color = colors.dim,
-            )
         }
     }
 }

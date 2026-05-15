@@ -88,12 +88,12 @@ private const val BIG_STAT_LINE_HEIGHT_RATIO: Float = 0.85f
  * secondary-text foreground for every eyebrow site.
  */
 @Composable
-fun EyebrowE(text: String, modifier: Modifier = Modifier) {
+fun EyebrowE(text: String, modifier: Modifier = Modifier, color: Color = Color.Unspecified) {
     Text(
         text = text,
         modifier = modifier,
         style = VestigeTheme.typography.eyebrow,
-        color = VestigeTheme.colors.dim,
+        color = if (color == Color.Unspecified) VestigeTheme.colors.dim else color,
     )
 }
 

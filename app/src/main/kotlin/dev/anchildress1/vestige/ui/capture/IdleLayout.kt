@@ -15,7 +15,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.requiredHeightIn
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -28,7 +27,6 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.semantics.testTag
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
@@ -262,28 +260,11 @@ private fun HistoryFooter(footer: LastEntryFooter, onHistoryTap: (() -> Unit)?) 
             )
         }
         if (onHistoryTap != null) {
-            Box(
-                modifier = Modifier
-                    .requiredHeightIn(min = 48.dp)
-                    .clickable(onClick = onHistoryTap)
-                    .semantics(mergeDescendants = true) {
-                        role = Role.Button
-                        contentDescription = CaptureCopy.HISTORY_LINK_A11Y
-                        testTag = "history_footer_link"
-                    }
-                    .padding(horizontal = 4.dp, vertical = 8.dp),
-                contentAlignment = Alignment.Center,
-            ) {
-                Text(
-                    text = CaptureCopy.HISTORY_LINK,
-                    style = VestigeTheme.typography.eyebrow,
-                    color = colors.ink,
-                )
-            }
+            HistoryLink(onClick = onHistoryTap, testTag = "history_footer_link")
         } else {
             Text(
                 text = CaptureCopy.HISTORY_LINK,
-                style = VestigeTheme.typography.eyebrow,
+                style = VestigeTheme.typography.personaLabel,
                 color = colors.dim,
             )
         }

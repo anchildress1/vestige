@@ -33,6 +33,7 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.testTag
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
@@ -196,7 +197,7 @@ private fun TranscriptTurn(label: String, body: String, bodyColor: Color) {
 }
 
 @Composable
-private fun HistoryLink(onClick: () -> Unit) {
+internal fun HistoryLink(onClick: () -> Unit, testTag: String? = null) {
     val colors = VestigeTheme.colors
     Box(
         modifier = Modifier
@@ -205,6 +206,7 @@ private fun HistoryLink(onClick: () -> Unit) {
             .semantics(mergeDescendants = true) {
                 role = Role.Button
                 contentDescription = CaptureCopy.HISTORY_LINK_A11Y
+                if (testTag != null) this.testTag = testTag
             }
             .padding(horizontal = 12.dp, vertical = 8.dp),
         contentAlignment = Alignment.Center,

@@ -411,6 +411,60 @@ class EntryStoreTest {
         assertEquals("completed", last!!.entryText)
     }
 
+    // deleteEntry tests
+
+    @Test
+    fun `deleteEntry removes the ObjectBox row`() {
+        val id = entryStore.createPendingEntry(SAMPLE_TEXT, SAMPLE_INSTANT)
+        entryStore.deleteEntry(id)
+        assertNull(boxStore.boxFor<EntryEntity>().get(id))
+    }
+
+    @Test
+    fun `deleteEntry deletes the markdown file`() {
+        val id = entryStore.createPendingEntry(SAMPLE_TEXT, SAMPLE_INSTANT)
+        val filename = boxStore.boxFor<EntryEntity>().get(id).markdownFilename
+        val mdFile = File(File(markdownDir, "entries"), filename)
+        assertTrue("markdown should exist before delete", mdFile.exists())
+
+        entryStore.deleteEntry(id)
+
+        assertFalse("markdown should be gone after delete", mdFile.exists())
+    }
+
+    @Test
+    fun `deleteEntry decrements tag entryCount`() {
+        val id1 = entryStore.createPendingEntry("first", SAMPLE_INSTANT)
+        val id2 = entryStore.createPendingEntry("second", SAMPLE_INSTANT.plusSeconds(60))
+        entryStore.completeEntry(id1, resolvedSample(), TemplateLabel.AFTERMATH)
+        entryStore.completeEntry(id2, resolvedSample(), TemplateLabel.AFTERMATH)
+
+        entryStore.deleteEntry(id1)
+
+        val tagBox = boxStore.boxFor<TagEntity>()
+        val standup = tagBox.all.firstOrNull { it.name == "standup" }
+        assertNotNull("tag should still exist (used by id2)", standup)
+        assertEquals(1, standup!!.entryCount)
+    }
+
+    @Test
+    fun `deleteEntry removes tag entity when count reaches zero`() {
+        val id = entryStore.createPendingEntry(SAMPLE_TEXT, SAMPLE_INSTANT)
+        entryStore.completeEntry(id, resolvedSample(), TemplateLabel.AFTERMATH)
+
+        entryStore.deleteEntry(id)
+
+        val tagBox = boxStore.boxFor<TagEntity>()
+        assertFalse("standup tag entity must be removed when no entries remain",
+            tagBox.all.any { it.name == "standup" })
+    }
+
+    @Test
+    fun `deleteEntry is a no-op for unknown id`() {
+        entryStore.deleteEntry(9_999L)
+        assertEquals(0L, boxStore.boxFor<EntryEntity>().count())
+    }
+
     private val emptyResolved = ResolvedExtraction(emptyMap())
 
     private companion object {

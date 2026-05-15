@@ -97,6 +97,24 @@ class EntryStore(private val boxStore: BoxStore, private val markdownStore: Mark
         }
     }
 
+    /**
+     * Permanently removes the entry, its markdown file, and its tag links. Tag [TagEntity.entryCount]
+     * values are decremented; tags that reach zero are removed. No-ops for unknown ids.
+     */
+    fun deleteEntry(entryId: Long) {
+        boxStore.runInTx {
+            val box = boxStore.boxFor<EntryEntity>()
+            val entry = box.get(entryId) ?: return@runInTx
+            val tagBox = boxStore.boxFor<TagEntity>()
+            entry.tags.forEach { tag ->
+                tag.entryCount = (tag.entryCount - 1).coerceAtLeast(0)
+                if (tag.entryCount == 0) tagBox.remove(tag.id) else tagBox.put(tag)
+            }
+            markdownStore.delete(entry.markdownFilename)
+            box.remove(entryId)
+        }
+    }
+
     /** Read-only lookup. Returns `null` for missing rows so callers can act without throwing. */
     fun readEntry(entryId: Long): EntryEntity? = boxStore.boxFor<EntryEntity>().get(entryId)
 

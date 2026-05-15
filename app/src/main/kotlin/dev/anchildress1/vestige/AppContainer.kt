@@ -83,7 +83,8 @@ class AppContainer(
         LiteRtLmEngine(
             modelPath = modelPath,
             backend = BackendChoice.Gpu,
-            audioBackend = BackendChoice.Cpu, // GPU audio path SIGSEGVs in mel_filterbank.cc; closest open upstream: https://github.com/google-ai-edge/LiteRT-LM/issues/2056
+            // GPU audio path SIGSEGVs in mel_filterbank.cc — see LiteRT-LM/issues/2056
+            audioBackend = BackendChoice.Cpu,
             cacheDir = cacheDir,
         )
     },
@@ -393,6 +394,7 @@ class AppContainer(
         _modelReadinessFlow.value = current
         if (current is ModelReadiness.Ready && previous !is ModelReadiness.Ready) {
             scope.launch { recoverPendingExtractions() }
+            scope.launch { ensureBackgroundEngineInitialized() }
         }
     }
 

@@ -232,6 +232,7 @@ class AppContainerTest {
                 retrievedHistory = emptyList(),
                 timeoutMs = null,
                 persona = dev.anchildress1.vestige.model.Persona.WITNESS,
+                durationMs = 0L,
             )
         } returns expected
         val container = AppContainer(
@@ -257,6 +258,7 @@ class AppContainerTest {
                 retrievedHistory = emptyList(),
                 timeoutMs = null,
                 persona = dev.anchildress1.vestige.model.Persona.WITNESS,
+                durationMs = 0L,
             )
         }
     }
@@ -273,6 +275,7 @@ class AppContainerTest {
                 retrievedHistory = any<List<HistoryChunk>>(),
                 timeoutMs = any(),
                 persona = any(),
+                durationMs = any(),
             )
         } answers { SaveOutcome.Pending(entryId = 7L, extractionJob = kotlinx.coroutines.Job()) }
         val container = AppContainer(
@@ -291,7 +294,41 @@ class AppContainerTest {
         container.saveAndExtract("second", capturedAt, timeoutMs = 90_000L)
 
         coVerify(exactly = 1) { engine.initialize() }
-        coVerify(exactly = 2) { saveFlow.saveAndExtract(any(), capturedAt, any(), any(), any()) }
+        coVerify(exactly = 2) { saveFlow.saveAndExtract(any(), capturedAt, any(), any(), any(), any()) }
+    }
+
+    @Test
+    fun `saveAndExtract threads caller-supplied durationMs through to the save flow`() = runTest {
+        val engine = mockk<LiteRtLmEngine>(relaxed = true)
+        val saveFlow = mockk<BackgroundExtractionSaveFlow>()
+        val capturedAt = ZonedDateTime.of(2026, 5, 11, 7, 21, 24, 0, ZoneId.of("America/New_York"))
+        coEvery { saveFlow.saveAndExtract(any(), any(), any(), any(), any(), any()) } answers {
+            SaveOutcome.Pending(entryId = 1L, extractionJob = kotlinx.coroutines.Job())
+        }
+        val container = AppContainer(
+            applicationContext = mockk<Context>(relaxed = true),
+            boxStoreFactory = { mockk<BoxStore>(relaxed = true) },
+            markdownStoreFactory = { mockk<MarkdownEntryStore>(relaxed = true) },
+            modelPathLoader = { "/tmp/fake-model.litertlm" },
+            backgroundEngineFactory = { _, _ -> engine },
+            backgroundExtractionSaveFlowFactory = { _, _, _, _, _, _ -> saveFlow },
+            recoveredEntryIdsLoader = { emptyList() },
+            foregroundServiceIntentFactory = { Intent("dev.anchildress1.vestige.TEST_START") },
+            foregroundServiceStarter = {},
+        )
+
+        container.saveAndExtract("voice entry", capturedAt, durationMs = 90_000L)
+
+        coVerify(exactly = 1) {
+            saveFlow.saveAndExtract(
+                entryText = "voice entry",
+                capturedAt = capturedAt,
+                retrievedHistory = emptyList(),
+                timeoutMs = null,
+                persona = dev.anchildress1.vestige.model.Persona.WITNESS,
+                durationMs = 90_000L,
+            )
+        }
     }
 
     @Test
@@ -301,7 +338,7 @@ class AppContainerTest {
         val capturedAt = ZonedDateTime.of(2026, 5, 12, 8, 15, 0, 0, ZoneId.of("America/New_York"))
         val expected = SaveOutcome.Pending(entryId = 42L, extractionJob = kotlinx.coroutines.Job())
         var scheduled = 0
-        coEvery { saveFlow.saveAndExtract(any(), any(), any(), any(), any()) } returns expected
+        coEvery { saveFlow.saveAndExtract(any(), any(), any(), any(), any(), any()) } returns expected
 
         val container = AppContainer(
             applicationContext = mockk<Context>(relaxed = true),
@@ -381,6 +418,7 @@ class AppContainerTest {
                     retrievedHistory = emptyList(),
                     timeoutMs = null,
                     persona = dev.anchildress1.vestige.model.Persona.EDITOR,
+                    durationMs = 0L,
                 )
             } returns expected
             val context = mockk<Context>(relaxed = true) {
@@ -415,6 +453,7 @@ class AppContainerTest {
                     retrievedHistory = emptyList(),
                     timeoutMs = null,
                     persona = dev.anchildress1.vestige.model.Persona.EDITOR,
+                    durationMs = 0L,
                 )
             }
         }

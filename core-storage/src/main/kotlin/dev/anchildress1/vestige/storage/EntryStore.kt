@@ -42,11 +42,12 @@ class EntryStore(private val boxStore: BoxStore, private val markdownStore: Mark
      * [dev.anchildress1.vestige.inference.ExtractionStatusListener] callbacks into
      * [io.objectbox.BoxStore]-backed status tracking.
      */
-    fun createPendingEntry(entryText: String, timestamp: Instant): Long {
+    fun createPendingEntry(entryText: String, timestamp: Instant, durationMs: Long = 0L): Long {
         require(entryText.isNotBlank()) { "EntryStore.createPendingEntry requires a non-blank entryText" }
         val entry = EntryEntity(
             entryText = entryText.trimEnd(),
             timestampEpochMs = timestamp.toEpochMilli(),
+            durationMs = durationMs,
             extractionStatus = ExtractionStatus.PENDING,
         )
         return boxStore.callInTx<Long> {

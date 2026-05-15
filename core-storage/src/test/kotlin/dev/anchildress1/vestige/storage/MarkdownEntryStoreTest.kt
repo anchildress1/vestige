@@ -420,6 +420,100 @@ class MarkdownEntryStoreTest {
         assertEquals(all.map { it.name }.sorted(), all.map { it.name })
     }
 
+    // --- durationMs tests ---
+
+    @Test
+    fun `durationMs round-trips through write and read`() {
+        val entryBox = boxStore.boxFor<EntryEntity>()
+        val entry = EntryEntity(timestampEpochMs = ISO_TIMESTAMP_MS, durationMs = 242_000L)
+        entryBox.put(entry)
+
+        val written = store.write(entry)
+        assertTrue("frontmatter must contain duration_ms: 242000", written.readText().contains("duration_ms: 242000"))
+
+        val readBack = store.read(written)
+        assertEquals(242_000L, readBack.durationMs)
+    }
+
+    @Test
+    fun `zero durationMs writes duration_ms 0 and reads back as 0`() {
+        val entryBox = boxStore.boxFor<EntryEntity>()
+        val entry = EntryEntity(timestampEpochMs = ISO_TIMESTAMP_MS, durationMs = 0L)
+        entryBox.put(entry)
+
+        val written = store.write(entry)
+        assertTrue("frontmatter must contain duration_ms: 0", written.readText().contains("duration_ms: 0"))
+
+        val readBack = store.read(written)
+        assertEquals(0L, readBack.durationMs)
+    }
+
+    @Test
+    fun `malformed duration_ms in frontmatter returns 0 without throwing`() {
+        markdownDir.mkdirs()
+        val entriesDir = File(markdownDir, MarkdownEntryStore.ENTRIES_SUBDIR).apply { mkdirs() }
+        val file = File(entriesDir, "bad-duration.md").apply {
+            writeText(
+                """
+                ---
+                schema_version: 1
+                timestamp: 2026-05-09T14:32:15Z
+                duration_ms: not-a-number
+                template_label: null
+                energy_descriptor: null
+                recurrence_link: null
+                stated_commitment: null
+                tags:
+                confidence: {}
+                entry_observations: []
+                ---
+
+                body text
+                """.trimIndent(),
+            )
+        }
+        val readBack = store.read(file)
+        assertEquals(0L, readBack.durationMs)
+    }
+
+    @Test
+    fun `Long MAX_VALUE durationMs round-trips exactly`() {
+        val entryBox = boxStore.boxFor<EntryEntity>()
+        val entry = EntryEntity(timestampEpochMs = ISO_TIMESTAMP_MS, durationMs = Long.MAX_VALUE)
+        entryBox.put(entry)
+
+        val written = store.write(entry)
+        val readBack = store.read(written)
+        assertEquals(Long.MAX_VALUE, readBack.durationMs)
+    }
+
+    @Test
+    fun `missing duration_ms key in frontmatter returns 0 without throwing`() {
+        markdownDir.mkdirs()
+        val entriesDir = File(markdownDir, MarkdownEntryStore.ENTRIES_SUBDIR).apply { mkdirs() }
+        val file = File(entriesDir, "no-duration.md").apply {
+            writeText(
+                """
+                ---
+                schema_version: 1
+                timestamp: 2026-05-09T14:32:15Z
+                template_label: null
+                energy_descriptor: null
+                recurrence_link: null
+                stated_commitment: null
+                tags:
+                confidence: {}
+                entry_observations: []
+                ---
+
+                body text
+                """.trimIndent(),
+            )
+        }
+        val readBack = store.read(file)
+        assertEquals(0L, readBack.durationMs)
+    }
+
     private companion object {
         val ISO_TIMESTAMP_MS: Long = Instant.parse("2026-05-09T14:32:15Z").toEpochMilli()
     }

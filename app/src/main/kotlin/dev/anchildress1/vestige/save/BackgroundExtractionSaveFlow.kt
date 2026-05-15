@@ -52,14 +52,16 @@ class BackgroundExtractionSaveFlow(
      * extraction status is delivered to the listener registered against the returned entry id.
      * Returns the detached [Job] on the outcome so tests + tooling can await completion.
      */
+    @Suppress("LongParameterList") // 6-param orchestration contract; no grouping improves it.
     suspend fun saveAndExtract(
         entryText: String,
         capturedAt: ZonedDateTime,
         retrievedHistory: List<HistoryChunk> = emptyList(),
         timeoutMs: Long? = null,
         persona: Persona = Persona.WITNESS,
+        durationMs: Long = 0L,
     ): SaveOutcome.Pending {
-        val entryId = entryStore.createPendingEntry(entryText, capturedAt.toInstant())
+        val entryId = entryStore.createPendingEntry(entryText, capturedAt.toInstant(), durationMs)
         val terminalRelay = DeferredTerminalRelay(listenerFactory(entryId))
         // Emit PENDING before launching the detached coroutine — otherwise a fast-failing
         // extraction can emit RUNNING/FAILED first and this report would overwrite the

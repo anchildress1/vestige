@@ -49,6 +49,9 @@ class EntryEntity(
     @Index
     var extractionStatus: ExtractionStatus = ExtractionStatus.PENDING,
 
+    /** Millis of captured audio; 0 for typed entries or pre-duration rows. */
+    var durationMs: Long = 0L,
+
     /** Retry budget; cap at 3. */
     var attemptCount: Int = 0,
 

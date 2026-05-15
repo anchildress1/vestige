@@ -21,7 +21,8 @@ fun HistoryHost(
     modifier: Modifier = Modifier,
 ) {
     BackHandler(onBack = onExit)
-    val viewModel = remember(entryStore, zoneId) { HistoryViewModel(entryStore, zoneId, dataRevision = dataRevision) }
+    val viewModel =
+        remember(entryStore, zoneId, dataRevision) { HistoryViewModel(entryStore, zoneId, dataRevision = dataRevision) }
     HistoryScreen(
         viewModel = viewModel,
         persona = persona,

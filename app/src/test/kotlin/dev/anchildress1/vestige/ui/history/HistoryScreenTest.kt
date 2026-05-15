@@ -1,7 +1,7 @@
 package dev.anchildress1.vestige.ui.history
 
 import androidx.compose.ui.test.assertCountEquals
-import androidx.compose.ui.test.assertHasClickAction
+import androidx.compose.ui.test.assertHasNoClickAction
 import androidx.compose.ui.test.assertHeightIsAtLeast
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.v2.createComposeRule
@@ -145,11 +145,11 @@ class HistoryScreenTest {
     // a11y — semantics
 
     @Test
-    fun `history row has click action`() {
+    fun `history row has no click action until tap-to-detail is implemented`() {
         seedCompleted("something happened today", 1_000_000L)
 
         composeRule.setContent { HistoryScreen(viewModel = newViewModel(), persona = Persona.WITNESS) }
-        composeRule.onNodeWithTag("history_row").assertHasClickAction()
+        composeRule.onNodeWithTag("history_row").assertHasNoClickAction()
     }
 
     @Test
@@ -166,6 +166,47 @@ class HistoryScreenTest {
     fun `hero eyebrow TAIL ALL TIME is visible`() {
         composeRule.setContent { HistoryScreen(viewModel = newViewModel(), persona = Persona.WITNESS) }
         composeRule.onNodeWithContentDescription("TAIL · ALL TIME", substring = true).assertIsDisplayed()
+    }
+
+    // a11y — DensityBar: contentDescription present, not interactive
+
+    @Test
+    fun `density bar has contentDescription summarising entry count`() {
+        val now = System.currentTimeMillis()
+        seedCompleted("entry one", now - 3_600_000L)
+        seedCompleted("entry two", now - 7_200_000L)
+
+        composeRule.setContent { HistoryScreen(viewModel = newViewModel(), persona = Persona.WITNESS) }
+        composeRule.onNodeWithContentDescription("2 entries in the last 30 days", substring = true).assertIsDisplayed()
+    }
+
+    @Test
+    fun `density bar has no click action`() {
+        val now = System.currentTimeMillis()
+        seedCompleted("entry one", now - 3_600_000L)
+
+        composeRule.setContent { HistoryScreen(viewModel = newViewModel(), persona = Persona.WITNESS) }
+        composeRule.onNodeWithContentDescription("entries in the last 30 days", substring = true)
+            .assertHasNoClickAction()
+    }
+
+    // a11y — StatRibbon: contentDescription present, not interactive
+
+    @Test
+    fun `stat ribbon has contentDescription summarising stats`() {
+        seedCompleted("entry one", 1_000_000L)
+        seedCompleted("entry two", 2_000_000L)
+
+        composeRule.setContent { HistoryScreen(viewModel = newViewModel(), persona = Persona.WITNESS) }
+        composeRule.onNodeWithContentDescription("2 entries", substring = true).assertIsDisplayed()
+    }
+
+    @Test
+    fun `stat ribbon has no click action`() {
+        seedCompleted("entry one", 1_000_000L)
+
+        composeRule.setContent { HistoryScreen(viewModel = newViewModel(), persona = Persona.WITNESS) }
+        composeRule.onNodeWithContentDescription("1 entries", substring = true).assertHasNoClickAction()
     }
 
     private fun newViewModel() = HistoryViewModel(entryStore, zoneId = ZoneOffset.UTC, ioDispatcher = testDispatcher)

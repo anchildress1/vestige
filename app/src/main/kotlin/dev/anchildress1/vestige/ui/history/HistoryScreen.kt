@@ -1,7 +1,6 @@
 package dev.anchildress1.vestige.ui.history
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -23,7 +22,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
@@ -82,7 +80,16 @@ fun HistoryScreen(viewModel: HistoryViewModel, persona: Persona, modifier: Modif
                 // Stats + density bar scroll with the list — full screen height for items
                 uiState.stats?.let { stats ->
                     item(key = "stats") {
-                        Box(modifier = Modifier.padding(horizontal = 18.dp, vertical = 10.dp)) {
+                        Box(
+                            modifier = Modifier
+                                .padding(horizontal = 18.dp, vertical = 10.dp)
+                                .semantics(mergeDescendants = true) {
+                                    contentDescription = "${stats.totalEntries} entries, " +
+                                        "${stats.daysTracked} days tracked, " +
+                                        "+${stats.thisWeek} this week, " +
+                                        "${stats.avgAudioLabel} average per day"
+                                },
+                        ) {
                             StatRibbon(
                                 items = listOf(
                                     StatItem(value = "${stats.totalEntries}", label = "ENTRIES"),
@@ -116,7 +123,7 @@ fun HistoryScreen(viewModel: HistoryViewModel, persona: Persona, modifier: Modif
                         HistoryRow(
                             summary = summary,
                             durationLabel = HistoryDurationFormatter.format(summary.durationMs),
-                            onClick = { /* Story 4.7 — tap-to-detail */ },
+                            onClick = null,
                         )
                     }
                 }
@@ -136,7 +143,6 @@ private fun HistorySectionHeader(label: String, count: Int) {
         modifier = Modifier
             .fillMaxWidth()
             .background(colors.floor)
-            .border(width = 0.dp, color = Color.Transparent)
             .padding(horizontal = 18.dp, vertical = 10.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically,
@@ -160,7 +166,9 @@ private fun DensityBar(buckets: List<Int>, modifier: Modifier = Modifier) {
     val maxCount = buckets.maxOrNull()?.coerceAtLeast(1) ?: 1
     val totalInWindow = buckets.sum()
     Row(
-        modifier = modifier.height(32.dp),
+        modifier = modifier
+            .height(32.dp)
+            .semantics { contentDescription = "$totalInWindow entries in the last 30 days" },
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(4.dp),
     ) {

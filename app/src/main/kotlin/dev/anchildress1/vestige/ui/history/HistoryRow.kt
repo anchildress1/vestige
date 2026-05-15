@@ -25,7 +25,7 @@ import dev.anchildress1.vestige.ui.theme.VestigeTheme
 fun HistoryRow(
     summary: HistorySummary,
     durationLabel: String,
-    onClick: () -> Unit,
+    onClick: (() -> Unit)?,
     modifier: Modifier = Modifier,
 ) {
     val colors = VestigeTheme.colors
@@ -42,7 +42,11 @@ fun HistoryRow(
             .fillMaxWidth()
             .semantics(mergeDescendants = true) { contentDescription = a11yDesc }
             .testTag("history_row"),
-        interaction = VestigeListCardInteraction.Click(onClick = onClick),
+        interaction = if (onClick != null) {
+            VestigeListCardInteraction.Click(onClick = onClick)
+        } else {
+            VestigeListCardInteraction.Static
+        },
     ) {
         Row(
             modifier = Modifier

@@ -82,6 +82,8 @@ class AppContainer(
     private val backgroundEngineFactory: (String, String) -> LiteRtLmEngine = { modelPath, cacheDir ->
         LiteRtLmEngine(
             modelPath = modelPath,
+            backend = BackendChoice.Gpu,
+            // GPU audio path SIGSEGVs in mel_filterbank.cc — see LiteRT-LM/issues/2056
             audioBackend = BackendChoice.Cpu,
             cacheDir = cacheDir,
         )
@@ -392,6 +394,10 @@ class AppContainer(
         _modelReadinessFlow.value = current
         if (current is ModelReadiness.Ready && previous !is ModelReadiness.Ready) {
             scope.launch { recoverPendingExtractions() }
+            scope.launch {
+                delay(ENGINE_PREWARM_DELAY_MS)
+                ensureBackgroundEngineInitialized()
+            }
         }
     }
 
@@ -581,6 +587,7 @@ class AppContainer(
         const val MODEL_ARTIFACTS_SUBDIR = "models"
         const val VECTOR_BACKFILL_RETRY_DELAY_MS = 5_000L
         const val VECTOR_BACKFILL_MAX_RETRIES = 12
+        const val ENGINE_PREWARM_DELAY_MS = 2_000L
 
         fun defaultScope(): CoroutineScope {
             val exceptionHandler = CoroutineExceptionHandler { _, error ->

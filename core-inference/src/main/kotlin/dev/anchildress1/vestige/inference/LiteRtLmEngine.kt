@@ -56,7 +56,7 @@ class LiteRtLmEngine(
                 "maxTokens=$maxNumTokens sampler=topK=${samplerConfig.topK}," +
                 "topP=${samplerConfig.topP},temp=${samplerConfig.temperature},seed=${samplerConfig.seed}",
         )
-        Engine.setNativeMinLogSeverity(LogSeverity.WARNING)
+        Engine.setNativeMinLogSeverity(LogSeverity.INFO)
         val started = System.nanoTime()
         engine = Engine(
             EngineConfig(

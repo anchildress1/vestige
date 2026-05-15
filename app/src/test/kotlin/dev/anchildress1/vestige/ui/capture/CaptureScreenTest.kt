@@ -1,11 +1,19 @@
 package dev.anchildress1.vestige.ui.capture
 
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.assertHasClickAction
+import androidx.compose.ui.test.assertHeightIsAtLeast
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithTag
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.unit.dp
 import dev.anchildress1.vestige.inference.AudioChunk
+import dev.anchildress1.vestige.inference.ForegroundResult
 import dev.anchildress1.vestige.model.Persona
 import dev.anchildress1.vestige.ui.theme.VestigeTheme
 import kotlinx.coroutines.Dispatchers
@@ -84,8 +92,81 @@ class CaptureScreenTest {
         composeRule.onNodeWithText(CaptureCopy.READING_PLACEHOLDER).assertIsDisplayed()
     }
 
+    // --- Capture footer tests ---
+
+    @Test
+    fun `footer is hidden when lastEntryFooter is null`() {
+        val vm = newViewModel(readiness = ModelReadiness.Ready)
+        composeRule.setContent { VestigeTheme { captureScreen(vm) } }
+        composeRule.onAllNodesWithText(CaptureCopy.HISTORY_FOOTER_PREFIX).assertCountEquals(0)
+        composeRule.onAllNodesWithTag("history_footer_link").assertCountEquals(0)
+    }
+
+    @Test
+    fun `footer renders prefix date and duration when lastEntryFooter is present`() {
+        val vm = newViewModel(readiness = ModelReadiness.Ready)
+        val footer = LastEntryFooter(monthLabel = "JAN", dayLabel = "27", durationLabel = "4m 02s")
+        composeRule.setContent {
+            VestigeTheme { captureScreen(vm, chrome = IdleChromeCallbacks(lastEntryFooter = footer)) }
+        }
+        // Use count checks: footer is in composition but may be below viewport in test.
+        composeRule.onAllNodesWithText(CaptureCopy.HISTORY_FOOTER_PREFIX, substring = true).assertCountEquals(1)
+        composeRule.onAllNodesWithText("JAN", substring = true).assertCountEquals(1)
+        composeRule.onAllNodesWithText("27", substring = true).assertCountEquals(1)
+        composeRule.onAllNodesWithText("4m 02s", substring = true).assertCountEquals(1)
+    }
+
+    @Test
+    fun `History link is clickable with correct contentDescription`() {
+        val vm = newViewModel(readiness = ModelReadiness.Ready)
+        val footer = LastEntryFooter(monthLabel = "JAN", dayLabel = "27", durationLabel = "4m 02s")
+        composeRule.setContent {
+            VestigeTheme {
+                captureScreen(vm, chrome = IdleChromeCallbacks(lastEntryFooter = footer, onHistoryTap = {}))
+            }
+        }
+        composeRule.onNodeWithContentDescription(CaptureCopy.HISTORY_LINK_A11Y).assertHasClickAction()
+    }
+
+    // --- Reviewing state tests ---
+
+    @Test
+    fun `reviewing state renders DONE button`() {
+        val vm = newReviewingViewModel()
+        composeRule.setContent { VestigeTheme { captureScreen(vm) } }
+        composeRule.onNodeWithContentDescription("Done").assertIsDisplayed()
+    }
+
+    @Test
+    fun `reviewing state history link present when onOpenHistory provided`() {
+        val vm = newReviewingViewModel()
+        composeRule.setContent {
+            VestigeTheme { captureScreen(vm, chrome = IdleChromeCallbacks(onHistoryTap = {})) }
+        }
+        composeRule.onNodeWithContentDescription(CaptureCopy.HISTORY_LINK_A11Y).assertHasClickAction()
+    }
+
+    @Test
+    fun `reviewing state history link absent when onOpenHistory is null`() {
+        val vm = newReviewingViewModel()
+        composeRule.setContent { VestigeTheme { captureScreen(vm) } }
+        composeRule.onAllNodesWithText(CaptureCopy.HISTORY_LINK).assertCountEquals(0)
+    }
+
+    @Test
+    fun `History link tap target is at least 48 dp tall`() {
+        val vm = newViewModel(readiness = ModelReadiness.Ready)
+        val footer = LastEntryFooter(monthLabel = "JAN", dayLabel = "27", durationLabel = "4m 02s")
+        composeRule.setContent {
+            VestigeTheme {
+                captureScreen(vm, chrome = IdleChromeCallbacks(lastEntryFooter = footer, onHistoryTap = {}))
+            }
+        }
+        composeRule.onNodeWithTag("history_footer_link").assertHeightIsAtLeast(48.dp)
+    }
+
     @Composable
-    private fun captureScreen(vm: CaptureViewModel) {
+    private fun captureScreen(vm: CaptureViewModel, chrome: IdleChromeCallbacks = IdleChromeCallbacks()) {
         CaptureScreen(
             viewModel = vm,
             stats = CaptureStats(kept = 0, active = 0, hitsThisMonth = 0, cloud = 0),
@@ -96,7 +177,30 @@ class CaptureScreenTest {
                 dayNumber = 1,
                 streakDays = 0,
             ),
+            chrome = chrome,
         )
+    }
+
+    private fun newReviewingViewModel(): CaptureViewModel {
+        val audio = AudioChunk(FloatArray(16), sampleRateHz = 16_000, isFinal = true)
+        return CaptureViewModel(
+            initialPersona = Persona.WITNESS,
+            recordVoice = VoiceCapture { _, _ -> audio },
+            foregroundInference = ForegroundInferenceCall { _, _ ->
+                ForegroundResult.Success(
+                    persona = Persona.WITNESS,
+                    rawResponse = "",
+                    elapsedMs = 0L,
+                    completedAt = clock.instant(),
+                    transcription = "something happened",
+                    followUp = "sounds like a pattern",
+                )
+            },
+            saveAndExtract = SaveAndExtract { _, _, _, _ -> },
+            clock = clock,
+            zoneId = ZoneOffset.UTC,
+            initialReadiness = ModelReadiness.Ready,
+        ).also { it.startRecording() }
     }
 
     private fun newViewModel(readiness: ModelReadiness, startInInferringPhase: Boolean = false): CaptureViewModel {

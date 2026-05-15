@@ -5,15 +5,20 @@ import android.content.pm.PackageManager
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.requiredHeightIn
+import androidx.compose.foundation.layout.windowInsetsBottomHeight
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -29,6 +34,7 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.testTag
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
@@ -48,7 +54,6 @@ import dev.anchildress1.vestige.ui.theme.VestigeTheme
  * from `AppContainer.entryStore.countCompleted()` + similar reads.
  */
 @Composable
-@Suppress("LongParameterList") // Route-level Compose entry; bundled callbacks already.
 @OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 fun CaptureScreen(
     viewModel: CaptureViewModel,
@@ -56,7 +61,6 @@ fun CaptureScreen(
     meta: CaptureMeta,
     modifier: Modifier = Modifier,
     chrome: IdleChromeCallbacks = IdleChromeCallbacks(),
-    onOpenPatterns: (() -> Unit)? = null,
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val context = LocalContext.current
@@ -82,7 +86,7 @@ fun CaptureScreen(
             onRecTap = onRecTap,
             onTypeTap = { showTypeSheet = true },
             modifier = modifier,
-            chrome = chrome.copy(onPatternsTap = onOpenPatterns ?: chrome.onPatternsTap),
+            chrome = chrome,
         )
 
         is CaptureUiState.Recording -> LiveLayout(
@@ -100,6 +104,7 @@ fun CaptureScreen(
         is CaptureUiState.Reviewing -> ReviewingPane(
             state = current,
             onAcknowledge = viewModel::acknowledgeReview,
+            onOpenHistory = chrome.onHistoryTap,
             modifier = modifier,
         )
     }
@@ -131,7 +136,12 @@ private fun InferringPane(persona: Persona, modifier: Modifier = Modifier) {
 }
 
 @Composable
-private fun ReviewingPane(state: CaptureUiState.Reviewing, onAcknowledge: () -> Unit, modifier: Modifier = Modifier) {
+private fun ReviewingPane(
+    state: CaptureUiState.Reviewing,
+    onAcknowledge: () -> Unit,
+    onOpenHistory: (() -> Unit)? = null,
+    modifier: Modifier = Modifier,
+) {
     val colors = VestigeTheme.colors
     Column(modifier = modifier.fillMaxSize().background(colors.floor)) {
         AppTop(persona = state.persona.name, status = AppTopStatuses.Ready)
@@ -146,6 +156,17 @@ private fun ReviewingPane(state: CaptureUiState.Reviewing, onAcknowledge: () -> 
         }
         Spacer(modifier = Modifier.weight(1f))
         DoneButton(onClick = onAcknowledge)
+        if (onOpenHistory != null) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 18.dp, vertical = 8.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                HistoryLink(onClick = onOpenHistory)
+            }
+        }
+        Spacer(Modifier.windowInsetsBottomHeight(WindowInsets.navigationBars))
     }
 }
 
@@ -164,6 +185,30 @@ private fun TranscriptTurn(label: String, body: String, bodyColor: Color) {
             text = body.ifBlank { "—" },
             style = VestigeTheme.typography.p,
             color = bodyColor,
+        )
+    }
+}
+
+@Composable
+internal fun HistoryLink(onClick: () -> Unit, testTag: String? = null) {
+    val colors = VestigeTheme.colors
+    Box(
+        modifier = Modifier
+            .requiredHeightIn(min = 48.dp)
+            .border(width = 1.dp, color = colors.hair)
+            .clickable(onClick = onClick)
+            .semantics(mergeDescendants = true) {
+                role = Role.Button
+                contentDescription = CaptureCopy.HISTORY_LINK_A11Y
+                if (testTag != null) this.testTag = testTag
+            }
+            .padding(horizontal = 12.dp, vertical = 8.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            text = CaptureCopy.HISTORY_LINK,
+            style = VestigeTheme.typography.personaLabel,
+            color = colors.dim,
         )
     }
 }

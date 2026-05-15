@@ -22,7 +22,12 @@ commit-msg:
 pre-push:
   parallel: true
   commands:
+    ktlint:
+      priority: 1
+      run: make ktlint-check
     build:
+      priority: 2
       run: make build
     test:
+      priority: 2
       run: make test

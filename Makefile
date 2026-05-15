@@ -1,4 +1,4 @@
-.PHONY: install bootstrap-wrapper doctor build assemble reinstall _reinstall_base push-model logcat test lint format ktlint-format ktlint-check detekt android-lint secret-scan commitlint verify-no-telemetry verify ci clean
+.PHONY: install bootstrap-wrapper doctor build assemble reinstall _reinstall_base push-model seed-entries logcat test lint format ktlint-format ktlint-check detekt android-lint secret-scan commitlint verify-no-telemetry verify ci clean
 
 GRADLE := ./gradlew
 KTLINT := $(or $(shell command -v ktlint 2>/dev/null), $(HOME)/.local/bin/ktlint)
@@ -38,6 +38,9 @@ build:
 ENV ?= dev
 VESTIGE_PACKAGE := dev.anchildress1.vestige
 
+# App tags + inference/GPU runtime tags. AndroidRuntime ensures crash stacktraces are never swallowed.
+LOGCAT_TAGS := Vestige|CaptureVM|PatternDetailVM|PatternsListVM|OnboardingPrefs|HistoryViewModel|MarkdownEntryStore|DebugSeedReceiver|litertlm|LiteRt|tflite|TfLite|GpuDelegate|Adreno|Mali|AndroidRuntime|System\.err
+
 # Filenames must match `core-model/src/main/resources/model/manifest.properties` exactly so
 # the artifact store accepts the pushed files without re-downloading. Local source paths
 # default to ~/Downloads/<filename>; override the VESTIGE_*_FILE vars for non-default homes.
@@ -48,7 +51,7 @@ VESTIGE_MAIN_MODEL_FILE ?= $(HOME)/Downloads/$(VESTIGE_MAIN_MODEL_FILENAME)
 VESTIGE_EMBEDDING_MODEL_FILE ?= $(HOME)/Downloads/$(VESTIGE_EMBEDDING_MODEL_FILENAME)
 VESTIGE_EMBEDDING_TOKENIZER_FILE ?= $(HOME)/Downloads/$(VESTIGE_EMBEDDING_TOKENIZER_FILENAME)
 
-DEV_SETUP_STEPS_dev := push-model
+DEV_SETUP_STEPS_dev := push-model seed-entries
 DEV_SETUP_STEPS_prod :=
 DEV_SETUP_STEPS := $(DEV_SETUP_STEPS_$(ENV))
 
@@ -59,7 +62,8 @@ _reinstall_base:
 		echo "❌ Unknown ENV='$(ENV)'. Set ENV=dev (default) or ENV=prod."; exit 1; \
 	fi
 	@echo "→ ENV=$(ENV); reinstall steps: _reinstall_base $(DEV_SETUP_STEPS) logcat"
-	adb uninstall $(VESTIGE_PACKAGE); $(GRADLE) :app:installDebug
+	$(GRADLE) :app:assembleDebug
+	adb uninstall $(VESTIGE_PACKAGE); adb install -r -d app/build/outputs/apk/debug/app-debug.apk
 
 # Stream the on-device artifacts into the freshly-installed app's data dir via `run-as`.
 # `adb uninstall` wipes filesDir on every iteration; this skips the 3.66 GB onboarding
@@ -75,6 +79,19 @@ push-model:
 	@./scripts/push-vestige-artifact.sh "$(VESTIGE_PACKAGE)" "$(VESTIGE_MAIN_MODEL_FILE)" "$(VESTIGE_MAIN_MODEL_FILENAME)" required
 	@./scripts/push-vestige-artifact.sh "$(VESTIGE_PACKAGE)" "$(VESTIGE_EMBEDDING_MODEL_FILE)" "$(VESTIGE_EMBEDDING_MODEL_FILENAME)" optional
 	@./scripts/push-vestige-artifact.sh "$(VESTIGE_PACKAGE)" "$(VESTIGE_EMBEDDING_TOKENIZER_FILE)" "$(VESTIGE_EMBEDDING_TOKENIZER_FILENAME)" optional
+# Seed fixture entries + patterns via DebugSeedReceiver (debug builds only).
+# Uses explicit component targeting (-n); works even with android:exported="false".
+seed-entries:
+	@command -v adb >/dev/null 2>&1 || { echo "❌ adb not found. Install Android platform-tools."; exit 1; }
+	@adb get-state >/dev/null 2>&1 || { echo "❌ no device connected. Run 'adb devices' to check."; exit 1; }
+	@adb shell "pm list packages $(VESTIGE_PACKAGE)" | grep -q "$(VESTIGE_PACKAGE)" || { \
+		echo "❌ $(VESTIGE_PACKAGE) is not installed. Run 'make reinstall' first."; \
+		exit 1; \
+	}
+	@echo "→ seeding debug fixtures…"
+	@adb shell am broadcast -n "$(VESTIGE_PACKAGE)/$(VESTIGE_PACKAGE).debug.DebugSeedReceiver" \
+		|| { echo "❌ broadcast failed — is this a debug build?"; exit 1; }
+	@echo "✓ seed complete"
 # ───────────────────────────────────────────────────────────────────────────────
 
 logcat:
@@ -86,11 +103,11 @@ logcat:
 		[ -n "$$pid" ] && break; sleep 1; \
 	done; \
 	if [ -z "$$pid" ]; then \
-		echo "⚠ could not resolve app PID — tailing entire device log (Ctrl-C, then narrow with EXTRA=...)"; \
-		adb logcat -v color -T 1 $(EXTRA); \
+		echo "⚠ could not resolve app PID — filtering by tags only (Ctrl-C to stop)"; \
+		adb logcat -v color -T 1 $(EXTRA) | grep -E "$(LOGCAT_TAGS)"; \
 	else \
 		echo "📱 tailing pid=$$pid (Ctrl-C to stop)"; \
-		adb logcat -v color -T 1 --pid="$$pid" $(EXTRA); \
+		adb logcat -v color -T 1 --pid="$$pid" $(EXTRA) | grep -E "$(LOGCAT_TAGS)"; \
 	fi
 
 assemble:

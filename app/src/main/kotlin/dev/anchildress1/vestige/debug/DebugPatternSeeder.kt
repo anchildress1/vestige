@@ -38,26 +38,28 @@ object DebugPatternSeeder {
             boxStore.boxFor(EntryEntity::class.java).removeAll()
             boxStore.boxFor(PatternEntity::class.java).removeAll()
 
-            val entryTexts = listOf(
-                "crashed after standup, wired until 2am",
-                "tuesday meeting again, same concrete shoes",
-                "wrote that doc in one sitting, surprising",
-                "wired until 2am, can't tell if good or bad",
-                "another tuesday, another aftermath",
-                "shipped the thing, immediate crash",
-                "decided to rewrite the migration, third time this week",
-                "rewrote it again, this version is the one",
-                "tuesday standup landed harder than expected",
-                "audit cycle hit; reviewed everything twice",
-                "concrete shoes on the morning standup",
-                "crashed at 3pm, no warning, just gone",
+            data class SeedEntry(val text: String, val durationMs: Long)
+            val seedEntries = listOf(
+                SeedEntry("crashed after standup, wired until 2am", 18_000L),
+                SeedEntry("tuesday meeting again, same concrete shoes", 22_000L),
+                SeedEntry("wrote that doc in one sitting, surprising", 15_000L),
+                SeedEntry("wired until 2am, can't tell if good or bad", 27_000L),
+                SeedEntry("another tuesday, another aftermath", 12_000L),
+                SeedEntry("shipped the thing, immediate crash", 20_000L),
+                SeedEntry("decided to rewrite the migration, third time this week", 28_000L),
+                SeedEntry("rewrote it again, this version is the one", 19_000L),
+                SeedEntry("tuesday standup landed harder than expected", 24_000L),
+                SeedEntry("audit cycle hit; reviewed everything twice", 16_000L),
+                SeedEntry("concrete shoes on the morning standup", 11_000L),
+                SeedEntry("crashed at 3pm, no warning, just gone", 25_000L),
             )
             val baseMs = System.currentTimeMillis() - DAY_MS * ENTRY_COUNT
-            val entries = entryTexts.mapIndexed { idx, text ->
+            val entries = seedEntries.mapIndexed { idx, seed ->
                 EntryEntity(
                     markdownFilename = "debug-seed-$idx.md",
-                    entryText = text,
+                    entryText = seed.text,
                     timestampEpochMs = baseMs + idx * DAY_MS,
+                    durationMs = seed.durationMs,
                     extractionStatus = ExtractionStatus.COMPLETED,
                 ).also {
                     markdownStore.write(it)

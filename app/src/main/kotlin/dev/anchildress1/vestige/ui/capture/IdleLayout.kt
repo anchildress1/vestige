@@ -8,10 +8,13 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.windowInsetsBottomHeight
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -27,6 +30,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -41,8 +45,8 @@ import dev.anchildress1.vestige.ui.theme.VestigeTheme
  * Capture screen idle composition. Matches `poc/screenshots/capture-still.png` modulo the
  * deferred patterns peek + footer (out of scope this branch — see plan).
  */
+@Suppress("LongMethod", "LongParameterList") // Top-level Compose layout; chrome already bundled.
 @Composable
-@Suppress("LongParameterList") // Top-level Compose layout; chrome already bundled.
 fun IdleLayout(
     state: CaptureUiState.Idle,
     stats: CaptureStats,
@@ -94,12 +98,37 @@ fun IdleLayout(
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 18.dp, vertical = 18.dp),
+                    .padding(horizontal = 18.dp, vertical = 4.dp),
                 contentAlignment = Alignment.Center,
             ) {
                 PatternsLink(onClick = onTap)
             }
         }
+        if (chrome.lastEntryFooter != null) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 18.dp, vertical = 12.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                HistoryFooter(
+                    footer = chrome.lastEntryFooter,
+                    onHistoryTap = chrome.onHistoryTap,
+                )
+            }
+        } else {
+            chrome.onHistoryTap?.let { onTap ->
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 18.dp, vertical = 12.dp),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    HistoryLink(onClick = onTap)
+                }
+            }
+        }
+        Spacer(Modifier.windowInsetsBottomHeight(WindowInsets.navigationBars))
     }
 }
 
@@ -205,6 +234,50 @@ private fun heroAnnotated(full: String, highlightSuffix: String, inkColor: Color
             withStyle(SpanStyle(color = inkColor)) { append(full.substring(0, split)) }
         }
         withStyle(SpanStyle(color = accentColor)) { append(highlightSuffix) }
+    }
+}
+
+@Composable
+private fun HistoryFooter(footer: LastEntryFooter, onHistoryTap: (() -> Unit)?) {
+    val colors = VestigeTheme.colors
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        // Left group: prefix + stacked date + duration
+        Row(
+            modifier = Modifier.weight(1f),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            EyebrowE(text = CaptureCopy.HISTORY_FOOTER_PREFIX)
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                EyebrowE(text = footer.monthLabel, color = colors.faint)
+                Text(
+                    text = footer.dayLabel,
+                    style = VestigeTheme.typography.eyebrow.copy(fontSize = 16.sp),
+                    color = colors.ink,
+                )
+            }
+            Text(
+                text = footer.durationLabel,
+                style = VestigeTheme.typography.eyebrow,
+                color = colors.dim,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f),
+            )
+        }
+        if (onHistoryTap != null) {
+            HistoryLink(onClick = onHistoryTap, testTag = "history_footer_link")
+        } else {
+            Text(
+                text = CaptureCopy.HISTORY_LINK,
+                style = VestigeTheme.typography.personaLabel,
+                color = colors.dim,
+            )
+        }
     }
 }
 

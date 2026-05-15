@@ -45,6 +45,17 @@ kover {
                         // `Composer` + `$changed` Int args that produce uncoverable
                         // `if ($changed != 0 || !composer.skipping)` branches.
                         // Reference: kotlinx-kover #756 — "Wrong branch coverage for composables".
+                        // History screen Composables — same Composer / $changed branch tax
+                        // as other screen files (kotlinx-kover #756).
+                        "dev.anchildress1.vestige.ui.history.HistoryHostKt",
+                        "dev.anchildress1.vestige.ui.history.HistoryHostKt*",
+                        "dev.anchildress1.vestige.ui.history.*HistoryHostKt*",
+                        "dev.anchildress1.vestige.ui.history.HistoryRowKt",
+                        "dev.anchildress1.vestige.ui.history.HistoryRowKt*",
+                        "dev.anchildress1.vestige.ui.history.*HistoryRowKt*",
+                        "dev.anchildress1.vestige.ui.history.HistoryScreenKt",
+                        "dev.anchildress1.vestige.ui.history.HistoryScreenKt*",
+                        "dev.anchildress1.vestige.ui.history.*HistoryScreenKt*",
                         "dev.anchildress1.vestige.ui.patterns.PatternsListScreenKt",
                         "dev.anchildress1.vestige.ui.patterns.PatternsListScreenKt*",
                         "dev.anchildress1.vestige.ui.patterns.*PatternsListScreenKt*",
@@ -202,6 +213,9 @@ sonar {
                 // Compose @Composable bodies cap at ~50% branch coverage from `Composer` +
                 // `$changed` plugin instrumentation (kotlinx-kover #756); mirrors the kover
                 // excludes in `kover { reports { total { filters { excludes { classes(...) } } } }`.
+                "**/ui/history/HistoryHost.kt",
+                "**/ui/history/HistoryRow.kt",
+                "**/ui/history/HistoryScreen.kt",
                 "**/ui/patterns/PatternsListScreen.kt",
                 "**/ui/patterns/PatternDetailScreen.kt",
                 "**/ui/patterns/PatternsHost.kt",

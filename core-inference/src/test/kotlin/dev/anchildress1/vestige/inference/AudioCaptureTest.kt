@@ -168,6 +168,22 @@ class AudioCaptureTest {
     }
 
     @Test
+    fun `readUntilCapOrStop exits immediately when stop was requested before capture starts`() = runTest {
+        val capture = AudioCapture(sampleRateHz = 16_000, chunkDurationMs = 30_000L)
+        val builder = ChunkBuilder(samplesPerChunk = 1_000)
+        val readBuffer = FloatArray(8)
+        val record = mockk<AudioRecord>()
+        capture.requestStop()
+
+        val chunk = capture.readUntilCapOrStop(record, readBuffer, builder)
+
+        assertNull(chunk, "Pre-start stop must stay sticky for this recording session")
+        verify(exactly = 0) {
+            record.read(any<FloatArray>(), any(), any(), any())
+        }
+    }
+
+    @Test
     fun `readUntilCapOrStop throws when AudioRecord_read returns a negative error code`() = runTest {
         val capture = AudioCapture(sampleRateHz = 16_000, chunkDurationMs = 30_000L)
         val builder = ChunkBuilder(samplesPerChunk = 1_000)

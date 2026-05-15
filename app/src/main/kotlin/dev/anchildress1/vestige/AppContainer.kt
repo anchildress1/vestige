@@ -140,7 +140,14 @@ class AppContainer(
         CoroutineScope,
         PatternDetectionOrchestrator?,
     ) -> BackgroundExtractionSaveFlow =
-        { entryStore, worker, observationGenerator, listenerFactory, extractionScope, orchestrator ->
+        {
+                entryStore,
+                worker,
+                observationGenerator,
+                listenerFactory,
+                extractionScope,
+                orchestrator,
+            ->
             BackgroundExtractionSaveFlow(
                 entryStore = entryStore,
                 worker = worker,
@@ -409,7 +416,6 @@ class AppContainer(
                 )
             }
         }
-        _dataRevision.value += 1
     }
 
     private suspend fun recoverOneEntry(entryId: Long, entryText: String, capturedAt: ZonedDateTime) {

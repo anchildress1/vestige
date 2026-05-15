@@ -38,7 +38,6 @@ class AudioCapture(
 
     @RequiresPermission(Manifest.permission.RECORD_AUDIO)
     fun captureChunks(): Flow<AudioChunk> = flow {
-        stopRequested.set(false)
         val samplesPerChunk = (sampleRateHz.toLong() * chunkDurationMs / MS_PER_SECOND).toInt()
         val bufferBytes = resolveBufferBytes()
         val readBuffer = FloatArray(bufferBytes / BYTES_PER_FLOAT)

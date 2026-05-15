@@ -1005,6 +1005,7 @@ class AppContainerTest {
 
             coVerify(exactly = 1) { saveFlow.recoverEntry(firstId, "typed-1", any(), any()) }
             coVerify(exactly = 1) { saveFlow.recoverEntry(secondId, "typed-2", any(), any()) }
+            assertEquals(0L, container.dataRevision.value)
         } finally {
             container.close()
             cleanupObjectBoxTempRoot(tempRoot, dataDir)

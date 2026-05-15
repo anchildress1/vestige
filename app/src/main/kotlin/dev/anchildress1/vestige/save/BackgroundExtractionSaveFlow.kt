@@ -179,6 +179,9 @@ class BackgroundExtractionSaveFlow(
         // Runs after the terminal commit so a callout failure can't unwind the resolved
         // entry. Best-effort — failures are swallowed in runPatternOrchestration.
         runPatternOrchestration(entryId, persona)
+        if (patternOrchestrator != null) {
+            terminalRelay.emitTerminal(ExtractionStatus.COMPLETED, entryAttemptCount, null)
+        }
     }
 
     private suspend fun runPatternOrchestration(entryId: Long, persona: Persona): EntryObservation? {

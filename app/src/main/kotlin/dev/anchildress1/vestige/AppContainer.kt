@@ -50,11 +50,13 @@ import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.joinAll
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -196,9 +198,11 @@ class AppContainer(
     private val embedderInitMutex = Mutex()
     private val modelMutationMutex = Mutex()
     private val readinessRefreshMutex = Mutex()
+    private val trackedExtractionJobsMutex = Mutex()
     private val vectorBackfillMutex = Mutex()
     private val vectorBackfillRunning = AtomicBoolean(false)
     private val vectorBackfillRequested = AtomicBoolean(false)
+    private val trackedExtractionJobs: MutableSet<Job> = linkedSetOf()
 
     @Volatile
     private var backgroundEngineInitialized = false
@@ -412,6 +416,7 @@ class AppContainer(
             durationMs = durationMs,
             followUpText = followUpText,
         )
+        trackExtractionJob(outcome.extractionJob)
         launchVectorBackfillIfReady()
         return outcome
     }
@@ -452,6 +457,7 @@ class AppContainer(
     fun deleteMainModel() {
         scope.launch {
             runMainModelMutation(name = "delete model") {
+                cancelTrackedExtractionsAndResetLifecycle()
                 resetBackgroundEngine()
                 val artifact = mainModelArtifactStore.artifactFile
                 if (!artifact.delete()) Log.w(TAG, "Failed to delete model artifact")
@@ -477,6 +483,7 @@ class AppContainer(
     fun redownloadMainModel() {
         scope.launch {
             runMainModelMutation(name = "re-download model") {
+                cancelTrackedExtractionsAndResetLifecycle()
                 resetBackgroundEngine()
                 val store = mainModelArtifactStore
                 deleteArtifactFiles(store.artifactFile)
@@ -534,7 +541,7 @@ class AppContainer(
      * Per `ux-copy.md` §"Destructive Confirmations / Delete all data".
      */
     suspend fun wipeAllData() {
-        foregroundServiceStopper(foregroundServiceIntentFactory())
+        cancelTrackedExtractionsAndResetLifecycle()
         withContext(ioDispatcher) {
             boxStore.boxFor(EntryEntity::class.java).removeAll()
             boxStore.boxFor(PatternEntity::class.java).removeAll()
@@ -543,9 +550,6 @@ class AppContainer(
             markdownStore.listAll().forEach { if (!it.delete()) Log.w(TAG, "Failed to delete markdown file") }
             Log.i(TAG, "All user data wiped on explicit request")
         }
-        statusBus.clear()
-        lifecycleStateMachine.onInFlightCountChange(0)
-        lifecycleStateMachine.onServiceKilled()
         _dataRevision.value += 1
     }
 
@@ -598,24 +602,21 @@ class AppContainer(
 
     private suspend fun recoverOneEntry(entryId: Long, entryText: String, capturedAt: ZonedDateTime) {
         runCatching {
-            backgroundExtractionSaveFlow.recoverEntry(
+            val job = backgroundExtractionSaveFlow.recoverEntry(
                 entryId = entryId,
                 entryText = entryText,
                 capturedAt = capturedAt,
                 persona = Persona.WITNESS,
             )
+            trackExtractionJob(job)
         }.onFailure { Log.e(TAG, "Recovery extraction failed for entry $entryId", it) }
     }
 
-    private fun mainModelArtifactLooksPresent(): Boolean = runCatching {
-        val store = mainModelArtifactStore
-        val file = store.artifactFile
-        file.exists() && file.length() == store.manifest.expectedByteSize
-    }.onFailure { Log.e(TAG, "Failed to probe main model artifact", it) }
-        .getOrDefault(false)
+    private suspend fun mainModelArtifactLooksPresent(): Boolean =
+        verifiedMainModelState() is ModelArtifactState.Complete
 
     private suspend fun probeModelReadiness(previous: ModelReadiness): ModelReadiness = runCatching {
-        when (val state = mainModelArtifactStore.probe()) {
+        when (val state = verifiedMainModelState()) {
             ModelArtifactState.Absent -> ModelReadiness.Loading
 
             ModelArtifactState.Complete -> ModelReadiness.Ready
@@ -635,6 +636,38 @@ class AppContainer(
         }
     }.onFailure { Log.e(TAG, "Failed to probe model readiness", it) }
         .getOrDefault(ModelReadiness.Loading)
+
+    private suspend fun verifiedMainModelState(): ModelArtifactState {
+        val probed = mainModelArtifactStore.probe()
+        return if (probed == ModelArtifactState.Complete) {
+            mainModelArtifactStore.currentState()
+        } else {
+            probed
+        }
+    }
+
+    private suspend fun trackExtractionJob(job: Job) {
+        trackedExtractionJobsMutex.withLock { trackedExtractionJobs.add(job) }
+        job.invokeOnCompletion {
+            scope.launch {
+                trackedExtractionJobsMutex.withLock { trackedExtractionJobs.remove(job) }
+            }
+        }
+    }
+
+    private suspend fun cancelTrackedExtractionJobs() {
+        val jobs = trackedExtractionJobsMutex.withLock { trackedExtractionJobs.toList() }
+        jobs.forEach(Job::cancel)
+        jobs.joinAll()
+    }
+
+    private suspend fun cancelTrackedExtractionsAndResetLifecycle() {
+        foregroundServiceStopper(foregroundServiceIntentFactory())
+        cancelTrackedExtractionJobs()
+        statusBus.clear()
+        lifecycleStateMachine.onInFlightCountChange(0)
+        lifecycleStateMachine.onServiceKilled()
+    }
 
     private suspend fun runMainModelMutation(name: String, block: suspend () -> Unit) {
         if (!modelMutationMutex.tryLock()) {

@@ -30,6 +30,7 @@ import io.mockk.coVerify
 import io.mockk.coVerifyOrder
 import io.mockk.every
 import io.mockk.mockk
+import io.mockk.verify
 import io.objectbox.BoxStore
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -442,31 +443,53 @@ class AppContainerTest {
     fun `deleteMainModel removes the artifact and drops readiness to Loading`(@TempDir tempRoot: File) = runTest {
         val modelFile = File(tempRoot, "main-model.litertlm").apply { writeText("xx") } // 2 bytes
         val artifactStore = fakeArtifactStore(artifactFile = modelFile, expectedByteSize = 2L)
+        val extractionFinished = CompletableDeferred<Unit>()
+        val extractionJob = kotlinx.coroutines.Job().also { job ->
+            job.invokeOnCompletion {
+                extractionFinished.complete(Unit)
+            }
+        }
         val context = mockk<Context>(relaxed = true) {
             every { filesDir } returns tempRoot
             every { cacheDir } returns File(tempRoot, "cache").apply { mkdirs() }
         }
+        val engineMock = mockk<LiteRtLmEngine>(relaxed = true)
+        val saveFlow = mockk<BackgroundExtractionSaveFlow>()
+        coEvery { saveFlow.saveAndExtract(any(), any(), any(), any(), any(), any(), any()) } returns
+            SaveOutcome.Pending(entryId = 7L, extractionJob = extractionJob)
+        var stopRequests = 0
         val container = AppContainer(
             applicationContext = context,
             boxStoreFactory = { mockk<BoxStore>(relaxed = true) },
             markdownStoreFactory = { mockk<MarkdownEntryStore>(relaxed = true) },
             modelPathLoader = { modelFile.absolutePath },
-            backgroundEngineFactory = { _, _ -> mockk<LiteRtLmEngine>(relaxed = true) },
+            backgroundEngineFactory = { _, _ -> engineMock },
             mainModelArtifactStoreFactory = { _, _, _ -> artifactStore },
+            backgroundExtractionSaveFlowFactory = { _, _, _, _, _, _ -> saveFlow },
             recoveredEntryIdsLoader = { emptyList() },
             foregroundServiceIntentFactory = { Intent("dev.anchildress1.vestige.TEST_START") },
             foregroundServiceStarter = {},
+            foregroundServiceStopper = { stopRequests += 1 },
             scope = this,
         )
         container.refreshModelReadiness()
         advanceUntilIdle()
         assertEquals(ModelReadiness.Ready, container.modelReadinessFlow.value)
+        container.ensureBackgroundEngineInitialized()
+        container.saveAndExtract("still running", CAPTURED_AT)
+        container.lifecycleStateMachine.onInFlightCountChange(1)
+        assertEquals(BackgroundExtractionLifecycleState.PROMOTING, container.lifecycleStateMachine.state.value)
 
         container.deleteMainModel()
         advanceUntilIdle()
 
         assertTrue(!modelFile.exists(), "artifact file must be gone after deleteMainModel")
         assertEquals(ModelReadiness.Loading, container.modelReadinessFlow.value)
+        assertTrue(extractionJob.isCancelled)
+        assertTrue(extractionFinished.isCompleted)
+        assertEquals(1, stopRequests)
+        assertEquals(BackgroundExtractionLifecycleState.NORMAL, container.lifecycleStateMachine.state.value)
+        verify(exactly = 1) { engineMock.close() }
     }
 
     @Test
@@ -515,27 +538,50 @@ class AppContainerTest {
             modelFile.writeText("xx")
             ModelArtifactState.Complete
         }
+        val extractionFinished = CompletableDeferred<Unit>()
+        val extractionJob = kotlinx.coroutines.Job().also { job ->
+            job.invokeOnCompletion {
+                extractionFinished.complete(Unit)
+            }
+        }
         val context = mockk<Context>(relaxed = true) {
             every { filesDir } returns tempRoot
             every { cacheDir } returns File(tempRoot, "cache").apply { mkdirs() }
         }
+        val engineMock = mockk<LiteRtLmEngine>(relaxed = true)
+        val saveFlow = mockk<BackgroundExtractionSaveFlow>()
+        coEvery { saveFlow.saveAndExtract(any(), any(), any(), any(), any(), any(), any()) } returns
+            SaveOutcome.Pending(entryId = 9L, extractionJob = extractionJob)
+        var stopRequests = 0
         val container = AppContainer(
             applicationContext = context,
             boxStoreFactory = { mockk<BoxStore>(relaxed = true) },
             markdownStoreFactory = { mockk<MarkdownEntryStore>(relaxed = true) },
             modelPathLoader = { modelFile.absolutePath },
-            backgroundEngineFactory = { _, _ -> mockk<LiteRtLmEngine>(relaxed = true) },
+            backgroundEngineFactory = { _, _ -> engineMock },
             mainModelArtifactStoreFactory = { _, _, _ -> artifactStore },
+            backgroundExtractionSaveFlowFactory = { _, _, _, _, _, _ -> saveFlow },
             recoveredEntryIdsLoader = { emptyList() },
             foregroundServiceIntentFactory = { Intent("dev.anchildress1.vestige.TEST_START") },
             foregroundServiceStarter = {},
+            foregroundServiceStopper = { stopRequests += 1 },
             scope = this,
         )
+        container.ensureBackgroundEngineInitialized()
+        container.saveAndExtract("still running", CAPTURED_AT)
+        container.lifecycleStateMachine.onInFlightCountChange(1)
+        assertEquals(BackgroundExtractionLifecycleState.PROMOTING, container.lifecycleStateMachine.state.value)
 
         container.redownloadMainModel()
         advanceUntilIdle()
 
         coVerify(exactly = 1) { artifactStore.download(any()) }
+        assertTrue(extractionJob.isCancelled)
+        assertTrue(extractionFinished.isCompleted)
+        assertEquals(1, stopRequests)
+        assertEquals(BackgroundExtractionLifecycleState.NORMAL, container.lifecycleStateMachine.state.value)
+        verify(exactly = 1) { engineMock.close() }
+        coVerify(exactly = 2) { engineMock.initialize() }
         assertTrue(modelFile.exists(), "re-pull must land the artifact on disk")
         assertEquals(ModelReadiness.Ready, container.modelReadinessFlow.value)
     }
@@ -610,6 +656,53 @@ class AppContainerTest {
 
         assertEquals(ModelReadiness.Paused, container.modelReadinessFlow.value)
     }
+
+    @Test
+    fun `refreshModelReadiness leaves a checksum-corrupt full-size artifact Loading`(@TempDir tempRoot: File) =
+        runTest {
+            val modelFile = File(tempRoot, "main-model.litertlm").apply { writeText("xx") }
+            val manifest = ModelManifest(
+                schemaVersion = ModelManifest.SUPPORTED_SCHEMA_VERSION,
+                artifactRepo = "test",
+                filename = modelFile.name,
+                downloadUrl = "https://example.invalid/${modelFile.name}",
+                expectedByteSize = 2L,
+                sha256 = "expected",
+                allowedHosts = listOf("example.invalid"),
+            )
+            val artifactStore = mockk<ModelArtifactStore>(relaxed = true) {
+                every { this@mockk.artifactFile } returns modelFile
+                every { this@mockk.manifest } returns manifest
+                coEvery { this@mockk.probe() } returns ModelArtifactState.Complete
+                coEvery {
+                    this@mockk.currentState()
+                } returns ModelArtifactState.Corrupt(expectedSha256 = "expected", actualSha256 = "actual")
+            }
+            val engineMock = mockk<LiteRtLmEngine>(relaxed = true)
+            val context = mockk<Context>(relaxed = true) {
+                every { filesDir } returns tempRoot
+                every { cacheDir } returns File(tempRoot, "cache").apply { mkdirs() }
+            }
+            val container = AppContainer(
+                applicationContext = context,
+                boxStoreFactory = { mockk<BoxStore>(relaxed = true) },
+                markdownStoreFactory = { mockk<MarkdownEntryStore>(relaxed = true) },
+                modelPathLoader = { modelFile.absolutePath },
+                backgroundEngineFactory = { _, _ -> engineMock },
+                mainModelArtifactStoreFactory = { _, _, _ -> artifactStore },
+                recoveredEntryIdsLoader = { emptyList() },
+                foregroundServiceIntentFactory = { Intent("dev.anchildress1.vestige.TEST_START") },
+                foregroundServiceStarter = {},
+                scope = this,
+            )
+
+            container.refreshModelReadiness()
+            advanceUntilIdle()
+
+            assertEquals(ModelReadiness.Loading, container.modelReadinessFlow.value)
+            coVerify(exactly = 1) { artifactStore.currentState() }
+            coVerify(exactly = 0) { engineMock.initialize() }
+        }
 
     @Test
     fun `redownloadMainModel ignores a second request while the first download is active`(@TempDir tempRoot: File) =
@@ -715,6 +808,50 @@ class AppContainerTest {
             assertEquals(1, stopRequests)
             assertEquals(BackgroundExtractionLifecycleState.NORMAL, container.lifecycleStateMachine.state.value)
             assertTrue(container.dataRevision.value > revisionBefore)
+        } finally {
+            box.close()
+        }
+    }
+
+    @Test
+    fun `wipeAllData cancels detached extraction jobs before returning`(@TempDir tempRoot: File) = runTest {
+        val boxDir = newInMemoryObjectBoxDirectory("wipe-jobs")
+        val box = openInMemoryBoxStore(boxDir)
+        try {
+            val extractionFinished = CompletableDeferred<Unit>()
+            val extractionJob = kotlinx.coroutines.Job().also { job ->
+                job.invokeOnCompletion {
+                    extractionFinished.complete(Unit)
+                }
+            }
+            val saveFlow = mockk<BackgroundExtractionSaveFlow>()
+            coEvery { saveFlow.saveAndExtract(any(), any(), any(), any(), any(), any(), any()) } returns
+                SaveOutcome.Pending(entryId = 7L, extractionJob = extractionJob)
+            val context = mockk<Context>(relaxed = true) {
+                every { filesDir } returns tempRoot
+                every { cacheDir } returns File(tempRoot, "cache").apply { mkdirs() }
+            }
+            val container = AppContainer(
+                applicationContext = context,
+                boxStoreFactory = { box },
+                markdownStoreFactory = { MarkdownEntryStore(tempRoot) },
+                modelPathLoader = { File(tempRoot, "m").absolutePath },
+                backgroundEngineFactory = { _, _ -> mockk<LiteRtLmEngine>(relaxed = true) },
+                mainModelArtifactStoreFactory = { _, _, _ -> fakeArtifactStore(File(tempRoot, "m"), 1L) },
+                backgroundExtractionSaveFlowFactory = { _, _, _, _, _, _ -> saveFlow },
+                recoveredEntryIdsLoader = { emptyList() },
+                foregroundServiceIntentFactory = { Intent("dev.anchildress1.vestige.TEST_START") },
+                foregroundServiceStarter = {},
+                foregroundServiceStopper = {},
+                scope = backgroundScope,
+            )
+
+            container.saveAndExtract("wipe me", CAPTURED_AT)
+            container.wipeAllData()
+            advanceUntilIdle()
+
+            assertTrue(extractionJob.isCancelled)
+            assertTrue(extractionFinished.isCompleted)
         } finally {
             box.close()
         }
@@ -839,6 +976,22 @@ class AppContainerTest {
             every { this@mockk.artifactFile } returns artifactFile
             every { this@mockk.manifest } returns manifest
             coEvery { this@mockk.probe() } answers {
+                when {
+                    !artifactFile.exists() -> ModelArtifactState.Absent
+
+                    artifactFile.length() < expectedByteSize ->
+                        ModelArtifactState.Partial(artifactFile.length(), expectedByteSize)
+
+                    artifactFile.length() > expectedByteSize ->
+                        ModelArtifactState.Corrupt(
+                            expectedSha256 = manifest.sha256,
+                            actualSha256 = "size_mismatch",
+                        )
+
+                    else -> ModelArtifactState.Complete
+                }
+            }
+            coEvery { this@mockk.currentState() } answers {
                 when {
                     !artifactFile.exists() -> ModelArtifactState.Absent
 

@@ -193,6 +193,7 @@ class AppContainer(
     private val backgroundEngineInitMutex = Mutex()
     private val embedderInitMutex = Mutex()
     private val modelMutationMutex = Mutex()
+    private val readinessRefreshMutex = Mutex()
     private val vectorBackfillMutex = Mutex()
     private val vectorBackfillRunning = AtomicBoolean(false)
     private val vectorBackfillRequested = AtomicBoolean(false)
@@ -422,15 +423,20 @@ class AppContainer(
      */
     fun refreshModelReadiness() {
         scope.launch {
-            val previous = _modelReadinessFlow.value
-            val current = probeModelReadiness(previous)
-            if (previous == current) return@launch
-            _modelReadinessFlow.value = current
-            if (current is ModelReadiness.Ready && previous !is ModelReadiness.Ready) {
-                scope.launch { recoverPendingExtractions() }
-                scope.launch {
-                    delay(ENGINE_PREWARM_DELAY_MS)
-                    ensureBackgroundEngineInitialized()
+            // Serialize probe→compare→set so concurrent callers (lifecycle resume + a model
+            // action) can't interleave and let an older probe overwrite a newer readiness.
+            // Each caller queues and re-probes after the prior completes (Codex review #4).
+            readinessRefreshMutex.withLock {
+                val previous = _modelReadinessFlow.value
+                val current = probeModelReadiness(previous)
+                if (previous == current) return@withLock
+                _modelReadinessFlow.value = current
+                if (current is ModelReadiness.Ready && previous !is ModelReadiness.Ready) {
+                    scope.launch { recoverPendingExtractions() }
+                    scope.launch {
+                        delay(ENGINE_PREWARM_DELAY_MS)
+                        ensureBackgroundEngineInitialized()
+                    }
                 }
             }
         }
@@ -471,7 +477,7 @@ class AppContainer(
                 artifact.delete()
                 _modelReadinessFlow.value = ModelReadiness.Downloading(0)
                 networkGate.openForDownload(reason = "Model Status — user-requested re-download")
-                try {
+                val result: ModelArtifactState? = try {
                     store.download { current, expected ->
                         val pct = if (expected > 0L) {
                             ((current * PCT_MAX) / expected).toInt().coerceIn(0, PCT_MAX)
@@ -484,10 +490,25 @@ class AppContainer(
                     throw cancel
                 } catch (@Suppress("TooGenericExceptionCaught") error: Exception) {
                     Log.e(TAG, "Model re-download failed", error)
+                    null
                 } finally {
                     networkGate.seal()
-                    refreshModelReadiness()
                 }
+                // Honor the terminal result (Codex review #1/#3). The size-only probe would read
+                // a checksum-corrupt full-size file as Complete → false Ready, so discard it.
+                // Anything other than Complete must not stay Downloading — Model Status actions
+                // are disabled in that state — so drop to a non-Downloading readiness and let the
+                // probe resolve to Paused (.part remains) or Loading (discarded), keeping the
+                // retry/delete affordances live.
+                if (result is ModelArtifactState.Corrupt) {
+                    Log.e(TAG, "Re-download produced a checksum-corrupt artifact; discarding")
+                    store.artifactFile.delete()
+                    File(store.artifactFile.parentFile, "${store.artifactFile.name}.part").delete()
+                }
+                if (result != ModelArtifactState.Complete) {
+                    _modelReadinessFlow.value = ModelReadiness.Paused
+                }
+                refreshModelReadiness()
             }
         }
     }

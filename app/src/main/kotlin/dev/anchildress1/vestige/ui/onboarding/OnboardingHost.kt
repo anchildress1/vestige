@@ -386,7 +386,9 @@ private suspend fun performModelDownload(
     val watchdog = launch {
         while (isActive) {
             delay(WATCHDOG_TICK_MS)
-            if (status.phase == DownloadPhase.Active &&
+            // Reacquiring is an active transfer too (the corrupt-artifact auto re-pull); a hang
+            // there must still surface stall + Retry, not be suppressed (Codex review #5).
+            if ((status.phase == DownloadPhase.Active || status.phase == DownloadPhase.Reacquiring) &&
                 isStalled(lastProgressAtMs.get(), System.currentTimeMillis())
             ) {
                 publish(status.copy(phase = DownloadPhase.Stalled))

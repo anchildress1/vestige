@@ -63,27 +63,26 @@ class ForegroundInferenceTest {
     }
 
     @Test
-    fun `runForegroundTextCall returns Success when engine response parses cleanly`(@TempDir cacheDir: File) =
-        runTest {
-            val engine = mockk<LiteRtLmEngine>()
-            coEvery { engine.sendMessageContents(any()) } returns rawSuccess(
-                transcription = "just got off the call again",
-                followUp = "what did they actually want",
-            )
+    fun `runForegroundTextCall returns Success on a clean response`(@TempDir cacheDir: File) = runTest {
+        val engine = mockk<LiteRtLmEngine>()
+        coEvery { engine.sendMessageContents(any()) } returns rawSuccess(
+            transcription = "just got off the call again",
+            followUp = "what did they actually want",
+        )
 
-            val result = ForegroundInference(engine, cacheDir, clock = fixedClock).runForegroundTextCall(
-                text = "just got off the call again",
-                persona = Persona.EDITOR,
-            )
+        val result = ForegroundInference(engine, cacheDir, clock = fixedClock).runForegroundTextCall(
+            text = "just got off the call again",
+            persona = Persona.EDITOR,
+        )
 
-            val success = assertInstanceOf(ForegroundResult.Success::class.java, result)
-            assertAll(
-                { assertEquals("just got off the call again", success.transcription) },
-                { assertEquals("what did they actually want", success.followUp) },
-                { assertEquals(Persona.EDITOR, success.persona) },
-                { assertEquals(completedAt, success.completedAt) },
-            )
-        }
+        val success = assertInstanceOf(ForegroundResult.Success::class.java, result)
+        assertAll(
+            { assertEquals("just got off the call again", success.transcription) },
+            { assertEquals("what did they actually want", success.followUp) },
+            { assertEquals(Persona.EDITOR, success.persona) },
+            { assertEquals(completedAt, success.completedAt) },
+        )
+    }
 
     @Test
     fun `runForegroundTextCall surfaces ParseFailure without throwing`(@TempDir cacheDir: File) = runTest {

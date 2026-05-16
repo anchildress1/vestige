@@ -77,32 +77,31 @@ class ForegroundInference(
      * is required (no model-free typed path); the caller gates on readiness.
      */
     // Engine handle is single-threaded; do not call concurrently against the same engine.
-    suspend fun runForegroundTextCall(text: String, persona: Persona): ForegroundResult =
-        withContext(ioDispatcher) {
-            require(text.isNotBlank()) { "ForegroundInference requires non-blank typed text." }
+    suspend fun runForegroundTextCall(text: String, persona: Persona): ForegroundResult = withContext(ioDispatcher) {
+        require(text.isNotBlank()) { "ForegroundInference requires non-blank typed text." }
 
-            val callStartedAt = clock.instant()
-            val systemPrompt = composeSystemPrompt(persona, callStartedAt)
-            val started = System.nanoTime()
-            val rawResponse = engine.sendMessageContents(
-                listOf(
-                    Content.Text(systemPrompt),
-                    Content.Text(text),
-                ),
-            )
-            val elapsedMs = (System.nanoTime() - started) / NANOS_PER_MILLI
-            Log.d(
-                TAG,
-                "runForegroundTextCall persona=$persona elapsed=${elapsedMs}ms raw=${rawResponse.length}c",
-            )
+        val callStartedAt = clock.instant()
+        val systemPrompt = composeSystemPrompt(persona, callStartedAt)
+        val started = System.nanoTime()
+        val rawResponse = engine.sendMessageContents(
+            listOf(
+                Content.Text(systemPrompt),
+                Content.Text(text),
+            ),
+        )
+        val elapsedMs = (System.nanoTime() - started) / NANOS_PER_MILLI
+        Log.d(
+            TAG,
+            "runForegroundTextCall persona=$persona elapsed=${elapsedMs}ms raw=${rawResponse.length}c",
+        )
 
-            ForegroundResponseParser.parse(
-                raw = rawResponse,
-                persona = persona,
-                elapsedMs = elapsedMs,
-                completedAt = clock.instant(),
-            )
-        }
+        ForegroundResponseParser.parse(
+            raw = rawResponse,
+            persona = persona,
+            elapsedMs = elapsedMs,
+            completedAt = clock.instant(),
+        )
+    }
 
     // Truncate-then-retry-delete on failure so audio bytes are unrecoverable even if the inode
     // survives. `internal` for JVM testability.

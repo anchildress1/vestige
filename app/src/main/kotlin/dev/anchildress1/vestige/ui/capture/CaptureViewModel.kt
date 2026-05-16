@@ -298,11 +298,7 @@ class CaptureViewModel(
 
     // Shared foreground result handler for both the voice path (audio call) and the typed path
     // (text call). `durationMs` is the audio length for voice, 0 for typed.
-    private suspend fun runForeground(
-        persona: Persona,
-        durationMs: Long,
-        call: suspend () -> ForegroundResult,
-    ) {
+    private suspend fun runForeground(persona: Persona, durationMs: Long, call: suspend () -> ForegroundResult) {
         try {
             when (val result = call()) {
                 is ForegroundResult.Success -> {

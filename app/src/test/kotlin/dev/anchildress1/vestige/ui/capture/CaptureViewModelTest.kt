@@ -337,54 +337,52 @@ class CaptureViewModelTest {
     }
 
     @Test
-    fun `submitTyped runs the foreground text call and reviews with the model follow-up`() =
-        runTest(dispatcher) {
-            val save = RecordingSaveAndExtract()
-            val vm = newViewModel(
-                save = save,
-                textInference = ForegroundTextInferenceCall { text, persona ->
-                    ForegroundResult.Success(
-                        persona = persona,
-                        rawResponse = "<x/>",
-                        elapsedMs = 800,
-                        completedAt = clock.instant(),
-                        transcription = text,
-                        followUp = "and then what",
-                    )
-                },
-                initialReadiness = ModelReadiness.Ready,
-            )
+    fun `submitTyped runs the foreground text call and reviews with the model follow-up`() = runTest(dispatcher) {
+        val save = RecordingSaveAndExtract()
+        val vm = newViewModel(
+            save = save,
+            textInference = ForegroundTextInferenceCall { text, persona ->
+                ForegroundResult.Success(
+                    persona = persona,
+                    rawResponse = "<x/>",
+                    elapsedMs = 800,
+                    completedAt = clock.instant(),
+                    transcription = text,
+                    followUp = "and then what",
+                )
+            },
+            initialReadiness = ModelReadiness.Ready,
+        )
 
-            vm.submitTyped("just got off the call again")
-            advanceUntilIdle()
+        vm.submitTyped("just got off the call again")
+        advanceUntilIdle()
 
-            assertEquals(1, save.invocations.get())
-            val reviewing = vm.state.value as CaptureUiState.Reviewing
-            assertEquals("just got off the call again", reviewing.review.transcription)
-            assertEquals("and then what", reviewing.review.followUp)
-        }
+        assertEquals(1, save.invocations.get())
+        val reviewing = vm.state.value as CaptureUiState.Reviewing
+        assertEquals("just got off the call again", reviewing.review.transcription)
+        assertEquals("and then what", reviewing.review.followUp)
+    }
 
     @Test
-    fun `submitTyped is a silent no-op when the model is not Ready (parity with disabled REC)`() =
-        runTest(dispatcher) {
-            val save = RecordingSaveAndExtract()
-            val textCalls = AtomicInteger(0)
-            val vm = newViewModel(
-                save = save,
-                textInference = ForegroundTextInferenceCall { _, _ ->
-                    textCalls.incrementAndGet()
-                    parseFailure()
-                },
-                initialReadiness = ModelReadiness.Loading,
-            )
+    fun `submitTyped is a silent no-op when the model is not Ready (parity with disabled REC)`() = runTest(dispatcher) {
+        val save = RecordingSaveAndExtract()
+        val textCalls = AtomicInteger(0)
+        val vm = newViewModel(
+            save = save,
+            textInference = ForegroundTextInferenceCall { _, _ ->
+                textCalls.incrementAndGet()
+                parseFailure()
+            },
+            initialReadiness = ModelReadiness.Loading,
+        )
 
-            vm.submitTyped("just typed it")
-            advanceUntilIdle()
+        vm.submitTyped("just typed it")
+        advanceUntilIdle()
 
-            assertTrue(vm.state.value is CaptureUiState.Idle)
-            assertEquals(0, save.invocations.get())
-            assertEquals(0, textCalls.get())
-        }
+        assertTrue(vm.state.value is CaptureUiState.Idle)
+        assertEquals(0, save.invocations.get())
+        assertEquals(0, textCalls.get())
+    }
 
     @Test
     fun `submitTyped parse failure surfaces InferenceFailed PARSE_FAILED`() = runTest(dispatcher) {

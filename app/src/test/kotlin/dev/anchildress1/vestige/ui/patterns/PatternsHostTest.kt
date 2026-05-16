@@ -4,6 +4,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -22,6 +23,7 @@ import dev.anchildress1.vestige.testing.cleanupObjectBoxTempRoot
 import dev.anchildress1.vestige.testing.newInMemoryObjectBoxDirectory
 import dev.anchildress1.vestige.testing.newModuleTempRoot
 import dev.anchildress1.vestige.testing.openInMemoryBoxStore
+import dev.anchildress1.vestige.ui.history.EntryDetailCopy
 import io.objectbox.BoxStore
 import org.junit.After
 import org.junit.Assert.assertTrue
@@ -100,6 +102,37 @@ class PatternsHostTest {
         composeRule.waitForIdle()
         composeRule.onNodeWithText("● NEW ENTRY").assertIsDisplayed()
         composeRule.onNodeWithTag("entry_source_highlight").assertIsDisplayed()
+    }
+
+    @Test
+    fun `new entry from entry detail clears stale detail nav and exits`() {
+        val supporting = listOf(seedEntry("crashed after standup"))
+        seedActivePattern("p-host", "Tuesday Meetings", "Aftermath", "Callout.", supporting)
+        var exited = false
+
+        composeRule.activity.setContent {
+            PatternsHost(
+                patternStore = patternStore,
+                patternRepo = patternRepo,
+                entryStore = entryStore,
+                zoneId = ZoneOffset.UTC,
+                onExit = { exited = true },
+            )
+        }
+
+        composeRule.onNodeWithText("Tuesday Meetings").performClick()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithText("crashed after standup").performScrollTo().performClick()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithText("● NEW ENTRY").assertIsDisplayed()
+
+        composeRule.onNodeWithContentDescription(EntryDetailCopy.NEW_ENTRY_CD).performClick()
+        composeRule.waitForIdle()
+
+        assertTrue("onNewEntry must call onExit", exited)
+        // Regression guard: openEntryId is rememberSaveable; the explicit reset must drop the
+        // stale entry detail. Falls back to the pattern detail (openPatternId still set).
+        composeRule.onNodeWithText("Callout.").assertIsDisplayed()
     }
 
     @Test

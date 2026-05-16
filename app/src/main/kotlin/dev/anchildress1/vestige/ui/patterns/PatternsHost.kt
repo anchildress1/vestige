@@ -35,24 +35,24 @@ fun PatternsHost(
     }
 
     when {
-        openEntryId != null -> {
-            BackHandler {
+        openEntryId != null -> PatternEntryDetailRoute(
+            entryId = openEntryId!!,
+            entryStore = entryStore,
+            zoneId = zoneId,
+            highlightOnOpen = highlightEntryOnOpen,
+            onClose = {
                 openEntryId = null
                 highlightEntryOnOpen = false
-            }
-            EntryDetailHost(
-                entryId = openEntryId!!,
-                entryStore = entryStore,
-                zoneId = zoneId,
-                onBack = {
-                    openEntryId = null
-                    highlightEntryOnOpen = false
-                },
-                onNewEntry = onExit,
-                highlightOnOpen = highlightEntryOnOpen,
-                modifier = modifier,
-            )
-        }
+            },
+            // Clear detail nav before leaving — openEntryId is rememberSaveable, so without
+            // this a later return to Patterns would re-open the stale detail.
+            onNewEntry = {
+                openEntryId = null
+                highlightEntryOnOpen = false
+                onExit()
+            },
+            modifier = modifier,
+        )
 
         detailViewModel == null -> {
             BackHandler(onBack = onExit)
@@ -82,4 +82,27 @@ fun PatternsHost(
             )
         }
     }
+}
+
+@Suppress("LongParameterList") // Route seam: ids + store + zone + nav callbacks + modifier.
+@Composable
+private fun PatternEntryDetailRoute(
+    entryId: Long,
+    entryStore: EntryStore,
+    zoneId: ZoneId,
+    highlightOnOpen: Boolean,
+    onClose: () -> Unit,
+    onNewEntry: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    BackHandler(onBack = onClose)
+    EntryDetailHost(
+        entryId = entryId,
+        entryStore = entryStore,
+        zoneId = zoneId,
+        onBack = onClose,
+        onNewEntry = onNewEntry,
+        highlightOnOpen = highlightOnOpen,
+        modifier = modifier,
+    )
 }

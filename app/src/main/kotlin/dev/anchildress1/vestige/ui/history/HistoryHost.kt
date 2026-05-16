@@ -72,7 +72,13 @@ fun HistoryHost( // NOSONAR kotlin:S107
                     openEntryId = null
                     highlightOnOpen = false
                 },
-                onNewEntry = onExit,
+                // Clear detail nav before leaving — openEntryId is rememberSaveable, so without
+                // this a later return to History would re-open the stale detail instead of the list.
+                onNewEntry = {
+                    openEntryId = null
+                    highlightOnOpen = false
+                    onExit()
+                },
                 highlightOnOpen = highlightOnOpen,
                 modifier = modifier,
             )

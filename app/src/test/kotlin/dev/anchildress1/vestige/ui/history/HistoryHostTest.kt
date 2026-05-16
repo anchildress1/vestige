@@ -4,6 +4,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -107,6 +108,34 @@ class HistoryHostTest {
         }
         composeRule.waitForIdle()
         assertTrue("onExit should fire when back is pressed at list level", exited)
+    }
+
+    @Test
+    fun `new entry from detail clears stale detail nav and exits`() {
+        seedCompleted("standup crashed me again", 1_000_000L)
+        var exited = false
+
+        composeRule.activity.setContent {
+            HistoryHost(
+                entryStore = entryStore,
+                persona = Persona.WITNESS,
+                onExit = { exited = true },
+                zoneId = ZoneOffset.UTC,
+                dataRevision = MutableStateFlow(0L),
+            )
+        }
+
+        composeRule.onNodeWithTag("history_row").performClick()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithText("● NEW ENTRY").assertIsDisplayed()
+
+        composeRule.onNodeWithContentDescription(EntryDetailCopy.NEW_ENTRY_CD).performClick()
+        composeRule.waitForIdle()
+
+        assertTrue("onNewEntry must call onExit", exited)
+        // Regression guard: openEntryId is rememberSaveable; without the explicit reset the host
+        // would still render the stale detail. After the fix it falls back to the list.
+        composeRule.onNodeWithText("standup crashed me again", substring = true).assertIsDisplayed()
     }
 
     @Test

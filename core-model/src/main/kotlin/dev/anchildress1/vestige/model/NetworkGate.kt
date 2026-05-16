@@ -24,7 +24,7 @@ interface NetworkGate {
 
 sealed interface GateState {
     data class Open(val reason: String) : GateState
-    data object Sealed : GateState
+    object Sealed : GateState
 }
 
 class NetworkSealedException(message: String) : SecurityException(message)

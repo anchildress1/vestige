@@ -120,7 +120,7 @@ fun VestigeRow(
  * click, role, selected, and checked knobs that can drift out of sync at call sites.
  */
 sealed interface VestigeListCardInteraction {
-    data object Static : VestigeListCardInteraction
+    object Static : VestigeListCardInteraction
 
     data class Click(val onClick: () -> Unit, val role: Role = Role.Button) : VestigeListCardInteraction
 

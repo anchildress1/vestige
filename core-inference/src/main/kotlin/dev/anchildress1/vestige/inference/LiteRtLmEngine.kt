@@ -21,8 +21,8 @@ import kotlinx.coroutines.withContext
 
 /** Backend selection. NPU needs the host's `nativeLibraryDir` — only Android `Context` has it. */
 sealed interface BackendChoice {
-    data object Cpu : BackendChoice
-    data object Gpu : BackendChoice
+    object Cpu : BackendChoice
+    object Gpu : BackendChoice
     data class Npu(val nativeLibraryDir: String) : BackendChoice
 }
 

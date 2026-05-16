@@ -58,7 +58,7 @@ data class EntryDetailUiModel(
 data class ObservationLine(val text: String)
 
 sealed interface EntryDetailUiState {
-    data object Loading : EntryDetailUiState
-    data object NotFound : EntryDetailUiState
+    object Loading : EntryDetailUiState
+    object NotFound : EntryDetailUiState
     data class Loaded(val model: EntryDetailUiModel) : EntryDetailUiState
 }

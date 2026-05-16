@@ -21,6 +21,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -29,6 +30,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
@@ -102,7 +104,7 @@ private fun EntryDetailContent(model: EntryDetailUiModel, highlightOnOpen: Boole
     var sourceHighlightVisible by remember(model.id, highlightOnOpen) {
         mutableStateOf(highlightOnOpen)
     }
-    androidx.compose.runtime.LaunchedEffect(model.id, highlightOnOpen) {
+    LaunchedEffect(model.id, highlightOnOpen) {
         if (!highlightOnOpen) return@LaunchedEffect
         sourceHighlightVisible = true
         delay(SOURCE_HIGHLIGHT_MS)
@@ -263,12 +265,7 @@ private fun EntryTagsRow(tags: List<String>) {
 private const val SOURCE_HIGHLIGHT_MS: Long = 1_200L
 
 @Composable
-private fun TranscriptBlock(
-    eyebrow: String,
-    body: String,
-    bodyColor: androidx.compose.ui.graphics.Color,
-    testTag: String,
-) {
+private fun TranscriptBlock(eyebrow: String, body: String, bodyColor: Color, testTag: String) {
     val colors = VestigeTheme.colors
     // testTag on the container (not the inner Text) so the tag and the merged
     // contentDescription resolve to one node.

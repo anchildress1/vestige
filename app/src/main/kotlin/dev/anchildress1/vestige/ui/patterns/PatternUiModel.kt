@@ -41,7 +41,7 @@ enum class PatternSection { ACTIVE, SKIPPED, CLOSED, DROPPED }
 data class PatternSourceUi(val entryId: Long, val dateLabel: String, val snippet: String)
 
 sealed interface PatternsListUiState {
-    data object Loading : PatternsListUiState
+    object Loading : PatternsListUiState
 
     /** [entryCount] feeds the Day-1 eyebrow `VESTIGES · {n} ENTRIES · 30 DAYS`. */
     data class Empty(val reason: EmptyReason, val entryCount: Int) : PatternsListUiState {
@@ -61,8 +61,8 @@ sealed interface PatternsListUiState {
 }
 
 sealed interface PatternDetailUiState {
-    data object Loading : PatternDetailUiState
-    data object NotFound : PatternDetailUiState
+    object Loading : PatternDetailUiState
+    object NotFound : PatternDetailUiState
     data class Loaded(
         val patternId: String,
         val title: String,

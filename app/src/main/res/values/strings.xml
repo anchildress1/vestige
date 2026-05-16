@@ -147,4 +147,26 @@
     <string name="model_status_delete_title">Delete model file?</string>
     <string name="model_status_delete_body">The app won\'t work until you re-download. Your entries stay where they are.</string>
     <string name="model_status_delete_confirm">Delete model</string>
+
+    <!-- Settings (P0). Copy: ux-copy.md §Settings + §"Destructive Confirmations / Delete all data". -->
+    <string name="settings_eyebrow">SETTINGS</string>
+    <string name="settings_header">Settings.</string>
+    <string name="settings_section_persona">PERSONA</string>
+    <string name="settings_section_data">DATA</string>
+    <string name="settings_section_model">MODEL</string>
+    <string name="settings_section_about">ABOUT</string>
+    <string name="settings_persona_witness">Witness</string>
+    <string name="settings_persona_hardass">Hardass</string>
+    <string name="settings_persona_editor">Editor</string>
+    <string name="settings_export">Export all entries</string>
+    <string name="settings_delete_all">Delete all data</string>
+    <string name="settings_model_status">Model status</string>
+    <string name="settings_source">Source code</string>
+    <string name="settings_license">Polyform Shield 1.0.0</string>
+    <string name="settings_version">v%1$s</string>
+    <string name="settings_cancel">Cancel</string>
+    <string name="settings_wipe_title">This deletes everything.</string>
+    <string name="settings_wipe_body">Every entry, every pattern, every tag. Nothing is sent anywhere. Nothing is recoverable.</string>
+    <string name="settings_wipe_placeholder">DELETE</string>
+    <string name="settings_wipe_confirm">Wipe everything. No backup.</string>
 </resources>

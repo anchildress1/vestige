@@ -17,6 +17,7 @@ import dev.anchildress1.vestige.model.PatternKind
 import dev.anchildress1.vestige.model.PatternState
 import dev.anchildress1.vestige.save.BackgroundExtractionSaveFlow
 import dev.anchildress1.vestige.save.SaveOutcome
+import dev.anchildress1.vestige.storage.EntryEntity
 import dev.anchildress1.vestige.storage.MarkdownEntryStore
 import dev.anchildress1.vestige.storage.PatternEntity
 import dev.anchildress1.vestige.storage.VectorBackfillWorker
@@ -39,9 +40,11 @@ import org.junit.jupiter.api.Assertions.assertNotNull
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
+import java.io.ByteArrayOutputStream
 import java.io.File
 import java.time.ZoneId
 import java.time.ZonedDateTime
+import java.util.zip.ZipInputStream
 
 @OptIn(ExperimentalCoroutinesApi::class)
 @Suppress("LargeClass") // Wiring + lifecycle + save + recovery scenarios share one container fixture.
@@ -472,6 +475,66 @@ class AppContainerTest {
         coVerify(exactly = 1) { artifactStore.download(any()) }
         assertTrue(modelFile.exists(), "re-pull must land the artifact on disk")
         assertEquals(ModelReadiness.Ready, container.modelReadinessFlow.value)
+    }
+
+    @Test
+    fun `wipeAllData clears every entity box and every markdown file`(@TempDir tempRoot: File) = runTest {
+        val boxDir = newInMemoryObjectBoxDirectory("wipe")
+        val box = openInMemoryBoxStore(boxDir)
+        try {
+            box.boxFor(EntryEntity::class.java)
+                .put(EntryEntity(markdownFilename = "a.md", entryText = "x", timestampEpochMs = 1))
+            File(tempRoot, "entries").mkdirs()
+            File(tempRoot, "entries/a.md").writeText("x")
+            File(tempRoot, "entries/b.md").writeText("y")
+            val container = AppContainer(
+                applicationContext = mockk<Context>(relaxed = true) { every { filesDir } returns tempRoot },
+                boxStoreFactory = { box },
+                markdownStoreFactory = { MarkdownEntryStore(tempRoot) },
+                modelPathLoader = { File(tempRoot, "m").absolutePath },
+                backgroundEngineFactory = { _, _ -> mockk<LiteRtLmEngine>(relaxed = true) },
+                recoveredEntryIdsLoader = { emptyList() },
+                foregroundServiceIntentFactory = { Intent("dev.anchildress1.vestige.TEST_START") },
+                foregroundServiceStarter = {},
+                scope = this,
+            )
+            val revisionBefore = container.dataRevision.value
+
+            container.wipeAllData()
+
+            assertEquals(0L, box.boxFor(EntryEntity::class.java).count())
+            assertTrue((File(tempRoot, "entries").listFiles()?.none { it.name.endsWith(".md") } ?: true))
+            assertTrue(container.dataRevision.value > revisionBefore)
+        } finally {
+            box.close()
+        }
+    }
+
+    @Test
+    fun `zipAllEntriesTo streams every entry markdown file into the zip`(@TempDir tempRoot: File) = runTest {
+        File(tempRoot, "entries").mkdirs()
+        File(tempRoot, "entries/one.md").writeText("first")
+        File(tempRoot, "entries/two.md").writeText("second")
+        val container = AppContainer(
+            applicationContext = mockk<Context>(relaxed = true) { every { filesDir } returns tempRoot },
+            boxStoreFactory = { mockk<BoxStore>(relaxed = true) },
+            markdownStoreFactory = { MarkdownEntryStore(tempRoot) },
+            modelPathLoader = { File(tempRoot, "m").absolutePath },
+            backgroundEngineFactory = { _, _ -> mockk<LiteRtLmEngine>(relaxed = true) },
+            recoveredEntryIdsLoader = { emptyList() },
+            foregroundServiceIntentFactory = { Intent("dev.anchildress1.vestige.TEST_START") },
+            foregroundServiceStarter = {},
+            scope = this,
+        )
+        val out = ByteArrayOutputStream()
+
+        container.zipAllEntriesTo(out)
+
+        val names = mutableListOf<String>()
+        ZipInputStream(out.toByteArray().inputStream()).use { zip ->
+            generateSequence { zip.nextEntry }.forEach { names += it.name }
+        }
+        assertEquals(listOf("one.md", "two.md"), names.sorted())
     }
 
     @Test

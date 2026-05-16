@@ -499,6 +499,8 @@ Section: **About**
 - Source code (link to GitHub)
 - License
 
+> _Story 4.9 reconciliation:_ the screen header is `Settings.` (this section named no header string — derived to match the `Model status.` screen-header pattern). The **Model** section is a single **Model status** row that opens the Story 4.4 screen; Re-download / Delete model live there with their canonical confirm dialogs, so they are reached by delegation rather than duplicated here (one destructive-confirm implementation, per KISS / no-duplicate-flows). The **Persona** section lists the three names only (no descriptions — settings is not the onboarding pitch). Export uses the Storage Access Framework `CreateDocument` picker — no `FileProvider`, no storage permission (`AGENTS.md` storage constraint). Delete-all wipes ObjectBox (entry/pattern/tag/callout) + every markdown file + onboarding prefs, then returns to the first-run flow.
+
 ### Locked v1 behavior (not configurable)
 
 - **Default input:** voice. Typed entry is an always-available alternate input but, like voice, requires the local model to be Ready (ADR-013 — it runs the same foreground call and reviews identically). Voice is the entry-point per product positioning. No setting toggle.

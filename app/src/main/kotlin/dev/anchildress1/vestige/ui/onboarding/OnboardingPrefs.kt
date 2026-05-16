@@ -54,6 +54,13 @@ open class OnboardingPrefs(private val prefs: SharedPreferences) {
         return ok
     }
 
+    /** Wipe onboarding state so Delete-all returns the user to the first-run flow. */
+    open fun reset() {
+        if (!prefs.edit().clear().commit()) {
+            Log.w(TAG, "reset did not flush — onboarding state may survive a Delete-all")
+        }
+    }
+
     companion object {
         const val PREFS_NAME: String = "vestige.onboarding"
         private const val TAG = "OnboardingPrefs"

@@ -32,12 +32,16 @@ import dev.anchildress1.vestige.model.Persona
 import dev.anchildress1.vestige.patterns.PatternDetectionOrchestrator
 import dev.anchildress1.vestige.save.BackgroundExtractionSaveFlow
 import dev.anchildress1.vestige.save.SaveOutcome
+import dev.anchildress1.vestige.storage.CalloutCooldownEntity
 import dev.anchildress1.vestige.storage.CalloutCooldownStore
+import dev.anchildress1.vestige.storage.EntryEntity
 import dev.anchildress1.vestige.storage.EntryStore
 import dev.anchildress1.vestige.storage.MarkdownEntryStore
 import dev.anchildress1.vestige.storage.PatternDetector
+import dev.anchildress1.vestige.storage.PatternEntity
 import dev.anchildress1.vestige.storage.PatternRepo
 import dev.anchildress1.vestige.storage.PatternStore
+import dev.anchildress1.vestige.storage.TagEntity
 import dev.anchildress1.vestige.storage.VectorBackfillWorker
 import dev.anchildress1.vestige.storage.VestigeBoxStore
 import dev.anchildress1.vestige.ui.capture.ModelReadiness
@@ -53,11 +57,15 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 import java.io.File
+import java.io.OutputStream
 import java.time.Instant
 import java.time.ZoneId
 import java.time.ZonedDateTime
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.zip.ZipEntry
+import java.util.zip.ZipOutputStream
 
 /** Process-singleton hub for Phase-2 cross-cutting concerns. */
 @Suppress(
@@ -176,7 +184,9 @@ class AppContainer(
     /** Shared ObjectBox handle. Closed when the process dies; tests use [close]. */
     val boxStore: BoxStore = boxStoreFactory(applicationContext)
 
-    val entryStore: EntryStore = EntryStore(boxStore, markdownStoreFactory(applicationContext))
+    private val markdownStore: MarkdownEntryStore = markdownStoreFactory(applicationContext)
+
+    val entryStore: EntryStore = EntryStore(boxStore, markdownStore)
     private val backgroundEngineInitMutex = Mutex()
     private val embedderInitMutex = Mutex()
     private val vectorBackfillMutex = Mutex()
@@ -464,6 +474,36 @@ class AppContainer(
             } finally {
                 networkGate.seal()
                 refreshModelReadiness()
+            }
+        }
+    }
+
+    /**
+     * Wipe every entry, pattern, tag, and callout-cooldown row plus every markdown file.
+     * Nothing is sent anywhere; nothing is recoverable. The model artifact is left alone.
+     * Per `ux-copy.md` §"Destructive Confirmations / Delete all data".
+     */
+    suspend fun wipeAllData() {
+        withContext(Dispatchers.IO) {
+            boxStore.boxFor(EntryEntity::class.java).removeAll()
+            boxStore.boxFor(PatternEntity::class.java).removeAll()
+            boxStore.boxFor(TagEntity::class.java).removeAll()
+            boxStore.boxFor(CalloutCooldownEntity::class.java).removeAll()
+            markdownStore.listAll().forEach { it.delete() }
+            Log.i(TAG, "All user data wiped on explicit request")
+        }
+        _dataRevision.value += 1
+    }
+
+    /** Stream a zip of every entry markdown file into [out] (caller owns/closes the stream). */
+    suspend fun zipAllEntriesTo(out: OutputStream) {
+        withContext(Dispatchers.IO) {
+            ZipOutputStream(out).use { zip ->
+                markdownStore.listAll().forEach { file ->
+                    zip.putNextEntry(ZipEntry(file.name))
+                    file.inputStream().use { it.copyTo(zip) }
+                    zip.closeEntry()
+                }
             }
         }
     }

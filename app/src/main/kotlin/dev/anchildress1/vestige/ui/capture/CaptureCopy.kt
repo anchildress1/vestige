@@ -57,6 +57,8 @@ object CaptureCopy {
 
     const val HISTORY_LINK: String = "History"
     const val HISTORY_LINK_A11Y: String = "Open history"
+
+    const val SETTINGS_LINK: String = "Settings"
     const val HISTORY_FOOTER_SEPARATOR: String = " · "
     const val HISTORY_FOOTER_PREFIX: String = "Last entry"
 }

@@ -252,15 +252,17 @@ Checked bullets above are the historical record that the Mist tokens shipped to 
 **As** the user, **I need** a settings screen with the v1 P0 scope from `PRD.md` §Phase 4 / `ux-copy.md` §Settings — persona default, export all entries (markdown zip), delete all data, model status / re-download / delete — **so that** the privacy and data-sovereignty claims have implementations a judge can poke.
 
 **Done when:**
-- [ ] Settings reachable from the app shell.
-- [ ] Sections per `ux-copy.md` §Settings:
-  - **Persona**: default persona (Witness / Hardass / Editor).
-  - **Data**: Export all entries (zip of markdown) + Delete all data (destructive flow).
-  - **Model**: Status (link to Story 4.4 full screen) + Re-download + Delete model.
-  - **About**: version, GitHub source link, license.
-- [ ] Export all entries: produces a zip of all markdown files from `MarkdownEntryStore` (Story 1.7) and hands the file to Android's system share/picker flow per the `AGENTS.md` constraint on storage permissions ("Do not request broad storage permission for internal markdown/ObjectBox; exports use Android's system picker/share flow").
-- [ ] Delete all data: destructive flow per `ux-copy.md` §"Destructive Confirmations / Delete all data". Requires typing `DELETE` to confirm. Wipes ObjectBox + all markdown files. Returns the user to onboarding.
-- [ ] **Settings explicitly NOT in v1 P0**: pattern threshold, cooldown, default-input toggle, transcription-visibility toggle. These are removed from `ux-copy.md` for v1 per the PRD note. Don't add them.
+- [x] Settings reachable from the app shell. _(`Settings` link in the Capture idle chrome next to Patterns/History, wired `IdleChromeCallbacks.onSettingsTap` → `PostOnboardingScreen.Settings`.)_
+- [x] Sections per `ux-copy.md` §Settings: _(`SettingsScreen`.)_
+  - **Persona**: default persona (Witness / Hardass / Editor) — selectable radio rows, persists via `OnboardingPrefs.setDefaultPersona` + reflects live in capture chrome.
+  - **Data**: Export all entries (zip of markdown) + Delete all data (typed-`DELETE` destructive flow).
+  - **Model**: single **Model status** row → the Story 4.4 screen, which owns Re-download + Delete model with their canonical confirms (delegation, not duplicated — recorded in `ux-copy.md`).
+  - **About**: version (read off the installed package), GitHub source link (`ACTION_VIEW`), Polyform Shield license label.
+- [x] Export all entries: `AppContainer.zipAllEntriesTo(OutputStream)` zips every `MarkdownEntryStore` file; the screen uses the SAF `CreateDocument("application/zip")` picker — no `FileProvider`, no storage permission (`AGENTS.md` storage constraint satisfied via the system picker).
+- [x] Delete all data: `ux-copy.md` §"Destructive Confirmations / Delete all data" — typed `DELETE` arms the destructive confirm; `AppContainer.wipeAllData()` clears ObjectBox (entry/pattern/tag/callout) + every markdown file, `OnboardingPrefs.reset()` returns the user to onboarding.
+- [x] **Settings explicitly NOT in v1 P0**: pattern threshold, cooldown, default-input toggle, transcription-visibility toggle — not added.
+
+**Notes / risks:** Export-to-zip is the data-sovereignty claim's implementation; SAF keeps it permission-free. Delete-all is a real irreversible wipe — typed-`DELETE` gate + coral destructive styling, no snackbar theatre. Header `Settings.` derived (ux-copy named no header). Tests: `OnboardingPrefs.reset`, `AppContainer.wipeAllData` (in-memory box + temp markdown) + `zipAllEntriesTo`, `SettingsScreen` render/persona-select/typed-DELETE gating/confirm/cancel/model-status nav.
 
 **Notes / risks:** Export-to-zip is the implementation of the data-sovereignty claim. If it doesn't work, the privacy story has a hole.
 

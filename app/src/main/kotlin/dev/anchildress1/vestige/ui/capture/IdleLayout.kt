@@ -103,6 +103,16 @@ fun IdleLayout(
                 PatternsLink(onClick = onTap)
             }
         }
+        chrome.onSettingsTap?.let { onTap ->
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 18.dp, vertical = 4.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                SettingsLink(onClick = onTap)
+            }
+        }
         if (chrome.lastEntryFooter != null) {
             Box(
                 modifier = Modifier
@@ -145,6 +155,26 @@ private fun PatternsLink(onClick: () -> Unit) {
     ) {
         Text(
             text = CaptureCopy.PATTERNS_LINK,
+            style = VestigeTheme.typography.personaLabel,
+            color = colors.dim,
+        )
+    }
+}
+
+@Composable
+private fun SettingsLink(onClick: () -> Unit) {
+    val colors = VestigeTheme.colors
+    Box(
+        modifier = Modifier
+            .clickable(onClick = onClick)
+            .semantics(mergeDescendants = true) {
+                role = Role.Button
+                contentDescription = CaptureCopy.SETTINGS_LINK
+            }
+            .padding(horizontal = 12.dp, vertical = 8.dp),
+    ) {
+        Text(
+            text = CaptureCopy.SETTINGS_LINK,
             style = VestigeTheme.typography.personaLabel,
             color = colors.dim,
         )

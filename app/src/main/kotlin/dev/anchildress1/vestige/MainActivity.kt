@@ -1,6 +1,7 @@
 package dev.anchildress1.vestige
 
 import android.content.Intent
+import android.net.Uri
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -12,6 +13,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
@@ -44,7 +46,11 @@ import dev.anchildress1.vestige.ui.onboarding.ModelAvailability
 import dev.anchildress1.vestige.ui.onboarding.OnboardingHost
 import dev.anchildress1.vestige.ui.onboarding.OnboardingPrefs
 import dev.anchildress1.vestige.ui.patterns.PatternsHost
+import dev.anchildress1.vestige.ui.settings.SettingsActions
+import dev.anchildress1.vestige.ui.settings.SettingsInfo
+import dev.anchildress1.vestige.ui.settings.SettingsScreen
 import dev.anchildress1.vestige.ui.theme.VestigeTheme
+import kotlinx.coroutines.launch
 import java.time.Clock
 import java.time.ZoneId
 
@@ -82,7 +88,7 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-private enum class PostOnboardingScreen { Capture, Patterns, History, ModelStatus }
+private enum class PostOnboardingScreen { Capture, Patterns, History, ModelStatus, Settings }
 
 private data class LaunchTargetController(val target: PostOnboardingLaunchTarget, val onConsumed: () -> Unit)
 
@@ -118,20 +124,15 @@ private fun MainActivityContent(
             clock = clock,
             zoneId = zoneId,
             launchTargetController = launchTargetController,
+            onboardingPrefs = onboardingPrefs,
+            onPersonaChange = { selectedPersona = it },
+            onResetToOnboarding = { onboardingComplete = false },
         )
     }
 }
 
 @Composable
-private fun MainPostOnboardingContent(
-    container: AppContainer,
-    persona: Persona,
-    clock: Clock,
-    zoneId: ZoneId,
-    launchTargetController: LaunchTargetController,
-) {
-    var screen by rememberSaveable { mutableStateOf(PostOnboardingScreen.Capture) }
-    var historyOpenRequest by remember { mutableStateOf<EntryDetailOpenRequest?>(null) }
+private fun PostOnboardingResumeEffects(container: AppContainer) {
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) {
         // Re-probe on ON_RESUME so a download that completed in another activity / process
         // is reflected when the user returns. AppContainer no-ops if nothing changed.
@@ -140,6 +141,23 @@ private fun MainPostOnboardingContent(
         // surface the user returns to, not just Capture.
         container.sweepExpiredSkips()
     }
+}
+
+@Suppress("LongParameterList") // Post-onboarding nav root — host seams are intentionally co-located.
+@androidx.compose.runtime.Composable
+private fun MainPostOnboardingContent(
+    container: AppContainer,
+    persona: Persona,
+    clock: Clock,
+    zoneId: ZoneId,
+    launchTargetController: LaunchTargetController,
+    onboardingPrefs: OnboardingPrefs,
+    onPersonaChange: (Persona) -> Unit,
+    onResetToOnboarding: () -> Unit,
+) {
+    var screen by rememberSaveable { mutableStateOf(PostOnboardingScreen.Capture) }
+    var historyOpenRequest by remember { mutableStateOf<EntryDetailOpenRequest?>(null) }
+    PostOnboardingResumeEffects(container)
     ConsumeLaunchTarget(
         screen = screen,
         controller = launchTargetController,
@@ -157,6 +175,7 @@ private fun MainPostOnboardingContent(
             onOpenPatterns = { screen = PostOnboardingScreen.Patterns },
             onOpenHistory = { screen = PostOnboardingScreen.History },
             onOpenModelStatus = { screen = PostOnboardingScreen.ModelStatus },
+            onOpenSettings = { screen = PostOnboardingScreen.Settings },
         )
 
         PostOnboardingScreen.Patterns -> PatternsHost(
@@ -184,7 +203,74 @@ private fun MainPostOnboardingContent(
             container = container,
             onExit = { screen = PostOnboardingScreen.Capture },
         )
+
+        PostOnboardingScreen.Settings -> SettingsRoute(
+            container = container,
+            onboardingPrefs = onboardingPrefs,
+            persona = persona,
+            onPersonaChange = onPersonaChange,
+            onResetToOnboarding = onResetToOnboarding,
+            onOpenModelStatus = { screen = PostOnboardingScreen.ModelStatus },
+            onExit = { screen = PostOnboardingScreen.Capture },
+        )
     }
+}
+
+private const val VESTIGE_SOURCE_URL = "https://github.com/anchildress1/vestige"
+
+@Suppress("LongParameterList") // Settings nav root — host seams are intentionally co-located.
+@androidx.compose.runtime.Composable
+private fun SettingsRoute(
+    container: AppContainer,
+    onboardingPrefs: OnboardingPrefs,
+    persona: Persona,
+    onPersonaChange: (Persona) -> Unit,
+    onResetToOnboarding: () -> Unit,
+    onOpenModelStatus: () -> Unit,
+    onExit: () -> Unit,
+) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val versionName = remember(context) {
+        runCatching {
+            context.packageManager.getPackageInfo(context.packageName, 0).versionName
+        }.getOrNull().orEmpty()
+    }
+    SettingsScreen(
+        persona = persona,
+        info = SettingsInfo(versionLabel = versionName, sourceUrl = VESTIGE_SOURCE_URL),
+        actions = SettingsActions(
+            onSelectPersona = { picked ->
+                onPersonaChange(picked)
+                scope.launch { onboardingPrefs.setDefaultPersona(picked) }
+            },
+            onExportToUri = { uri ->
+                scope.launch {
+                    runCatching {
+                        context.contentResolver.openOutputStream(uri)?.use { container.zipAllEntriesTo(it) }
+                    }
+                }
+            },
+            onWipe = {
+                scope.launch {
+                    container.wipeAllData()
+                    onboardingPrefs.reset()
+                    onResetToOnboarding()
+                }
+            },
+            onOpenModelStatus = onOpenModelStatus,
+            onOpenSource = {
+                runCatching {
+                    context.startActivity(
+                        Intent(Intent.ACTION_VIEW, Uri.parse(VESTIGE_SOURCE_URL))
+                            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+                    )
+                }
+            },
+            onExit = onExit,
+        ),
+        modifier = Modifier.fillMaxSize(),
+    )
 }
 
 @androidx.compose.runtime.Composable
@@ -291,6 +377,7 @@ private fun CaptureRoute(
     onOpenPatterns: () -> Unit,
     onOpenHistory: () -> Unit,
     onOpenModelStatus: () -> Unit,
+    onOpenSettings: () -> Unit,
 ) {
     val limitWarningCue = remember { ToneGeneratorLimitWarningCue() }
     DisposableEffect(limitWarningCue) {
@@ -343,6 +430,7 @@ private fun CaptureRoute(
             onStatusTap = onOpenModelStatus,
             onPatternsTap = onOpenPatterns,
             onHistoryTap = onOpenHistory,
+            onSettingsTap = onOpenSettings,
             lastEntryFooter = lastEntryFooter,
         ),
     )

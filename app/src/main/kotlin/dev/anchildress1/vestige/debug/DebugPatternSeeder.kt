@@ -74,7 +74,7 @@ object DebugPatternSeeder {
                 SeedPattern(
                     signature = "tuesday-meeting-aftermath",
                     title = "Tuesday Meetings",
-                    templateLabel = "Aftermath",
+                    templateLabel = "Crashed",
                     callout = "Fourth entry mentions Tuesday meetings. State before: cruising. After: crashed.",
                     supporting = listOf(entries[1], entries[4], entries[8], entries[10]),
                 ),
@@ -84,7 +84,7 @@ object DebugPatternSeeder {
                 SeedPattern(
                     signature = "decision-spiral-migrations",
                     title = "Migration Rewrites",
-                    templateLabel = "Decision spiral",
+                    templateLabel = "Nonstop Spiral",
                     callout = "Three decisions to rewrite the migration in one week. " +
                         "Pattern: rewriting beats committing.",
                     supporting = listOf(entries[6], entries[7], entries[2]),

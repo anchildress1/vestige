@@ -127,7 +127,7 @@ Behavior:
 
 ### Status row (top)
 
-- Local model status indicator: `GEMMA 4 · LOCAL ONLY` (when idle, model loaded) / `GEMMA 4 · LISTENING LIVE` (when recording) — pill color stays lime in both states; coral is reserved for the REC button heat + destructive flows (see `design-guidelines.md` §"Capture Screen / AppTop status pill")
+- Local model status indicator: `GEMMA 4 · LOCAL ONLY` (when idle, model loaded) / `GEMMA 4 · LISTENING LIVE` (when recording) / `GEMMA 4 · LOADING` (engine warming) / `DOWNLOADING · {N}%` (active download) / `MODEL PAUSED` (Wi-Fi dropped mid-download) — pill color stays lime in every state; coral is reserved for the REC button heat + destructive flows (see `design-guidelines.md` §"Capture Screen / AppTop status pill"). _(Story 4.4: `GEMMA 4 · LOADING` is the reconciled label — the doc previously named only the idle/recording strings; the pill now reflects all four `ModelReadiness` states and is tappable post-onboarding to open the Model Status screen.)_
 - Persona dropdown label: `WITNESS ▾` (or active persona)
 
 ### Patterns peek (below status)
@@ -213,6 +213,8 @@ Status states:
 - **Stalled:** `Download stalled.` + Retry button
 - **Failed:** `Network choked.` + Retry button
 - **Updating:** `Updating model.` + progress
+
+> _Story 4.4 reconciliation:_ the v1 runtime has four `ModelReadiness` states — `Ready` / `Loading` / `Downloading(percent)` / `Paused`. The screen renders `Paused` as **`Download stalled.`**; a user-initiated **Re-download** surfaces as **Downloading** (not a distinct `Updating`); a failed re-download falls back to `Loading` (no model on disk — honest). `Stalled` / `Failed` / `Updating` are not separate runtime states in v1 and were not spun up as such (demo-gate / no new abstraction layer). The confirm dialogs use the canonical §"Destructive Confirmations" wording below, not this section's shorter summary.
 
 Detail line (always visible when loaded):
 > Gemma 4 E4B · 3.66 GB · v{version} · On-device

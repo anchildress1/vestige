@@ -416,6 +416,58 @@ class AppContainer(
         }
     }
 
+    /** Expected on-disk size of the Gemma artifact — drives the Model Status detail line. */
+    val mainModelExpectedByteSize: Long get() = mainModelManifest.expectedByteSize
+
+    /**
+     * Delete the on-disk Gemma artifact (and any resumable `.part`), then re-probe readiness.
+     * Entries are untouched — only the model file goes; the app falls back to `Loading` until a
+     * re-download lands. Per `ux-copy.md` §"Destructive Confirmations / Delete model".
+     */
+    fun deleteMainModel() {
+        scope.launch {
+            val artifact = mainModelArtifactStore.artifactFile
+            artifact.delete()
+            File(artifact.parentFile, "${artifact.name}.part").delete()
+            Log.i(TAG, "Main model artifact deleted on user request")
+            refreshModelReadiness()
+        }
+    }
+
+    /**
+     * Replace the on-disk artifact with a fresh pull: wipe the current file so this is a true
+     * re-download (not a `.part` resume), open the [NetworkGate] for the transfer only, and tick
+     * [modelReadinessFlow] `Downloading(percent)` so the AppTop pill + Model Status screen track
+     * it from one source. Per `ux-copy.md` §"Destructive Confirmations / Re-download model".
+     */
+    fun redownloadMainModel() {
+        scope.launch {
+            val store = mainModelArtifactStore
+            val artifact = store.artifactFile
+            File(artifact.parentFile, "${artifact.name}.part").delete()
+            artifact.delete()
+            _modelReadinessFlow.value = ModelReadiness.Downloading(0)
+            networkGate.openForDownload(reason = "Model Status — user-requested re-download")
+            try {
+                store.download { current, expected ->
+                    val pct = if (expected > 0L) {
+                        ((current * PCT_MAX) / expected).toInt().coerceIn(0, PCT_MAX)
+                    } else {
+                        0
+                    }
+                    _modelReadinessFlow.value = ModelReadiness.Downloading(pct)
+                }
+            } catch (cancel: kotlinx.coroutines.CancellationException) {
+                throw cancel
+            } catch (@Suppress("TooGenericExceptionCaught") error: Exception) {
+                Log.e(TAG, "Model re-download failed", error)
+            } finally {
+                networkGate.seal()
+                refreshModelReadiness()
+            }
+        }
+    }
+
     /**
      * Scans entries with non-terminal extraction status and re-runs the foreground extraction
      * pipeline. Called on transition to `Ready` so typed entries that landed during model
@@ -603,6 +655,7 @@ class AppContainer(
         const val VECTOR_BACKFILL_RETRY_DELAY_MS = 5_000L
         const val VECTOR_BACKFILL_MAX_RETRIES = 12
         const val ENGINE_PREWARM_DELAY_MS = 2_000L
+        const val PCT_MAX = 100
 
         fun defaultScope(): CoroutineScope {
             val exceptionHandler = CoroutineExceptionHandler { _, error ->

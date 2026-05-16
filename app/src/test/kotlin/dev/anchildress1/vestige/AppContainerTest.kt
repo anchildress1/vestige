@@ -23,6 +23,7 @@ import dev.anchildress1.vestige.storage.VectorBackfillWorker
 import dev.anchildress1.vestige.testing.cleanupObjectBoxTempRoot
 import dev.anchildress1.vestige.testing.newInMemoryObjectBoxDirectory
 import dev.anchildress1.vestige.testing.openInMemoryBoxStore
+import dev.anchildress1.vestige.ui.capture.ModelReadiness
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.coVerifyOrder
@@ -404,6 +405,73 @@ class AppContainerTest {
 
         assertTrue(result is ForegroundResult.ParseFailure)
         coVerify { engine.initialize() }
+    }
+
+    @Test
+    fun `deleteMainModel removes the artifact and drops readiness to Loading`(@TempDir tempRoot: File) = runTest {
+        val modelFile = File(tempRoot, "main-model.litertlm").apply { writeText("xx") } // 2 bytes
+        val artifactStore = fakeArtifactStore(artifactFile = modelFile, expectedByteSize = 2L)
+        val context = mockk<Context>(relaxed = true) {
+            every { filesDir } returns tempRoot
+            every { cacheDir } returns File(tempRoot, "cache").apply { mkdirs() }
+        }
+        val container = AppContainer(
+            applicationContext = context,
+            boxStoreFactory = { mockk<BoxStore>(relaxed = true) },
+            markdownStoreFactory = { mockk<MarkdownEntryStore>(relaxed = true) },
+            modelPathLoader = { modelFile.absolutePath },
+            backgroundEngineFactory = { _, _ -> mockk<LiteRtLmEngine>(relaxed = true) },
+            mainModelArtifactStoreFactory = { _, _, _ -> artifactStore },
+            recoveredEntryIdsLoader = { emptyList() },
+            foregroundServiceIntentFactory = { Intent("dev.anchildress1.vestige.TEST_START") },
+            foregroundServiceStarter = {},
+            scope = this,
+        )
+        container.refreshModelReadiness()
+        advanceUntilIdle()
+        assertEquals(ModelReadiness.Ready, container.modelReadinessFlow.value)
+
+        container.deleteMainModel()
+        advanceUntilIdle()
+
+        assertTrue(!modelFile.exists(), "artifact file must be gone after deleteMainModel")
+        assertEquals(ModelReadiness.Loading, container.modelReadinessFlow.value)
+    }
+
+    @Test
+    fun `redownloadMainModel pulls a fresh artifact and settles readiness Ready`(@TempDir tempRoot: File) = runTest {
+        val modelFile = File(tempRoot, "main-model.litertlm") // absent until the re-pull writes it
+        val artifactStore = fakeArtifactStore(artifactFile = modelFile, expectedByteSize = 2L)
+        coEvery { artifactStore.download(any()) } coAnswers {
+            @Suppress("UNCHECKED_CAST")
+            val onProgress = firstArg<(Long, Long) -> Unit>()
+            onProgress(1L, 2L)
+            modelFile.writeText("xx")
+            ModelArtifactState.Complete
+        }
+        val context = mockk<Context>(relaxed = true) {
+            every { filesDir } returns tempRoot
+            every { cacheDir } returns File(tempRoot, "cache").apply { mkdirs() }
+        }
+        val container = AppContainer(
+            applicationContext = context,
+            boxStoreFactory = { mockk<BoxStore>(relaxed = true) },
+            markdownStoreFactory = { mockk<MarkdownEntryStore>(relaxed = true) },
+            modelPathLoader = { modelFile.absolutePath },
+            backgroundEngineFactory = { _, _ -> mockk<LiteRtLmEngine>(relaxed = true) },
+            mainModelArtifactStoreFactory = { _, _, _ -> artifactStore },
+            recoveredEntryIdsLoader = { emptyList() },
+            foregroundServiceIntentFactory = { Intent("dev.anchildress1.vestige.TEST_START") },
+            foregroundServiceStarter = {},
+            scope = this,
+        )
+
+        container.redownloadMainModel()
+        advanceUntilIdle()
+
+        coVerify(exactly = 1) { artifactStore.download(any()) }
+        assertTrue(modelFile.exists(), "re-pull must land the artifact on disk")
+        assertEquals(ModelReadiness.Ready, container.modelReadinessFlow.value)
     }
 
     @Test

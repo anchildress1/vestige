@@ -127,4 +127,24 @@
     <!-- Phase 3 placeholder overflow glyph fallback for the system A11Y description. -->
     <string name="pattern_overflow_glyph">⋮</string>
     <string name="pattern_back_glyph">←</string>
+
+    <!-- Local Model Status (standalone screen). Copy: ux-copy.md §"Local Model Status" +
+         §"Destructive Confirmations" (canonical confirm wording). -->
+    <string name="model_status_eyebrow">MODEL STATUS</string>
+    <string name="model_status_header">Model status.</string>
+    <string name="model_status_ready">Model ready. Running locally.</string>
+    <string name="model_status_loading">Loading model.</string>
+    <string name="model_status_downloading">Downloading model. Wi-Fi only.</string>
+    <string name="model_status_paused">Download stalled.</string>
+    <string name="model_status_downloading_pct">%1$d%%</string>
+    <string name="model_status_detail">Gemma 4 E4B · %1$s · v%2$s · On-device</string>
+    <string name="model_status_redownload">Re-download model</string>
+    <string name="model_status_delete">Delete model</string>
+    <string name="model_status_cancel">Cancel</string>
+    <string name="model_status_redownload_title">Re-download model?</string>
+    <string name="model_status_redownload_body">~3.7 GB on Wi-Fi. The model file is replaced. Your entries are not touched.</string>
+    <string name="model_status_redownload_confirm">Re-download</string>
+    <string name="model_status_delete_title">Delete model file?</string>
+    <string name="model_status_delete_body">The app won\'t work until you re-download. Your entries stay where they are.</string>
+    <string name="model_status_delete_confirm">Delete model</string>
 </resources>

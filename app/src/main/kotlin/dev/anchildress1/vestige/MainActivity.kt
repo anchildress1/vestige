@@ -15,6 +15,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
@@ -37,6 +38,8 @@ import dev.anchildress1.vestige.ui.capture.deriveMeta
 import dev.anchildress1.vestige.ui.capture.deriveStats
 import dev.anchildress1.vestige.ui.history.EntryDetailOpenRequest
 import dev.anchildress1.vestige.ui.history.HistoryHost
+import dev.anchildress1.vestige.ui.modelstatus.ModelStatusInfo
+import dev.anchildress1.vestige.ui.modelstatus.ModelStatusScreen
 import dev.anchildress1.vestige.ui.onboarding.ModelAvailability
 import dev.anchildress1.vestige.ui.onboarding.OnboardingHost
 import dev.anchildress1.vestige.ui.onboarding.OnboardingPrefs
@@ -79,7 +82,7 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-private enum class PostOnboardingScreen { Capture, Patterns, History }
+private enum class PostOnboardingScreen { Capture, Patterns, History, ModelStatus }
 
 private data class LaunchTargetController(val target: PostOnboardingLaunchTarget, val onConsumed: () -> Unit)
 
@@ -137,27 +140,14 @@ private fun MainPostOnboardingContent(
         // surface the user returns to, not just Capture.
         container.sweepExpiredSkips()
     }
-    LaunchedEffect(screen, launchTargetController.target) {
-        when (val target = launchTargetController.target) {
-            PostOnboardingLaunchTarget.None -> Unit
-
-            is PostOnboardingLaunchTarget.History -> {
-                screen = PostOnboardingScreen.History
-                historyOpenRequest = null
-                launchTargetController.onConsumed()
-            }
-
-            is PostOnboardingLaunchTarget.HistoryDetail -> {
-                screen = PostOnboardingScreen.History
-                historyOpenRequest = EntryDetailOpenRequest(
-                    entryId = target.entryId,
-                    highlightOnOpen = false,
-                    token = target.token,
-                )
-                launchTargetController.onConsumed()
-            }
-        }
-    }
+    ConsumeLaunchTarget(
+        screen = screen,
+        controller = launchTargetController,
+        onGoHistory = { request ->
+            screen = PostOnboardingScreen.History
+            historyOpenRequest = request
+        },
+    )
     when (screen) {
         PostOnboardingScreen.Capture -> CaptureRoute(
             container = container,
@@ -166,6 +156,7 @@ private fun MainPostOnboardingContent(
             zoneId = zoneId,
             onOpenPatterns = { screen = PostOnboardingScreen.Patterns },
             onOpenHistory = { screen = PostOnboardingScreen.History },
+            onOpenModelStatus = { screen = PostOnboardingScreen.ModelStatus },
         )
 
         PostOnboardingScreen.Patterns -> PatternsHost(
@@ -188,6 +179,68 @@ private fun MainPostOnboardingContent(
             onOpenRequestConsumed = { historyOpenRequest = null },
             modifier = Modifier.fillMaxSize(),
         )
+
+        PostOnboardingScreen.ModelStatus -> ModelStatusRoute(
+            container = container,
+            onExit = { screen = PostOnboardingScreen.Capture },
+        )
+    }
+}
+
+@androidx.compose.runtime.Composable
+private fun ModelStatusRoute(container: AppContainer, onExit: () -> Unit) {
+    val modelReadiness by container.modelReadinessFlow.collectAsStateWithLifecycle()
+    val context = LocalContext.current
+    // buildConfig isn't enabled for this module — read the version off the installed package
+    // instead of generating BuildConfig (a build-config change is out of scope here).
+    val versionName = remember(context) {
+        runCatching {
+            context.packageManager.getPackageInfo(context.packageName, 0).versionName
+        }.getOrNull().orEmpty()
+    }
+    ModelStatusScreen(
+        info = ModelStatusInfo(
+            readiness = modelReadiness,
+            sizeLabel = gigabyteLabel(container.mainModelExpectedByteSize),
+            versionName = versionName,
+        ),
+        onReDownload = container::redownloadMainModel,
+        onDelete = container::deleteMainModel,
+        onExit = onExit,
+        modifier = Modifier.fillMaxSize(),
+    )
+}
+
+private const val BYTES_PER_GB = 1_073_741_824.0 // 1024^3
+
+private fun gigabyteLabel(bytes: Long): String = "%.2f GB".format(bytes / BYTES_PER_GB)
+
+@androidx.compose.runtime.Composable
+private fun ConsumeLaunchTarget(
+    screen: PostOnboardingScreen,
+    controller: LaunchTargetController,
+    onGoHistory: (EntryDetailOpenRequest?) -> Unit,
+) {
+    LaunchedEffect(screen, controller.target) {
+        when (val target = controller.target) {
+            PostOnboardingLaunchTarget.None -> Unit
+
+            is PostOnboardingLaunchTarget.History -> {
+                onGoHistory(null)
+                controller.onConsumed()
+            }
+
+            is PostOnboardingLaunchTarget.HistoryDetail -> {
+                onGoHistory(
+                    EntryDetailOpenRequest(
+                        entryId = target.entryId,
+                        highlightOnOpen = false,
+                        token = target.token,
+                    ),
+                )
+                controller.onConsumed()
+            }
+        }
     }
 }
 
@@ -237,6 +290,7 @@ private fun CaptureRoute(
     zoneId: ZoneId,
     onOpenPatterns: () -> Unit,
     onOpenHistory: () -> Unit,
+    onOpenModelStatus: () -> Unit,
 ) {
     val limitWarningCue = remember { ToneGeneratorLimitWarningCue() }
     DisposableEffect(limitWarningCue) {
@@ -286,6 +340,7 @@ private fun CaptureRoute(
         meta = meta,
         modifier = Modifier.fillMaxSize(),
         chrome = IdleChromeCallbacks(
+            onStatusTap = onOpenModelStatus,
             onPatternsTap = onOpenPatterns,
             onHistoryTap = onOpenHistory,
             lastEntryFooter = lastEntryFooter,

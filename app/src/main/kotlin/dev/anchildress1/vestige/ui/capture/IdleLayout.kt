@@ -35,7 +35,6 @@ import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.anchildress1.vestige.ui.components.AppTop
-import dev.anchildress1.vestige.ui.components.AppTopStatuses
 import dev.anchildress1.vestige.ui.components.EyebrowE
 import dev.anchildress1.vestige.ui.components.StatItem
 import dev.anchildress1.vestige.ui.components.StatRibbon
@@ -60,7 +59,7 @@ fun IdleLayout(
     Column(modifier = modifier.fillMaxSize().background(colors.floor)) {
         AppTop(
             persona = state.persona.name,
-            status = AppTopStatuses.Ready,
+            status = appTopStatusFor(state.modelReadiness),
             onPersonaTap = chrome.onPersonaTap,
             onStatusTap = chrome.onStatusTap,
         )

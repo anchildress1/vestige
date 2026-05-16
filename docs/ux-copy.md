@@ -275,7 +275,7 @@ Filter chips (small, secondary text — Phase 4 polish on top of the section str
 Pattern card structure:
 
 > **{Pattern name}**
-> {Agent-emitted label — Aftermath / Tunnel exit / Concrete shoes / Decision spiral / Goblin hours / Audit}
+> {Agent-emitted label — Crashed / Deep Space / Busy Stalling / Nonstop Spiral / Goblin Hours / Brain Dump}
 > {One-line observation}
 > {N} of {M} entries · Last seen {date}
 
@@ -286,7 +286,7 @@ Card actions (per card, in overflow menu):
 Card actions (non-active cards, in overflow menu):
 - **Restart**
 
-Note: Closed is model-detected — not set by a user tap. Pattern auto-close is deferred to v1.5 (`pattern-auto-close` backlog entry), but a done card can still be restarted.
+Note: CLOSED · DONE is user-declared (user taps Close). RESOLVED — FADED is AI auto-detected and deferred to v1.5 (`pattern-auto-close` backlog entry). Both states support Restart.
 
 Empty states:
 
@@ -311,7 +311,7 @@ Header:
 > **{Pattern name}**
 
 Subhead (agent-emitted template label):
-> {Aftermath / Tunnel exit / Concrete shoes / Decision spiral / Goblin hours / Audit}
+> {Crashed / Deep Space / Busy Stalling / Nonstop Spiral / Goblin Hours / Brain Dump}
 
 Summary observation (one line, primary text):
 > {The card's one-line observation, expanded slightly with timing}

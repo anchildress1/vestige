@@ -73,7 +73,7 @@ Eleven content fields total. Extracted fields are convergence-driven; `entry_obs
 - `follow_up` — saved model turn for single-turn voice captures; `null` for typed entries
 - `persona` — the recorded authoring persona for the saved follow-up (`witness` / `hardass` / `editor`)
 - `timestamp` — auto
-- `template_label` — agent-emitted (Aftermath / Tunnel exit / Concrete shoes / Decision spiral / Goblin hours / Audit)
+- `template_label` — agent-emitted (Crashed / Deep Space / Busy Stalling / Nonstop Spiral / Goblin Hours / Brain Dump)
 - `tags` — free-form, model-extracted (people, topics, activities, places)
 - `energy_descriptor` — nullable; captured if user mentioned a state
 - `recurrence_link` — nullable; pattern_id if entry matches a known pattern
@@ -103,14 +103,14 @@ The "Reading" debug-style section on entry detail shows each lens's output per s
 
 The product produces useful observable signal from entry one — not validation, not "feels seen" framing, just specific behavioral or vocabulary observations the user can verify. The product visibly sharpens as data accumulates.
 
-**Pattern-enhanced callout (after threshold).** When ≥10 entries exist AND a pattern with ≥3 supporting entries is detected, the per-entry observation is *appended* with a pattern callout. "Witness also noticed: this is the fourth Aftermath entry in twelve — all post-meeting." Cooldown of 3 entries on the pattern-callout part only; per-entry observations continue normally during cooldown.
+**Pattern-enhanced callout (after threshold).** When ≥10 entries exist AND a pattern with ≥3 supporting entries is detected, the per-entry observation is *appended* with a pattern callout. "Witness also noticed: this is the fourth Crashed entry in twelve — all post-meeting." Cooldown of 3 entries on the pattern-callout part only; per-entry observations continue normally during cooldown.
 
 **Roast me button (P1)** — on-demand deep analysis across history, available in patterns view after the normal pattern list works. User-initiated, no hard threshold: button may be visible from entry one, but generation may return the insufficient-data fallback copy from `ux-copy.md` when there is not enough history to make a sourced roast. Output must always be sourced (counts, dates, quotes); never freeform speculation.
 
 ## Pattern persistence
-- Surfaced patterns persist as their own list, dismissible / snoozable / mark-resolved
+- Surfaced patterns persist as their own list, skippable / droppable / user-closeable
 - Own tab in the app
-- Pattern interpretation allowed (counts, co-occurrences, vocabulary). Feelings/motivation interpretation forbidden. "Fourth Aftermath in twelve, all post-meeting" — yes. "You might be feeling overwhelmed" — never.
+- Pattern interpretation allowed (counts, co-occurrences, vocabulary). Feelings/motivation interpretation forbidden. "Fourth Crashed in twelve, all post-meeting" — yes. "You might be feeling overwhelmed" — never.
 
 ## Memory architecture
 - Markdown files = source of truth (one per entry, exportable, debuggable)

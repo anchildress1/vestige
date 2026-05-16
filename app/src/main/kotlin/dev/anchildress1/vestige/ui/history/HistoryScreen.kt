@@ -22,7 +22,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -207,7 +209,15 @@ private fun DensityBar(buckets: List<Int>, modifier: Modifier = Modifier) {
 @Composable
 private fun HistoryEmptyState(modifier: Modifier = Modifier) {
     val colors = VestigeTheme.colors
-    Box(modifier = modifier, contentAlignment = Alignment.TopStart) {
+    // Empty surface = a status band: politely announced, no role, no click action
+    // (AGENTS.md band a11y rule — same shape as the Pattern-list empty states).
+    Box(
+        modifier = modifier.semantics(mergeDescendants = true) {
+            liveRegion = LiveRegionMode.Polite
+            contentDescription = "${HistoryCopy.EMPTY_HEADER} ${HistoryCopy.EMPTY_BODY}"
+        },
+        contentAlignment = Alignment.TopStart,
+    ) {
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(
                 text = HistoryCopy.EMPTY_HEADER,

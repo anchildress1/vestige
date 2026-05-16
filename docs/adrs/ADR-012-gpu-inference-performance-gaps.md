@@ -71,6 +71,16 @@ The `prebuilt/` directory referenced in the original decision does not exist in 
 
 ---
 
+### Addendum (2026-05-16) — GPU sampler platform scope + MTP available + CPU fallback is a bug
+
+**GPU sampler export bug is macOS/Windows only (GitHub Issue #2073).** Android ships all 7 required C ABI exports from `libLiteRtTopKOpenClSampler.so`. The Android GPU sampler fallback ("GPU sampler unavailable. Falling back to CPU sampling.") is caused exclusively by the `.so` being absent from the AAR — documented in the 2026-05-15 addendum above — not by the export-count defect. If a future SDK release restores the `.so` to the AAR, Android GPU sampling works correctly without any code change.
+
+**MTP Single Position is available in the pinned SDK.** `litertlm-android:0.11.0` ships Single Position MTP, documented at >2x decode speedup. The `mtp-speculative-decoding` backlog entry listed "ExperimentalFlags not yet stable" as its unblock condition — that condition no longer applies at this version. Story 2.15 carries enablement.
+
+**CPU fallback is a regression, not a documented limitation.** The 24–33s foreground latency figures recorded in Phase 2 were measured before `BackendChoice.GPU` was wired. With GPU active and the Decision 2 pre-warm in place, all inference paths run on GPU. Any logcat line indicating CPU fallback is a bug to fix at root per AGENTS.md §"Atomic correctness" — do not document it as a known constraint and move on.
+
+---
+
 ## Consequences
 
 - Engine init stall moves to app-open background (hidden from user on any session where model was already present at launch).

@@ -68,6 +68,42 @@ class DownloadProgressTrackerTest {
     }
 
     @Test
+    fun `eta is null until a speed sample exists`() {
+        val etas = mutableListOf<Long?>()
+        var clock = 0L
+        val tracker = DownloadProgressTracker(
+            onState = {},
+            onSpeed = {},
+            onEta = { etas += it },
+            nowMillis = { clock },
+        )
+        // Baseline tick — no rate yet.
+        tracker.onProgress(currentBytes = 0, expectedBytes = BYTES_PER_MB.toLong() * 2)
+        clock = 500L // still inside the sample window — rate remains unknown
+        tracker.onProgress(currentBytes = BYTES_PER_MB.toLong() / 2, expectedBytes = BYTES_PER_MB.toLong() * 2)
+
+        assertEquals(listOf<Long?>(null, null), etas)
+    }
+
+    @Test
+    fun `eta is remaining bytes over the sampled rate once a sample lands`() {
+        val etas = mutableListOf<Long?>()
+        var clock = 0L
+        val tracker = DownloadProgressTracker(
+            onState = {},
+            onSpeed = {},
+            onEta = { etas += it },
+            nowMillis = { clock },
+        )
+        tracker.onProgress(currentBytes = 0, expectedBytes = BYTES_PER_MB.toLong() * 2)
+        // +1 s, +1 MB → 1 MB/s. 1 MB still to go → ~1 s remaining.
+        clock = MS_PER_SECOND.toLong()
+        tracker.onProgress(currentBytes = BYTES_PER_MB.toLong(), expectedBytes = BYTES_PER_MB.toLong() * 2)
+
+        assertEquals(listOf<Long?>(null, 1L), etas)
+    }
+
+    @Test
     fun `unchanged percent does not re-log between ticks`() {
         // Same pct on two consecutive ticks — second tick must early-exit the log branch and not
         // emit a MB/s sample (within-window suppress + identical bytes = zero delta).

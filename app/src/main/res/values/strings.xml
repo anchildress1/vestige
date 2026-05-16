@@ -69,8 +69,13 @@
     <string name="onboarding_download_body">Quiet for a minute. This takes a while.</string>
     <string name="onboarding_download_loading_pill">DOWNLOADING</string>
     <string name="onboarding_download_loading_pill_percent">DOWNLOADING %1$d%%</string>
-    <string name="onboarding_download_loading_note">Model file is still landing. Keep Vestige open — this is the one network event in the app\'s life.</string>
     <string name="onboarding_download_ready_pill">GEMMA READY</string>
+    <string name="onboarding_download_stalled">Download stalled.</string>
+    <string name="onboarding_download_failed">Network choked.</string>
+    <string name="onboarding_download_reacquiring">Model file unreadable. Re-downloading.</string>
+    <string name="onboarding_download_retry">Retry</string>
+    <string name="onboarding_download_try_again">Try again</string>
+    <string name="onboarding_download_pause">Pause</string>
 
 <!-- Phase 3 placeholder source-entry surface. Phase 4 replaces this with the real history detail screen. -->
     <string name="entry_detail_placeholder_title">Entry</string>
@@ -86,7 +91,7 @@
     <string name="patterns_empty_none_header">No repeating pattern detected.</string>
     <string name="patterns_empty_none_body">The model looked. Nothing came back twice.</string>
     <string name="pattern_detail_seen_in">Seen in:</string>
-    <string name="pattern_detail_no_sources">No source entries.</string>
+    <string name="pattern_detail_no_sources">No entries logged for this pattern yet.</string>
     <string name="pattern_detail_not_found">Pattern not found.</string>
     <string name="pattern_detail_intensity_eyebrow">INTENSITY · 30 DAYS</string>
     <!-- Action labels per docs/ux-copy.md §"Pattern List / Card actions" + spec-pattern-action-buttons.md.
@@ -122,4 +127,50 @@
     <!-- Phase 3 placeholder overflow glyph fallback for the system A11Y description. -->
     <string name="pattern_overflow_glyph">⋮</string>
     <string name="pattern_back_glyph">←</string>
+
+    <!-- Local Model Status (standalone screen). Copy: ux-copy.md §"Local Model Status" +
+         §"Destructive Confirmations" (canonical confirm wording). -->
+    <string name="model_status_eyebrow">MODEL STATUS</string>
+    <string name="model_status_header">Model status.</string>
+    <string name="model_status_ready">Model ready. Running locally.</string>
+    <string name="model_status_loading">Loading model.</string>
+    <string name="model_status_downloading">Downloading model. Wi-Fi only.</string>
+    <string name="model_status_paused">Download stalled.</string>
+    <string name="model_status_downloading_pct">%1$d%%</string>
+    <string name="model_status_detail">Gemma 4 E4B · %1$s · v%2$s · On-device</string>
+    <string name="model_status_redownload">Re-download model</string>
+    <string name="model_status_delete">Delete model</string>
+    <string name="model_status_cancel">Cancel</string>
+    <string name="model_status_redownload_title">Re-download model?</string>
+    <string name="model_status_redownload_body">~3.7 GB on Wi-Fi. The model file is replaced. Your entries are not touched.</string>
+    <string name="model_status_redownload_confirm">Re-download</string>
+    <string name="model_status_delete_title">Delete model file?</string>
+    <string name="model_status_delete_body">The app won\'t work until you re-download. Your entries stay where they are.</string>
+    <string name="model_status_delete_confirm">Delete model</string>
+
+    <!-- Settings (P0). Copy: ux-copy.md §Settings + §"Destructive Confirmations / Delete all data". -->
+    <string name="settings_eyebrow">SETTINGS</string>
+    <string name="settings_header">Settings.</string>
+    <string name="settings_section_persona">PERSONA</string>
+    <string name="settings_section_data">DATA</string>
+    <string name="settings_section_model">MODEL</string>
+    <string name="settings_section_about">ABOUT</string>
+    <string name="settings_persona_witness">Witness</string>
+    <string name="settings_persona_hardass">Hardass</string>
+    <string name="settings_persona_editor">Editor</string>
+    <string name="settings_export">Export all entries</string>
+    <!-- SAF picks the destination, so the copy stays location-agnostic per docs/ux-copy.md
+         §System Messages. Failure is surfaced honestly — a silently-broken export is the bug. -->
+    <string name="settings_export_success">Entries exported.</string>
+    <string name="settings_export_failed">Export failed. Nothing was written.</string>
+    <string name="settings_delete_all">Delete all data</string>
+    <string name="settings_model_status">Model status</string>
+    <string name="settings_source">Source code</string>
+    <string name="settings_license">Polyform Shield 1.0.0</string>
+    <string name="settings_version">v%1$s</string>
+    <string name="settings_cancel">Cancel</string>
+    <string name="settings_wipe_title">This deletes everything.</string>
+    <string name="settings_wipe_body">Every entry, every pattern, every tag. Nothing is sent anywhere. Nothing is recoverable.</string>
+    <string name="settings_wipe_placeholder">DELETE</string>
+    <string name="settings_wipe_confirm">Wipe everything. No backup.</string>
 </resources>

@@ -42,7 +42,7 @@ Privacy:
 
 Memory and patterns:
 - I want to see patterns the app surfaces about my own behavior across entries, named in my own words with no interpretive overlay, so I trust what I'm seeing.
-- I want to dismiss, snooze, or mark-resolved a pattern, so the app respects my agency.
+- I want to skip, drop, or restart a pattern, so the app respects my agency.
 - I want to browse past entries and see the tags the model extracted, so I can audit what it caught.
 
 Edge cases:
@@ -76,7 +76,7 @@ Edge cases:
 - Pattern detection runs after every N entries (default 10, hardcoded for v1)
 - At least one cross-entry pattern surfaces in the demo session
 - Patterns persist as their own list; basic patterns view
-- **Pattern actions in v1:** dismiss / snooze / mark-resolved. Agency over surfaced patterns is part of the user story; promoted from P1 to P0.
+- **Pattern actions in v1:** Skip / Drop / Restart. Agency over surfaced patterns is part of the user story; promoted from P1 to P0.
 
 **Privacy:**
 - Zero outbound network calls during normal operation; model download is the only network event
@@ -221,7 +221,7 @@ Sample data for STT-C, STT-D, STT-E lives in `sample-data-scenarios.md`.
 2. Embedding layer + ObjectBox vector index integration. **🛑 STT-E — EmbeddingGemma vs tag-only comparison.** Run prepared vocabulary-drift sample data through both retrieval paths; embeddings ship only if visibly better. If not, drop EmbeddingGemma and the vector index to v1.5.
 3. Pattern detection runs at end of session
 4. Patterns persist in their own list
-5. Pattern detection list + minimal pattern detail with source evidence; pattern actions (dismiss / snooze / mark-resolved) reachable per P0
+5. Pattern detection list + minimal pattern detail with source evidence; pattern actions (Skip / Drop / Restart) reachable per P0
 6. Per-entry observation generation wired into the capture loop (P0)
 
 ### Phase 4 — UX surface
@@ -284,8 +284,7 @@ If no → reject, log to `backlog.md`, respond: *"this doesn't help us win, defe
 - `adrs/ADR-005-stt-b-scope-and-v1-single-turn.md` — STT-B scope correction; v1 single-turn-per-capture decision
 - `adrs/ADR-006-foreground-service-restart-policy.md` — foreground service restart policy
 - `adrs/ADR-007-foreground-service-state-machine-extensions.md` — foreground service state machine extensions
-- `adrs/ADR-008-parallel-lens-execution.md` — parallel 3-lens execution via LiteRT-LM Engine/Session cloning **(superseded 2026-05-11 by ADR-009; historical)**
-- `adrs/ADR-009-litertlm-kotlin-session-clone-unavailable.md` — supersedes ADR-008; documents the `litertlm-android:0.11.0` Kotlin SDK gap and restores ADR-002's original sequential 3-lens rule for v1
+- `adrs/ADR-008-parallel-lens-execution.md` — concurrent multi-context 3-lens on one Engine. **Accepted; mechanism + performance premise corrected 2026-05-16** (`Engine.createSession`/`createConversation`, not `Session.clone()`/CoW). The interim ADR-009 that declared this SDK-impossible was a mis-scoped-probe **mistake and was deleted** — there is no ADR-009. v1 ships ADR-002 sequential until Story 2.6.6/2.19 measures concurrent RAM + wall-clock.
 - `architecture-brief.md` — module breakdown, build plan, interface contracts
 - `sample-data-scenarios.md` — stop-and-test validation transcripts (STT-C, STT-D, STT-E)
 - `backlog.md` — features deferred from v1, with rationale and "what would unblock" per entry

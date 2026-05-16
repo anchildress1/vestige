@@ -87,6 +87,21 @@ class OnboardingPrefsTest {
     }
 
     @Test
+    fun `reset wipes persona, completion and step back to first-run defaults`() {
+        prefs.setDefaultPersona(Persona.EDITOR)
+        prefs.setCurrentStep(OnboardingStep.ModelDownload)
+        assertTrue(prefs.markComplete())
+
+        prefs.reset()
+
+        val ctx = ApplicationProvider.getApplicationContext<Context>()
+        val reopened = OnboardingPrefs.from(ctx)
+        assertFalse(reopened.isComplete)
+        assertEquals(Persona.WITNESS, reopened.defaultPersona)
+        assertEquals(OnboardingStep.PersonaPick, reopened.currentStep)
+    }
+
+    @Test
     fun `markComplete returns false when SharedPreferences flush fails`() {
         val editor = mockk<SharedPreferences.Editor>()
         every { editor.putBoolean(any(), any()) } returns editor

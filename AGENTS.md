@@ -24,6 +24,8 @@
 - Can't ship as written → edit the story or push to `backlog.md` before moving on.
 
 ## Atomic correctness
+- Accuracy over speed. Verify facts, behavior, and assumptions before optimizing for turnaround.
+- Long-term maintainability and reliability beat challenge-deadline panic. The human owns the deadline; the agent owns code quality.
 - No backwards compatibility. Design change → rewrite + supersede ADR. No shims, no deprecated-kept APIs, no compat wrappers.
 - No quick fixes, no temp solutions, no `// TODO fix later` in shipped code.
 - All scans pass (Sonar, Semgrep, Snyk, lint, detekt, ktlint). Every finding is a blocker. Fix at root.
@@ -35,6 +37,7 @@
 
 ## Tests + docs ship together
 - Every code change: pos / neg / err / edge across unit / integration / perf / a11y tiers as applicable.
+- Before `lefthook` pre-push: run targeted tests for the touched area, not the full suite. The hook already owns the full pre-push gate.
 - Same commit updates README / ADRs / stories / architecture-brief / design-guidelines / ux-copy / diagrams the change invalidates.
 - Coverage shape declared explicitly per touched suite. UI suites assert a11y semantics + tap-target where feasible. Robolectric-blocked a11y → say so + keep JVM suite honest with semantics coverage.
 - **Band a11y coverage is a blocker, same gate as test coverage.** Every inline status / error / diagnostic band ships with role + `contentDescription` + `liveRegion` + click-action presence/absence asserted at the unit tier.

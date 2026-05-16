@@ -96,13 +96,15 @@ class CaptureViewModel(
         }
     }
 
-    fun onMicDenied() {
+    /** [permanentlyBlocked] true ⇒ system-level "don't ask again"; surface the Settings path. */
+    fun onMicDenied(permanentlyBlocked: Boolean = false) {
+        val micError = if (permanentlyBlocked) CaptureError.MicBlocked else CaptureError.MicDenied
         _state.update { current ->
-            (current as? CaptureUiState.Idle)?.copy(error = CaptureError.MicDenied)
+            (current as? CaptureUiState.Idle)?.copy(error = micError)
                 ?: CaptureUiState.Idle(
                     persona = current.persona,
                     modelReadiness = current.modelReadiness,
-                    error = CaptureError.MicDenied,
+                    error = micError,
                 )
         }
     }

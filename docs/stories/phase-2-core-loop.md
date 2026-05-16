@@ -2,7 +2,7 @@
 
 **Status:** In progress
 **Dates:** 2026-05-09 – TBD
-**References:** `PRD.md` §Phase 2, `concept-locked.md` §"Multi-lens extraction architecture", `concept-locked.md` §Schema, `AGENTS.md`, `architecture-brief.md`, `adrs/ADR-001-stack-and-build-infra.md` §Q3 / §Q4, `adrs/ADR-002-multi-lens-extraction-pattern.md` (entire), `adrs/ADR-004-app-backgrounding-and-model-handle-lifecycle.md` (entire), `adrs/ADR-009-litertlm-kotlin-session-clone-unavailable.md` (supersedes ADR-008 — sequential is the v1 rule), `sample-data-scenarios.md`
+**References:** `PRD.md` §Phase 2, `concept-locked.md` §"Multi-lens extraction architecture", `concept-locked.md` §Schema, `AGENTS.md`, `architecture-brief.md`, `adrs/ADR-001-stack-and-build-infra.md` §Q3 / §Q4, `adrs/ADR-002-multi-lens-extraction-pattern.md` (entire), `adrs/ADR-004-app-backgrounding-and-model-handle-lifecycle.md` (entire), `adrs/ADR-008-parallel-lens-execution.md` (concurrent multi-context restored; mechanism corrected — §Correction 2026-05-16; v1 ships sequential pending measurement), `sample-data-scenarios.md`
 
 ---
 
@@ -22,7 +22,7 @@ Build the end-to-end capture loop: user records or types → foreground call ret
 - [x] **STT-C passes**: tag extraction is stable (≥80% same-tag emission on equivalent test dumps). If unstable, prompts have been tightened until stable, or the limitation is documented. _(2026-05-11 — **PASSED at 1.00** on S24 Ultra GPU. 41/41 (entry, tag) pairs stable across 3 runs over 17 of 18 corpus entries. C2 produced zero tags on all 3 runs (INFERENTIAL + SKEPTICAL parse-fail × 2 retries on GPU) — same regression flagged in Story 2.7's GPU re-run. Stability gate is unaffected; C2 parse-rate is tracked separately.)_
 - [ ] Convergence resolver implementation lands into Story 1.12's test scaffolding and all happy-path tests pass.
 - [ ] Agent-emitted template labels work for all six archetypes on representative sample transcripts.
-- [x] Background extraction populates the canonical schema on the reference device. **Latency target reverted to ADR-002 sequential per `adrs/ADR-009-litertlm-kotlin-session-clone-unavailable.md` (2026-05-11)** — Story 2.7's device record stands as the measured baseline: ~5–7 s per lens, 25–55 s per entry on E4B GPU after the `libOpenCL.so` manifest fix. The 30–90s ceiling remains the timeout guard. _(2026-05-11 — measured under Story 2.7 GPU re-run.)_
+- [x] Background extraction populates the canonical schema on the reference device. **Latency target is ADR-002 sequential for v1** — a scope position, not an SDK limit (ADR-008 concurrent multi-context is restored; adoption gated on Story 2.6.6 / 2.19 measurement). Story 2.7's device record stands as the measured baseline: ~5–7 s per lens, 25–55 s per entry on E4B GPU after the `libOpenCL.so` manifest fix. The 30–90s ceiling remains the timeout guard. _(2026-05-11 — measured under Story 2.7 GPU re-run.)_
 - [ ] Background extraction lifecycle service is wired per ADR-004 (conditional foreground service): app promotes when extraction begins, demotes after 30-second keep-alive once all extractions reach terminal status. Notification text matches `ux-copy.md` §"Loading States".
 - [ ] Personas (Witness / Hardass / Editor) demonstrably affect tone on the foreground response without affecting structured field extraction.
 
@@ -129,7 +129,7 @@ Build the end-to-end capture loop: user records or types → foreground call ret
 - [x] Latency per entry on the reference device is logged; total foreground + background time per entry is recorded for the latency note. _(`Log.d("VestigeBackgroundExtraction", …)` per lens (`elapsed=Xms`) and per entry (`extract completed: lenses=N/3 model_calls=K elapsed=Yms`). Reference-device measurements get added under ADR-002 §"Latency budget" once the worker is wired into the running app.)_
 - [x] If a lens call fails (parse error, model error), the worker retries per ADR-001 Q3's retry policy. Two consecutive failures on the same lens marks the lens as "no opinion" rather than retrying indefinitely. _(`maxAttemptsPerLens = 2` (one initial + one retry) per lens. After exhausting that budget the lens contributes `LensResult(extraction = null, lastError = ...)` and the resolver receives only the lenses that parsed — ADR-002 §"Convergence edge cases" already routes parse-fail to "no opinion" rather than agreement. The original story copy said `extraction_status=ambiguous_partial`; the entry-level enum stays `COMPLETED` (≥1 lens parsed) or `FAILED` (every lens failed) per ADR-001 §Q3, with the per-field ambiguity expressed by the resolver's `ConfidenceVerdict.AMBIGUOUS` rather than a new entry-level status.)_
 
-**Notes / risks:** Lens calls run **sequentially** for v1 per `adrs/ADR-002-multi-lens-extraction-pattern.md` §"Background pass (3 lens calls, sequential)" — restored by `adrs/ADR-009-litertlm-kotlin-session-clone-unavailable.md` (supersedes ADR-008). The parallel-via-Session-cloning design ADR-008 prescribed is not buildable against `litertlm-android:0.11.0`; Story 2.6.6 was deferred and is tracked in `backlog.md` under `parallel-lens-execution-via-clone`.
+**Notes / risks:** Lens calls run **sequentially in v1** per `adrs/ADR-002-multi-lens-extraction-pattern.md` §"Background pass" — a scope position, not an SDK limit. ADR-008's concurrent multi-context design is restored (mechanism corrected to `Engine.createSession`/`createConversation`, no `Session.clone()` — ADR-008 §Correction 2026-05-16); concurrent adoption is scope-deferred to Story 2.6.6 / 2.19 pending the RAM + wall-clock measurement, not deferred to `backlog.md`.
 
 The worker does **not** own its own backgrounding behavior. The `BackgroundExtractionService` from Story 2.6.5 wraps the worker and keeps it alive across app backgrounding by promoting the process to a foreground service while extractions are in flight. Don't bake `Service` lifecycle handling into the worker class itself — that's the wrapper's job.
 
@@ -160,16 +160,14 @@ Don't conflate this story with Story 2.6 (worker logic). Story 2.6 is *what* run
 
 ---
 
-### Story 2.6.6 — Parallel lens execution via Engine/Session cloning — **SUPERSEDED 2026-05-11; DEFERRED TO BACKLOG**
+### Story 2.6.6 — Concurrent lens execution via one Engine, many contexts — **SCOPE-DEFERRED pending measurement (not SDK-blocked)**
 
-🪦 **Superseded by [ADR-009](../adrs/ADR-009-litertlm-kotlin-session-clone-unavailable.md).** The API-feasibility probe run 2026-05-11 (ADR-008 Action Item 6) confirmed the `litertlm-android:0.11.0` Kotlin SDK does not expose `Session.clone()` or any equivalent parent-Session API. `Engine.createSession(SessionConfig)` takes no parent reference; the JNI binding (`nativeCreateSession(engineHandle, samplerConfig)`) confirms it at the native layer. Upstream PR #1515 (Kotlin clone surface) was closed unmerged 2026-03-09 and no replacement landed in the two months before this story's feasibility check. The C++ runtime (`runtime/core/session_advanced.cc`) has cloning; the Android SDK does not bind to it. No newer artifact is published — Google Android Maven `lastUpdated 2026-05-04` shows 0.11.0 is `<latest>`.
+**Corrected 2026-05-16.** The 2026-05-11 feasibility probe was **mis-scoped** — it searched for a method literally named `Session.clone()`, didn't find one, and wrongly concluded the SDK couldn't do this (recorded in the now-**deleted** ADR-009). A direct AAR bytecode probe of the pinned `litertlm-android:0.11.0` found `Engine.createSession(SessionConfig)` and `Engine.createConversation(ConversationConfig)`: one Engine → many **independent** contexts. ADR-008's decision (concurrent multi-context 3-lens on one Engine) is **restored**; its mechanism is corrected (independent contexts, **no** `Session.clone()` / no CoW shared-prefix) — see [ADR-008 §Correction (2026-05-16)](../adrs/ADR-008-parallel-lens-execution.md#correction-2026-05-16--mechanism-and-performance-premise).
 
-ADR-009 restores ADR-002's original sequential rule for v1. Story 2.6's sequential `BackgroundExtractionWorker` ships as-is. This story is deferred to `backlog.md` under `parallel-lens-execution-via-clone` with the SDK-gap revival triggers recorded.
-
-**Original story preserved below for historical context. No `Done when` boxes will be ticked on this story — the feasibility check itself was the work, and its outcome was "defer."**
+This story is **not** superseded and **not** a `backlog.md` SDK-gap entry. It is **scope-deferred**: v1 ships Story 2.6's sequential `BackgroundExtractionWorker` until this story measures concurrent-context RAM on the reference S24 Ultra and the realized background wall-clock (a single GPU serializes at the command queue — the win is non-blocking foreground preempt, not a literal 3×). Story 2.6.6 / Story 2.19 own that measured adoption call against the 17-day timebox + demo gate. `Done when` boxes are reframed below to the corrected mechanism; they remain unticked because the work (measure, then adopt or hold) is open, not because it was deferred to backlog.
 
 <details>
-<summary>Original Story 2.6.6 contents (2026-05-10 draft, superseded)</summary>
+<summary>Original Story 2.6.6 contents (2026-05-10 draft — mechanism corrected; read clone/CoW/3× through ADR-008 §Correction 2026-05-16)</summary>
 
 **As** the AI implementor, **I need** to refactor `BackgroundExtractionWorker` from sequential lens iteration to parallel execution via LiteRT-LM's Engine/Session API with Copy-on-Write KV-cache (per `adrs/ADR-008-parallel-lens-execution.md`), **so that** per-entry wall-clock drops from ~3× single-call (sequential) to ~1× single-call (parallel) and the extraction queue drains in real-time under ADHD-cadence capture.
 
@@ -334,6 +332,119 @@ Phase 2 has no capture screen to attach a placeholder to — Story 4.5 builds th
 
 ---
 
+---
+
+### Story 2.14 — SDK upgrade probe: verify Session.clone(), MTP, sampler fix, bump litertlm-android
+
+**As** the AI implementor, **I need** to probe the pinned `litertlm-android` AAR bytecode for the concurrency + streaming surface, **so that** Stories 2.15, 2.16, and 2.19 build on the real SDK shape rather than the mis-scoped `Session.clone()` assumption.
+
+**Done when:**
+- [x] Fetch current `maven-metadata.xml` for `com.google.ai.edge.litertlm:litertlm-android`. _(2026-05-16: `<latest>` = `<release>` = `0.11.0`, `lastUpdated` `20260504232658`. No newer artifact — and none is needed; see below.)_
+- [x] `javap` the **pinned 0.11.0** AAR `classes.jar` (`Engine`, `Conversation`, `Session`, `ConversationConfig`, `SessionConfig`). _(Done 2026-05-16. The earlier "only if a newer release publishes" gate was the mis-scoped framing — the question is the pinned artifact's actual surface, not the version.)_
+- [x] Concurrency surface: does the SDK support one Engine → many contexts? _(**Yes, on 0.11.0.** `Engine.createSession(SessionConfig): Session` and `Engine.createConversation(ConversationConfig): Conversation` — independent contexts, each `AutoCloseable` + `cancelProcess()`. No `Session.clone()` / parent-Session / CoW prefix-fork exists, and none is needed. The 2026-05-11 `clone()`-named-method probe was mis-scoped; the resulting ADR-009 was **deleted as a mistake**; ADR-008 is restored with the mechanism corrected — see [ADR-008 §Correction (2026-05-16)](../adrs/ADR-008-parallel-lens-execution.md#correction-2026-05-16--mechanism-and-performance-premise).)_
+- [x] Streaming surface: multimodal streaming present? _(**Yes, on 0.11.0.** `Conversation.sendMessageAsync(Contents, Map): Flow<Message>`. Story 2.16 is a thin wrapper over the existing Flow — no new SDK API.)_
+- [x] Sampler `.so` check (`libLiteRtTopKOpenClSampler.so` / `libLiteRtTopKWebGpuSampler.so` in `jni/arm64-v8a/`). _(Not present in 0.11.0 — unchanged; tracked by ADR-012 Decision 1, blocked.)_
+- [x] Dependency pin. _(`gradle/libs.versions.toml` `litert-lm` stays `0.11.0` — already `<latest>` and already exposes everything needed. No bump, no build/test delta.)_
+- [x] Record findings in the ADR layer. _(ADR-008 §Correction 2026-05-16 + ADR-001/002 corrections + `architecture-brief.md`. ADR-009 deleted — not superseded — per the operator's mistake-vs-change waiver.)_
+
+**Notes / risks:** This story's original framing ("probe a newer release for `Session.clone()`; bump if newer") was wrong on two counts: the concurrency capability was never `clone()` (it is `createSession`/`createConversation`), and it was present on the pinned `0.11.0` all along — no newer artifact needed. Net: no dependency change; the ADR record is the deliverable.
+
+---
+
+### Story 2.15 — Enable MTP speculative decoding (>2x decode speedup)
+
+**As** the AI implementor, **I need** Multi-Token Prediction enabled on the LiteRT-LM engine initialization in `LiteRtLmEngine`, **so that** foreground and background inference decode at the documented >2x speedup from Single Position MTP — which ships in the already-pinned `litertlm-android:0.11.0`.
+
+**Done when:**
+- [ ] Identify the MTP enablement API in `litertlm-android` (likely an `EngineConfig` or `ExperimentalFlags` parameter). Check the SDK source or AAR for the relevant flag/option name.
+- [ ] Enable MTP in `LiteRtLmEngine.initialize()` via the appropriate config. GPU backend stays `BackendChoice.GPU`.
+- [ ] Measure foreground call latency on the reference S24 Ultra before and after. Record delta in logcat under `VestigeLiteRtLm`. A >1.5x decode speedup is the acceptance threshold; if below 1.5x, document why and leave MTP enabled regardless (correctness is primary).
+- [ ] Measure background lens call latency (one lens call, no convergence) before and after. Record delta.
+- [ ] All existing unit + integration tests pass.
+- [ ] If MTP requires a minimum SDK version newer than what Story 2.14 confirms is available, defer this story and document in a dated addendum to ADR-012.
+
+**Notes / risks:** MTP is a decode-path optimization only — it does not change prompt composition, sampler config, convergence logic, or output format. If the model output changes in any measurable way (unexpected tokens, format drift), that is a regression — disable MTP and surface conflict with the user for discussion.
+
+---
+
+### Story 2.16 — Streaming foreground inference: token-by-token output to UI
+
+**As** the AI implementor, **I need** the foreground inference call to switch from blocking `sendMessageContents()` to streaming `sendMessageAsync()` (Kotlin Flow), **so that** the user sees tokens appearing in the UI as the model generates them rather than waiting for the full response — eliminating the perceived wall-clock stall on every capture.
+
+**Done when:**
+- [ ] `LiteRtLmEngine.streamMessageContents(parts: List<Content>): Flow<String>` is added — the multimodal streaming counterpart to `sendMessageContents`. `streamText(prompt)` already exists and wraps `sendMessageAsync` Flow for text-only calls; `streamMessageContents` applies the same pattern to the `AudioFile + Text` foreground path. The SDK's `sendMessageAsync(contents): Flow<Message>` is the underlying API (per official Android docs `https://ai.google.dev/edge/litert-lm/android`).
+- [ ] `ForegroundInference.runForegroundCall()` switches from `sendMessageContents()` (blocking) to `streamMessageContents()`. The return type changes from a single `ForegroundResult` to a `Flow<ForegroundToken>` or equivalent streaming shape — design this surface so `CaptureViewModel` can update its `Reviewing` state incrementally.
+- [ ] `ForegroundResponseParser` is updated to parse XML tags (`<transcription>`, `<follow_up>`) from a streamed token buffer rather than a completed string. The parser must handle tag boundaries arriving mid-token.
+- [ ] `CaptureViewModel.Reviewing` state carries a `followUpText: String` field that appends tokens as they arrive. The capture screen renders the growing string in real time.
+- [ ] Temp WAV file deletion still fires in `finally` after the stream completes or is cancelled — audio discard contract (ADR-001 §Q8) is unchanged.
+- [ ] Coroutine cancellation: if the user navigates away during streaming, the Flow is cancelled and the partial result is discarded. No partial entries are saved.
+- [ ] Existing `ForegroundInferenceTest` suite updated to exercise streaming happy path, mid-stream cancellation, and parse-failure on incomplete XML tag at stream end.
+- [ ] On-device: subjective latency improvement is visible on the reference S24 Ultra. Time-to-first-token logged under `VestigeForegroundInference`.
+
+**Notes / risks:** Per Story 2.2 §"Notes / risks": "Streaming is a Phase 4 polish decision, not a Phase 2 baseline." That framing was written before the 24–33s wall-clock was measured on-device; the UX case for streaming is now clear and this is the right time to do it. The parser complexity is real — test the boundary case where `</transcription>` arrives split across two token emissions before shipping.
+
+---
+
+### Story 2.17 — Fix pre-warm race: event-driven engine init instead of hardcoded delay
+
+**As** the AI implementor, **I need** the engine pre-warm in `AppContainer.refreshModelReadiness()` to trigger on a reliable lifecycle signal rather than a hardcoded 2-second delay, **so that** a user who opens the app and taps record within 2 seconds does not block on engine initialization — and users on slower devices who need more than 2 seconds to paint the first frame are also covered.
+
+**Done when:**
+- [x] Remove `ENGINE_PREWARM_DELAY_MS = 2000L` and the `delay(ENGINE_PREWARM_DELAY_MS)` call from `AppContainer.refreshModelReadiness()`.
+- [x] Pre-warm fires immediately on model-ready transition: when `probeModelReadiness()` returns `Ready` and prior state was not `Ready`, launch `ensureBackgroundEngineInitialized()` directly on `scope` with no delay.
+- [x] The pre-warm coroutine runs at `Dispatchers.Default` (or lower priority) so it does not compete with the main thread's UI work. The Mutex inside `ensureBackgroundEngineInitialized()` already ensures only one init runs at a time. _(`scope` is `Dispatchers.Default` per `defaultScope()`; no change needed.)_
+- [x] If a recording starts before pre-warm completes, `ensureBackgroundEngineInitialized()` is called inline on the recording path and blocks until init finishes — this behavior is unchanged and is the correct fallback.
+- [x] Unit test: `AppContainerTest` verifies that pre-warm launches immediately (within one coroutine scheduler tick) after `probeModelReadiness()` returns `Ready` — not after a 2-second delay. _(`pre-warm fires immediately on Ready transition without a delay`: `coVerify(exactly=1) { engineMock.initialize() }` + `assertEquals(0L, testScheduler.currentTime)`.)_
+- [ ] Manual check: open the app on the reference S24 Ultra; verify engine init completes in background before the first record tap in a typical interaction (>3 seconds between app open and first record).
+
+**Notes / risks:** The 2s delay was added to avoid competing with UI thread on cold open. Switching to `Dispatchers.Default` + the existing Mutex achieves the same isolation without the timing guess. If the Compose frame renderer is still painting when pre-warm launches, coroutine scheduling ensures the init runs on a background thread — no contention with the main thread.
+
+---
+
+### Story 2.18 — Thread retrieval history into foreground call
+
+**As** the AI implementor, **I need** `CaptureViewModel` to run a `RetrievalRepo.query()` after the transcription is available and pass the results into the foreground follow-up call, **so that** the response the user sees immediately after recording is context-aware — not context-free while only the background extraction gets prior-entry context.
+
+**Done when:**
+- [ ] After voice transcription returns (or typed text is submitted), `CaptureViewModel` calls `RetrievalRepo.query(transcriptionText, topN = 3)` before generating the follow-up.
+- [ ] The retrieved history is threaded into `ForegroundInference.runForegroundCall()` (or `runForegroundTextCall()`). `PersonaPromptComposer` or the prompt construction must incorporate the history chunks — review how `PromptComposer` currently handles `retrievedHistory` for background calls and apply the same shape to the foreground prompt.
+- [ ] `AppContainer.runForegroundCall()` / `runForegroundTextCall()` signature updated to accept `retrievedHistory: List<HistoryChunk>` if not already wired through.
+- [ ] History retrieval runs on the background dispatcher; it does not block the UI thread.
+- [ ] If `RetrievalRepo` returns empty (no prior entries, or embeddings not yet backfilled), the foreground call proceeds normally with no history block — degraded retrieval must not prevent the call.
+- [ ] Unit test: `CaptureViewModelTest` verifies that `RetrievalRepo.query()` is called with the transcription text before `runForegroundCall()` fires, and that the returned history is passed through.
+
+**Notes / risks:** This is a correctness fix for the gap documented in `architecture-brief.md` §"Retrieval History Gap (Addendum 2026-05-16)". The retrieval call adds ~880ms (embedding cost) + ObjectBox scan to the foreground path latency. With streaming output (Story 2.16), this is masked — the model starts generating before the user would perceive the retrieval delay. If streaming is not yet in place, add a logcat note about the added latency.
+
+---
+
+### Story 2.19 — Concurrent inference: eliminate foreground-blocks-on-background mutex contention
+
+**As** the AI implementor, **I need** the foreground inference path to never block on a background extraction that is currently running, **so that** a user who taps record while a prior entry's extraction is in flight gets an immediate response rather than waiting for the current lens call to finish.
+
+**Unblocked (2026-05-16).** Story 2.14's bytecode probe is done: pinned `0.11.0` exposes `Engine.createSession`/`createConversation` (concurrent independent contexts) — Path C is **buildable today**, no `Session.clone()` gate. Path choice is now a **measurement** decision (concurrent-context RAM on the reference S24 Ultra + realized wall-clock under single-GPU command-queue serialization), not an SDK gate. See [ADR-008 §Correction (2026-05-16)](../adrs/ADR-008-parallel-lens-execution.md#correction-2026-05-16--mechanism-and-performance-premise). v1 ships sequential until this story makes that measured call.
+
+**Path B — priority queue (simplest; no concurrency RAM cost):**
+- [ ] Introduce a `PriorityInferenceQueue` in `AppContainer` that serializes all engine calls with foreground priority. Foreground requests go to the front; background lens calls go to the back.
+- [ ] When a foreground call arrives while a background lens call is executing, the background coroutine is cancelled (`job.cancel()`). The background worker catches `CancellationException` and re-queues its current lens as the next background request after the foreground call completes.
+- [ ] Background extraction re-queues cleanly — the entry's `extraction_status` does not change to `FAILED` on a priority preempt; the worker distinguishes cancellation-for-preempt from cancellation-for-discard.
+- [ ] Foreground call latency on a device with an active background extraction is indistinguishable from latency with no background work running. Manual check on reference device.
+
+**Path C — detached background context (one Engine, independent contexts — no cloning):**
+- [ ] Maintain one `LiteRtLmEngine` and per-role contexts via `Engine.createSession`/`createConversation`: a foreground context for interactive calls and one background context per active extraction. **Independent** contexts (no parent-Session, no CoW shared prefix — each composes its own prefix).
+- [ ] `BackgroundExtractionWorker` creates a background context per entry extraction and `close()`s it on completion. The foreground context is never borrowed by background work.
+- [ ] Background contexts are `cancelProcess()`/`close()`d when preempted by a higher-priority foreground call — the worker detects closure and re-queues.
+- [ ] Measure: concurrent-context RAM on the reference S24 Ultra (weights shared; per-context KV is not) and realized background wall-clock (a single GPU serializes at the command queue — no literal 3×; the win is non-blocking preempt). These numbers are the Path-B-vs-C decision input. Log under `VestigeLiteRtLm`.
+
+**Done when (either path):**
+- [ ] A foreground call that arrives during an active background extraction does not block on the engine Mutex beyond the time needed to cancel and yield.
+- [ ] Background extraction resumes after the foreground call completes without requiring user action.
+- [ ] All existing `BackgroundExtractionWorkerTest` + `LiteRtLmEngineTest` cases pass.
+- [ ] `architecture-brief.md` §"AppContainer Ownership" row for `InferenceCoordinator` updated to reflect the chosen path. If Path C is adopted, record the measured RAM/wall-clock and the decision in `ADR-008` via a dated addendum (no new superseding ADR — ADR-008 is the live record).
+
+**Notes / risks:** Do not instantiate two `LiteRtLmEngine` objects. Two Engines pointing at the same model file path load weights twice — at E4B's footprint this is prohibitive on Android. One Engine, multiple contexts (`createSession`/`createConversation`) is the correct shape regardless of which path is chosen.
+
+---
+
 ## What is explicitly NOT in Phase 2
 
 - No history list, history filter, or entry detail UI (Phase 4).
@@ -353,7 +464,7 @@ If a Phase 2 story starts pulling Phase 3+ scope, stop. Reference `backlog.md` a
 
 Phase 3 starts when all the following are true:
 
-- [x] All fifteen stories above are Done or have an explicit, recorded fallback. (Story 2.6.6 — parallel refactor per ADR-008 — added 2026-05-10, **superseded by ADR-009 on 2026-05-11 and deferred to `backlog.md` as `parallel-lens-execution-via-clone`**. Fallback recorded; the v1 contract is ADR-002's original sequential rule.)
+- [x] All fifteen stories above are Done or have an explicit, recorded fallback. (Story 2.6.6 — concurrent multi-context per ADR-008 — added 2026-05-10. The interim ADR-009 "SDK-impossible" supersede was a mis-scoped-probe mistake and was **deleted 2026-05-16**; ADR-008 restored, mechanism corrected. Story 2.6.6 is **scope-deferred** pending the RAM/wall-clock measurement — not a backlog SDK-gap entry. v1 contract stays ADR-002 sequential until that measurement.)
 - [x] **STT-B resolved** — multi-turn works on E4B *or* the single-turn fallback is implemented and the spec updated. _(2026-05-09 — single-turn fallback shipped per `adrs/ADR-005-stt-b-scope-and-v1-single-turn.md`; `concept-locked.md`, `PRD.md`, `design-guidelines.md` updated; `CaptureSession` made single-use; multi-turn harness deleted.)_
 - [x] **STT-D resolved** — 3-lens divergence is validated *or* multi-lens has been replaced with single-pass and ADR-002 has been superseded. _(2026-05-10 — validated at 83%.)_
 - [x] **STT-C resolved** — tag stability is ≥80% *or* the limitation is documented and Phase 3's pattern engine is designed around the noise floor. _(2026-05-11 — passed at 1.00 on GPU; C2 GPU parse-failure documented under Story 2.7's GPU regression note.)_
@@ -361,6 +472,6 @@ Phase 3 starts when all the following are true:
 - [x] `BackgroundExtractionService` state machine tests pass; service is wired into `AppContainer` per ADR-004. _(Story 2.6.5 covered the state-machine + service integration; Story 2.12 closed the wiring loop by routing `extractionStatusListener(entryId)` from `BackgroundExtractionSaveFlow` and replacing the no-op `recoveredEntryIdsLoader` default with the live `VestigeBoxStore.findNonTerminalEntryIds(boxStore)` query.)_
 - [x] Latency budget on the reference device is recorded (foreground per turn, background per entry). _(Foreground per-turn: 24.4 / 31.2 / 33.4 s on E4B CPU post-fallback (Story 2.3 smoke). Background per-entry: 25–55 s on E4B GPU after the `libOpenCL.so` manifest fix (Story 2.7 device record); 5–7 s per lens. Both are outside the ADR-002 §"Latency budget" 1–5 s foreground target — GPU / NPU latency work lives in Phase 4/5.)_
 - [ ] Markdown + ObjectBox stay in sync across at least 10 saved sessions (smoke test). _(Per-save sync is validated under `EntryStoreTest` + `BackgroundExtractionSaveFlowTest` from Story 2.12 — the ≥10-sessions volume check stays open until Phase 4's history UI exercises it end-to-end.)_
-- [x] No new entries logged to `backlog.md` from Phase 2 work that change the v1 contract beyond what an STT fallback already required. _(One Phase-2 deferral added: `parallel-lens-execution-via-clone` from the ADR-009 supersede. ADR-002's original sequential rule stays the v1 contract; the deferral records future SDK-gap work, not a contract shift.)_
+- [x] No new entries logged to `backlog.md` from Phase 2 work that change the v1 contract beyond what an STT fallback already required. _(The earlier `parallel-lens-execution-via-clone` backlog entry came from the mistaken ADR-009 supersede; ADR-009 is deleted and that entry is retired — concurrent multi-context is scope-deferred to Story 2.6.6 / 2.19, not a backlog SDK-gap item. ADR-002 sequential stays the v1 contract until measurement.)_
 
 If STT-B or STT-D fired their fallbacks: the v1 contract has shifted. Update `concept-locked.md`, `PRD.md`, and the relevant stories in `phase-3-memory-patterns.md`, `phase-4-ux-surface.md` (when those are written) before starting Phase 3 work.

@@ -1,11 +1,17 @@
 package dev.anchildress1.vestige.ui.capture
 
+import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.assertHasClickAction
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performClick
 import dev.anchildress1.vestige.ui.theme.VestigeTheme
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
@@ -205,5 +211,65 @@ class CaptureErrorBandTest {
         }
         composeRule.onNodeWithText(CaptureCopy.MIC_DENIED_LINE).assertIsDisplayed()
         composeRule.onAllNodesWithText(CaptureCopy.MODEL_LOADING_LINE).assertCountEquals(0)
+    }
+
+    @Test
+    fun `resolver maps MicBlocked (err)`() {
+        assertEquals(
+            BandKind.MicBlocked,
+            resolveBandKind(error = CaptureError.MicBlocked, readiness = ModelReadiness.Ready),
+        )
+    }
+
+    @Test
+    fun `MicBlocked band is a polite no-click status region with a separate Use-typed button`() {
+        var usedTyped = false
+        composeRule.setContent {
+            VestigeTheme {
+                CaptureErrorBand(
+                    error = CaptureError.MicBlocked,
+                    readiness = ModelReadiness.Ready,
+                    onUseTyped = { usedTyped = true },
+                )
+            }
+        }
+        val band = composeRule.onNodeWithContentDescription(
+            "${CaptureCopy.MIC_BLOCKED_LINE} ${CaptureCopy.MIC_BLOCKED_SETTINGS_LINE}",
+        )
+        band.assertIsDisplayed()
+        band.assert(SemanticsMatcher.keyIsDefined(SemanticsProperties.LiveRegion))
+        band.assert(SemanticsMatcher.keyNotDefined(SemanticsActions.OnClick))
+
+        // The recovery affordance is a distinct, actionable node — not merged into the band.
+        val useTyped = composeRule.onNodeWithContentDescription(CaptureCopy.USE_TYPED_INSTEAD)
+        useTyped.assertHasClickAction()
+        useTyped.performClick()
+        assertEquals(true, usedTyped)
+    }
+
+    @Test
+    fun `MicBlocked omits the Use-typed affordance when no callback is wired`() {
+        composeRule.setContent {
+            VestigeTheme {
+                CaptureErrorBand(error = CaptureError.MicBlocked, readiness = ModelReadiness.Ready)
+            }
+        }
+        composeRule.onAllNodesWithText(CaptureCopy.USE_TYPED_INSTEAD).assertCountEquals(0)
+    }
+
+    @Test
+    fun `Inference band is a polite no-click status region (a11y)`() {
+        composeRule.setContent {
+            VestigeTheme {
+                CaptureErrorBand(
+                    error = CaptureError.InferenceFailed(CaptureError.InferenceFailed.Reason.ENGINE_FAILED),
+                    readiness = ModelReadiness.Ready,
+                )
+            }
+        }
+        val band = composeRule.onNodeWithContentDescription("Last reading failed.", substring = true)
+        band.assertIsDisplayed()
+        band.assert(SemanticsMatcher.keyIsDefined(SemanticsProperties.LiveRegion))
+        band.assert(SemanticsMatcher.keyNotDefined(SemanticsActions.OnClick))
     }
 }

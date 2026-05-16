@@ -1,3 +1,5 @@
+@file:Suppress("TooManyFunctions") // Onboarding orchestration — each function is a distinct flow step.
+
 package dev.anchildress1.vestige.ui.onboarding
 
 import android.Manifest
@@ -35,10 +37,14 @@ import dev.anchildress1.vestige.model.Persona
 import dev.anchildress1.vestige.ui.components.VestigeScaffold
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import java.util.concurrent.atomic.AtomicLong
 
 /** Hosts the onboarding hub flow. Step + persona survive process death via SharedPreferences. */
 @Suppress("LongMethod", "LongParameterList") // Orchestration root — wiring is intentionally co-located.
@@ -124,6 +130,7 @@ fun OnboardingHost(
                 }
             }
         },
+        onRetryDownload = environment.onRetryDownload,
     )
     val state = OnboardingStepState(
         step = step,
@@ -134,6 +141,7 @@ fun OnboardingHost(
         micGranted = micGranted,
         notifGranted = notifGranted,
         downloadMbps = environment.downloadMbps,
+        downloadStatus = environment.downloadStatus,
     )
     // VestigeScaffold owns floor/ink propagation + system-bar insets — onboarding never paints
     // its own background or applies its own padding, so it stays in lockstep with the rest of
@@ -155,11 +163,13 @@ private data class OnboardingStateHandles(
     val advance: () -> Unit,
 )
 
+@Suppress("LongParameterList") // Callback assembler — host seams are intentionally co-located.
 private fun buildCallbacks(
     context: Context,
     launchers: PermissionLaunchers,
     handles: OnboardingStateHandles,
     onOpenApp: () -> Unit,
+    onRetryDownload: () -> Unit,
 ): OnboardingStepCallbacks = OnboardingStepCallbacks(
     onPersonaChange = handles.setPersona,
     advance = handles.advance,
@@ -177,12 +187,15 @@ private fun buildCallbacks(
     onOpenModelDownload = { handles.setStep(OnboardingStep.ModelDownload) },
     onDownloadReturn = { handles.setStep(OnboardingStep.Wiring) },
     onChangePersona = { handles.setStep(OnboardingStep.PersonaPick) },
+    onRetryDownload = onRetryDownload,
 )
 
 private data class OnboardingEnvironment(
     val wifiConnected: Boolean,
     val modelState: ModelArtifactState,
     val downloadMbps: Float?,
+    val downloadStatus: DownloadStatus,
+    val onRetryDownload: () -> Unit,
 )
 
 @Composable
@@ -196,15 +209,25 @@ private fun rememberOnboardingEnvironment(
     onDownloadBlockedByWifi: () -> Unit,
 ): OnboardingEnvironment {
     val scope = rememberCoroutineScope()
+    val downloadSingleFlightMutex = remember { Mutex() }
     var wifiConnected by remember { mutableStateOf(wifiAvailability.isWifiConnected()) }
     var modelState by remember { mutableStateOf<ModelArtifactState>(ModelArtifactState.Absent) }
     var downloadMbps by remember { mutableStateOf<Float?>(null) }
+    var downloadStatus by remember { mutableStateOf(DownloadStatus()) }
+    // Bumping this re-keys the download effect: a Retry/Try-again resumes from the `.part`
+    // file via HTTP Range — same code path as a fresh entry, no special-case restart.
+    var retryNonce by remember { mutableStateOf(0) }
 
     // Persist resume point + refresh the Wi-Fi snapshot. commit() runs on IO so the durability
     // guarantee survives a process kill mid-step without blocking the main thread.
     LaunchedEffect(step) {
         persistedStateWriteLane.run { prefs.setCurrentStep(step) }
         wifiConnected = wifiAvailability.isWifiConnected()
+        downloadChromeOnStepEntry(step = step, downloadMbps = downloadMbps, downloadStatus = downloadStatus)
+            .also { refreshed ->
+                downloadStatus = refreshed.downloadStatus
+                downloadMbps = refreshed.downloadMbps
+            }
     }
 
     // Snapshot the model state ONCE on mount for every screen except ModelDownload. Screen 6
@@ -218,14 +241,19 @@ private fun rememberOnboardingEnvironment(
 
     // ModelDownload is only for active/resumable transfers. If the artifact is already complete,
     // or Wi-Fi is unavailable on entry/restoration, resolve that once and unwind back to Wiring.
-    LaunchedEffect(step, wifiConnected) {
+    // retryNonce re-runs this on a Retry/Try-again tap.
+    LaunchedEffect(step, wifiConnected, retryNonce) {
         when (
-            runDownloadIfNeeded(
+            runDownloadIfNeededSingleFlight(
+                downloadMutex = downloadSingleFlightMutex,
                 step = step,
                 wifiConnected = wifiConnected,
                 modelAvailability = modelAvailability,
-                onState = { modelState = it },
-                onSpeed = { downloadMbps = it },
+                callbacks = DownloadCallbacks(
+                    onState = { modelState = it },
+                    onSpeed = { downloadMbps = it },
+                    onStatus = { downloadStatus = it },
+                ),
             )
         ) {
             ModelDownloadEntryResult.BlockedByWifi -> onDownloadBlockedByWifi()
@@ -243,6 +271,11 @@ private fun rememberOnboardingEnvironment(
         wifiConnected = wifiConnected,
         modelState = modelState,
         downloadMbps = downloadMbps,
+        downloadStatus = downloadStatus,
+        onRetryDownload = {
+            downloadStatus = DownloadStatus()
+            retryNonce++
+        },
     )
 }
 
@@ -287,7 +320,7 @@ private fun ObserveBackgroundResume(onResumeFromBackground: () -> Unit) {
     }
 }
 
-private enum class ModelDownloadEntryResult {
+internal enum class ModelDownloadEntryResult {
     NotOnDownloadScreen,
     BlockedByWifi,
     CompletedAlready,
@@ -296,12 +329,14 @@ private enum class ModelDownloadEntryResult {
 
 // Resolves a ModelDownload entry exactly once: complete artifacts unwind immediately, Wi-Fi-
 // blocked entries bounce back to Wiring, and only active/resumable states start download().
-private suspend fun runDownloadIfNeeded(
+@Suppress("LongParameterList") // Download seam — each callback feeds a distinct UI surface.
+internal suspend fun runDownloadIfNeeded(
     step: OnboardingStep,
     wifiConnected: Boolean,
     modelAvailability: ModelAvailability,
     onState: (ModelArtifactState) -> Unit,
     onSpeed: (Float?) -> Unit,
+    onStatus: (DownloadStatus) -> Unit,
 ): ModelDownloadEntryResult {
     if (step != OnboardingStep.ModelDownload) return ModelDownloadEntryResult.NotOnDownloadScreen
     val current = modelAvailability.status()
@@ -320,33 +355,108 @@ private suspend fun runDownloadIfNeeded(
             ModelDownloadEntryResult.BlockedByWifi
         }
 
-        else -> performModelDownload(modelAvailability = modelAvailability, onState = onState, onSpeed = onSpeed)
+        else -> performModelDownload(
+            modelAvailability = modelAvailability,
+            resumeFrom = current,
+            onState = onState,
+            onSpeed = onSpeed,
+            onStatus = onStatus,
+        )
     }
 }
 
+private const val WATCHDOG_TICK_MS = 5_000L
+
 private suspend fun performModelDownload(
     modelAvailability: ModelAvailability,
+    resumeFrom: ModelArtifactState,
     onState: (ModelArtifactState) -> Unit,
     onSpeed: (Float?) -> Unit,
+    onStatus: (DownloadStatus) -> Unit,
+): ModelDownloadEntryResult = coroutineScope {
+    // `probe()` reports the resumable `.part` as Partial, so seeding it makes a cold-process
+    // re-entry show the real resumed byte count immediately instead of flashing 0%.
+    if (resumeFrom is ModelArtifactState.Partial) onState(resumeFrom)
+
+    var status = DownloadStatus()
+    fun publish(next: DownloadStatus) {
+        status = next
+        onStatus(next)
+    }
+
+    val lastProgressAtMs = AtomicLong(System.currentTimeMillis())
+    val tracker = DownloadProgressTracker(
+        onState = {
+            lastProgressAtMs.set(System.currentTimeMillis())
+            if (status.phase == DownloadPhase.Stalled) publish(status.copy(phase = DownloadPhase.Active))
+            onState(it)
+        },
+        onSpeed = onSpeed,
+        onEta = { publish(status.copy(etaSeconds = it)) },
+    )
+    val watchdog = launchDownloadWatchdog(
+        getStatus = { status },
+        lastProgressAtMs = lastProgressAtMs,
+        onStatus = { publish(it) },
+    )
+    executeDownload(
+        modelAvailability = modelAvailability,
+        tracker = tracker,
+        onSpeed = onSpeed,
+        onState = onState,
+        onStatus = { publish(it) },
+        getStatus = { status },
+        watchdog = watchdog,
+    )
+}
+
+private fun kotlinx.coroutines.CoroutineScope.launchDownloadWatchdog(
+    getStatus: () -> DownloadStatus,
+    lastProgressAtMs: AtomicLong,
+    onStatus: (DownloadStatus) -> Unit,
+): kotlinx.coroutines.Job = launch {
+    while (isActive) {
+        delay(WATCHDOG_TICK_MS)
+        val current = getStatus()
+        // Reacquiring is an active transfer too (the corrupt-artifact auto re-pull); a hang
+        // there must still surface stall + Retry, not be suppressed (Codex review #5).
+        if ((current.phase == DownloadPhase.Active || current.phase == DownloadPhase.Reacquiring) &&
+            isStalled(lastProgressAtMs.get(), System.currentTimeMillis())
+        ) {
+            onStatus(current.copy(phase = DownloadPhase.Stalled))
+        }
+    }
+}
+
+@Suppress("LongParameterList") // Download execution seam — each param feeds a distinct concern.
+private suspend fun executeDownload(
+    modelAvailability: ModelAvailability,
+    tracker: DownloadProgressTracker,
+    getStatus: () -> DownloadStatus,
+    onSpeed: (Float?) -> Unit,
+    onState: (ModelArtifactState) -> Unit,
+    onStatus: (DownloadStatus) -> Unit,
+    watchdog: kotlinx.coroutines.Job,
 ): ModelDownloadEntryResult {
-    // For Absent / Partial / Corrupt: don't publish `current` to state. `currentState()` reports
-    // Absent any time the .part file exists but the final artifact doesn't — publishing that
-    // on re-entry collapses the percent to 0 before the resumed download's first onProgress
-    // ticks it back to the actual byte count. Result: percent appears to flash. Letting the
-    // prior `state` ride keeps the screen showing the last known progress until the resumed
-    // bytes arrive.
-    val tracker = DownloadProgressTracker(onState, onSpeed)
-    return try {
+    try {
         Log.i(ONBOARDING_TAG, "Starting download()...")
         // `ModelAvailability.download` is a suspend fun and main-safe by convention
         // (`DefaultModelArtifactStore.download` already wraps its blocking I/O in
         // `withContext(ioDispatcher)`). Wrapping again here would be redundant and trips
         // Sonar S6311.
-        val terminal = modelAvailability.download(tracker::onProgress)
+        var terminal = modelAvailability.download(tracker::onProgress)
+        if (terminal is ModelArtifactState.Corrupt) {
+            // The store already wiped the bad payload. One automatic clean re-pull, surfaced —
+            // a silent retry would hide a persistently broken artifact host.
+            Log.w(ONBOARDING_TAG, "Artifact corrupt post-download; re-pulling once.")
+            onStatus(getStatus().copy(phase = DownloadPhase.Reacquiring))
+            terminal = modelAvailability.download(tracker::onProgress)
+        }
         onSpeed(null)
-        Log.i(ONBOARDING_TAG, "download() finished. terminalState=$terminal")
         onState(terminal)
-        ModelDownloadEntryResult.DownloadRan
+        if (terminal is ModelArtifactState.Corrupt) onStatus(getStatus().copy(phase = DownloadPhase.Failed))
+        Log.i(ONBOARDING_TAG, "download() finished. terminalState=$terminal")
+        return ModelDownloadEntryResult.DownloadRan
     } catch (cancel: kotlinx.coroutines.CancellationException) {
         // Normal coroutine teardown when the user navigates away from ModelDownload. The
         // .part file persists; HTTP-Range resume picks up where we left off on re-entry.
@@ -355,7 +465,10 @@ private suspend fun performModelDownload(
         throw cancel
     } catch (@Suppress("TooGenericExceptionCaught") error: Exception) {
         Log.e(ONBOARDING_TAG, "Model download failed", error)
-        ModelDownloadEntryResult.DownloadRan
+        onStatus(getStatus().copy(phase = DownloadPhase.Failed))
+        return ModelDownloadEntryResult.DownloadRan
+    } finally {
+        watchdog.cancel()
     }
 }
 

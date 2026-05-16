@@ -32,13 +32,13 @@ No extra modules in v1 unless they remove a real compile or ownership problem. D
 | Singleton | Lifecycle | Owns |
 |---|---|---|
 | `ModelArtifactStore` | process-scoped | model file path, download state, SHA-256 verification, re-download/delete model |
-| `ModelHandle` | process-scoped, lazy after artifact verified. Backgrounding/lifecycle behavior per `adrs/ADR-004-app-backgrounding-and-model-handle-lifecycle.md` (conditional foreground service in v1, Option 1 always-on as documented fallback). | Loaded LiteRT-LM engine and conversation factory. One handle per process. ADR-008's "Engine wrapper" rename is rolled back by `adrs/ADR-009-litertlm-kotlin-session-clone-unavailable.md` (the Kotlin SDK does not expose the Session-cloning API the rename anticipated). |
+| `ModelHandle` | process-scoped, lazy after artifact verified. Backgrounding/lifecycle behavior per `adrs/ADR-004-app-backgrounding-and-model-handle-lifecycle.md` (conditional foreground service in v1, Option 1 always-on as documented fallback). | Loaded LiteRT-LM engine and conversation factory. One handle per process. ADR-008's "Engine wrapper" framing stands — the Engine creates contexts via `Engine.createSession`/`createConversation` (the shipping code already uses `createConversation`). The interim ADR-009 rollback was a mis-scoped-probe mistake and was deleted; see `adrs/ADR-008-parallel-lens-execution.md` §Correction (2026-05-16). |
 | `Embedder` | process-scoped, lazy after embedding artifacts verified. STT-E-contingent — instantiated only if `embedding_artifact_*` + `embedding_tokenizer_*` manifest entries resolve and Story 3.3 passes. | EmbeddingGemma 300M loader via `GemmaEmbeddingModel` from `com.google.ai.edge.localagents:localagents-rag` (LiteRT TFLite + SentencePiece bundled in `libgemma_embedding_model_jni.so`). Distinct native runtime from `ModelHandle`'s LiteRT-LM — they share no `.so`. SDK pick rationale: `adrs/ADR-010-embeddinggemma-runtime-switch-to-litert.md`. |
 | `NetworkGate` | process-scoped | sole HTTP/download path; `OPEN` only during model download, `SEALED` otherwise |
 | `EntryStore` | process-scoped | ObjectBox entry/tag writes plus markdown source-of-truth |
 | `PatternStore` | process-scoped | ObjectBox pattern persistence, lifecycle state machine, and pattern detection algorithm per `adrs/ADR-003-pattern-detection-and-persistence.md` |
 | `RetrievalRepo` | process-scoped | keyword + tag + recency retrieval; vector only if STT-E passes |
-| `InferenceCoordinator` | process-scoped | Foreground call, background extraction scheduling, prompt composition, resolver. Lens calls run **sequentially** per `adrs/ADR-002-multi-lens-extraction-pattern.md` §"Background pass (3 lens calls, sequential)" — restored as the v1 rule by `adrs/ADR-009-litertlm-kotlin-session-clone-unavailable.md` (supersedes ADR-008). |
+| `InferenceCoordinator` | process-scoped | Foreground call, background extraction scheduling, prompt composition, resolver. Lens calls run **sequentially in v1** per `adrs/ADR-002-multi-lens-extraction-pattern.md` §"Background pass" — a scope position, not an SDK limit. ADR-008 (concurrent multi-context, mechanism corrected to `Engine.createSession`/`createConversation`) is restored; concurrent adoption is gated on Story 2.6.6 / 2.19's RAM + wall-clock measurement. |
 | `SessionState` | per-capture (single-use, terminates with the capture) | active persona for this capture + the in-flight `CaptureSession` instance (one USER turn + one MODEL turn under the v1 single-turn lifecycle per `adrs/ADR-005-stt-b-scope-and-v1-single-turn.md`, which amends `adrs/ADR-002-multi-lens-extraction-pattern.md` §"Multi-turn behavior"). Terminals: `RESPONDED`, `ERROR`, `DISCARDED` (user-initiated cancel during RECORDING per `adrs/ADR-001-stack-and-build-infra.md` §Q8 — no rehydration, no Undo). The "last turns" + "chunk counter" fields the original spec described are moot under the 30 s hard cap and have been retired. |
 
 Use manual constructor injection. No Hilt in v1.
@@ -152,11 +152,63 @@ Standup ran long again. I was fine before it, then completely flattened by 11. O
 - **ObjectBox is downstream of markdown.** All writes go through `EntryStore`, which writes the markdown file first and the ObjectBox row second, in that order, in a single transactional unit. If the markdown write succeeds and ObjectBox fails, the next cold start rebuilds the row from the markdown. If the markdown write fails, no ObjectBox row exists.
 - **External markdown edits are out of scope for v1.** The user can read or back up the files, but in-place external edits are not detected and may be overwritten by a later re-eval. v1 ships with markdown as a debugging/export surface only. External-edit support is a v1.5 entry in `backlog.md` if it ever earns one.
 - **Re-eval rewrites the file.** Re-eval (P1) updates `tags`, `entry_observations`, etc. The resolver writes the new markdown atomically (write to `.tmp`, fsync, rename). Old content is not preserved unless the user explicitly rejects the new shape.
-- **Export is a copy, not a move.** Settings → Export zips a snapshot of `entries/` plus a generated `manifest.json` (one row per entry: filename, sha256, schema_version). The originals remain in-place.
+- **Export is a copy, not a move.** Settings → Export zips a snapshot of the markdown files under `entries/`. The originals remain in-place.
 
 ### `schema_version`
 
 Top-level integer. v1 is `schema_version: 1`. Bump on any breaking frontmatter change. The reader must reject a markdown file with a schema_version it does not understand rather than silently downgrading fields. Migration paths are v1.5+ work.
+
+## Embedding Strategy (Addendum 2026-05-16)
+
+**Unit of embedding: one vector per entry (`EntryEntity.vector`).**
+
+The deterministic retrieval layer (Story 3.1) already handles tag matching via Jaccard overlap — exact tag-set intersection is fast, deterministic, and correct for "find entries with this tag." Adding per-tag semantic embeddings on top of that is redundant; the deterministic layer already does that job better.
+
+The semantic embedding layer's job is to catch what the deterministic layer *can't*: vocabulary drift over months, paraphrased concepts that didn't resolve to the same tags, semantic relationships between entries that tag overlap misses entirely. That is a per-entry, cross-vocabulary concern. One vector per entry is the correct granularity.
+
+**The bug in the original implementation:** `VectorBackfillWorker` embeds `entry.entryText` — the raw verbatim transcription. A 30s ADHD voice entry is stream-of-consciousness; its semantic centroid captures filler, tangents, and noise, not what the entry is actually about. The distilled signal already exists in the extracted fields.
+
+**Correct embedding target:** synthesize a short string from the extraction output after convergence resolves:
+- Tags: join the `TagEntity` labels as a space-separated phrase (e.g., `"tuesday-meeting standup flattened"`)
+- Observation texts: join each `text` field from `entryObservationsJson` with `. `
+- Commitment topic: append `topic_or_person` from `statedCommitmentJson` if present
+- Result: `"{tags}. {observations}. {commitment topic}"` — omit any empty component and its separator
+
+This is the model's own distillation of what happened. The vector then represents semantic meaning, not transcription noise. Two entries about the same phenomenon phrased differently will cluster correctly even if the user's vocabulary drifted between them.
+
+**Query side:** `RetrievalRepo.query(text: String, ...)` embeds the raw user query as-is — correct. Natural language query against distilled semantic content.
+
+**Story 3.11 carries the embedding source fix and re-backfill sweep.**
+
+---
+
+## Concurrent Inference Architecture (Addendum 2026-05-16)
+
+v1 runs foreground and background inference sequentially through a single `LiteRtLmEngine` behind a `Mutex`. A recording attempt while a background extraction is running blocks on the mutex until the current lens call finishes. This is the documented v1 **scope position** (ADR-002 sequential rule), not an SDK limitation.
+
+**SDK reality (2026-05-16 bytecode probe of pinned 0.11.0):** one Engine → many **independent** contexts via `Engine.createSession(SessionConfig)` / `Engine.createConversation(ConversationConfig)`. Contexts share the loaded model weights (no 2× weight RAM) but each holds **its own** KV state — there is **no** parent-Session Copy-on-Write prefix sharing (`Session.clone()` does not exist; the earlier ADR-009 claim to the contrary was a mis-scoped-probe mistake and was deleted — see ADR-008 §Correction 2026-05-16).
+
+**Two viable paths (Story 2.6.6 / 2.19 decide on measurement, not on an SDK gate):**
+
+*Path B — Priority queue, single context:* Foreground calls preempt background. Background extraction jobs live in a `Channel<InferenceRequest>` ordered by priority. When a foreground call arrives, the background coroutine is cancelled (Flow cancellation is cooperative) and the foreground call runs immediately. Background re-queues after completion. Simplest; no concurrency RAM cost.
+
+*Path C — Detached background context:* One Engine; a dedicated context per concurrent task via `createSession`/`createConversation` (independent, **not** cloned — each composes its own prefix; no CoW). Eliminates Kotlin-layer mutex blocking so foreground can preempt without waiting. A single GPU still serializes at the hardware command queue, so this is **not** a literal wall-clock speedup — the win is non-blocking preemption. Net background wall-clock and concurrent-context RAM on the reference S24 Ultra are **unmeasured**; that measurement is the Path-B-vs-C decision input.
+
+Two Engine instances pointing at the same model file path load weights twice (~2× RAM). Not viable on Android given E4B's footprint. Do not propose this path.
+
+Story 2.19 carries the implementation decision and wiring once Story 2.14 confirms what the SDK supports.
+
+---
+
+## Retrieval History Gap (Addendum 2026-05-16)
+
+`AppContainer.saveAndExtract` accepts `retrievedHistory: List<HistoryChunk>` but `CaptureViewModel` does not perform a `RetrievalRepo.query()` before the foreground call and therefore passes no history. Retrieved history flows only into `BackgroundExtractionWorker`'s lens prompts.
+
+The consequence: the foreground response the user sees immediately after recording has no awareness of prior entries. The background extraction does. This means the follow-up question the user receives is context-free while the structured fields are context-aware — an inversion of where context matters most from a UX standpoint.
+
+**Correct behavior:** run `RetrievalRepo.query(transcription)` after the foreground transcription is available but before the follow-up is generated — or restructure the foreground call to accept prior context. Story 2.18 carries the fix.
+
+---
 
 ## Phase-1 Build Sequence
 

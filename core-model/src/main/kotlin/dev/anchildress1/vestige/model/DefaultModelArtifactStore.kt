@@ -26,6 +26,30 @@ class DefaultModelArtifactStore(
 
     override val artifactFile: File = File(baseDir, manifest.filename)
 
+    private val partFile: File = File(baseDir, "${manifest.filename}.part")
+
+    override suspend fun probe(): ModelArtifactState = withContext(ioDispatcher) {
+        if (artifactFile.exists()) {
+            val length = artifactFile.length()
+            return@withContext when {
+                length < manifest.expectedByteSize ->
+                    ModelArtifactState.Partial(length, manifest.expectedByteSize)
+
+                length > manifest.expectedByteSize ->
+                    ModelArtifactState.Corrupt(manifest.sha256, "size_mismatch:$length")
+
+                // Size matches — trust it for UI gating. Integrity is the load path's job.
+                else -> ModelArtifactState.Complete
+            }
+        }
+        // No final file, but a resumable `.part` means a download is mid-flight: report its
+        // byte count so a cold-process re-entry shows real progress instead of flashing 0%.
+        if (partFile.exists()) {
+            return@withContext ModelArtifactState.Partial(partFile.length(), manifest.expectedByteSize)
+        }
+        ModelArtifactState.Absent
+    }
+
     override suspend fun currentState(): ModelArtifactState = withContext(ioDispatcher) {
         if (!artifactFile.exists()) return@withContext ModelArtifactState.Absent
 
@@ -93,7 +117,6 @@ class DefaultModelArtifactStore(
     }
 
     private fun downloadOnce(onProgress: (Long, Long) -> Unit): ModelArtifactState {
-        val partFile = File(baseDir, "${manifest.filename}.part")
         streamPayloadToPartFile(partFile, onProgress)
         promotePartToArtifact(partFile)
 

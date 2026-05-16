@@ -2,13 +2,19 @@ package dev.anchildress1.vestige.ui.onboarding
 
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.assertHasClickAction
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertIsNotSelected
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
@@ -117,9 +123,9 @@ class OnboardingScreensTest {
                 )
             }
         }
-        // The hero number and the MB/s stat both fall back to "—" with no fraction; both must
-        // render so the UI doesn't blank out.
-        composeRule.onAllNodesWithText("—").assertCountEquals(2)
+        // Hero number, the MB/s stat, and the ETA slot all fall back to "—" with no known
+        // total; all three must render so the UI doesn't blank out.
+        composeRule.onAllNodesWithText("—").assertCountEquals(3)
     }
 
     @Test
@@ -130,6 +136,86 @@ class OnboardingScreensTest {
             }
         }
         composeRule.onNodeWithText("GEMMA READY").assertIsDisplayed()
+    }
+
+    @Test
+    fun `active download shows the ETA label and a Pause affordance`() {
+        composeRule.activity.setContent {
+            VestigeTheme {
+                ModelDownloadPlaceholderScreen(
+                    modelState = ModelArtifactState.Partial(currentBytes = 100L, expectedBytes = 1_000L),
+                    downloadStatus = DownloadStatus(phase = DownloadPhase.Active, etaSeconds = 125L),
+                    onContinue = {},
+                )
+            }
+        }
+        composeRule.onNodeWithText("~2 min").performScrollTo().assertIsDisplayed()
+        // Pause lives in the fixed bottom bar (no scrollable parent) — assert in place.
+        composeRule.onNodeWithText("Pause").assertIsDisplayed().assertHasClickAction()
+    }
+
+    @Test
+    fun `stalled download surfaces a status band with no click action and a Retry button`() {
+        var retried = false
+        composeRule.activity.setContent {
+            VestigeTheme {
+                ModelDownloadPlaceholderScreen(
+                    modelState = ModelArtifactState.Partial(currentBytes = 400L, expectedBytes = 1_000L),
+                    downloadStatus = DownloadStatus(phase = DownloadPhase.Stalled),
+                    onContinue = {},
+                    onRetry = { retried = true },
+                )
+            }
+        }
+        // Band a11y: polite live region, no click action — recovery is the Retry button's job.
+        val band = composeRule.onNodeWithContentDescription("Download stalled.")
+        band.assertIsDisplayed()
+        band.assert(SemanticsMatcher.keyIsDefined(SemanticsProperties.LiveRegion))
+        band.assert(SemanticsMatcher.keyNotDefined(SemanticsActions.OnClick))
+
+        // Retry lives in the fixed bottom bar (no scrollable parent) — act in place.
+        composeRule.onNodeWithText("Retry").assertHasClickAction().performClick()
+        assertEquals(true, retried)
+    }
+
+    @Test
+    fun `failed download surfaces the network-choked band and a Try again button`() {
+        composeRule.activity.setContent {
+            VestigeTheme {
+                ModelDownloadPlaceholderScreen(
+                    modelState = ModelArtifactState.Partial(currentBytes = 400L, expectedBytes = 1_000L),
+                    downloadStatus = DownloadStatus(phase = DownloadPhase.Failed),
+                    onContinue = {},
+                    onRetry = {},
+                )
+            }
+        }
+        val band = composeRule.onNodeWithContentDescription("Network choked.")
+        band.assertIsDisplayed()
+        band.assert(SemanticsMatcher.keyIsDefined(SemanticsProperties.LiveRegion))
+        band.assert(SemanticsMatcher.keyNotDefined(SemanticsActions.OnClick))
+        composeRule.onNodeWithText("Try again").assertHasClickAction()
+    }
+
+    @Test
+    fun `reacquiring shows the auto-redownload band and offers no manual affordance`() {
+        composeRule.activity.setContent {
+            VestigeTheme {
+                ModelDownloadPlaceholderScreen(
+                    modelState = ModelArtifactState.Partial(currentBytes = 0L, expectedBytes = 1_000L),
+                    downloadStatus = DownloadStatus(phase = DownloadPhase.Reacquiring),
+                    onContinue = {},
+                )
+            }
+        }
+        val band = composeRule.onNodeWithContentDescription("Model file unreadable. Re-downloading.")
+        band.assertIsDisplayed()
+        band.assert(SemanticsMatcher.keyIsDefined(SemanticsProperties.LiveRegion))
+        band.assert(SemanticsMatcher.keyNotDefined(SemanticsActions.OnClick))
+        // Automatic clean re-pull in flight — no Retry / Try again / Pause while it runs.
+        composeRule.onAllNodesWithText("Retry").assertCountEquals(0)
+        composeRule.onAllNodesWithText("Try again").assertCountEquals(0)
+        composeRule.onAllNodesWithText("Pause").assertCountEquals(0)
     }
 
     // endregion

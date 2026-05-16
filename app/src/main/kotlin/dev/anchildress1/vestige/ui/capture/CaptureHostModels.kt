@@ -2,6 +2,7 @@ package dev.anchildress1.vestige.ui.capture
 
 import android.util.Log
 import dev.anchildress1.vestige.AppContainer
+import dev.anchildress1.vestige.model.ModelArtifactState
 import dev.anchildress1.vestige.model.PatternState
 import dev.anchildress1.vestige.ui.history.HistoryDurationFormatter
 import java.time.Clock
@@ -15,17 +16,21 @@ internal fun deriveInitialReadiness(container: AppContainer): ModelReadiness {
     val store = container.mainModelArtifactStore
     val file = store.artifactFile
     return runCatching {
-        deriveModelReadiness(
-            fileExists = file.exists(),
-            actualBytes = file.length(),
-            expectedBytes = store.manifest.expectedByteSize,
-        )
+        when {
+            file.exists() && file.length() == store.manifest.expectedByteSize -> ModelReadiness.Ready
+            file.exists() -> ModelReadiness.Paused
+            else -> ModelReadiness.Loading
+        }
     }.onFailure { Log.e(TAG, "Failed to probe model artifact at ${file.path}; defaulting to Loading", it) }
         .getOrDefault(ModelReadiness.Loading)
 }
 
-internal fun deriveModelReadiness(fileExists: Boolean, actualBytes: Long, expectedBytes: Long): ModelReadiness =
-    if (fileExists && actualBytes == expectedBytes) ModelReadiness.Ready else ModelReadiness.Loading
+internal fun deriveModelReadiness(state: ModelArtifactState): ModelReadiness = when (state) {
+    ModelArtifactState.Absent -> ModelReadiness.Loading
+    ModelArtifactState.Complete -> ModelReadiness.Ready
+    is ModelArtifactState.Corrupt -> ModelReadiness.Loading
+    is ModelArtifactState.Partial -> ModelReadiness.Paused
+}
 
 internal fun deriveStats(container: AppContainer): CaptureStats = deriveStatsFromInputs(
     kept = container.entryStore.countCompleted(),

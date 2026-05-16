@@ -35,7 +35,6 @@ import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.anchildress1.vestige.ui.components.AppTop
-import dev.anchildress1.vestige.ui.components.AppTopStatuses
 import dev.anchildress1.vestige.ui.components.EyebrowE
 import dev.anchildress1.vestige.ui.components.StatItem
 import dev.anchildress1.vestige.ui.components.StatRibbon
@@ -60,7 +59,7 @@ fun IdleLayout(
     Column(modifier = modifier.fillMaxSize().background(colors.floor)) {
         AppTop(
             persona = state.persona.name,
-            status = AppTopStatuses.Ready,
+            status = appTopStatusFor(state.modelReadiness),
             onPersonaTap = chrome.onPersonaTap,
             onStatusTap = chrome.onStatusTap,
         )
@@ -72,6 +71,7 @@ fun IdleLayout(
             error = state.error,
             readiness = state.modelReadiness,
             modifier = Modifier.padding(horizontal = 18.dp),
+            onUseTyped = onTypeTap,
         )
         HeroBlock()
         Spacer(modifier = Modifier.height(8.dp))
@@ -102,6 +102,16 @@ fun IdleLayout(
                 contentAlignment = Alignment.Center,
             ) {
                 PatternsLink(onClick = onTap)
+            }
+        }
+        chrome.onSettingsTap?.let { onTap ->
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 18.dp, vertical = 4.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                SettingsLink(onClick = onTap)
             }
         }
         if (chrome.lastEntryFooter != null) {
@@ -146,6 +156,26 @@ private fun PatternsLink(onClick: () -> Unit) {
     ) {
         Text(
             text = CaptureCopy.PATTERNS_LINK,
+            style = VestigeTheme.typography.personaLabel,
+            color = colors.dim,
+        )
+    }
+}
+
+@Composable
+private fun SettingsLink(onClick: () -> Unit) {
+    val colors = VestigeTheme.colors
+    Box(
+        modifier = Modifier
+            .clickable(onClick = onClick)
+            .semantics(mergeDescendants = true) {
+                role = Role.Button
+                contentDescription = CaptureCopy.SETTINGS_LINK
+            }
+            .padding(horizontal = 12.dp, vertical = 8.dp),
+    ) {
+        Text(
+            text = CaptureCopy.SETTINGS_LINK,
             style = VestigeTheme.typography.personaLabel,
             color = colors.dim,
         )

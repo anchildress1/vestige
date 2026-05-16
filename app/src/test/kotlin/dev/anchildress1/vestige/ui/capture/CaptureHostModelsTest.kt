@@ -1,5 +1,6 @@
 package dev.anchildress1.vestige.ui.capture
 
+import dev.anchildress1.vestige.model.ModelArtifactState
 import dev.anchildress1.vestige.model.PatternState
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
@@ -15,22 +16,22 @@ import java.time.ZoneId
  */
 class CaptureHostModelsTest {
     @Test
-    fun `deriveModelReadiness returns ready only for present exact-size artifact`() {
+    fun `deriveModelReadiness maps artifact states to shell readiness`() {
         assertEquals(
             ModelReadiness.Ready,
-            deriveModelReadiness(fileExists = true, actualBytes = 42L, expectedBytes = 42L),
+            deriveModelReadiness(ModelArtifactState.Complete),
         )
         assertEquals(
             ModelReadiness.Loading,
-            deriveModelReadiness(fileExists = false, actualBytes = 42L, expectedBytes = 42L),
+            deriveModelReadiness(ModelArtifactState.Absent),
+        )
+        assertEquals(
+            ModelReadiness.Paused,
+            deriveModelReadiness(ModelArtifactState.Partial(currentBytes = 41L, expectedBytes = 42L)),
         )
         assertEquals(
             ModelReadiness.Loading,
-            deriveModelReadiness(fileExists = true, actualBytes = 41L, expectedBytes = 42L),
-        )
-        assertEquals(
-            ModelReadiness.Loading,
-            deriveModelReadiness(fileExists = true, actualBytes = 43L, expectedBytes = 42L),
+            deriveModelReadiness(ModelArtifactState.Corrupt(expectedSha256 = "expected", actualSha256 = "actual")),
         )
     }
 

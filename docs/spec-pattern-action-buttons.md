@@ -1,6 +1,6 @@
 # Spec — Pattern Action Buttons
 
-**Feature:** Pattern lifecycle actions — Skip, Drop, and Restart (user), model-detected Close (v1.5)
+**Feature:** Pattern lifecycle actions — Skip, Drop, and Restart (user); model-detected Close (AI-only, v1.5)
 **Status:** Draft — 2026-05-13
 **Phase:** 4 (UX Surface)
 **Author:** Ashley (sole owner). AI implementors read this as authoritative.
@@ -13,11 +13,11 @@
 The pattern list has no user-facing actions that move a pattern out of the active state. Patterns accumulate indefinitely once detected. The prior action model (Dismiss / Snooze 7 days / Mark resolved) had two problems: Dismiss and Mark resolved were functionally identical — both expressed "I am done with this" — and user-declared resolution is the wrong model. A pattern closing should be earned by behavioral evidence (it stopped appearing in entries), not self-reported by the user. That mirrors the core product philosophy: Vestige observes, it doesn't validate.
 
 In v1, users need three clear controls with different jobs:
-- Skip: this is real but I don't want to look at it right now.
-- Drop: this is noise, get it out of my active view.
+- Skip: this is real but I don't want to look at it right now. Returns in 7 days.
+- Drop: this is noise, get it out of my active view. Stays dropped until Restart.
 - Restart: bring a skipped, dropped, or done pattern back to ACTIVE immediately.
 
-Closed is still a state the model earns for a pattern in v1.5 when it has not appeared in entries for long enough.
+Closed is a state the model earns in v1.5 when a pattern has stopped appearing in entries. The user does not have a Close action. CLOSED · DONE is AI territory.
 
 ---
 
@@ -28,13 +28,13 @@ Closed is still a state the model earns for a pattern in v1.5 when it has not ap
 3. Skipped patterns surface again after 7 days without any user action — no re-add required.
 4. Dropped patterns are accessible in a DROPPED section (not deleted) — the record exists, the claim doesn't.
 5. Pattern state transitions are undoable within the snackbar window (standard Material 3 undo timing, ~4s).
-6. No user-facing "Mark resolved" / "Done" action exists. Closure is not user-declared.
+6. No user-facing "Close," "Resolve," or "Mark resolved" action exists. Closure is earned by behavioral evidence — the model auto-closes when a pattern stops appearing in entries. The user does not declare a pattern done.
 
 ---
 
 ## Non-Goals
 
-1. **Model-detected pattern close (v1.5).** Automatic lifecycle transition from active → Closed when a pattern hasn't appeared in N days is deferred. See `backlog.md` §`pattern-auto-close`. This spec does not wire a staleness check — the CLOSED · DONE section will be empty in v1.
+1. **Model-detected pattern close (v1.5).** Automatic lifecycle transition from ACTIVE → CLOSED when a pattern hasn't appeared in entries for N days is deferred. See `backlog.md` §`pattern-auto-close`. This spec does not wire a staleness check — the CLOSED · DONE section will be empty in v1.
 2. **Custom skip durations.** Skip is 7 days, fixed. No picker, no settings row. See `ux-copy.md` §Locked UX Decisions.
 3. **Permanent deletion.** Drop moves a pattern to DROPPED state — it does not delete the ObjectBox record. Purge-on-wipe (DestructiveScreen) handles mass deletion.
 4. **Cross-pattern actions.** No multi-select, no "skip all," no batch drop. Single-pattern scope only for v1.
@@ -115,12 +115,12 @@ Acceptance criteria:
 
 Pattern List displays four sections, each only rendered when non-empty:
 
-| Section header | Condition |
-|---|---|
-| `ACTIVE` | state = ACTIVE, skippedUntil = null or expired |
-| `SKIPPED · ON HOLD` | state = SKIPPED, skippedUntil > now |
-| `CLOSED · DONE` | state = CLOSED (model-detected — empty in v1; section omitted if empty) |
-| `DROPPED` | state = DROPPED |
+| Section header | Condition | Who sets it |
+|---|---|---|
+| `ACTIVE — STILL HITTING` | state = ACTIVE, skippedUntil = null or expired | — |
+| `SKIPPED · ON HOLD` | state = SKIPPED, skippedUntil > now | User (Skip) |
+| `CLOSED · DONE` | state = CLOSED | AI auto-detected (v1.5) — empty in v1 |
+| `DROPPED` | state = DROPPED | User (Drop) |
 
 Section headers render in JetBrains Mono, uppercase, `EyebrowE` primitive per Scoreboard tokens.
 
@@ -139,12 +139,13 @@ Acceptance criteria:
 - No user action is required to bring a skipped pattern back.
 - Implementation: evaluated on app start / resume via `AppContainer` or the existing cold-start sweep — not a WorkManager job in v1 (pattern-auto-close deferred; this is a simpler date check on load).
 
-**P0.6 — No user-facing "Mark resolved" / "Dismiss" / "Snooze" actions**
+**P0.6 — No user-facing "Mark resolved" / "Close" / "Dismiss" / "Snooze" actions**
 
-None of these labels appear anywhere in the UI as user-facing copy. Restart is the only action shown outside ACTIVE. No undo copy references resolution.
+The user's action vocabulary is exactly: Skip / Drop / Restart. Nothing else. Close, Resolve, Mark resolved, Dismiss, and Snooze are all dead labels. Closure is earned by behavioral evidence; the user does not declare a pattern done.
 
 Acceptance criteria:
-- Full-text search of `:app` source for "dismiss", "Dismiss", "resolve", "Resolve", "Mark resolved", "Snooze" returns zero hits in any user-visible string resource or composable.
+- Full-text search of `:app` source for "dismiss", "Dismiss", "resolve", "Resolve", "Mark resolved", "Snooze", "Close" in user-facing string resources returns zero hits.
+- CLOSED · DONE section header is rendered by the app but never wired to a user tap — it only populates when the model transitions a pattern (v1.5).
 
 ---
 
@@ -182,7 +183,7 @@ If the PatternEngine re-detects a dropped pattern in new entries, surface it as 
 
 All copy is locked in `ux-copy.md`. Reproduced here for implementor convenience.
 
-**Overflow menu labels:**
+**Overflow menu labels (ACTIVE patterns):**
 - `Skip`
 - `Drop`
 
@@ -193,17 +194,19 @@ All copy is locked in `ux-copy.md`. Reproduced here for implementor convenience.
 **Action row / overflow (non-active patterns):**
 - `Restart`
 
-**Pattern Detail — Closed state banner (v1.5, read-only, no action row):**
-> Closed {date}. No new entries matched in {N} days.
+**Pattern Detail — state banners (read-only, no action row):**
+
+CLOSED · DONE (model-detected, v1.5):
+> `Closed {date}. No new entries matched in {N} days.`
 
 **Snackbars:**
 - `Skipped.` *(with Undo)*
 - `Dropped.` *(with Undo)*
-- `Pattern is back.` *(with Undo)*
-- Pattern closed (model): *(no snackbar — silent, visible on next list load)*
+- `Pattern is back.` *(with Undo — on Restart)*
+- Pattern closed by model (v1.5): *(no snackbar — silent, visible on next list load)*
 
 **Section headers (JetBrains Mono, EyebrowE primitive):**
-- `ACTIVE`
+- `ACTIVE — STILL HITTING`
 - `SKIPPED · ON HOLD`
 - `CLOSED · DONE`
 - `DROPPED`
@@ -215,7 +218,7 @@ All copy is locked in `ux-copy.md`. Reproduced here for implementor convenience.
 `PatternEntity` needs:
 
 ```kotlin
-// Existing field — extend the enum
+// Four states — CLOSED is AI-only (v1.5, unreachable in v1)
 enum class PatternState { ACTIVE, SKIPPED, CLOSED, DROPPED }
 
 // Existing or add
@@ -227,20 +230,20 @@ var skippedUntil: Long? = null  // epoch ms; null when not skipped
 
 State transition rules:
 
-| From | Action | To | skippedUntil |
-|---|---|---|---|
-| ACTIVE | Skip | SKIPPED | now + 7 days |
-| ACTIVE | Drop | DROPPED | null |
-| SKIPPED | Undo (skip) | ACTIVE | null |
-| DROPPED | Undo (drop) | ACTIVE | null |
-| SKIPPED | Restart | ACTIVE | null |
-| DROPPED | Restart | ACTIVE | null |
-| CLOSED | Restart | ACTIVE | null |
-| ACTIVE | Undo (restart from SKIPPED) | SKIPPED | restore original value |
-| ACTIVE | Undo (restart from DROPPED) | DROPPED | null |
-| ACTIVE | Undo (restart from CLOSED) | CLOSED | null |
-| SKIPPED | Wake-up check on load | ACTIVE | null (cleared) |
-| ACTIVE | Model detects stale (v1.5) | CLOSED | null |
+| From | Action | Who | To | skippedUntil |
+|---|---|---|---|---|
+| ACTIVE | Skip | User | SKIPPED | now + 7 days |
+| ACTIVE | Drop | User | DROPPED | null |
+| SKIPPED | Undo (skip) | User | ACTIVE | null |
+| DROPPED | Undo (drop) | User | ACTIVE | null |
+| SKIPPED | Restart | User | ACTIVE | null |
+| DROPPED | Restart | User | ACTIVE | null |
+| CLOSED | Restart | User | ACTIVE | null |
+| ACTIVE | Undo (restart from SKIPPED) | User | SKIPPED | restore original value |
+| ACTIVE | Undo (restart from DROPPED) | User | DROPPED | null |
+| ACTIVE | Undo (restart from CLOSED) | User | CLOSED | null |
+| SKIPPED | Wake-up check on load | System | ACTIVE | null (cleared) |
+| ACTIVE | Model detects stale (v1.5) | AI | CLOSED | null |
 
 **ObjectBox note:** Do not delete `PatternEntity` on Drop. Hard-deletes lose the audit trail and break the v1.5 re-detection comparison.
 

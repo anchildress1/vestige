@@ -20,6 +20,7 @@ internal data class OnboardingStepState(
     val micGranted: Boolean,
     val notifGranted: Boolean,
     val downloadMbps: Float? = null,
+    val downloadStatus: DownloadStatus = DownloadStatus(),
 ) {
     /** Count of switches that should read GREEN in the chrome counter. */
     val enabledCount: Int
@@ -47,6 +48,8 @@ internal data class OnboardingStepCallbacks(
     val onDownloadReturn: () -> Unit,
     /** Wiring persona card → PersonaPick. Lets the user change their voice mid-flow. */
     val onChangePersona: () -> Unit,
+    /** Retry / Try-again on a stalled or failed download. Resumes from the `.part` file. */
+    val onRetryDownload: () -> Unit = {},
 )
 
 @Composable
@@ -75,10 +78,14 @@ internal fun OnboardingStepContent(
             modifier = modifier,
             modelState = state.modelState,
             downloadMbps = state.downloadMbps,
+            downloadStatus = state.downloadStatus,
             wifiConnected = state.wifiConnected,
             enabledCount = state.enabledCount,
             // Auto-unwinds back to Wiring once Complete; the screen is intentionally not a stop.
             onContinue = callbacks.onDownloadReturn,
+            onRetry = callbacks.onRetryDownload,
+            // Pause = leave the screen; `.part` persists and HTTP-Range resumes on re-entry.
+            onPause = callbacks.onDownloadReturn,
         )
     }
 }

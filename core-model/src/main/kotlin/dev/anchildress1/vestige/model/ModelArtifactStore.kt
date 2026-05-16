@@ -10,8 +10,16 @@ interface ModelArtifactStore {
     /** Where the artifact lives, regardless of current state. */
     val artifactFile: File
 
-    /** Cheap presence + size + SHA-256 check. */
+    /** Presence + size + SHA-256 check. Hashes the whole file when the size matches. */
     suspend fun currentState(): ModelArtifactState
+
+    /**
+     * Cheap disposition: presence + size + in-flight `.part`. Never hashes — a size match
+     * resolves to `Complete` on trust. SHA-256 integrity is deferred to the load path
+     * ([requireComplete]) / [verifyChecksum], so UI gating never blocks on hashing the
+     * multi-GB artifact. Reports `Partial` from a resumable `.part` when no final file exists.
+     */
+    suspend fun probe(): ModelArtifactState
 
     /**
      * Downloads with exponential backoff up to [MAX_DOWNLOAD_ATTEMPTS]. Resumes via HTTP `Range`

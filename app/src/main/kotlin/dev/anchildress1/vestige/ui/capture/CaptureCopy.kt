@@ -39,6 +39,9 @@ object CaptureCopy {
     const val MODEL_DOWNLOADING_LINE_FMT: String = "Downloading model · %d%%"
     const val MIC_DENIED_LINE: String = "Mic permission required to record. Settings → Permissions."
     const val MIC_UNAVAILABLE_LINE: String = "Mic unavailable. Try typing."
+    const val MIC_BLOCKED_LINE: String = "Mic blocked at the system level."
+    const val MIC_BLOCKED_SETTINGS_LINE: String = "Settings → Apps → Vestige → Permissions → Microphone."
+    const val USE_TYPED_INSTEAD: String = "Use typed entry instead"
     const val INFERENCE_PARSE_FAILED_LINE: String = "Model couldn't read that. Try again."
     const val INFERENCE_TIMED_OUT_LINE: String = "Model timed out. Try a shorter chunk."
     const val INFERENCE_ENGINE_FAILED_LINE: String = "Reading failed. Try again."
@@ -57,6 +60,8 @@ object CaptureCopy {
 
     const val HISTORY_LINK: String = "History"
     const val HISTORY_LINK_A11Y: String = "Open history"
+
+    const val SETTINGS_LINK: String = "Settings"
     const val HISTORY_FOOTER_SEPARATOR: String = " · "
     const val HISTORY_FOOTER_PREFIX: String = "Last entry"
 }

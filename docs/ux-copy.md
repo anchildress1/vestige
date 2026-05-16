@@ -106,6 +106,11 @@ If failed:
 >
 > **Try again**
 
+If artifact corrupt (post-download SHA-256 mismatch):
+> Model file unreadable. Re-downloading.
+
+This is the onboarding **auto-recovery** surface: the bad payload is wiped and one clean re-pull runs automatically, no tap required. Distinct from the error-catalog row `Model file unreadable. Re-download from settings.`, which is the *manual* settings path for a corrupt artifact found later. Both are correct; they serve different moments. (Reconciliation added per Story 4.3 — onboarding had no copy for the auto-retrigger case.)
+
 ---
 
 Primary action:
@@ -122,7 +127,7 @@ Behavior:
 
 ### Status row (top)
 
-- Local model status indicator: `GEMMA 4 · LOCAL ONLY` (when idle, model loaded) / `GEMMA 4 · LISTENING LIVE` (when recording) — pill color stays lime in both states; coral is reserved for the REC button heat + destructive flows (see `design-guidelines.md` §"Capture Screen / AppTop status pill")
+- Local model status indicator: `GEMMA 4 · LOCAL ONLY` (when idle, model loaded) / `GEMMA 4 · LISTENING LIVE` (when recording) / `GEMMA 4 · LOADING` (engine warming) / `DOWNLOADING · {N}%` (active download) / `MODEL PAUSED` (Wi-Fi dropped mid-download) — pill color stays lime in every state; coral is reserved for the REC button heat + destructive flows (see `design-guidelines.md` §"Capture Screen / AppTop status pill"). _(Story 4.4: `GEMMA 4 · LOADING` is the reconciled label — the doc previously named only the idle/recording strings; the pill now reflects all four `ModelReadiness` states and is tappable post-onboarding to open the Model Status screen.)_
 - Persona dropdown label: `WITNESS ▾` (or active persona)
 
 ### Patterns peek (below status)
@@ -209,6 +214,8 @@ Status states:
 - **Failed:** `Network choked.` + Retry button
 - **Updating:** `Updating model.` + progress
 
+> _Story 4.4 reconciliation:_ the v1 runtime has four `ModelReadiness` states — `Ready` / `Loading` / `Downloading(percent)` / `Paused`. The screen renders `Paused` as **`Download stalled.`**; a user-initiated **Re-download** surfaces as **Downloading** (not a distinct `Updating`); a failed re-download falls back to `Loading` (no model on disk — honest). `Stalled` / `Failed` / `Updating` are not separate runtime states in v1 and were not spun up as such (demo-gate / no new abstraction layer). The confirm dialogs use the canonical §"Destructive Confirmations" wording below, not this section's shorter summary.
+
 Detail line (always visible when loaded):
 > Gemma 4 E4B · 3.66 GB · v{version} · On-device
 
@@ -268,7 +275,7 @@ Filter chips (small, secondary text — Phase 4 polish on top of the section str
 Pattern card structure:
 
 > **{Pattern name}**
-> {Agent-emitted label — Aftermath / Tunnel exit / Concrete shoes / Decision spiral / Goblin hours / Audit}
+> {Agent-emitted label — Crashed / Deep Space / Busy Stalling / Nonstop Spiral / Goblin Hours / Brain Dump}
 > {One-line observation}
 > {N} of {M} entries · Last seen {date}
 
@@ -279,7 +286,7 @@ Card actions (per card, in overflow menu):
 Card actions (non-active cards, in overflow menu):
 - **Restart**
 
-Note: Closed is model-detected — not set by a user tap. Pattern auto-close is deferred to v1.5 (`pattern-auto-close` backlog entry), but a done card can still be restarted.
+Note: CLOSED · DONE is model-detected only — the model auto-closes a pattern when it stops appearing in entries (v1.5, `pattern-auto-close` backlog). The section exists in v1 but stays empty until that ships. There is no user Close action (`spec-pattern-action-buttons.md`). DROPPED is user exclusion. Both support Restart.
 
 Empty states:
 
@@ -304,7 +311,7 @@ Header:
 > **{Pattern name}**
 
 Subhead (agent-emitted template label):
-> {Aftermath / Tunnel exit / Concrete shoes / Decision spiral / Goblin hours / Audit}
+> {Crashed / Deep Space / Busy Stalling / Nonstop Spiral / Goblin Hours / Brain Dump}
 
 Summary observation (one line, primary text):
 > {The card's one-line observation, expanded slightly with timing}
@@ -415,7 +422,8 @@ Diff actions:
 | Mic permission permanently denied (system-level, "don't ask again") | `Mic blocked at the system level.` / `Settings → Apps → Vestige → Permissions → Microphone.` / secondary action: `Use typed entry instead` |
 | Mic hardware unavailable | `Mic unavailable. Try typing.` |
 | Inference timeout | `Model timed out. Try a shorter chunk.` |
-| Inference failed | `Model couldn't read that. Try again.` |
+| Inference failed (parse) | `Model couldn't read that. Try again.` |
+| Inference failed (engine) | `Reading failed. Try again.` |
 | Storage full | `Phone storage full. Free up space and try again.` |
 | Audio recording failed | `Recording failed. Try again.` |
 | Entry save failed | `Entry not saved. Try again.` |
@@ -492,6 +500,8 @@ Section: **About**
 - Source code (link to GitHub)
 - License
 
+> _Story 4.9 reconciliation:_ the screen header is `Settings.` (this section named no header string — derived to match the `Model status.` screen-header pattern). The **Model** section is a single **Model status** row that opens the Story 4.4 screen; Re-download / Delete model live there with their canonical confirm dialogs, so they are reached by delegation rather than duplicated here (one destructive-confirm implementation, per KISS / no-duplicate-flows). The **Persona** section lists the three names only (no descriptions — settings is not the onboarding pitch). Export uses the Storage Access Framework `CreateDocument` picker — no `FileProvider`, no storage permission (`AGENTS.md` storage constraint). Delete-all wipes ObjectBox (entry/pattern/tag/callout) + every markdown file + onboarding prefs, then returns to the first-run flow.
+
 ### Locked v1 behavior (not configurable)
 
 - **Default input:** voice. Typed entry is an always-available alternate input but, like voice, requires the local model to be Ready (ADR-013 — it runs the same foreground call and reviews identically). Voice is the entry-point per product positioning. No setting toggle.
@@ -515,7 +525,8 @@ Use sparingly. Only for actions where the user needs confirmation that something
 | Pattern skipped | `Skipped.` *(with Undo)* |
 | Pattern restarted | `Pattern is back.` *(with Undo)* |
 | Pattern closed (model) | *(no snackbar — silent state change, visible on next list load)* |
-| Export complete | `Exported {N} entries to Downloads.` |
+| Export complete | `Entries exported.` |
+| Export failed | `Export failed. Nothing was written.` |
 | Model re-download started | `Downloading model.` *(opens status screen)* |
 | Model deleted | `Model deleted.` |
 

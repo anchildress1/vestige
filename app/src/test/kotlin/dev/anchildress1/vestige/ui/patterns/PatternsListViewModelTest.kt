@@ -355,7 +355,7 @@ class PatternsListViewModelTest {
             kind = PatternKind.TEMPLATE_RECURRENCE,
             signatureJson = "{}",
             title = "Title $patternId",
-            templateLabel = "Aftermath",
+            templateLabel = "Crashed",
             firstSeenTimestamp = lastSeenMs - 1_000L,
             lastSeenTimestamp = lastSeenMs,
             state = PatternState.ACTIVE,

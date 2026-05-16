@@ -301,7 +301,9 @@ The 3.66 GB E4B model is the largest single asset in the build. How it ships aff
 | Q_decision | 1/3 | 2/3 |
 | Q_lateNight | 1/3 | 2/3 |
 
-Storage row in §"Locked Stack" now records a ships-in-v1 schema with the HNSW vector index on `EntryEntity.vector`. The minimum-free-storage requirement bumps from 6 GB to 7 GB (model 3.66 GB + EmbeddingGemma artifact ~180 MB + tokenizer ~5 MB + headroom). `backlog.md` `embeddings-fallback` closes out — there is no v1.5 fallback to keep open.
+Storage row in §"Locked Stack" now records a ships-in-v1 schema with the HNSW vector index on `EntryEntity.vector` (one vector per entry, embedded from distilled fields — see `architecture-brief.md` §"Embedding Strategy"). The minimum-free-storage requirement bumps from 6 GB to 7 GB (model 3.66 GB + EmbeddingGemma artifact ~180 MB + tokenizer ~5 MB + headroom). `backlog.md` `embeddings-fallback` closes out — there is no v1.5 fallback to keep open.
+
+**Note (2026-05-16):** STT-E was run with the embedding source bug present (`entry.entryText` verbatim, not distilled fields). The pass verdict still justifies shipping EmbeddingGemma in v1, but the benchmark numbers above reflect noisy embeddings. STT-E should be re-run after Story 3.11 fixes the embedding source. Story 3.11's on-device spot-check is the minimum; a structured re-run against the same STT-E corpus is the correct verification before Phase 4 starts.
 
 ### Q7. Privacy / network enforcement (the P0 marketing claim has to be code, not vibes)
 
@@ -376,6 +378,39 @@ RECORDING → DISCARDED → IDLE
 - Cancelling typed entries — different affordance, separate spec.
 
 **Revisit when:** post-submission, if user research surfaces accidental-discard at meaningful rate → consider a 3-second snackbar with `Undo`. Note: this would change the privacy contract and requires a superseding ADR.
+
+### Addendum (2026-05-16) — Official Android SDK API reference: key findings
+
+**Source:** `https://ai.google.dev/edge/litert-lm/android` (last updated 2026-03-30 UTC). This is the authoritative Kotlin API surface for `litertlm-android`. Implementors should consult this page for API shapes before coding against the SDK.
+
+**Findings that affect v1 implementation:**
+
+**Audio modality requires explicit `audioBackend` in `EngineConfig`.** The official pattern:
+```kotlin
+EngineConfig(
+    modelPath = "...",
+    backend = Backend.GPU(),
+    audioBackend = Backend.CPU(), // without this, audio bytes silently fail
+)
+```
+`AppContainer.backgroundEngineFactory` already sets `audioBackend = BackendChoice.Cpu` with a comment referencing LiteRT-LM issue #2056 (GPU audio path SIGSEGVs in `mel_filterbank.cc`). Correctly implemented — this entry is for reference.
+
+**GPU backend requires native library declarations in `AndroidManifest.xml`.** Official requirement per the Android docs (also in the 2026-05-10 addendum above):
+```xml
+<application>
+    <uses-native-library android:name="libvndksupport.so" android:required="false"/>
+    <uses-native-library android:name="libOpenCL.so" android:required="false"/>
+</application>
+```
+Without these, Android 12+'s vendor namespace isolation blocks GPU access and the engine silently falls back to CPU. Already present in the manifest; recorded here with the official source for future reference.
+
+**Streaming API is `sendMessageAsync(contents): Flow<Message>`.** Official recommended path for coroutine users. Already wrapped in `LiteRtLmEngine.streamText(prompt: String): Flow<String>` for text. **Multimodal streaming already exists on the pinned 0.11.0** — a 2026-05-16 AAR bytecode probe confirms `Conversation.sendMessageAsync(Contents, Map): Flow<Message>`. (An earlier draft of this addendum claimed it "does not yet exist"; that was wrong — corrected in place per the 2026-05-16 ADR-discipline waiver for mistakes.) Story 2.16 is a thin wrapper: add `streamMessageContents(parts): Flow<String>` calling `conversation.sendMessageAsync(Contents.of(*parts))`, mirroring `streamText` — no new SDK API.
+
+**`ConversationConfig.systemInstruction` is the official system-prompt surface.** Current implementation passes `Contents.of("")` (empty system instruction) and stacks the full system prompt into the message body. This works but bypasses the SDK's intended instruction/message separation. Post-v1 consideration only — changing it during submission window is unnecessary risk.
+
+**`latest.release` is an available Maven coordinate.** The doc shows `implementation("com.google.ai.edge.litertlm:litertlm-android:latest.release")`. Vestige pins `0.11.0` explicitly in `gradle/libs.versions.toml`, which is correct for a submission-deadline build. Story 2.14 carries the SDK upgrade probe. The 2026-05-16 bytecode probe of the pinned `0.11.0` confirmed `Engine.createSession()` / `createConversation()` (concurrent independent contexts) are already present — there is no `Session.clone()` gate and no newer artifact is needed; see ADR-008 §Correction (2026-05-16).
+
+**Tool use API exists (`@Tool`, `@ToolParam`, `OpenApiTool`).** Out of scope per `concept-locked.md` §"Out of scope — multi-step agentic tool chains". Documented here so a future ADR doesn't re-research from scratch.
 
 ---
 

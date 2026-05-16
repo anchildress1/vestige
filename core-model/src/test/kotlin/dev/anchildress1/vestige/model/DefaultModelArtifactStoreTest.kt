@@ -475,6 +475,71 @@ class DefaultModelArtifactStoreTest {
         assertEquals(SHORT_BYTES.size.toLong(), artifact.length())
     }
 
+    @Test
+    fun `probe reports Absent when neither artifact nor part file exists`() = runTest {
+        val store = DefaultModelArtifactStore(
+            manifest = manifest(SHORT_BYTES.size.toLong(), sha256Of(SHORT_BYTES)),
+            baseDir = baseDir,
+            httpClient = ByteArrayHttpClient(SHORT_BYTES),
+            backoff = ZeroBackoff,
+        )
+        assertEquals(ModelArtifactState.Absent, store.probe())
+    }
+
+    @Test
+    fun `probe reports Partial from the resumable part file when no final artifact exists`() = runTest {
+        // Cold-process re-entry: only `.part` is on disk. probe() must surface its byte count so
+        // the download screen shows real resumed progress instead of flashing 0%.
+        File(baseDir, "$MANIFEST_FILENAME.part").writeBytes(ByteArray(40))
+        val store = DefaultModelArtifactStore(
+            manifest = manifest(expectedSize = 100, sha256 = "any"),
+            baseDir = baseDir,
+            httpClient = ByteArrayHttpClient(SHORT_BYTES),
+            backoff = ZeroBackoff,
+        )
+        assertEquals(ModelArtifactState.Partial(40, 100), store.probe())
+    }
+
+    @Test
+    fun `probe reports Partial when the artifact is below expected size`() = runTest {
+        File(baseDir, MANIFEST_FILENAME).writeBytes(ByteArray(50))
+        val store = DefaultModelArtifactStore(
+            manifest = manifest(expectedSize = 100, sha256 = "any"),
+            baseDir = baseDir,
+            httpClient = ByteArrayHttpClient(SHORT_BYTES),
+            backoff = ZeroBackoff,
+        )
+        assertEquals(ModelArtifactState.Partial(50, 100), store.probe())
+    }
+
+    @Test
+    fun `probe reports Corrupt when the artifact exceeds expected size`() = runTest {
+        File(baseDir, MANIFEST_FILENAME).writeBytes(ByteArray(120))
+        val store = DefaultModelArtifactStore(
+            manifest = manifest(expectedSize = 100, sha256 = "any"),
+            baseDir = baseDir,
+            httpClient = ByteArrayHttpClient(SHORT_BYTES),
+            backoff = ZeroBackoff,
+        )
+        assertTrue(store.probe() is ModelArtifactState.Corrupt)
+    }
+
+    @Test
+    fun `probe trusts a size-matching artifact without hashing while currentState still verifies`() = runTest {
+        // Same on-disk file, two readings. Right size, wrong content (SHA mismatch). probe()
+        // must return Complete on size trust (no multi-GB hash on the UI path); currentState()
+        // must still hash and return Corrupt. Divergence here is the contract, not a bug.
+        File(baseDir, MANIFEST_FILENAME).writeBytes(ByteArray(SHORT_BYTES.size))
+        val store = DefaultModelArtifactStore(
+            manifest = manifest(SHORT_BYTES.size.toLong(), sha256Of(SHORT_BYTES)),
+            baseDir = baseDir,
+            httpClient = ByteArrayHttpClient(SHORT_BYTES),
+            backoff = ZeroBackoff,
+        )
+        assertEquals(ModelArtifactState.Complete, store.probe())
+        assertTrue(store.currentState() is ModelArtifactState.Corrupt)
+    }
+
     private fun manifest(expectedSize: Long, sha256: String) = ModelManifest(
         schemaVersion = ModelManifest.SUPPORTED_SCHEMA_VERSION,
         artifactRepo = "test/repo",

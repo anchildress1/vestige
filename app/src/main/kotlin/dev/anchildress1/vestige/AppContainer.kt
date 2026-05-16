@@ -32,32 +32,43 @@ import dev.anchildress1.vestige.model.Persona
 import dev.anchildress1.vestige.patterns.PatternDetectionOrchestrator
 import dev.anchildress1.vestige.save.BackgroundExtractionSaveFlow
 import dev.anchildress1.vestige.save.SaveOutcome
+import dev.anchildress1.vestige.storage.CalloutCooldownEntity
 import dev.anchildress1.vestige.storage.CalloutCooldownStore
+import dev.anchildress1.vestige.storage.EntryEntity
 import dev.anchildress1.vestige.storage.EntryStore
 import dev.anchildress1.vestige.storage.MarkdownEntryStore
 import dev.anchildress1.vestige.storage.PatternDetector
+import dev.anchildress1.vestige.storage.PatternEntity
 import dev.anchildress1.vestige.storage.PatternRepo
 import dev.anchildress1.vestige.storage.PatternStore
+import dev.anchildress1.vestige.storage.TagEntity
 import dev.anchildress1.vestige.storage.VectorBackfillWorker
 import dev.anchildress1.vestige.storage.VestigeBoxStore
 import dev.anchildress1.vestige.ui.capture.ModelReadiness
 import io.objectbox.BoxStore
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.joinAll
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 import java.io.File
+import java.io.OutputStream
 import java.time.Instant
 import java.time.ZoneId
 import java.time.ZonedDateTime
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.zip.ZipEntry
+import java.util.zip.ZipOutputStream
 
 /** Process-singleton hub for Phase-2 cross-cutting concerns. */
 @Suppress(
@@ -167,21 +178,31 @@ class AppContainer(
     private val foregroundServiceStarter: (Intent) -> Unit = { intent ->
         applicationContext.startForegroundService(intent)
     },
+    private val foregroundServiceStopper: (Intent) -> Unit = { intent ->
+        applicationContext.stopService(intent)
+    },
     private val vectorBackfillRetryDelayMs: Long = VECTOR_BACKFILL_RETRY_DELAY_MS,
     private val vectorBackfillMaxRetries: Int = VECTOR_BACKFILL_MAX_RETRIES,
     private val vectorBackfillScheduleListener: (() -> Unit)? = null,
     private val scope: CoroutineScope = defaultScope(),
+    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) {
 
     /** Shared ObjectBox handle. Closed when the process dies; tests use [close]. */
     val boxStore: BoxStore = boxStoreFactory(applicationContext)
 
-    val entryStore: EntryStore = EntryStore(boxStore, markdownStoreFactory(applicationContext))
+    private val markdownStore: MarkdownEntryStore = markdownStoreFactory(applicationContext)
+
+    val entryStore: EntryStore = EntryStore(boxStore, markdownStore)
     private val backgroundEngineInitMutex = Mutex()
     private val embedderInitMutex = Mutex()
+    private val modelMutationMutex = Mutex()
+    private val readinessRefreshMutex = Mutex()
+    private val trackedExtractionJobsMutex = Mutex()
     private val vectorBackfillMutex = Mutex()
     private val vectorBackfillRunning = AtomicBoolean(false)
     private val vectorBackfillRequested = AtomicBoolean(false)
+    private val trackedExtractionJobs: MutableSet<Job> = linkedSetOf()
 
     @Volatile
     private var backgroundEngineInitialized = false
@@ -355,6 +376,10 @@ class AppContainer(
     }
 
     fun reportExtractionStatus(entryId: Long, status: ExtractionStatus) {
+        if (!status.isTerminal() && entryStore.readEntry(entryId) == null) {
+            Log.w(TAG, "Ignoring stale in-flight extraction status for missing entryId=$entryId")
+            return
+        }
         statusBus.report(entryId, status)
         lifecycleStateMachine.onInFlightCountChange(statusBus.inFlightCount.value)
     }
@@ -391,6 +416,7 @@ class AppContainer(
             durationMs = durationMs,
             followUpText = followUpText,
         )
+        trackExtractionJob(outcome.extractionJob)
         launchVectorBackfillIfReady()
         return outcome
     }
@@ -403,15 +429,146 @@ class AppContainer(
      * the model was absent get extracted now.
      */
     fun refreshModelReadiness() {
-        val previous = _modelReadinessFlow.value
-        val current = probeModelReadiness()
-        if (previous == current) return
-        _modelReadinessFlow.value = current
-        if (current is ModelReadiness.Ready && previous !is ModelReadiness.Ready) {
-            scope.launch { recoverPendingExtractions() }
-            scope.launch {
-                delay(ENGINE_PREWARM_DELAY_MS)
-                ensureBackgroundEngineInitialized()
+        scope.launch {
+            // Serialize probe→compare→set so concurrent callers (lifecycle resume + a model
+            // action) can't interleave and let an older probe overwrite a newer readiness.
+            // Each caller queues and re-probes after the prior completes (Codex review #4).
+            readinessRefreshMutex.withLock {
+                val previous = _modelReadinessFlow.value
+                val current = probeModelReadiness(previous)
+                if (previous == current) return@withLock
+                _modelReadinessFlow.value = current
+                if (current is ModelReadiness.Ready && previous !is ModelReadiness.Ready) {
+                    scope.launch { recoverPendingExtractions() }
+                    scope.launch { ensureBackgroundEngineInitialized() }
+                }
+            }
+        }
+    }
+
+    /** Expected on-disk size of the Gemma artifact — drives the Model Status detail line. */
+    val mainModelExpectedByteSize: Long get() = mainModelManifest.expectedByteSize
+
+    /**
+     * Delete the on-disk Gemma artifact (and any resumable `.part`), then re-probe readiness.
+     * Entries are untouched — only the model file goes; the app falls back to `Loading` until a
+     * re-download lands. Per `ux-copy.md` §"Destructive Confirmations / Delete model".
+     */
+    fun deleteMainModel() {
+        scope.launch {
+            runMainModelMutation(name = "delete model") {
+                cancelTrackedExtractionsAndResetLifecycle()
+                resetBackgroundEngine()
+                val artifact = mainModelArtifactStore.artifactFile
+                if (!artifact.delete()) Log.w(TAG, "Failed to delete model artifact")
+                if (!File(
+                        artifact.parentFile,
+                        "${artifact.name}.part",
+                    ).delete()
+                ) {
+                    Log.w(TAG, "Failed to delete model part file")
+                }
+                Log.i(TAG, "Main model artifact deleted on user request")
+                refreshModelReadiness()
+            }
+        }
+    }
+
+    /**
+     * Replace the on-disk artifact with a fresh pull: wipe the current file so this is a true
+     * re-download (not a `.part` resume), open the [NetworkGate] for the transfer only, and tick
+     * [modelReadinessFlow] `Downloading(percent)` so the AppTop pill + Model Status screen track
+     * it from one source. Per `ux-copy.md` §"Destructive Confirmations / Re-download model".
+     */
+    fun redownloadMainModel() {
+        scope.launch {
+            runMainModelMutation(name = "re-download model") {
+                cancelTrackedExtractionsAndResetLifecycle()
+                resetBackgroundEngine()
+                val store = mainModelArtifactStore
+                deleteArtifactFiles(store.artifactFile)
+                _modelReadinessFlow.value = ModelReadiness.Downloading(0)
+                networkGate.openForDownload(reason = "Model Status — user-requested re-download")
+                val result = runDownload(store)
+                // Honor the terminal result (Codex review #1/#3). The size-only probe would read
+                // a checksum-corrupt full-size file as Complete → false Ready, so discard it.
+                // Anything other than Complete must not stay Downloading — Model Status actions
+                // are disabled in that state — so drop to a non-Downloading readiness and let the
+                // probe resolve to Paused (.part remains) or Loading (discarded), keeping the
+                // retry/delete affordances live.
+                handleCorruptDownloadResult(store, result)
+                if (result != ModelArtifactState.Complete) {
+                    _modelReadinessFlow.value = ModelReadiness.Paused
+                }
+                refreshModelReadiness()
+            }
+        }
+    }
+
+    private fun deleteArtifactFiles(artifact: File) {
+        if (!File(artifact.parentFile, "${artifact.name}.part").delete()) {
+            Log.w(TAG, "Failed to delete model part file")
+        }
+        if (!artifact.delete()) Log.w(TAG, "Failed to delete model artifact")
+    }
+
+    private fun computeDownloadPercent(current: Long, expected: Long): Int =
+        if (expected > 0L) ((current * PCT_MAX) / expected).toInt().coerceIn(0, PCT_MAX) else 0
+
+    private suspend fun runDownload(store: ModelArtifactStore): ModelArtifactState? = try {
+        store.download { current, expected ->
+            _modelReadinessFlow.value = ModelReadiness.Downloading(computeDownloadPercent(current, expected))
+        }
+    } catch (cancel: kotlinx.coroutines.CancellationException) {
+        throw cancel
+    } catch (@Suppress("TooGenericExceptionCaught") error: Exception) {
+        Log.e(TAG, "Model re-download failed", error)
+        null
+    } finally {
+        networkGate.seal()
+    }
+
+    private fun handleCorruptDownloadResult(store: ModelArtifactStore, result: ModelArtifactState?) {
+        if (result is ModelArtifactState.Corrupt) {
+            Log.e(TAG, "Re-download produced a checksum-corrupt artifact; discarding")
+            deleteArtifactFiles(store.artifactFile)
+        }
+    }
+
+    /**
+     * Wipe every entry, pattern, tag, and callout-cooldown row plus every markdown file.
+     * Nothing is sent anywhere; nothing is recoverable. The model artifact is left alone.
+     * Per `ux-copy.md` §"Destructive Confirmations / Delete all data".
+     */
+    suspend fun wipeAllData() {
+        cancelTrackedExtractionsAndResetLifecycle()
+        withContext(ioDispatcher) {
+            boxStore.boxFor(EntryEntity::class.java).removeAll()
+            boxStore.boxFor(PatternEntity::class.java).removeAll()
+            boxStore.boxFor(TagEntity::class.java).removeAll()
+            boxStore.boxFor(CalloutCooldownEntity::class.java).removeAll()
+            markdownStore.listAll().forEach { if (!it.delete()) Log.w(TAG, "Failed to delete markdown file") }
+            Log.i(TAG, "All user data wiped on explicit request")
+        }
+        _dataRevision.value += 1
+    }
+
+    /** Stream a zip of every entry markdown file into [out] (caller owns/closes the stream). */
+    suspend fun zipAllEntriesTo(out: OutputStream) {
+        withContext(ioDispatcher) {
+            ZipOutputStream(out).use { zip ->
+                markdownStore.listAll().forEach { file ->
+                    zip.putNextEntry(ZipEntry(file.name))
+                    // closeEntry must run for every opened entry, else `use` closing the stream
+                    // over a dangling entry yields a malformed archive. Contain a secondary
+                    // close failure so it can't be thrown out of finally and mask the primary
+                    // read exception (the read is the true root cause).
+                    try {
+                        file.inputStream().use { it.copyTo(zip) }
+                    } finally {
+                        runCatching { zip.closeEntry() }
+                    }
+                }
             }
         }
     }
@@ -445,24 +602,84 @@ class AppContainer(
 
     private suspend fun recoverOneEntry(entryId: Long, entryText: String, capturedAt: ZonedDateTime) {
         runCatching {
-            backgroundExtractionSaveFlow.recoverEntry(
+            val job = backgroundExtractionSaveFlow.recoverEntry(
                 entryId = entryId,
                 entryText = entryText,
                 capturedAt = capturedAt,
                 persona = Persona.WITNESS,
             )
+            trackExtractionJob(job)
         }.onFailure { Log.e(TAG, "Recovery extraction failed for entry $entryId", it) }
     }
 
-    private fun mainModelArtifactLooksPresent(): Boolean = runCatching {
-        val store = mainModelArtifactStore
-        val file = store.artifactFile
-        file.exists() && file.length() == store.manifest.expectedByteSize
-    }.onFailure { Log.e(TAG, "Failed to probe main model artifact", it) }
-        .getOrDefault(false)
+    private suspend fun mainModelArtifactLooksPresent(): Boolean =
+        verifiedMainModelState() is ModelArtifactState.Complete
 
-    private fun probeModelReadiness(): ModelReadiness =
-        if (mainModelArtifactLooksPresent()) ModelReadiness.Ready else ModelReadiness.Loading
+    private suspend fun probeModelReadiness(previous: ModelReadiness): ModelReadiness = runCatching {
+        when (val state = verifiedMainModelState()) {
+            ModelArtifactState.Absent -> ModelReadiness.Loading
+
+            ModelArtifactState.Complete -> ModelReadiness.Ready
+
+            is ModelArtifactState.Corrupt -> ModelReadiness.Loading
+
+            is ModelArtifactState.Partial ->
+                if (previous is ModelReadiness.Downloading) {
+                    ModelReadiness.Downloading(
+                        percent = ((state.currentBytes * PCT_MAX) / state.expectedBytes)
+                            .toInt()
+                            .coerceIn(0, PCT_MAX),
+                    )
+                } else {
+                    ModelReadiness.Paused
+                }
+        }
+    }.onFailure { Log.e(TAG, "Failed to probe model readiness", it) }
+        .getOrDefault(ModelReadiness.Loading)
+
+    private suspend fun verifiedMainModelState(): ModelArtifactState {
+        val probed = mainModelArtifactStore.probe()
+        return if (probed == ModelArtifactState.Complete) {
+            mainModelArtifactStore.currentState()
+        } else {
+            probed
+        }
+    }
+
+    private suspend fun trackExtractionJob(job: Job) {
+        trackedExtractionJobsMutex.withLock { trackedExtractionJobs.add(job) }
+        job.invokeOnCompletion {
+            scope.launch {
+                trackedExtractionJobsMutex.withLock { trackedExtractionJobs.remove(job) }
+            }
+        }
+    }
+
+    private suspend fun cancelTrackedExtractionJobs() {
+        val jobs = trackedExtractionJobsMutex.withLock { trackedExtractionJobs.toList() }
+        jobs.forEach(Job::cancel)
+        jobs.joinAll()
+    }
+
+    private suspend fun cancelTrackedExtractionsAndResetLifecycle() {
+        foregroundServiceStopper(foregroundServiceIntentFactory())
+        cancelTrackedExtractionJobs()
+        statusBus.clear()
+        lifecycleStateMachine.onInFlightCountChange(0)
+        lifecycleStateMachine.onServiceKilled()
+    }
+
+    private suspend fun runMainModelMutation(name: String, block: suspend () -> Unit) {
+        if (!modelMutationMutex.tryLock()) {
+            Log.w(TAG, "Ignoring $name while another model mutation is in flight")
+            return
+        }
+        try {
+            block()
+        } finally {
+            modelMutationMutex.unlock()
+        }
+    }
 
     internal suspend fun ensureBackgroundEngineInitialized() {
         if (backgroundEngineInitialized) return
@@ -470,6 +687,16 @@ class AppContainer(
             if (backgroundEngineInitialized) return
             backgroundEngine.initialize()
             backgroundEngineInitialized = true
+        }
+    }
+
+    private suspend fun resetBackgroundEngine() {
+        backgroundEngineInitMutex.withLock {
+            if (!backgroundEngineInitialized) return
+            // Keep the wrapper instance so every collaborator holding `backgroundEngine` sees the
+            // same object; `LiteRtLmEngine.close()` clears the native handle and supports re-init.
+            backgroundEngine.close()
+            backgroundEngineInitialized = false
         }
     }
 
@@ -602,7 +829,7 @@ class AppContainer(
         const val MODEL_ARTIFACTS_SUBDIR = "models"
         const val VECTOR_BACKFILL_RETRY_DELAY_MS = 5_000L
         const val VECTOR_BACKFILL_MAX_RETRIES = 12
-        const val ENGINE_PREWARM_DELAY_MS = 2_000L
+        const val PCT_MAX = 100
 
         fun defaultScope(): CoroutineScope {
             val exceptionHandler = CoroutineExceptionHandler { _, error ->

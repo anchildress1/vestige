@@ -71,8 +71,9 @@ sealed interface ModelReadiness {
  * inference errors come from `ForegroundResult.ParseFailure` or thrown engine failures.
  */
 sealed interface CaptureError {
-    object MicDenied : CaptureError
-    object MicUnavailable : CaptureError
+    data object MicDenied : CaptureError
+    data object MicBlocked : CaptureError
+    data object MicUnavailable : CaptureError
     data class InferenceFailed(val reason: Reason) : CaptureError {
         enum class Reason { TIMED_OUT, PARSE_FAILED, ENGINE_FAILED }
     }

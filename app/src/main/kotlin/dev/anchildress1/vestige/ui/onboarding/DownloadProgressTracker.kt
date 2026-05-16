@@ -15,15 +15,18 @@ import dev.anchildress1.vestige.model.ModelArtifactState
 internal class DownloadProgressTracker(
     private val onState: (ModelArtifactState) -> Unit,
     private val onSpeed: (Float?) -> Unit,
+    private val onEta: (Long?) -> Unit = {},
     private val nowMillis: () -> Long = System::currentTimeMillis,
 ) {
     private var lastPct = -1
     private var sampleBytes = -1L
     private var sampleTimeMs = 0L
+    private var lastBytesPerSec = -1.0
 
     fun onProgress(currentBytes: Long, expectedBytes: Long) {
         onState(ModelArtifactState.Partial(currentBytes, expectedBytes))
         sampleSpeed(currentBytes)
+        emitEta(currentBytes, expectedBytes)
         logPercent(currentBytes, expectedBytes)
     }
 
@@ -39,8 +42,20 @@ internal class DownloadProgressTracker(
         val deltaBytes = (currentBytes - sampleBytes).coerceAtLeast(0L)
         val mbps = (deltaBytes.toFloat() / BYTES_PER_MB) / (elapsed.toFloat() / MS_PER_SECOND)
         onSpeed(mbps.coerceAtLeast(0f))
+        lastBytesPerSec = deltaBytes.toDouble() / (elapsed.toDouble() / MS_PER_SECOND)
         sampleBytes = currentBytes
         sampleTimeMs = now
+    }
+
+    // ETA rides the last good speed sample. Before any sample (or a zero-rate window) the
+    // remaining time is genuinely unknown — emit null rather than a fabricated number.
+    private fun emitEta(currentBytes: Long, expectedBytes: Long) {
+        if (lastBytesPerSec <= 0.0) {
+            onEta(null)
+            return
+        }
+        val remaining = (expectedBytes - currentBytes).coerceAtLeast(0L)
+        onEta((remaining / lastBytesPerSec).toLong())
     }
 
     private fun logPercent(currentBytes: Long, expectedBytes: Long) {

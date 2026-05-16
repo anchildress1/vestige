@@ -145,12 +145,16 @@ private fun EntryDetailContent(model: EntryDetailUiModel, modifier: Modifier = M
 
         if (model.energyDescriptor != null || model.observations.isNotEmpty()) {
             val readingLabel = "${model.personaName} ${EntryDetailCopy.READING_LABEL_SUFFIX}"
+            // Explicit CD spans energy + every observation line: mergeDescendants with a manual
+            // contentDescription replaces descendant text, so anything omitted here is unspoken.
+            val readingBody = (listOfNotNull(model.energyDescriptor) + model.observations.map { it.text })
+                .joinToString(". ")
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
                     .testTag("entry_reading_card")
                     .semantics(mergeDescendants = true) {
-                        contentDescription = "$readingLabel: ${model.energyDescriptor.orEmpty()}"
+                        contentDescription = "$readingLabel: $readingBody"
                     },
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {

@@ -31,16 +31,18 @@ class EntryDetailViewModel(
 
     private fun load() {
         viewModelScope.launch {
-            val entity = runCatching {
-                withContext(ioDispatcher) { entryStore.readEntry(entryId) }
+            // Projection runs inside the IO context: EntryEntity.tags is a lazy ObjectBox
+            // ToMany whose resolution would otherwise hit the database on the main thread.
+            _state.value = runCatching {
+                withContext(ioDispatcher) {
+                    entryStore.readEntry(entryId)
+                        ?.let { EntryDetailUiState.Loaded(EntryDetailUiModel.from(it, personaName, zoneId)) }
+                        ?: EntryDetailUiState.NotFound
+                }
             }.getOrElse { e ->
                 if (e is CancellationException) throw e
                 Log.e(TAG, "readEntry failed for id=$entryId", e)
-                null
-            }
-            _state.value = when (entity) {
-                null -> EntryDetailUiState.NotFound
-                else -> EntryDetailUiState.Loaded(EntryDetailUiModel.from(entity, personaName, zoneId))
+                EntryDetailUiState.NotFound
             }
         }
     }

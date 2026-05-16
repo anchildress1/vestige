@@ -273,7 +273,7 @@ private fun SettingsRoute(
                         Intent(Intent.ACTION_VIEW, Uri.parse(VESTIGE_SOURCE_URL))
                             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
                     )
-                }
+                }.onFailure { Log.e(SETTINGS_TAG, "Opening source URL failed", it) }
             },
             onExit = onExit,
         ),

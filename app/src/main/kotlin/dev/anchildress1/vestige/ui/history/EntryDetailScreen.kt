@@ -22,6 +22,9 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
@@ -43,6 +46,7 @@ import dev.anchildress1.vestige.ui.components.StatRibbon
 import dev.anchildress1.vestige.ui.components.VestigeSurface
 import dev.anchildress1.vestige.ui.components.limeLeftRuleForActive
 import dev.anchildress1.vestige.ui.theme.VestigeTheme
+import kotlinx.coroutines.delay
 
 @Suppress("LongMethod")
 @Composable
@@ -50,6 +54,7 @@ fun EntryDetailScreen(
     viewModel: EntryDetailViewModel,
     onBack: () -> Unit,
     onNewEntry: () -> Unit,
+    highlightOnOpen: Boolean = false,
     modifier: Modifier = Modifier,
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -66,7 +71,8 @@ fun EntryDetailScreen(
 
             EntryDetailUiState.NotFound -> Box(
                 modifier = Modifier
-                    .fillMaxSize()
+                    .weight(1f)
+                    .fillMaxWidth()
                     .padding(horizontal = 20.dp, vertical = 24.dp),
                 contentAlignment = Alignment.TopStart,
             ) {
@@ -79,6 +85,7 @@ fun EntryDetailScreen(
 
             is EntryDetailUiState.Loaded -> EntryDetailContent(
                 model = s.model,
+                highlightOnOpen = highlightOnOpen,
                 modifier = Modifier.weight(1f),
             )
         }
@@ -91,8 +98,17 @@ fun EntryDetailScreen(
 @Suppress("LongMethod")
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun EntryDetailContent(model: EntryDetailUiModel, modifier: Modifier = Modifier) {
+private fun EntryDetailContent(model: EntryDetailUiModel, highlightOnOpen: Boolean, modifier: Modifier = Modifier) {
     val colors = VestigeTheme.colors
+    var sourceHighlightVisible by remember(model.id, highlightOnOpen) {
+        mutableStateOf(highlightOnOpen)
+    }
+    androidx.compose.runtime.LaunchedEffect(model.id, highlightOnOpen) {
+        if (!highlightOnOpen) return@LaunchedEffect
+        sourceHighlightVisible = true
+        delay(SOURCE_HIGHLIGHT_MS)
+        sourceHighlightVisible = false
+    }
     Column(
         modifier = modifier
             .fillMaxWidth()
@@ -136,12 +152,32 @@ private fun EntryDetailContent(model: EntryDetailUiModel, modifier: Modifier = M
                 },
         )
 
-        TranscriptBlock(
-            eyebrow = EntryDetailCopy.YOU_LABEL,
-            body = model.transcription,
-            bodyColor = colors.dim,
-            testTag = "entry_transcription",
-        )
+        Column(
+            modifier = if (sourceHighlightVisible) {
+                Modifier
+                    .fillMaxWidth()
+                    .limeLeftRuleForActive()
+                    .testTag("entry_source_highlight")
+            } else {
+                Modifier.fillMaxWidth()
+            },
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            TranscriptBlock(
+                eyebrow = EntryDetailCopy.YOU_LABEL,
+                body = model.transcription,
+                bodyColor = colors.dim,
+                testTag = "entry_transcription",
+            )
+            if (model.followUp != null) {
+                TranscriptBlock(
+                    eyebrow = model.personaName,
+                    body = model.followUp,
+                    bodyColor = colors.ink,
+                    testTag = "entry_follow_up",
+                )
+            }
+        }
 
         if (model.energyDescriptor != null || model.observations.isNotEmpty()) {
             val readingLabel = "${model.personaName} ${EntryDetailCopy.READING_LABEL_SUFFIX}"
@@ -210,6 +246,8 @@ private fun EntryDetailContent(model: EntryDetailUiModel, modifier: Modifier = M
         Spacer(Modifier.height(8.dp))
     }
 }
+
+private const val SOURCE_HIGHLIGHT_MS: Long = 1_200L
 
 @Composable
 private fun TranscriptBlock(

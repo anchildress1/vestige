@@ -1,8 +1,9 @@
 # ADR Decisions
 
-Every ADR (001–013) as written, assuming the full v1 feature set is complete. `backlog.md` is
-out of scope by design. Shared state machines live in [state-diagrams.md](state-diagrams.md) and
-are cross-linked rather than redrawn.
+Every live ADR as written, assuming the full v1 feature set is complete. (ADR-009 was **deleted
+2026-05-16** as a mis-scoped-probe mistake — not superseded; ADR-008 restored. There is no ADR-009.)
+`backlog.md` is out of scope by design. Shared state machines live in
+[state-diagrams.md](state-diagrams.md) and are cross-linked rather than redrawn.
 
 ---
 
@@ -11,7 +12,7 @@ are cross-linked rather than redrawn.
 ```mermaid
 flowchart TD
     accTitle: ADR supersession and amendment relationships
-    accDescr: ADR-006 and ADR-007 amend ADR-004. ADR-005 amends ADR-002. ADR-008 was superseded entirely by ADR-009, which restored ADR-002's sequential lens rule. ADR-010 supersedes ADR-001's embeddings section. ADR-011 supersedes the design-guidelines visual layer only. ADR-013 supersedes the model-free typed-fallback premise.
+    accDescr: ADR-006 and ADR-007 amend ADR-004. ADR-005 amends ADR-002. ADR-008 supersedes ADR-002's sequencing with concurrent multi-context; its mechanism was corrected 2026-05-16 (Engine.createSession/createConversation, not Session.clone); v1 ships sequential pending measurement. The interim ADR-009 was deleted as a mistake and is not in the graph. ADR-010 supersedes ADR-001's embeddings section. ADR-011 supersedes the design-guidelines visual layer only. ADR-013 supersedes the model-free typed-fallback premise.
 
     A001["ADR-001<br/>stack & infra"]
     A002["ADR-002<br/>3-lens × 5-surface"]
@@ -20,8 +21,7 @@ flowchart TD
     A005["ADR-005<br/>single-turn (amends 002)"]
     A006["ADR-006<br/>START_NOT_STICKY (amends 004)"]
     A007["ADR-007<br/>FG state machine ext (amends 004)"]
-    A008["ADR-008<br/>parallel lenses (SUPERSEDED)"]
-    A009["ADR-009<br/>clone unavailable (supersedes 008)"]
+    A008["ADR-008<br/>concurrent multi-context lenses<br/>(mechanism corrected 2026-05-16)"]
     A010["ADR-010<br/>EmbeddingGemma → LiteRT"]
     A011["ADR-011<br/>Scoreboard design pivot"]
     A012["ADR-012<br/>GPU perf + pre-warm"]
@@ -31,8 +31,7 @@ flowchart TD
     A006 -- amends --> A004
     A007 -- amends --> A004
     A007 -- depends on --> A006
-    A009 -- supersedes --> A008
-    A009 -- restores sequential rule of --> A002
+    A008 -- supersedes sequencing of --> A002
     A010 -- supersedes §Embeddings of --> A001
     A011 -- supersedes visual layer of --> Design["design-guidelines.md"]
     A013 -- supersedes typed-fallback premise --> A005
@@ -72,8 +71,9 @@ sequenceDiagram
 
 ## ADR-002 — Multi-Lens Extraction Pattern
 
-**Status:** Accepted. Amended by ADR-005; sequencing superseded by ADR-008 then **restored**
-by ADR-009.
+**Status:** Accepted. Amended by ADR-005; sequencing superseded by ADR-008 (concurrent
+multi-context; mechanism corrected 2026-05-16 — `createSession`/`createConversation`, not
+`Session.clone()`). v1 ships sequential pending Story 2.6.6 / 2.19 measurement.
 **Decision:** 3 independent lens calls (Literal / Inferential / Skeptical), each composing all 5
 surfaces (Behavioral / State / Vocabulary / Commitment / Recurrence); a **deterministic Kotlin**
 convergence resolver (not a 4th model call). Two-tier: foreground returns
@@ -157,39 +157,32 @@ kill). `onStartCommand` resolves 5 cases by current state. Drawn in
 
 ---
 
-## ADR-008 — Parallel 3-Lens Execution (SUPERSEDED)
+## ADR-008 — Concurrent Multi-Context 3-Lens Execution
 
-**Status:** **Superseded entirely by ADR-009.** Historical only — recorded for the revival path.
-**Decision (historical):** one Engine (weights loaded once), one base Session per entry (shared
-prefix), 3 CoW-cloned Sessions appending lens suffixes, fired concurrently (~7–9 s/entry vs
-~15–21 s sequential). Action Item 6 = stop-and-supersede on first cloning failure.
+**Status:** Accepted. **Decision stands; mechanism + performance premise corrected 2026-05-16**
+(ADR-008 §Correction). The interim ADR-009 that declared this SDK-impossible was a
+mis-scoped-probe mistake and was **deleted** — there is no ADR-009.
+**Decision:** one Engine (weights loaded once) drives **independent** per-lens contexts via
+`Engine.createSession(SessionConfig)` / `createConversation(ConversationConfig)` on the pinned
+`0.11.0` — **no** `Session.clone()`, **no** CoW shared prefix (each context composes its own).
+A single GPU serializes at the command queue, so the win is non-blocking foreground preempt,
+**not** a literal 3×; realized wall-clock + concurrent-context RAM are unmeasured. v1 ships
+ADR-002 sequential until Story 2.6.6 / 2.19 measures and decides adoption — a scope position,
+not an SDK limit.
 
 ```mermaid
 flowchart TD
-    accTitle: ADR-008 historical parallel-clone lens execution
-    accDescr: Historical and superseded. One engine loads weights once. A base session holds the shared prefix. Three copy-on-write cloned sessions append the Literal, Inferential, and Skeptical suffixes and run concurrently into the resolver.
+    accTitle: ADR-008 concurrent multi-context lens execution (corrected 2026-05-16)
+    accDescr: One engine loads weights once. Three independent contexts created via Engine.createSession or createConversation each compose their own prefix plus the Literal, Inferential, or Skeptical suffix and feed the resolver. No session cloning and no copy-on-write shared prefix. A single GPU serializes at the command queue so the benefit is non-blocking foreground preemption, not a literal threefold speedup. v1 ships sequential until measured.
 
-    Eng["Engine (weights once)"] --> Base["base Session (shared prefix)"]
-    Base --> Cl1["clone → Literal suffix"]
-    Base --> Cl2["clone → Inferential suffix"]
-    Base --> Cl3["clone → Skeptical suffix"]
-    Cl1 --> R["resolver"]
-    Cl2 --> R
-    Cl3 --> R
-    R --> X["SUPERSEDED by ADR-009 — clone API absent in 0.11.0"]
+    Eng["Engine (weights once)"] --> C1["createSession/createConversation → Literal"]
+    Eng --> C2["createSession/createConversation → Inferential"]
+    Eng --> C3["createSession/createConversation → Skeptical"]
+    C1 --> R["resolver"]
+    C2 --> R
+    C3 --> R
+    R --> V["v1: sequential until Story 2.6.6/2.19 measures RAM + wall-clock"]
 ```
-
----
-
-## ADR-009 — Kotlin `Session.clone()` Unavailable (supersedes ADR-008)
-
-**Status:** Accepted. Supersedes ADR-008 entirely; **restores ADR-002's sequential rule**.
-**Decision:** The clone API is absent in `litertlm-android:0.11.0`. 3 lenses run **sequential**
-on one Engine (~5–7 s/lens GPU, 25–55 s/entry). Story 2.6.6 deferred. Revival is
-upstream-signal-driven (new release / `main` adds clone / Issue #1226 ships / PR #1515-equiv
-merges) — no calendar re-probe.
-**Addendum 2026-05-16:** C++ clone is first-class in the docs (CoW, <10 ms); an unpinned
-`<latest>` AAR re-probe is required before any post-submission implementation.
 
 ---
 

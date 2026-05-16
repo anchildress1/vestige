@@ -1,7 +1,7 @@
 # LLM Functionality
 
 Gemma 4 E4B running on-device via LiteRT-LM. Source: ADR-002 (3-lens × 5-surface, two-tier,
-convergence), ADR-005 (single-turn), ADR-009 (sequential lenses), ADR-010 (embedder runtime),
+convergence), ADR-005 (single-turn), ADR-008 (concurrent multi-context; v1 sequential pending measurement), ADR-010 (embedder runtime),
 `concept-locked.md` (personas, audio, observation layering).
 
 One model artifact (`gemma-4-E4B-it-litert-lm`, 3.66 GB), one `ModelHandle` per process.

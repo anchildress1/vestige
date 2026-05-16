@@ -468,7 +468,7 @@ class EntryStoreTest {
     private val emptyResolved = ResolvedExtraction(emptyMap())
 
     private companion object {
-        // 2026-05-11T07:21:24Z — ADR-009 supersede commit timestamp; one neutral fixture date.
+        // 2026-05-11T07:21:24Z — fixed, arbitrary fixture instant; value is not significant.
         private val SAMPLE_INSTANT: Instant = Instant.ofEpochSecond(1_778_829_684L)
         private const val SAMPLE_TEXT =
             "Standup ran long. Fine before, then completely flattened by eleven."

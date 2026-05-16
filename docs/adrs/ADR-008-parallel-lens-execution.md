@@ -1,12 +1,26 @@
 # ADR-008 — Parallel 3-Lens Execution via LiteRT-LM Engine/Session Pattern
 
-**Status:** Superseded by [ADR-009](ADR-009-litertlm-kotlin-session-clone-unavailable.md) on 2026-05-11.
+**Status:** Accepted. Corrected 2026-05-16 — see [§Correction](#correction-2026-05-16--mechanism-and-performance-premise). The decision (concurrent multi-context 3-lens on one Engine) stands; the mechanism is `Engine.createSession()` / `createConversation()`, **not** `Session.clone()` + CoW prefix-fork.
 **Date:** 2026-05-10
 **Deciders:** Ashley (sole owner). AI implementors read this as authoritative.
 **Depends on:** `adrs/ADR-002-multi-lens-extraction-pattern.md` (supersedes the "sequential" sequencing rule)
-**Supersedes:** ADR-002 §"Background pass (3 lens calls, sequential)" — that rule was based on the assumption that "E4B is one model on one device" forced serialization. LiteRT-LM's Engine/Session API with Copy-on-Write KV-cache invalidates that assumption.
+**Supersedes:** ADR-002 §"Background pass (3 lens calls, sequential)" — that rule assumed one model handle forced serialization. LiteRT-LM's Engine → multi-Session API invalidates that assumption.
 
-> **Superseded by [ADR-009](ADR-009-litertlm-kotlin-session-clone-unavailable.md) on 2026-05-11.** Probe against `litertlm-android:0.11.0` (the latest published artifact, `lastUpdated 2026-05-04`) confirmed the Kotlin SDK does not expose `Session.clone()` or any equivalent parent-Session API. The C++ runtime (`runtime/core/session_advanced.cc`) has the capability; the Android JNI bridge does not bind to it. Upstream PR #1515 (Kotlin clone surface) was closed unmerged 2026-03-09. Issue #1226 remains open with no shipped timeline. ADR-009 restores ADR-002's original sequential rule for v1 and defers the parallel design to backlog with explicit revival triggers. The decision recorded below — and ADR-008's amendments to ADR-002 §"Background pass" / §"Why three calls" footnote — are historical context only; do not treat them as authoritative.
+> **Correction note (2026-05-16).** A prior ADR (ADR-009, since **deleted as a mistake**) claimed `litertlm-android:0.11.0` could not do this because it lacks `Session.clone()`. That probe was mis-scoped: it searched for a method literally named `clone()`. A direct AAR bytecode probe of the pinned `0.11.0` artifact found `Engine.createSession(SessionConfig)` and `Engine.createConversation(ConversationConfig)` — one Engine drives many **independent** contexts. The capability this ADR depends on shipped in 0.11.0 the whole time. The original `Session.clone()` + Copy-on-Write **shared-prefix** mechanism below was never the SDK shape and is corrected in [§Correction](#correction-2026-05-16--mechanism-and-performance-premise); read the body's clone/CoW/wall-clock specifics through that section.
+
+---
+
+## Correction (2026-05-16) — mechanism and performance premise
+
+This ADR's **decision stands**: run the 3 lenses concurrently against one loaded Engine instead of serially. What was wrong is the *how* and the *how-much*, corrected here. The body below is the original 2026-05-10 rationale; where it says "clone", "CoW", "shared prefix computed once", or quotes a ~3× wall-clock, read it through this section.
+
+**Mechanism.** The SDK has no `Session.clone()` and no parent-Session / CoW prefix-fork. The pinned `litertlm-android:0.11.0` AAR exposes `Engine.createSession(SessionConfig)` and `Engine.createConversation(ConversationConfig)`: one Engine → many **independent** contexts. Concurrency is per-context, not per-clone. There is **no shared-prefix-computed-once optimization** — each lens context composes and prefills its own prefix.
+
+**Performance.** Because the prefix is not shared, the "3× via CoW" wall-clock math in §Wall-Clock Math / §RAM Math does **not** hold as written. Worse, a single GPU serializes work at the hardware command queue, so three concurrent contexts do not execute in true parallel on-device. The real, defensible win is **eliminating Kotlin-layer mutex blocking** — a foreground capture can preempt an in-flight background lens instead of waiting on a shared `Mutex`. Net background wall-clock improvement is **unmeasured** and may be modest. Concurrent-context RAM on the reference S24 Ultra (E4B weights shared; per-context KV is not) is also **unmeasured**.
+
+**Adoption gate.** Whether v1 actually runs the background pass concurrently is **not decided here** — it is Story 2.6.6 / Story 2.19's call, made on the RAM + wall-clock measurement above against the 17-day timebox and the demo gate. This ADR establishes only that the SDK does not block it. Until that measurement, the shipped path remains ADR-002 sequential; that is a scope position, not an SDK limitation.
+
+**ADR-009 is deleted.** Its "clone unavailable → impossible → revert to sequential" conclusion was a mis-scoped-probe mistake, not a design change. Per AGENTS.md ADR discipline waiver for mistakes (operator decision 2026-05-16), it was removed outright rather than left as a superseding record.
 
 ---
 

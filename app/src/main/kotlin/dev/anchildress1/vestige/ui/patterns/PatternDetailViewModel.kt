@@ -9,6 +9,7 @@ import dev.anchildress1.vestige.storage.EntryStore
 import dev.anchildress1.vestige.storage.PatternEntity
 import dev.anchildress1.vestige.storage.PatternRepo
 import dev.anchildress1.vestige.storage.PatternStore
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.BufferOverflow
@@ -72,7 +73,10 @@ class PatternDetailViewModel(
                         previousState = priorState,
                         previousSnoozedUntil = priorSnoozedUntil,
                     )
-                }.onFailure { Log.e(TAG, "restart failed for $patternId", it) }
+                }.onFailure { t ->
+                    if (t is CancellationException) throw t
+                    Log.e(TAG, "restart failed for $patternId", t)
+                }
                     .getOrNull()
             }
             _state.value = loadState()
@@ -97,6 +101,7 @@ class PatternDetailViewModel(
                         )
                     }
                 }.onFailure { failure ->
+                    if (failure is CancellationException) throw failure
                     // Stale undo path (e.g. skip → drop → tap-undo on the older skip snackbar)
                     // sends SNOOZED→ACTIVE through a row already in DROPPED. PatternRepo/
                     // PatternStore throw on illegal transitions per ADR-003; the refresh below
@@ -119,6 +124,7 @@ class PatternDetailViewModel(
             val applied = withContext(ioDispatcher) {
                 runCatching { mutate() }
                     .onFailure { t ->
+                        if (t is CancellationException) throw t
                         if (t is IllegalStateException) {
                             Log.w(TAG, "Pattern $action skipped for $patternId — concurrent transition", t)
                         } else {

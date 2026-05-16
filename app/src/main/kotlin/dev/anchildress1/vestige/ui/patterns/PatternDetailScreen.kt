@@ -188,7 +188,6 @@ private fun LoadedBody(
         }
 
         // CLOSED is model-detected — the terminal banner replaces the action row. DROPPED keeps Restart.
-        // the terminal banner replaces the action row. DROPPED keeps Restart.
         if (loaded.availableActions.isNotEmpty() && loaded.state != PatternState.CLOSED) {
             ActionRow(availableActions = loaded.availableActions, actions = actions)
         }

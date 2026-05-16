@@ -10,10 +10,20 @@ import java.io.File
  * state names (`SNOOZED`, `PatternState.DROPPED`, …) stay as code identifiers; only rendered
  * copy is policed. This walks the real `app/src/main` tree so a future copy regression fails
  * here instead of in a screenshot review.
+ *
+ * Patterns use `\b` word boundaries where needed to avoid false positives on unrelated English
+ * words (e.g. "resolution"). Block comments (/* … */) are intentionally out of scope — they
+ * cannot appear inside a `Text("…")` literal, so the scan can only be falsely strict, never
+ * falsely green.
  */
 class PatternForbiddenCopyTest {
 
-    private val forbidden = listOf("snooze", "dismiss", "mark resolved", "resolve")
+    private val forbidden: List<Regex> = listOf(
+        Regex("""\bsnooze""", RegexOption.IGNORE_CASE),
+        Regex("""\bdismiss""", RegexOption.IGNORE_CASE),
+        Regex("""mark\s+resolved""", RegexOption.IGNORE_CASE),
+        Regex("""\bresolve[sd]?\b""", RegexOption.IGNORE_CASE),
+    )
 
     @Test
     fun `no string resource value contains retired user-facing vocabulary`() {
@@ -22,7 +32,7 @@ class PatternForbiddenCopyTest {
 
         val violations = STRING_ELEMENT.findAll(stringsXml.readText())
             .map { it.groupValues[1].trim() }
-            .filter { value -> forbidden.any { value.contains(it, ignoreCase = true) } }
+            .filter { value -> forbidden.any { it.containsMatchIn(value) } }
             .toList()
 
         assertTrue(
@@ -42,7 +52,7 @@ class PatternForbiddenCopyTest {
                     TEXT_LITERALS.forEach { pattern ->
                         pattern.findAll(line).forEach { match ->
                             val literal = match.groupValues[1]
-                            if (forbidden.any { literal.contains(it, ignoreCase = true) }) {
+                            if (forbidden.any { it.containsMatchIn(literal) }) {
                                 violations += "${file.name}:${idx + 1} -> \"$literal\""
                             }
                         }

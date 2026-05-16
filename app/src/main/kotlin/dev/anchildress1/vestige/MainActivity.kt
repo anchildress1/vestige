@@ -129,6 +129,8 @@ private fun MainPostOnboardingContent(
     var screen by rememberSaveable { mutableStateOf(PostOnboardingScreen.Capture) }
     var historyOpenRequest by remember { mutableStateOf<EntryDetailOpenRequest?>(null) }
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) {
+        // Re-probe on ON_RESUME so a download that completed in another activity / process
+        // is reflected when the user returns. AppContainer no-ops if nothing changed.
         container.refreshModelReadiness()
         // Skip windows that elapse off-screen must wake up no matter which post-onboarding
         // surface the user returns to, not just Capture.

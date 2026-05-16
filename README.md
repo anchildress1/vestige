@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="https://repository-images.githubusercontent.com/1233196257/46917750-eb0c-4ffe-b1a4-3dab4da6a841" alt="Vestige social banner" />
+  <img src="https://repository-images.githubusercontent.com/1233196257/6d5cb58c-808a-4c73-8627-ee3d5dc7ad7c" alt="Vestige social banner" />
 </p>
 
 # Vestige
@@ -33,15 +33,13 @@ On-device cognition tracker for ADHD-flavored adults. Anti-sycophant, behavioral
 
 Vestige observes behavioral traces and surfaces patterns without therapy framing, mood scoring, or wellness vocabulary. It runs Gemma 4 E4B locally via LiteRT-LM — your voice never leaves the device, the audio bytes are discarded after inference, and entries are stored as plain markdown you can export at any time.
 
-The positioning is deliberate: cognition tracker, not journal app. Templates (`Aftermath`, `Tunnel exit`, `Concrete shoes`, `Decision spiral`, `Goblin hours`, `Audit`) are agent-emitted labels, not user-picked moods. Patterns are sourced — every claim cites the entries it counted. Full product spec: [`docs/concept-locked.md`](docs/concept-locked.md).
+The positioning is deliberate: cognition tracker, not journal app. Templates (`Crashed`, `Deep Space`, `Busy Stalling`, `Nonstop Spiral`, `Goblin Hours`, `Brain Dump`) are agent-emitted labels, not user-picked moods. Patterns are sourced — every claim cites the entries it counted. Full product spec: [`docs/concept-locked.md`](docs/concept-locked.md).
 
 ---
 
 ## Status
 
-Scaffold. Phase 1 implementation begins after spec sign-off; risk is managed inline via five stop-and-test points (STT-A–E) embedded in phases 1–3. Full README pass lands in Phase 6 alongside the demo video and dev.to post — see [`docs/PRD.md`](docs/PRD.md) §Timeline for phase-by-phase scope.
-
-> **Branch caveat:** Tech Stack version pins, Project Structure tree, Getting Started commands, and Run-on-device steps below describe the **post-merge** main state. Android scaffold infra (Makefile, `gradle/`, `app/`, lefthook config, release-please config) lives on `chore/scaffold` and merges to main separately. Links to those paths resolve only after that branch lands. This branch (`docs/foundation`) ships the canonical docs; the scaffold ships its own infra.
+Phase-4 P0 shipped. The capture loop, history, pattern list + detail, settings, model-status, and the onboarding model-download UX are implemented against the canonical spec under [`docs/`](docs). Pattern lifecycle actions are Skip / Drop / Restart — closure is model-detected only (v1.5, see [`backlog.md`](docs/backlog.md) §`pattern-auto-close`). On-device verification (fresh install on the Galaxy S24 Ultra, STT no-regression round-trip) is the remaining gate before the v1 cut; risk through phases 1–3 was managed via five stop-and-test points (STT-A–E). Full README pass + demo video land in Phase 6 — see [`docs/PRD.md`](docs/PRD.md) §Timeline.
 
 ---
 
@@ -54,6 +52,8 @@ Scaffold. Phase 1 implementation begins after spec sign-off; risk is managed inl
 | Three personas | Witness / Hardass / Editor — tone-only variants. They do not fork extraction logic. |
 | Pattern detection | Five primitives counted over the last 90 days; sourced (counts, dates, snippets), no feelings or motivation interpretation. See [ADR-003](docs/adrs/ADR-003-pattern-detection-and-persistence.md). |
 | Markdown source-of-truth | One file per entry, exportable, schema-versioned. ObjectBox is a structured cache, not the source. |
+| Pattern lifecycle | Skip (returns in 7 days) / Drop (noise, archived) / Restart, with Undo. Closure is model-detected only — v1.5. |
+| Export | System-picker (SAF) zip of per-entry markdown. No storage permission; failures surface, never silent. |
 | Hybrid retrieval | Keyword + tags + recency. Vector layer (EmbeddingGemma 300M) ships only if STT-E passes. |
 | Local-only | Zero outbound network calls during normal operation; model download is the only network event. Verified with `tcpdump`. |
 
@@ -61,11 +61,11 @@ Scaffold. Phase 1 implementation begins after spec sign-off; risk is managed inl
 
 ## Tech Stack
 
-- Kotlin `2.3.21` + Jetpack Compose (BOM `2026.04.01`)
+- Kotlin `2.3.21` + Jetpack Compose (BOM `2026.05.00`), AGP `9.2.1`
 - Gradle KTS + version catalog ([`gradle/libs.versions.toml`](gradle/libs.versions.toml))
 - Gemma 4 E4B via LiteRT-LM (`com.google.ai.edge.litertlm:litertlm-android:0.11.0`), on-device only
 - ObjectBox `5.4.2` (structured tags + pattern store) + markdown (entry source-of-truth)
-- Android `minSdk 31` / `targetSdk 35` / `compileSdk 35`, JVM toolchain 25 (Java source/target compat 17)
+- Android `minSdk 31` / `targetSdk 35` / `compileSdk 36`, JVM toolchain 25 (Java source/target compat 17)
 
 ---
 
@@ -107,34 +107,34 @@ Module boundaries: `:app` (UI), `:core-inference` (LiteRT-LM + lens composition)
 
 ```
 .
-├── app/                       # :app — Compose UI, navigation, AppContainer (lives on chore/scaffold)
+├── app/                       # :app — Compose UI, navigation, AppContainer (manual DI)
+├── core-model/                # :core-model — domain types, manifests, no Android deps
+├── core-inference/            # :core-inference — LiteRT-LM engine + 3-lens composition
+├── core-storage/              # :core-storage — ObjectBox + markdown source-of-truth
 ├── docs/                      # canonical product/architecture/UX spec
 │   ├── README.md              # reading order + file inventory
 │   ├── PRD.md                 # P0/P1/P2 requirements + phase schedule
 │   ├── concept-locked.md      # full product spec
-│   ├── adrs/                  # ADR-001..003 (stack, lenses, patterns)
+│   ├── adrs/                  # ADR-001..013 (stack, lenses, patterns, lifecycle, …)
 │   ├── architecture-brief.md
 │   ├── design-guidelines.md
-│   ├── ux-copy.md
+│   ├── ux-copy.md             # locked microcopy authority
+│   ├── spec-pattern-action-buttons.md
 │   ├── sample-data-scenarios.md
-│   ├── runtime-research.md
-│   ├── challenge-brief.md
-│   ├── blog-template.md
-│   ├── backlog.md             # deferred features
+│   ├── backlog.md             # deferred features w/ unblock conditions
 │   └── stories/               # phase-1..7 build queue
 ├── poc/                       # Compose-port reference (JSX prototypes + screenshots)
-├── gradle/                    # version catalog + verification (lives on chore/scaffold)
-├── scripts/                   # doctor, lint, secret scan helpers (lives on chore/scaffold)
+├── gradle/                    # version catalog + dependency verification
+├── scripts/                   # doctor, lint, secret scan helpers
 ├── AGENTS.md                  # AI implementor guardrails (authoritative)
-├── CLAUDE.md                  # Claude Code → AGENTS.md pointer (lives on chore/scaffold)
-├── lefthook.yml               # pre-commit / commit-msg / pre-push hooks (lives on chore/scaffold)
-├── release-please-config.json # (lives on chore/scaffold)
-├── Makefile                   # local CI surface (lives on chore/scaffold)
+├── CLAUDE.md                  # Claude Code → AGENTS.md pointer
+├── lefthook.yml               # pre-commit / commit-msg / pre-push hooks
+├── Makefile                   # local CI surface
 ├── LICENSE
 └── README.md
 ```
 
-Phase 1 splits `:app` into `:app + :core-model + :core-inference + :core-storage` per ADR-001. Tree above reflects the **post-merge** main state — entries marked `(lives on chore/scaffold)` arrive when that branch lands; everything else exists on `docs/foundation`.
+Four-module split per [ADR-001](docs/adrs/ADR-001-stack-and-build-infra.md): `:app` (UI) depends on `:core-inference`, `:core-storage`, and `:core-model`; the core modules do not depend on `:app`.
 
 ---
 
@@ -242,7 +242,7 @@ adb uninstall dev.anchildress1.vestige
 
 ## Configuration
 
-v1 has effectively zero configuration. The model artifact downloads on first launch over Wi-Fi (~3.7 GB) into `Context.filesDir/models/`; SHA-256 is verified on every cold start. Persona default is set during onboarding and changeable from settings. Pattern detection threshold (10 entries) and callout cooldown (3 entries) are hardcoded for v1 per [`docs/ux-copy.md` §"Locked v1 behavior"](docs/ux-copy.md). No env vars, no `.env` file, no remote-config layer — adding any of those is a P0 violation per [ADR-001 §Q7](docs/adrs/ADR-001-stack-and-build-infra.md).
+v1 has effectively zero configuration. The model artifact downloads on first launch over Wi-Fi (~3.7 GB) into `Context.filesDir/models/`. A cheap presence + size probe gates UI readiness on every cold start; full SHA-256 verification is deferred to the engine load path so onboarding never hashes the multi-GB artifact on the UI thread (Story 4.3). Persona default is set during onboarding and changeable from settings. Pattern detection threshold (10 entries) and callout cooldown (3 entries) are hardcoded for v1 per [`docs/ux-copy.md` §"Locked v1 behavior"](docs/ux-copy.md). No env vars, no `.env` file, no remote-config layer — adding any of those is a P0 violation per [ADR-001 §Q7](docs/adrs/ADR-001-stack-and-build-infra.md).
 
 ---
 
@@ -264,7 +264,7 @@ Contributors: do not introduce dependencies that pull in Firebase, Crashlytics, 
 
 PRs are not accepted during the challenge window (until 2026-05-24). Issues are welcome — use the GitHub issue tracker. Post-submission, see [`AGENTS.md`](AGENTS.md) and [`backlog.md`](docs/backlog.md) for the contribution surface.
 
-Branches and commits follow [`AGENTS.md`](AGENTS.md) and the user's repo conventions: atomic, signed AI footer (`generated-by: claude opus 4.7 <noreply@anthropic.com>`), Conventional Commits, never on `main`.
+Branches and commits follow [`AGENTS.md`](AGENTS.md) and the repo conventions: atomic, GPG-signed, a `Generated-by:` footer on AI-authored commits (e.g. `Generated-by: claude-opus-4-7`), Conventional Commits, never on `main`.
 
 ---
 

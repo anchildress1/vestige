@@ -266,7 +266,11 @@ private fun CaptureRoute(
     LaunchedEffect(viewModel, modelReadiness) { viewModel.setModelReadiness(modelReadiness) }
     // Re-probe on ON_RESUME so a download that completed in another activity / process is
     // reflected when the user returns. AppContainer no-ops if nothing changed.
-    LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { container.refreshModelReadiness() }
+    LifecycleEventEffect(Lifecycle.Event.ON_RESUME) {
+        container.refreshModelReadiness()
+        // Skip windows that elapsed while backgrounded wake up on return, not just cold start.
+        container.sweepExpiredSkips()
+    }
     // `dataRevision` as a remember key forces re-derivation whenever AppContainer increments
     // it (entry write / pattern write / recovery sweep). Cheap — entryStore.countCompleted +
     // patternStore.findVisibleSortedByLastSeen are indexed reads.

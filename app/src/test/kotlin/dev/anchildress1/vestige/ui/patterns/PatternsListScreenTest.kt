@@ -1,10 +1,13 @@
 package dev.anchildress1.vestige.ui.patterns
 
+import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertHasClickAction
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.v2.createComposeRule
-import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
@@ -84,16 +87,42 @@ class PatternsListScreenTest {
     }
 
     @Test
-    fun `empty state with no entries renders Insufficient data`() {
+    fun `Day-1 empty state renders the eyebrow header and body text`() {
         composeRule.setContent { PatternsListScreen(viewModel = newViewModel(), onOpenPattern = {}) }
-        composeRule.onNodeWithText("Insufficient data.").assertIsDisplayed()
+        composeRule.onNodeWithText("VESTIGES · 0 ENTRIES · 30 DAYS").assertIsDisplayed()
+        composeRule.onNodeWithText("Nothing to read yet.").assertIsDisplayed()
+        composeRule.onNodeWithText("Patterns surface after 10 entries. Keep recording.").assertIsDisplayed()
     }
 
     @Test
-    fun `empty state with completed entries but no patterns renders Nothing repeating yet`() {
-        seedEntry("entry one", ExtractionStatus.COMPLETED)
+    fun `Day-1 eyebrow substitutes the live entry count below the detection threshold`() {
+        // Nine COMPLETED entries — one below PATTERN_SURFACE_MIN_ENTRIES, so still NO_ENTRIES.
+        // Proves the %1$d substitution in patterns_empty_day1_eyebrow, not just count==0.
+        repeat(9) { seedEntry("entry $it", ExtractionStatus.COMPLETED) }
         composeRule.setContent { PatternsListScreen(viewModel = newViewModel(), onOpenPattern = {}) }
-        composeRule.onNodeWithText("Nothing repeating yet.").assertIsDisplayed()
+        composeRule.onNodeWithText("VESTIGES · 9 ENTRIES · 30 DAYS").assertIsDisplayed()
+    }
+
+    @Test
+    fun `Day-1 empty state is an announced status band with no click action (a11y)`() {
+        composeRule.setContent { PatternsListScreen(viewModel = newViewModel(), onOpenPattern = {}) }
+        // AGENTS.md band rule: merged contentDescription + polite liveRegion present, NO click.
+        val mergedDescription =
+            "VESTIGES · 0 ENTRIES · 30 DAYS Nothing to read yet. " +
+                "Patterns surface after 10 entries. Keep recording."
+        val band = composeRule.onNodeWithContentDescription(mergedDescription)
+        band.assertIsDisplayed()
+        band.assert(SemanticsMatcher.keyIsDefined(SemanticsProperties.LiveRegion))
+        band.assert(SemanticsMatcher.keyNotDefined(SemanticsActions.OnClick))
+    }
+
+    @Test
+    fun `NO_PATTERNS empty state renders header and body but no eyebrow`() {
+        repeat(10) { seedEntry("entry $it", ExtractionStatus.COMPLETED) }
+        composeRule.setContent { PatternsListScreen(viewModel = newViewModel(), onOpenPattern = {}) }
+        composeRule.onNodeWithText("No repeating pattern detected.").assertIsDisplayed()
+        composeRule.onNodeWithText("The model looked. Nothing came back twice.").assertIsDisplayed()
+        composeRule.onAllNodesWithText("VESTIGES", substring = true).assertCountEquals(0)
     }
 
     @Test
@@ -120,16 +149,65 @@ class PatternsListScreenTest {
     fun `section headers render only for sections that have cards`() {
         val supporting = listOf(seedEntry("crashed", ExtractionStatus.COMPLETED))
         seedActivePattern("p-active", "Tuesday Meetings", "Aftermath", "Callout.", supporting)
-        seedActivePattern("p-dismissed", "Migration Rewrites", "Decision spiral", "Callout.", supporting)
-        patternRepo.dismiss("p-dismissed")
+        seedActivePattern("p-dropped", "Migration Rewrites", "Decision spiral", "Callout.", supporting)
+        patternRepo.drop("p-dropped")
 
         composeRule.setContent { PatternsListScreen(viewModel = newViewModel(), onOpenPattern = {}) }
 
         composeRule.onNodeWithText("ACTIVE").assertIsDisplayed()
         composeRule.onNodeWithText("DROPPED").assertIsDisplayed()
-        // No snoozed or closed cards in this seed, so those headers must stay hidden.
+        // No skipped or closed cards in this seed, so those headers must stay hidden.
         composeRule.onAllNodesWithText("SKIPPED · ON HOLD").assertCountEquals(0)
         composeRule.onAllNodesWithText("CLOSED · DONE").assertCountEquals(0)
+    }
+
+    @Test
+    fun `skipped and dropped sections both render their headers and CLOSED is omitted`() {
+        // Two non-active sections + their cards fit the default Robolectric viewport (the same
+        // shape as the proven ACTIVE+DROPPED case). Fixed ACTIVE→SKIPPED→CLOSED→DROPPED render
+        // order is exhaustively asserted at the PatternSection / ViewModel tier — this guards
+        // the screen-level section grouping + the CLOSED-omission gate.
+        val supporting = listOf(seedEntry("crashed", ExtractionStatus.COMPLETED))
+        seedActivePattern("p-skp", "Skipped One", "Aftermath", "Callout.", supporting)
+        seedActivePattern("p-drp", "Dropped One", "Aftermath", "Callout.", supporting)
+        patternRepo.skip("p-skp")
+        patternRepo.drop("p-drp")
+
+        composeRule.setContent { PatternsListScreen(viewModel = newViewModel(), onOpenPattern = {}) }
+
+        composeRule.onNodeWithText("SKIPPED · ON HOLD").assertIsDisplayed()
+        composeRule.onNodeWithText("Skipped One").assertIsDisplayed()
+        composeRule.onNodeWithText("DROPPED").assertIsDisplayed()
+        composeRule.onNodeWithText("Dropped One").assertIsDisplayed()
+        // Empty sections render no header — no ACTIVE pattern, no CLOSED pattern.
+        composeRule.onAllNodesWithText("ACTIVE").assertCountEquals(0)
+        composeRule.onAllNodesWithText("CLOSED · DONE").assertCountEquals(0)
+    }
+
+    @Test
+    fun `dropped section card renders and is not the active lime-rule card`() {
+        val supporting = listOf(seedEntry("crashed", ExtractionStatus.COMPLETED))
+        seedActivePattern("p-dropped-card", "Dropped Card", "Aftermath", "Callout.", supporting)
+        patternRepo.drop("p-dropped-card")
+
+        composeRule.setContent { PatternsListScreen(viewModel = newViewModel(), onOpenPattern = {}) }
+
+        // Alpha de-prioritizes the card but it stays present + tappable; it's under DROPPED.
+        composeRule.onNodeWithText("Dropped Card").assertIsDisplayed().assertHasClickAction()
+        composeRule.onNodeWithText("DROPPED").assertIsDisplayed()
+        composeRule.onAllNodesWithText("ACTIVE").assertCountEquals(0)
+    }
+
+    @Test
+    fun `skipped card surfaces the Back wake-up date line`() {
+        val supporting = listOf(seedEntry("crashed", ExtractionStatus.COMPLETED))
+        seedActivePattern("p-skip-back", "Skipped Card", "Aftermath", "Callout.", supporting)
+        patternRepo.skip("p-skip-back")
+
+        composeRule.setContent { PatternsListScreen(viewModel = newViewModel(), onOpenPattern = {}) }
+
+        // skip() default = 7 days from now; assert the "Back <date>." line is present.
+        composeRule.onNodeWithText("Back ", substring = true).assertIsDisplayed()
     }
 
     @Test
@@ -158,7 +236,7 @@ class PatternsListScreenTest {
     }
 
     @Test
-    fun `snackbar Undo restores a dismissed pattern back to ACTIVE`() {
+    fun `snackbar Undo restores a dropped pattern back to ACTIVE`() {
         val supporting = listOf(seedEntry("crashed", ExtractionStatus.COMPLETED))
         seedActivePattern("p-undo", "Tuesday Meetings", "Aftermath", "Callout.", supporting)
 
@@ -167,17 +245,17 @@ class PatternsListScreenTest {
         composeRule.onNodeWithContentDescription("Pattern actions").performClick()
         composeRule.onNodeWithText("Drop").performClick()
         composeRule.waitForIdle()
-        // Snackbar surfaces with Undo while the pattern is in DISMISSED state.
-        assertEquals(PatternState.DISMISSED, patternStore.findByPatternId("p-undo")?.state)
+        // Snackbar surfaces with Undo while the pattern is in DROPPED state.
+        assertEquals(PatternState.DROPPED, patternStore.findByPatternId("p-undo")?.state)
         composeRule.onNodeWithText("Undo").performClick()
         composeRule.waitForIdle()
         assertEquals(PatternState.ACTIVE, patternStore.findByPatternId("p-undo")?.state)
     }
 
     @Test
-    fun `overflow Dismiss action transitions pattern to DISMISSED`() {
+    fun `overflow Drop action transitions pattern to DROPPED`() {
         val supporting = listOf(seedEntry("crashed", ExtractionStatus.COMPLETED))
-        seedActivePattern("p-dismiss", "Tuesday Meetings", "Aftermath", "Callout.", supporting)
+        seedActivePattern("p-drop", "Tuesday Meetings", "Aftermath", "Callout.", supporting)
 
         composeRule.setContent { PatternsListScreen(viewModel = newViewModel(), onOpenPattern = {}) }
 
@@ -185,14 +263,31 @@ class PatternsListScreenTest {
         composeRule.onNodeWithText("Drop").performClick()
         composeRule.waitForIdle()
 
-        assertEquals(PatternState.DISMISSED, patternStore.findByPatternId("p-dismiss")?.state)
+        assertEquals(PatternState.DROPPED, patternStore.findByPatternId("p-drop")?.state)
     }
 
     @Test
-    fun `snoozed cards only expose Restart in overflow menu`() {
+    fun `active overflow exposes Drop and Skip and no retired action labels`() {
         val supporting = listOf(seedEntry("crashed", ExtractionStatus.COMPLETED))
-        seedActivePattern("p-snoozed", "Tuesday Meetings", "Aftermath", "Callout.", supporting)
-        patternRepo.snooze("p-snoozed")
+        seedActivePattern("p-active-overflow", "Tuesday Meetings", "Aftermath", "Callout.", supporting)
+
+        composeRule.setContent { PatternsListScreen(viewModel = newViewModel(), onOpenPattern = {}) }
+
+        composeRule.onNodeWithContentDescription("Pattern actions").performClick()
+        composeRule.onNodeWithText("Drop").assertIsDisplayed()
+        composeRule.onNodeWithText("Skip").assertIsDisplayed()
+        composeRule.onAllNodesWithText("Restart").assertCountEquals(0)
+        composeRule.onAllNodesWithText("Done").assertCountEquals(0)
+        composeRule.onAllNodesWithText("Mark resolved").assertCountEquals(0)
+        composeRule.onAllNodesWithText("Snooze").assertCountEquals(0)
+        composeRule.onAllNodesWithText("Dismiss").assertCountEquals(0)
+    }
+
+    @Test
+    fun `skipped cards only expose Restart in overflow menu`() {
+        val supporting = listOf(seedEntry("crashed", ExtractionStatus.COMPLETED))
+        seedActivePattern("p-skipped", "Tuesday Meetings", "Aftermath", "Callout.", supporting)
+        patternRepo.skip("p-skipped")
 
         composeRule.setContent { PatternsListScreen(viewModel = newViewModel(), onOpenPattern = {}) }
 
@@ -204,10 +299,10 @@ class PatternsListScreenTest {
     }
 
     @Test
-    fun `dismissed cards expose Restart in overflow menu`() {
+    fun `dropped cards expose Restart in overflow menu`() {
         val supporting = listOf(seedEntry("crashed", ExtractionStatus.COMPLETED))
-        seedActivePattern("p-dismissed", "Tuesday Meetings", "Aftermath", "Callout.", supporting)
-        patternRepo.dismiss("p-dismissed")
+        seedActivePattern("p-dropped", "Tuesday Meetings", "Aftermath", "Callout.", supporting)
+        patternRepo.drop("p-dropped")
 
         composeRule.setContent { PatternsListScreen(viewModel = newViewModel(), onOpenPattern = {}) }
 
@@ -219,7 +314,7 @@ class PatternsListScreenTest {
     fun `Restart from a dropped card transitions pattern back to ACTIVE`() {
         val supporting = listOf(seedEntry("crashed", ExtractionStatus.COMPLETED))
         seedActivePattern("p-restart-list", "Tuesday Meetings", "Aftermath", "Callout.", supporting)
-        patternRepo.dismiss("p-restart-list")
+        patternRepo.drop("p-restart-list")
 
         composeRule.setContent { PatternsListScreen(viewModel = newViewModel(), onOpenPattern = {}) }
 

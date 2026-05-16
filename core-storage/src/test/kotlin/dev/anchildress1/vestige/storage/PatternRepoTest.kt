@@ -45,7 +45,7 @@ class PatternRepoTest {
         BoxStore.deleteAllFiles(dataDir)
     }
 
-    private fun seed(patternId: String = "p".repeat(64)): String {
+    private fun seed(patternId: String = "p".repeat(64), state: PatternState = PatternState.ACTIVE): String {
         store.put(
             PatternEntity(
                 patternId = patternId,
@@ -54,43 +54,42 @@ class PatternRepoTest {
                 title = "Aftermath Loop",
                 firstSeenTimestamp = now.toEpochMilli() - 1_000,
                 lastSeenTimestamp = now.toEpochMilli(),
-                state = PatternState.ACTIVE,
+                state = state,
             ),
         )
         return patternId
     }
 
     @Test
-    fun `dismiss transitions active to dismissed`() {
+    fun `drop transitions active to dropped`() {
         val id = seed()
-        repo.dismiss(id)
-        assertEquals(PatternState.DISMISSED, store.findByPatternId(id)!!.state)
+        repo.drop(id)
+        assertEquals(PatternState.DROPPED, store.findByPatternId(id)!!.state)
     }
 
     @Test
-    fun `dismiss with undo returns dismissed pattern to active`() {
+    fun `drop with undo returns dropped pattern to active`() {
         val id = seed()
-        repo.dismiss(id)
-        repo.dismiss(id, undo = true)
+        repo.drop(id)
+        repo.drop(id, undo = true)
         assertEquals(PatternState.ACTIVE, store.findByPatternId(id)!!.state)
     }
 
     @Test
-    fun `dismiss undo rejects rows that are not currently DISMISSED`() {
-        // Misrouted undo callback on a RESOLVED pattern must NOT reopen it. ADR-003 §"Mark-
-        // resolved is sticky" — a stale snackbar from a previous action shouldn't bypass
-        // terminal-state semantics.
-        val id = seed()
-        repo.markResolved(id)
-        val raised = runCatching { repo.dismiss(id, undo = true) }
-        assertTrue("dismiss undo on RESOLVED must throw", raised.exceptionOrNull() is IllegalArgumentException)
-        assertEquals(PatternState.RESOLVED, store.findByPatternId(id)!!.state)
+    fun `drop undo rejects rows that are not currently DROPPED`() {
+        // Misrouted undo callback on a CLOSED pattern must NOT reopen it. ADR-003 Addendum
+        // 2026-05-13b — a stale snackbar from a previous action shouldn't bypass the
+        // model-detected terminal.
+        val id = seed(state = PatternState.CLOSED)
+        val raised = runCatching { repo.drop(id, undo = true) }
+        assertTrue("drop undo on CLOSED must throw", raised.exceptionOrNull() is IllegalArgumentException)
+        assertEquals(PatternState.CLOSED, store.findByPatternId(id)!!.state)
     }
 
     @Test
-    fun `snooze default sets 7-day window`() {
+    fun `skip default sets 7-day window`() {
         val id = seed()
-        repo.snooze(id)
+        repo.skip(id)
         val row = store.findByPatternId(id)!!
         assertEquals(PatternState.SNOOZED, row.state)
         val expected = now.toEpochMilli() + 7L * 24 * 60 * 60 * 1000
@@ -98,54 +97,36 @@ class PatternRepoTest {
     }
 
     @Test
-    fun `snooze with custom days honors the override`() {
+    fun `skip with custom days honors the override`() {
         val id = seed()
-        repo.snooze(id, days = 3)
+        repo.skip(id, days = 3)
         val expected = now.toEpochMilli() + 3L * 24 * 60 * 60 * 1000
         assertEquals(expected, store.findByPatternId(id)!!.snoozedUntil)
     }
 
     @Test
-    fun `snooze undo rejects rows that are not currently SNOOZED`() {
+    fun `skip undo rejects rows that are not currently SNOOZED`() {
         val id = seed()
-        // Pattern is ACTIVE; snooze-undo must not "un-snooze" an active row (no-op-via-error).
-        val raised = runCatching { repo.snooze(id, undo = true) }
-        assertTrue("snooze undo on ACTIVE must throw", raised.exceptionOrNull() is IllegalArgumentException)
+        // Pattern is ACTIVE; skip-undo must not "un-skip" an active row (no-op-via-error).
+        val raised = runCatching { repo.skip(id, undo = true) }
+        assertTrue("skip undo on ACTIVE must throw", raised.exceptionOrNull() is IllegalArgumentException)
         assertEquals(PatternState.ACTIVE, store.findByPatternId(id)!!.state)
     }
 
     @Test
-    fun `snooze undo clears snoozedUntil and returns to active`() {
+    fun `skip undo clears snoozedUntil and returns to active`() {
         val id = seed()
-        repo.snooze(id)
-        repo.snooze(id, undo = true)
+        repo.skip(id)
+        repo.skip(id, undo = true)
         val row = store.findByPatternId(id)!!
         assertEquals(PatternState.ACTIVE, row.state)
         assertNull(row.snoozedUntil)
     }
 
     @Test
-    fun `markResolved transitions active to resolved`() {
-        val id = seed()
-        repo.markResolved(id)
-        assertEquals(PatternState.RESOLVED, store.findByPatternId(id)!!.state)
-    }
-
-    @Test
-    fun `markResolved is sticky — no undo path in v1`() {
-        val id = seed()
-        repo.markResolved(id)
-        // RESOLVED is terminal per ADR-003 §"Mark-resolved is sticky." Any subsequent transition
-        // attempt throws via the validator chokepoint — there's no API surface for reopening.
-        val raised = runCatching { store.transitionState(id, PatternState.ACTIVE) }
-        assertTrue("RESOLVED→ACTIVE must throw — re-open is backlog-deferred", raised.isFailure)
-        assertEquals(PatternState.RESOLVED, store.findByPatternId(id)!!.state)
-    }
-
-    @Test
     fun `actions survive BoxStore close and reopen by name`() {
         val id = seed()
-        repo.snooze(id, days = 1)
+        repo.skip(id, days = 1)
         boxStore.close()
         // ObjectBox keys in-memory stores by their `memory:` URI; reopening with the same path
         // reattaches to the same backing registry. That's the invariant under test — process-
@@ -159,17 +140,18 @@ class PatternRepoTest {
     }
 
     @Test
-    fun `dismiss followed by markResolved without undo is rejected — DISMISSED is terminal`() {
+    fun `drop followed by a second drop without undo is rejected — DROPPED is terminal`() {
         val id = seed()
-        repo.dismiss(id)
-        val raised = runCatching { repo.markResolved(id) }
-        assertTrue("DISMISSED→RESOLVED must throw", raised.isFailure)
+        repo.drop(id)
+        // DROPPED is terminal to the strict validator; a non-undo re-drop self-loops illegally.
+        val raised = runCatching { repo.drop(id) }
+        assertTrue("DROPPED→DROPPED must throw", raised.isFailure)
     }
 
     @Test
-    fun `restart from DISMISSED returns the pattern to ACTIVE`() {
+    fun `restart from DROPPED returns the pattern to ACTIVE`() {
         val id = seed()
-        repo.dismiss(id)
+        repo.drop(id)
         repo.restart(id)
         val row = store.findByPatternId(id)!!
         assertEquals(PatternState.ACTIVE, row.state)
@@ -179,7 +161,7 @@ class PatternRepoTest {
     @Test
     fun `restart from SNOOZED returns the pattern to ACTIVE and clears snoozedUntil`() {
         val id = seed()
-        repo.snooze(id)
+        repo.skip(id)
         assertNotNull(store.findByPatternId(id)!!.snoozedUntil)
         repo.restart(id)
         val row = store.findByPatternId(id)!!
@@ -188,9 +170,9 @@ class PatternRepoTest {
     }
 
     @Test
-    fun `restart from RESOLVED returns the pattern to ACTIVE`() {
-        val id = seed()
-        repo.markResolved(id)
+    fun `restart from CLOSED returns the pattern to ACTIVE`() {
+        // CLOSED is model-detected only — seed it directly since no user action produces it.
+        val id = seed(state = PatternState.CLOSED)
         repo.restart(id)
         assertEquals(PatternState.ACTIVE, store.findByPatternId(id)!!.state)
     }
@@ -205,16 +187,16 @@ class PatternRepoTest {
     @Test
     fun `restart undo returns the row to the previousState terminal`() {
         val id = seed()
-        repo.dismiss(id)
+        repo.drop(id)
         repo.restart(id)
-        repo.restart(id, undo = true, previousState = PatternState.DISMISSED)
-        assertEquals(PatternState.DISMISSED, store.findByPatternId(id)!!.state)
+        repo.restart(id, undo = true, previousState = PatternState.DROPPED)
+        assertEquals(PatternState.DROPPED, store.findByPatternId(id)!!.state)
     }
 
     @Test
     fun `restart undo restores the original snoozedUntil when returning to SNOOZED`() {
         val id = seed()
-        repo.snooze(id, days = 3)
+        repo.skip(id, days = 3)
         val originalSnoozedUntil = store.findByPatternId(id)!!.snoozedUntil
         assertNotNull(originalSnoozedUntil)
 
@@ -234,10 +216,10 @@ class PatternRepoTest {
     @Test
     fun `restart undo rejects rows that are not currently ACTIVE`() {
         val id = seed()
-        repo.dismiss(id)
-        // Row is DISMISSED — undo path expects ACTIVE and must reject.
+        repo.drop(id)
+        // Row is DROPPED — undo path expects ACTIVE and must reject.
         val raised = runCatching {
-            repo.restart(id, undo = true, previousState = PatternState.DISMISSED)
+            repo.restart(id, undo = true, previousState = PatternState.DROPPED)
         }
         assertTrue("undo precondition must reject non-ACTIVE rows", raised.isFailure)
     }

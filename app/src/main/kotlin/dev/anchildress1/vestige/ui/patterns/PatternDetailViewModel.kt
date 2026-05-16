@@ -54,9 +54,8 @@ class PatternDetailViewModel(
         }
     }
 
-    fun dismiss() = dispatch(PatternAction.DISMISSED) { patternRepo.dismiss(patternId) }
-    fun snooze() = dispatch(PatternAction.SNOOZED) { patternRepo.snooze(patternId) }
-    fun markResolved() = dispatch(PatternAction.MARKED_RESOLVED) { patternRepo.markResolved(patternId) }
+    fun drop() = dispatch(PatternAction.DROP) { patternRepo.drop(patternId) }
+    fun skip() = dispatch(PatternAction.SKIP) { patternRepo.skip(patternId) }
 
     fun restart() {
         viewModelScope.launch {
@@ -83,11 +82,9 @@ class PatternDetailViewModel(
             withContext(ioDispatcher) {
                 runCatching {
                     when (undo.action) {
-                        PatternAction.DISMISSED -> patternRepo.dismiss(undo.patternId, undo = true)
+                        PatternAction.DROP -> patternRepo.drop(undo.patternId, undo = true)
 
-                        PatternAction.SNOOZED -> patternRepo.snooze(undo.patternId, undo = true)
-
-                        PatternAction.MARKED_RESOLVED -> Unit
+                        PatternAction.SKIP -> patternRepo.skip(undo.patternId, undo = true)
 
                         PatternAction.RESTART -> patternRepo.restart(
                             patternId = undo.patternId,
@@ -97,10 +94,10 @@ class PatternDetailViewModel(
                         )
                     }
                 }.onFailure { failure ->
-                    // Stale undo path (e.g. snooze → dismiss → tap-undo on the older snooze
-                    // snackbar) sends SNOOZED→ACTIVE through a row already in DISMISSED.
-                    // PatternRepo/PatternStore throw on illegal transitions per ADR-003; the
-                    // refresh below replays the persisted state back onto the detail screen.
+                    // Stale undo path (e.g. skip → drop → tap-undo on the older skip snackbar)
+                    // sends SNOOZED→ACTIVE through a row already in DROPPED. PatternRepo/
+                    // PatternStore throw on illegal transitions per ADR-003; the refresh below
+                    // replays the persisted state back onto the detail screen.
                     Log.w(TAG, "Ignoring stale undo for ${undo.patternId}", failure)
                 }
             }
@@ -113,10 +110,16 @@ class PatternDetailViewModel(
     // signature on the lambda and assumes the dispatcher is redundant; that's a shallow read.
     private fun dispatch(action: PatternAction, mutate: suspend () -> Unit) {
         viewModelScope.launch {
-            withContext(ioDispatcher) { mutate() }
+            // A concurrent sweep or double-tap can move the row out of ACTIVE before this lands;
+            // PatternStore then throws on the now-illegal transition. Swallow it, replay
+            // persisted truth, and emit no undo for an action that never took effect.
+            val applied = withContext(ioDispatcher) {
+                runCatching { mutate() }
+                    .onFailure { Log.w(TAG, "Pattern $action failed for $patternId", it) }
+                    .isSuccess
+            }
             _state.value = loadState()
-            val undo = if (action == PatternAction.MARKED_RESOLVED) null else PatternUndo(patternId, action)
-            _events.emit(PatternActionEvent(patternId, action, undo))
+            if (applied) _events.emit(PatternActionEvent(patternId, action, PatternUndo(patternId, action)))
         }
     }
 
@@ -154,7 +157,7 @@ class PatternDetailViewModel(
         traceHits = traceHits,
         state = state,
         isTerminal = isTerminalState(state),
-        terminalLabel = terminalLabelFor(state, stateChangedTimestamp),
+        terminalLabel = terminalLabelFor(state, stateChangedTimestamp, lastSeenTimestamp),
         availableActions = availableActionsFor(state),
     )
 

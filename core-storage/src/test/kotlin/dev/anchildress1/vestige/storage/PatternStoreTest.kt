@@ -58,10 +58,10 @@ class PatternStoreTest {
     }
 
     @Test
-    fun `active to dismissed is legal`() {
+    fun `active to dropped is legal`() {
         val seeded = seed()
-        val updated = store.transitionState(seeded.patternId, PatternState.DISMISSED)
-        assertEquals(PatternState.DISMISSED, updated.state)
+        val updated = store.transitionState(seeded.patternId, PatternState.DROPPED)
+        assertEquals(PatternState.DROPPED, updated.state)
         assertEquals(now.toEpochMilli(), updated.stateChangedTimestamp)
     }
 
@@ -75,11 +75,11 @@ class PatternStoreTest {
     }
 
     @Test
-    fun `snoozed to dismissed clears snoozedUntil`() {
+    fun `snoozed to dropped clears snoozedUntil`() {
         val seeded = seed()
         store.transitionState(seeded.patternId, PatternState.SNOOZED, snoozedUntilMs = now.toEpochMilli() + 1_000)
-        val updated = store.transitionState(seeded.patternId, PatternState.DISMISSED)
-        assertEquals(PatternState.DISMISSED, updated.state)
+        val updated = store.transitionState(seeded.patternId, PatternState.DROPPED)
+        assertEquals(PatternState.DROPPED, updated.state)
         assertNull(updated.snoozedUntil)
     }
 
@@ -100,9 +100,9 @@ class PatternStoreTest {
     }
 
     @Test
-    fun `dismissed is terminal — any transition out throws`() {
-        val seeded = seed(state = PatternState.DISMISSED)
-        for (target in PatternState.entries.filter { it != PatternState.DISMISSED }) {
+    fun `dropped is terminal — any transition out throws`() {
+        val seeded = seed(state = PatternState.DROPPED)
+        for (target in PatternState.entries.filter { it != PatternState.DROPPED }) {
             assertThrows(IllegalStateException::class.java) {
                 if (target == PatternState.SNOOZED) {
                     store.transitionState(seeded.patternId, target, snoozedUntilMs = now.toEpochMilli() + 1_000)
@@ -114,9 +114,9 @@ class PatternStoreTest {
     }
 
     @Test
-    fun `resolved is terminal — any transition out throws`() {
-        val seeded = seed(state = PatternState.RESOLVED)
-        for (target in PatternState.entries.filter { it != PatternState.RESOLVED }) {
+    fun `closed is terminal — any transition out throws`() {
+        val seeded = seed(state = PatternState.CLOSED)
+        for (target in PatternState.entries.filter { it != PatternState.CLOSED }) {
             assertThrows(IllegalStateException::class.java) {
                 if (target == PatternState.SNOOZED) {
                     store.transitionState(seeded.patternId, target, snoozedUntilMs = now.toEpochMilli() + 1_000)
@@ -138,7 +138,7 @@ class PatternStoreTest {
     @Test
     fun `missing patternId raises explicit error`() {
         val raised = assertThrows(IllegalStateException::class.java) {
-            store.transitionState(patternId = "missing", target = PatternState.DISMISSED)
+            store.transitionState(patternId = "missing", target = PatternState.DROPPED)
         }
         assertNotNull(raised.message)
     }
@@ -149,7 +149,7 @@ class PatternStoreTest {
         // the validator rejects exactly the pairs the ADR forbids. Legal pairs land in their
         // dedicated tests above; this one is the negative matrix.
         val illegalFromActive = setOf(PatternState.ACTIVE) // self-transitions not legal
-        val illegalFromSnoozed = setOf(PatternState.SNOOZED, PatternState.BELOW_THRESHOLD, PatternState.RESOLVED)
+        val illegalFromSnoozed = setOf(PatternState.SNOOZED, PatternState.BELOW_THRESHOLD, PatternState.CLOSED)
         val illegalFromBelowThreshold = PatternState.entries.toSet() -
             setOf(PatternState.ACTIVE, PatternState.BELOW_THRESHOLD)
 
@@ -189,11 +189,11 @@ class PatternStoreTest {
             it.snoozedUntil = base + 86_400_000
             store.put(it)
         }
-        seed(state = PatternState.RESOLVED, patternId = "c".repeat(64)).also {
+        seed(state = PatternState.CLOSED, patternId = "c".repeat(64)).also {
             it.lastSeenTimestamp = base - 200
             store.put(it)
         }
-        seed(state = PatternState.DISMISSED, patternId = "d".repeat(64)).also {
+        seed(state = PatternState.DROPPED, patternId = "d".repeat(64)).also {
             it.lastSeenTimestamp = base - 100
             store.put(it)
         }
@@ -220,6 +220,117 @@ class PatternStoreTest {
     @Test
     fun `findVisibleSortedByLastSeen returns empty on an empty table`() {
         assertEquals(emptyList<PatternEntity>(), store.findVisibleSortedByLastSeen())
+    }
+
+    @Test
+    fun `promoteExpiredSkips promotes a past-window snoozed row to active and clears snoozedUntil`() {
+        val id = "exp".padEnd(64, 'x')
+        seed(state = PatternState.ACTIVE, patternId = id)
+        store.transitionState(id, PatternState.SNOOZED, snoozedUntilMs = now.toEpochMilli() + 1_000)
+        // Rewind the window so it sits in the past relative to the fixed clock.
+        store.findByPatternId(id)!!.also {
+            it.snoozedUntil = now.toEpochMilli() - 1
+            store.put(it)
+        }
+
+        val promoted = store.promoteExpiredSkips()
+
+        assertEquals(listOf(id), promoted)
+        val row = store.findByPatternId(id)!!
+        assertEquals(PatternState.ACTIVE, row.state)
+        assertNull(row.snoozedUntil)
+    }
+
+    @Test
+    fun `promoteExpiredSkips promotes a row whose snoozedUntil equals now (boundary, lte)`() {
+        val id = "bnd".padEnd(64, 'x')
+        seed(state = PatternState.ACTIVE, patternId = id)
+        store.transitionState(id, PatternState.SNOOZED, snoozedUntilMs = now.toEpochMilli() + 1_000)
+        store.findByPatternId(id)!!.also {
+            it.snoozedUntil = now.toEpochMilli()
+            store.put(it)
+        }
+
+        val promoted = store.promoteExpiredSkips()
+
+        assertEquals(listOf(id), promoted)
+        assertEquals(PatternState.ACTIVE, store.findByPatternId(id)!!.state)
+    }
+
+    @Test
+    fun `promoteExpiredSkips does not promote a snoozed row whose window is in the future`() {
+        val id = "fut".padEnd(64, 'x')
+        seed(state = PatternState.ACTIVE, patternId = id)
+        store.transitionState(id, PatternState.SNOOZED, snoozedUntilMs = now.toEpochMilli() + 86_400_000)
+
+        val promoted = store.promoteExpiredSkips()
+
+        assertEquals(emptyList<String>(), promoted)
+        val row = store.findByPatternId(id)!!
+        assertEquals(PatternState.SNOOZED, row.state)
+        assertEquals(now.toEpochMilli() + 86_400_000, row.snoozedUntil)
+    }
+
+    @Test
+    fun `promoteExpiredSkips ignores a snoozed row with a null snoozedUntil`() {
+        // A SNOOZED row with no window can't be "expired" — leave it untouched.
+        val id = "nul".padEnd(64, 'x')
+        seed(state = PatternState.SNOOZED, patternId = id).also {
+            it.snoozedUntil = null
+            store.put(it)
+        }
+
+        val promoted = store.promoteExpiredSkips()
+
+        assertEquals(emptyList<String>(), promoted)
+        assertEquals(PatternState.SNOOZED, store.findByPatternId(id)!!.state)
+    }
+
+    @Test
+    fun `promoteExpiredSkips is a no-op when nothing is expired`() {
+        seed(state = PatternState.ACTIVE, patternId = "a".repeat(64))
+
+        assertEquals(emptyList<String>(), store.promoteExpiredSkips())
+    }
+
+    @Test
+    fun `promoteExpiredSkips only touches snoozed rows and leaves active dropped closed alone`() {
+        seed(state = PatternState.ACTIVE, patternId = "act".padEnd(64, 'x'))
+        seed(state = PatternState.DROPPED, patternId = "drp".padEnd(64, 'x'))
+        seed(state = PatternState.CLOSED, patternId = "cls".padEnd(64, 'x'))
+        val snoozedId = "snz".padEnd(64, 'x')
+        seed(state = PatternState.ACTIVE, patternId = snoozedId)
+        store.transitionState(snoozedId, PatternState.SNOOZED, snoozedUntilMs = now.toEpochMilli() + 1_000)
+        store.findByPatternId(snoozedId)!!.also {
+            it.snoozedUntil = now.toEpochMilli() - 1
+            store.put(it)
+        }
+
+        val promoted = store.promoteExpiredSkips()
+
+        assertEquals(listOf(snoozedId), promoted)
+        assertEquals(PatternState.ACTIVE, store.findByPatternId("act".padEnd(64, 'x'))!!.state)
+        assertEquals(PatternState.DROPPED, store.findByPatternId("drp".padEnd(64, 'x'))!!.state)
+        assertEquals(PatternState.CLOSED, store.findByPatternId("cls".padEnd(64, 'x'))!!.state)
+    }
+
+    @Test
+    fun `findSnoozed returns only snoozed rows`() {
+        seed(state = PatternState.ACTIVE, patternId = "a".repeat(64))
+        val snoozedId = "s".repeat(64)
+        seed(state = PatternState.ACTIVE, patternId = snoozedId)
+        store.transitionState(snoozedId, PatternState.SNOOZED, snoozedUntilMs = now.toEpochMilli() + 1_000)
+
+        val snoozed = store.findSnoozed()
+
+        assertEquals(listOf(snoozedId), snoozed.map { it.patternId })
+    }
+
+    @Test
+    fun `findSnoozed returns empty when no rows are snoozed`() {
+        seed(state = PatternState.ACTIVE, patternId = "a".repeat(64))
+
+        assertEquals(emptyList<PatternEntity>(), store.findSnoozed())
     }
 
     @Test

@@ -2,6 +2,7 @@ package dev.anchildress1.vestige.storage
 
 import dev.anchildress1.vestige.model.ConfidenceVerdict
 import dev.anchildress1.vestige.model.ExtractionStatus
+import dev.anchildress1.vestige.model.PatternState
 import dev.anchildress1.vestige.model.TemplateLabel
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNull
@@ -64,5 +65,37 @@ class ConvertersTest {
         assertNull(converter.convertToDatabaseValue(null))
         assertNull(converter.convertToEntityProperty(null))
         assertNull(converter.convertToEntityProperty("UNKNOWN"))
+    }
+
+    @Test
+    fun `PatternState converter round-trips every entry through the persisted serial`() {
+        val converter = PatternStateConverter()
+        PatternState.entries.forEach { state ->
+            val db = converter.convertToDatabaseValue(state)
+            assertEquals(state, converter.convertToEntityProperty(db))
+        }
+    }
+
+    @Test
+    fun `PatternState converter deserializes the legacy serials without resurrecting old vocab`() {
+        val converter = PatternStateConverter()
+        // Serials were intentionally kept at pre-rename values so no ObjectBox migration is
+        // needed: "dismissed" rows stay DROPPED, "resolved" rows stay CLOSED. A silent rename
+        // would map these to the constant default and lose terminal state on every read.
+        assertEquals(PatternState.DROPPED, converter.convertToEntityProperty("dismissed"))
+        assertEquals(PatternState.CLOSED, converter.convertToEntityProperty("resolved"))
+        assertEquals(PatternState.ACTIVE, converter.convertToEntityProperty("active"))
+        assertEquals(PatternState.SNOOZED, converter.convertToEntityProperty("snoozed"))
+        assertEquals(PatternState.BELOW_THRESHOLD, converter.convertToEntityProperty("below_threshold"))
+    }
+
+    @Test
+    fun `PatternState converter defaults to ACTIVE on null or unknown`() {
+        val converter = PatternStateConverter()
+        // ACTIVE is the documented fallback — a row that lost its state serial is shown, not
+        // hidden. Pins current behavior so a future default change is a deliberate diff.
+        assertEquals(PatternState.ACTIVE, converter.convertToEntityProperty(null))
+        assertEquals(PatternState.ACTIVE, converter.convertToEntityProperty("RESOLVED"))
+        assertEquals(PatternState.ACTIVE, converter.convertToEntityProperty(""))
     }
 }

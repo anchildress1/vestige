@@ -1,5 +1,9 @@
 package dev.anchildress1.vestige.ui.patterns
 
+import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertHasClickAction
 import androidx.compose.ui.test.assertIsDisplayed
@@ -121,10 +125,10 @@ class PatternDetailScreenTest {
     }
 
     @Test
-    fun `terminal dismissed pattern surfaces the terminal label and Restart action`() {
+    fun `terminal dropped pattern surfaces the terminal label and Restart action`() {
         val supporting = listOf(seedEntry("crashed"))
         seedActivePattern("p-terminal", "Tuesday Meetings", "Aftermath", "Callout.", supporting)
-        patternRepo.dismiss("p-terminal")
+        patternRepo.drop("p-terminal")
 
         composeRule.setContent {
             PatternDetailScreen(viewModel = newViewModel("p-terminal"), onBack = {})
@@ -138,13 +142,72 @@ class PatternDetailScreenTest {
     }
 
     @Test
-    fun `snoozed detail only exposes Restart`() {
+    fun `dropped terminal banner is an announced status band with no click action (a11y)`() {
         val supporting = listOf(seedEntry("crashed"))
-        seedActivePattern("p-snoozed-detail", "Tuesday Meetings", "Aftermath", "Callout.", supporting)
-        patternRepo.snooze("p-snoozed-detail")
+        seedActivePattern("p-drop-band", "Tuesday Meetings", "Aftermath", "Callout.", supporting)
+        patternRepo.drop("p-drop-band")
 
         composeRule.setContent {
-            PatternDetailScreen(viewModel = newViewModel("p-snoozed-detail"), onBack = {})
+            PatternDetailScreen(viewModel = newViewModel("p-drop-band"), onBack = {})
+        }
+
+        // stateChangedTimestamp is set by drop() via the test clock default — banner reads
+        // "Dropped <date>." with a polite liveRegion and no click action per AGENTS.md.
+        val band = composeRule.onNodeWithText("Dropped", substring = true)
+        band.performScrollTo().assertIsDisplayed()
+        band.assert(SemanticsMatcher.keyIsDefined(SemanticsProperties.LiveRegion))
+        band.assert(SemanticsMatcher.keyNotDefined(SemanticsActions.OnClick))
+    }
+
+    @Test
+    fun `closed pattern shows the terminal banner with no action row`() {
+        val supporting = listOf(seedEntry("crashed"))
+        seedActivePattern("p-closed-detail", "Tuesday Meetings", "Aftermath", "Callout.", supporting)
+        // CLOSED is model-detected only — seed it directly; the detail screen suppresses the
+        // action row for CLOSED per design-guidelines.md §"Pattern Detail".
+        patternStore.findByPatternId("p-closed-detail")!!.also {
+            it.state = PatternState.CLOSED
+            patternStore.put(it)
+        }
+
+        composeRule.setContent {
+            PatternDetailScreen(viewModel = newViewModel("p-closed-detail"), onBack = {})
+        }
+
+        val band = composeRule.onNodeWithText("Closed", substring = true)
+        band.performScrollTo().assertIsDisplayed()
+        band.assert(SemanticsMatcher.keyIsDefined(SemanticsProperties.LiveRegion))
+        band.assert(SemanticsMatcher.keyNotDefined(SemanticsActions.OnClick))
+        // CLOSED is read-only: no action row, not even Restart.
+        composeRule.onAllNodesWithText("Restart").assertCountEquals(0)
+        composeRule.onAllNodesWithText("Drop").assertCountEquals(0)
+        composeRule.onAllNodesWithText("Skip").assertCountEquals(0)
+    }
+
+    @Test
+    fun `active detail shows Drop and Skip with no terminal banner`() {
+        val supporting = listOf(seedEntry("crashed"))
+        seedActivePattern("p-active-detail", "Tuesday Meetings", "Aftermath", "Callout.", supporting)
+
+        composeRule.setContent {
+            PatternDetailScreen(viewModel = newViewModel("p-active-detail"), onBack = {})
+        }
+
+        composeRule.onNodeWithText("Drop").performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithText("Skip").performScrollTo().assertIsDisplayed()
+        composeRule.onAllNodesWithText("Closed", substring = true).assertCountEquals(0)
+        composeRule.onAllNodesWithText("Dropped", substring = true).assertCountEquals(0)
+        composeRule.onAllNodesWithText("Restart").assertCountEquals(0)
+    }
+
+    @Test
+    fun `skipped detail only exposes Restart`() {
+        val supporting = listOf(seedEntry("crashed"))
+        seedActivePattern("p-skipped-detail", "Tuesday Meetings", "Aftermath", "Callout.", supporting)
+        patternRepo.skip("p-skipped-detail")
+
+        composeRule.setContent {
+            PatternDetailScreen(viewModel = newViewModel("p-skipped-detail"), onBack = {})
         }
 
         composeRule.onNodeWithText("Restart").performScrollTo().assertIsDisplayed()
@@ -154,10 +217,10 @@ class PatternDetailScreenTest {
     }
 
     @Test
-    fun `Restart button on a dismissed pattern transitions it back to ACTIVE`() {
+    fun `Restart button on a dropped pattern transitions it back to ACTIVE`() {
         val supporting = listOf(seedEntry("crashed"))
         seedActivePattern("p-restart-click", "Tuesday Meetings", "Aftermath", "Callout.", supporting)
-        patternRepo.dismiss("p-restart-click")
+        patternRepo.drop("p-restart-click")
 
         composeRule.setContent {
             PatternDetailScreen(viewModel = newViewModel("p-restart-click"), onBack = {})

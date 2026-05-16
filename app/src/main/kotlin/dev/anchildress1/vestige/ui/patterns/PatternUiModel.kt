@@ -16,18 +16,17 @@ data class PatternCardUi(
     val traceHits: Set<Int>,
     /** UI must only surface actions the lifecycle state machine will accept. */
     val availableActions: Set<PatternAction>,
+    /** `Back {date}` wake-up line — non-null only for [PatternSection.SKIPPED] cards. */
+    val backLabel: String? = null,
 )
 
 /**
- * Status grouping for the Patterns list, mirroring the POC's "Active / Snoozed · still drifting /
- * Resolved · faded / Dismissed" sections. Internal `BELOW_THRESHOLD` is never user-visible.
+ * Status grouping for the Patterns list per `ux-copy.md` §"Pattern List / Section headers".
+ * Declaration order is the fixed render order (`spec-pattern-action-buttons.md` §P0.4):
+ * ACTIVE → SKIPPED → CLOSED → DROPPED. The persisted `SNOOZED` state maps to the [SKIPPED]
+ * section (user-facing label is "Skip"); internal `BELOW_THRESHOLD` is never user-visible.
  */
-enum class PatternSection(val headerLabel: String) {
-    ACTIVE("Active"),
-    SNOOZED("Snoozed · still drifting"),
-    RESOLVED("Resolved · faded"),
-    DISMISSED("Dismissed"),
-}
+enum class PatternSection { ACTIVE, SKIPPED, CLOSED, DROPPED }
 
 /**
  * Source row for the Pattern detail. [snippet] is the leading slice of the supporting entry's
@@ -37,11 +36,16 @@ data class PatternSourceUi(val entryId: Long, val dateLabel: String, val snippet
 
 sealed interface PatternsListUiState {
     data object Loading : PatternsListUiState
-    data class Empty(val reason: EmptyReason) : PatternsListUiState
+
+    /** [entryCount] feeds the Day-1 eyebrow `VESTIGES · {n} ENTRIES · 30 DAYS`. */
+    data class Empty(val reason: EmptyReason, val entryCount: Int) : PatternsListUiState
     data class Loaded(val cards: List<PatternCardUi>) : PatternsListUiState
 
     enum class EmptyReason {
+        /** Fewer than the detection threshold of entries — the Day-1 "keep recording" state. */
         NO_ENTRIES,
+
+        /** Enough entries, detector found nothing repeating. */
         NO_PATTERNS,
     }
 }
@@ -67,23 +71,17 @@ sealed interface PatternDetailUiState {
 }
 
 /**
- * MARKED_RESOLVED is system-only in v1 — never reachable from a user tap per
- * `spec-pattern-action-buttons.md`. It survives in the enum because v1.5's
- * `pattern-auto-close` (`backlog.md`) sets the same state. v1 user actions are
- * DISMISSED (`Drop`), SNOOZED (`Skip`), and RESTART (`Restart`).
+ * User-driven pattern actions. `Skip` persists as `PatternState.SNOOZED` (the user label is
+ * "Skip", the state name stays `SNOOZED` per ADR-003 Addendum 2026-05-13). There is no
+ * user-facing close action — closure is model-detected only (v1.5 `pattern-auto-close`).
  */
-enum class PatternAction { DISMISSED, SNOOZED, MARKED_RESOLVED, RESTART }
+enum class PatternAction { DROP, SKIP, RESTART }
 
 /** One-shot snackbar payload shared by the list and detail surfaces. */
 data class PatternActionEvent(val patternId: String, val action: PatternAction, val undo: PatternUndo?)
 
 /** Card-action callbacks bundled so composables stay within detekt's parameter ceiling. */
-data class PatternActionCallbacks<T>(
-    val onDismiss: (T) -> Unit,
-    val onSnooze: (T) -> Unit,
-    val onMarkResolved: (T) -> Unit,
-    val onRestart: (T) -> Unit = {},
-)
+data class PatternActionCallbacks<T>(val onDrop: (T) -> Unit, val onSkip: (T) -> Unit, val onRestart: (T) -> Unit = {})
 
 /**
  * Inverse-action payload the snackbar reissues if the user taps `Undo` while it's alive.

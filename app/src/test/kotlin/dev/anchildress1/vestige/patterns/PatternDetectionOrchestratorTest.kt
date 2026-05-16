@@ -154,23 +154,23 @@ class PatternDetectionOrchestratorTest {
     }
 
     @Test
-    fun `dismissed pattern's latestCalloutText is frozen on silent UPDATE branch`() = runTest {
+    fun `dropped pattern's latestCalloutText is frozen on silent UPDATE branch`() = runTest {
         // Drive 10 entries → detector inserts an ACTIVE pattern with a generated callout.
         repeat(10) { commitOne() }
         val initial = patternStore.all().single { it.kind == PatternKind.TEMPLATE_RECURRENCE }
         val frozenText = initial.latestCalloutText
         assertTrue("seeded callout must be non-blank", frozenText.isNotBlank())
 
-        // User dismisses the pattern.
-        patternStore.transitionState(initial.patternId, PatternState.DISMISSED)
+        // User drops the pattern.
+        patternStore.transitionState(initial.patternId, PatternState.DROPPED)
 
         // Ten more matching entries → another detection run upserts the same patternId.
         repeat(10) { commitOne() }
         val pattern = patternStore.findByPatternId(initial.patternId)!!
-        assertEquals(PatternState.DISMISSED, pattern.state)
+        assertEquals(PatternState.DROPPED, pattern.state)
         assertEquals(20, pattern.supportingEntries.size)
         assertEquals(
-            "dismissed pattern's callout text must not drift on silent update",
+            "dropped pattern's callout text must not drift on silent update",
             frozenText,
             pattern.latestCalloutText,
         )
@@ -349,7 +349,7 @@ class PatternDetectionOrchestratorTest {
     }
 
     @Test
-    fun `dismissed patterns do not surface as callouts even when matching`() = runTest {
+    fun `dropped patterns do not surface as callouts even when matching`() = runTest {
         patternStore.put(
             PatternEntity(
                 patternId = "x".repeat(64),
@@ -359,7 +359,7 @@ class PatternDetectionOrchestratorTest {
                 templateLabel = TemplateLabel.AFTERMATH.serial,
                 firstSeenTimestamp = 1L,
                 lastSeenTimestamp = 2L,
-                state = PatternState.DISMISSED,
+                state = PatternState.DROPPED,
                 latestCalloutText = "Worth noting.",
             ),
         )

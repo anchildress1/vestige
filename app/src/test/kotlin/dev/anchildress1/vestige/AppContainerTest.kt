@@ -13,9 +13,12 @@ import dev.anchildress1.vestige.model.ExtractionStatus
 import dev.anchildress1.vestige.model.ModelArtifactState
 import dev.anchildress1.vestige.model.ModelArtifactStore
 import dev.anchildress1.vestige.model.ModelManifest
+import dev.anchildress1.vestige.model.PatternKind
+import dev.anchildress1.vestige.model.PatternState
 import dev.anchildress1.vestige.save.BackgroundExtractionSaveFlow
 import dev.anchildress1.vestige.save.SaveOutcome
 import dev.anchildress1.vestige.storage.MarkdownEntryStore
+import dev.anchildress1.vestige.storage.PatternEntity
 import dev.anchildress1.vestige.storage.VectorBackfillWorker
 import dev.anchildress1.vestige.testing.cleanupObjectBoxTempRoot
 import dev.anchildress1.vestige.testing.newInMemoryObjectBoxDirectory
@@ -994,5 +997,89 @@ class AppContainerTest {
             container.close()
             cleanupObjectBoxTempRoot(tempRoot, dataDir)
         }
+    }
+
+    @Test
+    fun `cold start promotes an expired SNOOZED pattern back to ACTIVE`(@TempDir tempRoot: File) = runTest {
+        val dataDir = newInMemoryObjectBoxDirectory("sweep-expired-skip-")
+        val boxStore = openInMemoryBoxStore(dataDir)
+        // Seed an expired SNOOZED row BEFORE container init — snoozedUntil far in the past so the
+        // container's default system clock sees the skip window as elapsed. The init{} block
+        // runs sweepExpiredSkips() during construction.
+        val expiredId = seedSnoozedPattern(boxStore, "p-expired", snoozedUntil = 1_000L)
+        val context = mockk<Context>(relaxed = true) {
+            every { filesDir } returns tempRoot
+            every { cacheDir } returns File(tempRoot, "cache").apply { mkdirs() }
+        }
+        val container = AppContainer(
+            applicationContext = context,
+            boxStoreFactory = { boxStore },
+            markdownStoreFactory = { mockk<MarkdownEntryStore>(relaxed = true) },
+            recoveredEntryIdsLoader = { emptyList() },
+            foregroundServiceIntentFactory = { Intent("dev.anchildress1.vestige.TEST_START") },
+            foregroundServiceStarter = {},
+            scope = backgroundScope,
+        )
+
+        try {
+            val swept = container.patternStore.findByPatternId(expiredId)
+            assertEquals(PatternState.ACTIVE, swept?.state)
+            assertEquals(null, swept?.snoozedUntil)
+        } finally {
+            container.close()
+            cleanupObjectBoxTempRoot(tempRoot, dataDir)
+        }
+    }
+
+    @Test
+    fun `sweepExpiredSkips is idempotent and safe to call repeatedly`(@TempDir tempRoot: File) = runTest {
+        // Fault injection into the live PatternStore.promoteExpiredSkips() isn't reachable through
+        // the AppContainer harness without a fake store factory (none exists; patternStore is a
+        // private lazy over the real boxStore). Idempotency + no-throw is the feasible coverage:
+        // the second sweep must not re-promote (the row is already ACTIVE) and must not throw.
+        val dataDir = newInMemoryObjectBoxDirectory("sweep-idempotent-")
+        val boxStore = openInMemoryBoxStore(dataDir)
+        val expiredId = seedSnoozedPattern(boxStore, "p-idempotent", snoozedUntil = 1_000L)
+        val context = mockk<Context>(relaxed = true) {
+            every { filesDir } returns tempRoot
+            every { cacheDir } returns File(tempRoot, "cache").apply { mkdirs() }
+        }
+        val container = AppContainer(
+            applicationContext = context,
+            boxStoreFactory = { boxStore },
+            markdownStoreFactory = { mockk<MarkdownEntryStore>(relaxed = true) },
+            recoveredEntryIdsLoader = { emptyList() },
+            foregroundServiceIntentFactory = { Intent("dev.anchildress1.vestige.TEST_START") },
+            foregroundServiceStarter = {},
+            scope = backgroundScope,
+        )
+
+        try {
+            // init{} already swept once → ACTIVE. Two more explicit sweeps must be no-op + no-throw.
+            container.sweepExpiredSkips()
+            container.sweepExpiredSkips()
+            val row = container.patternStore.findByPatternId(expiredId)
+            assertEquals(PatternState.ACTIVE, row?.state)
+            assertEquals(null, row?.snoozedUntil)
+        } finally {
+            container.close()
+            cleanupObjectBoxTempRoot(tempRoot, dataDir)
+        }
+    }
+
+    private fun seedSnoozedPattern(boxStore: BoxStore, patternId: String, snoozedUntil: Long): String {
+        val entity = PatternEntity(
+            patternId = patternId,
+            kind = PatternKind.TEMPLATE_RECURRENCE,
+            signatureJson = "{}",
+            title = "Title $patternId",
+            firstSeenTimestamp = 1L,
+            lastSeenTimestamp = 1L,
+            state = PatternState.SNOOZED,
+            snoozedUntil = snoozedUntil,
+            stateChangedTimestamp = 1L,
+        )
+        boxStore.boxFor(PatternEntity::class.java).put(entity)
+        return patternId
     }
 }

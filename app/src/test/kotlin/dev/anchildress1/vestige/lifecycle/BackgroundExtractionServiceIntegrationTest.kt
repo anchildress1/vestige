@@ -19,6 +19,7 @@ import org.robolectric.Shadows.shadowOf
 import org.robolectric.android.controller.ServiceController
 import org.robolectric.annotation.Config
 import org.robolectric.shadows.ShadowApplication
+import java.time.Instant
 
 /**
  * Service ↔ machine handshake coverage per ADR-007 §"Test coverage contract". The state-machine
@@ -47,10 +48,18 @@ class BackgroundExtractionServiceIntegrationTest {
         (app as? TestVestigeApplication)?.releaseTempStorage()
     }
 
+    // Non-terminal status is only honored for an entry that exists (AppContainer's stale-status
+    // guard, d4ed7d86). Seed a real PENDING row so reportExtractionStatus(RUNNING) isn't dropped.
+    private fun seedPendingEntryId(): Long = app.appContainer.entryStore.createPendingEntry(
+        entryText = "integration-test entry",
+        timestamp = Instant.now(),
+    )
+
     @Test
     fun `onStartCommand with state PROMOTING starts foreground and confirms the machine`() {
         val machine = app.appContainer.lifecycleStateMachine
-        app.appContainer.reportExtractionStatus(entryId = 1L, status = ExtractionStatus.RUNNING)
+        val entryId = seedPendingEntryId()
+        app.appContainer.reportExtractionStatus(entryId = entryId, status = ExtractionStatus.RUNNING)
         assertEquals(BackgroundExtractionLifecycleState.PROMOTING, machine.state.value)
 
         serviceController.create().startCommand(0, 0)
@@ -75,7 +84,8 @@ class BackgroundExtractionServiceIntegrationTest {
     @Test
     fun `OS-only kill triggers onServiceKilled and re-promotes if work remains`() {
         val machine = app.appContainer.lifecycleStateMachine
-        app.appContainer.reportExtractionStatus(entryId = 5L, status = ExtractionStatus.RUNNING)
+        val entryId = seedPendingEntryId()
+        app.appContainer.reportExtractionStatus(entryId = entryId, status = ExtractionStatus.RUNNING)
         serviceController.create().startCommand(0, 0)
         assertEquals(BackgroundExtractionLifecycleState.FOREGROUND, machine.state.value)
 
@@ -94,8 +104,9 @@ class BackgroundExtractionServiceIntegrationTest {
         // drains the in-flight count and transitions PROMOTING → KEEP_ALIVE. The service must
         // (a) satisfy the OS startForeground deadline and (b) stay alive so the keep-alive timer
         // can transition KEEP_ALIVE → DEMOTING with a live collector to ack it.
-        app.appContainer.reportExtractionStatus(entryId = 11L, status = ExtractionStatus.RUNNING)
-        app.appContainer.reportExtractionStatus(entryId = 11L, status = ExtractionStatus.COMPLETED)
+        val entryId = seedPendingEntryId()
+        app.appContainer.reportExtractionStatus(entryId = entryId, status = ExtractionStatus.RUNNING)
+        app.appContainer.reportExtractionStatus(entryId = entryId, status = ExtractionStatus.COMPLETED)
         assertEquals(BackgroundExtractionLifecycleState.KEEP_ALIVE, machine.state.value)
 
         serviceController.create().startCommand(0, 0)
@@ -114,7 +125,8 @@ class BackgroundExtractionServiceIntegrationTest {
     @Test
     fun `late-start race — already-FOREGROUND on onStartCommand keeps the service alive without re-acking`() {
         val machine = app.appContainer.lifecycleStateMachine
-        app.appContainer.reportExtractionStatus(entryId = 21L, status = ExtractionStatus.RUNNING)
+        val entryId = seedPendingEntryId()
+        app.appContainer.reportExtractionStatus(entryId = entryId, status = ExtractionStatus.RUNNING)
         // Simulate ack already arriving via a parallel path: state is FOREGROUND when the
         // dispatched intent finally lands.
         machine.onForegroundStartConfirmed()
@@ -132,7 +144,8 @@ class BackgroundExtractionServiceIntegrationTest {
         // can route. The default `foregroundServiceStarter` calls `applicationContext.startForegroundService`,
         // so a PROMOTING transition must enqueue a service intent on the shadow application.
         shadowApp.clearStartedServices()
-        app.appContainer.reportExtractionStatus(entryId = 9L, status = ExtractionStatus.RUNNING)
+        val entryId = seedPendingEntryId()
+        app.appContainer.reportExtractionStatus(entryId = entryId, status = ExtractionStatus.RUNNING)
 
         val started: Intent? = shadowApp.peekNextStartedService()
         assertEquals(

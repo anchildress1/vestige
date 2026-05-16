@@ -31,6 +31,7 @@ import io.mockk.coVerifyOrder
 import io.mockk.every
 import io.mockk.mockk
 import io.objectbox.BoxStore
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.advanceUntilIdle
@@ -478,6 +479,72 @@ class AppContainerTest {
     }
 
     @Test
+    fun `refreshModelReadiness maps a leftover partial artifact to Paused`(@TempDir tempRoot: File) = runTest {
+        val modelFile = File(tempRoot, "main-model.litertlm").apply { writeText("x") }
+        val artifactStore = fakeArtifactStore(artifactFile = modelFile, expectedByteSize = 2L)
+        val context = mockk<Context>(relaxed = true) {
+            every { filesDir } returns tempRoot
+            every { cacheDir } returns File(tempRoot, "cache").apply { mkdirs() }
+        }
+        val container = AppContainer(
+            applicationContext = context,
+            boxStoreFactory = { mockk<BoxStore>(relaxed = true) },
+            markdownStoreFactory = { mockk<MarkdownEntryStore>(relaxed = true) },
+            modelPathLoader = { modelFile.absolutePath },
+            backgroundEngineFactory = { _, _ -> mockk<LiteRtLmEngine>(relaxed = true) },
+            mainModelArtifactStoreFactory = { _, _, _ -> artifactStore },
+            recoveredEntryIdsLoader = { emptyList() },
+            foregroundServiceIntentFactory = { Intent("dev.anchildress1.vestige.TEST_START") },
+            foregroundServiceStarter = {},
+            scope = this,
+        )
+
+        container.refreshModelReadiness()
+        advanceUntilIdle()
+
+        assertEquals(ModelReadiness.Paused, container.modelReadinessFlow.value)
+    }
+
+    @Test
+    fun `redownloadMainModel ignores a second request while the first download is active`(@TempDir tempRoot: File) =
+        runTest {
+            val modelFile = File(tempRoot, "main-model.litertlm")
+            val artifactStore = fakeArtifactStore(artifactFile = modelFile, expectedByteSize = 2L)
+            val releaseDownload = CompletableDeferred<Unit>()
+            coEvery { artifactStore.download(any()) } coAnswers {
+                releaseDownload.await()
+                modelFile.writeText("xx")
+                ModelArtifactState.Complete
+            }
+            val context = mockk<Context>(relaxed = true) {
+                every { filesDir } returns tempRoot
+                every { cacheDir } returns File(tempRoot, "cache").apply { mkdirs() }
+            }
+            val container = AppContainer(
+                applicationContext = context,
+                boxStoreFactory = { mockk<BoxStore>(relaxed = true) },
+                markdownStoreFactory = { mockk<MarkdownEntryStore>(relaxed = true) },
+                modelPathLoader = { modelFile.absolutePath },
+                backgroundEngineFactory = { _, _ -> mockk<LiteRtLmEngine>(relaxed = true) },
+                mainModelArtifactStoreFactory = { _, _, _ -> artifactStore },
+                recoveredEntryIdsLoader = { emptyList() },
+                foregroundServiceIntentFactory = { Intent("dev.anchildress1.vestige.TEST_START") },
+                foregroundServiceStarter = {},
+                scope = this,
+            )
+
+            container.redownloadMainModel()
+            advanceUntilIdle()
+            container.redownloadMainModel()
+            advanceUntilIdle()
+            releaseDownload.complete(Unit)
+            advanceUntilIdle()
+
+            coVerify(exactly = 1) { artifactStore.download(any()) }
+            assertEquals(ModelReadiness.Ready, container.modelReadinessFlow.value)
+        }
+
+    @Test
     fun `wipeAllData clears every entity box and every markdown file`(@TempDir tempRoot: File) = runTest {
         val boxDir = newInMemoryObjectBoxDirectory("wipe")
         val box = openInMemoryBoxStore(boxDir)
@@ -591,6 +658,22 @@ class AppContainerTest {
         return mockk<ModelArtifactStore>(relaxed = true) {
             every { this@mockk.artifactFile } returns artifactFile
             every { this@mockk.manifest } returns manifest
+            coEvery { this@mockk.probe() } answers {
+                when {
+                    !artifactFile.exists() -> ModelArtifactState.Absent
+
+                    artifactFile.length() < expectedByteSize ->
+                        ModelArtifactState.Partial(artifactFile.length(), expectedByteSize)
+
+                    artifactFile.length() > expectedByteSize ->
+                        ModelArtifactState.Corrupt(
+                            expectedSha256 = manifest.sha256,
+                            actualSha256 = "size_mismatch",
+                        )
+
+                    else -> ModelArtifactState.Complete
+                }
+            }
         }
     }
 
@@ -815,6 +898,7 @@ class AppContainerTest {
             recoveredEntryIdsLoader = { emptyList() },
             foregroundServiceIntentFactory = { Intent("dev.anchildress1.vestige.TEST_START") },
             foregroundServiceStarter = {},
+            scope = this,
         )
 
         assertEquals(
@@ -822,6 +906,7 @@ class AppContainerTest {
             container.modelReadinessFlow.value,
         )
         container.refreshModelReadiness()
+        advanceUntilIdle()
         assertEquals(
             dev.anchildress1.vestige.ui.capture.ModelReadiness.Ready,
             container.modelReadinessFlow.value,
@@ -846,6 +931,7 @@ class AppContainerTest {
             recoveredEntryIdsLoader = { emptyList() },
             foregroundServiceIntentFactory = { Intent("dev.anchildress1.vestige.TEST_START") },
             foregroundServiceStarter = {},
+            scope = this,
         )
 
         // Initial Loading + probe-Loading == same value; flow stays at Loading.
@@ -875,13 +961,14 @@ class AppContainerTest {
                 recoveredEntryIdsLoader = { emptyList() },
                 foregroundServiceIntentFactory = { Intent("dev.anchildress1.vestige.TEST_START") },
                 foregroundServiceStarter = {},
+                scope = this,
             )
 
             container.refreshModelReadiness()
-            // Size mismatch keeps readiness in Loading — covers the size-check branch of
-            // mainModelArtifactLooksPresent.
+            advanceUntilIdle()
+            // A leftover wrong-size artifact is resumable state now, not generic loading.
             assertEquals(
-                dev.anchildress1.vestige.ui.capture.ModelReadiness.Loading,
+                dev.anchildress1.vestige.ui.capture.ModelReadiness.Paused,
                 container.modelReadinessFlow.value,
             )
         }
@@ -905,15 +992,18 @@ class AppContainerTest {
                 recoveredEntryIdsLoader = { emptyList() },
                 foregroundServiceIntentFactory = { Intent("dev.anchildress1.vestige.TEST_START") },
                 foregroundServiceStarter = {},
+                scope = this,
             )
 
             container.refreshModelReadiness()
+            advanceUntilIdle()
             assertEquals(
                 dev.anchildress1.vestige.ui.capture.ModelReadiness.Ready,
                 container.modelReadinessFlow.value,
             )
             // Re-probe with the same state — no transition, no recover sweep.
             container.refreshModelReadiness()
+            advanceUntilIdle()
             assertEquals(
                 dev.anchildress1.vestige.ui.capture.ModelReadiness.Ready,
                 container.modelReadinessFlow.value,
@@ -922,6 +1012,7 @@ class AppContainerTest {
             // Artifact removed mid-session — readiness flips back to Loading.
             modelFile.delete()
             container.refreshModelReadiness()
+            advanceUntilIdle()
             assertEquals(
                 dev.anchildress1.vestige.ui.capture.ModelReadiness.Loading,
                 container.modelReadinessFlow.value,

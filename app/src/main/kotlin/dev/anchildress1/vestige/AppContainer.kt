@@ -189,6 +189,7 @@ class AppContainer(
     val entryStore: EntryStore = EntryStore(boxStore, markdownStore)
     private val backgroundEngineInitMutex = Mutex()
     private val embedderInitMutex = Mutex()
+    private val modelMutationMutex = Mutex()
     private val vectorBackfillMutex = Mutex()
     private val vectorBackfillRunning = AtomicBoolean(false)
     private val vectorBackfillRequested = AtomicBoolean(false)
@@ -413,15 +414,17 @@ class AppContainer(
      * the model was absent get extracted now.
      */
     fun refreshModelReadiness() {
-        val previous = _modelReadinessFlow.value
-        val current = probeModelReadiness()
-        if (previous == current) return
-        _modelReadinessFlow.value = current
-        if (current is ModelReadiness.Ready && previous !is ModelReadiness.Ready) {
-            scope.launch { recoverPendingExtractions() }
-            scope.launch {
-                delay(ENGINE_PREWARM_DELAY_MS)
-                ensureBackgroundEngineInitialized()
+        scope.launch {
+            val previous = _modelReadinessFlow.value
+            val current = probeModelReadiness(previous)
+            if (previous == current) return@launch
+            _modelReadinessFlow.value = current
+            if (current is ModelReadiness.Ready && previous !is ModelReadiness.Ready) {
+                scope.launch { recoverPendingExtractions() }
+                scope.launch {
+                    delay(ENGINE_PREWARM_DELAY_MS)
+                    ensureBackgroundEngineInitialized()
+                }
             }
         }
     }
@@ -436,11 +439,13 @@ class AppContainer(
      */
     fun deleteMainModel() {
         scope.launch {
-            val artifact = mainModelArtifactStore.artifactFile
-            artifact.delete()
-            File(artifact.parentFile, "${artifact.name}.part").delete()
-            Log.i(TAG, "Main model artifact deleted on user request")
-            refreshModelReadiness()
+            runMainModelMutation(name = "delete model") {
+                val artifact = mainModelArtifactStore.artifactFile
+                artifact.delete()
+                File(artifact.parentFile, "${artifact.name}.part").delete()
+                Log.i(TAG, "Main model artifact deleted on user request")
+                refreshModelReadiness()
+            }
         }
     }
 
@@ -452,28 +457,30 @@ class AppContainer(
      */
     fun redownloadMainModel() {
         scope.launch {
-            val store = mainModelArtifactStore
-            val artifact = store.artifactFile
-            File(artifact.parentFile, "${artifact.name}.part").delete()
-            artifact.delete()
-            _modelReadinessFlow.value = ModelReadiness.Downloading(0)
-            networkGate.openForDownload(reason = "Model Status — user-requested re-download")
-            try {
-                store.download { current, expected ->
-                    val pct = if (expected > 0L) {
-                        ((current * PCT_MAX) / expected).toInt().coerceIn(0, PCT_MAX)
-                    } else {
-                        0
+            runMainModelMutation(name = "re-download model") {
+                val store = mainModelArtifactStore
+                val artifact = store.artifactFile
+                File(artifact.parentFile, "${artifact.name}.part").delete()
+                artifact.delete()
+                _modelReadinessFlow.value = ModelReadiness.Downloading(0)
+                networkGate.openForDownload(reason = "Model Status — user-requested re-download")
+                try {
+                    store.download { current, expected ->
+                        val pct = if (expected > 0L) {
+                            ((current * PCT_MAX) / expected).toInt().coerceIn(0, PCT_MAX)
+                        } else {
+                            0
+                        }
+                        _modelReadinessFlow.value = ModelReadiness.Downloading(pct)
                     }
-                    _modelReadinessFlow.value = ModelReadiness.Downloading(pct)
+                } catch (cancel: kotlinx.coroutines.CancellationException) {
+                    throw cancel
+                } catch (@Suppress("TooGenericExceptionCaught") error: Exception) {
+                    Log.e(TAG, "Model re-download failed", error)
+                } finally {
+                    networkGate.seal()
+                    refreshModelReadiness()
                 }
-            } catch (cancel: kotlinx.coroutines.CancellationException) {
-                throw cancel
-            } catch (@Suppress("TooGenericExceptionCaught") error: Exception) {
-                Log.e(TAG, "Model re-download failed", error)
-            } finally {
-                networkGate.seal()
-                refreshModelReadiness()
             }
         }
     }
@@ -553,8 +560,39 @@ class AppContainer(
     }.onFailure { Log.e(TAG, "Failed to probe main model artifact", it) }
         .getOrDefault(false)
 
-    private fun probeModelReadiness(): ModelReadiness =
-        if (mainModelArtifactLooksPresent()) ModelReadiness.Ready else ModelReadiness.Loading
+    private suspend fun probeModelReadiness(previous: ModelReadiness): ModelReadiness = runCatching {
+        when (val state = mainModelArtifactStore.probe()) {
+            ModelArtifactState.Absent -> ModelReadiness.Loading
+
+            ModelArtifactState.Complete -> ModelReadiness.Ready
+
+            is ModelArtifactState.Corrupt -> ModelReadiness.Loading
+
+            is ModelArtifactState.Partial ->
+                if (previous is ModelReadiness.Downloading) {
+                    ModelReadiness.Downloading(
+                        percent = ((state.currentBytes * PCT_MAX) / state.expectedBytes)
+                            .toInt()
+                            .coerceIn(0, PCT_MAX),
+                    )
+                } else {
+                    ModelReadiness.Paused
+                }
+        }
+    }.onFailure { Log.e(TAG, "Failed to probe model readiness", it) }
+        .getOrDefault(ModelReadiness.Loading)
+
+    private suspend fun runMainModelMutation(name: String, block: suspend () -> Unit) {
+        if (!modelMutationMutex.tryLock()) {
+            Log.w(TAG, "Ignoring $name while another model mutation is in flight")
+            return
+        }
+        try {
+            block()
+        } finally {
+            modelMutationMutex.unlock()
+        }
+    }
 
     internal suspend fun ensureBackgroundEngineInitialized() {
         if (backgroundEngineInitialized) return

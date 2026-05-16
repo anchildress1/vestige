@@ -47,6 +47,7 @@ fun ModelStatusScreen(
 ) {
     BackHandler(onBack = onExit)
     var pending by remember { mutableStateOf(PendingConfirm.None) }
+    val actionsEnabled = info.readiness !is ModelReadiness.Downloading
     VestigeScaffold(modifier = modifier) { padding ->
         Column(
             modifier = Modifier
@@ -68,12 +69,14 @@ fun ModelStatusScreen(
             Spacer(modifier = Modifier.weight(1f))
             OutlinedButton(
                 onClick = { pending = PendingConfirm.ReDownload },
+                enabled = actionsEnabled,
                 modifier = Modifier.fillMaxWidth(),
             ) {
                 Text(text = stringResource(id = R.string.model_status_redownload))
             }
             TextButton(
                 onClick = { pending = PendingConfirm.Delete },
+                enabled = actionsEnabled,
                 modifier = Modifier.fillMaxWidth(),
             ) {
                 Text(text = stringResource(id = R.string.model_status_delete), color = VestigeTheme.colors.coral)

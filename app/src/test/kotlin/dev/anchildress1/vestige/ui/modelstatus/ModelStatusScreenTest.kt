@@ -7,6 +7,7 @@ import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertHasClickAction
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onLast
@@ -79,6 +80,13 @@ class ModelStatusScreenTest {
         screen(readiness = ModelReadiness.Downloading(percent = 50))
         composeRule.onNodeWithText("Downloading model. Wi-Fi only.", substring = true).assertIsDisplayed()
         composeRule.onNodeWithText("50%", substring = true).assertIsDisplayed()
+    }
+
+    @Test
+    fun `model actions disable while a download is in flight`() {
+        screen(readiness = ModelReadiness.Downloading(percent = 50))
+        composeRule.onNodeWithText("Re-download model").assertIsNotEnabled()
+        composeRule.onNodeWithText("Delete model").assertIsNotEnabled()
     }
 
     @Test

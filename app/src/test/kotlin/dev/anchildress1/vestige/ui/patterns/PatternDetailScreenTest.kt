@@ -217,6 +217,20 @@ class PatternDetailScreenTest {
     }
 
     @Test
+    fun `skipping from the detail screen shows the Skip snackbar`() {
+        val supporting = listOf(seedEntry("crashed after standup"))
+        seedActivePattern("p-skip-snackbar", "Tuesday Meetings", "Aftermath", "Callout.", supporting)
+
+        composeRule.setContent {
+            PatternDetailScreen(viewModel = newViewModel("p-skip-snackbar"), onBack = {})
+        }
+
+        composeRule.onNodeWithText("Skip").performScrollTo().performClick()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithText("Skipped.").assertIsDisplayed()
+    }
+
+    @Test
     fun `Restart button on a dropped pattern transitions it back to ACTIVE`() {
         val supporting = listOf(seedEntry("crashed"))
         seedActivePattern("p-restart-click", "Tuesday Meetings", "Aftermath", "Callout.", supporting)

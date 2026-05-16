@@ -126,6 +126,20 @@ class PatternsListScreenTest {
     }
 
     @Test
+    fun `NO_PATTERNS empty state is an announced status band with no click action (a11y)`() {
+        repeat(10) { seedEntry("entry $it", ExtractionStatus.COMPLETED) }
+        composeRule.setContent { PatternsListScreen(viewModel = newViewModel(), onOpenPattern = {}) }
+        // AGENTS.md band rule: same requirements as NO_ENTRIES — merged contentDescription +
+        // polite liveRegion, no click action.
+        val mergedDescription =
+            "No repeating pattern detected. The model looked. Nothing came back twice."
+        val band = composeRule.onNodeWithContentDescription(mergedDescription)
+        band.assertIsDisplayed()
+        band.assert(SemanticsMatcher.keyIsDefined(SemanticsProperties.LiveRegion))
+        band.assert(SemanticsMatcher.keyNotDefined(SemanticsActions.OnClick))
+    }
+
+    @Test
     fun `loaded list surfaces card title observation and source count`() {
         val supporting = listOf(seedEntry("crashed", ExtractionStatus.COMPLETED))
         seedActivePattern(

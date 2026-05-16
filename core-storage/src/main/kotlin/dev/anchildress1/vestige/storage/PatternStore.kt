@@ -1,5 +1,6 @@
 package dev.anchildress1.vestige.storage
 
+import android.util.Log
 import dev.anchildress1.vestige.model.PatternState
 import io.objectbox.BoxStore
 import io.objectbox.kotlin.boxFor
@@ -70,7 +71,11 @@ class PatternStore(private val boxStore: BoxStore, private val clock: Clock = Cl
             .mapNotNull { row ->
                 // One row losing its SNOOZED state to a concurrent writer between the query and
                 // here must not strand the rest of the expired cohort — promote per row.
-                runCatching { transitionState(row.patternId, PatternState.ACTIVE).patternId }.getOrNull()
+                runCatching { transitionState(row.patternId, PatternState.ACTIVE).patternId }
+                    .onFailure { t ->
+                        Log.w(TAG, "promoteExpiredSkips: skipped ${row.patternId} (${t::class.simpleName})", t)
+                    }
+                    .getOrNull()
             }
     }
 
@@ -112,7 +117,9 @@ class PatternStore(private val boxStore: BoxStore, private val clock: Clock = Cl
     }
 
     private companion object {
-        // No path into CLOSED in v1 — model-detected close is v1.5 (`pattern-auto-close`).
+        const val TAG = "PatternStore"
+
+        // CLOSED has no inbound path through the validator — pattern-auto-close writes it directly via the bypass.
         val ACTIVE_OUT = setOf(
             PatternState.DROPPED,
             PatternState.SNOOZED,

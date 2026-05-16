@@ -43,6 +43,7 @@ fun undoLabelResFor(undo: PatternUndo?): Int? = if (undo == null) null else R.st
 
 /** Structured empty-state copy per `ux-copy.md` §"Pattern List / Empty states". */
 data class PatternEmptyCopy(
+    /** Format string expecting `entryCount` as its `%1$d` argument when non-null. */
     @field:StringRes val eyebrowRes: Int?,
     @field:StringRes val headerRes: Int,
     @field:StringRes val bodyRes: Int,
@@ -97,7 +98,7 @@ fun isTerminalState(state: PatternState): Boolean = state == PatternState.DROPPE
  * Per `spec-pattern-action-buttons.md` §P0.1–P0.3: ACTIVE patterns expose Drop + Skip; every
  * other user-visible state exposes Restart. The detail screen separately suppresses the action
  * row for `CLOSED` (read-only, model-detected) — that gate lives at the call site, not here, so
- * the list-card overflow can still Restart a (v1.5) closed card.
+ * the list-card overflow can still Restart a closed card.
  */
 fun availableActionsFor(state: PatternState): Set<PatternAction> = when (state) {
     PatternState.ACTIVE -> setOf(PatternAction.DROP, PatternAction.SKIP)

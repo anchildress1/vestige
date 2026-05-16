@@ -75,7 +75,7 @@ fun PatternsListScreen(
                 PatternAction.RESTART -> restartMessage
             }
             // Standard Material short-snackbar duration (~4s) — the undo affordance lifetime.
-            // CLOSED is model-detected (v1.5) and emits no action event, so it stays silent.
+            // CLOSED is model-detected — no action event is emitted, so the snackbar stays silent.
             val result = snackbarHostState.showSnackbar(
                 message = message,
                 actionLabel = if (event.undo != null) undoLabel else null,

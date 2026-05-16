@@ -87,20 +87,23 @@ class PatternsListViewModel(
     fun restart(patternId: String) {
         viewModelScope.launch {
             val undo = withContext(ioDispatcher) {
-                val current = patternStore.findByPatternId(patternId)
-                    ?: error("PatternsListViewModel: no pattern row for patternId=$patternId")
-                val priorState = current.state
-                val priorSnoozedUntil = current.snoozedUntil
-                patternRepo.restart(patternId)
-                PatternUndo(
-                    patternId = patternId,
-                    action = PatternAction.RESTART,
-                    previousState = priorState,
-                    previousSnoozedUntil = priorSnoozedUntil,
-                )
+                runCatching {
+                    val current = patternStore.findByPatternId(patternId)
+                        ?: error("PatternsListViewModel: no pattern row for patternId=$patternId")
+                    val priorState = current.state
+                    val priorSnoozedUntil = current.snoozedUntil
+                    patternRepo.restart(patternId)
+                    PatternUndo(
+                        patternId = patternId,
+                        action = PatternAction.RESTART,
+                        previousState = priorState,
+                        previousSnoozedUntil = priorSnoozedUntil,
+                    )
+                }.onFailure { Log.e(TAG, "restart failed for $patternId", it) }
+                    .getOrNull()
             }
             _state.value = loadState()
-            _events.emit(PatternActionEvent(patternId, PatternAction.RESTART, undo))
+            if (undo != null) _events.emit(PatternActionEvent(patternId, PatternAction.RESTART, undo))
         }
     }
 
@@ -143,7 +146,13 @@ class PatternsListViewModel(
             // persisted truth, and emit no undo for an action that never took effect.
             val applied = withContext(ioDispatcher) {
                 runCatching { mutate() }
-                    .onFailure { Log.w(TAG, "Pattern $action failed for $patternId", it) }
+                    .onFailure { t ->
+                        if (t is IllegalStateException) {
+                            Log.w(TAG, "Pattern $action skipped for $patternId — concurrent transition", t)
+                        } else {
+                            Log.e(TAG, "Pattern $action failed unexpectedly for $patternId", t)
+                        }
+                    }
                     .isSuccess
             }
             _state.value = loadState()

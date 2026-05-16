@@ -187,7 +187,7 @@ private fun LoadedBody(
             )
         }
 
-        // CLOSED is read-only (model-detected, v1.5) per design-guidelines.md §"Pattern Detail":
+        // CLOSED is model-detected — the terminal banner replaces the action row. DROPPED keeps Restart.
         // the terminal banner replaces the action row. DROPPED keeps Restart.
         if (loaded.availableActions.isNotEmpty() && loaded.state != PatternState.CLOSED) {
             ActionRow(availableActions = loaded.availableActions, actions = actions)

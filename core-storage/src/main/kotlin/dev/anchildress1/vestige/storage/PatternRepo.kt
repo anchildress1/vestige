@@ -10,8 +10,8 @@ import java.time.Clock
  * User actions are `Drop` / `Skip` (on ACTIVE) and `Restart` (on any non-active visible state)
  * per `spec-pattern-action-buttons.md` + ADR-003 Addendum 2026-05-13b. The persisted "skip"
  * state is `SNOOZED` (field `snoozedUntil`) — the user-facing label is "Skip", the state name
- * stays `SNOOZED` per the ADR. `Mark resolved` was retired with this story: closure is
- * model-detected only (v1.5 `pattern-auto-close`), never user-declared.
+ * stays `SNOOZED` per the ADR. `Mark resolved` was retired: closure is model-detected only
+ * (`pattern-auto-close`), never user-declared.
  *
  * `undo = true` re-issues the inverse transition for the action just taken — `drop(..., undo
  * = true)` brings a `DROPPED` row back to `ACTIVE`. v1 only exposes undo through the snackbar

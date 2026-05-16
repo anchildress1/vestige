@@ -18,7 +18,13 @@ data class PatternCardUi(
     val availableActions: Set<PatternAction>,
     /** `Back {date}` wake-up line — non-null only for [PatternSection.SKIPPED] cards. */
     val backLabel: String? = null,
-)
+) {
+    init {
+        check(backLabel == null || section == PatternSection.SKIPPED) {
+            "backLabel must be null for non-SKIPPED cards (section=$section)"
+        }
+    }
+}
 
 /**
  * Status grouping for the Patterns list per `ux-copy.md` §"Pattern List / Section headers".
@@ -38,7 +44,11 @@ sealed interface PatternsListUiState {
     data object Loading : PatternsListUiState
 
     /** [entryCount] feeds the Day-1 eyebrow `VESTIGES · {n} ENTRIES · 30 DAYS`. */
-    data class Empty(val reason: EmptyReason, val entryCount: Int) : PatternsListUiState
+    data class Empty(val reason: EmptyReason, val entryCount: Int) : PatternsListUiState {
+        init {
+            require(entryCount >= 0) { "entryCount must be non-negative" }
+        }
+    }
     data class Loaded(val cards: List<PatternCardUi>) : PatternsListUiState
 
     enum class EmptyReason {
@@ -73,7 +83,7 @@ sealed interface PatternDetailUiState {
 /**
  * User-driven pattern actions. `Skip` persists as `PatternState.SNOOZED` (the user label is
  * "Skip", the state name stays `SNOOZED` per ADR-003 Addendum 2026-05-13). There is no
- * user-facing close action — closure is model-detected only (v1.5 `pattern-auto-close`).
+ * user-facing close action — closure is model-detected only (`pattern-auto-close`).
  */
 enum class PatternAction { DROP, SKIP, RESTART }
 

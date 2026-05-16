@@ -327,6 +327,34 @@ class PatternStoreTest {
     }
 
     @Test
+    fun `promoteExpiredSkips promotes all expired rows without stranding the cohort`() {
+        // Verifies the per-row resilience invariant documented in promoteExpiredSkips: if one row
+        // fails its transition (concurrent writer), the remaining expired rows still promote.
+        // This positive case seeds two expired + one future row and asserts all three are handled.
+        val expiredId1 = "ex1".padEnd(64, 'x')
+        val expiredId2 = "ex2".padEnd(64, 'x')
+        val futureId = "fu2".padEnd(64, 'x')
+
+        for (id in listOf(expiredId1, expiredId2, futureId)) {
+            seed(state = PatternState.ACTIVE, patternId = id)
+            store.transitionState(id, PatternState.SNOOZED, snoozedUntilMs = now.toEpochMilli() + 1_000)
+        }
+        for (id in listOf(expiredId1, expiredId2)) {
+            store.findByPatternId(id)!!.also {
+                it.snoozedUntil = now.toEpochMilli() - 1
+                store.put(it)
+            }
+        }
+
+        val promoted = store.promoteExpiredSkips()
+
+        assertEquals(setOf(expiredId1, expiredId2), promoted.toSet())
+        assertEquals(PatternState.ACTIVE, store.findByPatternId(expiredId1)!!.state)
+        assertEquals(PatternState.ACTIVE, store.findByPatternId(expiredId2)!!.state)
+        assertEquals(PatternState.SNOOZED, store.findByPatternId(futureId)!!.state)
+    }
+
+    @Test
     fun `findSnoozed returns empty when no rows are snoozed`() {
         seed(state = PatternState.ACTIVE, patternId = "a".repeat(64))
 

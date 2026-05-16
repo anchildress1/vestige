@@ -42,7 +42,7 @@ class SettingsScreenTest {
                     info = SettingsInfo(versionLabel = "1.0.0", sourceUrl = "https://example.test"),
                     actions = SettingsActions(
                         onSelectPersona = onSelectPersona,
-                        onExportToUri = {},
+                        onExportToUri = { true },
                         onWipe = onWipe,
                         onOpenModelStatus = onOpenModelStatus,
                         onOpenSource = {},

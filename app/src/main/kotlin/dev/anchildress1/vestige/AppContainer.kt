@@ -508,8 +508,15 @@ class AppContainer(
             ZipOutputStream(out).use { zip ->
                 markdownStore.listAll().forEach { file ->
                     zip.putNextEntry(ZipEntry(file.name))
-                    file.inputStream().use { it.copyTo(zip) }
-                    zip.closeEntry()
+                    // closeEntry must run for every opened entry, else `use` closing the stream
+                    // over a dangling entry yields a malformed archive. Contain a secondary
+                    // close failure so it can't be thrown out of finally and mask the primary
+                    // read exception (the read is the true root cause).
+                    try {
+                        file.inputStream().use { it.copyTo(zip) }
+                    } finally {
+                        runCatching { zip.closeEntry() }
+                    }
                 }
             }
         }

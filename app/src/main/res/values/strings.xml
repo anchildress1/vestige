@@ -159,6 +159,10 @@
     <string name="settings_persona_hardass">Hardass</string>
     <string name="settings_persona_editor">Editor</string>
     <string name="settings_export">Export all entries</string>
+    <!-- SAF picks the destination, so the copy stays location-agnostic per docs/ux-copy.md
+         §System Messages. Failure is surfaced honestly — a silently-broken export is the bug. -->
+    <string name="settings_export_success">Entries exported.</string>
+    <string name="settings_export_failed">Export failed. Nothing was written.</string>
     <string name="settings_delete_all">Delete all data</string>
     <string name="settings_model_status">Model status</string>
     <string name="settings_source">Source code</string>

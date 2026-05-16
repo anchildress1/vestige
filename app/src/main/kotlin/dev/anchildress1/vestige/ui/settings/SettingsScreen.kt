@@ -15,12 +15,15 @@ import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
@@ -32,6 +35,7 @@ import dev.anchildress1.vestige.model.Persona
 import dev.anchildress1.vestige.ui.components.EyebrowE
 import dev.anchildress1.vestige.ui.components.VestigeScaffold
 import dev.anchildress1.vestige.ui.theme.VestigeTheme
+import kotlinx.coroutines.launch
 
 /** Static facts for the Settings surface (version + source link), bundled to keep arity low. */
 data class SettingsInfo(val versionLabel: String, val sourceUrl: String)
@@ -39,7 +43,8 @@ data class SettingsInfo(val versionLabel: String, val sourceUrl: String)
 /** Settings actions, grouped so the screen stays a small-arity surface. */
 data class SettingsActions(
     val onSelectPersona: (Persona) -> Unit,
-    val onExportToUri: (Uri) -> Unit,
+    /** Writes the export to [Uri]; returns `true` on success so the screen can confirm honestly. */
+    val onExportToUri: suspend (Uri) -> Boolean,
     val onWipe: () -> Unit,
     val onOpenModelStatus: () -> Unit,
     val onOpenSource: () -> Unit,
@@ -56,11 +61,22 @@ const val WIPE_FIELD_TAG = "settings_wipe_field"
 fun SettingsScreen(persona: Persona, info: SettingsInfo, actions: SettingsActions, modifier: Modifier = Modifier) {
     BackHandler(onBack = actions.onExit)
     var confirmingWipe by remember { mutableStateOf(false) }
+    val snackbarHostState = remember { SnackbarHostState() }
+    val scope = rememberCoroutineScope()
+    val exportOkMessage = stringResource(id = R.string.settings_export_success)
+    val exportFailedMessage = stringResource(id = R.string.settings_export_failed)
     val exportLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.CreateDocument("application/zip"),
-    ) { uri -> uri?.let(actions.onExportToUri) }
+    ) { uri ->
+        if (uri != null) {
+            scope.launch {
+                val ok = actions.onExportToUri(uri)
+                snackbarHostState.showSnackbar(if (ok) exportOkMessage else exportFailedMessage)
+            }
+        }
+    }
 
-    VestigeScaffold(modifier = modifier) { padding ->
+    VestigeScaffold(modifier = modifier, snackbarHost = { SnackbarHost(snackbarHostState) }) { padding ->
         Column(
             modifier = Modifier
                 .fillMaxSize()

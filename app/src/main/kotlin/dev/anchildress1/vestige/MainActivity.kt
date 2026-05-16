@@ -3,6 +3,7 @@ package dev.anchildress1.vestige
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
+import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -50,6 +51,7 @@ import dev.anchildress1.vestige.ui.settings.SettingsActions
 import dev.anchildress1.vestige.ui.settings.SettingsInfo
 import dev.anchildress1.vestige.ui.settings.SettingsScreen
 import dev.anchildress1.vestige.ui.theme.VestigeTheme
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 import java.time.Clock
 import java.time.ZoneId
@@ -217,6 +219,7 @@ private fun MainPostOnboardingContent(
 }
 
 private const val VESTIGE_SOURCE_URL = "https://github.com/anchildress1/vestige"
+private const val SETTINGS_TAG = "SettingsRoute"
 
 @Suppress("LongParameterList") // Settings nav root — host seams are intentionally co-located.
 @androidx.compose.runtime.Composable
@@ -245,10 +248,15 @@ private fun SettingsRoute(
                 scope.launch { onboardingPrefs.setDefaultPersona(picked) }
             },
             onExportToUri = { uri ->
-                scope.launch {
-                    runCatching {
-                        context.contentResolver.openOutputStream(uri)?.use { container.zipAllEntriesTo(it) }
-                    }
+                runCatching {
+                    val target = context.contentResolver.openOutputStream(uri)
+                        ?: error("openOutputStream returned null for the export target")
+                    target.use { container.zipAllEntriesTo(it) }
+                    true
+                }.getOrElse { failure ->
+                    if (failure is CancellationException) throw failure
+                    Log.e(SETTINGS_TAG, "Entry export failed", failure)
+                    false
                 }
             },
             onWipe = {

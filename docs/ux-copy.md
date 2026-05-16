@@ -286,7 +286,7 @@ Card actions (per card, in overflow menu):
 Card actions (non-active cards, in overflow menu):
 - **Restart**
 
-Note: CLOSED · DONE is user-declared (user taps Close). RESOLVED — FADED is AI auto-detected and deferred to v1.5 (`pattern-auto-close` backlog entry). Both states support Restart.
+Note: CLOSED · DONE is model-detected only — the model auto-closes a pattern when it stops appearing in entries (v1.5, `pattern-auto-close` backlog). The section exists in v1 but stays empty until that ships. There is no user Close action (`spec-pattern-action-buttons.md`). DROPPED is user exclusion. Both support Restart.
 
 Empty states:
 
@@ -525,7 +525,8 @@ Use sparingly. Only for actions where the user needs confirmation that something
 | Pattern skipped | `Skipped.` *(with Undo)* |
 | Pattern restarted | `Pattern is back.` *(with Undo)* |
 | Pattern closed (model) | *(no snackbar — silent state change, visible on next list load)* |
-| Export complete | `Exported {N} entries to Downloads.` |
+| Export complete | `Entries exported.` |
+| Export failed | `Export failed. Nothing was written.` |
 | Model re-download started | `Downloading model.` *(opens status screen)* |
 | Model deleted | `Model deleted.` |
 

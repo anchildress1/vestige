@@ -605,6 +605,43 @@ class AppContainerTest {
     }
 
     @Test
+    fun `zipAllEntriesTo surfaces a mid-archive read failure and leaves prior entries intact`(
+        @TempDir tempRoot: File,
+    ) = runTest {
+        val good = File(tempRoot, "good.md").apply { writeText("first") }
+        // Never created — file.inputStream() throws FileNotFoundException after putNextEntry,
+        // exercising the try/finally{closeEntry()} path.
+        val missing = File(tempRoot, "missing.md")
+        val markdownStore = mockk<MarkdownEntryStore>(relaxed = true) {
+            every { listAll() } returns listOf(good, missing)
+        }
+        val container = AppContainer(
+            applicationContext = mockk<Context>(relaxed = true) { every { filesDir } returns tempRoot },
+            boxStoreFactory = { mockk<BoxStore>(relaxed = true) },
+            markdownStoreFactory = { markdownStore },
+            modelPathLoader = { File(tempRoot, "m").absolutePath },
+            backgroundEngineFactory = { _, _ -> mockk<LiteRtLmEngine>(relaxed = true) },
+            recoveredEntryIdsLoader = { emptyList() },
+            foregroundServiceIntentFactory = { Intent("dev.anchildress1.vestige.TEST_START") },
+            foregroundServiceStarter = {},
+            scope = this,
+        )
+        val out = ByteArrayOutputStream()
+
+        val raised = runCatching { container.zipAllEntriesTo(out) }
+
+        // The export is honest about failure — a failed entry read propagates, never swallowed.
+        assertTrue(raised.isFailure, "a mid-archive read failure must propagate, not be swallowed")
+        // closeEntry() ran in finally, so the archive stays parseable and the entry written
+        // before the failure survives instead of being orphaned by a dangling open entry.
+        val names = mutableListOf<String>()
+        ZipInputStream(out.toByteArray().inputStream()).use { zip ->
+            generateSequence { zip.nextEntry }.forEach { names += it.name }
+        }
+        assertTrue(names.contains("good.md"), "the entry completed before the failure must remain in the archive")
+    }
+
+    @Test
     fun `launchVectorBackfillIfReady retries the real pass after artifact states turn complete`() = runTest {
         val modelStore = mockk<ModelArtifactStore>()
         val tokenizerStore = mockk<ModelArtifactStore>()

@@ -37,6 +37,7 @@ import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertNotNull
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
@@ -569,6 +570,36 @@ class AppContainerTest {
             coVerify(exactly = 1) { artifactStore.download(any()) }
             assertEquals(ModelReadiness.Ready, container.modelReadinessFlow.value)
         }
+
+    @Test
+    fun `redownloadMainModel discards a Corrupt download result and lands Loading`(@TempDir tempRoot: File) = runTest {
+        val modelFile = File(tempRoot, "main-model.litertlm")
+        val artifactStore = fakeArtifactStore(artifactFile = modelFile, expectedByteSize = 2L)
+        coEvery { artifactStore.download(any()) } returns ModelArtifactState.Corrupt(
+            expectedSha256 = "expected",
+            actualSha256 = "actual",
+        )
+        val context = mockk<Context>(relaxed = true) {
+            every { filesDir } returns tempRoot
+            every { cacheDir } returns File(tempRoot, "cache").apply { mkdirs() }
+        }
+        val container = AppContainer(
+            applicationContext = context,
+            boxStoreFactory = { mockk<BoxStore>(relaxed = true) },
+            markdownStoreFactory = { mockk<MarkdownEntryStore>(relaxed = true) },
+            modelPathLoader = { modelFile.absolutePath },
+            backgroundEngineFactory = { _, _ -> mockk<LiteRtLmEngine>(relaxed = true) },
+            mainModelArtifactStoreFactory = { _, _, _ -> artifactStore },
+            recoveredEntryIdsLoader = { emptyList() },
+            foregroundServiceIntentFactory = { Intent("dev.anchildress1.vestige.TEST_START") },
+            foregroundServiceStarter = {},
+            scope = this,
+        )
+        container.redownloadMainModel()
+        advanceUntilIdle()
+        assertFalse(modelFile.exists(), "corrupt artifact must be discarded")
+        assertEquals(ModelReadiness.Loading, container.modelReadinessFlow.value)
+    }
 
     @Test
     fun `wipeAllData clears every entity box and every markdown file`(@TempDir tempRoot: File) = runTest {

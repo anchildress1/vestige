@@ -8,7 +8,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import dev.anchildress1.vestige.model.Persona
 import dev.anchildress1.vestige.storage.EntryStore
 import dev.anchildress1.vestige.storage.PatternRepo
 import dev.anchildress1.vestige.storage.PatternStore
@@ -21,13 +20,13 @@ fun PatternsHost(
     patternStore: PatternStore,
     patternRepo: PatternRepo,
     entryStore: EntryStore,
-    persona: Persona,
     zoneId: ZoneId,
     onExit: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     var openPatternId by rememberSaveable { mutableStateOf<String?>(null) }
     var openEntryId by rememberSaveable { mutableStateOf<Long?>(null) }
+    var highlightEntryOnOpen by rememberSaveable { mutableStateOf(false) }
     val listViewModel = remember(patternStore, patternRepo, entryStore) {
         PatternsListViewModel(patternStore, patternRepo, entryStore)
     }
@@ -37,14 +36,20 @@ fun PatternsHost(
 
     when {
         openEntryId != null -> {
-            BackHandler { openEntryId = null }
+            BackHandler {
+                openEntryId = null
+                highlightEntryOnOpen = false
+            }
             EntryDetailHost(
                 entryId = openEntryId!!,
                 entryStore = entryStore,
-                personaName = persona.name,
                 zoneId = zoneId,
-                onBack = { openEntryId = null },
+                onBack = {
+                    openEntryId = null
+                    highlightEntryOnOpen = false
+                },
                 onNewEntry = onExit,
+                highlightOnOpen = highlightEntryOnOpen,
                 modifier = modifier,
             )
         }
@@ -69,7 +74,10 @@ fun PatternsHost(
                     openPatternId = null
                     listViewModel.refresh()
                 },
-                onOpenEntry = { openEntryId = it },
+                onOpenEntry = {
+                    openEntryId = it
+                    highlightEntryOnOpen = true
+                },
                 modifier = modifier,
             )
         }

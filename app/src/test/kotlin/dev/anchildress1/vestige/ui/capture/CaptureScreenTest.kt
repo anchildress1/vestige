@@ -75,7 +75,7 @@ class CaptureScreenTest {
                 kotlinx.coroutines.suspendCancellableCoroutine { /* park */ }
             },
             foregroundInference = ForegroundInferenceCall { _, _ -> error("unreached") },
-            saveAndExtract = SaveAndExtract { _, _, _, _ -> },
+            saveAndExtract = SaveAndExtract { _, _, _, _, _ -> },
             clock = clock,
             zoneId = ZoneOffset.UTC,
             initialReadiness = ModelReadiness.Ready,
@@ -196,7 +196,7 @@ class CaptureScreenTest {
                     followUp = "sounds like a pattern",
                 )
             },
-            saveAndExtract = SaveAndExtract { _, _, _, _ -> },
+            saveAndExtract = SaveAndExtract { _, _, _, _, _ -> },
             clock = clock,
             zoneId = ZoneOffset.UTC,
             initialReadiness = ModelReadiness.Ready,
@@ -215,7 +215,7 @@ class CaptureScreenTest {
                 // cancellation. The test only verifies that the route reaches the placeholder.
                 kotlinx.coroutines.suspendCancellableCoroutine { /* park */ }
             },
-            saveAndExtract = SaveAndExtract { _, _, _, _ -> },
+            saveAndExtract = SaveAndExtract { _, _, _, _, _ -> },
             clock = clock,
             zoneId = ZoneOffset.UTC,
             initialReadiness = readiness,

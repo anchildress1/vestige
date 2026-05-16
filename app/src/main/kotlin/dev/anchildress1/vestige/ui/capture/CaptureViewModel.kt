@@ -42,7 +42,7 @@ class CaptureViewModel(
     private val foregroundInference: ForegroundInferenceCall,
     private val saveAndExtract: SaveAndExtract,
     private val saveTypedEntry: SaveTypedEntry = SaveTypedEntry { text, capturedAt, persona ->
-        saveAndExtract(text, capturedAt, persona, 0L)
+        saveAndExtract(text, capturedAt, persona, 0L, null)
     },
     private val clock: Clock = Clock.systemUTC(),
     private val zoneId: ZoneId = ZoneId.systemDefault(),
@@ -324,6 +324,7 @@ class CaptureViewModel(
                         ZonedDateTime.now(clock.withZone(zoneId)),
                         persona,
                         audio.durationMs,
+                        result.followUp,
                     )
                     _state.update { c ->
                         CaptureUiState.Reviewing(
@@ -396,7 +397,13 @@ fun interface ForegroundInferenceCall {
 
 /** Routes a transcription (voice or typed) into the two-tier save + background extraction pipeline. */
 fun interface SaveAndExtract {
-    suspend operator fun invoke(text: String, capturedAt: ZonedDateTime, persona: Persona, durationMs: Long)
+    suspend operator fun invoke(
+        text: String,
+        capturedAt: ZonedDateTime,
+        persona: Persona,
+        durationMs: Long,
+        followUpText: String?,
+    )
 }
 
 /** Persists typed fallback entries without requiring the local model to be ready first. */

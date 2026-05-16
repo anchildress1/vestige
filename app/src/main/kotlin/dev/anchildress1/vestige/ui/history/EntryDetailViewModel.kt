@@ -17,7 +17,6 @@ import java.time.ZoneId
 class EntryDetailViewModel(
     private val entryId: Long,
     private val entryStore: EntryStore,
-    private val personaName: String,
     private val zoneId: ZoneId,
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) : ViewModel() {
@@ -36,7 +35,7 @@ class EntryDetailViewModel(
             _state.value = runCatching {
                 withContext(ioDispatcher) {
                     entryStore.readEntry(entryId)
-                        ?.let { EntryDetailUiState.Loaded(EntryDetailUiModel.from(it, personaName, zoneId)) }
+                        ?.let { EntryDetailUiState.Loaded(EntryDetailUiModel.from(it, zoneId)) }
                         ?: EntryDetailUiState.NotFound
                 }
             }.getOrElse { e ->

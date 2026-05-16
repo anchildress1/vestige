@@ -109,8 +109,31 @@ class HistoryHostTest {
         assertTrue("onExit should fire when back is pressed at list level", exited)
     }
 
-    private fun seedCompleted(text: String, timestampEpochMs: Long) {
+    @Test
+    fun `openRequest routes directly to entry detail and consumes the one-shot request`() {
+        val entryId = seedCompleted("opened from notification", 1_000_000L)
+        var consumed = false
+
+        composeRule.activity.setContent {
+            HistoryHost(
+                entryStore = entryStore,
+                persona = Persona.WITNESS,
+                onExit = {},
+                zoneId = ZoneOffset.UTC,
+                dataRevision = MutableStateFlow(0L),
+                openRequest = EntryDetailOpenRequest(entryId = entryId, token = 7L),
+                onOpenRequestConsumed = { consumed = true },
+            )
+        }
+
+        composeRule.waitForIdle()
+        composeRule.onNodeWithText("● NEW ENTRY").assertIsDisplayed()
+        assertTrue("openRequest should be consumed after routing", consumed)
+    }
+
+    private fun seedCompleted(text: String, timestampEpochMs: Long): Long {
         val id = entryStore.createPendingEntry(text, Instant.ofEpochMilli(timestampEpochMs))
         entryStore.completeEntry(id, ResolvedExtraction(emptyMap()), templateLabel = null)
+        return id
     }
 }

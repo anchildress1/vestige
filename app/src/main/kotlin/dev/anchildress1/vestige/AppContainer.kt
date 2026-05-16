@@ -349,6 +349,7 @@ class AppContainer(
         timeoutMs: Long? = null,
         persona: Persona = Persona.WITNESS,
         durationMs: Long = 0L,
+        followUpText: String? = null,
     ): SaveOutcome.Pending {
         ensureBackgroundEngineInitialized()
         val outcome = backgroundExtractionSaveFlow.saveAndExtract(
@@ -358,6 +359,7 @@ class AppContainer(
             timeoutMs = timeoutMs,
             persona = persona,
             durationMs = durationMs,
+            followUpText = followUpText,
         )
         launchVectorBackfillIfReady()
         return outcome
@@ -373,7 +375,11 @@ class AppContainer(
             return saveAndExtract(entryText = entryText, capturedAt = capturedAt, persona = persona, durationMs = 0L)
         }
         // Typed entries carry no audio duration. Default 0L is correct — not an omission.
-        val entryId = entryStore.createPendingEntry(entryText, capturedAt.toInstant())
+        val entryId = entryStore.createPendingEntry(
+            entryText = entryText,
+            timestamp = capturedAt.toInstant(),
+            persona = persona,
+        )
         reportExtractionStatus(entryId, ExtractionStatus.PENDING)
         _dataRevision.value += 1
         val completedJob = Job().also { it.complete() }

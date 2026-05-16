@@ -4,6 +4,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
@@ -82,7 +83,6 @@ class PatternsHostTest {
                 patternStore = patternStore,
                 patternRepo = patternRepo,
                 entryStore = entryStore,
-                persona = Persona.WITNESS,
                 zoneId = ZoneOffset.UTC,
             )
         }
@@ -99,6 +99,7 @@ class PatternsHostTest {
         composeRule.onNodeWithText("crashed after standup").performScrollTo().performClick()
         composeRule.waitForIdle()
         composeRule.onNodeWithText("● NEW ENTRY").assertIsDisplayed()
+        composeRule.onNodeWithTag("entry_source_highlight").assertIsDisplayed()
     }
 
     @Test
@@ -109,7 +110,6 @@ class PatternsHostTest {
                 patternStore = patternStore,
                 patternRepo = patternRepo,
                 entryStore = entryStore,
-                persona = Persona.WITNESS,
                 zoneId = ZoneOffset.UTC,
                 onExit = { exited = true },
             )

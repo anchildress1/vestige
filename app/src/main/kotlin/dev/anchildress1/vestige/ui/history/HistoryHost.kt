@@ -2,6 +2,7 @@ package dev.anchildress1.vestige.ui.history
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -23,9 +24,12 @@ fun HistoryHost(
     onExit: () -> Unit,
     zoneId: ZoneId,
     dataRevision: StateFlow<Long>,
+    openRequest: EntryDetailOpenRequest? = null,
+    onOpenRequestConsumed: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     var openEntryId by rememberSaveable { mutableStateOf<Long?>(null) }
+    var highlightOnOpen by rememberSaveable { mutableStateOf(false) }
     val viewModel: HistoryViewModel = viewModel(
         factory = object : ViewModelProvider.Factory {
             @Suppress("UNCHECKED_CAST")
@@ -33,6 +37,12 @@ fun HistoryHost(
                 HistoryViewModel(entryStore, zoneId, dataRevision = dataRevision) as T
         },
     )
+    LaunchedEffect(openRequest?.token) {
+        val request = openRequest ?: return@LaunchedEffect
+        openEntryId = request.entryId
+        highlightOnOpen = request.highlightOnOpen
+        onOpenRequestConsumed()
+    }
 
     when (openEntryId) {
         null -> {
@@ -40,20 +50,29 @@ fun HistoryHost(
             HistoryScreen(
                 viewModel = viewModel,
                 persona = persona,
-                onEntryClick = { openEntryId = it },
+                onEntryClick = {
+                    openEntryId = it
+                    highlightOnOpen = false
+                },
                 modifier = modifier,
             )
         }
 
         else -> {
-            BackHandler { openEntryId = null }
+            BackHandler {
+                openEntryId = null
+                highlightOnOpen = false
+            }
             EntryDetailHost(
                 entryId = openEntryId!!,
                 entryStore = entryStore,
-                personaName = persona.name,
                 zoneId = zoneId,
-                onBack = { openEntryId = null },
+                onBack = {
+                    openEntryId = null
+                    highlightOnOpen = false
+                },
                 onNewEntry = onExit,
+                highlightOnOpen = highlightOnOpen,
                 modifier = modifier,
             )
         }

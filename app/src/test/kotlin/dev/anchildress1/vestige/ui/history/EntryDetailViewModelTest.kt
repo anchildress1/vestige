@@ -3,6 +3,7 @@ package dev.anchildress1.vestige.ui.history
 import app.cash.turbine.test
 import dev.anchildress1.vestige.model.EntryObservation
 import dev.anchildress1.vestige.model.ObservationEvidence
+import dev.anchildress1.vestige.model.Persona
 import dev.anchildress1.vestige.model.ResolvedExtraction
 import dev.anchildress1.vestige.storage.EntryEntity
 import dev.anchildress1.vestige.storage.EntryStore
@@ -72,6 +73,22 @@ class EntryDetailViewModelTest {
         vm.state.test {
             val loaded = awaitItem() as EntryDetailUiState.Loaded
             assertEquals("standup was brutal today", loaded.model.transcription)
+        }
+    }
+
+    @Test
+    fun `state is Loaded with the persisted follow-up and recorded persona`() = runTest {
+        val id = createCompleted(
+            text = "standup was brutal today",
+            followUpText = "What happened after you opened the doc?",
+            persona = Persona.EDITOR,
+        )
+        val vm = buildVm(id)
+
+        vm.state.test {
+            val loaded = awaitItem() as EntryDetailUiState.Loaded
+            assertEquals("What happened after you opened the doc?", loaded.model.followUp)
+            assertEquals("EDITOR", loaded.model.personaName)
         }
     }
 
@@ -184,13 +201,17 @@ class EntryDetailViewModelTest {
     private fun buildVm(entryId: Long): EntryDetailViewModel = EntryDetailViewModel(
         entryId = entryId,
         entryStore = entryStore,
-        personaName = "WITNESS",
         zoneId = zone,
         ioDispatcher = dispatcher,
     )
 
-    private fun createCompleted(text: String): Long {
-        val id = entryStore.createPendingEntry(text, FIXTURE_INSTANT)
+    private fun createCompleted(text: String, followUpText: String? = null, persona: Persona = Persona.WITNESS): Long {
+        val id = entryStore.createPendingEntry(
+            entryText = text,
+            timestamp = FIXTURE_INSTANT,
+            followUpText = followUpText,
+            persona = persona,
+        )
         entryStore.completeEntry(id, ResolvedExtraction(emptyMap()), null)
         return id
     }

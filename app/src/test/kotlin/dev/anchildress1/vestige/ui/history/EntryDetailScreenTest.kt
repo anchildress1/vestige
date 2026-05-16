@@ -10,6 +10,7 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import dev.anchildress1.vestige.model.EntryObservation
 import dev.anchildress1.vestige.model.ObservationEvidence
+import dev.anchildress1.vestige.model.Persona
 import dev.anchildress1.vestige.model.ResolvedExtraction
 import dev.anchildress1.vestige.model.TemplateLabel
 import dev.anchildress1.vestige.storage.EntryEntity
@@ -88,6 +89,21 @@ class EntryDetailScreenTest {
 
         composeRule.onNodeWithTag("entry_transcription").assertIsDisplayed()
         composeRule.onNodeWithText("standup was brutal today").assertIsDisplayed()
+    }
+
+    @Test
+    fun `follow-up text is displayed as the saved model turn`() {
+        val id = createCompleted(
+            text = "standup was brutal today",
+            followUpText = "What did you do right after it ended?",
+            persona = Persona.HARDASS,
+        )
+        setDetail(id)
+
+        composeRule.onNodeWithTag("entry_follow_up").assertIsDisplayed()
+        composeRule.onNodeWithText("What did you do right after it ended?").assertIsDisplayed()
+        composeRule.onNodeWithContentDescription("HARDASS: What did you do right after it ended?")
+            .assertIsDisplayed()
     }
 
     @Test
@@ -221,6 +237,23 @@ class EntryDetailScreenTest {
         assertTrue(newEntryFired)
     }
 
+    @Test
+    fun `source-link highlight cue appears when requested`() {
+        val id = createCompleted("pattern source entry")
+        composeRule.setContent {
+            dev.anchildress1.vestige.ui.theme.VestigeTheme {
+                EntryDetailScreen(
+                    viewModel = buildVm(id),
+                    onBack = {},
+                    onNewEntry = {},
+                    highlightOnOpen = true,
+                )
+            }
+        }
+
+        composeRule.onNodeWithTag("entry_source_highlight").assertIsDisplayed()
+    }
+
     // --- a11y: stat ribbon ---
 
     @Test
@@ -251,13 +284,17 @@ class EntryDetailScreenTest {
     private fun buildVm(id: Long) = EntryDetailViewModel(
         entryId = id,
         entryStore = entryStore,
-        personaName = "WITNESS",
         zoneId = zone,
         ioDispatcher = dispatcher,
     )
 
-    private fun createCompleted(text: String): Long {
-        val id = entryStore.createPendingEntry(text, FIXTURE_INSTANT)
+    private fun createCompleted(text: String, followUpText: String? = null, persona: Persona = Persona.WITNESS): Long {
+        val id = entryStore.createPendingEntry(
+            entryText = text,
+            timestamp = FIXTURE_INSTANT,
+            followUpText = followUpText,
+            persona = persona,
+        )
         entryStore.completeEntry(id, ResolvedExtraction(emptyMap()), null)
         return id
     }

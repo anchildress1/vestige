@@ -12,17 +12,16 @@ import java.time.ZoneId
 fun EntryDetailHost(
     entryId: Long,
     entryStore: EntryStore,
-    personaName: String,
     zoneId: ZoneId,
     onBack: () -> Unit,
     onNewEntry: () -> Unit,
+    highlightOnOpen: Boolean = false,
     modifier: Modifier = Modifier,
 ) {
-    val viewModel = remember(entryId, entryStore, personaName, zoneId) {
+    val viewModel = remember(entryId, entryStore, zoneId) {
         EntryDetailViewModel(
             entryId = entryId,
             entryStore = entryStore,
-            personaName = personaName,
             zoneId = zoneId,
         )
     }
@@ -30,6 +29,7 @@ fun EntryDetailHost(
         viewModel = viewModel,
         onBack = onBack,
         onNewEntry = onNewEntry,
+        highlightOnOpen = highlightOnOpen,
         modifier = modifier,
     )
 }

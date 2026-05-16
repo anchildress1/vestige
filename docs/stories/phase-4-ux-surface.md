@@ -205,13 +205,13 @@ Checked bullets above are the historical record that the Mist tokens shipped to 
 
 **Done when:**
 - [ ] Header shows: timestamp + template label.
-- [ ] Body shows: the entry transcript (one USER turn + one MODEL turn per the v1 single-turn lifecycle, user transcription muted, model follow-up primary, same treatment as Story 4.5).
+- [x] Body shows: the entry transcript (one USER turn + one MODEL turn per the v1 single-turn lifecycle, user transcription muted, model follow-up primary, same treatment as Story 4.5).
 - [ ] A "Tags" row below the transcript shows the model-extracted tags as quiet chips.
 - [ ] A "Observation" section shows the 1-2 per-entry observations (from Story 2.13) with their evidence references.
 - [ ] Reading / Re-eval section is **deferred to Story 4.13** as P1 contingent.
 - [ ] Vocabulary chip cloud below the observation is **deferred to Story 4.13** if it ships at all (it ships only if STT-E passed; otherwise the observation copy carries the vocabulary observation in plain text).
-- [ ] Source-link integration: tapping a pattern source from Story 3.10's pattern detail navigates here and the entry is highlighted briefly.
-- [ ] Notification tap target deep-links here per ADR-004 §"Notification Contract": tapping the system-shade `Reading the entry.` notification opens this screen scrolled to the most recent entry whose `extraction_status` is non-terminal. Falls back to History if no in-flight entry exists at tap time (e.g., the user tapped the notification right as the keep-alive expired).
+- [x] Source-link integration: tapping a pattern source from Story 3.10's pattern detail navigates here and the entry is highlighted briefly.
+- [x] Notification tap target deep-links here per ADR-004 §"Notification Contract": tapping the system-shade `Reading the entry.` notification opens this screen scrolled to the most recent entry whose `extraction_status` is non-terminal. Falls back to History if no in-flight entry exists at tap time (e.g., the user tapped the notification right as the keep-alive expired).
 
 **Notes / risks:** Don't show audio waveform or play-back controls — audio doesn't persist. The entry detail is the *text* view. Per `design-guidelines.md` §"Entry transcript", the user's transcribed words show but never as a waveform.
 

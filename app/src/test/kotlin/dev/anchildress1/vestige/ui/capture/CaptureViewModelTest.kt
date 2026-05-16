@@ -634,9 +634,9 @@ class CaptureViewModelTest {
         inference: ForegroundInferenceCall = ForegroundInferenceCall { _, _ ->
             error("inference call not expected in this test")
         },
-        save: SaveAndExtract = SaveAndExtract { _, _, _, _ -> },
+        save: SaveAndExtract = SaveAndExtract { _, _, _, _, _ -> },
         saveTyped: SaveTypedEntry = SaveTypedEntry { text, capturedAt, persona ->
-            save(text, capturedAt, persona, 0L)
+            save(text, capturedAt, persona, 0L, null)
         },
         initialReadiness: ModelReadiness = ModelReadiness.Loading,
         clockOverride: Clock = clock,
@@ -685,6 +685,7 @@ class CaptureViewModelTest {
             capturedAt: java.time.ZonedDateTime,
             persona: Persona,
             durationMs: Long,
+            followUpText: String?,
         ) {
             invocations.incrementAndGet()
             lastDurationMs = durationMs

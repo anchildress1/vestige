@@ -233,6 +233,7 @@ class AppContainerTest {
                 timeoutMs = null,
                 persona = dev.anchildress1.vestige.model.Persona.WITNESS,
                 durationMs = 0L,
+                followUpText = null,
             )
         } returns expected
         val container = AppContainer(
@@ -259,6 +260,7 @@ class AppContainerTest {
                 timeoutMs = null,
                 persona = dev.anchildress1.vestige.model.Persona.WITNESS,
                 durationMs = 0L,
+                followUpText = null,
             )
         }
     }
@@ -276,6 +278,7 @@ class AppContainerTest {
                 timeoutMs = any(),
                 persona = any(),
                 durationMs = any(),
+                followUpText = any(),
             )
         } answers { SaveOutcome.Pending(entryId = 7L, extractionJob = kotlinx.coroutines.Job()) }
         val container = AppContainer(
@@ -294,7 +297,7 @@ class AppContainerTest {
         container.saveAndExtract("second", capturedAt, timeoutMs = 90_000L)
 
         coVerify(exactly = 1) { engine.initialize() }
-        coVerify(exactly = 2) { saveFlow.saveAndExtract(any(), capturedAt, any(), any(), any(), any()) }
+        coVerify(exactly = 2) { saveFlow.saveAndExtract(any(), capturedAt, any(), any(), any(), any(), any()) }
     }
 
     @Test
@@ -302,7 +305,7 @@ class AppContainerTest {
         val engine = mockk<LiteRtLmEngine>(relaxed = true)
         val saveFlow = mockk<BackgroundExtractionSaveFlow>()
         val capturedAt = ZonedDateTime.of(2026, 5, 11, 7, 21, 24, 0, ZoneId.of("America/New_York"))
-        coEvery { saveFlow.saveAndExtract(any(), any(), any(), any(), any(), any()) } answers {
+        coEvery { saveFlow.saveAndExtract(any(), any(), any(), any(), any(), any(), any()) } answers {
             SaveOutcome.Pending(entryId = 1L, extractionJob = kotlinx.coroutines.Job())
         }
         val container = AppContainer(
@@ -327,6 +330,7 @@ class AppContainerTest {
                 timeoutMs = null,
                 persona = dev.anchildress1.vestige.model.Persona.WITNESS,
                 durationMs = 90_000L,
+                followUpText = null,
             )
         }
     }
@@ -338,7 +342,7 @@ class AppContainerTest {
         val capturedAt = ZonedDateTime.of(2026, 5, 12, 8, 15, 0, 0, ZoneId.of("America/New_York"))
         val expected = SaveOutcome.Pending(entryId = 42L, extractionJob = kotlinx.coroutines.Job())
         var scheduled = 0
-        coEvery { saveFlow.saveAndExtract(any(), any(), any(), any(), any(), any()) } returns expected
+        coEvery { saveFlow.saveAndExtract(any(), any(), any(), any(), any(), any(), any()) } returns expected
 
         val container = AppContainer(
             applicationContext = mockk<Context>(relaxed = true),
@@ -419,6 +423,7 @@ class AppContainerTest {
                     timeoutMs = null,
                     persona = dev.anchildress1.vestige.model.Persona.EDITOR,
                     durationMs = 0L,
+                    followUpText = null,
                 )
             } returns expected
             val context = mockk<Context>(relaxed = true) {
@@ -454,6 +459,7 @@ class AppContainerTest {
                     timeoutMs = null,
                     persona = dev.anchildress1.vestige.model.Persona.EDITOR,
                     durationMs = 0L,
+                    followUpText = null,
                 )
             }
         }

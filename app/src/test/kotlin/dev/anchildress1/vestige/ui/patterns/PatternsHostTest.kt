@@ -10,6 +10,7 @@ import androidx.compose.ui.test.performScrollTo
 import dev.anchildress1.vestige.model.ExtractionStatus
 import dev.anchildress1.vestige.model.PatternKind
 import dev.anchildress1.vestige.model.PatternState
+import dev.anchildress1.vestige.model.Persona
 import dev.anchildress1.vestige.storage.EntryEntity
 import dev.anchildress1.vestige.storage.EntryStore
 import dev.anchildress1.vestige.storage.MarkdownEntryStore
@@ -30,6 +31,7 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import java.io.File
+import java.time.ZoneOffset
 
 /**
  * Exercises the in-process nav graph in PatternsHost. Uses createAndroidComposeRule so the
@@ -71,7 +73,7 @@ class PatternsHostTest {
     }
 
     @Test
-    fun `renders list by default and routes through detail then entry placeholder`() {
+    fun `renders list by default and routes through detail then entry detail`() {
         val supporting = listOf(seedEntry("crashed after standup"))
         seedActivePattern("p-host", "Tuesday Meetings", "Aftermath", "Callout.", supporting)
 
@@ -80,6 +82,8 @@ class PatternsHostTest {
                 patternStore = patternStore,
                 patternRepo = patternRepo,
                 entryStore = entryStore,
+                persona = Persona.WITNESS,
+                zoneId = ZoneOffset.UTC,
             )
         }
 
@@ -91,11 +95,10 @@ class PatternsHostTest {
         composeRule.waitForIdle()
         composeRule.onNodeWithText("Callout.").assertIsDisplayed()
 
-        // Detail → entry placeholder.
+        // Detail → entry detail (real EntryDetailScreen; bottom bar is the stable navigation landmark).
         composeRule.onNodeWithText("crashed after standup").performScrollTo().performClick()
         composeRule.waitForIdle()
-        composeRule.onNodeWithText("Entry").assertIsDisplayed()
-        composeRule.onNodeWithText("crashed after standup").assertIsDisplayed()
+        composeRule.onNodeWithText("● NEW ENTRY").assertIsDisplayed()
     }
 
     @Test
@@ -106,6 +109,8 @@ class PatternsHostTest {
                 patternStore = patternStore,
                 patternRepo = patternRepo,
                 entryStore = entryStore,
+                persona = Persona.WITNESS,
+                zoneId = ZoneOffset.UTC,
                 onExit = { exited = true },
             )
         }

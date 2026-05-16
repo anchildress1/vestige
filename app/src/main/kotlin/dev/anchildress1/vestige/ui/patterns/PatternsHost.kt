@@ -8,20 +8,21 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import dev.anchildress1.vestige.model.Persona
 import dev.anchildress1.vestige.storage.EntryStore
 import dev.anchildress1.vestige.storage.PatternRepo
 import dev.anchildress1.vestige.storage.PatternStore
+import dev.anchildress1.vestige.ui.history.EntryDetailHost
+import java.time.ZoneId
 
-/**
- * Lightweight in-process navigation between list and detail. Story 3.9 / 3.10 both call out
- * "rough navigation" — polish is Phase 4, which adds androidx.navigation. [onExit] unwinds to
- * whatever surface hosts the patterns experience (Phase-1 shell today).
- */
+@Suppress("LongParameterList")
 @Composable
 fun PatternsHost(
     patternStore: PatternStore,
     patternRepo: PatternRepo,
     entryStore: EntryStore,
+    persona: Persona,
+    zoneId: ZoneId,
     onExit: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
@@ -37,10 +38,13 @@ fun PatternsHost(
     when {
         openEntryId != null -> {
             BackHandler { openEntryId = null }
-            EntryDetailPlaceholderScreen(
+            EntryDetailHost(
                 entryId = openEntryId!!,
                 entryStore = entryStore,
+                personaName = persona.name,
+                zoneId = zoneId,
                 onBack = { openEntryId = null },
+                onNewEntry = onExit,
                 modifier = modifier,
             )
         }

@@ -2,6 +2,10 @@ package dev.anchildress1.vestige.ui.history
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
@@ -21,7 +25,7 @@ fun HistoryHost(
     dataRevision: StateFlow<Long>,
     modifier: Modifier = Modifier,
 ) {
-    BackHandler(onBack = onExit)
+    var openEntryId by rememberSaveable { mutableStateOf<Long?>(null) }
     val viewModel: HistoryViewModel = viewModel(
         factory = object : ViewModelProvider.Factory {
             @Suppress("UNCHECKED_CAST")
@@ -29,9 +33,29 @@ fun HistoryHost(
                 HistoryViewModel(entryStore, zoneId, dataRevision = dataRevision) as T
         },
     )
-    HistoryScreen(
-        viewModel = viewModel,
-        persona = persona,
-        modifier = modifier,
-    )
+
+    when (openEntryId) {
+        null -> {
+            BackHandler(onBack = onExit)
+            HistoryScreen(
+                viewModel = viewModel,
+                persona = persona,
+                onEntryClick = { openEntryId = it },
+                modifier = modifier,
+            )
+        }
+
+        else -> {
+            BackHandler { openEntryId = null }
+            EntryDetailHost(
+                entryId = openEntryId!!,
+                entryStore = entryStore,
+                personaName = persona.name,
+                zoneId = zoneId,
+                onBack = { openEntryId = null },
+                onNewEntry = onExit,
+                modifier = modifier,
+            )
+        }
+    }
 }

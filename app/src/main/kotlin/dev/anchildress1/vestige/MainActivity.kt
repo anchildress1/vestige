@@ -83,6 +83,8 @@ class MainActivity : ComponentActivity() {
                         patternStore = container.patternStore,
                         patternRepo = container.patternRepo,
                         entryStore = container.entryStore,
+                        persona = selectedPersona,
+                        zoneId = zoneId,
                         onExit = { screen = PostOnboardingScreen.Capture },
                         modifier = Modifier.fillMaxSize(),
                     )

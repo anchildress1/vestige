@@ -145,6 +145,39 @@ Pretending the v1 decision was forced by capability rather than scope would have
 
 ---
 
+### Addendum (2026-05-15) — user-expectation note: pattern callouts are the cross-entry surface
+
+This ADR closes the multi-turn question for engineers. It does not close the user-expectation
+question. A demo viewer (and a real user past entry one) will reasonably assume "ask another
+follow-up about the previous entry" works — that is the default mental model for any
+chat-shaped UI, and Vestige's Capture screen renders the transcription + follow-up in a
+chat-shape per `design-guidelines.md` §"Entry transcript".
+
+**The product-side answer:** the foreground follow-up sees only this turn's audio by design;
+**pattern callouts are how Vestige references prior entries**, not the follow-up. The
+ADR-002 (2026-05-15) personality addendum's three-beat follow-up shape (declarative +
+adjacent-observable + persona question) deliberately operates on this turn's surfaces only.
+Cross-entry intelligence — "fourth Aftermath in twelve, all post-meeting" — lives on the
+pattern-callout surface (ADR-003 §"Cooldown" + ADR-002 §3 deterministic append step), which
+is appended to the per-entry observation, not to the follow-up.
+
+`concept-locked.md` §"Two-tier processing" gets a one-line note under the v1 single-turn
+scope: *Each follow-up sees only this turn — pattern callouts are how Vestige references
+prior entries, not the follow-up.* Same anti-pushy invariant as everything else in the
+spec; this is preempting one demo question that would otherwise eat 30 seconds of stage
+time.
+
+**What does not change.**
+
+- The v1 single-turn scope decision and the executed code path (one fresh
+  `engine.createConversation()` per call, no `## RECENT TURNS` block, single-use
+  `CaptureSession`).
+- The future-revival path described in §"Future revival path (post-v1)". The user-expectation
+  note above clarifies the *current* product framing; it does not foreclose the SDK-stateful
+  path returning later.
+
+---
+
 ## Action Items
 
 1. [x] Land the v1 single-turn scope decision across docs + code. _(Done across the `docs/stt-b-fallback-and-adr-004` branch commits enumerated above.)_

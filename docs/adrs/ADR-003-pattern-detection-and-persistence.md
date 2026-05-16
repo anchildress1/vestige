@@ -446,3 +446,89 @@ What does not change:
 - Story 3.8's `markResolved` API path and the `PatternAction.MARKED_RESOLVED` enum
   value still retire with Story 4.8, per the prior addendum; Restart adds to the user
   surface, it does not change the retirement plan for the resolved-write path.
+
+### Addendum (2026-05-15) — Phase-3 pre-work + verdict surfacing (queued for post-Phase-4)
+
+Companion to the ADR-002 (2026-05-15) personality + observation-depth addendum. The same
+audit surfaced two structural gaps on the pattern-detection side. Both are queued for
+post-Phase-4 — Scoreboard rebuild lands first. Neither alters the five primitives, the
+content-addressable `pattern_id` rule, the matching predicate, or any persisted shape
+recorded above.
+
+**`time_of_day_cluster` ships in Phase 2's tail, ahead of the Phase-3 pattern-engine work.**
+
+The user-visible cliff between Phase 2 (per-entry observations only) and Phase 3 (cross-
+entry pattern callouts) is the single biggest gap between what the spec promises and what
+the user sees. `time_of_day_cluster` is the cheapest of the five primitives to implement
+in isolation — one signature (`("goblin", null)`), scan-once over the last 30 days, no tag
+enumeration, no commitment-topic enumeration, no vocab-token frequency table.
+
+Implementation lands in `:core-storage` per §"Detection algorithm (run every 10 entries)"
+step 6 with the rest of the five-primitive detector stubbed (`emptyList()` returns from each
+of the other four enumerators). `PatternDetectionOrchestrator` already carries the cooldown
+machinery + tests; wiring `time_of_day_cluster` through it is the integration step. Result:
+the Goblin Hours pattern callout becomes the first cross-entry observation users ever see —
+turns "shallow per-recording response" into "I see a pattern after my third 3am entry"
+without waiting for Phase 3's full pattern-engine landing.
+
+The §"Detection cost" calculus is unchanged (one signature, scan-once is bounded by entry
+count, not by the other primitives' enumerator costs). The §"Pattern title generation"
+short-model-call path runs only when this single primitive crosses threshold, so the Phase-2
+title-generation cost is bounded to one pattern-title model call ever, not per detection
+run.
+
+When Phase 3 lands, the other four enumerators wire in alongside; `time_of_day_cluster`'s
+implementation does not need a rewrite. The §"ObjectBox `Pattern` entity" schema and the
+state machine are the contract this pre-work commits to.
+
+**Verdict chips in entry detail — the convergence resolver becomes a visible product
+surface.**
+
+§"`pattern_id` generation" + ADR-002 §"Convergence Resolver Contract / Resolution rules"
+write per-field verdicts (`canonical` / `candidate` / `ambiguous` / `canonical_with_conflict`)
+that today live in storage and never reach the user except indirectly through the
+deterministic-vs-model observation-generation routing. The Reading section per
+`concept-locked.md` §Re-eval is described as showing per-lens output collapsed; surface the
+**verdict** on each canonical field as a small chip in the same view (`canonical` /
+`candidate` / `ambiguous` / `canonical_with_conflict`).
+
+The data exists in ObjectBox today (Story 2.8 ticked, `ResolvedField.verdict` is persisted
+per Story 2.12). The work is a Phase-4 read path, not a Phase-3 write path. This is the
+demo beat that earns the multi-lens architecture *visually* — judges see "the model
+disagreed with itself here" without needing the technical-walkthrough explanation. ADR-002's
+sixth-addendum rubric verified `canonical_with_conflict` reaches A4 and B2 on the STT-D
+corpus deterministically across three runs; those entries become the demo storyboard
+material when this surfacing lands.
+
+Surfacing belongs to Phase 4 (after the Scoreboard rebuild stabilizes per ADR-011) and the
+chip styling is owned by `design-guidelines.md`. Recording the data ↔ surface contract
+here so the Phase-4 work has the spec it needs.
+
+**Pattern-callout cooldown stays as written; deterministic-observation cooldown
+generalizes from it.**
+
+§"Cooldown (callout-side only, global)" is unchanged. ADR-002 (2026-05-15) introduces a
+parallel `DeterministicObservationCooldown` keyed by `ObservationEvidence` enum value with
+the same 3-entry window and same global semantics as defined here. The two cooldowns
+coexist — one gates pattern-callout *appends* (this ADR), the other gates deterministic
+observation *kinds* (ADR-002). The §"Why global, not per-pattern" rationale generalizes to
+the observation cooldown: per-kind cooldown lets unrelated evidence kinds fire freely while
+suppressing the kind that already fired, which is exactly the noise the user-facing
+deterministic-observation case needs suppressed. Identical knob shape, different keying
+domain.
+
+**What does not change.**
+
+- The five pattern primitives, their thresholds, the matching predicate, the
+  content-addressable `pattern_id` rule, the `Pattern` ObjectBox entity, the lifecycle
+  state machine (with the 2026-05-13 + 2026-05-13b user-action revisions), the global
+  pattern-callout cooldown, the Re-eval `below_threshold` interaction.
+- The "no machine-learning-shaped detection in v1" rationale from §"Pattern primitives".
+  Surfacing verdicts as chips is reading existing engine output, not adding learned
+  detection.
+- The `pattern_id` content-addressable rule. Pre-shipping `time_of_day_cluster` ahead of
+  the other four primitives does not affect its hash inputs (the signature is
+  `("goblin", null)`, defined in §"Pattern primitives" v1 row).
+
+Implementation queued for post-Phase-4. Story file gets entries per item; tracking lives
+in stories, work-decision rationale lives here.

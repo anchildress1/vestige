@@ -435,10 +435,7 @@ class AppContainer(
                 _modelReadinessFlow.value = current
                 if (current is ModelReadiness.Ready && previous !is ModelReadiness.Ready) {
                     scope.launch { recoverPendingExtractions() }
-                    scope.launch {
-                        delay(ENGINE_PREWARM_DELAY_MS)
-                        ensureBackgroundEngineInitialized()
-                    }
+                    scope.launch { ensureBackgroundEngineInitialized() }
                 }
             }
         }
@@ -799,7 +796,6 @@ class AppContainer(
         const val MODEL_ARTIFACTS_SUBDIR = "models"
         const val VECTOR_BACKFILL_RETRY_DELAY_MS = 5_000L
         const val VECTOR_BACKFILL_MAX_RETRIES = 12
-        const val ENGINE_PREWARM_DELAY_MS = 2_000L
         const val PCT_MAX = 100
 
         fun defaultScope(): CoroutineScope {

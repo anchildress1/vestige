@@ -390,11 +390,11 @@ Phase 2 has no capture screen to attach a placeholder to — Story 4.5 builds th
 **As** the AI implementor, **I need** the engine pre-warm in `AppContainer.refreshModelReadiness()` to trigger on a reliable lifecycle signal rather than a hardcoded 2-second delay, **so that** a user who opens the app and taps record within 2 seconds does not block on engine initialization — and users on slower devices who need more than 2 seconds to paint the first frame are also covered.
 
 **Done when:**
-- [ ] Remove `ENGINE_PREWARM_DELAY_MS = 2000L` and the `delay(ENGINE_PREWARM_DELAY_MS)` call from `AppContainer.refreshModelReadiness()`.
-- [ ] Pre-warm fires immediately on model-ready transition: when `probeModelReadiness()` returns `Ready` and prior state was not `Ready`, launch `ensureBackgroundEngineInitialized()` directly on `scope` with no delay.
-- [ ] The pre-warm coroutine runs at `Dispatchers.Default` (or lower priority) so it does not compete with the main thread's UI work. The Mutex inside `ensureBackgroundEngineInitialized()` already ensures only one init runs at a time.
-- [ ] If a recording starts before pre-warm completes, `ensureBackgroundEngineInitialized()` is called inline on the recording path and blocks until init finishes — this behavior is unchanged and is the correct fallback.
-- [ ] Unit test: `AppContainerTest` verifies that pre-warm launches immediately (within one coroutine scheduler tick) after `probeModelReadiness()` returns `Ready` — not after a 2-second delay.
+- [x] Remove `ENGINE_PREWARM_DELAY_MS = 2000L` and the `delay(ENGINE_PREWARM_DELAY_MS)` call from `AppContainer.refreshModelReadiness()`.
+- [x] Pre-warm fires immediately on model-ready transition: when `probeModelReadiness()` returns `Ready` and prior state was not `Ready`, launch `ensureBackgroundEngineInitialized()` directly on `scope` with no delay.
+- [x] The pre-warm coroutine runs at `Dispatchers.Default` (or lower priority) so it does not compete with the main thread's UI work. The Mutex inside `ensureBackgroundEngineInitialized()` already ensures only one init runs at a time. _(`scope` is `Dispatchers.Default` per `defaultScope()`; no change needed.)_
+- [x] If a recording starts before pre-warm completes, `ensureBackgroundEngineInitialized()` is called inline on the recording path and blocks until init finishes — this behavior is unchanged and is the correct fallback.
+- [x] Unit test: `AppContainerTest` verifies that pre-warm launches immediately (within one coroutine scheduler tick) after `probeModelReadiness()` returns `Ready` — not after a 2-second delay. _(`pre-warm fires immediately on Ready transition without a delay`: `coVerify(exactly=1) { engineMock.initialize() }` + `assertEquals(0L, testScheduler.currentTime)`.)_
 - [ ] Manual check: open the app on the reference S24 Ultra; verify engine init completes in background before the first record tap in a typical interaction (>3 seconds between app open and first record).
 
 **Notes / risks:** The 2s delay was added to avoid competing with UI thread on cold open. Switching to `Dispatchers.Default` + the existing Mutex achieves the same isolation without the timing guess. If the Compose frame renderer is still painting when pre-warm launches, coroutine scheduling ensures the init runs on a background thread — no contention with the main thread.

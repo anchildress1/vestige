@@ -1094,6 +1094,36 @@ class AppContainerTest {
     }
 
     @Test
+    fun `pre-warm fires immediately on Ready transition without a delay`(@TempDir tempRoot: File) = runTest {
+        val modelFile = File(tempRoot, "main-model.litertlm").apply { writeText("xx") } // 2 bytes
+        val artifactStore = fakeArtifactStore(artifactFile = modelFile, expectedByteSize = 2L)
+        val context = mockk<Context>(relaxed = true) {
+            every { filesDir } returns tempRoot
+            every { cacheDir } returns File(tempRoot, "cache").apply { mkdirs() }
+        }
+        val engineMock = mockk<LiteRtLmEngine>(relaxed = true)
+        val container = AppContainer(
+            applicationContext = context,
+            boxStoreFactory = { mockk<BoxStore>(relaxed = true) },
+            markdownStoreFactory = { mockk<MarkdownEntryStore>(relaxed = true) },
+            modelPathLoader = { modelFile.absolutePath },
+            backgroundEngineFactory = { _, _ -> engineMock },
+            mainModelArtifactStoreFactory = { _, _, _ -> artifactStore },
+            recoveredEntryIdsLoader = { emptyList() },
+            foregroundServiceIntentFactory = { Intent("dev.anchildress1.vestige.TEST_START") },
+            foregroundServiceStarter = {},
+            scope = this,
+        )
+
+        container.refreshModelReadiness()
+        advanceUntilIdle()
+
+        assertEquals(ModelReadiness.Ready, container.modelReadinessFlow.value)
+        coVerify(exactly = 1) { engineMock.initialize() }
+        assertEquals(0L, testScheduler.currentTime, "pre-warm must fire without advancing virtual time")
+    }
+
+    @Test
     fun `refreshModelReadiness skips emitting when the readiness has not changed`(@TempDir tempRoot: File) = runTest {
         val modelFile = File(tempRoot, "absent.litertlm")
         val artifactStore = fakeArtifactStore(artifactFile = modelFile, expectedByteSize = 1L)

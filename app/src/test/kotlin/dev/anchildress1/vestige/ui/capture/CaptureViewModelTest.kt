@@ -178,6 +178,14 @@ class CaptureViewModelTest {
     }
 
     @Test
+    fun `mic permanently blocked surfaces MicBlocked, not MicDenied`() {
+        val vm = newViewModel(initialReadiness = ModelReadiness.Ready)
+        vm.onMicDenied(permanentlyBlocked = true)
+        val state = vm.state.value as CaptureUiState.Idle
+        assertEquals(CaptureError.MicBlocked, state.error)
+    }
+
+    @Test
     fun `dismissError clears the error in Idle`() {
         val vm = newViewModel(initialReadiness = ModelReadiness.Ready)
         vm.onMicDenied()

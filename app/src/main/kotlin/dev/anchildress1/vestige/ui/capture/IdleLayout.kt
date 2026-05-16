@@ -71,6 +71,7 @@ fun IdleLayout(
             error = state.error,
             readiness = state.modelReadiness,
             modifier = Modifier.padding(horizontal = 18.dp),
+            onUseTyped = onTypeTap,
         )
         HeroBlock()
         Spacer(modifier = Modifier.height(8.dp))

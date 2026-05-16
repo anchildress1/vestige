@@ -1,6 +1,9 @@
 package dev.anchildress1.vestige.ui.capture
 
 import android.Manifest
+import android.app.Activity
+import android.content.Context
+import android.content.ContextWrapper
 import android.content.pm.PackageManager
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -38,6 +41,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.testTag
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.anchildress1.vestige.model.Persona
@@ -45,6 +49,19 @@ import dev.anchildress1.vestige.ui.components.AppTop
 import dev.anchildress1.vestige.ui.components.AppTopStatuses
 import dev.anchildress1.vestige.ui.components.EyebrowE
 import dev.anchildress1.vestige.ui.theme.VestigeTheme
+
+private tailrec fun Context.findActivity(): Activity? = when (this) {
+    is Activity -> this
+    is ContextWrapper -> baseContext.findActivity()
+    else -> null
+}
+
+// Denied + no rationale after an explicit ask ⇒ system-level "don't ask again": surface the
+// Settings path + typed-entry fallback instead of a dead Retry.
+private fun Context.isMicPermanentlyBlocked(): Boolean {
+    val activity = findActivity() ?: return false
+    return !ActivityCompat.shouldShowRequestPermissionRationale(activity, Manifest.permission.RECORD_AUDIO)
+}
 
 /**
  * Route composable for the capture surface. Owns the mic permission launcher and dispatches
@@ -66,7 +83,11 @@ fun CaptureScreen(
     val state by viewModel.state.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val launcher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
-        if (granted) viewModel.startRecording() else viewModel.onMicDenied()
+        if (granted) {
+            viewModel.startRecording()
+        } else {
+            viewModel.onMicDenied(permanentlyBlocked = context.isMicPermanentlyBlocked())
+        }
     }
     val onRecTap = remember(viewModel, launcher, context) {
         {

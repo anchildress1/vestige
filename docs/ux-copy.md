@@ -422,7 +422,8 @@ Diff actions:
 | Mic permission permanently denied (system-level, "don't ask again") | `Mic blocked at the system level.` / `Settings → Apps → Vestige → Permissions → Microphone.` / secondary action: `Use typed entry instead` |
 | Mic hardware unavailable | `Mic unavailable. Try typing.` |
 | Inference timeout | `Model timed out. Try a shorter chunk.` |
-| Inference failed | `Model couldn't read that. Try again.` |
+| Inference failed (parse) | `Model couldn't read that. Try again.` |
+| Inference failed (engine) | `Reading failed. Try again.` |
 | Storage full | `Phone storage full. Free up space and try again.` |
 | Audio recording failed | `Recording failed. Try again.` |
 | Entry save failed | `Entry not saved. Try again.` |

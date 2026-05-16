@@ -45,7 +45,7 @@ class AudioCapture(
     fun captureChunks(): Flow<AudioChunk> = flow {
         val samplesPerChunk = (sampleRateHz.toLong() * chunkDurationMs / MS_PER_SECOND).toInt()
         val bufferBytes = resolveBufferBytes()
-        val readBuffer = FloatArray(bufferBytes / BYTES_PER_FLOAT)
+        val readBuffer = FloatArray(readFrameSamples())
         val record = openAudioRecord(bufferBytes)
         val builder = ChunkBuilder(samplesPerChunk)
         activeRecord = record
@@ -113,6 +113,13 @@ class AudioCapture(
         return AudioChunk(samples = complete.first(), sampleRateHz = sampleRateHz, isFinal = true)
     }
 
+    // Per-read window. The AudioRecord internal buffer stays >= 1 s (overrun-safe) but we pull it
+    // in small frames so the read loop re-checks `stopRequested` ~20x/s. Without this, a STOP tap
+    // landed mid-`read(... READ_BLOCKING)` and the loop stayed parked until the whole >= 1 s buffer
+    // filled — on stop the recording appeared to keep running. `internal` for JVM testability.
+    internal fun readFrameSamples(): Int =
+        (sampleRateHz.toLong() * READ_FRAME_MS / MS_PER_SECOND).toInt().coerceAtLeast(1)
+
     private fun resolveBufferBytes(): Int {
         val minBufferBytes = AudioRecord.getMinBufferSize(
             sampleRateHz,
@@ -164,6 +171,7 @@ class AudioCapture(
     companion object {
         const val SAMPLE_RATE_HZ: Int = 16_000
         const val CHUNK_DURATION_MS: Long = 30_000L
+        private const val READ_FRAME_MS: Long = 50L
         private const val BYTES_PER_FLOAT: Int = 4
         private const val MS_PER_SECOND: Long = 1_000L
         private const val JNI_RELEASE_BUDGET_MS: Long = 100L

@@ -4,7 +4,7 @@
 
 **Category:** On-device brain tracker (cognition tracker), not a journaling app and not a mental wellness app.
 
-**Hook:** "I built a brain tracker that doesn't blow smoke up your ass."
+**Hook:** "I wrote a brain tracker that won't blow smoke up your ass."
 
 **Tagline:** *Vestige (n.) — a trace, mark, or visible evidence of something no longer present. Your brain keeps leaving traces. This app catches them.*
 
@@ -28,12 +28,12 @@
 Templates are no longer user-picked. Capture screen has no template grid. The user just records or types. The agent labels each entry post-extraction based on which surfaces dominate.
 
 Six labels:
-- **Aftermath** — energy crash (State surface signals: `state_descriptor` = "crashed" + state shift evidence)
-- **Tunnel exit** — hyperfocus debrief (Behavioral surface: focus subject + extended duration + things-ignored mentions)
-- **Concrete shoes** — task paralysis (Behavioral surface: stuck task + resistance markers)
-- **Decision spiral** — rumination loop (State surface: decision-looping + iteration markers)
-- **Goblin hours** — 3am spiral (Time-of-day context between midnight–5am + State surface late-night markers; **shorter follow-up cadence applied automatically by context-aware prompting**, not template selection)
-- **Audit** — catch-all when no archetype dominates
+- **Crashed** — energy crash (State surface signals: `state_descriptor` = "crashed" + state shift evidence)
+- **Deep Space** — hyperfocus debrief (Behavioral surface: focus subject + extended duration + things-ignored mentions)
+- **Busy Stalling** — task paralysis (Behavioral surface: stuck task + resistance markers)
+- **Nonstop Spiral** — rumination loop (State surface: decision-looping + iteration markers)
+- **Goblin Hours** — 3am spiral (Time-of-day context between midnight–5am + State surface late-night markers; **shorter follow-up cadence applied automatically by context-aware prompting**, not template selection)
+- **Brain Dump** — catch-all when no archetype dominates
 
 Echoes is not a template — recurrence is pattern-engine output across entries.
 
@@ -62,7 +62,7 @@ Each entry runs through a **3-lens × 5-surface** extraction pipeline. Three len
 - Skeptical flags conflict even when others agree → **canonical with conflict marker**
 
 **Two-tier processing:**
-- *Foreground:* fast pass returns transcription + follow-up question only. **Single-turn-per-capture** as a v1 scope choice (the STT-B prompt-stuffing pattern was tested and produced retention=0.0; the LiteRT-LM SDK's stateful Conversation path was not measured — see `adrs/ADR-005-stt-b-scope-and-v1-single-turn.md` (amends `adrs/ADR-002-multi-lens-extraction-pattern.md` §"Multi-turn behavior")). Each tap of record begins a fresh exchange and the model never sees prior turns.
+- *Foreground:* fast pass returns transcription + follow-up question only. **Single-turn-per-capture** as a v1 scope choice (the STT-B prompt-stuffing pattern was tested and produced retention=0.0; the LiteRT-LM SDK's stateful Conversation path was not measured — see `adrs/ADR-005-stt-b-scope-and-v1-single-turn.md` (amends `adrs/ADR-002-multi-lens-extraction-pattern.md` §"Multi-turn behavior")). Each tap of record begins a fresh exchange and the model never sees prior turns. **Each follow-up sees only this turn — pattern callouts are how Vestige references prior entries, not the follow-up.** (Per `adrs/ADR-005-stt-b-scope-and-v1-single-turn.md` §"Addendum (2026-05-15)".)
 - *Background:* 3-lens multi-pass runs after the chunk is acknowledged. Canonical extraction populates over the next 30–90 seconds.
 
 ## Schema (minimal v1)
@@ -108,7 +108,7 @@ The product produces useful observable signal from entry one — not validation,
 **Roast me button (P1)** — on-demand deep analysis across history, available in patterns view after the normal pattern list works. User-initiated, no hard threshold: button may be visible from entry one, but generation may return the insufficient-data fallback copy from `ux-copy.md` when there is not enough history to make a sourced roast. Output must always be sourced (counts, dates, quotes); never freeform speculation.
 
 ## Pattern persistence
-- Surfaced patterns persist as their own list, skippable / droppable / user-closeable
+- Surfaced patterns persist as their own list, skippable / droppable / model-closeable (v1.5)
 - Own tab in the app
 - Pattern interpretation allowed (counts, co-occurrences, vocabulary). Feelings/motivation interpretation forbidden. "Fourth Crashed in twelve, all post-meeting" — yes. "You might be feeling overwhelmed" — never.
 

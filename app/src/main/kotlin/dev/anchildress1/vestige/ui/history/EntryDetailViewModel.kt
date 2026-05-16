@@ -10,6 +10,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.time.ZoneId
@@ -19,30 +20,31 @@ class EntryDetailViewModel(
     private val entryStore: EntryStore,
     private val zoneId: ZoneId,
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
+    dataRevision: StateFlow<Long> = MutableStateFlow(0L),
 ) : ViewModel() {
 
     private val _state = MutableStateFlow<EntryDetailUiState>(EntryDetailUiState.Loading)
     val state: StateFlow<EntryDetailUiState> = _state.asStateFlow()
 
     init {
-        load()
+        viewModelScope.launch {
+            dataRevision.collectLatest { load() }
+        }
     }
 
-    private fun load() {
-        viewModelScope.launch {
-            // Projection runs inside the IO context: EntryEntity.tags is a lazy ObjectBox
-            // ToMany whose resolution would otherwise hit the database on the main thread.
-            _state.value = runCatching {
-                withContext(ioDispatcher) {
-                    entryStore.readEntry(entryId)
-                        ?.let { EntryDetailUiState.Loaded(EntryDetailUiModel.from(it, zoneId)) }
-                        ?: EntryDetailUiState.NotFound
-                }
-            }.getOrElse { e ->
-                if (e is CancellationException) throw e
-                Log.e(TAG, "readEntry failed for id=$entryId", e)
-                EntryDetailUiState.NotFound
+    private suspend fun load() {
+        // Projection runs inside the IO context: EntryEntity.tags is a lazy ObjectBox
+        // ToMany whose resolution would otherwise hit the database on the main thread.
+        _state.value = runCatching {
+            withContext(ioDispatcher) {
+                entryStore.readEntry(entryId)
+                    ?.let { EntryDetailUiState.Loaded(EntryDetailUiModel.from(it, zoneId)) }
+                    ?: EntryDetailUiState.NotFound
             }
+        }.getOrElse { e ->
+            if (e is CancellationException) throw e
+            Log.e(TAG, "readEntry failed for id=$entryId", e)
+            EntryDetailUiState.NotFound
         }
     }
 

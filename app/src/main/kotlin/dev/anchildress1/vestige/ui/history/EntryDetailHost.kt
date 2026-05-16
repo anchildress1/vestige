@@ -4,6 +4,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import dev.anchildress1.vestige.storage.EntryStore
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import java.time.ZoneId
 
 /** Wires [EntryDetailViewModel] to [EntryDetailScreen]. */
@@ -13,6 +15,7 @@ fun EntryDetailHost(
     entryId: Long,
     entryStore: EntryStore,
     zoneId: ZoneId,
+    dataRevision: StateFlow<Long> = MutableStateFlow(0L),
     onBack: () -> Unit,
     onNewEntry: () -> Unit,
     highlightOnOpen: Boolean = false,
@@ -23,6 +26,7 @@ fun EntryDetailHost(
             entryId = entryId,
             entryStore = entryStore,
             zoneId = zoneId,
+            dataRevision = dataRevision,
         )
     }
     EntryDetailScreen(

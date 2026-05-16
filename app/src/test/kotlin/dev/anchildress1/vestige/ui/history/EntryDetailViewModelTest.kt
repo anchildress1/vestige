@@ -5,6 +5,7 @@ import dev.anchildress1.vestige.model.EntryObservation
 import dev.anchildress1.vestige.model.ObservationEvidence
 import dev.anchildress1.vestige.model.Persona
 import dev.anchildress1.vestige.model.ResolvedExtraction
+import dev.anchildress1.vestige.model.TemplateLabel
 import dev.anchildress1.vestige.storage.EntryEntity
 import dev.anchildress1.vestige.storage.EntryStore
 import dev.anchildress1.vestige.storage.MarkdownEntryStore
@@ -15,6 +16,7 @@ import dev.anchildress1.vestige.testing.openInMemoryBoxStore
 import io.objectbox.BoxStore
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
@@ -250,6 +252,28 @@ class EntryDetailViewModelTest {
         }
     }
 
+    @Test
+    fun `state reloads when dataRevision changes so in-flight detail reflects completion`() = runTest {
+        val dataRevision = MutableStateFlow(0L)
+        val id = entryStore.createPendingEntry("pending entry", FIXTURE_INSTANT)
+        val vm = buildVm(entryId = id, dataRevision = dataRevision)
+
+        vm.state.test {
+            val initial = awaitItem() as EntryDetailUiState.Loaded
+            assertNull(initial.model.templateLabel)
+
+            entryStore.completeEntry(
+                id,
+                ResolvedExtraction(emptyMap()),
+                TemplateLabel.AFTERMATH,
+            )
+            dataRevision.value = 1L
+
+            val reloaded = awaitItem() as EntryDetailUiState.Loaded
+            assertEquals("AFTERMATH", reloaded.model.templateLabel)
+        }
+    }
+
     // --- persona ---
 
     @Test
@@ -332,11 +356,15 @@ class EntryDetailViewModelTest {
 
     // --- helper ---
 
-    private fun buildVm(entryId: Long): EntryDetailViewModel = EntryDetailViewModel(
+    private fun buildVm(
+        entryId: Long,
+        dataRevision: MutableStateFlow<Long> = MutableStateFlow(0L),
+    ): EntryDetailViewModel = EntryDetailViewModel(
         entryId = entryId,
         entryStore = entryStore,
         zoneId = zone,
         ioDispatcher = dispatcher,
+        dataRevision = dataRevision,
     )
 
     private fun createCompleted(text: String, followUpText: String? = null, persona: Persona = Persona.WITNESS): Long {

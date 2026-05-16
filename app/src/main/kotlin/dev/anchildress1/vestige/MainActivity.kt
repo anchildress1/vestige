@@ -55,7 +55,7 @@ class MainActivity : ComponentActivity() {
         val onboardingPrefs = OnboardingPrefs.from(this)
         val clock = Clock.systemDefaultZone()
         val zoneId: ZoneId = ZoneId.systemDefault()
-        pendingLaunchTarget = resolvePostOnboardingLaunchTarget(intent, container.entryStore, nextLaunchToken++)
+        pendingLaunchTarget = consumePostOnboardingLaunchTarget(intent, container.entryStore, nextLaunchToken++)
         setContent {
             MainActivityContent(
                 container = container,
@@ -74,7 +74,7 @@ class MainActivity : ComponentActivity() {
         super.onNewIntent(intent)
         setIntent(intent)
         val container = (application as VestigeApplication).appContainer
-        pendingLaunchTarget = resolvePostOnboardingLaunchTarget(intent, container.entryStore, nextLaunchToken++)
+        pendingLaunchTarget = consumePostOnboardingLaunchTarget(intent, container.entryStore, nextLaunchToken++)
     }
 }
 
@@ -201,6 +201,18 @@ internal fun resolvePostOnboardingLaunchTarget(
     } else {
         PostOnboardingLaunchTarget.History(token = token)
     }
+}
+
+internal fun consumePostOnboardingLaunchTarget(
+    intent: Intent?,
+    entryStore: EntryStore,
+    token: Long,
+): PostOnboardingLaunchTarget {
+    val target = resolvePostOnboardingLaunchTarget(intent, entryStore, token)
+    if (intent?.getBooleanExtra(EXTRA_OPEN_LATEST_IN_FLIGHT_ENTRY, false) == true) {
+        intent.removeExtra(EXTRA_OPEN_LATEST_IN_FLIGHT_ENTRY)
+    }
+    return target
 }
 
 internal const val EXTRA_OPEN_LATEST_IN_FLIGHT_ENTRY: String =

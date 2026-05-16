@@ -18,7 +18,7 @@ import java.time.ZoneId
 
 @Composable
 @Suppress("LongParameterList") // Route-level host; dataRevision + modifier are structural, not business.
-fun HistoryHost(
+fun HistoryHost( // NOSONAR kotlin:S107
     entryStore: EntryStore,
     persona: Persona,
     onExit: () -> Unit,
@@ -67,6 +67,7 @@ fun HistoryHost(
                 entryId = openEntryId!!,
                 entryStore = entryStore,
                 zoneId = zoneId,
+                dataRevision = dataRevision,
                 onBack = {
                     openEntryId = null
                     highlightOnOpen = false

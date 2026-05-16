@@ -4,6 +4,7 @@ import android.content.Intent
 import dev.anchildress1.vestige.storage.EntryStore
 import io.mockk.every
 import io.mockk.mockk
+import io.mockk.verify
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
@@ -44,5 +45,19 @@ class MainActivityLaunchTargetTest {
         val target = resolvePostOnboardingLaunchTarget(intent = intent, entryStore = entryStore, token = 11L)
 
         assertEquals(PostOnboardingLaunchTarget.History(token = 11L), target)
+    }
+
+    @Test
+    fun `consumePostOnboardingLaunchTarget clears the one-shot extra after use`() {
+        val entryStore = mockk<EntryStore> {
+            every { mostRecentNonTerminalEntryId() } returns 42L
+        }
+        val intent = mockk<Intent>(relaxed = true)
+        every { intent.getBooleanExtra(EXTRA_OPEN_LATEST_IN_FLIGHT_ENTRY, false) } returns true
+
+        val target = consumePostOnboardingLaunchTarget(intent = intent, entryStore = entryStore, token = 13L)
+
+        assertEquals(PostOnboardingLaunchTarget.HistoryDetail(entryId = 42L, token = 13L), target)
+        verify(exactly = 1) { intent.removeExtra(EXTRA_OPEN_LATEST_IN_FLIGHT_ENTRY) }
     }
 }

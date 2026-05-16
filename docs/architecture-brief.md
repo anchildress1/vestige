@@ -50,7 +50,7 @@ Use manual constructor injection. No Hilt in v1.
 3. `:core-inference` downmixes/resamples/normalizes audio to Gemma's model-level target: mono 16 kHz float32 samples in `[-1, 1]`, max 30 seconds per clip.
 4. STT-A (Phase 1 audio plumbing) locks the exact LiteRT-LM Android handoff: `Content.AudioBytes(...)` packing or temp `Content.AudioFile(...)`.
 5. Foreground Gemma call returns transcription + follow-up.
-6. `EntryStore` persists transcription as `entry_text` and writes markdown before background extraction starts.
+6. `EntryStore` persists the foreground exchange before background extraction starts: transcription as `entry_text`, saved model turn as `follow_up` when present, and the recorded `persona` that authored it.
 7. Background extraction runs three sequential lens calls.
 8. Convergence resolver writes canonical/candidate/ambiguous fields plus `entry_observations`.
 9. Pattern detection runs after the configured threshold and persists sourced patterns.
@@ -61,6 +61,8 @@ Audio bytes are never product data. If temp audio files are required for LiteRT-
 
 Content fields:
 - `entry_text`
+- `follow_up`
+- `persona`
 - `timestamp`
 - `template_label`
 - `tags`
@@ -93,12 +95,14 @@ Markdown files are the source of truth per `concept-locked.md` §"Memory archite
 
 ### File format
 
-YAML frontmatter, then plain markdown body. Frontmatter holds the structured fields; body holds `entry_text` exactly as captured.
+YAML frontmatter, then plain markdown body. Frontmatter holds the structured fields for the saved exchange; body holds `entry_text` exactly as captured.
 
 ```yaml
 ---
 schema_version: 1
 timestamp: 2026-05-08T14:32:15Z
+persona: witness
+follow_up: What happened right after that?
 template_label: aftermath
 energy_descriptor: crashed
 recurrence_link: a3f9c2b8d4e7f1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6
@@ -131,6 +135,8 @@ Standup ran long again. I was fine before it, then completely flattened by 11. O
 |---|---|---|
 | `entry_text` | body | Exactly as captured. No transformation. Trailing newline only. |
 | `timestamp` | frontmatter | UTC, ISO-8601 with seconds, no fractional. |
+| `persona` | frontmatter | Lowercase enum value for the saved model turn's author (`witness`, `hardass`, `editor`). |
+| `follow_up` | frontmatter | Saved model turn for single-turn voice captures, or `null` when no follow-up exists. |
 | `duration_ms` | frontmatter | Millis of captured audio; `0` for typed entries and rows written before Story 4.6. |
 | `template_label` | frontmatter | Lowercase enum value (one of: aftermath, tunnel-exit, concrete-shoes, decision-spiral, goblin-hours, audit). |
 | `tags` | frontmatter list | Lowercase, kebab-case. Sorted lexicographically on write for diff stability. |
@@ -182,4 +188,3 @@ Per ADR-001 §Q5 the keystore lives outside the repo and is referenced via `keys
 If `keystore.properties` is absent the release variant falls back to the debug keystore so the build still completes for agent loops — the Gradle warning makes this loud. The Phase 6 submission build must use the real key; the build operator confirms by checking the WARN line is absent.
 
 If the keystore is lost: a sideload upgrade to a differently-signed APK requires the user to uninstall first. Document that limitation in the README before submission.
-

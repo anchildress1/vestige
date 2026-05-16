@@ -60,8 +60,15 @@ class BackgroundExtractionSaveFlow(
         timeoutMs: Long? = null,
         persona: Persona = Persona.WITNESS,
         durationMs: Long = 0L,
+        followUpText: String? = null,
     ): SaveOutcome.Pending {
-        val entryId = entryStore.createPendingEntry(entryText, capturedAt.toInstant(), durationMs)
+        val entryId = entryStore.createPendingEntry(
+            entryText = entryText,
+            timestamp = capturedAt.toInstant(),
+            durationMs = durationMs,
+            followUpText = followUpText,
+            persona = persona,
+        )
         val terminalRelay = DeferredTerminalRelay(listenerFactory(entryId))
         // Emit PENDING before launching the detached coroutine — otherwise a fast-failing
         // extraction can emit RUNNING/FAILED first and this report would overwrite the

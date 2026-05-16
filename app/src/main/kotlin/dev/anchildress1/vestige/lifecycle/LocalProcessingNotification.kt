@@ -7,6 +7,7 @@ import android.content.Context
 import android.content.Intent
 import androidx.core.app.NotificationCompat
 import androidx.core.content.getSystemService
+import dev.anchildress1.vestige.EXTRA_OPEN_LATEST_IN_FLIGHT_ENTRY
 import dev.anchildress1.vestige.MainActivity
 import dev.anchildress1.vestige.R
 
@@ -45,6 +46,7 @@ internal object LocalProcessingNotification {
     private fun buildTapIntent(context: Context): PendingIntent {
         val intent = Intent(context, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
+            putExtra(EXTRA_OPEN_LATEST_IN_FLIGHT_ENTRY, true)
         }
         return PendingIntent.getActivity(
             context,

@@ -16,6 +16,52 @@ dependencies {
     kover(project(":core-storage"))
 }
 
+// Compose @Composable screen/host files cap at ~50% branch coverage from the Compose
+// compiler's `Composer` + `$changed` synthetics (kotlinx-kover #756 — "Wrong branch
+// coverage for composables"). Single source of truth: kover wants FQCN class globs,
+// Sonar wants source paths — both derive from this list, so a new screen is one line,
+// not six across two formats. Non-Composable logic lives in its own classes/files and
+// stays counted. Behaviour is covered by the *ScreenTest.kt Robolectric suites.
+val composeScreenExclusions = listOf(
+    "ui.history.HistoryHost",
+    "ui.history.HistoryRow",
+    "ui.history.HistoryScreen",
+    "ui.history.EntryDetailHost",
+    "ui.history.EntryDetailScreen",
+    "ui.patterns.PatternsListScreen",
+    "ui.patterns.PatternDetailScreen",
+    "ui.patterns.PatternsHost",
+    "ui.patterns.EntryDetailPlaceholderScreen",
+    "ui.patterns.TraceBar",
+    "ui.patterns.TraceBarE",
+    "ui.onboarding.OnboardingHost",
+    "ui.onboarding.OnboardingStepContent",
+    "ui.onboarding.OnboardingScaffold",
+    "ui.onboarding.OnboardingScreens",
+    "ui.onboarding.PersonaPickScreen",
+    "ui.onboarding.WiringScreen",
+    "ui.onboarding.ModelDownloadPlaceholderScreen",
+    "ui.components.ScoreboardPrimitives",
+    "ui.components.VestigeSurface",
+    "ui.components.VestigeScaffold",
+    "ui.components.AccentModifiers",
+    "ui.capture.IdleLayout",
+    "ui.capture.LiveLayout",
+    "ui.capture.RecButton",
+    "ui.capture.LiveLevelBars",
+    "ui.capture.ChunkProgressBar",
+    "ui.capture.CaptureScreen",
+    "ui.capture.TypeEntrySheet",
+)
+
+// kover form: the file-class `XKt`, its `XKt*` synthetics, and Compose's
+// `*XKt*` (`ComposableSingletons$XKt`) lambda holder — three globs per screen.
+val koverComposeClassGlobs: List<String> = composeScreenExclusions.flatMap { rel ->
+    val pkg = "dev.anchildress1.vestige." + rel.substringBeforeLast('.')
+    val kt = rel.substringAfterLast('.') + "Kt"
+    listOf("$pkg.$kt", "$pkg.$kt*", "$pkg.*$kt*")
+}
+
 kover {
     reports {
         total {
@@ -28,7 +74,10 @@ kover {
                     // `ComposableSingletons$MainActivityKt` lambda holder, which lives in the
                     // root package alongside MainActivity. `CaptureViewModelFactory` is lifecycle
                     // factory glue; tested business derivations live in `CaptureHostModels.kt`.
+                    // Compose screen/host files are generated from `composeScreenExclusions`
+                    // (single source of truth shared with Sonar) — see the val above the block.
                     classes(
+                        *koverComposeClassGlobs.toTypedArray(),
                         "dev.anchildress1.vestige.MainActivity",
                         "dev.anchildress1.vestige.MainActivity*",
                         "dev.anchildress1.vestige.MainActivityKt",
@@ -39,102 +88,6 @@ kover {
                         "dev.anchildress1.vestige.VestigeApplication",
                         "dev.anchildress1.vestige.VestigeApplication*",
                         "dev.anchildress1.vestige.ui.theme.*",
-                        // Compose screen files. JVM Compose UI tests under Robolectric cover the
-                        // user-visible behaviour (see *ScreenTest.kt), but branch coverage on
-                        // @Composable functions caps at ~50% because the Compose compiler injects
-                        // `Composer` + `$changed` Int args that produce uncoverable
-                        // `if ($changed != 0 || !composer.skipping)` branches.
-                        // Reference: kotlinx-kover #756 — "Wrong branch coverage for composables".
-                        // History screen Composables — same Composer / $changed branch tax
-                        // as other screen files (kotlinx-kover #756).
-                        "dev.anchildress1.vestige.ui.history.HistoryHostKt",
-                        "dev.anchildress1.vestige.ui.history.HistoryHostKt*",
-                        "dev.anchildress1.vestige.ui.history.*HistoryHostKt*",
-                        "dev.anchildress1.vestige.ui.history.HistoryRowKt",
-                        "dev.anchildress1.vestige.ui.history.HistoryRowKt*",
-                        "dev.anchildress1.vestige.ui.history.*HistoryRowKt*",
-                        "dev.anchildress1.vestige.ui.history.HistoryScreenKt",
-                        "dev.anchildress1.vestige.ui.history.HistoryScreenKt*",
-                        "dev.anchildress1.vestige.ui.history.*HistoryScreenKt*",
-                        "dev.anchildress1.vestige.ui.patterns.PatternsListScreenKt",
-                        "dev.anchildress1.vestige.ui.patterns.PatternsListScreenKt*",
-                        "dev.anchildress1.vestige.ui.patterns.*PatternsListScreenKt*",
-                        "dev.anchildress1.vestige.ui.patterns.PatternDetailScreenKt",
-                        "dev.anchildress1.vestige.ui.patterns.PatternDetailScreenKt*",
-                        "dev.anchildress1.vestige.ui.patterns.*PatternDetailScreenKt*",
-                        "dev.anchildress1.vestige.ui.patterns.PatternsHostKt",
-                        "dev.anchildress1.vestige.ui.patterns.PatternsHostKt*",
-                        "dev.anchildress1.vestige.ui.patterns.*PatternsHostKt*",
-                        "dev.anchildress1.vestige.ui.patterns.EntryDetailPlaceholderScreenKt",
-                        "dev.anchildress1.vestige.ui.patterns.EntryDetailPlaceholderScreenKt*",
-                        "dev.anchildress1.vestige.ui.patterns.*EntryDetailPlaceholderScreenKt*",
-                        "dev.anchildress1.vestige.ui.patterns.TraceBarKt",
-                        "dev.anchildress1.vestige.ui.patterns.TraceBarKt*",
-                        "dev.anchildress1.vestige.ui.patterns.*TraceBarKt*",
-                        "dev.anchildress1.vestige.ui.patterns.TraceBarEKt",
-                        "dev.anchildress1.vestige.ui.patterns.TraceBarEKt*",
-                        "dev.anchildress1.vestige.ui.patterns.*TraceBarEKt*",
-                        // Onboarding @Composable entries pay the same Composer / $changed
-                        // branch-coverage tax (kover #756). Non-Composable classes in these
-                        // files — `PersistedStateWriteLane`, `DownloadProgressTracker`, etc. —
-                        // live in their own classes and stay counted.
-                        "dev.anchildress1.vestige.ui.onboarding.OnboardingHostKt",
-                        "dev.anchildress1.vestige.ui.onboarding.OnboardingHostKt*",
-                        "dev.anchildress1.vestige.ui.onboarding.*OnboardingHostKt*",
-                        "dev.anchildress1.vestige.ui.onboarding.OnboardingStepContentKt",
-                        "dev.anchildress1.vestige.ui.onboarding.OnboardingStepContentKt*",
-                        "dev.anchildress1.vestige.ui.onboarding.*OnboardingStepContentKt*",
-                        "dev.anchildress1.vestige.ui.onboarding.OnboardingScaffoldKt",
-                        "dev.anchildress1.vestige.ui.onboarding.OnboardingScaffoldKt*",
-                        "dev.anchildress1.vestige.ui.onboarding.*OnboardingScaffoldKt*",
-                        "dev.anchildress1.vestige.ui.onboarding.OnboardingScreensKt",
-                        "dev.anchildress1.vestige.ui.onboarding.OnboardingScreensKt*",
-                        "dev.anchildress1.vestige.ui.onboarding.*OnboardingScreensKt*",
-                        "dev.anchildress1.vestige.ui.onboarding.PersonaPickScreenKt",
-                        "dev.anchildress1.vestige.ui.onboarding.PersonaPickScreenKt*",
-                        "dev.anchildress1.vestige.ui.onboarding.*PersonaPickScreenKt*",
-                        "dev.anchildress1.vestige.ui.onboarding.WiringScreenKt",
-                        "dev.anchildress1.vestige.ui.onboarding.WiringScreenKt*",
-                        "dev.anchildress1.vestige.ui.onboarding.*WiringScreenKt*",
-                        "dev.anchildress1.vestige.ui.onboarding.ModelDownloadPlaceholderScreenKt",
-                        "dev.anchildress1.vestige.ui.onboarding.ModelDownloadPlaceholderScreenKt*",
-                        "dev.anchildress1.vestige.ui.onboarding.*ModelDownloadPlaceholderScreenKt*",
-                        "dev.anchildress1.vestige.ui.components.ScoreboardPrimitivesKt",
-                        "dev.anchildress1.vestige.ui.components.ScoreboardPrimitivesKt*",
-                        "dev.anchildress1.vestige.ui.components.*ScoreboardPrimitivesKt*",
-                        "dev.anchildress1.vestige.ui.components.VestigeSurfaceKt",
-                        "dev.anchildress1.vestige.ui.components.VestigeSurfaceKt*",
-                        "dev.anchildress1.vestige.ui.components.*VestigeSurfaceKt*",
-                        "dev.anchildress1.vestige.ui.components.VestigeScaffoldKt",
-                        "dev.anchildress1.vestige.ui.components.VestigeScaffoldKt*",
-                        "dev.anchildress1.vestige.ui.components.*VestigeScaffoldKt*",
-                        "dev.anchildress1.vestige.ui.components.AccentModifiersKt",
-                        "dev.anchildress1.vestige.ui.components.AccentModifiersKt*",
-                        "dev.anchildress1.vestige.ui.components.*AccentModifiersKt*",
-                        // Capture screen Composables — same Composer / $changed branch tax.
-                        // Behavior is covered by IdleLayoutTest / LiveLayoutTest / *PrimitivesTest
-                        // through Robolectric semantics + click assertions.
-                        "dev.anchildress1.vestige.ui.capture.IdleLayoutKt",
-                        "dev.anchildress1.vestige.ui.capture.IdleLayoutKt*",
-                        "dev.anchildress1.vestige.ui.capture.*IdleLayoutKt*",
-                        "dev.anchildress1.vestige.ui.capture.LiveLayoutKt",
-                        "dev.anchildress1.vestige.ui.capture.LiveLayoutKt*",
-                        "dev.anchildress1.vestige.ui.capture.*LiveLayoutKt*",
-                        "dev.anchildress1.vestige.ui.capture.RecButtonKt",
-                        "dev.anchildress1.vestige.ui.capture.RecButtonKt*",
-                        "dev.anchildress1.vestige.ui.capture.*RecButtonKt*",
-                        "dev.anchildress1.vestige.ui.capture.LiveLevelBarsKt",
-                        "dev.anchildress1.vestige.ui.capture.LiveLevelBarsKt*",
-                        "dev.anchildress1.vestige.ui.capture.*LiveLevelBarsKt*",
-                        "dev.anchildress1.vestige.ui.capture.ChunkProgressBarKt",
-                        "dev.anchildress1.vestige.ui.capture.ChunkProgressBarKt*",
-                        "dev.anchildress1.vestige.ui.capture.*ChunkProgressBarKt*",
-                        "dev.anchildress1.vestige.ui.capture.CaptureScreenKt",
-                        "dev.anchildress1.vestige.ui.capture.CaptureScreenKt*",
-                        "dev.anchildress1.vestige.ui.capture.*CaptureScreenKt*",
-                        "dev.anchildress1.vestige.ui.capture.TypeEntrySheetKt",
-                        "dev.anchildress1.vestige.ui.capture.TypeEntrySheetKt*",
-                        "dev.anchildress1.vestige.ui.capture.*TypeEntrySheetKt*",
                         // Debug-only fixture seeder for on-device manual verification.
                         // FLAG_DEBUGGABLE-gated at the call site; not on any release path.
                         "dev.anchildress1.vestige.debug.*",
@@ -204,38 +157,21 @@ sonar {
         )
         property(
             "sonar.coverage.exclusions",
-            listOf(
-                "**/ui/theme/**",
-                "**/VestigeApplication.kt",
-                "**/MainActivity.kt",
-                "**/LiteRtLmEngine.kt",
-                "**/AudioCapture.kt",
-                // Compose @Composable bodies cap at ~50% branch coverage from `Composer` +
-                // `$changed` plugin instrumentation (kotlinx-kover #756); mirrors the kover
-                // excludes in `kover { reports { total { filters { excludes { classes(...) } } } }`.
-                "**/ui/history/HistoryHost.kt",
-                "**/ui/history/HistoryRow.kt",
-                "**/ui/history/HistoryScreen.kt",
-                "**/ui/patterns/PatternsListScreen.kt",
-                "**/ui/patterns/PatternDetailScreen.kt",
-                "**/ui/patterns/PatternsHost.kt",
-                "**/ui/patterns/EntryDetailPlaceholderScreen.kt",
-                "**/ui/patterns/TraceBar.kt",
-                "**/ui/patterns/TraceBarE.kt",
-                "**/ui/components/ScoreboardPrimitives.kt",
-                "**/ui/components/VestigeSurface.kt",
-                "**/ui/components/VestigeScaffold.kt",
-                "**/ui/components/AccentModifiers.kt",
-                "**/ui/capture/IdleLayout.kt",
-                "**/ui/capture/LiveLayout.kt",
-                "**/ui/capture/RecButton.kt",
-                "**/ui/capture/LiveLevelBars.kt",
-                "**/ui/capture/ChunkProgressBar.kt",
-                "**/ui/capture/CaptureScreen.kt",
-                "**/ui/capture/TypeEntrySheet.kt",
-                // Debug-only fixture seeder, FLAG_DEBUGGABLE-gated; never on a release path.
-                "**/debug/**",
-            ).joinToString(","),
+            (
+                listOf(
+                    "**/ui/theme/**",
+                    "**/VestigeApplication.kt",
+                    "**/MainActivity.kt",
+                    "**/LiteRtLmEngine.kt",
+                    "**/AudioCapture.kt",
+                    // Debug-only fixture seeder, FLAG_DEBUGGABLE-gated; never on a release path.
+                    "**/debug/**",
+                ) +
+                    // Compose @Composable bodies cap at ~50% branch coverage from `Composer`
+                    // + `$changed` instrumentation (kotlinx-kover #756); same source-of-truth
+                    // list the kover `excludes { classes(...) }` block derives from.
+                    composeScreenExclusions.map { "**/${it.replace('.', '/')}.kt" }
+                ).joinToString(","),
         )
         // Both pattern view-models share an action-dispatch + undo skeleton (dismiss /
         // snooze / markResolved / restart). The structural overlap is intentional for the

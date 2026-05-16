@@ -50,6 +50,27 @@ class AudioCaptureTest {
     }
 
     @Test
+    fun `readFrameSamples is a small sub-second window so STOP is observed within ~50ms`() {
+        val capture = AudioCapture(sampleRateHz = 16_000, chunkDurationMs = 30_000L)
+
+        // 16 kHz * 50 ms = 800 samples. Regression guard for the stop-latency bug: the per-read
+        // window must stay far below one second (16 000) and one chunk (480 000) so the
+        // READ_BLOCKING loop re-checks stopRequested ~20x/s instead of once per >= 1 s buffer.
+        assertEquals(800, capture.readFrameSamples())
+        assertTrue(
+            capture.readFrameSamples() < 16_000,
+            "Read frame must be well under one second of audio (was ${capture.readFrameSamples()})",
+        )
+    }
+
+    @Test
+    fun `readFrameSamples never drops below one sample for tiny sample rates`() {
+        val capture = AudioCapture(sampleRateHz = 1, chunkDurationMs = 30_000L)
+
+        assertEquals(1, capture.readFrameSamples(), "Frame size must clamp to >= 1 sample")
+    }
+
+    @Test
     fun `requestStop is callable on a fresh instance without error`() {
         val capture = AudioCapture()
         capture.requestStop()

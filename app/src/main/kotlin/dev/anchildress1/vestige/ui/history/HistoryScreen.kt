@@ -36,7 +36,12 @@ import dev.anchildress1.vestige.ui.theme.VestigeTheme
 
 @Suppress("LongMethod")
 @Composable
-fun HistoryScreen(viewModel: HistoryViewModel, persona: Persona, modifier: Modifier = Modifier) {
+fun HistoryScreen(
+    viewModel: HistoryViewModel,
+    persona: Persona,
+    onEntryClick: (Long) -> Unit = {},
+    modifier: Modifier = Modifier,
+) {
     val uiState by viewModel.state.collectAsStateWithLifecycle()
     val colors = VestigeTheme.colors
 
@@ -124,7 +129,7 @@ fun HistoryScreen(viewModel: HistoryViewModel, persona: Persona, modifier: Modif
                         HistoryRow(
                             summary = summary,
                             durationLabel = HistoryDurationFormatter.format(summary.durationMs),
-                            onClick = null,
+                            onClick = { onEntryClick(summary.id) },
                         )
                     }
                 }

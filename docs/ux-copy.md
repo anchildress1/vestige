@@ -133,12 +133,12 @@ Card title:
 Card body (one-line teaser):
 > {pattern_name_1} · {pattern_name_2} · {pattern_name_3}
 
-If model still downloading (record button disabled):
-> Model loading. Typed entries work now.
+If model still downloading (record + typed both disabled — ADR-013):
+> Model loading. Hang tight.
 
 Status pill during download: `DOWNLOADING · {N}%`
 Status pill if paused (no Wi-Fi): `MODEL PAUSED`
-Below button if paused: `Reconnect to Wi-Fi to resume. Typed entries work now.`
+Below button if paused: `Reconnect to Wi-Fi to resume.`
 
 If no active patterns:
 > Nothing repeating yet.
@@ -428,18 +428,6 @@ Diff actions:
 
 ## Destructive Confirmations
 
-### Delete single entry
-
-Title:
-> **Delete this entry?**
-
-Body:
-> The entry, its transcription, and any tags extracted from it. Patterns referencing it will be recalculated.
-
-Actions:
-- **Delete** *(system error/destructive style)*
-- **Cancel**
-
 ### Delete all data
 
 Title:
@@ -506,7 +494,7 @@ Section: **About**
 
 ### Locked v1 behavior (not configurable)
 
-- **Default input:** voice. Typed fallback is always available but voice is the entry-point per product positioning. No setting toggle.
+- **Default input:** voice. Typed entry is an always-available alternate input but, like voice, requires the local model to be Ready (ADR-013 — it runs the same foreground call and reviews identically). Voice is the entry-point per product positioning. No setting toggle.
 - **Transcription visibility:** always shown in the transcript per P0 acceptance criteria. No setting toggle.
 - **Pattern detection threshold:** every 10 entries, hardcoded for v1.
 - **Pattern callout cooldown:** 3 entries after a callout, hardcoded for v1.

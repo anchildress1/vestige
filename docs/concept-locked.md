@@ -67,9 +67,11 @@ Each entry runs through a **3-lens × 5-surface** extraction pipeline. Three len
 
 ## Schema (minimal v1)
 
-Nine content fields total. Extracted fields are convergence-driven; `entry_observations` is generated after convergence from the stored transcript plus resolved fields. No archetype-specific quantification in v1.
+Eleven content fields total. Extracted fields are convergence-driven; `entry_observations` is generated after convergence from the stored transcript plus resolved fields. No archetype-specific quantification in v1.
 
 - `entry_text` — substrate (transcription or typed)
+- `follow_up` — saved model turn for single-turn voice captures; `null` for typed entries
+- `persona` — the recorded authoring persona for the saved follow-up (`witness` / `hardass` / `editor`)
 - `timestamp` — auto
 - `template_label` — agent-emitted (Aftermath / Tunnel exit / Concrete shoes / Decision spiral / Goblin hours / Audit)
 - `tags` — free-form, model-extracted (people, topics, activities, places)
@@ -79,7 +81,7 @@ Nine content fields total. Extracted fields are convergence-driven; `entry_obser
 - `entry_observations` — 1–2 persisted observations from this entry alone, each with evidence text or a field reference. Generated after convergence; never freeform speculation.
 - `confidence` — per-field convergence result (canonical / candidate / ambiguous / canonical_with_conflict)
 
-These nine are the **content schema** — what the agent extracts/generates and the user sees. The ObjectBox `Entry` entity also carries operational metadata (`extraction_status`, `attempt_count`, `last_error`) for the retry-based background-extraction recovery path. Operational fields are owned by `adrs/ADR-001-stack-and-build-infra.md` §Q3, not by this spec — they are storage concerns, not product concerns.
+These eleven are the **content schema** — what the agent extracts/generates and the user sees. The ObjectBox `Entry` entity also carries operational metadata (`extraction_status`, `attempt_count`, `last_error`) for the retry-based background-extraction recovery path. Operational fields are owned by `adrs/ADR-001-stack-and-build-infra.md` §Q3, not by this spec — they are storage concerns, not product concerns.
 
 **Archetype-specific fields deferred to v2** (not v1.5 — further out): `state_before`, `onset`, `last_food_caffeine`, `last_sleep`, `intent_now`, `focus_subject`, `focus_duration`, `ignored_during_focus`, `output_produced`, `stuck_task`, `resistance_type`, `time_stuck`, `external_pressure`, `last_attempt`, `decision_looped`, `iterations`, `stakes`, `decision_missing`, `time_pressure`, `spiral_topic`, `bedtime_delta`, `body_state`. With templates becoming labels rather than prompt scaffolds, archetype-specific extractions lose their v1 justification — `entry_text` carries the substance, and the agent can re-extract these fields on demand in v2.
 
@@ -124,7 +126,7 @@ The product produces useful observable signal from entry one — not validation,
 - **Model artifact:** `litert-community/gemma-4-E4B-it-litert-lm` from Hugging Face (pre-converted)
 - **Platform:** Android, Kotlin + Jetpack Compose
 - **Voice input:** Native Gemma 4 audio modality — raw audio via `AudioRecord` straight to the model. No SpeechRecognizer, no third-party STT, no external service touches the bytes. Gemma 4 itself produces transcription as part of its response (native ASR capability). Audio path stays inside our process end-to-end.
-- **Transcription handling:** Gemma 4 returns both the transcription and the follow-up question in a single structured response. Transcription is shown alongside the model's response in the entry view (visually secondary to the model's response — see design-guidelines.md §"Entry transcript"). Transcription is saved as `entry_text` (the substrate of the entry). Audio bytes are discarded after the model call. Per the v1 single-turn scope choice (see §"Two-tier processing"), each capture is one self-contained exchange — the entry view is two items (your transcription + the model's follow-up), not a scrolling conversation.
+- **Transcription handling:** Gemma 4 returns both the transcription and the follow-up question in a single structured response. Transcription is shown alongside the model's response in the entry view (visually secondary to the model's response — see design-guidelines.md §"Entry transcript"). Transcription is saved as `entry_text` (the substrate of the entry); the saved model turn is stored separately as `follow_up`, and the authored tone is stored as `persona` so prior entries keep their original speaker label even after the default persona changes. Audio bytes are discarded after the model call. Per the v1 single-turn scope choice (see §"Two-tier processing"), each capture is one self-contained exchange — the entry view is two items (your transcription + the model's follow-up), not a scrolling conversation.
 - **Audio constraint (per `adrs/ADR-001-stack-and-build-infra.md` §Q4):** 30s hard cap per capture in v1. One Gemma call returns transcription + follow-up from a single final chunk. Audio past 30 seconds is truncated at the audio layer; the deferred `>30s` multi-chunk orchestration lives in backlog row `multi-chunk-foreground` and is not part of the v1 contract.
 - **Voice output:** None in v1. Gemma 4 doesn't natively generate audio, and adding a TTS engine (Kokoro etc.) is deferred to v2. Documented as an explicit limitation in the blog post.
 - **Fallback runtime if LiteRT-LM is unworkable:** llama.cpp via JNI with GGUF Q4_K_M. Adopting it ships as a v1.5 contingency only — would require a superseding ADR per `AGENTS.md` guardrail 13, not a v1 default.

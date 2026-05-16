@@ -5,6 +5,7 @@ import dev.anchildress1.vestige.model.EntryObservation
 import dev.anchildress1.vestige.model.ExtractionStatus
 import dev.anchildress1.vestige.model.Lens
 import dev.anchildress1.vestige.model.ObservationEvidence
+import dev.anchildress1.vestige.model.Persona
 import dev.anchildress1.vestige.model.ResolvedExtraction
 import dev.anchildress1.vestige.model.ResolvedField
 import dev.anchildress1.vestige.model.TemplateLabel
@@ -66,6 +67,8 @@ class EntryStoreTest {
         val row = boxStore.boxFor<EntryEntity>().get(id)
         assertNotNull(row)
         assertEquals(SAMPLE_TEXT, row!!.entryText)
+        assertNull(row.followUpText)
+        assertEquals(Persona.WITNESS, row.persona)
         assertEquals(SAMPLE_INSTANT.toEpochMilli(), row.timestampEpochMs)
         assertEquals(ExtractionStatus.PENDING, row.extractionStatus)
         assertEquals(0, row.attemptCount)
@@ -99,6 +102,25 @@ class EntryStoreTest {
             "markdown must contain duration_ms: 242000",
             mdFile.readText().contains("duration_ms: 242000"),
         )
+    }
+
+    @Test
+    fun `createPendingEntry persists followUpText and persona for saved single-turn transcript`() {
+        val id = entryStore.createPendingEntry(
+            entryText = SAMPLE_TEXT,
+            timestamp = SAMPLE_INSTANT,
+            followUpText = "What happened right after the crash?",
+            persona = Persona.EDITOR,
+        )
+
+        val row = boxStore.boxFor<EntryEntity>().get(id)
+        assertEquals("What happened right after the crash?", row.followUpText)
+        assertEquals(Persona.EDITOR, row.persona)
+
+        val mdFile = File(File(markdownDir, "entries"), row.markdownFilename)
+        val markdown = mdFile.readText()
+        assertTrue(markdown.contains("persona: editor"))
+        assertTrue(markdown.contains("follow_up: What happened right after the crash?"))
     }
 
     @Test
@@ -172,6 +194,15 @@ class EntryStoreTest {
         assertThrows(IllegalArgumentException::class.java) {
             entryStore.failEntry(id, ExtractionStatus.RUNNING, "still working")
         }
+    }
+
+    @Test
+    fun `mostRecentNonTerminalEntryId returns newest pending or running row`() {
+        val first = entryStore.createPendingEntry("first", SAMPLE_INSTANT)
+        val second = entryStore.createPendingEntry("second", SAMPLE_INSTANT.plusSeconds(60))
+        entryStore.failEntry(first, ExtractionStatus.FAILED, "done failing")
+
+        assertEquals(second, entryStore.mostRecentNonTerminalEntryId())
     }
 
     @Test
@@ -315,6 +346,29 @@ class EntryStoreTest {
         val observations = JSONArray(row.entryObservationsJson)
         assertEquals(1, observations.length())
         assertEquals("Worth noting.", observations.getJSONObject(0).getString("text"))
+    }
+
+    @Test
+    fun `appendObservation appends to non-empty existing observations`() {
+        val id = entryStore.createPendingEntry(SAMPLE_TEXT, SAMPLE_INSTANT)
+        val first = EntryObservation(
+            text = "You used fine twice.",
+            evidence = ObservationEvidence.VOCABULARY_CONTRADICTION,
+            fields = listOf("fine"),
+        )
+        entryStore.completeEntry(id, resolvedSample(), null, listOf(first))
+
+        val second = EntryObservation(
+            text = "Committed to review by Friday.",
+            evidence = ObservationEvidence.COMMITMENT_FLAG,
+            fields = emptyList(),
+        )
+        entryStore.appendObservation(id, second)
+
+        val arr = JSONArray(boxStore.boxFor<EntryEntity>().get(id).entryObservationsJson)
+        assertEquals(2, arr.length())
+        assertEquals("You used fine twice.", arr.getJSONObject(0).getString("text"))
+        assertEquals("Committed to review by Friday.", arr.getJSONObject(1).getString("text"))
     }
 
     @Test

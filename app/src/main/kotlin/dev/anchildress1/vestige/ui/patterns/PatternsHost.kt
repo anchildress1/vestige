@@ -11,22 +11,22 @@ import androidx.compose.ui.Modifier
 import dev.anchildress1.vestige.storage.EntryStore
 import dev.anchildress1.vestige.storage.PatternRepo
 import dev.anchildress1.vestige.storage.PatternStore
+import dev.anchildress1.vestige.ui.history.EntryDetailHost
+import java.time.ZoneId
 
-/**
- * Lightweight in-process navigation between list and detail. Story 3.9 / 3.10 both call out
- * "rough navigation" — polish is Phase 4, which adds androidx.navigation. [onExit] unwinds to
- * whatever surface hosts the patterns experience (Phase-1 shell today).
- */
+@Suppress("LongParameterList")
 @Composable
 fun PatternsHost(
     patternStore: PatternStore,
     patternRepo: PatternRepo,
     entryStore: EntryStore,
+    zoneId: ZoneId,
     onExit: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     var openPatternId by rememberSaveable { mutableStateOf<String?>(null) }
     var openEntryId by rememberSaveable { mutableStateOf<Long?>(null) }
+    var highlightEntryOnOpen by rememberSaveable { mutableStateOf(false) }
     val listViewModel = remember(patternStore, patternRepo, entryStore) {
         PatternsListViewModel(patternStore, patternRepo, entryStore)
     }
@@ -35,15 +35,24 @@ fun PatternsHost(
     }
 
     when {
-        openEntryId != null -> {
-            BackHandler { openEntryId = null }
-            EntryDetailPlaceholderScreen(
-                entryId = openEntryId!!,
-                entryStore = entryStore,
-                onBack = { openEntryId = null },
-                modifier = modifier,
-            )
-        }
+        openEntryId != null -> PatternEntryDetailRoute(
+            entryId = openEntryId!!,
+            entryStore = entryStore,
+            zoneId = zoneId,
+            highlightOnOpen = highlightEntryOnOpen,
+            onClose = {
+                openEntryId = null
+                highlightEntryOnOpen = false
+            },
+            // Clear detail nav before leaving — openEntryId is rememberSaveable, so without
+            // this a later return to Patterns would re-open the stale detail.
+            onNewEntry = {
+                openEntryId = null
+                highlightEntryOnOpen = false
+                onExit()
+            },
+            modifier = modifier,
+        )
 
         detailViewModel == null -> {
             BackHandler(onBack = onExit)
@@ -65,9 +74,35 @@ fun PatternsHost(
                     openPatternId = null
                     listViewModel.refresh()
                 },
-                onOpenEntry = { openEntryId = it },
+                onOpenEntry = {
+                    openEntryId = it
+                    highlightEntryOnOpen = true
+                },
                 modifier = modifier,
             )
         }
     }
+}
+
+@Suppress("LongParameterList") // Route seam: ids + store + zone + nav callbacks + modifier.
+@Composable
+private fun PatternEntryDetailRoute(
+    entryId: Long,
+    entryStore: EntryStore,
+    zoneId: ZoneId,
+    highlightOnOpen: Boolean,
+    onClose: () -> Unit,
+    onNewEntry: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    BackHandler(onBack = onClose)
+    EntryDetailHost(
+        entryId = entryId,
+        entryStore = entryStore,
+        zoneId = zoneId,
+        onBack = onClose,
+        onNewEntry = onNewEntry,
+        highlightOnOpen = highlightOnOpen,
+        modifier = modifier,
+    )
 }

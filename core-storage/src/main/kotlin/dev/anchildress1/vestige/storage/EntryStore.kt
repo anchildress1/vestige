@@ -4,6 +4,7 @@ import dev.anchildress1.vestige.model.ConfidenceVerdict
 import dev.anchildress1.vestige.model.EntryObservation
 import dev.anchildress1.vestige.model.ExtractionStatus
 import dev.anchildress1.vestige.model.ObservationEvidence
+import dev.anchildress1.vestige.model.Persona
 import dev.anchildress1.vestige.model.ResolvedExtraction
 import dev.anchildress1.vestige.model.TemplateLabel
 import io.objectbox.BoxStore
@@ -19,8 +20,9 @@ import java.time.Instant
  * Joint owner of the markdown source-of-truth and the ObjectBox `EntryEntity` row.
  *
  * Two-phase lifecycle per ADR-001 §Q3 and architecture-brief §"Sync direction":
- *   1. [createPendingEntry] — foreground call returned. Persist `entry_text` + timestamp +
- *      `extraction_status=PENDING`. Returns the assigned entry id so the caller can register an
+ *   1. [createPendingEntry] — foreground call returned. Persist `entry_text` + saved persona +
+ *      optional `follow_up` + timestamp + `extraction_status=PENDING`. Returns the assigned
+ *      entry id so the caller can register an
  *      [dev.anchildress1.vestige.inference.ExtractionStatusListener][listener] against it.
  *   2. [completeEntry] / [failEntry] — background extraction terminal. Updates the row + rewrites
  *      the markdown front-matter atomically.
@@ -42,10 +44,19 @@ class EntryStore(private val boxStore: BoxStore, private val markdownStore: Mark
      * [dev.anchildress1.vestige.inference.ExtractionStatusListener] callbacks into
      * [io.objectbox.BoxStore]-backed status tracking.
      */
-    fun createPendingEntry(entryText: String, timestamp: Instant, durationMs: Long = 0L): Long {
+    @Suppress("LongParameterList") // Entry seed needs the full saved single-turn transcript payload.
+    fun createPendingEntry(
+        entryText: String,
+        timestamp: Instant,
+        durationMs: Long = 0L,
+        followUpText: String? = null,
+        persona: Persona = Persona.WITNESS,
+    ): Long {
         require(entryText.isNotBlank()) { "EntryStore.createPendingEntry requires a non-blank entryText" }
         val entry = EntryEntity(
             entryText = entryText.trimEnd(),
+            followUpText = followUpText?.trimEnd()?.takeIf(String::isNotBlank),
+            persona = persona,
             timestampEpochMs = timestamp.toEpochMilli(),
             durationMs = durationMs,
             extractionStatus = ExtractionStatus.PENDING,
@@ -99,6 +110,14 @@ class EntryStore(private val boxStore: BoxStore, private val markdownStore: Mark
 
     /** Read-only lookup. Returns `null` for missing rows so callers can act without throwing. */
     fun readEntry(entryId: Long): EntryEntity? = boxStore.boxFor<EntryEntity>().get(entryId)
+
+    /** Most-recent entry still in-flight, or `null` when no notification deep-link target exists. */
+    fun mostRecentNonTerminalEntryId(): Long? = boxStore.boxFor<EntryEntity>()
+        .query()
+        .`in`(EntryEntity_.extractionStatus, NON_TERMINAL_STATUS_NAMES, QueryBuilder.StringOrder.CASE_SENSITIVE)
+        .orderDesc(EntryEntity_.id)
+        .build()
+        .use { it.findFirst()?.id }
 
     /** Total persisted rows, regardless of extraction terminality. */
     fun count(): Long = boxStore.boxFor<EntryEntity>().count()
@@ -238,6 +257,10 @@ class EntryStore(private val boxStore: BoxStore, private val markdownStore: Mark
         private const val KEY_ENERGY = "energy_descriptor"
         private const val KEY_RECURRENCE = "recurrence_link"
         private const val KEY_COMMITMENT = "stated_commitment"
+        private val NON_TERMINAL_STATUS_NAMES: Array<String> = arrayOf(
+            ExtractionStatus.PENDING.name,
+            ExtractionStatus.RUNNING.name,
+        )
         private val PROMOTABLE_VERDICTS = setOf(
             ConfidenceVerdict.CANONICAL,
             ConfidenceVerdict.CANONICAL_WITH_CONFLICT,

@@ -350,7 +350,7 @@ The cost of accidental discard is at most 30 seconds of re-recording. The cost o
 
 Single-tap behavior. No confirmation dialog, no long-press, no two-tap arming. Rationale: the affordance is already small, subordinate, and below the primary action. Adding a confirmation flow imposes friction on every cancel for the rare-event case of accidental tap. The buffer is gone the instant the tap registers.
 
-Visual register: muted/mist-gray text (`#7B8497`), no destructive accent color. Discard is calm, not alarming — it's the escape hatch, not the nuclear option. The destructive purple accent stays reserved for `Delete entry` and `Wipe everything`.
+Visual register: muted/mist-gray text (`#7B8497`), no destructive accent color. Discard is calm, not alarming — it's the escape hatch, not the nuclear option. The destructive purple accent stays reserved for ~~`Delete entry` and~~ `Wipe everything`.
 
 **State machine.** `CaptureSession` from Phase 2 Story 2.1 gains a `DISCARDED` terminal state.
 

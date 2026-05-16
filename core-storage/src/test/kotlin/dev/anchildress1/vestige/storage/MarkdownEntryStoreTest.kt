@@ -1,6 +1,7 @@
 package dev.anchildress1.vestige.storage
 
 import dev.anchildress1.vestige.model.ExtractionStatus
+import dev.anchildress1.vestige.model.Persona
 import dev.anchildress1.vestige.model.TemplateLabel
 import dev.anchildress1.vestige.testing.cleanupObjectBoxTempRoot
 import dev.anchildress1.vestige.testing.newInMemoryObjectBoxDirectory
@@ -67,6 +68,8 @@ class MarkdownEntryStoreTest {
         assertEquals(entry.markdownFilename, readBack.markdownFilename)
         assertEquals(entry.timestampEpochMs, readBack.timestampEpochMs)
         assertEquals(entry.entryText, readBack.entryText)
+        assertEquals(entry.followUpText, readBack.followUpText)
+        assertEquals(entry.persona, readBack.persona)
         assertEquals(entry.templateLabel, readBack.templateLabel)
         assertEquals(entry.energyDescriptor, readBack.energyDescriptor)
         assertEquals(entry.recurrenceLink, readBack.recurrenceLink)
@@ -90,6 +93,8 @@ class MarkdownEntryStoreTest {
         val entry = EntryEntity(
             timestampEpochMs = ISO_TIMESTAMP_MS,
             entryText = "Standup ran long again. Stared at the launch doc.",
+            followUpText = "What did you do right after the crash hit?",
+            persona = Persona.HARDASS,
             templateLabel = TemplateLabel.AFTERMATH,
             energyDescriptor = "flattened",
             extractionStatus = ExtractionStatus.PENDING,
@@ -104,6 +109,8 @@ class MarkdownEntryStoreTest {
 
         val readBack = store.read(written)
         assertEquals(entry.entryText, readBack.entryText)
+        assertEquals("What did you do right after the crash hit?", readBack.followUpText)
+        assertEquals(Persona.HARDASS, readBack.persona)
         assertEquals(TemplateLabel.AFTERMATH, readBack.templateLabel)
         assertEquals("flattened", readBack.energyDescriptor)
     }

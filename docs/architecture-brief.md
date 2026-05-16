@@ -160,30 +160,25 @@ Top-level integer. v1 is `schema_version: 1`. Bump on any breaking frontmatter c
 
 ## Embedding Strategy (Addendum 2026-05-16)
 
-**Unit of embedding: individual tags, not entries.**
+**Unit of embedding: one vector per entry (`EntryEntity.vector`).**
 
-The original design embedded one vector per entry into `EntryEntity.vector`. This is the wrong granularity. A single entry commonly holds multiple tags that are semantically unrelated — `tuesday-meeting` and `hyperfocus-coding` co-occurring on the same entry because both happened that day, not because they mean the same thing. A combined embedding of both sits in the semantic dead zone between two concepts and accurately represents neither. A query about meetings has to compete with the pull of deep-work signal.
+The deterministic retrieval layer (Story 3.1) already handles tag matching via Jaccard overlap — exact tag-set intersection is fast, deterministic, and correct for "find entries with this tag." Adding per-tag semantic embeddings on top of that is redundant; the deterministic layer already does that job better.
 
-The correct unit is the individual tag. Each `TagEntity` gets its own `vector` field and `@HnswIndex`. Retrieval is an OR across tag vectors: an entry matches if *any* of its tags are close to the query vector, not if the averaged centroid of all of them is. This is late-interaction retrieval — semantically correct for ADHD capture where unrelated cognitive events share an entry.
+The semantic embedding layer's job is to catch what the deterministic layer *can't*: vocabulary drift over months, paraphrased concepts that didn't resolve to the same tags, semantic relationships between entries that tag overlap misses entirely. That is a per-entry, cross-vocabulary concern. One vector per entry is the correct granularity.
 
-**Schema change:**
-- `TagEntity` gains `vector: FloatArray?` and an ObjectBox `@HnswIndex` (768 dimensions, cosine distance, same as the original `EntryEntity` design).
-- `EntryEntity.vector` is removed — no vector field on the entry row.
-- The ToMany relation `EntryEntity → TagEntity` is already in the schema; retrieval walks it in reverse (tag → parent entry) after the HNSW lookup.
+**The bug in the original implementation:** `VectorBackfillWorker` embeds `entry.entryText` — the raw verbatim transcription. A 30s ADHD voice entry is stream-of-consciousness; its semantic centroid captures filler, tangents, and noise, not what the entry is actually about. The distilled signal already exists in the extracted fields.
 
-**Embedding target:** each tag's kebab-case label string (e.g., `"tuesday-meeting"`, `"flattened"`, `"hyperfocus-coding"`). This is a short, dense, signal-only string. No concatenation. One `embedder(tag.label)` call per tag.
+**Correct embedding target:** synthesize a short string from the extraction output after convergence resolves:
+- Tags: join the `TagEntity` labels as a space-separated phrase (e.g., `"tuesday-meeting standup flattened"`)
+- Observation texts: join each `text` field from `entryObservationsJson` with `. `
+- Commitment topic: append `topic_or_person` from `statedCommitmentJson` if present
+- Result: `"{tags}. {observations}. {commitment topic}"` — omit any empty component and its separator
 
-**Backfill:** `VectorBackfillWorker` iterates `tagBox.all` where `vector == null` and `extractionStatus == COMPLETED` on the parent entry. One embedding call per tag. Tags on entries still in extraction are skipped and re-swept on completion.
+This is the model's own distillation of what happened. The vector then represents semantic meaning, not transcription noise. Two entries about the same phenomenon phrased differently will cluster correctly even if the user's vocabulary drifted between them.
 
-**Retrieval — `RetrievalRepo.query(text: String, ...)` change:**
-1. Embed the raw query string → `queryVector: FloatArray`
-2. HNSW nearest-neighbor search on `TagEntity.vector` → top-K matching `TagEntity` rows
-3. Collect distinct parent `EntryEntity` IDs via the ToMany relation
-4. Apply recency weight + deduplicate → return ranked `EntryEntity` list
+**Query side:** `RetrievalRepo.query(text: String, ...)` embeds the raw user query as-is — correct. Natural language query against distilled semantic content.
 
-Query side embeds the raw user query string directly—correct, because the user's natural language query should match against individual semantic concepts, not against other raw transcriptions.
-
-**Story 3.11 carries the schema change and per-tag backfill. Story 3.12 carries the re-backfill of any tags whose vectors were computed under the old entry-level strategy.**
+**Story 3.11 carries the embedding source fix and re-backfill sweep.**
 
 ---
 

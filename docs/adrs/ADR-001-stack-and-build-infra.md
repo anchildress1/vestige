@@ -301,7 +301,9 @@ The 3.66 GB E4B model is the largest single asset in the build. How it ships aff
 | Q_decision | 1/3 | 2/3 |
 | Q_lateNight | 1/3 | 2/3 |
 
-Storage row in §"Locked Stack" now records a ships-in-v1 schema with the HNSW vector index on `TagEntity.vector` (one vector per tag, not per entry — see `architecture-brief.md` §"Embedding Strategy"). The minimum-free-storage requirement bumps from 6 GB to 7 GB (model 3.66 GB + EmbeddingGemma artifact ~180 MB + tokenizer ~5 MB + headroom). `backlog.md` `embeddings-fallback` closes out — there is no v1.5 fallback to keep open.
+Storage row in §"Locked Stack" now records a ships-in-v1 schema with the HNSW vector index on `EntryEntity.vector` (one vector per entry, embedded from distilled fields — see `architecture-brief.md` §"Embedding Strategy"). The minimum-free-storage requirement bumps from 6 GB to 7 GB (model 3.66 GB + EmbeddingGemma artifact ~180 MB + tokenizer ~5 MB + headroom). `backlog.md` `embeddings-fallback` closes out — there is no v1.5 fallback to keep open.
+
+**Note (2026-05-16):** STT-E was run with the embedding source bug present (`entry.entryText` verbatim, not distilled fields). The pass verdict still justifies shipping EmbeddingGemma in v1, but the benchmark numbers above reflect noisy embeddings. STT-E should be re-run after Story 3.11 fixes the embedding source. Story 3.11's on-device spot-check is the minimum; a structured re-run against the same STT-E corpus is the correct verification before Phase 4 starts.
 
 ### Q7. Privacy / network enforcement (the P0 marketing claim has to be code, not vibes)
 

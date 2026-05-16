@@ -203,42 +203,34 @@ Query-side tag extraction goes beyond exact-substring match: a free-form query b
 
 ---
 
-### Story 3.11 — Per-tag vector embedding: schema change and backfill
+### Story 3.11 — Fix embedding source: embed distilled semantic fields, not raw transcription
 
-**As** the AI implementor, **I need** the embedding layer to index individual `TagEntity` rows rather than whole entries, **so that** a retrieval query matches an entry if *any* of its tags are semantically close to the query — not only if the averaged centroid of all co-occurring tags happens to be close.
+**As** the AI implementor, **I need** `VectorBackfillWorker` to embed a synthesized string from the entry's extracted semantic fields — tags, observation texts, and stated commitment topic — instead of the raw `entry.entryText` transcription body, **so that** the per-entry vector represents what the entry is *about* and semantic retrieval matches on meaning rather than on verbatim word reuse.
 
-**The architectural decision:** One entry can carry multiple semantically unrelated tags (`tuesday-meeting` and `hyperfocus-coding` co-occurring because both happened that day, not because they mean the same thing). A single per-entry vector sits in the semantic dead zone between them and accurately represents neither. Per-tag vectors with OR-retrieval is the correct granularity. See `architecture-brief.md` §"Embedding Strategy".
+**Why per-entry, not per-tag:** The deterministic retrieval layer (Story 3.1) already handles tag matching via Jaccard overlap. Per-tag semantic embeddings would be redundant — exact tag intersection already does that job. The embedding layer's job is to catch what the deterministic layer can't: vocabulary drift over months, paraphrased concepts that didn't resolve to the same tags, semantic relationships that tag overlap misses. That is a per-entry concern. See `architecture-brief.md` §"Embedding Strategy".
+
+**The bug:** `VectorBackfillWorker` calls `embedder(entry.entryText)` — the verbatim transcription. A 30s ADHD voice entry is stream-of-consciousness; its semantic centroid captures noise. Tags, observations, and commitment topics are the model's distillation of what the entry is about — none of them are in the current vector.
 
 **Done when:**
-- [ ] `TagEntity` gains `var vector: FloatArray?` annotated with ObjectBox `@HnswIndex(dimensions = 768, distanceType = VectorDistanceType.COSINE)`. Remove `vector` from `EntryEntity` — no vector field on the entry row.
-- [ ] `VectorBackfillWorker` is rewritten to iterate `tagBox.all` where `vector == null` AND the parent entry's `extractionStatus == COMPLETED`. For each qualifying tag: call `embedder(tag.label)` (the kebab-case string, e.g., `"tuesday-meeting"`). One embedding call per tag. Tags on incomplete entries are skipped and swept again when extraction completes.
-- [ ] `RetrievalRepo.query(text: String, topN: Int, recencyWeight: Float)` is updated to the multi-hop path:
-  1. `embedder(text)` → `queryVector: FloatArray`
-  2. ObjectBox HNSW nearest-neighbor on `TagEntity.vector` → top-K `TagEntity` rows (K = `topN * 3` before dedup/rerank)
-  3. Collect distinct parent `EntryEntity` IDs via the ToMany back-relation
-  4. Apply keyword overlap + recency weight → return top-N ranked `EntryEntity` list
-- [ ] Query-side embedding is the raw user query string — unchanged in intent, updated in path to hit the tag-level index.
-- [ ] `AppContainer.launchVectorBackfillIfReady()` triggers the tag-level sweep on cold start after extraction artifacts are verified.
-- [ ] Unit test: `VectorBackfillWorkerTest` verifies `embedder` is called once per tag label (not once per entry, not with `entryText`), and that tags on incomplete entries are skipped.
-- [ ] Unit test: `RetrievalRepoTest` verifies a query close to `"tuesday-meeting"` retrieves the parent entry even when a second unrelated tag (`"hyperfocus-coding"`) on the same entry is far from the query vector.
-- [ ] Smoke test on reference device: query `"crashed after the meeting"` retrieves entries tagged `tuesday-meeting` or `flattened` even when the raw transcription uses different words.
+- [ ] Add `buildEmbeddingText(entity: EntryEntity): String` in `:core-storage`. Constructs the embedding target from resolved fields:
+  - Tags: join `TagEntity` labels space-separated (e.g., `"tuesday-meeting standup flattened"`)
+  - Observation texts: join each `text` field from `entryObservationsJson` with `. `
+  - Commitment topic: append `topic_or_person` from `statedCommitmentJson` if non-null
+  - Result: `"{tags}. {observations}. {commitment topic}"` — omit any empty component and its separator
+- [ ] `VectorBackfillWorker` calls `embedder(buildEmbeddingText(entry))` instead of `embedder(entry.entryText)`. Entries where `extractionStatus != COMPLETED` are skipped and re-swept when extraction completes.
+- [ ] Existing entries with `vector != null` are treated as stale and re-backfilled. Simplest implementation: add `vectorSchemaVersion: Int` to `EntryEntity` (default `0`); current correct version is `1`; re-backfill any entry at `< 1`. After re-backfill, set to `1`.
+- [ ] `AppContainer.launchVectorBackfillIfReady()` triggers the sweep on cold start. Processes in batches to avoid main-thread contention.
+- [ ] `RetrievalRepo.query(text: String, ...)` query-side embedding unchanged — raw user query string embeds as-is.
+- [ ] Unit test: `VectorBackfillWorkerTest` verifies `embedder` is called with the synthesized string (not `entryText`) for a fixture with populated tags + observations; verifies incomplete entries are skipped; verifies already-current `vectorSchemaVersion` entries are skipped on re-run.
+- [ ] On-device: after re-backfill, run STT-E corpus (same 4 cohort queries, same 18-entry set) against the corrected vectors and record new hybrid vs tag-only numbers in ADR-001 §"Addendum (2026-05-12)". This is the STT-E re-run required before Phase 4 starts.
 
-**Notes / risks:** This is a schema change — ObjectBox requires a migration. Test on the reference device after migration to confirm data integrity. Story 3.12 immediately follows to sweep any pre-existing tags that have `vector == null` post-migration. Do not ship 3.11 without 3.12 in the same build.
+**Notes / risks:** `vectorSchemaVersion` is an operational field — does not appear in markdown source-of-truth. If ObjectBox is rebuilt from markdown, it defaults to `0` and the re-backfill runs, which is correct.
 
 ---
 
-### Story 3.12 — Re-backfill tag vectors after schema migration
+### Story 3.12 — (Absorbed into Story 3.11)
 
-**As** the AI implementor, **I need** all existing `TagEntity` rows with `vector == null` and a completed parent entry to have their vectors computed after the Story 3.11 schema change lands, **so that** the existing corpus is fully indexed rather than requiring fresh entries to trigger retrieval.
-
-**Done when:**
-- [ ] On first launch after 3.11 ships, `AppContainer.launchVectorBackfillIfReady()` runs the tag-level sweep. Because `TagEntity.vector` is a new field, all existing tags start at `null` and the sweep processes every completed-entry tag in the corpus.
-- [ ] Backfill processes in batches (configurable batch size, default 50 tags) to avoid blocking the main thread or starving the engine Mutex during active use.
-- [ ] `VectorBackfillWorker` idempotency: a second run on a fully-backfilled corpus (all tags have `vector != null` or belong to incomplete entries) makes zero `embedder()` calls.
-- [ ] Unit test: second run of the worker on an already-complete corpus makes zero `embedder()` calls.
-- [ ] On-device: after sweep completes, spot-check 3 queries from `sample-data-scenarios.md` STT-E corpus against the newly indexed tag vectors. Retrieval results match entries by semantic topic across paraphrased queries.
-
-**Notes / risks:** `vector` is an operational field on `TagEntity` — it does not appear in the markdown source-of-truth. If ObjectBox is rebuilt from markdown, tags start at `vector == null` and the sweep re-runs, which is correct.
+The re-backfill sweep and schema versioning that were originally Story 3.12 are now part of Story 3.11's done-when criteria. No separate story needed — they ship together.
 
 ---
 
@@ -264,7 +256,7 @@ If a Phase 3 story starts pulling Phase 4 polish or a backlog entry, stop. Refer
 Phase 4 starts when all the following are true:
 
 - [x] All ten stories above are Done. Story 3.4 is either Done (STT-E passed) or explicitly skipped (STT-E failed, recorded in ADR-001 + `backlog.md`). (STT-E passed; Story 3.4 Done.)
-- [x] **STT-E resolved.** Embeddings either ship in v1 or defer to v1.5 with the cut recorded in the right places. (Passed; ADR-001 Addendum 2026-05-12.) Vector index lives on `TagEntity.vector` (per-tag, not per-entry) per `architecture-brief.md` §"Embedding Strategy". Stories 3.11 and 3.12 carry the schema migration and backfill.
+- [ ] **STT-E re-run required.** Original STT-E passed 2026-05-12 but was run with the embedding source bug present (`entry.entryText`, not distilled fields). The pass verdict justifies shipping EmbeddingGemma, but the benchmark numbers are stale. Re-run the STT-E corpus (same 4 cohort queries, same 18-entry set) against the corrected vectors after Story 3.11 completes. Record updated hybrid vs tag-only numbers in ADR-001 §"Addendum (2026-05-12)". Phase 4 does not start until this row is checked.
 - [x] At least 10 saved entries exist on the reference device. Pattern detection has run at end-of-session at least once with real data. (12 entries seeded via the FLAG_DEBUGGABLE-gated `DebugPatternSeeder` on the reference S24 Ultra 2026-05-12; capture-UI-driven entries blocked on Phase 4 P1, fixture exercises the same `EntryStore` / `PatternStore` paths.)
 - [x] At least one cross-entry pattern is surfaced and persisted in `state=active`. The user can dismiss / snooze / mark-resolve it and the change survives app restart. (Verified 2026-05-12: two ACTIVE patterns rendered; snooze + dismiss applied via overflow menu + detail action row; force-stop + relaunch confirmed both states persisted — list went to `Nothing repeating yet.` post-restart as expected.)
 - [x] Pattern list and pattern detail screens render correctly on the reference S24 Ultra. Source entries are clickable; navigation back to the pattern list works. (Verified 2026-05-12: cards render with full-height purple left-rule, detail's "Seen in:" section shows 3 dated source rows with snippets, system back unwinds detail→list→shell via `BackHandler`. Source-row taps fire `onOpenEntry` cleanly — no-op landing for v1 since Phase 4 owns the history detail screen.)

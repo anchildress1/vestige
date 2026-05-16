@@ -372,11 +372,11 @@ Phase 2 has no capture screen to attach a placeholder to — Story 4.5 builds th
 
 ### Story 2.16 — Streaming foreground inference: token-by-token output to UI
 
-**As** the AI implementor, **I need** the foreground inference call to switch from blocking `generateText()` to streaming `sendMessageAsync()` (Kotlin Flow), **so that** the user sees tokens appearing in the UI as the model generates them rather than waiting for the full response — eliminating the perceived wall-clock stall on every capture.
+**As** the AI implementor, **I need** the foreground inference call to switch from blocking `sendMessageContents()` to streaming `sendMessageAsync()` (Kotlin Flow), **so that** the user sees tokens appearing in the UI as the model generates them rather than waiting for the full response — eliminating the perceived wall-clock stall on every capture.
 
 **Done when:**
-- [ ] `LiteRtLmEngine.streamText(contents)` returns a `Flow<String>` that emits tokens as they are generated. Verify `sendMessageAsync()` is the correct underlying API in the current SDK version; confirm it returns a Flow or wraps a callback into one.
-- [ ] `ForegroundInference.runForegroundCall()` switches from `generateText()` to `streamText()`. The return type changes from a single `ForegroundResult` to a `Flow<ForegroundToken>` or equivalent streaming shape — design this surface so `CaptureViewModel` can update its `Reviewing` state incrementally.
+- [ ] `LiteRtLmEngine.streamMessageContents(parts: List<Content>): Flow<String>` is added — the multimodal streaming counterpart to `sendMessageContents`. `streamText(prompt)` already exists and wraps `sendMessageAsync` Flow for text-only calls; `streamMessageContents` applies the same pattern to the `AudioFile + Text` foreground path. The SDK's `sendMessageAsync(contents): Flow<Message>` is the underlying API (per official Android docs `https://ai.google.dev/edge/litert-lm/android`).
+- [ ] `ForegroundInference.runForegroundCall()` switches from `sendMessageContents()` (blocking) to `streamMessageContents()`. The return type changes from a single `ForegroundResult` to a `Flow<ForegroundToken>` or equivalent streaming shape — design this surface so `CaptureViewModel` can update its `Reviewing` state incrementally.
 - [ ] `ForegroundResponseParser` is updated to parse XML tags (`<transcription>`, `<follow_up>`) from a streamed token buffer rather than a completed string. The parser must handle tag boundaries arriving mid-token.
 - [ ] `CaptureViewModel.Reviewing` state carries a `followUpText: String` field that appends tokens as they arrive. The capture screen renders the growing string in real time.
 - [ ] Temp WAV file deletion still fires in `finally` after the stream completes or is cancelled — audio discard contract (ADR-001 §Q8) is unchanged.

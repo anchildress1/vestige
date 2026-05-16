@@ -377,6 +377,39 @@ RECORDING → DISCARDED → IDLE
 
 **Revisit when:** post-submission, if user research surfaces accidental-discard at meaningful rate → consider a 3-second snackbar with `Undo`. Note: this would change the privacy contract and requires a superseding ADR.
 
+### Addendum (2026-05-16) — Official Android SDK API reference: key findings
+
+**Source:** `https://ai.google.dev/edge/litert-lm/android` (last updated 2026-03-30 UTC). This is the authoritative Kotlin API surface for `litertlm-android`. Implementors should consult this page for API shapes before coding against the SDK.
+
+**Findings that affect v1 implementation:**
+
+**Audio modality requires explicit `audioBackend` in `EngineConfig`.** The official pattern:
+```kotlin
+EngineConfig(
+    modelPath = "...",
+    backend = Backend.GPU(),
+    audioBackend = Backend.CPU(), // without this, audio bytes silently fail
+)
+```
+`AppContainer.backgroundEngineFactory` already sets `audioBackend = BackendChoice.Cpu` with a comment referencing LiteRT-LM issue #2056 (GPU audio path SIGSEGVs in `mel_filterbank.cc`). Correctly implemented — this entry is for reference.
+
+**GPU backend requires native library declarations in `AndroidManifest.xml`.** Official requirement per the Android docs (also in the 2026-05-10 addendum above):
+```xml
+<application>
+    <uses-native-library android:name="libvndksupport.so" android:required="false"/>
+    <uses-native-library android:name="libOpenCL.so" android:required="false"/>
+</application>
+```
+Without these, Android 12+'s vendor namespace isolation blocks GPU access and the engine silently falls back to CPU. Already present in the manifest; recorded here with the official source for future reference.
+
+**Streaming API is `sendMessageAsync(contents): Flow<Message>`.** Official recommended path for coroutine users. Already wrapped in `LiteRtLmEngine.streamText(prompt: String): Flow<String>`. The multimodal streaming variant (`streamMessageContents` equivalent) does not yet exist — `sendMessageContents` is blocking. Story 2.16 carries the fix: add `streamMessageContents(parts: List<Content>): Flow<String>` and wire `ForegroundInference` to it.
+
+**`ConversationConfig.systemInstruction` is the official system-prompt surface.** Current implementation passes `Contents.of("")` (empty system instruction) and stacks the full system prompt into the message body. This works but bypasses the SDK's intended instruction/message separation. Post-v1 consideration only — changing it during submission window is unnecessary risk.
+
+**`latest.release` is an available Maven coordinate.** The doc shows `implementation("com.google.ai.edge.litertlm:litertlm-android:latest.release")`. Vestige pins `0.11.0` explicitly in `gradle/libs.versions.toml`, which is correct for a submission-deadline build. Story 2.14 carries the SDK upgrade probe; if a new artifact publishes with `Session.clone()`, bump the pin and re-run the AAR probe per ADR-009 revival triggers.
+
+**Tool use API exists (`@Tool`, `@ToolParam`, `OpenApiTool`).** Out of scope per `concept-locked.md` §"Out of scope — multi-step agentic tool chains". Documented here so a future ADR doesn't re-research from scratch.
+
 ---
 
 ## Trade-off Analysis

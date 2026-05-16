@@ -196,6 +196,140 @@ class EntryDetailViewModelTest {
         }
     }
 
+    @Test
+    fun `observations is empty when entryObservationsJson is a blank string`() = runTest {
+        val id = createCompleted("blank observations json")
+        val box = boxStore.boxFor(EntryEntity::class.java)
+        box.get(id).also { it.entryObservationsJson = "   " }.let(box::put)
+        val vm = buildVm(id)
+
+        vm.state.test {
+            val loaded = awaitItem() as EntryDetailUiState.Loaded
+            assertTrue(loaded.model.observations.isEmpty())
+        }
+    }
+
+    @Test
+    fun `observations skip entries with blank or missing text`() = runTest {
+        val id = createCompleted("mixed observations")
+        val box = boxStore.boxFor(EntryEntity::class.java)
+        box.get(id).also {
+            it.entryObservationsJson =
+                """[{"text":"You said fine twice."},{"text":"   "},{"evidence":"x"}]"""
+        }.let(box::put)
+        val vm = buildVm(id)
+
+        vm.state.test {
+            val loaded = awaitItem() as EntryDetailUiState.Loaded
+            assertEquals(1, loaded.model.observations.size)
+            assertEquals("You said fine twice.", loaded.model.observations[0].text)
+        }
+    }
+
+    // --- follow-up ---
+
+    @Test
+    fun `followUp is null when no follow-up was persisted`() = runTest {
+        val id = createCompleted("no follow up")
+        val vm = buildVm(id)
+
+        vm.state.test {
+            val loaded = awaitItem() as EntryDetailUiState.Loaded
+            assertNull(loaded.model.followUp)
+        }
+    }
+
+    @Test
+    fun `followUp is null when the persisted follow-up is blank`() = runTest {
+        val id = createCompleted("blank follow up", followUpText = "   ")
+        val vm = buildVm(id)
+
+        vm.state.test {
+            val loaded = awaitItem() as EntryDetailUiState.Loaded
+            assertNull(loaded.model.followUp)
+        }
+    }
+
+    // --- persona ---
+
+    @Test
+    fun `personaName reflects the recorded persona`() = runTest {
+        Persona.entries.forEach { persona ->
+            val id = createCompleted("persona ${persona.name}", persona = persona)
+            val vm = buildVm(id)
+
+            vm.state.test {
+                val loaded = awaitItem() as EntryDetailUiState.Loaded
+                assertEquals(persona.name, loaded.model.personaName)
+            }
+        }
+    }
+
+    // --- energy descriptor ---
+
+    @Test
+    fun `energyDescriptor is exposed when present`() = runTest {
+        val id = createCompleted("energy entry")
+        completeWithEnergy(id, "cruisy in, crashed out")
+        val vm = buildVm(id)
+
+        vm.state.test {
+            val loaded = awaitItem() as EntryDetailUiState.Loaded
+            assertEquals("cruisy in, crashed out", loaded.model.energyDescriptor)
+        }
+    }
+
+    @Test
+    fun `energyDescriptor is null when none extracted`() = runTest {
+        val id = createCompleted("no energy")
+        val vm = buildVm(id)
+
+        vm.state.test {
+            val loaded = awaitItem() as EntryDetailUiState.Loaded
+            assertNull(loaded.model.energyDescriptor)
+        }
+    }
+
+    // --- tags ---
+
+    @Test
+    fun `tags are name-mapped and returned sorted`() = runTest {
+        val id = entryStore.createPendingEntry("tagged entry", FIXTURE_INSTANT)
+        entryStore.completeEntry(id, resolvedTags("monday", "tired", "aftermath"), null)
+        val vm = buildVm(id)
+
+        vm.state.test {
+            val loaded = awaitItem() as EntryDetailUiState.Loaded
+            assertEquals(listOf("aftermath", "monday", "tired"), loaded.model.tags)
+        }
+    }
+
+    @Test
+    fun `tags are empty when none extracted`() = runTest {
+        val id = createCompleted("no tags")
+        val vm = buildVm(id)
+
+        vm.state.test {
+            val loaded = awaitItem() as EntryDetailUiState.Loaded
+            assertTrue(loaded.model.tags.isEmpty())
+        }
+    }
+
+    // --- word count ---
+
+    @Test
+    fun `wordCount is zero for a blank transcription`() = runTest {
+        val id = createCompleted("placeholder")
+        val box = boxStore.boxFor(EntryEntity::class.java)
+        box.get(id).also { it.entryText = "   " }.let(box::put)
+        val vm = buildVm(id)
+
+        vm.state.test {
+            val loaded = awaitItem() as EntryDetailUiState.Loaded
+            assertEquals(0, loaded.model.wordCount)
+        }
+    }
+
     // --- helper ---
 
     private fun buildVm(entryId: Long): EntryDetailViewModel = EntryDetailViewModel(
@@ -215,6 +349,27 @@ class EntryDetailViewModelTest {
         entryStore.completeEntry(id, ResolvedExtraction(emptyMap()), null)
         return id
     }
+
+    private fun completeWithEnergy(id: Long, energy: String) {
+        val resolved = ResolvedExtraction(
+            mapOf(
+                "energy_descriptor" to dev.anchildress1.vestige.model.ResolvedField(
+                    energy,
+                    dev.anchildress1.vestige.model.ConfidenceVerdict.CANONICAL,
+                ),
+            ),
+        )
+        entryStore.completeEntry(id, resolved, null)
+    }
+
+    private fun resolvedTags(vararg tags: String): ResolvedExtraction = ResolvedExtraction(
+        mapOf(
+            "tags" to dev.anchildress1.vestige.model.ResolvedField(
+                tags.toList(),
+                dev.anchildress1.vestige.model.ConfidenceVerdict.CANONICAL,
+            ),
+        ),
+    )
 
     companion object {
         private val FIXTURE_INSTANT: Instant = Instant.ofEpochSecond(1_778_829_684L)

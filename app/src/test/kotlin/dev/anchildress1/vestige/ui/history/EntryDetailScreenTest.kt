@@ -1,9 +1,11 @@
 package dev.anchildress1.vestige.ui.history
 
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertHasClickAction
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotDisplayed
 import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -265,6 +267,84 @@ class EntryDetailScreenTest {
             "— audio, 4 words",
             substring = true,
         ).assertIsDisplayed()
+    }
+
+    // --- a11y: reading card content description ---
+
+    @Test
+    fun `reading card content description includes observation text when energy is absent`() {
+        val id = createCompleted("observation only")
+        val obs = listOf(
+            EntryObservation("You said fine twice.", ObservationEvidence.VOCABULARY_CONTRADICTION, emptyList()),
+        )
+        entryStore.completeEntry(id, ResolvedExtraction(emptyMap()), null, obs)
+        setDetail(id)
+
+        // Regression guard: a manual mergeDescendants contentDescription replaces descendant
+        // text, so observation lines must be folded into it — not left unspoken.
+        composeRule.onNodeWithContentDescription(
+            "READING: You said fine twice.",
+            substring = true,
+        ).assertIsDisplayed()
+    }
+
+    @Test
+    fun `reading card content description spans energy and observations`() {
+        val id = createCompleted("energy and observation")
+        val resolved = ResolvedExtraction(
+            mapOf(
+                "energy_descriptor" to dev.anchildress1.vestige.model.ResolvedField(
+                    "cruisy in, crashed out",
+                    dev.anchildress1.vestige.model.ConfidenceVerdict.CANONICAL,
+                ),
+            ),
+        )
+        val obs = listOf(
+            EntryObservation("You said fine twice.", ObservationEvidence.VOCABULARY_CONTRADICTION, emptyList()),
+        )
+        entryStore.completeEntry(id, resolved, null, obs)
+        setDetail(id)
+
+        composeRule.onNodeWithContentDescription(
+            "READING: cruisy in, crashed out. You said fine twice.",
+            substring = true,
+        ).assertIsDisplayed()
+    }
+
+    @Test
+    fun `reading card is absent when there is no energy or observation`() {
+        val id = createCompleted("plain entry")
+        setDetail(id)
+
+        composeRule.onAllNodesWithTag("entry_reading_card").assertCountEquals(0)
+    }
+
+    @Test
+    fun `follow-up block is absent when no follow-up was saved`() {
+        val id = createCompleted("no follow up here")
+        setDetail(id)
+
+        composeRule.onAllNodesWithTag("entry_follow_up").assertCountEquals(0)
+    }
+
+    // --- not-found keeps navigation ---
+
+    @Test
+    fun `not-found state still exposes back and new entry controls`() {
+        composeRule.setContent {
+            dev.anchildress1.vestige.ui.theme.VestigeTheme {
+                EntryDetailScreen(
+                    viewModel = buildVm(99_999L),
+                    onBack = {},
+                    onNewEntry = {},
+                )
+            }
+        }
+
+        // Regression guard: NotFound must not consume the whole column and push the bar off.
+        composeRule.onNodeWithText(EntryDetailCopy.NOT_FOUND).assertIsDisplayed()
+        composeRule.onNodeWithContentDescription(EntryDetailCopy.BACK_CD).assertHasClickAction()
+        composeRule.onNodeWithContentDescription(EntryDetailCopy.NEW_ENTRY_CD).assertHasClickAction()
     }
 
     // --- helpers ---

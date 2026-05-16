@@ -57,4 +57,15 @@ class BackgroundExtractionStatusBusTest {
 
         assertEquals(0, bus.inFlightCount.value)
     }
+
+    @Test
+    fun `clear drops every tracked entry immediately`() {
+        val bus = BackgroundExtractionStatusBus()
+        bus.report(entryId = 1L, status = ExtractionStatus.PENDING)
+        bus.report(entryId = 2L, status = ExtractionStatus.RUNNING)
+
+        bus.clear()
+
+        assertEquals(0, bus.inFlightCount.value)
+    }
 }

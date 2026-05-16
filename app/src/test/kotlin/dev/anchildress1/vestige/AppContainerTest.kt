@@ -73,78 +73,104 @@ class AppContainerTest {
     @Test
     fun `startForegroundService rejection schedules a retry for the active extraction`() = runTest {
         var serviceStarts = 0
-        val container = AppContainer(
-            applicationContext = mockk<Context>(relaxed = true),
-            boxStoreFactory = { mockk<BoxStore>(relaxed = true) },
-            markdownStoreFactory = { mockk<MarkdownEntryStore>(relaxed = true) },
-            recoveredEntryIdsLoader = { emptyList() },
-            foregroundServiceIntentFactory = { Intent("dev.anchildress1.vestige.TEST_START") },
-            foregroundServiceStarter = {
-                serviceStarts += 1
-                if (serviceStarts == 1) error("background-start denied")
-            },
-            scope = backgroundScope,
-        )
+        val boxDir = newInMemoryObjectBoxDirectory("retry")
+        val box = openInMemoryBoxStore(boxDir)
+        try {
+            val entryId = box.boxFor(EntryEntity::class.java)
+                .put(EntryEntity(entryText = "x", timestampEpochMs = 1))
+            val container = AppContainer(
+                applicationContext = mockk<Context>(relaxed = true),
+                boxStoreFactory = { box },
+                markdownStoreFactory = { mockk<MarkdownEntryStore>(relaxed = true) },
+                recoveredEntryIdsLoader = { emptyList() },
+                foregroundServiceIntentFactory = { Intent("dev.anchildress1.vestige.TEST_START") },
+                foregroundServiceStarter = {
+                    serviceStarts += 1
+                    if (serviceStarts == 1) error("background-start denied")
+                },
+                scope = backgroundScope,
+            )
 
-        container.reportExtractionStatus(entryId = 7L, status = ExtractionStatus.RUNNING)
-        assertEquals(BackgroundExtractionLifecycleState.NORMAL, container.lifecycleStateMachine.state.value)
+            container.reportExtractionStatus(entryId = entryId, status = ExtractionStatus.RUNNING)
+            assertEquals(BackgroundExtractionLifecycleState.NORMAL, container.lifecycleStateMachine.state.value)
 
-        advanceTimeBy(5_001L)
-        advanceUntilIdle()
+            advanceTimeBy(5_001L)
+            advanceUntilIdle()
 
-        assertEquals(2, serviceStarts)
-        assertEquals(BackgroundExtractionLifecycleState.PROMOTING, container.lifecycleStateMachine.state.value)
+            assertEquals(2, serviceStarts)
+            assertEquals(BackgroundExtractionLifecycleState.PROMOTING, container.lifecycleStateMachine.state.value)
+        } finally {
+            box.close()
+        }
     }
 
     @Test
     fun `work arriving during DEMOTING re-dispatches the foreground service after the platform ack`() = runTest {
         var serviceStarts = 0
-        val container = AppContainer(
-            applicationContext = mockk<Context>(relaxed = true),
-            boxStoreFactory = { mockk<BoxStore>(relaxed = true) },
-            markdownStoreFactory = { mockk<MarkdownEntryStore>(relaxed = true) },
-            recoveredEntryIdsLoader = { emptyList() },
-            foregroundServiceIntentFactory = { Intent("dev.anchildress1.vestige.TEST_START") },
-            foregroundServiceStarter = { serviceStarts += 1 },
-            scope = backgroundScope,
-        )
+        val boxDir = newInMemoryObjectBoxDirectory("demoting")
+        val box = openInMemoryBoxStore(boxDir)
+        try {
+            val firstEntryId = box.boxFor(EntryEntity::class.java)
+                .put(EntryEntity(entryText = "first", timestampEpochMs = 1))
+            val secondEntryId = box.boxFor(EntryEntity::class.java)
+                .put(EntryEntity(entryText = "second", timestampEpochMs = 2))
+            val container = AppContainer(
+                applicationContext = mockk<Context>(relaxed = true),
+                boxStoreFactory = { box },
+                markdownStoreFactory = { mockk<MarkdownEntryStore>(relaxed = true) },
+                recoveredEntryIdsLoader = { emptyList() },
+                foregroundServiceIntentFactory = { Intent("dev.anchildress1.vestige.TEST_START") },
+                foregroundServiceStarter = { serviceStarts += 1 },
+                scope = backgroundScope,
+            )
 
-        container.reportExtractionStatus(entryId = 1L, status = ExtractionStatus.RUNNING)
-        container.lifecycleStateMachine.onForegroundStartConfirmed()
-        container.reportExtractionStatus(entryId = 1L, status = ExtractionStatus.COMPLETED)
-        advanceTimeBy(30_001L)
-        assertEquals(BackgroundExtractionLifecycleState.DEMOTING, container.lifecycleStateMachine.state.value)
-        assertEquals(1, serviceStarts)
+            container.reportExtractionStatus(entryId = firstEntryId, status = ExtractionStatus.RUNNING)
+            container.lifecycleStateMachine.onForegroundStartConfirmed()
+            container.reportExtractionStatus(entryId = firstEntryId, status = ExtractionStatus.COMPLETED)
+            advanceTimeBy(30_001L)
+            assertEquals(BackgroundExtractionLifecycleState.DEMOTING, container.lifecycleStateMachine.state.value)
+            assertEquals(1, serviceStarts)
 
-        // New capture lands while we're awaiting the platform stop ack.
-        container.reportExtractionStatus(entryId = 2L, status = ExtractionStatus.RUNNING)
-        container.lifecycleStateMachine.onForegroundStopConfirmed()
-        advanceUntilIdle()
+            // New capture lands while we're awaiting the platform stop ack.
+            container.reportExtractionStatus(entryId = secondEntryId, status = ExtractionStatus.RUNNING)
+            container.lifecycleStateMachine.onForegroundStopConfirmed()
+            advanceUntilIdle()
 
-        assertEquals(BackgroundExtractionLifecycleState.PROMOTING, container.lifecycleStateMachine.state.value)
-        assertEquals(2, serviceStarts)
+            assertEquals(BackgroundExtractionLifecycleState.PROMOTING, container.lifecycleStateMachine.state.value)
+            assertEquals(2, serviceStarts)
+        } finally {
+            box.close()
+        }
     }
 
     @Test
     fun `extractionStatusListener forwards worker updates into the lifecycle machine`() = runTest {
-        val container = AppContainer(
-            applicationContext = mockk<Context>(relaxed = true),
-            boxStoreFactory = { mockk<BoxStore>(relaxed = true) },
-            markdownStoreFactory = { mockk<MarkdownEntryStore>(relaxed = true) },
-            recoveredEntryIdsLoader = { emptyList() },
-            foregroundServiceIntentFactory = { Intent("dev.anchildress1.vestige.TEST_START") },
-            foregroundServiceStarter = {},
-            scope = backgroundScope,
-        )
+        val boxDir = newInMemoryObjectBoxDirectory("listener")
+        val box = openInMemoryBoxStore(boxDir)
+        try {
+            val entryId = box.boxFor(EntryEntity::class.java)
+                .put(EntryEntity(entryText = "x", timestampEpochMs = 1))
+            val container = AppContainer(
+                applicationContext = mockk<Context>(relaxed = true),
+                boxStoreFactory = { box },
+                markdownStoreFactory = { mockk<MarkdownEntryStore>(relaxed = true) },
+                recoveredEntryIdsLoader = { emptyList() },
+                foregroundServiceIntentFactory = { Intent("dev.anchildress1.vestige.TEST_START") },
+                foregroundServiceStarter = {},
+                scope = backgroundScope,
+            )
 
-        val listener = container.extractionStatusListener(entryId = 42L)
-        listener.onUpdate(ExtractionStatus.RUNNING, entryAttemptCount = 0, lastError = null)
-        assertEquals(BackgroundExtractionLifecycleState.PROMOTING, container.lifecycleStateMachine.state.value)
+            val listener = container.extractionStatusListener(entryId = entryId)
+            listener.onUpdate(ExtractionStatus.RUNNING, entryAttemptCount = 0, lastError = null)
+            assertEquals(BackgroundExtractionLifecycleState.PROMOTING, container.lifecycleStateMachine.state.value)
 
-        container.lifecycleStateMachine.onForegroundStartConfirmed()
-        listener.onUpdate(ExtractionStatus.COMPLETED, entryAttemptCount = 0, lastError = null)
+            container.lifecycleStateMachine.onForegroundStartConfirmed()
+            listener.onUpdate(ExtractionStatus.COMPLETED, entryAttemptCount = 0, lastError = null)
 
-        assertEquals(BackgroundExtractionLifecycleState.KEEP_ALIVE, container.lifecycleStateMachine.state.value)
+            assertEquals(BackgroundExtractionLifecycleState.KEEP_ALIVE, container.lifecycleStateMachine.state.value)
+        } finally {
+            box.close()
+        }
     }
 
     @Test
@@ -554,6 +580,7 @@ class AppContainerTest {
             File(tempRoot, "entries").mkdirs()
             File(tempRoot, "entries/a.md").writeText("x")
             File(tempRoot, "entries/b.md").writeText("y")
+            var stopRequests = 0
             val container = AppContainer(
                 applicationContext = mockk<Context>(relaxed = true) { every { filesDir } returns tempRoot },
                 boxStoreFactory = { box },
@@ -563,14 +590,20 @@ class AppContainerTest {
                 recoveredEntryIdsLoader = { emptyList() },
                 foregroundServiceIntentFactory = { Intent("dev.anchildress1.vestige.TEST_START") },
                 foregroundServiceStarter = {},
+                foregroundServiceStopper = { stopRequests += 1 },
                 scope = this,
             )
             val revisionBefore = container.dataRevision.value
+            container.reportExtractionStatus(entryId = 1L, status = ExtractionStatus.RUNNING)
+            assertEquals(BackgroundExtractionLifecycleState.PROMOTING, container.lifecycleStateMachine.state.value)
 
             container.wipeAllData()
+            container.reportExtractionStatus(entryId = 1L, status = ExtractionStatus.RUNNING)
 
             assertEquals(0L, box.boxFor(EntryEntity::class.java).count())
             assertTrue((File(tempRoot, "entries").listFiles()?.none { it.name.endsWith(".md") } ?: true))
+            assertEquals(1, stopRequests)
+            assertEquals(BackgroundExtractionLifecycleState.NORMAL, container.lifecycleStateMachine.state.value)
             assertTrue(container.dataRevision.value > revisionBefore)
         } finally {
             box.close()

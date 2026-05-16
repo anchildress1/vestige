@@ -31,6 +31,12 @@ class BackgroundExtractionStatusBus {
         countState.update { tracked.size }
     }
 
+    @Synchronized
+    fun clear() {
+        tracked.clear()
+        countState.update { 0 }
+    }
+
     private fun ExtractionStatus.isTerminal(): Boolean = when (this) {
         ExtractionStatus.COMPLETED, ExtractionStatus.TIMED_OUT, ExtractionStatus.FAILED -> true
         ExtractionStatus.PENDING, ExtractionStatus.RUNNING -> false

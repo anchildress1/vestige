@@ -175,6 +175,9 @@ class AppContainer(
     private val foregroundServiceStarter: (Intent) -> Unit = { intent ->
         applicationContext.startForegroundService(intent)
     },
+    private val foregroundServiceStopper: (Intent) -> Unit = { intent ->
+        applicationContext.stopService(intent)
+    },
     private val vectorBackfillRetryDelayMs: Long = VECTOR_BACKFILL_RETRY_DELAY_MS,
     private val vectorBackfillMaxRetries: Int = VECTOR_BACKFILL_MAX_RETRIES,
     private val vectorBackfillScheduleListener: (() -> Unit)? = null,
@@ -366,6 +369,10 @@ class AppContainer(
     }
 
     fun reportExtractionStatus(entryId: Long, status: ExtractionStatus) {
+        if (!status.isTerminal() && entryStore.readEntry(entryId) == null) {
+            Log.w(TAG, "Ignoring stale in-flight extraction status for missing entryId=$entryId")
+            return
+        }
         statusBus.report(entryId, status)
         lifecycleStateMachine.onInFlightCountChange(statusBus.inFlightCount.value)
     }
@@ -491,6 +498,7 @@ class AppContainer(
      * Per `ux-copy.md` §"Destructive Confirmations / Delete all data".
      */
     suspend fun wipeAllData() {
+        foregroundServiceStopper(foregroundServiceIntentFactory())
         withContext(Dispatchers.IO) {
             boxStore.boxFor(EntryEntity::class.java).removeAll()
             boxStore.boxFor(PatternEntity::class.java).removeAll()
@@ -499,6 +507,9 @@ class AppContainer(
             markdownStore.listAll().forEach { it.delete() }
             Log.i(TAG, "All user data wiped on explicit request")
         }
+        statusBus.clear()
+        lifecycleStateMachine.onInFlightCountChange(0)
+        lifecycleStateMachine.onServiceKilled()
         _dataRevision.value += 1
     }
 

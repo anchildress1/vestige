@@ -96,7 +96,6 @@ fun EntryDetailScreen(
 }
 
 @Suppress("LongMethod")
-@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun EntryDetailContent(model: EntryDetailUiModel, highlightOnOpen: Boolean, modifier: Modifier = Modifier) {
     val colors = VestigeTheme.colors
@@ -179,71 +178,85 @@ private fun EntryDetailContent(model: EntryDetailUiModel, highlightOnOpen: Boole
             }
         }
 
-        if (model.energyDescriptor != null || model.observations.isNotEmpty()) {
-            val readingLabel = "${model.personaName} ${EntryDetailCopy.READING_LABEL_SUFFIX}"
-            // Explicit CD spans energy + every observation line: mergeDescendants with a manual
-            // contentDescription replaces descendant text, so anything omitted here is unspoken.
-            val readingBody = (listOfNotNull(model.energyDescriptor) + model.observations.map { it.text })
-                .joinToString(". ")
+        EntryReadingCard(
+            personaName = model.personaName,
+            energyDescriptor = model.energyDescriptor,
+            observations = model.observations,
+        )
+
+        EntryTagsRow(tags = model.tags)
+
+        Spacer(Modifier.height(8.dp))
+    }
+}
+
+@Composable
+private fun EntryReadingCard(personaName: String, energyDescriptor: String?, observations: List<ObservationLine>) {
+    if (energyDescriptor == null && observations.isEmpty()) return
+    val colors = VestigeTheme.colors
+    val readingLabel = "$personaName ${EntryDetailCopy.READING_LABEL_SUFFIX}"
+    // Explicit CD spans energy + every observation line: mergeDescendants with a manual
+    // contentDescription replaces descendant text, so anything omitted here is unspoken.
+    val readingBody = (listOfNotNull(energyDescriptor) + observations.map { it.text }).joinToString(". ")
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .testTag("entry_reading_card")
+            .semantics(mergeDescendants = true) {
+                contentDescription = "$readingLabel: $readingBody"
+            },
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        EyebrowE(text = readingLabel)
+        VestigeSurface(
+            accentModifier = Modifier.limeLeftRuleForActive(),
+            modifier = Modifier.fillMaxWidth(),
+        ) {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .testTag("entry_reading_card")
-                    .semantics(mergeDescendants = true) {
-                        contentDescription = "$readingLabel: $readingBody"
-                    },
+                    .padding(horizontal = 14.dp, vertical = 12.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                EyebrowE(text = readingLabel)
-                VestigeSurface(
-                    accentModifier = Modifier.limeLeftRuleForActive(),
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 14.dp, vertical = 12.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp),
-                    ) {
-                        if (model.energyDescriptor != null) {
-                            Text(
-                                text = model.energyDescriptor.uppercase(),
-                                style = VestigeTheme.typography.h1,
-                                color = colors.lime,
-                                modifier = Modifier.testTag("entry_energy_descriptor"),
-                            )
-                        }
-                        model.observations.forEach { obs ->
-                            Text(
-                                text = obs.text,
-                                style = VestigeTheme.typography.p,
-                                color = colors.ink,
-                            )
-                        }
-                    }
+                if (energyDescriptor != null) {
+                    Text(
+                        text = energyDescriptor.uppercase(),
+                        style = VestigeTheme.typography.h1,
+                        color = colors.lime,
+                        modifier = Modifier.testTag("entry_energy_descriptor"),
+                    )
                 }
-            }
-        }
-
-        if (model.tags.isNotEmpty()) {
-            FlowRow(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .testTag("entry_tags"),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalArrangement = Arrangement.spacedBy(6.dp),
-            ) {
-                model.tags.forEach { tag ->
-                    Pill(
-                        text = tag,
-                        color = colors.faint,
-                        modifier = Modifier.semantics { contentDescription = "tag: $tag" },
+                observations.forEach { obs ->
+                    Text(
+                        text = obs.text,
+                        style = VestigeTheme.typography.p,
+                        color = colors.ink,
                     )
                 }
             }
         }
+    }
+}
 
-        Spacer(Modifier.height(8.dp))
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun EntryTagsRow(tags: List<String>) {
+    if (tags.isEmpty()) return
+    val colors = VestigeTheme.colors
+    FlowRow(
+        modifier = Modifier
+            .fillMaxWidth()
+            .testTag("entry_tags"),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        tags.forEach { tag ->
+            Pill(
+                text = tag,
+                color = colors.faint,
+                modifier = Modifier.semantics { contentDescription = "tag: $tag" },
+            )
+        }
     }
 }
 

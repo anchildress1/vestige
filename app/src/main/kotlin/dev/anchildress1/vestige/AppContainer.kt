@@ -344,7 +344,10 @@ class AppContainer(
     fun sweepExpiredSkips() {
         runCatching { patternStore.promoteExpiredSkips() }
             .onSuccess { promoted ->
-                if (promoted.isNotEmpty()) Log.i(TAG, "Skip wake-up promoted ${promoted.size} pattern(s)")
+                if (promoted.isNotEmpty()) {
+                    _dataRevision.value += 1
+                    Log.i(TAG, "Skip wake-up promoted ${promoted.size} pattern(s)")
+                }
             }
             // Self-healing: the next ON_RESUME re-runs the sweep, so a transient failure here
             // is a warning, not an error — keeping it error-tier would devalue real alerts.

@@ -214,13 +214,14 @@ private fun PatternCard(
     onRestart: () -> Unit,
 ) {
     val cardAlpha = if (card.section == PatternSection.DROPPED) DROPPED_CARD_ALPHA else 1f
+    val backDescription = card.backLabel?.let { stringResource(R.string.pattern_card_back_on, it) }
     VestigeListCard(
         modifier = Modifier
             .fillMaxWidth()
             .alpha(cardAlpha)
             .semantics {
                 role = Role.Button
-                contentDescription = "${card.title}. ${card.observation}"
+                contentDescription = listOfNotNull(card.title, card.observation, backDescription).joinToString(". ")
             },
         interaction = VestigeListCardInteraction.Click(onClick = onClick),
         accentModifier = if (card.section == PatternSection.ACTIVE) {

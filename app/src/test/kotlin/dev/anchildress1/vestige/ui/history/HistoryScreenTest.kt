@@ -1,5 +1,9 @@
 package dev.anchildress1.vestige.ui.history
 
+import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertHasClickAction
 import androidx.compose.ui.test.assertHasNoClickAction
@@ -89,6 +93,15 @@ class HistoryScreenTest {
     fun `empty state renders locked body copy`() {
         composeRule.setContent { HistoryScreen(viewModel = newViewModel(), persona = Persona.WITNESS) }
         composeRule.onNodeWithText("First one takes 30 seconds.").assertIsDisplayed()
+    }
+
+    @Test
+    fun `empty state is a polite live region with merged copy and no click action`() {
+        composeRule.setContent { HistoryScreen(viewModel = newViewModel(), persona = Persona.WITNESS) }
+        val band = composeRule.onNodeWithContentDescription("No entries yet. First one takes 30 seconds.")
+        band.assertIsDisplayed()
+        band.assert(SemanticsMatcher.keyIsDefined(SemanticsProperties.LiveRegion))
+        band.assert(SemanticsMatcher.keyNotDefined(SemanticsActions.OnClick))
     }
 
     @Test

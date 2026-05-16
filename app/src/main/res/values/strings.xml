@@ -91,7 +91,7 @@
     <string name="patterns_empty_none_header">No repeating pattern detected.</string>
     <string name="patterns_empty_none_body">The model looked. Nothing came back twice.</string>
     <string name="pattern_detail_seen_in">Seen in:</string>
-    <string name="pattern_detail_no_sources">No source entries.</string>
+    <string name="pattern_detail_no_sources">No entries logged for this pattern yet.</string>
     <string name="pattern_detail_not_found">Pattern not found.</string>
     <string name="pattern_detail_intensity_eyebrow">INTENSITY · 30 DAYS</string>
     <!-- Action labels per docs/ux-copy.md §"Pattern List / Card actions" + spec-pattern-action-buttons.md.

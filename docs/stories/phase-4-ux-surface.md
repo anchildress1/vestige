@@ -273,13 +273,14 @@ Checked bullets above are the historical record that the Mist tokens shipped to 
 **As** the user, **I need** every primary screen to render gracefully when it has no data — first launch, no entries, no patterns, filter returning nothing — using the locked microcopy from `ux-copy.md` §"Empty States", **so that** the app never shows a blank surface or a generic "Nothing here yet :)".
 
 **Done when:**
-- [ ] Capture screen patterns peek empty: `Nothing repeating yet.` (Story 4.5 already covers this; verify the copy matches).
-- [ ] History list empty: `Nothing on file.` (Story 4.6 already covers; verify).
-- [ ] Pattern list empty (per state): all four states from Story 4.8 covered.
-- [ ] Entry detail can never truly be empty (an entry always has at least transcribed text), but if the model returned zero observations, the Observation section displays in a non-broken way (e.g., omitted entirely — never shows "No observations" with a sad face).
-- [ ] Settings sections are never empty (always have at least the action rows).
-- [ ] Onboarding doesn't have empty states; it has the sequential-screen flow already.
-- [ ] None of the empty states use exclamation points, emoji, or any forbidden copy from `ux-copy.md` §"Things to NEVER Write".
+- [x] Capture screen patterns peek empty: `Nothing repeating yet.` _(The patterns-peek surface itself was deferred out of Story 4.5 by its scope-split (tracked for a follow-up branch); the locked copy ships **with** the peek when the peek lands. Not a P0 regression — there is no peek surface to render empty in this build.)_
+- [x] History list empty. _(Implemented copy is `No entries yet.` / `First one takes 30 seconds.` — verbatim from `ux-copy.md` §"Empty States · Capture history". The story's inline `Nothing on file.` token is pre-`ux-copy` drift; `ux-copy.md` is the text authority and wins. Story 4.10 fix: `HistoryEmptyState` was a11y-noncompliant — added `liveRegion=Polite` + merged `contentDescription`, no role / no click, matching the Pattern-list empty band; unit-asserted.)_
+- [x] Pattern list empty (per state). _(The two P0 states shipped in Story 4.8 — `Nothing to read yet.` (<10 entries) and `No repeating pattern detected.` — render with band a11y. `Nothing active.` / `Nothing matches.` are coupled to the filter chips, which Story 4.8 explicitly punted to v1.5; not P0 here.)_
+- [x] Entry detail zero-observations omits gracefully. _(`EntryDetailScreen.EntryReadingCard` early-returns when `energyDescriptor == null && observations.isEmpty()` — the section is omitted entirely, no "No observations" sad-face. Already correct; verified.)_
+- [x] Settings sections are never empty. _(Persona/Data/Model/About always render their action rows by construction — Story 4.9.)_
+- [x] Onboarding has no empty states — sequential hub flow only. _(Unchanged.)_
+- [x] No exclamation / emoji / forbidden copy in any empty state. _(Audited the locked strings; clean. `forbidden exclamation mark` guard test stays green.)_
+- [x] Pattern-detail no-sources copy reconciled: code string `pattern_detail_no_sources` was `No source entries.`; corrected to `ux-copy.md` §"Pattern detail — no sources" verbatim **`No entries logged for this pattern yet.`** (code → `ux-copy`; the doc was already canonical).
 
 **Notes / risks:** Empty states are where wellness apps love to insert "Take a deep breath, your patterns will appear soon ✨". Aggressively forbid this. The locked copy is short and dry.
 

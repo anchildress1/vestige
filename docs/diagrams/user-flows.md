@@ -95,14 +95,14 @@ and returns to first-run.
 ```mermaid
 flowchart TD
     accTitle: Settings sections and model lifecycle
-    accDescr: Settings has Persona, Data, Model, and About sections. Export writes a SAF zip plus manifest as a copy. Delete all data requires typing DELETE then wipes ObjectBox, markdown, and onboarding prefs and returns to first run. The Model row opens Model Status where Re-download and Delete live; re-download replaces the file with entries untouched, a failed re-download falls back to Loading.
+    accDescr: Settings has Persona, Data, Model, and About sections. Export writes a SAF zip of the entry markdown files as a copy. Delete all data requires typing DELETE then wipes ObjectBox, markdown, and onboarding prefs and returns to first run. The Model row opens Model Status where Re-download and Delete live; re-download replaces the file with entries untouched, a failed re-download falls back to Loading.
 
     SET["Settings"] --> PER["Persona<br/>(3 names)"]
     SET --> DATA["Data"]
     SET --> MOD["Model status row"]
     SET --> ABT["About<br/>version · source · license"]
 
-    DATA --> EXP["Export all entries<br/>SAF zip + manifest.json (copy; failures surface)"]
+    DATA --> EXP["Export all entries<br/>SAF markdown zip (copy; failures surface)"]
     DATA --> WIPE["Delete all data<br/>type DELETE → wipe ObjectBox + markdown + prefs → first-run"]
 
     MOD --> MS["Local Model Status screen"]

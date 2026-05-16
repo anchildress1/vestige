@@ -152,7 +152,7 @@ Standup ran long again. I was fine before it, then completely flattened by 11. O
 - **ObjectBox is downstream of markdown.** All writes go through `EntryStore`, which writes the markdown file first and the ObjectBox row second, in that order, in a single transactional unit. If the markdown write succeeds and ObjectBox fails, the next cold start rebuilds the row from the markdown. If the markdown write fails, no ObjectBox row exists.
 - **External markdown edits are out of scope for v1.** The user can read or back up the files, but in-place external edits are not detected and may be overwritten by a later re-eval. v1 ships with markdown as a debugging/export surface only. External-edit support is a v1.5 entry in `backlog.md` if it ever earns one.
 - **Re-eval rewrites the file.** Re-eval (P1) updates `tags`, `entry_observations`, etc. The resolver writes the new markdown atomically (write to `.tmp`, fsync, rename). Old content is not preserved unless the user explicitly rejects the new shape.
-- **Export is a copy, not a move.** Settings → Export zips a snapshot of `entries/` plus a generated `manifest.json` (one row per entry: filename, sha256, schema_version). The originals remain in-place.
+- **Export is a copy, not a move.** Settings → Export zips a snapshot of the markdown files under `entries/`. The originals remain in-place.
 
 ### `schema_version`
 

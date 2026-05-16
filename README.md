@@ -2,13 +2,24 @@
   <img src="https://repository-images.githubusercontent.com/1233196257/6d5cb58c-808a-4c73-8627-ee3d5dc7ad7c" alt="Vestige social banner" />
 </p>
 
-# Vestige
+<h1 align="center">Vestige</h1>
 
-On-device cognition tracker for ADHD-flavored adults. Anti-sycophant, behavioral, private.
+<p align="center"><em>On-device cognition tracker for ADHD-flavored adults. Anti-sycophant, behavioral, private.</em></p>
 
-> Built for the [Gemma 4 Challenge](https://dev.to/devteam/join-the-gemma-4-challenge-3000-prize-pool-for-ten-winners-23in) — submission category: Build with Gemma 4. Canonical product spec lives under [`docs/`](docs); see [`AGENTS.md`](AGENTS.md) for AI agent rules.
+<p align="center">
+  Built for the <a href="https://dev.to/devteam/join-the-gemma-4-challenge-3000-prize-pool-for-ten-winners-23in">Gemma 4 Challenge</a> — submission category: Build with Gemma 4.<br/>
+  Canonical product spec lives under <a href="docs"><code>docs/</code></a>; see <a href="AGENTS.md"><code>AGENTS.md</code></a> for AI agent rules.
+</p>
 
-[![CI](https://github.com/anchildress1/vestige/actions/workflows/ci.yml/badge.svg)](https://github.com/anchildress1/vestige/actions/workflows/ci.yml) [![CodeQL](https://github.com/anchildress1/vestige/actions/workflows/codeql.yml/badge.svg)](https://github.com/anchildress1/vestige/actions/workflows/codeql.yml) ![Sonar Violations](https://img.shields.io/sonar/violations/anchildress1_vestige?server=https%3A%2F%2Fsonarcloud.io&format=short&style=for-the-badge)
+<p align="center">
+  <img alt="CI GHA Status" src="https://img.shields.io/github/actions/workflow/status/anchildress1/vestige/.github%2Fworkflows%2Fci.yml?style=for-the-badge&logo=github&label=CI" />
+  <img alt="CodeQL GitHub Actions Workflow Status" src="https://img.shields.io/github/actions/workflow/status/anchildress1/vestige/.github%2Fworkflows%2Fcodeql.yml?style=for-the-badge&logo=github&label=CodeQL" />
+  <br/>
+  <img alt="Sonar Violations" src="https://img.shields.io/sonar/violations/anchildress1_vestige?server=https%3A%2F%2Fsonarcloud.io&format=short&style=for-the-badge" />
+  <img alt="Sonar Coverage" src="https://img.shields.io/sonar/coverage/anchildress1_vestige?server=https%3A%2F%2Fsonarcloud.io&style=for-the-badge&color=limegreen" />
+  <img alt="Sonar Tests" src="https://img.shields.io/sonar/tests/anchildress1_vestige?server=https%3A%2F%2Fsonarcloud.io&compact_message&style=for-the-badge" />
+</p>
+
 
 
 ---

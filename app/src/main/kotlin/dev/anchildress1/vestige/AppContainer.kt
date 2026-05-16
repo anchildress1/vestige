@@ -453,9 +453,16 @@ class AppContainer(
     fun deleteMainModel() {
         scope.launch {
             runMainModelMutation(name = "delete model") {
+                resetBackgroundEngine()
                 val artifact = mainModelArtifactStore.artifactFile
-                artifact.delete()
-                File(artifact.parentFile, "${artifact.name}.part").delete()
+                if (!artifact.delete()) Log.w(TAG, "Failed to delete model artifact")
+                if (!File(
+                        artifact.parentFile,
+                        "${artifact.name}.part",
+                    ).delete()
+                ) {
+                    Log.w(TAG, "Failed to delete model part file")
+                }
                 Log.i(TAG, "Main model artifact deleted on user request")
                 refreshModelReadiness()
             }
@@ -471,10 +478,17 @@ class AppContainer(
     fun redownloadMainModel() {
         scope.launch {
             runMainModelMutation(name = "re-download model") {
+                resetBackgroundEngine()
                 val store = mainModelArtifactStore
                 val artifact = store.artifactFile
-                File(artifact.parentFile, "${artifact.name}.part").delete()
-                artifact.delete()
+                if (!File(
+                        artifact.parentFile,
+                        "${artifact.name}.part",
+                    ).delete()
+                ) {
+                    Log.w(TAG, "Failed to delete model part file")
+                }
+                if (!artifact.delete()) Log.w(TAG, "Failed to delete model artifact")
                 _modelReadinessFlow.value = ModelReadiness.Downloading(0)
                 networkGate.openForDownload(reason = "Model Status — user-requested re-download")
                 val result: ModelArtifactState? = try {
@@ -502,8 +516,14 @@ class AppContainer(
                 // retry/delete affordances live.
                 if (result is ModelArtifactState.Corrupt) {
                     Log.e(TAG, "Re-download produced a checksum-corrupt artifact; discarding")
-                    store.artifactFile.delete()
-                    File(store.artifactFile.parentFile, "${store.artifactFile.name}.part").delete()
+                    if (!store.artifactFile.delete()) Log.w(TAG, "Failed to delete corrupt model artifact")
+                    if (!File(
+                            store.artifactFile.parentFile,
+                            "${store.artifactFile.name}.part",
+                        ).delete()
+                    ) {
+                        Log.w(TAG, "Failed to delete corrupt model part file")
+                    }
                 }
                 if (result != ModelArtifactState.Complete) {
                     _modelReadinessFlow.value = ModelReadiness.Paused
@@ -525,7 +545,7 @@ class AppContainer(
             boxStore.boxFor(PatternEntity::class.java).removeAll()
             boxStore.boxFor(TagEntity::class.java).removeAll()
             boxStore.boxFor(CalloutCooldownEntity::class.java).removeAll()
-            markdownStore.listAll().forEach { it.delete() }
+            markdownStore.listAll().forEach { if (!it.delete()) Log.w(TAG, "Failed to delete markdown file") }
             Log.i(TAG, "All user data wiped on explicit request")
         }
         statusBus.clear()
@@ -639,6 +659,16 @@ class AppContainer(
             if (backgroundEngineInitialized) return
             backgroundEngine.initialize()
             backgroundEngineInitialized = true
+        }
+    }
+
+    private suspend fun resetBackgroundEngine() {
+        backgroundEngineInitMutex.withLock {
+            if (!backgroundEngineInitialized) return
+            // Keep the wrapper instance so every collaborator holding `backgroundEngine` sees the
+            // same object; `LiteRtLmEngine.close()` clears the native handle and supports re-init.
+            backgroundEngine.close()
+            backgroundEngineInitialized = false
         }
     }
 

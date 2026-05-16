@@ -102,7 +102,6 @@ private fun EntryDetailContent(model: EntryDetailUiModel, modifier: Modifier = M
     ) {
         Spacer(Modifier.height(12.dp))
 
-        // Header — FILED eyebrow + entry number display
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
@@ -125,7 +124,6 @@ private fun EntryDetailContent(model: EntryDetailUiModel, modifier: Modifier = M
             modifier = Modifier.testTag("entry_number"),
         )
 
-        // Stat ribbon — AUDIO duration + WORDS count
         StatRibbon(
             items = listOf(
                 StatItem(value = model.audioLabel, label = EntryDetailCopy.AUDIO_STAT_LABEL),
@@ -138,7 +136,6 @@ private fun EntryDetailContent(model: EntryDetailUiModel, modifier: Modifier = M
                 },
         )
 
-        // USER turn — muted transcription
         TranscriptBlock(
             eyebrow = EntryDetailCopy.YOU_LABEL,
             body = model.transcription,
@@ -146,7 +143,6 @@ private fun EntryDetailContent(model: EntryDetailUiModel, modifier: Modifier = M
             testTag = "entry_transcription",
         )
 
-        // MODEL turn — persona reading section
         if (model.energyDescriptor != null || model.observations.isNotEmpty()) {
             val readingLabel = "${model.personaName} ${EntryDetailCopy.READING_LABEL_SUFFIX}"
             Column(
@@ -189,7 +185,6 @@ private fun EntryDetailContent(model: EntryDetailUiModel, modifier: Modifier = M
             }
         }
 
-        // Tags
         if (model.tags.isNotEmpty()) {
             FlowRow(
                 modifier = Modifier
@@ -220,7 +215,8 @@ private fun TranscriptBlock(
     testTag: String,
 ) {
     val colors = VestigeTheme.colors
-    // testTag on the outer container so onNodeWithTag finds the visible block in the merged tree.
+    // testTag on the container (not the inner Text) so the tag and the merged
+    // contentDescription resolve to one node.
     Column(
         modifier = Modifier
             .testTag(testTag)
@@ -259,7 +255,6 @@ private fun EntryDetailBottomBar(onBack: () -> Unit, onNewEntry: () -> Unit) {
             },
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        // Back button — left slot
         Box(
             modifier = Modifier
                 .requiredHeightIn(min = 56.dp)
@@ -281,7 +276,6 @@ private fun EntryDetailBottomBar(onBack: () -> Unit, onNewEntry: () -> Unit) {
 
         Spacer(modifier = Modifier.weight(1f))
 
-        // New entry CTA — right slot
         Box(
             modifier = Modifier
                 .requiredHeightIn(min = 56.dp)
@@ -293,17 +287,12 @@ private fun EntryDetailBottomBar(onBack: () -> Unit, onNewEntry: () -> Unit) {
                 },
             contentAlignment = Alignment.Center,
         ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
-            ) {
-                Text(
-                    text = EntryDetailCopy.NEW_ENTRY_LABEL,
-                    style = VestigeTheme.typography.eyebrow,
-                    color = colors.lime,
-                    modifier = Modifier.testTag("detail_new_entry"),
-                )
-            }
+            Text(
+                text = EntryDetailCopy.NEW_ENTRY_LABEL,
+                style = VestigeTheme.typography.eyebrow,
+                color = colors.lime,
+                modifier = Modifier.testTag("detail_new_entry"),
+            )
         }
     }
 }

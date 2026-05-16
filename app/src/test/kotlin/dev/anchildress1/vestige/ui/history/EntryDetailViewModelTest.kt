@@ -4,6 +4,7 @@ import app.cash.turbine.test
 import dev.anchildress1.vestige.model.EntryObservation
 import dev.anchildress1.vestige.model.ObservationEvidence
 import dev.anchildress1.vestige.model.ResolvedExtraction
+import dev.anchildress1.vestige.storage.EntryEntity
 import dev.anchildress1.vestige.storage.EntryStore
 import dev.anchildress1.vestige.storage.MarkdownEntryStore
 import dev.anchildress1.vestige.testing.cleanupObjectBoxTempRoot
@@ -82,6 +83,17 @@ class EntryDetailViewModelTest {
         }
     }
 
+    @Test
+    fun `state is NotFound when readEntry throws`() = runTest {
+        val id = createCompleted("store closes before read")
+        boxStore.close()
+
+        val vm = buildVm(id)
+        vm.state.test {
+            assertEquals(EntryDetailUiState.NotFound, awaitItem())
+        }
+    }
+
     // --- word count ---
 
     @Test
@@ -146,6 +158,19 @@ class EntryDetailViewModelTest {
     @Test
     fun `observations is empty when json is empty array`() = runTest {
         val id = createCompleted("no observations")
+        val vm = buildVm(id)
+
+        vm.state.test {
+            val loaded = awaitItem() as EntryDetailUiState.Loaded
+            assertTrue(loaded.model.observations.isEmpty())
+        }
+    }
+
+    @Test
+    fun `observations is empty when entryObservationsJson is malformed`() = runTest {
+        val id = createCompleted("malformed observations")
+        val box = boxStore.boxFor(EntryEntity::class.java)
+        box.get(id).also { it.entryObservationsJson = "{not valid json" }.let(box::put)
         val vm = buildVm(id)
 
         vm.state.test {

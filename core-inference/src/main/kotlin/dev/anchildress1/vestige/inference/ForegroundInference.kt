@@ -13,7 +13,8 @@ import java.time.ZoneId
 import java.util.concurrent.ConcurrentHashMap
 
 /**
- * Single-turn foreground call: persona prompt + audio → `{transcription, follow_up}`. Audio is
+ * Single-turn foreground call: persona prompt + audio (voice) or typed text → the same
+ * `{transcription, follow_up}` envelope, so voice and typed entries review identically. Audio is
  * handed off as a temp PCM_S16LE WAV (the only handoff that works on LiteRT-LM 0.11.0); the file
  * is always deleted before this call returns, even on cancellation. Pure with respect to
  * [CaptureSession] — the caller advances session state from the parsed result.
@@ -68,6 +69,40 @@ class ForegroundInference(
             completedAt = clock.instant(),
         )
     }
+
+    /**
+     * Typed-entry counterpart of [runForegroundCall]. Same persona system prompt + same
+     * `{transcription, follow_up}` parser, so a typed entry produces the identical Reviewing
+     * surface a voice entry does — no temp WAV because there is no audio to hand off. The model
+     * is required (no model-free typed path); the caller gates on readiness.
+     */
+    // Engine handle is single-threaded; do not call concurrently against the same engine.
+    suspend fun runForegroundTextCall(text: String, persona: Persona): ForegroundResult =
+        withContext(ioDispatcher) {
+            require(text.isNotBlank()) { "ForegroundInference requires non-blank typed text." }
+
+            val callStartedAt = clock.instant()
+            val systemPrompt = composeSystemPrompt(persona, callStartedAt)
+            val started = System.nanoTime()
+            val rawResponse = engine.sendMessageContents(
+                listOf(
+                    Content.Text(systemPrompt),
+                    Content.Text(text),
+                ),
+            )
+            val elapsedMs = (System.nanoTime() - started) / NANOS_PER_MILLI
+            Log.d(
+                TAG,
+                "runForegroundTextCall persona=$persona elapsed=${elapsedMs}ms raw=${rawResponse.length}c",
+            )
+
+            ForegroundResponseParser.parse(
+                raw = rawResponse,
+                persona = persona,
+                elapsedMs = elapsedMs,
+                completedAt = clock.instant(),
+            )
+        }
 
     // Truncate-then-retry-delete on failure so audio bytes are unrecoverable even if the inode
     // survives. `internal` for JVM testability.

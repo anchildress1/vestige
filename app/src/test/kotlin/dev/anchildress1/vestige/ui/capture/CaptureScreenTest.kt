@@ -76,6 +76,7 @@ class CaptureScreenTest {
             },
             foregroundInference = ForegroundInferenceCall { _, _ -> error("unreached") },
             saveAndExtract = SaveAndExtract { _, _, _, _, _ -> },
+            foregroundTextInference = ForegroundTextInferenceCall { _, _ -> error("unused") },
             clock = clock,
             zoneId = ZoneOffset.UTC,
             initialReadiness = ModelReadiness.Ready,
@@ -197,6 +198,7 @@ class CaptureScreenTest {
                 )
             },
             saveAndExtract = SaveAndExtract { _, _, _, _, _ -> },
+            foregroundTextInference = ForegroundTextInferenceCall { _, _ -> error("unused") },
             clock = clock,
             zoneId = ZoneOffset.UTC,
             initialReadiness = ModelReadiness.Ready,
@@ -216,6 +218,7 @@ class CaptureScreenTest {
                 kotlinx.coroutines.suspendCancellableCoroutine { /* park */ }
             },
             saveAndExtract = SaveAndExtract { _, _, _, _, _ -> },
+            foregroundTextInference = ForegroundTextInferenceCall { _, _ -> error("unused") },
             clock = clock,
             zoneId = ZoneOffset.UTC,
             initialReadiness = readiness,

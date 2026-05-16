@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.Intent
 import dev.anchildress1.vestige.inference.BackgroundExtractionResult
 import dev.anchildress1.vestige.inference.Embedder
+import dev.anchildress1.vestige.inference.ForegroundResult
 import dev.anchildress1.vestige.inference.HistoryChunk
 import dev.anchildress1.vestige.inference.LiteRtLmEngine
 import dev.anchildress1.vestige.lifecycle.BackgroundExtractionLifecycleState
@@ -31,6 +32,7 @@ import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNotNull
+import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
 import java.io.File
@@ -365,26 +367,25 @@ class AppContainerTest {
     }
 
     @Test
-    fun `saveTypedEntry persists pending text without initializing engine when model file is absent`(
+    fun `runForegroundTextCall initializes the engine then delegates to the foreground text path`(
         @TempDir tempRoot: File,
     ) = runTest {
-        val dataDir = newInMemoryObjectBoxDirectory("typed-entry-missing-model-")
-        val markdownDir = File(tempRoot, "markdown").apply { mkdirs() }
-        val boxStore = openInMemoryBoxStore(dataDir)
+        // The relaxed engine returns "" from sendMessageContents, so the parser yields a
+        // ParseFailure — enough to prove the wiring (engine init + delegation to the text path).
+        // Response parsing itself is covered at the core-inference tier (ForegroundInferenceTest),
+        // where the litertlm Content type is on the classpath.
         val engine = mockk<LiteRtLmEngine>(relaxed = true)
-        val artifactStore = fakeArtifactStore(
-            artifactFile = File(tempRoot, "missing-model.litertlm"),
-            expectedByteSize = 1L,
-        )
+        val modelFile = File(tempRoot, "ready-model.litertlm").apply { writeText("x") }
+        val artifactStore = fakeArtifactStore(artifactFile = modelFile, expectedByteSize = 1L)
         val context = mockk<Context>(relaxed = true) {
             every { filesDir } returns tempRoot
             every { cacheDir } returns File(tempRoot, "cache").apply { mkdirs() }
         }
         val container = AppContainer(
             applicationContext = context,
-            boxStoreFactory = { boxStore },
-            markdownStoreFactory = { MarkdownEntryStore(markdownDir) },
-            modelPathLoader = { File(tempRoot, "missing-model.litertlm").absolutePath },
+            boxStoreFactory = { mockk<BoxStore>(relaxed = true) },
+            markdownStoreFactory = { mockk<MarkdownEntryStore>(relaxed = true) },
+            modelPathLoader = { modelFile.absolutePath },
             backgroundEngineFactory = { _, _ -> engine },
             mainModelArtifactStoreFactory = { _, _, _ -> artifactStore },
             recoveredEntryIdsLoader = { emptyList() },
@@ -393,76 +394,14 @@ class AppContainerTest {
             scope = backgroundScope,
         )
 
-        try {
-            val outcome = container.saveTypedEntry("typed fallback survives", CAPTURED_AT)
+        val result = container.runForegroundTextCall(
+            text = "typed it",
+            persona = dev.anchildress1.vestige.model.Persona.EDITOR,
+        )
 
-            assertEquals(1L, outcome.entryId)
-            val row = container.entryStore.readEntry(outcome.entryId)!!
-            assertEquals("typed fallback survives", row.entryText)
-            assertEquals(ExtractionStatus.PENDING, row.extractionStatus)
-            coVerify(exactly = 0) { engine.initialize() }
-        } finally {
-            container.close()
-            cleanupObjectBoxTempRoot(tempRoot, dataDir)
-        }
+        assertTrue(result is ForegroundResult.ParseFailure)
+        coVerify { engine.initialize() }
     }
-
-    @Test
-    fun `saveTypedEntry delegates to saveAndExtract when the model file looks present`(@TempDir tempRoot: File) =
-        runTest {
-            val engine = mockk<LiteRtLmEngine>(relaxed = true)
-            val saveFlow = mockk<BackgroundExtractionSaveFlow>()
-            val modelFile = File(tempRoot, "ready-model.litertlm").apply { writeText("x") }
-            val artifactStore = fakeArtifactStore(artifactFile = modelFile, expectedByteSize = 1L)
-            val expected = SaveOutcome.Pending(entryId = 77L, extractionJob = kotlinx.coroutines.Job())
-            coEvery {
-                saveFlow.saveAndExtract(
-                    entryText = "typed with model",
-                    capturedAt = CAPTURED_AT,
-                    retrievedHistory = emptyList(),
-                    timeoutMs = null,
-                    persona = dev.anchildress1.vestige.model.Persona.EDITOR,
-                    durationMs = 0L,
-                    followUpText = null,
-                )
-            } returns expected
-            val context = mockk<Context>(relaxed = true) {
-                every { filesDir } returns tempRoot
-                every { cacheDir } returns File(tempRoot, "cache").apply { mkdirs() }
-            }
-            val container = AppContainer(
-                applicationContext = context,
-                boxStoreFactory = { mockk<BoxStore>(relaxed = true) },
-                markdownStoreFactory = { mockk<MarkdownEntryStore>(relaxed = true) },
-                modelPathLoader = { modelFile.absolutePath },
-                backgroundEngineFactory = { _, _ -> engine },
-                mainModelArtifactStoreFactory = { _, _, _ -> artifactStore },
-                backgroundExtractionSaveFlowFactory = { _, _, _, _, _, _ -> saveFlow },
-                recoveredEntryIdsLoader = { emptyList() },
-                foregroundServiceIntentFactory = { Intent("dev.anchildress1.vestige.TEST_START") },
-                foregroundServiceStarter = {},
-            )
-
-            val actual = container.saveTypedEntry(
-                entryText = "typed with model",
-                capturedAt = CAPTURED_AT,
-                persona = dev.anchildress1.vestige.model.Persona.EDITOR,
-            )
-
-            assertEquals(expected, actual)
-            coVerifyOrder {
-                engine.initialize()
-                saveFlow.saveAndExtract(
-                    entryText = "typed with model",
-                    capturedAt = CAPTURED_AT,
-                    retrievedHistory = emptyList(),
-                    timeoutMs = null,
-                    persona = dev.anchildress1.vestige.model.Persona.EDITOR,
-                    durationMs = 0L,
-                    followUpText = null,
-                )
-            }
-        }
 
     @Test
     fun `launchVectorBackfillIfReady retries the real pass after artifact states turn complete`() = runTest {

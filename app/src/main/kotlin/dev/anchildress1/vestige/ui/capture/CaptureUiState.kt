@@ -45,10 +45,10 @@ sealed interface CaptureUiState {
 
 /** Local-model readiness drives the REC button + status-pill copy. */
 sealed interface ModelReadiness {
-    /** Engine initialized; voice path is usable. */
+    /** Engine initialized; both the voice and typed paths are usable. */
     data object Ready : ModelReadiness
 
-    /** Engine warming up after cold start. REC disabled; type path stays open. */
+    /** Engine warming up after cold start. REC + typed both gated until Ready (ADR-013). */
     data object Loading : ModelReadiness
 
     /** Active artifact download in progress. */
@@ -62,7 +62,7 @@ sealed interface ModelReadiness {
         }
     }
 
-    /** Wi-Fi went away mid-download. REC disabled; type path stays open. */
+    /** Wi-Fi went away mid-download. REC + typed both gated until Ready (ADR-013). */
     data object Paused : ModelReadiness
 }
 

@@ -160,22 +160,30 @@ Top-level integer. v1 is `schema_version: 1`. Bump on any breaking frontmatter c
 
 ## Embedding Strategy (Addendum 2026-05-16)
 
-`VectorBackfillWorker` currently passes `entry.entryText` verbatim to `GemmaTextEmbedder` — the raw transcription body, word-for-word as spoken. This is the wrong embedding target for this app.
+**Unit of embedding: individual tags, not entries.**
 
-**The problem:** A 30s ADHD voice entry is a stream of consciousness. The semantic centroid of the full transcription captures the noise — filler, tangents, digressions — not what the entry is actually about. Retrieval match quality degrades accordingly.
+The original design embedded one vector per entry into `EntryEntity.vector`. This is the wrong granularity. A single entry commonly holds multiple tags that are semantically unrelated — `tuesday-meeting` and `hyperfocus-coding` co-occurring on the same entry because both happened that day, not because they mean the same thing. A combined embedding of both sits in the semantic dead zone between two concepts and accurately represents neither. A query about meetings has to compete with the pull of deep-work signal.
 
-**The correct target:** The distilled signal the 3-lens extraction already produced. After `BackgroundExtractionWorker` completes, the entry has:
-- `tags` — kebab-case behavioral/state labels extracted by the lenses
-- `entryObservationsJson` — 1–2 observations each with an `evidence` type and `fields[]`
-- `statedCommitmentJson` — topic/person, when present
+The correct unit is the individual tag. Each `TagEntity` gets its own `vector` field and `@HnswIndex`. Retrieval is an OR across tag vectors: an entry matches if *any* of its tags are close to the query vector, not if the averaged centroid of all of them is. This is late-interaction retrieval — semantically correct for ADHD capture where unrelated cognitive events share an entry.
 
-These three surfaces together represent what the model determined the entry is about. The vector should be computed from a synthesis of them — not from the raw body.
+**Schema change:**
+- `TagEntity` gains `vector: FloatArray?` and an ObjectBox `@HnswIndex` (768 dimensions, cosine distance, same as the original `EntryEntity` design).
+- `EntryEntity.vector` is removed — no vector field on the entry row.
+- The ToMany relation `EntryEntity → TagEntity` is already in the schema; retrieval walks it in reverse (tag → parent entry) after the HNSW lookup.
 
-**Target embedding text shape:** `"{joined tags as a sentence}. {observation texts joined}. {commitment topic if present}"` — constructed after convergence resolves, not at save time. The raw transcription body (`entry_text`) is excluded from the embedded string.
+**Embedding target:** each tag's kebab-case label string (e.g., `"tuesday-meeting"`, `"flattened"`, `"hyperfocus-coding"`). This is a short, dense, signal-only string. No concatenation. One `embedder(tag.label)` call per tag.
 
-**Implementation:** `VectorBackfillWorker` must be updated to synthesize this string from entity fields before calling `embedder(text)`. Entries saved before this fix need re-backfill. Story 3.11 carries the fix; Story 3.12 carries the re-backfill sweep.
+**Backfill:** `VectorBackfillWorker` iterates `tagBox.all` where `vector == null` and `extractionStatus == COMPLETED` on the parent entry. One embedding call per tag. Tags on entries still in extraction are skipped and re-swept on completion.
 
-**Query side:** `RetrievalRepo.query(text: String, ...)` already embeds the raw user query string, which is correct — the user's query is spoken/typed naturally and should match against distilled semantic content, not against other raw transcriptions.
+**Retrieval — `RetrievalRepo.query(text: String, ...)` change:**
+1. Embed the raw query string → `queryVector: FloatArray`
+2. HNSW nearest-neighbor search on `TagEntity.vector` → top-K matching `TagEntity` rows
+3. Collect distinct parent `EntryEntity` IDs via the ToMany relation
+4. Apply recency weight + deduplicate → return ranked `EntryEntity` list
+
+Query side embeds the raw user query string directly—correct, because the user's natural language query should match against individual semantic concepts, not against other raw transcriptions.
+
+**Story 3.11 carries the schema change and per-tag backfill. Story 3.12 carries the re-backfill of any tags whose vectors were computed under the old entry-level strategy.**
 
 ---
 

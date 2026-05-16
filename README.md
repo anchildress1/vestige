@@ -8,6 +8,8 @@ On-device cognition tracker for ADHD-flavored adults. Anti-sycophant, behavioral
 
 > Built for the [Gemma 4 Challenge](https://dev.to/devteam/join-the-gemma-4-challenge-3000-prize-pool-for-ten-winners-23in) — submission category: Build with Gemma 4. Canonical product spec lives under [`docs/`](docs); see [`AGENTS.md`](AGENTS.md) for AI agent rules.
 
+[![CI](https://github.com/anchildress1/vestige/actions/workflows/ci.yml/badge.svg)](https://github.com/anchildress1/vestige/actions/workflows/ci.yml) [![CodeQL](https://github.com/anchildress1/vestige/actions/workflows/codeql.yml/badge.svg)](https://github.com/anchildress1/vestige/actions/workflows/codeql.yml)
+
 ---
 
 ## Table of Contents

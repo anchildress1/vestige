@@ -170,6 +170,7 @@ private fun MainPostOnboardingContent(
             patternRepo = container.patternRepo,
             entryStore = container.entryStore,
             zoneId = zoneId,
+            dataRevision = container.dataRevision,
             onExit = { screen = PostOnboardingScreen.Capture },
             modifier = Modifier.fillMaxSize(),
         )

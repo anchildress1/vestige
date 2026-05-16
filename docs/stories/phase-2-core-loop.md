@@ -334,6 +334,120 @@ Phase 2 has no capture screen to attach a placeholder to — Story 4.5 builds th
 
 ---
 
+---
+
+### Story 2.14 — SDK upgrade probe: verify Session.clone(), MTP, sampler fix, bump litertlm-android
+
+**As** the AI implementor, **I need** to probe the current `litertlm-android` `<latest>` release against the three capability gaps documented in ADR-009 and ADR-012, and upgrade the pinned dependency if a newer artifact is published, **so that** Stories 2.15, 2.16, and 2.19 build on accurate SDK knowledge rather than stale 0.11.0 assumptions.
+
+**Done when:**
+- [ ] Fetch current `maven-metadata.xml` for `com.google.ai.edge.litertlm:litertlm-android` from Google Android Maven. Record the `<latest>` version and `lastUpdated` timestamp.
+- [ ] If a version newer than `0.11.0` is published: unpack the AAR and run `javap` on `Session.kt`, `Engine.kt`, `LiteRtLmJni.kt`, `SessionConfig.kt`. Record every public method name on each class.
+- [ ] Specifically check: does any `Session` method accept a parent `Session` reference? Does `Engine` expose `cloneSession` or `createSession(SessionConfig, parentSession)`? Does `SessionConfig` have a parent parameter?
+- [ ] Check `jni/arm64-v8a/` inside the AAR. Are `libLiteRtTopKOpenClSampler.so` and/or `libLiteRtTopKWebGpuSampler.so` now present?
+- [ ] Bump `litertlm-android` in `gradle/libs.versions.toml` to `<latest>` if newer. Build and run the existing test suite; fix any breaking changes before Story 2.15 work begins.
+- [ ] Record findings in ADR-009 §"Addendum (2026-05-16)" revival trigger table: which triggers fired, which did not.
+- [ ] If `Session.clone()` is confirmed available: add a dated addendum to ADR-009 noting the API surface that was found. Write the superseding ADR only if the full Story 2.19 design is ready. Do not prematurely supersede.
+- [ ] All existing tests pass at the new SDK version.
+
+**Notes / risks:** Do not upgrade if the new SDK version breaks the `LiteRtLmEngine` API surface in ways that would require more than mechanical changes. If breaking, surface the conflict with the user with pros/cons for proceeding. Per AGENTS.md §"No backwards compatibility" — no shims, no compat wrappers.
+
+---
+
+### Story 2.15 — Enable MTP speculative decoding (>2x decode speedup)
+
+**As** the AI implementor, **I need** Multi-Token Prediction enabled on the LiteRT-LM engine initialization in `LiteRtLmEngine`, **so that** foreground and background inference decode at the documented >2x speedup from Single Position MTP — which ships in the already-pinned `litertlm-android:0.11.0`.
+
+**Done when:**
+- [ ] Identify the MTP enablement API in `litertlm-android` (likely an `EngineConfig` or `ExperimentalFlags` parameter). Check the SDK source or AAR for the relevant flag/option name.
+- [ ] Enable MTP in `LiteRtLmEngine.initialize()` via the appropriate config. GPU backend stays `BackendChoice.GPU`.
+- [ ] Measure foreground call latency on the reference S24 Ultra before and after. Record delta in logcat under `VestigeLiteRtLm`. A >1.5x decode speedup is the acceptance threshold; if below 1.5x, document why and leave MTP enabled regardless (correctness is primary).
+- [ ] Measure background lens call latency (one lens call, no convergence) before and after. Record delta.
+- [ ] All existing unit + integration tests pass.
+- [ ] If MTP requires a minimum SDK version newer than what Story 2.14 confirms is available, defer this story and document in a dated addendum to ADR-012.
+
+**Notes / risks:** MTP is a decode-path optimization only — it does not change prompt composition, sampler config, convergence logic, or output format. If the model output changes in any measurable way (unexpected tokens, format drift), that is a regression — disable MTP and surface conflict with the user for discussion.
+
+---
+
+### Story 2.16 — Streaming foreground inference: token-by-token output to UI
+
+**As** the AI implementor, **I need** the foreground inference call to switch from blocking `generateText()` to streaming `sendMessageAsync()` (Kotlin Flow), **so that** the user sees tokens appearing in the UI as the model generates them rather than waiting for the full response — eliminating the perceived wall-clock stall on every capture.
+
+**Done when:**
+- [ ] `LiteRtLmEngine.streamText(contents)` returns a `Flow<String>` that emits tokens as they are generated. Verify `sendMessageAsync()` is the correct underlying API in the current SDK version; confirm it returns a Flow or wraps a callback into one.
+- [ ] `ForegroundInference.runForegroundCall()` switches from `generateText()` to `streamText()`. The return type changes from a single `ForegroundResult` to a `Flow<ForegroundToken>` or equivalent streaming shape — design this surface so `CaptureViewModel` can update its `Reviewing` state incrementally.
+- [ ] `ForegroundResponseParser` is updated to parse XML tags (`<transcription>`, `<follow_up>`) from a streamed token buffer rather than a completed string. The parser must handle tag boundaries arriving mid-token.
+- [ ] `CaptureViewModel.Reviewing` state carries a `followUpText: String` field that appends tokens as they arrive. The capture screen renders the growing string in real time.
+- [ ] Temp WAV file deletion still fires in `finally` after the stream completes or is cancelled — audio discard contract (ADR-001 §Q8) is unchanged.
+- [ ] Coroutine cancellation: if the user navigates away during streaming, the Flow is cancelled and the partial result is discarded. No partial entries are saved.
+- [ ] Existing `ForegroundInferenceTest` suite updated to exercise streaming happy path, mid-stream cancellation, and parse-failure on incomplete XML tag at stream end.
+- [ ] On-device: subjective latency improvement is visible on the reference S24 Ultra. Time-to-first-token logged under `VestigeForegroundInference`.
+
+**Notes / risks:** Per Story 2.2 §"Notes / risks": "Streaming is a Phase 4 polish decision, not a Phase 2 baseline." That framing was written before the 24–33s wall-clock was measured on-device; the UX case for streaming is now clear and this is the right time to do it. The parser complexity is real — test the boundary case where `</transcription>` arrives split across two token emissions before shipping.
+
+---
+
+### Story 2.17 — Fix pre-warm race: event-driven engine init instead of hardcoded delay
+
+**As** the AI implementor, **I need** the engine pre-warm in `AppContainer.refreshModelReadiness()` to trigger on a reliable lifecycle signal rather than a hardcoded 2-second delay, **so that** a user who opens the app and taps record within 2 seconds does not block on engine initialization — and users on slower devices who need more than 2 seconds to paint the first frame are also covered.
+
+**Done when:**
+- [ ] Remove `ENGINE_PREWARM_DELAY_MS = 2000L` and the `delay(ENGINE_PREWARM_DELAY_MS)` call from `AppContainer.refreshModelReadiness()`.
+- [ ] Pre-warm fires immediately on model-ready transition: when `probeModelReadiness()` returns `Ready` and prior state was not `Ready`, launch `ensureBackgroundEngineInitialized()` directly on `scope` with no delay.
+- [ ] The pre-warm coroutine runs at `Dispatchers.Default` (or lower priority) so it does not compete with the main thread's UI work. The Mutex inside `ensureBackgroundEngineInitialized()` already ensures only one init runs at a time.
+- [ ] If a recording starts before pre-warm completes, `ensureBackgroundEngineInitialized()` is called inline on the recording path and blocks until init finishes — this behavior is unchanged and is the correct fallback.
+- [ ] Unit test: `AppContainerTest` verifies that pre-warm launches immediately (within one coroutine scheduler tick) after `probeModelReadiness()` returns `Ready` — not after a 2-second delay.
+- [ ] Manual check: open the app on the reference S24 Ultra; verify engine init completes in background before the first record tap in a typical interaction (>3 seconds between app open and first record).
+
+**Notes / risks:** The 2s delay was added to avoid competing with UI thread on cold open. Switching to `Dispatchers.Default` + the existing Mutex achieves the same isolation without the timing guess. If the Compose frame renderer is still painting when pre-warm launches, coroutine scheduling ensures the init runs on a background thread — no contention with the main thread.
+
+---
+
+### Story 2.18 — Thread retrieval history into foreground call
+
+**As** the AI implementor, **I need** `CaptureViewModel` to run a `RetrievalRepo.query()` after the transcription is available and pass the results into the foreground follow-up call, **so that** the response the user sees immediately after recording is context-aware — not context-free while only the background extraction gets prior-entry context.
+
+**Done when:**
+- [ ] After voice transcription returns (or typed text is submitted), `CaptureViewModel` calls `RetrievalRepo.query(transcriptionText, topN = 3)` before generating the follow-up.
+- [ ] The retrieved history is threaded into `ForegroundInference.runForegroundCall()` (or `runForegroundTextCall()`). `PersonaPromptComposer` or the prompt construction must incorporate the history chunks — review how `PromptComposer` currently handles `retrievedHistory` for background calls and apply the same shape to the foreground prompt.
+- [ ] `AppContainer.runForegroundCall()` / `runForegroundTextCall()` signature updated to accept `retrievedHistory: List<HistoryChunk>` if not already wired through.
+- [ ] History retrieval runs on the background dispatcher; it does not block the UI thread.
+- [ ] If `RetrievalRepo` returns empty (no prior entries, or embeddings not yet backfilled), the foreground call proceeds normally with no history block — degraded retrieval must not prevent the call.
+- [ ] Unit test: `CaptureViewModelTest` verifies that `RetrievalRepo.query()` is called with the transcription text before `runForegroundCall()` fires, and that the returned history is passed through.
+
+**Notes / risks:** This is a correctness fix for the gap documented in `architecture-brief.md` §"Retrieval History Gap (Addendum 2026-05-16)". The retrieval call adds ~880ms (embedding cost) + ObjectBox scan to the foreground path latency. With streaming output (Story 2.16), this is masked — the model starts generating before the user would perceive the retrieval delay. If streaming is not yet in place, add a logcat note about the added latency.
+
+---
+
+### Story 2.19 — Concurrent inference: eliminate foreground-blocks-on-background mutex contention
+
+**As** the AI implementor, **I need** the foreground inference path to never block on a background extraction that is currently running, **so that** a user who taps record while a prior entry's extraction is in flight gets an immediate response rather than waiting for the current lens call to finish.
+
+**Blocked by:** Story 2.14 (SDK probe must confirm whether `Session.clone()` is available).
+
+**Path B — priority queue (implement if Session.clone() unavailable):**
+- [ ] Introduce a `PriorityInferenceQueue` in `AppContainer` that serializes all engine calls with foreground priority. Foreground requests go to the front; background lens calls go to the back.
+- [ ] When a foreground call arrives while a background lens call is executing, the background coroutine is cancelled (`job.cancel()`). The background worker catches `CancellationException` and re-queues its current lens as the next background request after the foreground call completes.
+- [ ] Background extraction re-queues cleanly — the entry's `extraction_status` does not change to `FAILED` on a priority preempt; the worker distinguishes cancellation-for-preempt from cancellation-for-discard.
+- [ ] Foreground call latency on a device with an active background extraction is indistinguishable from latency with no background work running. Manual check on reference device.
+
+**Path C — Session clone, detached Sessions (implement if Session.clone() confirmed):**
+- [ ] Maintain one `LiteRtLmEngine` and two Sessions: `foregroundSession` (interactive) and one background Session per active extraction (cloned from the foreground session or from a base prefilled session).
+- [ ] `BackgroundExtractionWorker` creates a cloned Session for each entry extraction and closes it on completion. The foreground Session is never borrowed by background work.
+- [ ] Cloned Sessions are cancelled (closed) when preempted by a higher-priority foreground call — the worker detects closure and re-queues.
+- [ ] Verify clone latency is <10ms on reference device. Log per clone under `VestigeLiteRtLm`.
+
+**Done when (either path):**
+- [ ] A foreground call that arrives during an active background extraction does not block on the engine Mutex beyond the time needed to cancel and yield.
+- [ ] Background extraction resumes after the foreground call completes without requiring user action.
+- [ ] All existing `BackgroundExtractionWorkerTest` + `LiteRtLmEngineTest` cases pass.
+- [ ] `architecture-brief.md` §"AppContainer Ownership" row for `InferenceCoordinator` updated to reflect the chosen path. ADR-009 addendum updated or a superseding ADR written if Path C is taken.
+
+**Notes / risks:** Do not instantiate two `LiteRtLmEngine` objects. Two Engines pointing at the same model file path load weights twice — at E4B's footprint this is prohibitive on Android. One Engine, multiple Sessions is the correct shape regardless of which path is chosen.
+
+---
+
 ## What is explicitly NOT in Phase 2
 
 - No history list, history filter, or entry detail UI (Phase 4).

@@ -141,6 +141,20 @@ When one lands, a new ADR (likely ADR-N where N is the next free integer) supers
 
 ---
 
+### Addendum (2026-05-16) — Revival trigger conditions: re-probe required
+
+Research conducted 2026-05-16 (web search + GitHub survey) found `Session.clone()` **is** documented in the LiteRT-LM architecture and uses Copy-on-Write KV cache with documented clone latency under 10ms. The C++ runtime's cloning capability is described in official architecture references — not only in Issue #2160. One Engine → many Sessions with CoW KV cache is presented as a first-class design pattern in current docs. What remains unconfirmed is whether the Kotlin SDK **currently published** exposes it.
+
+Two facts that conflict with ADR-009's closing state:
+- External research (DeepWiki + Google AI Edge docs) describes multi-Session as a first-class design: one Engine, many Sessions, CoW KV cache, Sessions spawned and cloned as a standard pattern.
+- Maven metadata confirmed 0.11.0 was `<latest>` as of 2026-05-04. That window has passed; a newer artifact may now be published.
+
+**Required action before any post-submission implementation:** re-run the AAR bytecode probe against `<latest>` (unpinned) before writing a superseding ADR. The revival trigger table in this ADR stands verbatim. If the Kotlin surface exposes a clone/fork/parent-Session API, write the superseding ADR and unblock `parallel-lens-execution-via-clone` from the backlog.
+
+Story 2.14 (SDK upgrade probe) carries this verification as its first checkpoint.
+
+---
+
 ## Sources
 
 Primary evidence used to write this ADR. All accessed 2026-05-11.

@@ -158,6 +158,55 @@ Standup ran long again. I was fine before it, then completely flattened by 11. O
 
 Top-level integer. v1 is `schema_version: 1`. Bump on any breaking frontmatter change. The reader must reject a markdown file with a schema_version it does not understand rather than silently downgrading fields. Migration paths are v1.5+ work.
 
+## Embedding Strategy (Addendum 2026-05-16)
+
+`VectorBackfillWorker` currently passes `entry.entryText` verbatim to `GemmaTextEmbedder` — the raw transcription body, word-for-word as spoken. This is the wrong embedding target for this app.
+
+**The problem:** A 30s ADHD voice entry is a stream of consciousness. The semantic centroid of the full transcription captures the noise — filler, tangents, digressions — not what the entry is actually about. Retrieval match quality degrades accordingly.
+
+**The correct target:** The distilled signal the 3-lens extraction already produced. After `BackgroundExtractionWorker` completes, the entry has:
+- `tags` — kebab-case behavioral/state labels extracted by the lenses
+- `entryObservationsJson` — 1–2 observations each with an `evidence` type and `fields[]`
+- `statedCommitmentJson` — topic/person, when present
+
+These three surfaces together represent what the model determined the entry is about. The vector should be computed from a synthesis of them — not from the raw body.
+
+**Target embedding text shape:** `"{joined tags as a sentence}. {observation texts joined}. {commitment topic if present}"` — constructed after convergence resolves, not at save time. The raw transcription body (`entry_text`) is excluded from the embedded string.
+
+**Implementation:** `VectorBackfillWorker` must be updated to synthesize this string from entity fields before calling `embedder(text)`. Entries saved before this fix need re-backfill. Story 3.11 carries the fix; Story 3.12 carries the re-backfill sweep.
+
+**Query side:** `RetrievalRepo.query(text: String, ...)` already embeds the raw user query string, which is correct — the user's query is spoken/typed naturally and should match against distilled semantic content, not against other raw transcriptions.
+
+---
+
+## Concurrent Inference Architecture (Addendum 2026-05-16)
+
+v1 runs foreground and background inference sequentially through a single `LiteRtLmEngine` behind a `Mutex`. A recording attempt while a background extraction is running blocks on the mutex until the current lens call finishes. This is the documented v1 trade-off (ADR-002 sequential rule, restored by ADR-009).
+
+**Post-v1 direction:** One Engine → multiple Sessions. The LiteRT-LM architecture supports spawning multiple Sessions from one Engine, with Sessions sharing model weights and holding independent KV-cache state via Copy-on-Write. Two Sessions do not double the model's memory footprint.
+
+**Two viable paths depending on SDK probe results (Story 2.14):**
+
+*Path B — Priority queue, single Session:* One Session, foreground calls preempt background. Background extraction jobs live in a `Channel<InferenceRequest>` ordered by priority. When a foreground call arrives, the background coroutine is cancelled (Flow cancellation is cooperative) and the foreground call runs immediately. Background re-queues after completion. No API dependency; works with 0.11.0 today. Correct choice if Session.clone() remains unavailable.
+
+*Path C — Session clone, detached background:* One Engine, two Sessions. Foreground gets a dedicated Session for interactive calls. Background extraction gets a cloned Session (CoW, <10ms clone time) with independent KV context. Both run concurrently at the Kotlin layer; GPU serializes at the hardware command queue, which is acceptable — the goal is eliminating Kotlin-layer blocking, not GPU-level parallelism. Requires `Session.clone()` confirmed available in current SDK. Correct choice if Story 2.14's probe confirms the API.
+
+Two Engine instances pointing at the same model file path load weights twice (~2× RAM). Not viable on Android given E4B's footprint. Do not propose this path.
+
+Story 2.19 carries the implementation decision and wiring once Story 2.14 confirms what the SDK supports.
+
+---
+
+## Retrieval History Gap (Addendum 2026-05-16)
+
+`AppContainer.saveAndExtract` accepts `retrievedHistory: List<HistoryChunk>` but `CaptureViewModel` does not perform a `RetrievalRepo.query()` before the foreground call and therefore passes no history. Retrieved history flows only into `BackgroundExtractionWorker`'s lens prompts.
+
+The consequence: the foreground response the user sees immediately after recording has no awareness of prior entries. The background extraction does. This means the follow-up question the user receives is context-free while the structured fields are context-aware — an inversion of where context matters most from a UX standpoint.
+
+**Correct behavior:** run `RetrievalRepo.query(transcription)` after the foreground transcription is available but before the follow-up is generated — or restructure the foreground call to accept prior context. Story 2.18 carries the fix.
+
+---
+
 ## Phase-1 Build Sequence
 
 The granular work queue lives in `stories/phase-1-scaffold.md`. This list is the architectural ordering — what gets stood up before what — not the full story breakdown.

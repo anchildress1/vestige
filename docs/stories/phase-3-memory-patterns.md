@@ -201,6 +201,46 @@ Query-side tag extraction goes beyond exact-substring match: a free-form query b
 
 ---
 
+---
+
+### Story 3.11 — Fix embedding source: embed distilled semantic fields, not raw transcription
+
+**As** the AI implementor, **I need** `VectorBackfillWorker` to embed a synthesized string from the entry's extracted semantic fields — tags, observation texts, and stated commitment topic — instead of the raw `entry.entryText` transcription body, **so that** vector retrieval matches on what an entry is *about* rather than on whether the user happened to use the same words.
+
+**The bug:** `VectorBackfillWorker` calls `embedder(entry.entryText)` — the verbatim transcription. A 30s ADHD voice entry is stream-of-consciousness; its semantic centroid captures the noise. Tags, observations, and commitment topics are the model's own distillation of what the entry is about, and none of them are in the vector. See `architecture-brief.md` §"Embedding Strategy (Addendum 2026-05-16)".
+
+**Done when:**
+- [ ] Add a `buildEmbeddingText(entity: EntryEntity): String` function in `:core-storage` or `:core-inference`. It constructs the embedding target as follows:
+  - Tags: deserialize `TagEntity` list from the ObjectBox relation; join as natural-language phrase (e.g., `"tuesday-meeting standup flattened"` — space-separated, hyphens preserved).
+  - Observation texts: deserialize `entryObservationsJson`; extract each `text` field; join with `. `.
+  - Commitment topic: deserialize `statedCommitmentJson` if non-null; extract `topic_or_person`; append.
+  - Result: `"{tags}. {observations}. {commitment topic}"`. If any component is empty, omit it and its separator.
+- [ ] `VectorBackfillWorker` calls `embedder(buildEmbeddingText(entry))` instead of `embedder(entry.entryText)`.
+- [ ] Entries where `extractionStatus != COMPLETED` are skipped — only entries with fully resolved extraction have meaningful semantic fields to embed. They will be (re-)backfilled when extraction completes.
+- [ ] `RetrievalRepo.query(text: String, ...)` query-side embedding remains unchanged — the user query is natural language and should embed as-is.
+- [ ] Unit test: `VectorBackfillWorkerTest` verifies that the embedder is called with the synthesized string, not with `entryText`, for a fixture `EntryEntity` with populated tags + observations.
+- [ ] Smoke test: manually verify on the reference device that a query like "crashed after the meeting" retrieves entries tagged `tuesday-meeting` + `flattened` even when the entry's raw transcription doesn't contain those exact words.
+
+**Notes / risks:** This is a correctness fix, not a tuning change. The existing 768-dim vectors stored on entries with `vector != null` are wrong — they were computed from raw transcriptions. Story 3.12 carries the re-backfill sweep that overwrites them. Do not ship Story 3.11 without Story 3.12 immediately behind it.
+
+---
+
+### Story 3.12 — Re-backfill all existing entry vectors after embedding source fix
+
+**As** the AI implementor, **I need** all existing `EntryEntity` rows with a non-null `vector` to have their vectors recomputed using the corrected `buildEmbeddingText()` from Story 3.11, **so that** retrieval quality is correct on an existing corpus, not only on entries saved after the fix.
+
+**Done when:**
+- [ ] `VectorBackfillWorker` is updated to treat entries with `extractionStatus == COMPLETED` and `vector != null` as needing re-backfill if the app's `buildEmbeddingText()` schema version is newer than the vector's provenance. The simplest v1 implementation: add a `vectorSchemaVersion: Int` field to `EntryEntity` (default `0`); the current correct version is `1`. Backfill re-runs any entry with `vectorSchemaVersion < 1`.
+- [ ] On first launch after the fix lands, `AppContainer.launchVectorBackfillIfReady()` triggers the re-backfill sweep. It processes entries in batches to avoid blocking the main thread.
+- [ ] After re-backfilling an entry, `vectorSchemaVersion` is set to `1`.
+- [ ] `VectorBackfillWorker` idempotency: re-running the backfill on an already-migrated corpus (all entries at `vectorSchemaVersion == 1`) does no work.
+- [ ] Unit test: worker skips entries already at current schema version; processes entries at older versions.
+- [ ] On-device: after re-backfill completes, retrieval results on the `sample-data-scenarios.md` STT-E corpus match entries by semantic topic, not by verbatim word reuse. Manual spot-check with 3 queries.
+
+**Notes / risks:** The `vectorSchemaVersion` field is an operational field like `extractionStatus` — it does not appear in the markdown source-of-truth. If ObjectBox is rebuilt from markdown, `vectorSchemaVersion` defaults to `0` and the backfill re-runs, which is correct. Do not persist `vectorSchemaVersion` to frontmatter.
+
+---
+
 ## What is explicitly NOT in Phase 3
 
 - No "Roast me" button or Roast bottom sheet — Phase 4 P1.

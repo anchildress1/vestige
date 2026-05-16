@@ -17,7 +17,9 @@ interface ModelAvailability {
 
     class Default(private val artifactStore: ModelArtifactStore, private val networkGate: NetworkGate) :
         ModelAvailability {
-        override suspend fun status(): ModelArtifactState = artifactStore.currentState()
+        // `probe()` not `currentState()`: the onboarding entry/resume read must never hash the
+        // ~3.66 GB artifact on the UI path. Integrity is verified at engine load.
+        override suspend fun status(): ModelArtifactState = artifactStore.probe()
 
         /**
          * Opens the [NetworkGate] for the duration of the download — every outbound HTTP primitive

@@ -69,8 +69,13 @@
     <string name="onboarding_download_body">Quiet for a minute. This takes a while.</string>
     <string name="onboarding_download_loading_pill">DOWNLOADING</string>
     <string name="onboarding_download_loading_pill_percent">DOWNLOADING %1$d%%</string>
-    <string name="onboarding_download_loading_note">Model file is still landing. Keep Vestige open — this is the one network event in the app\'s life.</string>
     <string name="onboarding_download_ready_pill">GEMMA READY</string>
+    <string name="onboarding_download_stalled">Download stalled.</string>
+    <string name="onboarding_download_failed">Network choked.</string>
+    <string name="onboarding_download_reacquiring">Model file unreadable. Re-downloading.</string>
+    <string name="onboarding_download_retry">Retry</string>
+    <string name="onboarding_download_try_again">Try again</string>
+    <string name="onboarding_download_pause">Pause</string>
 
 <!-- Phase 3 placeholder source-entry surface. Phase 4 replaces this with the real history detail screen. -->
     <string name="entry_detail_placeholder_title">Entry</string>

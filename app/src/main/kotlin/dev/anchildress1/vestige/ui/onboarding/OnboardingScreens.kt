@@ -17,13 +17,16 @@ private const val PREVIEW_ENABLED_WITHOUT_MODEL = 2
 private const val PREVIEW_ENABLED_WITH_MODEL = 3
 
 @Composable
-@Suppress("LongParameterList") // Optional preview defaults — screen-host call site only passes 3.
+@Suppress("LongParameterList") // Optional preview defaults — screen-host call site only passes the live seams.
 internal fun ModelDownloadPlaceholderScreen(
     modelState: ModelArtifactState,
     onContinue: () -> Unit,
     modifier: Modifier = Modifier,
     downloadMbps: Float? = null,
+    downloadStatus: DownloadStatus = DownloadStatus(),
     wifiConnected: Boolean = true,
+    onRetry: () -> Unit = {},
+    onPause: () -> Unit = {},
     enabledCount: Int = if (modelState.isReady) PREVIEW_ENABLED_WITH_MODEL else PREVIEW_ENABLED_WITHOUT_MODEL,
 ) {
     OnboardingScaffold(
@@ -35,18 +38,53 @@ internal fun ModelDownloadPlaceholderScreen(
             onAction = onContinue,
             enabled = modelState.isReady,
         ),
+        secondary = downloadSecondaryAction(
+            modelState = modelState,
+            phase = downloadStatus.phase,
+            onRetry = onRetry,
+            onPause = onPause,
+        ),
     ) {
-        ModelReadinessBanner(modelState = modelState)
+        ModelReadinessBanner(modelState = modelState, downloadStatus = downloadStatus)
         DownloadStatsRibbon(
             modelState = modelState,
             downloadMbps = downloadMbps,
+            phase = downloadStatus.phase,
             wifiConnected = wifiConnected,
         )
     }
 }
 
+// Stalled → Retry, Failed → Try again, both per ux-copy.md §Onboarding Screen 3. Active →
+// Pause (the labelled cancel; `.part` persists, HTTP-Range resumes). Reacquiring is an
+// automatic clean re-pull — no manual affordance while it's in flight. Ready → none.
 @Composable
-private fun DownloadStatsRibbon(modelState: ModelArtifactState, downloadMbps: Float?, wifiConnected: Boolean) {
+private fun downloadSecondaryAction(
+    modelState: ModelArtifactState,
+    phase: DownloadPhase,
+    onRetry: () -> Unit,
+    onPause: () -> Unit,
+): OnboardingAction? = when {
+    modelState.isReady -> null
+
+    phase == DownloadPhase.Stalled ->
+        OnboardingAction(stringResource(id = R.string.onboarding_download_retry), onRetry)
+
+    phase == DownloadPhase.Failed ->
+        OnboardingAction(stringResource(id = R.string.onboarding_download_try_again), onRetry)
+
+    phase == DownloadPhase.Reacquiring -> null
+
+    else -> OnboardingAction(stringResource(id = R.string.onboarding_download_pause), onPause)
+}
+
+@Composable
+private fun DownloadStatsRibbon(
+    modelState: ModelArtifactState,
+    downloadMbps: Float?,
+    phase: DownloadPhase,
+    wifiConnected: Boolean,
+) {
     val isPartial = modelState is ModelArtifactState.Partial
     val mbpsValue = when {
         modelState.isReady -> "✓"
@@ -56,11 +94,16 @@ private fun DownloadStatsRibbon(modelState: ModelArtifactState, downloadMbps: Fl
         downloadMbps < 10f -> "%.1f".format(downloadMbps)
         else -> downloadMbps.toInt().toString()
     }
+    val stalled = phase == DownloadPhase.Stalled
     StatRibbon(
         items = listOf(
             StatItem(value = mbpsValue, label = "MB/S", color = VestigeTheme.colors.lime),
             StatItem(value = "1", label = "STREAM", color = VestigeTheme.colors.ink),
-            StatItem(value = "0", label = "STALLS", color = VestigeTheme.colors.ink),
+            StatItem(
+                value = if (stalled) "1" else "0",
+                label = "STALLS",
+                color = if (stalled) VestigeTheme.colors.coral else VestigeTheme.colors.ink,
+            ),
             StatItem(
                 value = if (wifiConnected) "✓" else "✗",
                 label = "WI-FI",

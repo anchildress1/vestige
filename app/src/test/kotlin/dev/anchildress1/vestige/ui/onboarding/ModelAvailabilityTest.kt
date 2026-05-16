@@ -50,13 +50,19 @@ class ModelAvailabilityTest {
     }
 
     @Test
-    fun `default availability delegates to artifact store state`() {
+    fun `default availability status delegates to the cheap probe, not the hashing currentState`() {
+        // currentState() and probe() return deliberately different values so the assertion can
+        // only pass if status() routes through probe() — the no-SHA UI path. A regression that
+        // points status() back at currentState() (the multi-GB hash) fails loudly here.
         val availability = ModelAvailability.Default(
             artifactStore = object : ModelArtifactStore {
                 override val manifest: ModelManifest = TEST_MANIFEST
                 override val artifactFile: File = File("ignored.bin")
 
                 override suspend fun currentState(): ModelArtifactState =
+                    ModelArtifactState.Corrupt(expectedSha256 = "expected", actualSha256 = "actual")
+
+                override suspend fun probe(): ModelArtifactState =
                     ModelArtifactState.Partial(currentBytes = 123L, expectedBytes = 456L)
 
                 override suspend fun download(onProgress: (Long, Long) -> Unit): ModelArtifactState =

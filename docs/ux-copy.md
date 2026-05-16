@@ -106,6 +106,11 @@ If failed:
 >
 > **Try again**
 
+If artifact corrupt (post-download SHA-256 mismatch):
+> Model file unreadable. Re-downloading.
+
+This is the onboarding **auto-recovery** surface: the bad payload is wiped and one clean re-pull runs automatically, no tap required. Distinct from the error-catalog row `Model file unreadable. Re-download from settings.`, which is the *manual* settings path for a corrupt artifact found later. Both are correct; they serve different moments. (Reconciliation added per Story 4.3 — onboarding had no copy for the auto-retrigger case.)
+
 ---
 
 Primary action:

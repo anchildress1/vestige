@@ -154,24 +154,6 @@ class EntryDetailViewModelTest {
         }
     }
 
-    // --- delete ---
-
-    @Test
-    fun `delete emits deleteComplete event and removes entry from store`() = runTest {
-        val id = createCompleted("going to be deleted")
-        val vm = buildVm(id)
-
-        // Wait for Loaded state first
-        vm.state.test { awaitItem() }
-
-        vm.deleteComplete.test {
-            vm.delete()
-            awaitItem()
-        }
-
-        assertNull("entry row should be gone after delete", entryStore.readEntry(id))
-    }
-
     // --- helper ---
 
     private fun buildVm(entryId: Long): EntryDetailViewModel = EntryDetailViewModel(

@@ -208,7 +208,6 @@ Checked bullets above are the historical record that the Mist tokens shipped to 
 - [ ] Body shows: the entry transcript (one USER turn + one MODEL turn per the v1 single-turn lifecycle, user transcription muted, model follow-up primary, same treatment as Story 4.5).
 - [ ] A "Tags" row below the transcript shows the model-extracted tags as quiet chips.
 - [ ] A "Observation" section shows the 1-2 per-entry observations (from Story 2.13) with their evidence references.
-- [ ] An overflow menu offers `Delete entry` (destructive flow per `ux-copy.md` §"Destructive Confirmations / Delete single entry").
 - [ ] Reading / Re-eval section is **deferred to Story 4.13** as P1 contingent.
 - [ ] Vocabulary chip cloud below the observation is **deferred to Story 4.13** if it ships at all (it ships only if STT-E passed; otherwise the observation copy carries the vocabulary observation in plain text).
 - [ ] Source-link integration: tapping a pattern source from Story 3.10's pattern detail navigates here and the entry is highlighted briefly.

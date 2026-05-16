@@ -19,18 +19,9 @@ import androidx.compose.foundation.layout.requiredHeightIn
 import androidx.compose.foundation.layout.windowInsetsBottomHeight
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
@@ -41,7 +32,6 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.anchildress1.vestige.ui.components.AppTop
@@ -65,20 +55,10 @@ fun EntryDetailScreen(
     val state by viewModel.state.collectAsStateWithLifecycle()
     val colors = VestigeTheme.colors
 
-    LaunchedEffect(viewModel) {
-        viewModel.deleteComplete.collect { onBack() }
-    }
-
-    var showDeleteDialog by rememberSaveable { mutableStateOf(false) }
-
     Column(modifier = modifier.fillMaxSize().background(colors.floor)) {
-        // AppTop — overflow menu on the right slot for delete action
         AppTop(
             persona = (state as? EntryDetailUiState.Loaded)?.model?.personaName ?: "",
             status = AppTopStatuses.Ready,
-            rightContent = {
-                EntryOverflowMenu(onDeleteTap = { showDeleteDialog = true })
-            },
         )
 
         when (val s = state) {
@@ -105,16 +85,6 @@ fun EntryDetailScreen(
 
         EntryDetailBottomBar(onBack = onBack, onNewEntry = onNewEntry)
         Spacer(Modifier.windowInsetsBottomHeight(WindowInsets.navigationBars))
-    }
-
-    if (showDeleteDialog) {
-        EntryDeleteDialog(
-            onConfirm = {
-                showDeleteDialog = false
-                viewModel.delete()
-            },
-            onDismiss = { showDeleteDialog = false },
-        )
     }
 }
 
@@ -269,76 +239,6 @@ private fun TranscriptBlock(
             color = bodyColor,
         )
     }
-}
-
-@Composable
-private fun EntryOverflowMenu(onDeleteTap: () -> Unit) {
-    var expanded by remember { mutableStateOf(false) }
-    Box {
-        Box(
-            modifier = Modifier
-                .requiredHeightIn(min = 48.dp)
-                .clickable { expanded = true }
-                .padding(horizontal = 12.dp)
-                .semantics {
-                    contentDescription = EntryDetailCopy.OVERFLOW_CD
-                    role = Role.Button
-                },
-            contentAlignment = Alignment.Center,
-        ) {
-            Text(
-                text = "⋮",
-                style = VestigeTheme.typography.h1,
-                color = VestigeTheme.colors.ink,
-            )
-        }
-        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
-            DropdownMenuItem(
-                text = { Text(EntryDetailCopy.OVERFLOW_DELETE) },
-                onClick = {
-                    expanded = false
-                    onDeleteTap()
-                },
-                modifier = Modifier.testTag("overflow_delete"),
-            )
-        }
-    }
-}
-
-@Composable
-private fun EntryDeleteDialog(onConfirm: () -> Unit, onDismiss: () -> Unit) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = {
-            Text(
-                text = EntryDetailCopy.DELETE_TITLE,
-                style = VestigeTheme.typography.h1,
-                color = VestigeTheme.colors.ink,
-            )
-        },
-        text = {
-            Text(
-                text = EntryDetailCopy.DELETE_BODY,
-                style = VestigeTheme.typography.p,
-                color = VestigeTheme.colors.dim,
-            )
-        },
-        confirmButton = {
-            TextButton(
-                onClick = onConfirm,
-                modifier = Modifier.testTag("delete_confirm"),
-            ) {
-                Text(EntryDetailCopy.DELETE_CONFIRM, color = VestigeTheme.colors.coral)
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text(EntryDetailCopy.DELETE_CANCEL, color = VestigeTheme.colors.dim)
-            }
-        },
-        containerColor = VestigeTheme.colors.s2,
-        titleContentColor = VestigeTheme.colors.ink,
-    )
 }
 
 @Suppress("LongMethod")

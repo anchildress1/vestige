@@ -428,18 +428,6 @@ Diff actions:
 
 ## Destructive Confirmations
 
-### Delete single entry
-
-Title:
-> **Delete this entry?**
-
-Body:
-> The entry, its transcription, and any tags extracted from it. Patterns referencing it will be recalculated.
-
-Actions:
-- **Delete** *(system error/destructive style)*
-- **Cancel**
-
 ### Delete all data
 
 Title:

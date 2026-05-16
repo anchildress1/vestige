@@ -12,6 +12,7 @@ import dev.anchildress1.vestige.model.EntryObservation
 import dev.anchildress1.vestige.model.ObservationEvidence
 import dev.anchildress1.vestige.model.ResolvedExtraction
 import dev.anchildress1.vestige.model.TemplateLabel
+import dev.anchildress1.vestige.storage.EntryEntity
 import dev.anchildress1.vestige.storage.EntryStore
 import dev.anchildress1.vestige.storage.MarkdownEntryStore
 import dev.anchildress1.vestige.testing.cleanupObjectBoxTempRoot
@@ -25,7 +26,6 @@ import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.setMain
 import org.junit.After
-import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Rule
@@ -88,6 +88,23 @@ class EntryDetailScreenTest {
 
         composeRule.onNodeWithTag("entry_transcription").assertIsDisplayed()
         composeRule.onNodeWithText("standup was brutal today").assertIsDisplayed()
+    }
+
+    @Test
+    fun `blank transcription shows dash placeholder`() {
+        val id = createCompleted("initial text")
+        val box = boxStore.boxFor(EntryEntity::class.java)
+        val entity = box.get(id)
+        entity.entryText = ""
+        box.put(entity)
+        setDetail(id)
+
+        composeRule.onNodeWithTag("entry_transcription").assertIsDisplayed()
+        // Blank body maps to "—" in display; content description captures the raw body.
+        composeRule.onNodeWithContentDescription(
+            "${EntryDetailCopy.YOU_LABEL}:",
+            substring = true,
+        ).assertIsDisplayed()
     }
 
     @Test
@@ -204,58 +221,6 @@ class EntryDetailScreenTest {
         assertTrue(newEntryFired)
     }
 
-    // --- overflow menu ---
-
-    @Test
-    fun `overflow menu button has accessible description`() {
-        val id = createCompleted("overflow test")
-        setDetail(id)
-
-        composeRule.onNodeWithContentDescription(EntryDetailCopy.OVERFLOW_CD).assertIsDisplayed()
-    }
-
-    @Test
-    fun `delete confirm button visible after overflow menu tap`() {
-        val id = createCompleted("delete flow")
-        setDetail(id)
-
-        composeRule.onNodeWithContentDescription(EntryDetailCopy.OVERFLOW_CD).performClick()
-        composeRule.onNodeWithTag("overflow_delete").assertIsDisplayed()
-    }
-
-    @Test
-    fun `delete dialog shown after tapping overflow delete`() {
-        val id = createCompleted("show dialog")
-        setDetail(id)
-
-        composeRule.onNodeWithContentDescription(EntryDetailCopy.OVERFLOW_CD).performClick()
-        composeRule.onNodeWithTag("overflow_delete").performClick()
-
-        composeRule.onNodeWithText(EntryDetailCopy.DELETE_TITLE).assertIsDisplayed()
-        composeRule.onNodeWithTag("delete_confirm").assertIsDisplayed()
-    }
-
-    @Test
-    fun `confirming delete removes entry and fires onBack`() {
-        val id = createCompleted("will be deleted")
-        var backFired = false
-        composeRule.setContent {
-            dev.anchildress1.vestige.ui.theme.VestigeTheme {
-                EntryDetailScreen(
-                    viewModel = buildVm(id),
-                    onBack = { backFired = true },
-                    onNewEntry = {},
-                )
-            }
-        }
-        composeRule.onNodeWithContentDescription(EntryDetailCopy.OVERFLOW_CD).performClick()
-        composeRule.onNodeWithTag("overflow_delete").performClick()
-        composeRule.onNodeWithTag("delete_confirm").performClick()
-
-        assertTrue("onBack should fire after delete", backFired)
-        assertFalse("entry row must be gone", entryStore.readEntry(id) != null)
-    }
-
     // --- a11y: stat ribbon ---
 
     @Test
@@ -264,8 +229,8 @@ class EntryDetailScreenTest {
         setDetail(id)
         // The StatRibbon merges descendants; its a11y content covers audio + words
         composeRule.onNodeWithContentDescription(
-            /* partial match not available in compose test; just assert it exists */
-            "— audio, 4 words", substring = true,
+            "— audio, 4 words",
+            substring = true,
         ).assertIsDisplayed()
     }
 

@@ -123,17 +123,6 @@ class MarkdownEntryStore(private val baseDir: File) {
         return parseTagNames(front)
     }
 
-    /**
-     * Deletes the markdown file for the given [filename]. No-ops if the file does not exist so
-     * callers do not need to guard against a missing markdown file on a partially-written entry.
-     * Returns `true` if a file was deleted, `false` if it was already absent.
-     */
-    fun delete(filename: String): Boolean {
-        if (filename.isBlank()) return false
-        val file = File(File(baseDir, ENTRIES_SUBDIR), filename)
-        return file.exists() && file.delete()
-    }
-
     /** All entry markdown files in `{baseDir}/entries`, alphabetical order. */
     fun listAll(): List<File> {
         val entriesDir = File(baseDir, ENTRIES_SUBDIR)

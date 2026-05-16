@@ -19,20 +19,19 @@ data class EntryDetailUiModel(
     val tags: List<String>,
 ) {
     companion object {
-        fun from(entity: EntryEntity, personaName: String, zoneId: ZoneId): EntryDetailUiModel =
-            EntryDetailUiModel(
-                id = entity.id,
-                filedTimeLabel = HistoryDateFormatter.formatTimeOnly(entity.timestampEpochMs, zoneId),
-                entryNumberLabel = "${EntryDetailCopy.ENTRY_NUMBER_PREFIX}${entity.id}",
-                templateLabel = entity.templateLabel?.serial?.uppercase(),
-                audioLabel = HistoryDurationFormatter.format(entity.durationMs),
-                wordCount = entity.entryText.trim().split("\\s+".toRegex()).count { it.isNotEmpty() },
-                transcription = entity.entryText,
-                personaName = personaName,
-                energyDescriptor = entity.energyDescriptor,
-                observations = parseObservations(entity.entryObservationsJson),
-                tags = entity.tags.map { it.name }.sorted(),
-            )
+        fun from(entity: EntryEntity, personaName: String, zoneId: ZoneId): EntryDetailUiModel = EntryDetailUiModel(
+            id = entity.id,
+            filedTimeLabel = HistoryDateFormatter.formatTimeOnly(entity.timestampEpochMs, zoneId),
+            entryNumberLabel = "${EntryDetailCopy.ENTRY_NUMBER_PREFIX}${entity.id}",
+            templateLabel = entity.templateLabel?.serial?.uppercase(),
+            audioLabel = HistoryDurationFormatter.format(entity.durationMs),
+            wordCount = entity.entryText.trim().split("\\s+".toRegex()).count { it.isNotEmpty() },
+            transcription = entity.entryText,
+            personaName = personaName,
+            energyDescriptor = entity.energyDescriptor,
+            observations = parseObservations(entity.entryObservationsJson),
+            tags = entity.tags.map { it.name }.sorted(),
+        )
 
         private fun parseObservations(json: String): List<ObservationLine> {
             if (json.isBlank() || json.trim() == "[]") return emptyList()

@@ -9,9 +9,9 @@ import kotlinx.coroutines.flow.StateFlow
 import java.time.ZoneId
 
 /** Wires [EntryDetailViewModel] to [EntryDetailScreen]. */
-@Suppress("LongParameterList")
+@Suppress("LongParameterList") // Route-level host; dataRevision + modifier are structural, not business.
 @Composable
-fun EntryDetailHost(
+fun EntryDetailHost( // NOSONAR kotlin:S107
     entryId: Long,
     entryStore: EntryStore,
     zoneId: ZoneId,

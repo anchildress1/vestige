@@ -11,6 +11,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
@@ -59,7 +60,7 @@ internal fun WiringScreen(switches: List<WiringSwitch>, modifier: Modifier = Mod
 
 private data class SwitchVisuals(
     val pillText: String,
-    val pillColor: androidx.compose.ui.graphics.Color,
+    val pillColor: Color,
     val showDot: Boolean,
     val showAccent: Boolean,
 )

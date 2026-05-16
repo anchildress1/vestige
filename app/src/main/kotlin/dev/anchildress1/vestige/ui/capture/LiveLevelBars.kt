@@ -7,6 +7,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.unit.Dp
@@ -35,7 +36,7 @@ fun LiveLevelBars(levels: List<Float>, modifier: Modifier = Modifier, height: Dp
     }
 }
 
-internal fun DrawScope.drawBars(levels: List<Float>, color: androidx.compose.ui.graphics.Color) {
+internal fun DrawScope.drawBars(levels: List<Float>, color: Color) {
     if (levels.isEmpty()) return
     val total = size.width
     val barCount = levels.size

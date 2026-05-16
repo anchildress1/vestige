@@ -149,13 +149,14 @@ class PatternDetailViewModelTest {
         val vm = newViewModel("p-closed")
         vm.state.test {
             val loaded = expectMostRecentItem() as PatternDetailUiState.Loaded
+            val terminalLabel = checkNotNull(loaded.terminalLabel)
             assertEquals(PatternState.CLOSED, loaded.state)
             assertTrue(loaded.isTerminal)
             assertEquals(
                 dev.anchildress1.vestige.R.string.pattern_terminal_resolved,
-                loaded.terminalLabel!!.prefixRes,
+                terminalLabel.prefixRes,
             )
-            assertNotNull(loaded.terminalLabel!!.days)
+            assertNotNull(terminalLabel.days)
             assertEquals(setOf(PatternAction.RESTART), loaded.availableActions)
         }
     }

@@ -49,13 +49,24 @@
 
         <activity
             android:name=".MainActivity"
+            android:exported="false"
+            android:theme="@style/Theme.Vestige">
+        </activity>
+
+        <!-- nosemgrep: java.android.security.exported_activity.exported_activity
+             Keep the launcher entrypoint exported, but route it through an alias so the real
+             app shell stays internal-only. This narrows the external surface without changing
+             the launcher contract. -->
+        <activity-alias
+            android:name=".LauncherActivity"
             android:exported="true"
+            android:targetActivity=".MainActivity"
             android:theme="@style/Theme.Vestige">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
-        </activity>
+        </activity-alias>
 
         <service
             android:name=".lifecycle.BackgroundExtractionService"

@@ -6,6 +6,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -82,7 +83,7 @@ private enum class PostOnboardingScreen { Capture, Patterns, History }
 
 private data class LaunchTargetController(val target: PostOnboardingLaunchTarget, val onConsumed: () -> Unit)
 
-@androidx.compose.runtime.Composable
+@Composable
 private fun MainActivityContent(
     container: AppContainer,
     onboardingPrefs: OnboardingPrefs,
@@ -118,7 +119,7 @@ private fun MainActivityContent(
     }
 }
 
-@androidx.compose.runtime.Composable
+@Composable
 private fun MainPostOnboardingContent(
     container: AppContainer,
     persona: Persona,
@@ -191,7 +192,7 @@ private fun MainPostOnboardingContent(
 }
 
 internal sealed interface PostOnboardingLaunchTarget {
-    data object None : PostOnboardingLaunchTarget
+    object None : PostOnboardingLaunchTarget
     data class History(val token: Long) : PostOnboardingLaunchTarget
     data class HistoryDetail(val entryId: Long, val token: Long) : PostOnboardingLaunchTarget
 }
@@ -228,7 +229,7 @@ internal const val EXTRA_OPEN_LATEST_IN_FLIGHT_ENTRY: String =
     "dev.anchildress1.vestige.extra.OPEN_LATEST_IN_FLIGHT_ENTRY"
 
 @Suppress("LongParameterList")
-@androidx.compose.runtime.Composable
+@Composable
 private fun CaptureRoute(
     container: AppContainer,
     persona: Persona,

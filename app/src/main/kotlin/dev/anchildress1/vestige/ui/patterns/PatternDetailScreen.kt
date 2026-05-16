@@ -14,20 +14,15 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.SnackbarDuration
-import androidx.compose.material3.SnackbarHostState
-import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -40,6 +35,7 @@ import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.anchildress1.vestige.R
 import dev.anchildress1.vestige.model.PatternState
 import dev.anchildress1.vestige.ui.components.VestigeListCard
@@ -48,7 +44,7 @@ import dev.anchildress1.vestige.ui.components.VestigeScaffold
 import dev.anchildress1.vestige.ui.components.VestigeSurface
 import dev.anchildress1.vestige.ui.theme.VestigeTheme
 
-@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 @Suppress("LongMethod") // Compose layout cluster; splitting hurts call-site readability.
 fun PatternDetailScreen(
@@ -57,32 +53,8 @@ fun PatternDetailScreen(
     onOpenEntry: (Long) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
-    val state by viewModel.state.collectAsState()
-    val snackbarHostState = remember { SnackbarHostState() }
-
-    val droppedMessage = stringResource(R.string.snackbar_dismissed)
-    val skippedMessage = stringResource(R.string.snackbar_snoozed_7_days)
-    val restartMessage = stringResource(R.string.snackbar_pattern_back)
-    val undoLabel = stringResource(R.string.pattern_undo)
-
-    LaunchedEffect(viewModel, droppedMessage, skippedMessage, restartMessage, undoLabel) {
-        viewModel.events.collect { event ->
-            val message = when (event.action) {
-                PatternAction.DROP -> droppedMessage
-                PatternAction.SKIP -> skippedMessage
-                PatternAction.RESTART -> restartMessage
-            }
-            // Standard Material short-snackbar duration (~4s) — the undo affordance lifetime.
-            val result = snackbarHostState.showSnackbar(
-                message = message,
-                actionLabel = if (event.undo != null) undoLabel else null,
-                duration = SnackbarDuration.Short,
-            )
-            if (result == SnackbarResult.ActionPerformed && event.undo != null) {
-                viewModel.undo(event.undo)
-            }
-        }
-    }
+    val state by viewModel.state.collectAsStateWithLifecycle()
+    val snackbarHostState = rememberPatternSnackbarHostState(viewModel.events, viewModel::undo)
 
     val backDescription = stringResource(R.string.pattern_back_description)
     VestigeScaffold(

@@ -15,16 +15,12 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.SnackbarDuration
-import androidx.compose.material3.SnackbarHostState
-import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -40,7 +36,9 @@ import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.anchildress1.vestige.R
 import dev.anchildress1.vestige.ui.components.VestigeListCard
 import dev.anchildress1.vestige.ui.components.VestigeListCardInteraction
@@ -51,41 +49,15 @@ import dev.anchildress1.vestige.ui.theme.VestigeTheme
 // Dropped cards stay legible but de-prioritized per spec-pattern-action-buttons.md §Visual.
 private const val DROPPED_CARD_ALPHA = 0.6f
 
-@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PatternsListScreen(
     viewModel: PatternsListViewModel,
     onOpenPattern: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val state by viewModel.state.collectAsState()
-    val snackbarHostState = remember { SnackbarHostState() }
-
-    // Pre-resolve copy at composition so the LaunchedEffect's non-composable scope can use it.
-    val droppedMessage = stringResource(R.string.snackbar_dismissed)
-    val skippedMessage = stringResource(R.string.snackbar_snoozed_7_days)
-    val restartMessage = stringResource(R.string.snackbar_pattern_back)
-    val undoLabel = stringResource(R.string.pattern_undo)
-
-    LaunchedEffect(viewModel, droppedMessage, skippedMessage, restartMessage, undoLabel) {
-        viewModel.events.collect { event ->
-            val message = when (event.action) {
-                PatternAction.DROP -> droppedMessage
-                PatternAction.SKIP -> skippedMessage
-                PatternAction.RESTART -> restartMessage
-            }
-            // Standard Material short-snackbar duration (~4s) — the undo affordance lifetime.
-            // CLOSED is model-detected — no action event is emitted, so the snackbar stays silent.
-            val result = snackbarHostState.showSnackbar(
-                message = message,
-                actionLabel = if (event.undo != null) undoLabel else null,
-                duration = SnackbarDuration.Short,
-            )
-            if (result == SnackbarResult.ActionPerformed && event.undo != null) {
-                viewModel.undo(event.undo)
-            }
-        }
-    }
+    val state by viewModel.state.collectAsStateWithLifecycle()
+    val snackbarHostState = rememberPatternSnackbarHostState(viewModel.events, viewModel::undo)
 
     VestigeScaffold(
         modifier = modifier,
@@ -330,7 +302,7 @@ private fun OverflowMenu(
     }
 }
 
-@androidx.compose.ui.tooling.preview.Preview
+@Preview
 @Composable
 private fun PatternsListPreview() {
     VestigeTheme {

@@ -84,14 +84,14 @@ internal sealed interface BandKind {
     val isError: Boolean
     val contentDescription: String
 
-    data object MicDenied : BandKind {
+    object MicDenied : BandKind {
         override val eyebrow = CaptureCopy.BAND_LABEL_MIC
         override val body = CaptureCopy.MIC_DENIED_LINE
         override val isError = true
         override val contentDescription = "Mic permission denied. $body"
     }
 
-    data object MicUnavailable : BandKind {
+    object MicUnavailable : BandKind {
         override val eyebrow = CaptureCopy.BAND_LABEL_MIC
         override val body = CaptureCopy.MIC_UNAVAILABLE_LINE
         override val isError = true
@@ -109,14 +109,14 @@ internal sealed interface BandKind {
         override val contentDescription: String = "Last reading failed. $body"
     }
 
-    data object ModelLoading : BandKind {
+    object ModelLoading : BandKind {
         override val eyebrow = CaptureCopy.BAND_LABEL_MODEL_LOADING
         override val body = CaptureCopy.MODEL_LOADING_LINE
         override val isError = false
         override val contentDescription = "Model warming up. $body"
     }
 
-    data object ModelPaused : BandKind {
+    object ModelPaused : BandKind {
         override val eyebrow = CaptureCopy.BAND_LABEL_MODEL_PAUSED
         override val body = CaptureCopy.MODEL_PAUSED_LINE
         override val isError = false

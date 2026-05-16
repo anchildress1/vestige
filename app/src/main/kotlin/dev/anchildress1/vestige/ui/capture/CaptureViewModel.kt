@@ -41,9 +41,7 @@ class CaptureViewModel(
     private val recordVoice: VoiceCapture,
     private val foregroundInference: ForegroundInferenceCall,
     private val saveAndExtract: SaveAndExtract,
-    private val saveTypedEntry: SaveTypedEntry = SaveTypedEntry { text, capturedAt, persona ->
-        saveAndExtract(text, capturedAt, persona, 0L)
-    },
+    private val foregroundTextInference: ForegroundTextInferenceCall,
     private val clock: Clock = Clock.systemUTC(),
     private val zoneId: ZoneId = ZoneId.systemDefault(),
     private val initialReadiness: ModelReadiness = ModelReadiness.Loading,
@@ -179,7 +177,9 @@ class CaptureViewModel(
                     return@launch
                 }
                 transitionToInferring()
-                runInference(audio, inferencePersona)
+                runForeground(inferencePersona, audio.durationMs) {
+                    foregroundInference(audio, inferencePersona)
+                }
             } catch (cancel: CancellationException) {
                 throw cancel
             } catch (@Suppress("TooGenericExceptionCaught") error: Exception) {
@@ -249,13 +249,16 @@ class CaptureViewModel(
         }
     }
 
-    /** Type-fallback path: save the typed entry text and route through the background extraction pipeline. */
+    /**
+     * Typed-entry path: runs the same foreground model call voice does, so a typed entry produces
+     * the identical Reviewing surface (persona follow-up included). The model is required — when it
+     * isn't Ready this is a silent no-op, exactly like a disabled REC button.
+     */
     fun submitTyped(text: String) {
         val trimmed = text.trim()
-        if (trimmed.length < MIN_TYPED_LENGTH) return
-        val current = _state.value
-        if (current !is CaptureUiState.Idle) return
-        val savePersona = current.persona
+        val current = _state.value as? CaptureUiState.Idle ?: return
+        if (trimmed.length < MIN_TYPED_LENGTH || current.modelReadiness !is ModelReadiness.Ready) return
+        val inferencePersona = current.persona
         viewModelScope.launch {
             _state.update { c ->
                 if (c is CaptureUiState.Idle) {
@@ -268,29 +271,8 @@ class CaptureViewModel(
                     c
                 }
             }
-            try {
-                saveTypedEntry(trimmed, ZonedDateTime.now(clock.withZone(zoneId)), savePersona)
-                _state.update { c ->
-                    when (c) {
-                        is CaptureUiState.Inferring -> CaptureUiState.Reviewing(
-                            persona = c.persona,
-                            modelReadiness = c.modelReadiness,
-                            review = ReviewState(
-                                transcription = trimmed,
-                                followUp = "",
-                                persona = c.persona,
-                                elapsedMs = 0L,
-                            ),
-                        )
-
-                        else -> c
-                    }
-                }
-            } catch (cancel: CancellationException) {
-                throw cancel
-            } catch (@Suppress("TooGenericExceptionCaught") error: Exception) {
-                Log.e(TAG, "submitTyped save failed", error)
-                emitInferenceError(CaptureError.InferenceFailed.Reason.ENGINE_FAILED)
+            runForeground(inferencePersona, durationMs = 0L) {
+                foregroundTextInference(trimmed, inferencePersona)
             }
         }
     }
@@ -314,16 +296,18 @@ class CaptureViewModel(
         }
     }
 
-    private suspend fun runInference(audio: AudioChunk, persona: Persona) {
+    // Shared foreground result handler for both the voice path (audio call) and the typed path
+    // (text call). `durationMs` is the audio length for voice, 0 for typed.
+    private suspend fun runForeground(persona: Persona, durationMs: Long, call: suspend () -> ForegroundResult) {
         try {
-            val result = foregroundInference(audio, persona)
-            when (result) {
+            when (val result = call()) {
                 is ForegroundResult.Success -> {
                     saveAndExtract(
                         result.transcription,
                         ZonedDateTime.now(clock.withZone(zoneId)),
                         persona,
-                        audio.durationMs,
+                        durationMs,
+                        result.followUp,
                     )
                     _state.update { c ->
                         CaptureUiState.Reviewing(
@@ -389,17 +373,23 @@ fun interface VoiceCapture {
     suspend operator fun invoke(onLevel: (Float) -> Unit, stopFlow: Flow<Unit>): AudioChunk?
 }
 
-/** Runs one foreground (single-turn) call against the local model. */
+/** Runs one foreground (single-turn) call against the local model for a voice entry. */
 fun interface ForegroundInferenceCall {
     suspend operator fun invoke(audio: AudioChunk, persona: Persona): ForegroundResult
 }
 
-/** Routes a transcription (voice or typed) into the two-tier save + background extraction pipeline. */
-fun interface SaveAndExtract {
-    suspend operator fun invoke(text: String, capturedAt: ZonedDateTime, persona: Persona, durationMs: Long)
+/** Runs one foreground (single-turn) call for a typed entry — text in, `{transcription, follow_up}` out. */
+fun interface ForegroundTextInferenceCall {
+    suspend operator fun invoke(text: String, persona: Persona): ForegroundResult
 }
 
-/** Persists typed fallback entries without requiring the local model to be ready first. */
-fun interface SaveTypedEntry {
-    suspend operator fun invoke(text: String, capturedAt: ZonedDateTime, persona: Persona)
+/** Routes a transcription (voice or typed) into the two-tier save + background extraction pipeline. */
+fun interface SaveAndExtract {
+    suspend operator fun invoke(
+        text: String,
+        capturedAt: ZonedDateTime,
+        persona: Persona,
+        durationMs: Long,
+        followUpText: String?,
+    )
 }

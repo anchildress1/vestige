@@ -37,6 +37,8 @@ class MarkdownEntryStore(private val baseDir: File) {
             append("schema_version: ").append(SCHEMA_VERSION).append('\n')
             append("timestamp: ").append(formatIso(entry.timestampEpochMs)).append('\n')
             append("duration_ms: ").append(entry.durationMs).append('\n')
+            append("persona: ").append(entry.persona.name.lowercase()).append('\n')
+            append("follow_up: ").append(yamlScalar(entry.followUpText)).append('\n')
             append("template_label: ").append(entry.templateLabel?.serial ?: NULL).append('\n')
             append("energy_descriptor: ").append(yamlScalar(entry.energyDescriptor)).append('\n')
             append("recurrence_link: ").append(yamlScalar(entry.recurrenceLink)).append('\n')
@@ -91,6 +93,15 @@ class MarkdownEntryStore(private val baseDir: File) {
         } else {
             0L
         }
+        val persona = parsed[KEY_PERSONA]
+            ?.let { raw ->
+                runCatching { dev.anchildress1.vestige.model.Persona.valueOf(raw.uppercase()) }.getOrElse {
+                    Log.w(TAG, "persona in ${file.name} is not recognized: '$raw'; defaulting to WITNESS")
+                    dev.anchildress1.vestige.model.Persona.WITNESS
+                }
+            }
+            ?: dev.anchildress1.vestige.model.Persona.WITNESS
+        val followUp = parsed[KEY_FOLLOW_UP]?.takeUnless { it == NULL }
         val templateLabel = parsed[KEY_TEMPLATE_LABEL]?.takeUnless { it == NULL }
             ?.let { TemplateLabel.fromSerial(it) }
         val energy = parsed[KEY_ENERGY_DESCRIPTOR]?.takeUnless { it == NULL }
@@ -102,6 +113,8 @@ class MarkdownEntryStore(private val baseDir: File) {
         return EntryEntity(
             markdownFilename = file.name,
             entryText = body.trimEnd(),
+            followUpText = followUp,
+            persona = persona,
             timestampEpochMs = timestamp,
             durationMs = durationMs,
             templateLabel = templateLabel,
@@ -228,6 +241,8 @@ class MarkdownEntryStore(private val baseDir: File) {
         private const val KEY_SCHEMA_VERSION = "schema_version"
         private const val KEY_TIMESTAMP = "timestamp"
         private const val KEY_DURATION_MS = "duration_ms"
+        private const val KEY_PERSONA = "persona"
+        private const val KEY_FOLLOW_UP = "follow_up"
         private const val KEY_TEMPLATE_LABEL = "template_label"
         private const val KEY_ENERGY_DESCRIPTOR = "energy_descriptor"
         private const val KEY_RECURRENCE_LINK = "recurrence_link"

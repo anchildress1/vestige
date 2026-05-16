@@ -4,12 +4,15 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
+import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import dev.anchildress1.vestige.model.ExtractionStatus
 import dev.anchildress1.vestige.model.PatternKind
 import dev.anchildress1.vestige.model.PatternState
+import dev.anchildress1.vestige.model.Persona
 import dev.anchildress1.vestige.storage.EntryEntity
 import dev.anchildress1.vestige.storage.EntryStore
 import dev.anchildress1.vestige.storage.MarkdownEntryStore
@@ -20,6 +23,7 @@ import dev.anchildress1.vestige.testing.cleanupObjectBoxTempRoot
 import dev.anchildress1.vestige.testing.newInMemoryObjectBoxDirectory
 import dev.anchildress1.vestige.testing.newModuleTempRoot
 import dev.anchildress1.vestige.testing.openInMemoryBoxStore
+import dev.anchildress1.vestige.ui.history.EntryDetailCopy
 import io.objectbox.BoxStore
 import org.junit.After
 import org.junit.Assert.assertTrue
@@ -30,6 +34,7 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import java.io.File
+import java.time.ZoneOffset
 
 /**
  * Exercises the in-process nav graph in PatternsHost. Uses createAndroidComposeRule so the
@@ -71,7 +76,7 @@ class PatternsHostTest {
     }
 
     @Test
-    fun `renders list by default and routes through detail then entry placeholder`() {
+    fun `renders list by default and routes through detail then entry detail`() {
         val supporting = listOf(seedEntry("crashed after standup"))
         seedActivePattern("p-host", "Tuesday Meetings", "Aftermath", "Callout.", supporting)
 
@@ -80,6 +85,7 @@ class PatternsHostTest {
                 patternStore = patternStore,
                 patternRepo = patternRepo,
                 entryStore = entryStore,
+                zoneId = ZoneOffset.UTC,
             )
         }
 
@@ -91,11 +97,42 @@ class PatternsHostTest {
         composeRule.waitForIdle()
         composeRule.onNodeWithText("Callout.").assertIsDisplayed()
 
-        // Detail → entry placeholder.
+        // Detail → entry detail (real EntryDetailScreen; bottom bar is the stable navigation landmark).
         composeRule.onNodeWithText("crashed after standup").performScrollTo().performClick()
         composeRule.waitForIdle()
-        composeRule.onNodeWithText("Entry").assertIsDisplayed()
-        composeRule.onNodeWithText("crashed after standup").assertIsDisplayed()
+        composeRule.onNodeWithText("● NEW ENTRY").assertIsDisplayed()
+        composeRule.onNodeWithTag("entry_source_highlight").assertIsDisplayed()
+    }
+
+    @Test
+    fun `new entry from entry detail clears stale detail nav and exits`() {
+        val supporting = listOf(seedEntry("crashed after standup"))
+        seedActivePattern("p-host", "Tuesday Meetings", "Aftermath", "Callout.", supporting)
+        var exited = false
+
+        composeRule.activity.setContent {
+            PatternsHost(
+                patternStore = patternStore,
+                patternRepo = patternRepo,
+                entryStore = entryStore,
+                zoneId = ZoneOffset.UTC,
+                onExit = { exited = true },
+            )
+        }
+
+        composeRule.onNodeWithText("Tuesday Meetings").performClick()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithText("crashed after standup").performScrollTo().performClick()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithText("● NEW ENTRY").assertIsDisplayed()
+
+        composeRule.onNodeWithContentDescription(EntryDetailCopy.NEW_ENTRY_CD).performClick()
+        composeRule.waitForIdle()
+
+        assertTrue("onNewEntry must call onExit", exited)
+        // Regression guard: openEntryId is rememberSaveable; the explicit reset must drop the
+        // stale entry detail. Falls back to the pattern detail (openPatternId still set).
+        composeRule.onNodeWithText("Callout.").assertIsDisplayed()
     }
 
     @Test
@@ -106,6 +143,7 @@ class PatternsHostTest {
                 patternStore = patternStore,
                 patternRepo = patternRepo,
                 entryStore = entryStore,
+                zoneId = ZoneOffset.UTC,
                 onExit = { exited = true },
             )
         }

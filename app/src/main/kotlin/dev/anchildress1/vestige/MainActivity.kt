@@ -1,5 +1,6 @@
 package dev.anchildress1.vestige
 
+import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -20,18 +21,20 @@ import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import dev.anchildress1.vestige.model.Persona
+import dev.anchildress1.vestige.storage.EntryStore
 import dev.anchildress1.vestige.ui.capture.CaptureScreen
 import dev.anchildress1.vestige.ui.capture.CaptureViewModel
 import dev.anchildress1.vestige.ui.capture.ForegroundInferenceCall
+import dev.anchildress1.vestige.ui.capture.ForegroundTextInferenceCall
 import dev.anchildress1.vestige.ui.capture.IdleChromeCallbacks
 import dev.anchildress1.vestige.ui.capture.ModelReadiness
 import dev.anchildress1.vestige.ui.capture.RealVoiceCapture
 import dev.anchildress1.vestige.ui.capture.SaveAndExtract
-import dev.anchildress1.vestige.ui.capture.SaveTypedEntry
 import dev.anchildress1.vestige.ui.capture.ToneGeneratorLimitWarningCue
 import dev.anchildress1.vestige.ui.capture.deriveLastEntryFooter
 import dev.anchildress1.vestige.ui.capture.deriveMeta
 import dev.anchildress1.vestige.ui.capture.deriveStats
+import dev.anchildress1.vestige.ui.history.EntryDetailOpenRequest
 import dev.anchildress1.vestige.ui.history.HistoryHost
 import dev.anchildress1.vestige.ui.onboarding.ModelAvailability
 import dev.anchildress1.vestige.ui.onboarding.OnboardingHost
@@ -42,6 +45,9 @@ import java.time.Clock
 import java.time.ZoneId
 
 class MainActivity : ComponentActivity() {
+    private var nextLaunchToken: Long = 1L
+    private var pendingLaunchTarget by mutableStateOf<PostOnboardingLaunchTarget>(PostOnboardingLaunchTarget.None)
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
@@ -49,59 +55,168 @@ class MainActivity : ComponentActivity() {
         val onboardingPrefs = OnboardingPrefs.from(this)
         val clock = Clock.systemDefaultZone()
         val zoneId: ZoneId = ZoneId.systemDefault()
+        pendingLaunchTarget = consumePostOnboardingLaunchTarget(intent, container.entryStore, nextLaunchToken++)
         setContent {
-            VestigeTheme {
-                var onboardingComplete by remember { mutableStateOf(onboardingPrefs.isComplete) }
-                var selectedPersona by remember { mutableStateOf(onboardingPrefs.defaultPersona) }
-                if (!onboardingComplete) {
-                    OnboardingHost(
-                        prefs = onboardingPrefs,
-                        onComplete = { persona ->
-                            selectedPersona = persona
-                            onboardingComplete = true
-                        },
-                        modelAvailability = ModelAvailability.Default(
-                            artifactStore = container.mainModelArtifactStore,
-                            networkGate = container.networkGate,
-                        ),
-                        modifier = Modifier.fillMaxSize(),
-                    )
-                    return@VestigeTheme
-                }
-                var screen by rememberSaveable { mutableStateOf(PostOnboardingScreen.Capture) }
-                when (screen) {
-                    PostOnboardingScreen.Capture -> CaptureRoute(
-                        container = container,
-                        persona = selectedPersona,
-                        clock = clock,
-                        zoneId = zoneId,
-                        onOpenPatterns = { screen = PostOnboardingScreen.Patterns },
-                        onOpenHistory = { screen = PostOnboardingScreen.History },
-                    )
-
-                    PostOnboardingScreen.Patterns -> PatternsHost(
-                        patternStore = container.patternStore,
-                        patternRepo = container.patternRepo,
-                        entryStore = container.entryStore,
-                        onExit = { screen = PostOnboardingScreen.Capture },
-                        modifier = Modifier.fillMaxSize(),
-                    )
-
-                    PostOnboardingScreen.History -> HistoryHost(
-                        entryStore = container.entryStore,
-                        persona = selectedPersona,
-                        onExit = { screen = PostOnboardingScreen.Capture },
-                        zoneId = zoneId,
-                        dataRevision = container.dataRevision,
-                        modifier = Modifier.fillMaxSize(),
-                    )
-                }
-            }
+            MainActivityContent(
+                container = container,
+                onboardingPrefs = onboardingPrefs,
+                clock = clock,
+                zoneId = zoneId,
+                launchTargetController = LaunchTargetController(
+                    target = pendingLaunchTarget,
+                    onConsumed = { pendingLaunchTarget = PostOnboardingLaunchTarget.None },
+                ),
+            )
         }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        val container = (application as VestigeApplication).appContainer
+        pendingLaunchTarget = consumePostOnboardingLaunchTarget(intent, container.entryStore, nextLaunchToken++)
     }
 }
 
 private enum class PostOnboardingScreen { Capture, Patterns, History }
+
+private data class LaunchTargetController(val target: PostOnboardingLaunchTarget, val onConsumed: () -> Unit)
+
+@androidx.compose.runtime.Composable
+private fun MainActivityContent(
+    container: AppContainer,
+    onboardingPrefs: OnboardingPrefs,
+    clock: Clock,
+    zoneId: ZoneId,
+    launchTargetController: LaunchTargetController,
+) {
+    VestigeTheme {
+        var onboardingComplete by remember { mutableStateOf(onboardingPrefs.isComplete) }
+        var selectedPersona by remember { mutableStateOf(onboardingPrefs.defaultPersona) }
+        if (!onboardingComplete) {
+            OnboardingHost(
+                prefs = onboardingPrefs,
+                onComplete = { persona ->
+                    selectedPersona = persona
+                    onboardingComplete = true
+                },
+                modelAvailability = ModelAvailability.Default(
+                    artifactStore = container.mainModelArtifactStore,
+                    networkGate = container.networkGate,
+                ),
+                modifier = Modifier.fillMaxSize(),
+            )
+            return@VestigeTheme
+        }
+        MainPostOnboardingContent(
+            container = container,
+            persona = selectedPersona,
+            clock = clock,
+            zoneId = zoneId,
+            launchTargetController = launchTargetController,
+        )
+    }
+}
+
+@androidx.compose.runtime.Composable
+private fun MainPostOnboardingContent(
+    container: AppContainer,
+    persona: Persona,
+    clock: Clock,
+    zoneId: ZoneId,
+    launchTargetController: LaunchTargetController,
+) {
+    var screen by rememberSaveable { mutableStateOf(PostOnboardingScreen.Capture) }
+    var historyOpenRequest by remember { mutableStateOf<EntryDetailOpenRequest?>(null) }
+    LaunchedEffect(screen, launchTargetController.target) {
+        when (val target = launchTargetController.target) {
+            PostOnboardingLaunchTarget.None -> Unit
+
+            is PostOnboardingLaunchTarget.History -> {
+                screen = PostOnboardingScreen.History
+                historyOpenRequest = null
+                launchTargetController.onConsumed()
+            }
+
+            is PostOnboardingLaunchTarget.HistoryDetail -> {
+                screen = PostOnboardingScreen.History
+                historyOpenRequest = EntryDetailOpenRequest(
+                    entryId = target.entryId,
+                    highlightOnOpen = false,
+                    token = target.token,
+                )
+                launchTargetController.onConsumed()
+            }
+        }
+    }
+    when (screen) {
+        PostOnboardingScreen.Capture -> CaptureRoute(
+            container = container,
+            persona = persona,
+            clock = clock,
+            zoneId = zoneId,
+            onOpenPatterns = { screen = PostOnboardingScreen.Patterns },
+            onOpenHistory = { screen = PostOnboardingScreen.History },
+        )
+
+        PostOnboardingScreen.Patterns -> PatternsHost(
+            patternStore = container.patternStore,
+            patternRepo = container.patternRepo,
+            entryStore = container.entryStore,
+            zoneId = zoneId,
+            onExit = { screen = PostOnboardingScreen.Capture },
+            modifier = Modifier.fillMaxSize(),
+        )
+
+        PostOnboardingScreen.History -> HistoryHost(
+            entryStore = container.entryStore,
+            persona = persona,
+            onExit = { screen = PostOnboardingScreen.Capture },
+            zoneId = zoneId,
+            dataRevision = container.dataRevision,
+            openRequest = historyOpenRequest,
+            onOpenRequestConsumed = { historyOpenRequest = null },
+            modifier = Modifier.fillMaxSize(),
+        )
+    }
+}
+
+internal sealed interface PostOnboardingLaunchTarget {
+    data object None : PostOnboardingLaunchTarget
+    data class History(val token: Long) : PostOnboardingLaunchTarget
+    data class HistoryDetail(val entryId: Long, val token: Long) : PostOnboardingLaunchTarget
+}
+
+internal fun resolvePostOnboardingLaunchTarget(
+    intent: Intent?,
+    entryStore: EntryStore,
+    token: Long,
+): PostOnboardingLaunchTarget {
+    if (intent?.getBooleanExtra(EXTRA_OPEN_LATEST_IN_FLIGHT_ENTRY, false) != true) {
+        return PostOnboardingLaunchTarget.None
+    }
+    val entryId = entryStore.mostRecentNonTerminalEntryId()
+    return if (entryId != null) {
+        PostOnboardingLaunchTarget.HistoryDetail(entryId = entryId, token = token)
+    } else {
+        PostOnboardingLaunchTarget.History(token = token)
+    }
+}
+
+internal fun consumePostOnboardingLaunchTarget(
+    intent: Intent?,
+    entryStore: EntryStore,
+    token: Long,
+): PostOnboardingLaunchTarget {
+    val target = resolvePostOnboardingLaunchTarget(intent, entryStore, token)
+    if (intent?.getBooleanExtra(EXTRA_OPEN_LATEST_IN_FLIGHT_ENTRY, false) == true) {
+        intent.removeExtra(EXTRA_OPEN_LATEST_IN_FLIGHT_ENTRY)
+    }
+    return target
+}
+
+internal const val EXTRA_OPEN_LATEST_IN_FLIGHT_ENTRY: String =
+    "dev.anchildress1.vestige.extra.OPEN_LATEST_IN_FLIGHT_ENTRY"
 
 @Suppress("LongParameterList")
 @androidx.compose.runtime.Composable
@@ -126,16 +241,17 @@ private fun CaptureRoute(
             foregroundInference = ForegroundInferenceCall { audio, sel ->
                 container.runForegroundCall(audio = audio, persona = sel)
             },
-            saveAndExtract = SaveAndExtract { text, capturedAt, personaSel, durationMs ->
+            saveAndExtract = SaveAndExtract { text, capturedAt, personaSel, durationMs, followUpText ->
                 container.saveAndExtract(
                     entryText = text,
                     capturedAt = capturedAt,
                     persona = personaSel,
                     durationMs = durationMs,
+                    followUpText = followUpText,
                 )
             },
-            saveTypedEntry = SaveTypedEntry { text, capturedAt, personaSel ->
-                container.saveTypedEntry(entryText = text, capturedAt = capturedAt, persona = personaSel)
+            foregroundTextInference = ForegroundTextInferenceCall { text, personaSel ->
+                container.runForegroundTextCall(text = text, persona = personaSel)
             },
             clock = clock,
             zoneId = zoneId,
@@ -176,7 +292,7 @@ private class CaptureViewModelFactory(
     private val recordVoice: RealVoiceCapture,
     private val foregroundInference: ForegroundInferenceCall,
     private val saveAndExtract: SaveAndExtract,
-    private val saveTypedEntry: SaveTypedEntry,
+    private val foregroundTextInference: ForegroundTextInferenceCall,
     private val clock: Clock,
     private val zoneId: ZoneId,
     private val initialReadiness: ModelReadiness,
@@ -192,7 +308,7 @@ private class CaptureViewModelFactory(
             recordVoice = recordVoice,
             foregroundInference = foregroundInference,
             saveAndExtract = saveAndExtract,
-            saveTypedEntry = saveTypedEntry,
+            foregroundTextInference = foregroundTextInference,
             clock = clock,
             zoneId = zoneId,
             initialReadiness = initialReadiness,

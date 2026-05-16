@@ -63,6 +63,76 @@ class ForegroundInferenceTest {
     }
 
     @Test
+    fun `runForegroundTextCall returns Success on a clean response`(@TempDir cacheDir: File) = runTest {
+        val engine = mockk<LiteRtLmEngine>()
+        coEvery { engine.sendMessageContents(any()) } returns rawSuccess(
+            transcription = "just got off the call again",
+            followUp = "what did they actually want",
+        )
+
+        val result = ForegroundInference(engine, cacheDir, clock = fixedClock).runForegroundTextCall(
+            text = "just got off the call again",
+            persona = Persona.EDITOR,
+        )
+
+        val success = assertInstanceOf(ForegroundResult.Success::class.java, result)
+        assertAll(
+            { assertEquals("just got off the call again", success.transcription) },
+            { assertEquals("what did they actually want", success.followUp) },
+            { assertEquals(Persona.EDITOR, success.persona) },
+            { assertEquals(completedAt, success.completedAt) },
+        )
+    }
+
+    @Test
+    fun `runForegroundTextCall surfaces ParseFailure without throwing`(@TempDir cacheDir: File) = runTest {
+        val engine = mockk<LiteRtLmEngine>()
+        coEvery { engine.sendMessageContents(any()) } returns ""
+
+        val result = ForegroundInference(engine, cacheDir, clock = fixedClock).runForegroundTextCall(
+            text = "typed it",
+            persona = Persona.WITNESS,
+        )
+
+        val failure = assertInstanceOf(ForegroundResult.ParseFailure::class.java, result)
+        assertEquals(ForegroundResult.ParseReason.EMPTY_RESPONSE, failure.reason)
+    }
+
+    @Test
+    fun `runForegroundTextCall hands the typed text off as Content_Text, never an audio file`(
+        @TempDir cacheDir: File,
+    ) = runTest {
+        val engine = mockk<LiteRtLmEngine>()
+        val captured = slot<List<Content>>()
+        coEvery { engine.sendMessageContents(capture(captured)) } returns rawSuccess("a", "b")
+
+        ForegroundInference(engine, cacheDir, clock = fixedClock).runForegroundTextCall(
+            text = "the literal typed words",
+            persona = Persona.WITNESS,
+        )
+
+        val parts = captured.captured
+        assertAll(
+            { assertEquals(2, parts.size) },
+            { assertInstanceOf(Content.Text::class.java, parts[0]) },
+            { assertInstanceOf(Content.Text::class.java, parts[1]) },
+            { assertEquals("the literal typed words", (parts[1] as Content.Text).text) },
+            { assertTrue(parts.none { it is Content.AudioFile }, "Typed path must not hand off audio") },
+            { assertEquals(0, cacheDir.listFiles().orEmpty().size, "Typed path writes no temp WAV") },
+        )
+    }
+
+    @Test
+    fun `runForegroundTextCall rejects blank text`(@TempDir cacheDir: File) = runTest {
+        val engine = mockk<LiteRtLmEngine>()
+        val inference = ForegroundInference(engine, cacheDir, clock = fixedClock)
+
+        val caught = runCatching { inference.runForegroundTextCall("   ", Persona.WITNESS) }.exceptionOrNull()
+
+        assertInstanceOf(IllegalArgumentException::class.java, caught)
+    }
+
+    @Test
     fun `parse failure surfaces as ParseFailure rather than throwing or retrying`(@TempDir cacheDir: File) = runTest {
         val engine = mockk<LiteRtLmEngine>()
         coEvery { engine.sendMessageContents(any()) } returns "no headers, just prose"

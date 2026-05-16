@@ -1,6 +1,7 @@
 package dev.anchildress1.vestige.ui.history
 
 import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.assertHasClickAction
 import androidx.compose.ui.test.assertHasNoClickAction
 import androidx.compose.ui.test.assertHeightIsAtLeast
 import androidx.compose.ui.test.assertIsDisplayed
@@ -144,11 +145,11 @@ class HistoryScreenTest {
     // a11y — semantics
 
     @Test
-    fun `history row has no click action until tap-to-detail is implemented`() {
+    fun `history row has click action`() {
         seedCompleted("something happened today", 1_000_000L)
 
         composeRule.setContent { HistoryScreen(viewModel = newViewModel(), persona = Persona.WITNESS) }
-        composeRule.onNodeWithTag("history_row").assertHasNoClickAction()
+        composeRule.onNodeWithTag("history_row").assertHasClickAction()
     }
 
     @Test

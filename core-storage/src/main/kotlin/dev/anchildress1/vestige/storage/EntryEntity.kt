@@ -1,6 +1,7 @@
 package dev.anchildress1.vestige.storage
 
 import dev.anchildress1.vestige.model.ExtractionStatus
+import dev.anchildress1.vestige.model.Persona
 import dev.anchildress1.vestige.model.TemplateLabel
 import io.objectbox.annotation.Convert
 import io.objectbox.annotation.Entity
@@ -24,6 +25,13 @@ class EntryEntity(
 
     /** Transcription or typed input. Mirrors the markdown body. */
     var entryText: String = "",
+
+    /** Foreground follow-up shown as the model turn in the saved single-turn transcript. */
+    var followUpText: String? = null,
+
+    /** Persona that authored the saved foreground follow-up for this entry. */
+    @Convert(converter = PersonaConverter::class, dbType = String::class)
+    var persona: Persona = Persona.WITNESS,
 
     /** UTC epoch millis. Markdown frontmatter persists ISO-8601 seconds; this is the index form. */
     var timestampEpochMs: Long = 0,

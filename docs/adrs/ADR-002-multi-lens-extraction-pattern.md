@@ -557,6 +557,199 @@ Pretending neither risk exists, the pattern is the right shape for the product a
 
 Latency record across all rounds, E4B CPU on S24 Ultra: per-turn 32.7–43.3 s. The ADR-002 §"Latency budget" 1–5 s target remains unmet; latency tuning is Phase 4/5 territory and does not gate the STT-B existential verdict.
 
+### Addendum (2026-05-15) — personality + observation depth pass (queued for post-Phase-4)
+
+Audit against this ADR + ADR-003 + the locked persona spec surfaced six structural gaps
+between the spec's promise ("a user can attribute output to persona on output alone" +
+"per-recording response carries real perceived impact") and what shipped through Story 2.13.
+The work is queued for post-Phase-4 — Scoreboard rebuild (ADR-011 / Story 4.1.5) lands first.
+None of the items below alter the convergence resolver, the lens prompts, the STT-D rubric,
+or any verified Phase-2 contract. They reshape the foreground follow-up's contract, the
+observation generator's flow, and the persona-prompt storage layout.
+
+**Spec-vs-code drift this addendum closes.** ADR-002 §3 ("Observation-generation prompt")
+mandates `[persona module — same persona as the active session]` in the observation prompt's
+slot list. `ObservationGenerator.composeModelPrompt` ships without persona injection — the
+generator does not accept a `Persona` parameter and `observations/system.txt` does not load
+a persona block. The implementation pre-dated the §3 addendum that added the slot; closing
+the gap is documented here so the implementation work is unambiguous.
+
+**Foreground follow-up — three-beat shape.**
+
+§"Prompt Composition Contracts / 2. Foreground prompt" output schema is preserved
+(`{transcription: string, follow_up: string}` — no schema change, no parser change). What
+changes is the **content contract** for `follow_up` enforced inside each persona's mandatory
+shape: each persona file's `## Mandatory shape` section becomes a three-beat structure —
+(a) one declarative sentence naming the load-bearing observable from this entry the user
+under-emphasized, (b) one sentence pointing at adjacent observable context the user did not
+record, (c) the persona-shaped question. Persona divergence becomes legible across three
+sentences instead of one closing clause.
+
+The "adjacent-observable" axis (beat b) is new and is the structural piece that makes the
+follow-up *prompt the user to record something else* rather than just rephrase what they
+said. Witness names what would have been in frame (the laptop you didn't open). Hardass
+names the missing commitment object (the *when* you didn't say). Editor names a word you
+should have used and didn't.
+
+**Witness shape gets an explicit count.**
+
+Witness's current opening rule ("echo a user phrase") is what most LLMs do by default with
+any persona prompt — it does not produce a recognizable Witness fingerprint. New mandatory
+shape clause for Witness only: name two concrete details the user mentioned and one timing
+anchor before the question. Three nouns + a clock reference = a fingerprint that no other
+persona produces. Hardass and Editor's distinguishing weapons (imperative + deadline /
+quoted word + pick-one) already meet the bar; only Witness needs the strengthening pass.
+
+**Persona examples expand to per-archetype coverage.**
+
+Each persona file currently ships 3-4 examples drawn from the same demo scenario (Nora /
+outline / standup / "fine"-"flattened"). E4B will pattern-match shape AND nouns. Expand
+to ≥2 examples per template archetype (Aftermath, Tunnel exit, Concrete shoes, Decision
+spiral, Goblin hours, Audit) per persona — ~12 examples per persona, 36 total. Ablate
+against ADR-002 §"Token budget" 2K/system-block ceiling; if expansion pushes over, the
+Skeptical-only revision pattern from the fifth addendum is the precedent — tighten one
+component at a time, do not pull the example expansion.
+
+**Examples-only-in-foreground; persona files split rules ↔ examples.**
+
+`personas/<name>.txt` splits into `personas/<name>-rules.txt` (role + tone rules + mandatory
+shape + forbidden openings) and `personas/<name>-examples.txt` (the example block). The
+existing `PersonaPromptComposer.compose(persona)` (foreground path) loads both. A new
+`PersonaPromptComposer.composeRulesOnly(persona)` loads rules only and is the path called
+from `ObservationGenerator` once persona injection lands. Result: examples never inflate the
+observation call's token budget and the architectural separation between "shape lock-in"
+(needs examples) and "voice carry" (does not) is enforced by which loader the call site
+picks. The §"Why separate storage" rationale generalizes to this split — same reasoning,
+finer grain.
+
+**Goblin-hours addendum becomes persona-aware.**
+
+`foreground/goblin-hours-addendum.txt` flattens persona divergence at exactly the demo
+beat (3am spiral) where the product's voice should be most distinct. Replace with three
+files: `foreground/goblin-hours-witness.txt` (name the hour without commentary),
+`foreground/goblin-hours-hardass.txt` (ask the *one* question that determines whether
+tomorrow gets ruined), `foreground/goblin-hours-editor.txt` (quote one word and ask whether
+it's the 3am word or the daytime word). The anti-pushy invariant from the original
+addendum — short, even-toned, no "go to bed" advice, no time-of-day commentary, no concern
+framing, do not name the hour beyond the Witness exception above — carries to all three
+files. `ForegroundInference.composeSystemPrompt` selects the persona-matched file inside
+the existing `isGoblinHours(startedAt)` branch.
+
+**Observation generator — model-always-runs, deterministic findings as input not
+short-circuit.**
+
+§"Convergence Resolver Contract / Entry observation generation" reads "deterministic string
+assembly when a clean signal exists … or one short model call if deterministic assembly
+produces nothing useful." Operational implementation (`ObservationGenerator.generate`) reads
+the OR as exclusive — if deterministic produces ≥1 observation the model call is skipped.
+That returns canned template strings ("You said you'd do this — flagged: …", "You said \"X\"
+and \"Y\" in the same entry.") forever. Same string, every commitment, every entry.
+
+Reshape: deterministic findings become **evidence** injected into the model prompt's
+`## RESOLVED FIELDS` section (or a new `## DETERMINISTIC FINDINGS` block — implementation
+choice during the work). The model is asked to write the observation lines in the active
+persona's voice, *citing* the evidence the deterministic detectors found. Parser keeps strict
+validation (forbidden-phrase list, evidence-type enum, ≤2 cap). Deterministic strings are
+the **fallback** on parse failure or model-attempt exhaustion, not the happy path.
+
+Latency cost: one model call per entry on the happy path (was: zero when deterministic
+fired, ~3-5 s on E4B GPU per ADR-002 §"Latency budget" measurements when it didn't). The
+call already lives inside the background pass; total per-entry latency increases by the
+delta of "always-run vs sometimes-run", not by a new call. Acceptable trade for the most-
+seen line in the entire app no longer being a template string.
+
+**Persona injection in observation prompt — closes ADR-002 §3 spec gap.**
+
+`ObservationGenerator.generate` accepts `persona: Persona`. `composeModelPrompt` prepends
+`PersonaPromptComposer.composeRulesOnly(persona)` per the rules ↔ examples split above.
+`observations/system.txt` keeps its role + sourced-only constraints; the persona block
+provides the voice. `BackgroundExtractionSaveFlow` (or whichever caller drives the
+generator at Story 2.13's wiring point) threads the entry's recorded persona through.
+Forbidden-phrase post-validation is unchanged.
+
+**Theme-noticing detector — fourth observation kind ships.**
+
+`ObservationEvidence.THEME_NOTICING` is in the enum and listed in `observations/system.txt`
+examples but no code path produces it; the deterministic short-circuit suppresses the model
+call where the model might emit it. Add a deterministic theme-noticing detector to
+`buildDeterministic`: tokenize `entry_text`, strip stopwords + the canonical tag set, count
+remaining noun frequency. If one noun appears ≥3 times in an entry under 200 tokens, emit
+`"This dump is mostly about \"$noun\"."` as a `THEME_NOTICING` observation. Cheap (one
+tokenizer pass, no model call), unlocks the fourth observation kind, and per the
+model-always-runs change above the deterministic finding becomes evidence the persona-voiced
+model call cites — so the user sees a persona-flavored theme-noticing line, not a template.
+
+**Negative-space observation kind — `OBSERVABLE_GAP`.**
+
+New `ObservationEvidence` enum value: `OBSERVABLE_GAP`. The detector enumerates
+canonical-extraction surfaces and emits one observation when a structurally interesting
+null/candidate verdict reveals a gap the user could have closed:
+
+- `state` null + `behavioral` populated → "You named what you did, not what state you were
+  in. Worth one more line."
+- `commitment` non-null + `recurrence_link` null (first-time commitment) → "This is the
+  first time you've logged this commitment. Set a check-in?"
+- Goblin-hours capture timestamp + `state` null → "3am entry, no state word. Tired or
+  wired?"
+
+Each is sourced (from a named null verdict on a named field), each invites a follow-up
+entry. This is the spec-side answer to the "make them want to record something else"
+requirement at the observation layer (the foreground three-beat shape answers the same
+requirement at the follow-up layer; `OBSERVABLE_GAP` answers it at the per-entry observation
+layer where impact lands harder). Per the model-always-runs change, the gap finding is
+evidence the model cites; the `OBSERVABLE_GAP` evidence enum value is what gets persisted.
+
+**Deterministic observation cooldown — generalizes the goblin-hours bonus.**
+
+A user logging the same recurring commitment three days running gets the same
+`commitment-flag` deterministic observation three times today. ADR-003's pattern-callout
+cooldown is per-entry-count and global; mirror it for deterministic observations. New
+singleton settings row `lastDeterministicObservationKind: ObservationEvidence?` +
+`lastDeterministicObservationEntryId: Long?` + `lastDeterministicObservationTimestamp: Long?`
+with a 3-entry cooldown matching the pattern-callout window from ADR-003 §"Cooldown
+(callout-side only, global)". Suppress only the kind that fired; other evidence kinds emit
+freely. Per the model-always-runs change, the cooldown gates the deterministic *finding*
+from being emitted twice in the cooldown window — not the model call itself.
+
+**Shared forbidden-phrase constant — closes prompt ↔ validator drift.**
+
+`observations/system.txt` declares the forbidden-opening list as prose; the validator inside
+`ObservationGenerator.runModelFallback` (today: implicit through the parser's reject path
+on validation violation) enforces another copy. If the two drift the model is told one rule
+and the validator enforces another. Hoist the list into a single Kotlin constant
+(`ObservationVoiceRules.FORBIDDEN_OPENINGS`), render into `observations/system.txt` at
+compose time, validate against the same constant. Same list, single source of truth.
+
+**Persona attribution test fixture.**
+
+JVM unit test loops `core-inference/src/test/resources/persona-attribution/<entry-id>.json`
+fixtures. Each fixture carries `entry_text` + three `expected_shape_signature` regexes
+(one per persona, capturing the mandatory-shape opening clause). Test runs each persona's
+compose against a stub `LiteRtLmEngine` returning a shape-conformant response per persona,
+asserts (a) the three outputs match their persona's regex and (b) do not match the other two.
+Catches shape regressions where Witness drifts toward Editor or Hardass loses its directive
+opener. Locks in the user-stated bar ("a blind reader can attribute output → persona") at
+the unit tier, no on-device cost.
+
+**What does not change.**
+
+- Convergence resolver (lens count, surface count, agreement predicates, verdict types,
+  edge-case 2-of-3 fallback). The STT-D rubric verdict from the sixth addendum is
+  byte-identical pre/post this work — the resolver is not touched.
+- Lens prompts (Literal / Inferential / Skeptical) and the surface modules. AGENTS.md
+  guardrail 9 stays — persona never enters a lens prompt. The `composeRulesOnly` loader is
+  reachable only from `ObservationGenerator`, not from the background lens pipeline.
+- Foreground output schema. `{transcription, follow_up}` is preserved; the three-beat shape
+  lives inside the `follow_up` string, not as new keys.
+- Goblin-hours window definition (`TemplateLabel.GOBLIN_HOURS_LOCAL_HOUR_RANGE`) and the
+  template-labeler post-extraction path.
+- ADR-005's single-turn-per-capture v1 scope. The follow-up still sees only this turn's
+  audio; the three-beat shape works on single-turn input by design (beat b points at
+  *adjacent observable context the user did not record*, not at prior turns).
+
+Implementation queued for post-Phase-4. Story file gets one entry per item above; tracking
+lives in stories, work-decision rationale lives here.
+
 ---
 
 ## Action Items

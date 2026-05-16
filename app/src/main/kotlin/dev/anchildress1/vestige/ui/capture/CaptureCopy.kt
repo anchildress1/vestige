@@ -34,8 +34,8 @@ object CaptureCopy {
     const val STREAK_LABEL: String = "STREAK"
     const val DAY_PREFIX: String = "DAY"
 
-    const val MODEL_LOADING_LINE: String = "Model loading. Typed entries work now."
-    const val MODEL_PAUSED_LINE: String = "Reconnect to Wi-Fi to resume. Typed entries work now."
+    const val MODEL_LOADING_LINE: String = "Model loading. Hang tight."
+    const val MODEL_PAUSED_LINE: String = "Reconnect to Wi-Fi to resume."
     const val MODEL_DOWNLOADING_LINE_FMT: String = "Downloading model · %d%%"
     const val MIC_DENIED_LINE: String = "Mic permission required to record. Settings → Permissions."
     const val MIC_UNAVAILABLE_LINE: String = "Mic unavailable. Try typing."

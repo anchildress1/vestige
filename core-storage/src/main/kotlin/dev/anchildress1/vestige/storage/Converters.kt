@@ -2,6 +2,7 @@ package dev.anchildress1.vestige.storage
 
 import dev.anchildress1.vestige.model.ConfidenceVerdict
 import dev.anchildress1.vestige.model.ExtractionStatus
+import dev.anchildress1.vestige.model.Persona
 import dev.anchildress1.vestige.model.TemplateLabel
 import io.objectbox.converter.PropertyConverter
 
@@ -22,6 +23,14 @@ internal class ExtractionStatusConverter : PropertyConverter<ExtractionStatus, S
             ?: ExtractionStatus.PENDING
 
     override fun convertToDatabaseValue(entityProperty: ExtractionStatus): String = entityProperty.name
+}
+
+internal class PersonaConverter : PropertyConverter<Persona, String> {
+    override fun convertToEntityProperty(databaseValue: String?): Persona =
+        databaseValue?.let { runCatching { Persona.valueOf(it) }.getOrNull() }
+            ?: Persona.WITNESS
+
+    override fun convertToDatabaseValue(entityProperty: Persona): String = entityProperty.name
 }
 
 internal class ConfidenceVerdictConverter : PropertyConverter<ConfidenceVerdict?, String?> {

@@ -45,7 +45,6 @@ import io.objectbox.BoxStore
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -259,6 +258,15 @@ class AppContainer(
         return foregroundInference.runForegroundCall(audio, persona)
     }
 
+    /**
+     * Typed-entry foreground call — same engine + parser as the voice path so a typed entry
+     * reviews identically. The model is required; the capture screen gates on readiness.
+     */
+    suspend fun runForegroundTextCall(text: String, persona: Persona): ForegroundResult {
+        ensureBackgroundEngineInitialized()
+        return foregroundInference.runForegroundTextCall(text, persona)
+    }
+
     val observationGenerator: ObservationGenerator by lazy {
         ObservationGenerator(engine = backgroundEngine)
     }
@@ -349,6 +357,7 @@ class AppContainer(
         timeoutMs: Long? = null,
         persona: Persona = Persona.WITNESS,
         durationMs: Long = 0L,
+        followUpText: String? = null,
     ): SaveOutcome.Pending {
         ensureBackgroundEngineInitialized()
         val outcome = backgroundExtractionSaveFlow.saveAndExtract(
@@ -358,26 +367,10 @@ class AppContainer(
             timeoutMs = timeoutMs,
             persona = persona,
             durationMs = durationMs,
+            followUpText = followUpText,
         )
         launchVectorBackfillIfReady()
         return outcome
-    }
-
-    suspend fun saveTypedEntry(
-        entryText: String,
-        capturedAt: ZonedDateTime,
-        persona: Persona = Persona.WITNESS,
-    ): SaveOutcome.Pending {
-        if (mainModelArtifactLooksPresent()) {
-            // Typed entries carry no audio duration by definition.
-            return saveAndExtract(entryText = entryText, capturedAt = capturedAt, persona = persona, durationMs = 0L)
-        }
-        // Typed entries carry no audio duration. Default 0L is correct — not an omission.
-        val entryId = entryStore.createPendingEntry(entryText, capturedAt.toInstant())
-        reportExtractionStatus(entryId, ExtractionStatus.PENDING)
-        _dataRevision.value += 1
-        val completedJob = Job().also { it.complete() }
-        return SaveOutcome.Pending(entryId, completedJob)
     }
 
     /**

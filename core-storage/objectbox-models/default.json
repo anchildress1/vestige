@@ -5,7 +5,7 @@
   "entities": [
     {
       "id": "1:8495295597095795304",
-      "lastPropertyId": "15:6706098502487978541",
+      "lastPropertyId": "17:8812289933283392122",
       "name": "EntryEntity",
       "properties": [
         {
@@ -89,6 +89,16 @@
           "id": "15:6706098502487978541",
           "name": "durationMs",
           "type": 6
+        },
+        {
+          "id": "16:7565906967393107217",
+          "name": "followUpText",
+          "type": 9
+        },
+        {
+          "id": "17:8812289933283392122",
+          "name": "persona",
+          "type": 9
         }
       ],
       "relations": [

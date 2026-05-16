@@ -10,17 +10,27 @@ class PatternDetailScreenStyleTest {
     fun `intensityToneFor maps each lifecycle state to a visible tone`() {
         assertEquals(IntensityTone.ACTIVE_PEAK, intensityToneFor(PatternState.ACTIVE))
         assertEquals(IntensityTone.SNOOZED, intensityToneFor(PatternState.SNOOZED))
-        assertEquals(IntensityTone.SETTLED, intensityToneFor(PatternState.RESOLVED))
-        assertEquals(IntensityTone.SETTLED, intensityToneFor(PatternState.DISMISSED))
+        assertEquals(IntensityTone.SETTLED, intensityToneFor(PatternState.CLOSED))
+        assertEquals(IntensityTone.SETTLED, intensityToneFor(PatternState.DROPPED))
         assertEquals(IntensityTone.FROZEN, intensityToneFor(PatternState.BELOW_THRESHOLD))
+    }
+
+    @Test
+    fun `intensityToneFor covers every PatternState variant`() {
+        PatternState.entries.forEach { intensityToneFor(it) }
     }
 
     @Test
     fun `cardSectionToneFor keeps non-active sections readable`() {
         assertEquals(IntensityTone.ACTIVE_PEAK, cardSectionToneFor(PatternSection.ACTIVE))
-        assertEquals(IntensityTone.SNOOZED, cardSectionToneFor(PatternSection.SNOOZED))
-        assertEquals(IntensityTone.SETTLED, cardSectionToneFor(PatternSection.RESOLVED))
-        assertEquals(IntensityTone.SETTLED, cardSectionToneFor(PatternSection.DISMISSED))
+        assertEquals(IntensityTone.SNOOZED, cardSectionToneFor(PatternSection.SKIPPED))
+        assertEquals(IntensityTone.SETTLED, cardSectionToneFor(PatternSection.CLOSED))
+        assertEquals(IntensityTone.SETTLED, cardSectionToneFor(PatternSection.DROPPED))
+    }
+
+    @Test
+    fun `cardSectionToneFor covers every PatternSection variant`() {
+        PatternSection.entries.forEach { cardSectionToneFor(it) }
     }
 
     @Test

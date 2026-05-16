@@ -7,26 +7,30 @@ import java.time.Clock
  * Action surface for the Patterns view. Each action funnels through
  * [PatternStore.transitionState] so ADR-003's lifecycle invariants are enforced in one place.
  *
- * `undo = true` re-issues the inverse transition for the action just taken — `dismiss(..., undo
- * = true)` brings a `DISMISSED` row back to `ACTIVE`. v1 only exposes undo through the
- * snackbar that follows the action, so callers re-issue while that affordance is alive; there
- * is no other path out of the terminal states.
+ * User actions are `Drop` / `Skip` (on ACTIVE) and `Restart` (on any non-active visible state)
+ * per `spec-pattern-action-buttons.md` + ADR-003 Addendum 2026-05-13b. The persisted "skip"
+ * state is `SNOOZED` (field `snoozedUntil`) — the user-facing label is "Skip", the state name
+ * stays `SNOOZED` per the ADR. `Mark resolved` was retired: closure is model-detected only
+ * (`pattern-auto-close`), never user-declared.
+ *
+ * `undo = true` re-issues the inverse transition for the action just taken — `drop(..., undo
+ * = true)` brings a `DROPPED` row back to `ACTIVE`. v1 only exposes undo through the snackbar
+ * that follows the action, so callers re-issue while that affordance is alive.
  */
 class PatternRepo(private val store: PatternStore, private val clock: Clock = Clock.systemUTC()) {
 
-    fun dismiss(patternId: String, undo: Boolean = false) {
+    fun drop(patternId: String, undo: Boolean = false) {
         if (undo) {
-            // Forced un-dismiss — `DISMISSED` is normally terminal per ADR-003. The undo path
-            // is the only legal way out and is bounded by the snackbar window the UI exposes.
-            // Refuse to undo a non-dismissed row: a stale snackbar callback firing on a
-            // RESOLVED pattern would otherwise reopen a sticky-terminal row.
-            forceTo(patternId, PatternState.ACTIVE, expectedFrom = PatternState.DISMISSED)
+            // Forced un-drop — `DROPPED` only leaves via the snackbar undo / Restart bypass per
+            // ADR-003. Refuse to undo a non-dropped row: a stale snackbar callback firing on a
+            // CLOSED pattern would otherwise reopen a model-terminal row.
+            forceTo(patternId, PatternState.ACTIVE, expectedFrom = PatternState.DROPPED)
         } else {
-            store.transitionState(patternId, PatternState.DISMISSED)
+            store.transitionState(patternId, PatternState.DROPPED)
         }
     }
 
-    fun snooze(patternId: String, days: Long = DEFAULT_SNOOZE_DAYS, undo: Boolean = false) {
+    fun skip(patternId: String, days: Long = DEFAULT_SKIP_DAYS, undo: Boolean = false) {
         if (undo) {
             // Validator already restricts `SNOOZED → ACTIVE` to legal transitions; add a state
             // precondition so a misrouted snackbar callback can't reopen an ACTIVE-stayed-active
@@ -49,18 +53,9 @@ class PatternRepo(private val store: PatternStore, private val clock: Clock = Cl
     }
 
     /**
-     * Sticky per ADR-003 §"Mark-resolved is sticky for the demo." User-tap path was retired in
-     * the 2026-05-13 lifecycle update (see `spec-pattern-action-buttons.md`); the method survives
-     * as the system-set entry point for v1.5's `pattern-auto-close` (`backlog.md`).
-     */
-    fun markResolved(patternId: String) {
-        store.transitionState(patternId, PatternState.RESOLVED)
-    }
-
-    /**
-     * Restart — moves a non-active pattern (`DISMISSED` / `SNOOZED` / `RESOLVED`) back to
-     * `ACTIVE`. Undo of a Restart restores the exact state snapshot the row had before the
-     * restart, including the original `snoozedUntil` when coming back to `SNOOZED`.
+     * Restart — moves a non-active pattern (`DROPPED` / `SNOOZED` / `CLOSED`) back to `ACTIVE`.
+     * Undo of a Restart restores the exact state snapshot the row had before the restart,
+     * including the original `snoozedUntil` when coming back to `SNOOZED`.
      */
     fun restart(
         patternId: String,
@@ -86,11 +81,12 @@ class PatternRepo(private val store: PatternStore, private val clock: Clock = Cl
     }
 
     /**
-     * Undo bypass — the only legal exit from `DISMISSED` is the snackbar undo. Writes the row
-     * directly rather than routing through [PatternStore.transitionState] so the lifecycle
-     * validator stays strict for every non-undo write. [expectedFrom] is the load-bearing
-     * precondition: the row must currently be in that state, otherwise the bypass would let a
-     * misrouted snackbar callback rewrite a `RESOLVED` (sticky-terminal) row to `ACTIVE`.
+     * Undo / restart bypass — `DROPPED` and `CLOSED` are terminal to the strict validator, so
+     * the only legal exits are the snackbar undo and the Restart action. Writes the row directly
+     * rather than routing through [PatternStore.transitionState] so the lifecycle validator
+     * stays strict for every non-bypass write. [expectedFrom] is the load-bearing precondition:
+     * the row must currently be in that state, otherwise the bypass would let a misrouted
+     * snackbar callback rewrite a `CLOSED` (model-terminal) row to `ACTIVE`.
      */
     private fun forceTo(
         patternId: String,
@@ -113,7 +109,7 @@ class PatternRepo(private val store: PatternStore, private val clock: Clock = Cl
     }
 
     companion object {
-        const val DEFAULT_SNOOZE_DAYS: Long = 7
+        const val DEFAULT_SKIP_DAYS: Long = 7
         private const val MILLIS_PER_DAY: Long = 24L * 60 * 60 * 1000
     }
 }

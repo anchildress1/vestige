@@ -8,6 +8,7 @@ import dev.anchildress1.vestige.storage.EntryStore
 import dev.anchildress1.vestige.storage.PatternEntity
 import dev.anchildress1.vestige.storage.PatternRepo
 import dev.anchildress1.vestige.storage.PatternStore
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.BufferOverflow
@@ -22,9 +23,9 @@ import kotlinx.coroutines.withContext
 import java.time.Clock
 
 /**
- * Drives Story 3.9's Patterns list. Surfaces ACTIVE / SNOOZED / RESOLVED / DISMISSED patterns
- * grouped by status section per `poc/screens-patterns.jsx`. Filter chips that scope the visible
- * sections still ship in Phase 4.
+ * Drives the Patterns list. Surfaces ACTIVE / SKIPPED / CLOSED / DROPPED patterns grouped by
+ * status section per `ux-copy.md` §"Pattern List". Filter chips are P1 — deferred until the
+ * P0 action surface is stable (`spec-pattern-action-buttons.md` §P1.1).
  *
  * Actions delegate to [PatternRepo] so ADR-003 lifecycle invariants stay on one validator.
  * Snackbar undo affordances surface via [events]; the View owns the timeout window.
@@ -61,8 +62,13 @@ class PatternsListViewModel(
         val visible = patternStore.findVisibleSortedByLastSeen()
         when {
             visible.isNotEmpty() -> PatternsListUiState.Loaded(visible.toCards(totalEntries))
-            totalEntries == 0L -> PatternsListUiState.Empty(PatternsListUiState.EmptyReason.NO_ENTRIES)
-            else -> PatternsListUiState.Empty(PatternsListUiState.EmptyReason.NO_PATTERNS)
+
+            // Below the detection threshold the honest copy is "keep recording", not
+            // "nothing repeating" — there has not yet been a detection pass to find anything.
+            totalEntries < PATTERN_SURFACE_MIN_ENTRIES ->
+                PatternsListUiState.Empty(PatternsListUiState.EmptyReason.NO_ENTRIES, totalEntries.toInt())
+
+            else -> PatternsListUiState.Empty(PatternsListUiState.EmptyReason.NO_PATTERNS, totalEntries.toInt())
         }
     }
 
@@ -71,35 +77,37 @@ class PatternsListViewModel(
         return mapNotNull { it.toCardOrNull(totalEntries, asOfMs) }
     }
 
-    fun dismiss(patternId: String) = dispatch(patternId, PatternAction.DISMISSED) {
-        patternRepo.dismiss(patternId)
+    fun drop(patternId: String) = dispatch(patternId, PatternAction.DROP) {
+        patternRepo.drop(patternId)
     }
 
-    fun snooze(patternId: String) = dispatch(patternId, PatternAction.SNOOZED) {
-        patternRepo.snooze(patternId)
-    }
-
-    fun markResolved(patternId: String) = dispatch(patternId, PatternAction.MARKED_RESOLVED) {
-        patternRepo.markResolved(patternId)
+    fun skip(patternId: String) = dispatch(patternId, PatternAction.SKIP) {
+        patternRepo.skip(patternId)
     }
 
     fun restart(patternId: String) {
         viewModelScope.launch {
             val undo = withContext(ioDispatcher) {
-                val current = patternStore.findByPatternId(patternId)
-                    ?: error("PatternsListViewModel: no pattern row for patternId=$patternId")
-                val priorState = current.state
-                val priorSnoozedUntil = current.snoozedUntil
-                patternRepo.restart(patternId)
-                PatternUndo(
-                    patternId = patternId,
-                    action = PatternAction.RESTART,
-                    previousState = priorState,
-                    previousSnoozedUntil = priorSnoozedUntil,
-                )
+                runCatching {
+                    val current = patternStore.findByPatternId(patternId)
+                        ?: error("PatternsListViewModel: no pattern row for patternId=$patternId")
+                    val priorState = current.state
+                    val priorSnoozedUntil = current.snoozedUntil
+                    patternRepo.restart(patternId)
+                    PatternUndo(
+                        patternId = patternId,
+                        action = PatternAction.RESTART,
+                        previousState = priorState,
+                        previousSnoozedUntil = priorSnoozedUntil,
+                    )
+                }.onFailure { t ->
+                    if (t is CancellationException) throw t
+                    Log.e(TAG, "restart failed for $patternId", t)
+                }
+                    .getOrNull()
             }
             _state.value = loadState()
-            _events.emit(PatternActionEvent(patternId, PatternAction.RESTART, undo))
+            if (undo != null) _events.emit(PatternActionEvent(patternId, PatternAction.RESTART, undo))
         }
     }
 
@@ -108,11 +116,9 @@ class PatternsListViewModel(
             withContext(ioDispatcher) {
                 runCatching {
                     when (undo.action) {
-                        PatternAction.DISMISSED -> patternRepo.dismiss(undo.patternId, undo = true)
+                        PatternAction.DROP -> patternRepo.drop(undo.patternId, undo = true)
 
-                        PatternAction.SNOOZED -> patternRepo.snooze(undo.patternId, undo = true)
-
-                        PatternAction.MARKED_RESOLVED -> Unit
+                        PatternAction.SKIP -> patternRepo.skip(undo.patternId, undo = true)
 
                         PatternAction.RESTART -> patternRepo.restart(
                             patternId = undo.patternId,
@@ -122,11 +128,12 @@ class PatternsListViewModel(
                         )
                     }
                 }.onFailure { failure ->
-                    // A stale undo (e.g. snooze→dismiss→tap-undo on the older snooze snackbar)
-                    // routes a SNOOZED→ACTIVE transition through a row already in DISMISSED.
-                    // PatternRepo/PatternStore throw on illegal lifecycle moves per ADR-003;
-                    // ignore the throw so the UI doesn't crash, and the refresh below replays
-                    // the persisted state back onto the list.
+                    if (failure is CancellationException) throw failure
+                    // A stale undo (e.g. skip→drop→tap-undo on the older skip snackbar) routes
+                    // a SNOOZED→ACTIVE transition through a row already in DROPPED. PatternRepo/
+                    // PatternStore throw on illegal lifecycle moves per ADR-003; ignore the
+                    // throw so the UI doesn't crash, and the refresh below replays the
+                    // persisted state back onto the list.
                     Log.w(TAG, "Ignoring stale undo for ${undo.patternId}", failure)
                 }
             }
@@ -139,11 +146,23 @@ class PatternsListViewModel(
     // signature on the lambda and assumes the dispatcher is redundant; that's a shallow read.
     private fun dispatch(patternId: String, action: PatternAction, mutate: suspend () -> Unit) {
         viewModelScope.launch {
-            withContext(ioDispatcher) { mutate() }
+            // A concurrent sweep or double-tap can move the row out of ACTIVE before this lands;
+            // PatternStore then throws on the now-illegal transition. Swallow it, replay
+            // persisted truth, and emit no undo for an action that never took effect.
+            val applied = withContext(ioDispatcher) {
+                runCatching { mutate() }
+                    .onFailure { t ->
+                        if (t is CancellationException) throw t
+                        if (t is IllegalStateException) {
+                            Log.w(TAG, "Pattern $action skipped for $patternId — concurrent transition", t)
+                        } else {
+                            Log.e(TAG, "Pattern $action failed unexpectedly for $patternId", t)
+                        }
+                    }
+                    .isSuccess
+            }
             _state.value = loadState()
-            // markResolved is sticky-terminal per ADR-003; the snackbar surfaces visibility only.
-            val undo = if (action == PatternAction.MARKED_RESOLVED) null else PatternUndo(patternId, action)
-            _events.emit(PatternActionEvent(patternId, action, undo))
+            if (applied) _events.emit(PatternActionEvent(patternId, action, PatternUndo(patternId, action)))
         }
     }
 
@@ -160,10 +179,17 @@ class PatternsListViewModel(
             section = section,
             traceHits = traceBarHitsFromEntries(supportingEntries.toList(), asOfMs),
             availableActions = availableActionsFor(state),
+            backLabel = snoozedUntil
+                ?.takeIf { section == PatternSection.SKIPPED }
+                ?.let { formatShortDate(it) },
         )
     }
 
     private companion object {
         const val TAG = "PatternsListVM"
+
+        // The pattern detector runs once every 10 committed entries; below that there is
+        // nothing for it to have surfaced yet.
+        const val PATTERN_SURFACE_MIN_ENTRIES = 10L
     }
 }

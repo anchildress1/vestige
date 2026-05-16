@@ -79,28 +79,30 @@
 
     <!-- Patterns list + detail surface. Mirrors poc/screens-patterns.jsx + ux-copy.md §"Pattern List / Detail". -->
     <string name="patterns_title">Patterns</string>
-    <string name="patterns_empty_no_entries">Insufficient data.</string>
-    <string name="patterns_empty_no_patterns">Nothing repeating yet.</string>
+    <!-- Empty states per docs/ux-copy.md §"Pattern List / Empty states". `%1$d` = live entry count. -->
+    <string name="patterns_empty_day1_eyebrow">VESTIGES · %1$d ENTRIES · 30 DAYS</string>
+    <string name="patterns_empty_day1_header">Nothing to read yet.</string>
+    <string name="patterns_empty_day1_body">Patterns surface after 10 entries. Keep recording.</string>
+    <string name="patterns_empty_none_header">No repeating pattern detected.</string>
+    <string name="patterns_empty_none_body">The model looked. Nothing came back twice.</string>
     <string name="pattern_detail_seen_in">Seen in:</string>
     <string name="pattern_detail_no_sources">No source entries.</string>
     <string name="pattern_detail_not_found">Pattern not found.</string>
     <string name="pattern_detail_intensity_eyebrow">INTENSITY · 30 DAYS</string>
     <!-- Action labels per docs/ux-copy.md §"Pattern List / Card actions" + spec-pattern-action-buttons.md.
-         User-facing actions on ACTIVE patterns: Drop / Skip. Terminal patterns (DISMISSED /
-         SNOOZED / RESOLVED): Restart only. MARKED_RESOLVED is the system-only "Done" state
-         (`pattern-auto-close`, v1.5). Resource keys retain their legacy `*_dismissed` /
-         `*_snoozed_7_days` / `*_mark_resolved` names until Story 4.8 renames the underlying
-         `PatternAction` enum; values are the spec-locked copy. -->
+         ACTIVE patterns: Drop / Skip. Non-active visible states (SKIPPED / CLOSED / DROPPED):
+         Restart only. Closure is model-detected (v1.5 `pattern-auto-close`) — no user "Done"
+         action exists. Resource keys retain their legacy `*_dismissed` / `*_snoozed_7_days`
+         names; values are the spec-locked copy. -->
     <string name="pattern_action_dismiss">Drop</string>
     <string name="pattern_action_snooze_7_days">Skip</string>
-    <string name="pattern_action_mark_resolved">Done</string>
     <string name="pattern_action_restart">Restart</string>
+    <string name="pattern_card_back_on">Back %1$s.</string>
     <string name="pattern_actions_overflow_description">Pattern actions</string>
     <string name="pattern_back_description">Back</string>
     <string name="pattern_undo">Undo</string>
     <string name="snackbar_dismissed">Dropped.</string>
     <string name="snackbar_snoozed_7_days">Skipped.</string>
-    <string name="snackbar_marked_resolved">Done.</string>
     <string name="snackbar_pattern_back">Pattern is back.</string>
 
     <!-- Patterns list section headers per docs/ux-copy.md §"Pattern List / Section headers". -->
@@ -112,8 +114,9 @@
     <!-- Pattern card source-count + last-seen meta line. Phase 4 can localise the date format. -->
     <string name="pattern_card_meta">%1$d of %2$d entries · Last seen %3$s</string>
 
-    <!-- Pattern detail terminal-state sublines. The `%1$s` slot receives the formatted date. -->
-    <string name="pattern_terminal_resolved">Done %1$s.</string>
+    <!-- Pattern detail terminal-state sublines per docs/ux-copy.md §"Pattern Detail". `%1$s` =
+         formatted date; CLOSED also takes `%2$d` = days since the pattern was last seen. -->
+    <string name="pattern_terminal_resolved">Closed %1$s. No new entries matched in %2$d days.</string>
     <string name="pattern_terminal_dismissed">Dropped %1$s.</string>
 
     <!-- Phase 3 placeholder overflow glyph fallback for the system A11Y description. -->

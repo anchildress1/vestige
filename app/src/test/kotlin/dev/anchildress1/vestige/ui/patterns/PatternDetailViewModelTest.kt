@@ -100,7 +100,7 @@ class PatternDetailViewModelTest {
             assertFalse(loaded.isTerminal)
             assertNull(loaded.terminalLabel)
             assertEquals(
-                setOf(PatternAction.DISMISSED, PatternAction.SNOOZED),
+                setOf(PatternAction.DROP, PatternAction.SKIP),
                 loaded.availableActions,
             )
         }
@@ -119,50 +119,123 @@ class PatternDetailViewModelTest {
     }
 
     @Test
-    fun `markResolved updates state to terminal Loaded`() = runTest(testDispatcher) {
+    fun `drop updates state to terminal Loaded with the closed-versus-dropped label`() = runTest(testDispatcher) {
         val entries = seedEntries(1)
-        seedActivePattern("p-resolve", lastSeenMs = 100L, supporting = entries)
-        val vm = newViewModel("p-resolve")
-        vm.markResolved()
+        seedActivePattern("p-drop-terminal", lastSeenMs = 100L, supporting = entries)
+        val vm = newViewModel("p-drop-terminal")
+        vm.drop()
         vm.state.test {
             val loaded = expectMostRecentItem() as PatternDetailUiState.Loaded
-            assertEquals(PatternState.RESOLVED, loaded.state)
+            assertEquals(PatternState.DROPPED, loaded.state)
             assertTrue(loaded.isTerminal)
             assertNotNull(loaded.terminalLabel)
+            assertEquals(
+                dev.anchildress1.vestige.R.string.pattern_terminal_dismissed,
+                loaded.terminalLabel!!.prefixRes,
+            )
+        }
+        assertEquals(PatternState.DROPPED, patternStore.findByPatternId("p-drop-terminal")?.state)
+    }
+
+    @Test
+    fun `CLOSED pattern loads as terminal with the resolved label and Restart available`() = runTest(testDispatcher) {
+        // CLOSED is model-detected only (v1.5) — seed it directly since no user action makes it.
+        val entries = seedEntries(1)
+        seedActivePattern("p-closed", lastSeenMs = 100L, supporting = entries)
+        patternStore.findByPatternId("p-closed")!!.also {
+            it.state = PatternState.CLOSED
+            patternStore.put(it)
+        }
+        val vm = newViewModel("p-closed")
+        vm.state.test {
+            val loaded = expectMostRecentItem() as PatternDetailUiState.Loaded
+            assertEquals(PatternState.CLOSED, loaded.state)
+            assertTrue(loaded.isTerminal)
             assertEquals(
                 dev.anchildress1.vestige.R.string.pattern_terminal_resolved,
                 loaded.terminalLabel!!.prefixRes,
             )
+            assertNotNull(loaded.terminalLabel!!.days)
+            assertEquals(setOf(PatternAction.RESTART), loaded.availableActions)
         }
-        assertEquals(PatternState.RESOLVED, patternStore.findByPatternId("p-resolve")?.state)
     }
 
     @Test
-    fun `undo on MARKED_RESOLVED is a no-op since the state is sticky-terminal`() = runTest(testDispatcher) {
+    fun `drop on an unknown patternId does not crash, refreshes to NotFound, and emits no event`() =
+        runTest(testDispatcher) {
+            val vm = newViewModel("missing-detail")
+            vm.events.test {
+                vm.drop()
+                // dispatch swallows the missing-row throw; no event for a no-op.
+                expectNoEvents()
+            }
+            vm.state.test {
+                assertEquals(PatternDetailUiState.NotFound, expectMostRecentItem())
+            }
+        }
+
+    @Test
+    fun `skip on an unknown patternId does not crash, refreshes to NotFound, and emits no event`() =
+        runTest(testDispatcher) {
+            val vm = newViewModel("missing-detail")
+            vm.events.test {
+                vm.skip()
+                expectNoEvents()
+            }
+            vm.state.test {
+                assertEquals(PatternDetailUiState.NotFound, expectMostRecentItem())
+            }
+        }
+
+    @Test
+    fun `drop on a row already DROPPED does not crash, emits no event, and stays DROPPED`() = runTest(testDispatcher) {
         val entries = seedEntries(1)
-        seedActivePattern("p-noop-detail", lastSeenMs = 100L, supporting = entries)
-        val vm = newViewModel("p-noop-detail")
-        vm.markResolved()
-        assertEquals(PatternState.RESOLVED, patternStore.findByPatternId("p-noop-detail")?.state)
-        vm.undo(PatternUndo("p-noop-detail", PatternAction.MARKED_RESOLVED))
-        assertEquals(PatternState.RESOLVED, patternStore.findByPatternId("p-noop-detail")?.state)
+        seedActivePattern("p-already-dropped", lastSeenMs = 100L, supporting = entries)
+        patternStore.findByPatternId("p-already-dropped")!!.also {
+            it.state = PatternState.DROPPED
+            patternStore.put(it)
+        }
+        val vm = newViewModel("p-already-dropped")
+        vm.events.test {
+            vm.drop()
+            expectNoEvents()
+        }
+        assertEquals(PatternState.DROPPED, patternStore.findByPatternId("p-already-dropped")?.state)
     }
+
+    @Test
+    fun `skip on a non-ACTIVE row does not crash, emits no event, and leaves state unchanged`() =
+        runTest(testDispatcher) {
+            val entries = seedEntries(1)
+            seedActivePattern("p-snoozed", lastSeenMs = 100L, supporting = entries)
+            patternStore.findByPatternId("p-snoozed")!!.also {
+                it.state = PatternState.SNOOZED
+                it.snoozedUntil = baseClock.millis() + 1_000L
+                patternStore.put(it)
+            }
+            val vm = newViewModel("p-snoozed")
+            vm.events.test {
+                vm.skip()
+                expectNoEvents()
+            }
+            assertEquals(PatternState.SNOOZED, patternStore.findByPatternId("p-snoozed")?.state)
+        }
 
     @Test
     fun `undo on a stale state logs and refreshes without crashing`() = runTest(testDispatcher) {
         val entries = seedEntries(1)
         seedActivePattern("p-stale", lastSeenMs = 100L, supporting = entries)
         val vm = newViewModel("p-stale")
-        // Snooze then dismiss in quick succession — state is now DISMISSED.
-        vm.snooze()
+        // Skip then drop in quick succession — state is now DROPPED.
+        vm.skip()
         assertEquals(PatternState.SNOOZED, patternStore.findByPatternId("p-stale")?.state)
-        vm.dismiss()
-        assertEquals(PatternState.DISMISSED, patternStore.findByPatternId("p-stale")?.state)
-        // Tap-undo on the older SNOOZED snackbar — PatternRepo.snooze(undo=true) requires SNOOZED,
-        // but the row is DISMISSED → throws. runCatching must swallow it.
-        vm.undo(PatternUndo("p-stale", PatternAction.SNOOZED))
+        vm.drop()
+        assertEquals(PatternState.DROPPED, patternStore.findByPatternId("p-stale")?.state)
+        // Tap-undo on the older SKIP snackbar — PatternRepo.skip(undo=true) requires SNOOZED,
+        // but the row is DROPPED → throws. runCatching must swallow it.
+        vm.undo(PatternUndo("p-stale", PatternAction.SKIP))
         // State unchanged; VM didn't crash.
-        assertEquals(PatternState.DISMISSED, patternStore.findByPatternId("p-stale")?.state)
+        assertEquals(PatternState.DROPPED, patternStore.findByPatternId("p-stale")?.state)
         vm.state.test {
             val loaded = expectMostRecentItem() as PatternDetailUiState.Loaded
             assertTrue(loaded.isTerminal)
@@ -170,27 +243,27 @@ class PatternDetailViewModelTest {
     }
 
     @Test
-    fun `dismiss emits undo event and undo restores ACTIVE state`() = runTest(testDispatcher) {
+    fun `drop emits undo event and undo restores ACTIVE state`() = runTest(testDispatcher) {
         val entries = seedEntries(1)
-        seedActivePattern("p-dismiss-undo", lastSeenMs = 100L, supporting = entries)
-        val vm = newViewModel("p-dismiss-undo")
+        seedActivePattern("p-drop-undo", lastSeenMs = 100L, supporting = entries)
+        val vm = newViewModel("p-drop-undo")
         vm.events.test {
-            vm.dismiss()
+            vm.drop()
             val event = awaitItem()
-            assertEquals(PatternAction.DISMISSED, event.action)
-            assertEquals("p-dismiss-undo", event.patternId)
+            assertEquals(PatternAction.DROP, event.action)
+            assertEquals("p-drop-undo", event.patternId)
             assertNotNull(event.undo)
             vm.undo(event.undo!!)
         }
-        assertEquals(PatternState.ACTIVE, patternStore.findByPatternId("p-dismiss-undo")?.state)
+        assertEquals(PatternState.ACTIVE, patternStore.findByPatternId("p-drop-undo")?.state)
     }
 
     @Test
-    fun `dismiss surfaces a Dismissed terminal label`() = runTest(testDispatcher) {
+    fun `drop surfaces a Dropped terminal label`() = runTest(testDispatcher) {
         val entries = seedEntries(1)
-        seedActivePattern("p-dismiss", lastSeenMs = 100L, supporting = entries)
-        val vm = newViewModel("p-dismiss")
-        vm.dismiss()
+        seedActivePattern("p-drop", lastSeenMs = 100L, supporting = entries)
+        val vm = newViewModel("p-drop")
+        vm.drop()
         vm.state.test {
             val loaded = expectMostRecentItem() as PatternDetailUiState.Loaded
             assertTrue(loaded.isTerminal)
@@ -199,15 +272,15 @@ class PatternDetailViewModelTest {
                 loaded.terminalLabel!!.prefixRes,
             )
         }
-        assertEquals(PatternState.DISMISSED, patternStore.findByPatternId("p-dismiss")?.state)
+        assertEquals(PatternState.DROPPED, patternStore.findByPatternId("p-drop")?.state)
     }
 
     @Test
-    fun `snooze leaves the detail in a non-terminal Loaded state`() = runTest(testDispatcher) {
+    fun `skip leaves the detail in a non-terminal Loaded state`() = runTest(testDispatcher) {
         val entries = seedEntries(1)
-        seedActivePattern("p-snooze", lastSeenMs = 100L, supporting = entries)
-        val vm = newViewModel("p-snooze")
-        vm.snooze()
+        seedActivePattern("p-skip", lastSeenMs = 100L, supporting = entries)
+        val vm = newViewModel("p-skip")
+        vm.skip()
         vm.state.test {
             val loaded = expectMostRecentItem() as PatternDetailUiState.Loaded
             assertEquals(PatternState.SNOOZED, loaded.state)
@@ -215,7 +288,7 @@ class PatternDetailViewModelTest {
             assertEquals(null, loaded.terminalLabel)
             assertEquals(setOf(PatternAction.RESTART), loaded.availableActions)
         }
-        assertEquals(PatternState.SNOOZED, patternStore.findByPatternId("p-snooze")?.state)
+        assertEquals(PatternState.SNOOZED, patternStore.findByPatternId("p-skip")?.state)
     }
 
     @Test
@@ -223,7 +296,7 @@ class PatternDetailViewModelTest {
         val entries = seedEntries(1)
         seedActivePattern("p-restart-snooze-detail", lastSeenMs = 100L, supporting = entries)
         val vm = newViewModel("p-restart-snooze-detail")
-        vm.snooze()
+        vm.skip()
         val originalSnoozedUntil = patternStore.findByPatternId("p-restart-snooze-detail")?.snoozedUntil
         assertNotNull(originalSnoozedUntil)
 

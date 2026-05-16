@@ -1,5 +1,6 @@
 package dev.anchildress1.vestige.storage
 
+import android.util.Log
 import dev.anchildress1.vestige.model.PatternState
 import io.objectbox.BoxStore
 import io.objectbox.kotlin.boxFor
@@ -8,7 +9,8 @@ import java.time.Clock
 
 /**
  * Persistence + lifecycle owner for `PatternEntity`. Enforces ADR-003 §"Lifecycle & state
- * transitions" — illegal transitions throw, terminal states stick.
+ * transitions" (as amended 2026-05-13 / 2026-05-13b) — illegal transitions throw, the `DROPPED`
+ * and `CLOSED` terminals only leave via the [PatternRepo] undo/restart bypass.
  *
  * Read paths are public; write paths funnel through [transitionState] so detection / repo /
  * re-eval share one validator.
@@ -37,10 +39,16 @@ class PatternStore(private val boxStore: BoxStore, private val clock: Clock = Cl
     /** ACTIVE rows ordered most-recently-seen first — drives the Patterns list card order. */
     fun findActiveSortedByLastSeen(): List<PatternEntity> = findActive().sortedByDescending { it.lastSeenTimestamp }
 
+    /** Indexed lookup of `SNOOZED` rows — drives the cold-start skip wake-up sweep. */
+    fun findSnoozed(): List<PatternEntity> = box.query()
+        .equal(PatternEntity_.state, PatternState.SNOOZED.serial, QueryBuilder.StringOrder.CASE_SENSITIVE)
+        .build()
+        .use { it.find() }
+
     /**
-     * All rows the Patterns list surfaces — ACTIVE / SNOOZED / RESOLVED / DISMISSED, ordered
+     * All rows the Patterns list surfaces — ACTIVE / SNOOZED / CLOSED / DROPPED, ordered
      * most-recently-seen first. BELOW_THRESHOLD is an internal-only state per ADR-003 and stays
-     * hidden. Callers slice by [PatternEntity.state] to render the POC's status sections.
+     * hidden. Callers slice by [PatternEntity.state] to render the status sections.
      */
     fun findVisibleSortedByLastSeen(): List<PatternEntity> = box.all
         .asSequence()
@@ -51,8 +59,29 @@ class PatternStore(private val boxStore: BoxStore, private val clock: Clock = Cl
     fun put(entity: PatternEntity): Long = box.put(entity)
 
     /**
+     * Cold-start skip wake-up per `spec-pattern-action-buttons.md` §P0.5 / ADR-003 Addendum
+     * 2026-05-13. Promotes every `SNOOZED` row whose `snoozedUntil` has elapsed back to `ACTIVE`
+     * (clearing `snoozedUntil`). A simple date check on load — not a WorkManager job. Returns the
+     * promoted `patternId`s for logging / tests.
+     */
+    fun promoteExpiredSkips(): List<String> {
+        val nowMs = clock.millis()
+        return findSnoozed()
+            .filter { row -> row.snoozedUntil?.let { it <= nowMs } == true }
+            .mapNotNull { row ->
+                // One row losing its SNOOZED state to a concurrent writer between the query and
+                // here must not strand the rest of the expired cohort — promote per row.
+                runCatching { transitionState(row.patternId, PatternState.ACTIVE).patternId }
+                    .onFailure { t ->
+                        Log.w(TAG, "promoteExpiredSkips: skipped ${row.patternId} (${t::class.simpleName})", t)
+                    }
+                    .getOrNull()
+            }
+    }
+
+    /**
      * Apply a state transition. Throws [IllegalStateException] when the transition is rejected by
-     * ADR-003 — callers handle one-off promotions (e.g. snoozed→active on cooldown expiry) via
+     * ADR-003 — callers handle one-off promotions (e.g. snoozed→active on skip-window expiry) via
      * the same hook so the validator stays in one place.
      */
     fun transitionState(patternId: String, target: PatternState, snoozedUntilMs: Long? = null): PatternEntity {
@@ -81,20 +110,24 @@ class PatternStore(private val boxStore: BoxStore, private val clock: Clock = Cl
 
         PatternState.BELOW_THRESHOLD -> to == PatternState.ACTIVE
 
-        // Terminal — dismiss and resolved have no transitions out in v1 per ADR-003.
-        PatternState.DISMISSED, PatternState.RESOLVED -> false
+        // DROPPED / CLOSED only leave via the PatternRepo undo/restart bypass per ADR-003
+        // Addendum 2026-05-13b — the strict validator still rejects them so every non-bypass
+        // write stays honest.
+        PatternState.DROPPED, PatternState.CLOSED -> false
     }
 
     private companion object {
+        const val TAG = "PatternStore"
+
+        // CLOSED has no inbound path through the validator — pattern-auto-close writes it directly via the bypass.
         val ACTIVE_OUT = setOf(
-            PatternState.DISMISSED,
+            PatternState.DROPPED,
             PatternState.SNOOZED,
-            PatternState.RESOLVED,
             PatternState.BELOW_THRESHOLD,
         )
         val SNOOZED_OUT = setOf(
             PatternState.ACTIVE,
-            PatternState.DISMISSED,
+            PatternState.DROPPED,
         )
     }
 }

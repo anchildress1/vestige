@@ -31,11 +31,15 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import dev.anchildress1.vestige.R
 import dev.anchildress1.vestige.ui.components.VestigeListCard
@@ -43,6 +47,9 @@ import dev.anchildress1.vestige.ui.components.VestigeListCardInteraction
 import dev.anchildress1.vestige.ui.components.VestigeScaffold
 import dev.anchildress1.vestige.ui.components.limeLeftRuleForActive
 import dev.anchildress1.vestige.ui.theme.VestigeTheme
+
+// Dropped cards stay legible but de-prioritized per spec-pattern-action-buttons.md §Visual.
+private const val DROPPED_CARD_ALPHA = 0.6f
 
 @OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
@@ -55,25 +62,24 @@ fun PatternsListScreen(
     val snackbarHostState = remember { SnackbarHostState() }
 
     // Pre-resolve copy at composition so the LaunchedEffect's non-composable scope can use it.
-    val dismissedMessage = stringResource(R.string.snackbar_dismissed)
-    val snoozedMessage = stringResource(R.string.snackbar_snoozed_7_days)
-    val resolvedMessage = stringResource(R.string.snackbar_marked_resolved)
+    val droppedMessage = stringResource(R.string.snackbar_dismissed)
+    val skippedMessage = stringResource(R.string.snackbar_snoozed_7_days)
     val restartMessage = stringResource(R.string.snackbar_pattern_back)
     val undoLabel = stringResource(R.string.pattern_undo)
 
-    LaunchedEffect(viewModel, dismissedMessage, snoozedMessage, resolvedMessage, restartMessage, undoLabel) {
+    LaunchedEffect(viewModel, droppedMessage, skippedMessage, restartMessage, undoLabel) {
         viewModel.events.collect { event ->
             val message = when (event.action) {
-                PatternAction.DISMISSED -> dismissedMessage
-                PatternAction.SNOOZED -> snoozedMessage
-                PatternAction.MARKED_RESOLVED -> resolvedMessage
+                PatternAction.DROP -> droppedMessage
+                PatternAction.SKIP -> skippedMessage
                 PatternAction.RESTART -> restartMessage
             }
-            // Long ≈ 10s — Story 3.8 wants the undo affordance alive for ≥5s.
+            // Standard Material short-snackbar duration (~4s) — the undo affordance lifetime.
+            // CLOSED is model-detected — no action event is emitted, so the snackbar stays silent.
             val result = snackbarHostState.showSnackbar(
                 message = message,
                 actionLabel = if (event.undo != null) undoLabel else null,
-                duration = SnackbarDuration.Long,
+                duration = SnackbarDuration.Short,
             )
             if (result == SnackbarResult.ActionPerformed && event.undo != null) {
                 viewModel.undo(event.undo)
@@ -91,9 +97,8 @@ fun PatternsListScreen(
             padding = padding,
             onCardClick = onOpenPattern,
             actions = PatternActionCallbacks(
-                onDismiss = viewModel::dismiss,
-                onSnooze = viewModel::snooze,
-                onMarkResolved = viewModel::markResolved,
+                onDrop = viewModel::drop,
+                onSkip = viewModel::skip,
                 onRestart = viewModel::restart,
             ),
         )
@@ -110,7 +115,7 @@ private fun PatternsListBody(
     when (state) {
         PatternsListUiState.Loading -> Unit
 
-        is PatternsListUiState.Empty -> EmptyState(state.reason, Modifier.padding(padding))
+        is PatternsListUiState.Empty -> EmptyState(state, Modifier.padding(padding))
 
         is PatternsListUiState.Loaded -> LazyColumn(
             modifier = Modifier
@@ -119,7 +124,8 @@ private fun PatternsListBody(
             contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            // Group cards into the POC's four sections; preserve last-seen ordering within each.
+            // Section order is the PatternSection declaration order per spec §P0.4:
+            // ACTIVE → SKIPPED → CLOSED → DROPPED. Empty sections render no header.
             val grouped = state.cards.groupBy { it.section }
             PatternSection.entries.forEach { section ->
                 val cards = grouped[section].orEmpty()
@@ -131,9 +137,8 @@ private fun PatternsListBody(
                     PatternCard(
                         card = card,
                         onClick = { onCardClick(card.patternId) },
-                        onDismiss = { actions.onDismiss(card.patternId) },
-                        onSnooze = { actions.onSnooze(card.patternId) },
-                        onMarkResolved = { actions.onMarkResolved(card.patternId) },
+                        onDrop = { actions.onDrop(card.patternId) },
+                        onSkip = { actions.onSkip(card.patternId) },
                         onRestart = { actions.onRestart(card.patternId) },
                     )
                 }
@@ -155,13 +160,47 @@ private fun SectionHeader(section: PatternSection) {
 }
 
 @Composable
-private fun EmptyState(reason: PatternsListUiState.EmptyReason, modifier: Modifier = Modifier) {
-    Box(modifier = modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-        Text(
-            text = stringResource(emptyStateCopyRes(reason)),
-            style = MaterialTheme.typography.bodyLarge,
-            color = VestigeTheme.colors.dim,
-        )
+private fun EmptyState(empty: PatternsListUiState.Empty, modifier: Modifier = Modifier) {
+    val copy = emptyCopyFor(empty.reason)
+    val eyebrow = copy.eyebrowRes?.let { stringResource(it, empty.entryCount) }
+    val header = stringResource(copy.headerRes)
+    val body = stringResource(copy.bodyRes)
+    // Status band per AGENTS.md: announced politely, no click action, single merged description.
+    val description = listOfNotNull(eyebrow, header, body).joinToString(" ")
+    Box(
+        modifier = modifier
+            .fillMaxSize()
+            .semantics(mergeDescendants = true) {
+                liveRegion = LiveRegionMode.Polite
+                contentDescription = description
+            },
+        contentAlignment = Alignment.Center,
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            eyebrow?.let {
+                Text(
+                    text = it,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = VestigeTheme.colors.dim,
+                    textAlign = TextAlign.Center,
+                )
+            }
+            Text(
+                text = header,
+                style = MaterialTheme.typography.titleMedium,
+                color = VestigeTheme.colors.ink,
+                textAlign = TextAlign.Center,
+            )
+            Text(
+                text = body,
+                style = MaterialTheme.typography.bodyMedium,
+                color = VestigeTheme.colors.dim,
+                textAlign = TextAlign.Center,
+            )
+        }
     }
 }
 
@@ -170,17 +209,19 @@ private fun EmptyState(reason: PatternsListUiState.EmptyReason, modifier: Modifi
 private fun PatternCard(
     card: PatternCardUi,
     onClick: () -> Unit,
-    onDismiss: () -> Unit,
-    onSnooze: () -> Unit,
-    onMarkResolved: () -> Unit,
+    onDrop: () -> Unit,
+    onSkip: () -> Unit,
     onRestart: () -> Unit,
 ) {
+    val cardAlpha = if (card.section == PatternSection.DROPPED) DROPPED_CARD_ALPHA else 1f
+    val backDescription = card.backLabel?.let { stringResource(R.string.pattern_card_back_on, it) }
     VestigeListCard(
         modifier = Modifier
             .fillMaxWidth()
+            .alpha(cardAlpha)
             .semantics {
                 role = Role.Button
-                contentDescription = "${card.title}. ${card.observation}"
+                contentDescription = listOfNotNull(card.title, card.observation, backDescription).joinToString(". ")
             },
         interaction = VestigeListCardInteraction.Click(onClick = onClick),
         accentModifier = if (card.section == PatternSection.ACTIVE) {
@@ -212,8 +253,6 @@ private fun PatternCard(
                     peak = traceBarStyle.peak,
                 )
                 Spacer(modifier = Modifier.height(2.dp))
-                // POC card meta is a single eyebrow line — no "Seen in:" label. (Two-eyebrow
-                // SpaceBetween treatment is Phase 4 polish.)
                 Text(
                     text = stringResource(
                         R.string.pattern_card_meta,
@@ -224,12 +263,18 @@ private fun PatternCard(
                     style = MaterialTheme.typography.bodySmall,
                     color = VestigeTheme.colors.dim,
                 )
+                card.backLabel?.let { back ->
+                    Text(
+                        text = stringResource(R.string.pattern_card_back_on, back),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = VestigeTheme.colors.dim,
+                    )
+                }
             }
             OverflowMenu(
                 availableActions = card.availableActions,
-                onDismiss = onDismiss,
-                onSnooze = onSnooze,
-                onMarkResolved = onMarkResolved,
+                onDrop = onDrop,
+                onSkip = onSkip,
                 onRestart = onRestart,
             )
         }
@@ -237,12 +282,10 @@ private fun PatternCard(
 }
 
 @Composable
-@Suppress("LongParameterList") // primitive UI dispatch — one callback per action.
 private fun OverflowMenu(
     availableActions: Set<PatternAction>,
-    onDismiss: () -> Unit,
-    onSnooze: () -> Unit,
-    onMarkResolved: () -> Unit,
+    onDrop: () -> Unit,
+    onSkip: () -> Unit,
     onRestart: () -> Unit,
 ) {
     if (availableActions.isEmpty()) return
@@ -256,30 +299,21 @@ private fun OverflowMenu(
             Text(text = stringResource(R.string.pattern_overflow_glyph), style = MaterialTheme.typography.titleLarge)
         }
         DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
-            if (PatternAction.DISMISSED in availableActions) {
+            if (PatternAction.DROP in availableActions) {
                 DropdownMenuItem(
                     text = { Text(stringResource(R.string.pattern_action_dismiss)) },
                     onClick = {
                         expanded = false
-                        onDismiss()
+                        onDrop()
                     },
                 )
             }
-            if (PatternAction.SNOOZED in availableActions) {
+            if (PatternAction.SKIP in availableActions) {
                 DropdownMenuItem(
                     text = { Text(stringResource(R.string.pattern_action_snooze_7_days)) },
                     onClick = {
                         expanded = false
-                        onSnooze()
-                    },
-                )
-            }
-            if (PatternAction.MARKED_RESOLVED in availableActions) {
-                DropdownMenuItem(
-                    text = { Text(stringResource(R.string.pattern_action_mark_resolved)) },
-                    onClick = {
-                        expanded = false
-                        onMarkResolved()
+                        onSkip()
                     },
                 )
             }
@@ -313,17 +347,13 @@ private fun PatternsListPreview() {
                         lastSeenLabel = "May 7",
                         section = PatternSection.ACTIVE,
                         traceHits = PREVIEW_TRACE_HITS,
-                        availableActions = setOf(
-                            PatternAction.DISMISSED,
-                            PatternAction.SNOOZED,
-                            PatternAction.MARKED_RESOLVED,
-                        ),
+                        availableActions = setOf(PatternAction.DROP, PatternAction.SKIP),
                     ),
                 ),
             ),
             padding = PaddingValues(0.dp),
             onCardClick = {},
-            actions = PatternActionCallbacks(onDismiss = {}, onSnooze = {}, onMarkResolved = {}, onRestart = {}),
+            actions = PatternActionCallbacks(onDrop = {}, onSkip = {}, onRestart = {}),
         )
     }
 }

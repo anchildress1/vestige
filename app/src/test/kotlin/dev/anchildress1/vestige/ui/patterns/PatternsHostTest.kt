@@ -25,6 +25,7 @@ import dev.anchildress1.vestige.testing.newModuleTempRoot
 import dev.anchildress1.vestige.testing.openInMemoryBoxStore
 import dev.anchildress1.vestige.ui.history.EntryDetailCopy
 import io.objectbox.BoxStore
+import kotlinx.coroutines.flow.MutableStateFlow
 import org.junit.After
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -54,6 +55,7 @@ class PatternsHostTest {
     private lateinit var entryStore: EntryStore
     private lateinit var patternStore: PatternStore
     private lateinit var patternRepo: PatternRepo
+    private lateinit var dataRevision: MutableStateFlow<Long>
 
     @Before
     fun setUp() {
@@ -67,6 +69,7 @@ class PatternsHostTest {
         )
         patternStore = PatternStore(boxStore)
         patternRepo = PatternRepo(patternStore)
+        dataRevision = MutableStateFlow(0L)
     }
 
     @After
@@ -86,6 +89,7 @@ class PatternsHostTest {
                 patternRepo = patternRepo,
                 entryStore = entryStore,
                 zoneId = ZoneOffset.UTC,
+                dataRevision = dataRevision,
             )
         }
 
@@ -116,6 +120,7 @@ class PatternsHostTest {
                 patternRepo = patternRepo,
                 entryStore = entryStore,
                 zoneId = ZoneOffset.UTC,
+                dataRevision = dataRevision,
                 onExit = { exited = true },
             )
         }
@@ -144,6 +149,7 @@ class PatternsHostTest {
                 patternRepo = patternRepo,
                 entryStore = entryStore,
                 zoneId = ZoneOffset.UTC,
+                dataRevision = dataRevision,
                 onExit = { exited = true },
             )
         }
@@ -153,6 +159,39 @@ class PatternsHostTest {
         }
         composeRule.waitForIdle()
         assertTrue("onExit should fire when back is pressed at list level", exited)
+    }
+
+    @Test
+    fun `data revision refreshes an open detail screen after an external state change`() {
+        val supporting = listOf(seedEntry("crashed after standup"))
+        seedSkippedPattern("p-host-refresh", "Tuesday Meetings", "Aftermath", "Callout.", supporting)
+
+        composeRule.activity.setContent {
+            PatternsHost(
+                patternStore = patternStore,
+                patternRepo = patternRepo,
+                entryStore = entryStore,
+                zoneId = ZoneOffset.UTC,
+                dataRevision = dataRevision,
+            )
+        }
+
+        composeRule.onNodeWithText("Tuesday Meetings").performClick()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithText("Restart").performScrollTo().assertIsDisplayed()
+
+        composeRule.runOnIdle {
+            patternStore.findByPatternId("p-host-refresh")!!.also {
+                it.state = PatternState.ACTIVE
+                it.snoozedUntil = null
+                patternStore.put(it)
+            }
+            dataRevision.value += 1
+        }
+        composeRule.waitForIdle()
+
+        composeRule.onNodeWithText("Drop").performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithText("Skip").performScrollTo().assertIsDisplayed()
     }
 
     private fun seedEntry(text: String): EntryEntity {
@@ -190,6 +229,17 @@ class PatternsHostTest {
             ?: error("pattern not persisted: $patternId")
         saved.supportingEntries.addAll(supporting)
         boxStore.boxFor(PatternEntity::class.java).put(saved)
+    }
+
+    private fun seedSkippedPattern(
+        patternId: String,
+        title: String,
+        templateLabel: String,
+        callout: String,
+        supporting: List<EntryEntity>,
+    ) {
+        seedActivePattern(patternId, title, templateLabel, callout, supporting)
+        patternRepo.skip(patternId)
     }
 
     private companion object {

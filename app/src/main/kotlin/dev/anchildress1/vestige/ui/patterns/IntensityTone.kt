@@ -23,14 +23,14 @@ internal enum class IntensityTone(val peak: Boolean) {
 internal fun intensityToneFor(state: PatternState): IntensityTone = when (state) {
     PatternState.ACTIVE -> IntensityTone.ACTIVE_PEAK
     PatternState.SNOOZED -> IntensityTone.SNOOZED
-    PatternState.RESOLVED, PatternState.DISMISSED -> IntensityTone.SETTLED
+    PatternState.CLOSED, PatternState.DROPPED -> IntensityTone.SETTLED
     PatternState.BELOW_THRESHOLD -> IntensityTone.FROZEN
 }
 
 internal fun cardSectionToneFor(section: PatternSection): IntensityTone = when (section) {
     PatternSection.ACTIVE -> IntensityTone.ACTIVE_PEAK
-    PatternSection.SNOOZED -> IntensityTone.SNOOZED
-    PatternSection.RESOLVED, PatternSection.DISMISSED -> IntensityTone.SETTLED
+    PatternSection.SKIPPED -> IntensityTone.SNOOZED
+    PatternSection.CLOSED, PatternSection.DROPPED -> IntensityTone.SETTLED
 }
 
 @Composable

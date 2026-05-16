@@ -330,6 +330,28 @@ class AppContainer(
         // `tryReserveCallout` and `settleReservedCallout` would otherwise survive into the next
         // launch and wedge every future save with `BLOCKED_BY_PENDING_RESERVATION`.
         calloutCooldownStore.clearStalePendingReservation()
+        // Cold-start skip wake-up runs before any Pattern surface composes, so an expired
+        // skip never flashes under SKIPPED on the first frame (spec §"Open Questions" Q2).
+        sweepExpiredSkips()
+    }
+
+    /**
+     * Promote every `SNOOZED` pattern whose skip window has elapsed back to `ACTIVE` per
+     * `spec-pattern-action-buttons.md` §P0.5. Cheap indexed query + a few puts — a simple date
+     * check on load, not a WorkManager job. Also re-run on `ON_RESUME` for windows that elapse
+     * while the app is backgrounded.
+     */
+    fun sweepExpiredSkips() {
+        runCatching { patternStore.promoteExpiredSkips() }
+            .onSuccess { promoted ->
+                if (promoted.isNotEmpty()) {
+                    _dataRevision.value += 1
+                    Log.i(TAG, "Skip wake-up promoted ${promoted.size} pattern(s)")
+                }
+            }
+            // Self-healing: the next ON_RESUME re-runs the sweep, so a transient failure here
+            // is a warning, not an error — keeping it error-tier would devalue real alerts.
+            .onFailure { Log.w(TAG, "Skip wake-up sweep failed", it) }
     }
 
     fun reportExtractionStatus(entryId: Long, status: ExtractionStatus) {

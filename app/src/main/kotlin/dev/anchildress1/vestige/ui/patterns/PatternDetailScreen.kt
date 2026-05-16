@@ -32,8 +32,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
@@ -58,24 +60,23 @@ fun PatternDetailScreen(
     val state by viewModel.state.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
 
-    val dismissedMessage = stringResource(R.string.snackbar_dismissed)
-    val snoozedMessage = stringResource(R.string.snackbar_snoozed_7_days)
-    val resolvedMessage = stringResource(R.string.snackbar_marked_resolved)
+    val droppedMessage = stringResource(R.string.snackbar_dismissed)
+    val skippedMessage = stringResource(R.string.snackbar_snoozed_7_days)
     val restartMessage = stringResource(R.string.snackbar_pattern_back)
     val undoLabel = stringResource(R.string.pattern_undo)
 
-    LaunchedEffect(viewModel, dismissedMessage, snoozedMessage, resolvedMessage, restartMessage, undoLabel) {
+    LaunchedEffect(viewModel, droppedMessage, skippedMessage, restartMessage, undoLabel) {
         viewModel.events.collect { event ->
             val message = when (event.action) {
-                PatternAction.DISMISSED -> dismissedMessage
-                PatternAction.SNOOZED -> snoozedMessage
-                PatternAction.MARKED_RESOLVED -> resolvedMessage
+                PatternAction.DROP -> droppedMessage
+                PatternAction.SKIP -> skippedMessage
                 PatternAction.RESTART -> restartMessage
             }
+            // Standard Material short-snackbar duration (~4s) — the undo affordance lifetime.
             val result = snackbarHostState.showSnackbar(
                 message = message,
                 actionLabel = if (event.undo != null) undoLabel else null,
-                duration = SnackbarDuration.Long,
+                duration = SnackbarDuration.Short,
             )
             if (result == SnackbarResult.ActionPerformed && event.undo != null) {
                 viewModel.undo(event.undo)
@@ -109,9 +110,8 @@ fun PatternDetailScreen(
             padding = padding,
             onOpenEntry = onOpenEntry,
             actions = PatternActionCallbacks(
-                onDismiss = { viewModel.dismiss() },
-                onSnooze = { viewModel.snooze() },
-                onMarkResolved = { viewModel.markResolved() },
+                onDrop = { viewModel.drop() },
+                onSkip = { viewModel.skip() },
                 onRestart = { viewModel.restart() },
             ),
         )
@@ -172,14 +172,23 @@ private fun LoadedBody(
         PatternSourcesCard(sources = loaded.sources, onOpenEntry = onOpenEntry)
 
         loaded.terminalLabel?.let { terminal ->
+            val text = terminal.days
+                ?.let { stringResource(terminal.prefixRes, terminal.dateLabel, it) }
+                ?: stringResource(terminal.prefixRes, terminal.dateLabel)
             Text(
-                text = stringResource(terminal.prefixRes, terminal.dateLabel),
+                text = text,
                 style = MaterialTheme.typography.bodyMedium,
                 color = VestigeTheme.colors.dim,
+                // Status band per AGENTS.md: announced politely, no click action.
+                modifier = Modifier.semantics {
+                    liveRegion = LiveRegionMode.Polite
+                    contentDescription = text
+                },
             )
         }
 
-        if (loaded.availableActions.isNotEmpty()) {
+        // CLOSED is model-detected — the terminal banner replaces the action row. DROPPED keeps Restart.
+        if (loaded.availableActions.isNotEmpty() && loaded.state != PatternState.CLOSED) {
             ActionRow(availableActions = loaded.availableActions, actions = actions)
         }
     }
@@ -291,31 +300,22 @@ private fun ActionRow(availableActions: Set<PatternAction>, actions: PatternActi
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        if (PatternAction.DISMISSED in availableActions) {
+        if (PatternAction.DROP in availableActions) {
             OutlinedButton(
-                onClick = { actions.onDismiss(Unit) },
+                onClick = { actions.onDrop(Unit) },
                 modifier = Modifier.weight(1f),
                 contentPadding = padding,
             ) {
                 ActionButtonLabel(stringResource(R.string.pattern_action_dismiss))
             }
         }
-        if (PatternAction.SNOOZED in availableActions) {
+        if (PatternAction.SKIP in availableActions) {
             OutlinedButton(
-                onClick = { actions.onSnooze(Unit) },
+                onClick = { actions.onSkip(Unit) },
                 modifier = Modifier.weight(1f),
                 contentPadding = padding,
             ) {
                 ActionButtonLabel(stringResource(R.string.pattern_action_snooze_7_days))
-            }
-        }
-        if (PatternAction.MARKED_RESOLVED in availableActions) {
-            OutlinedButton(
-                onClick = { actions.onMarkResolved(Unit) },
-                modifier = Modifier.weight(1f),
-                contentPadding = padding,
-            ) {
-                ActionButtonLabel(stringResource(R.string.pattern_action_mark_resolved))
             }
         }
         if (PatternAction.RESTART in availableActions) {

@@ -11,6 +11,8 @@ import java.util.Locale
 /** Short, ND-friendly date format for cards + source rows. Avoids the year — pattern cadence is recent. */
 private val SHORT_DATE: DateTimeFormatter = DateTimeFormatter.ofPattern("MMM d", Locale.ENGLISH)
 
+private const val MILLIS_PER_DAY = 86_400_000L
+
 fun formatShortDate(epochMs: Long, zone: ZoneId = ZoneId.systemDefault()): String =
     SHORT_DATE.format(Instant.ofEpochMilli(epochMs).atZone(zone))
 
@@ -26,55 +28,84 @@ fun snippetOf(entryText: String, maxLen: Int = MAX_SNIPPET_LEN): String {
 /** Snackbar copy string-resource per `ux-copy.md` §"System Messages". UI resolves via `stringResource`. */
 @StringRes
 fun actionSnackbarMessageRes(action: PatternAction): Int = when (action) {
-    PatternAction.DISMISSED -> R.string.snackbar_dismissed
-    PatternAction.SNOOZED -> R.string.snackbar_snoozed_7_days
-    PatternAction.MARKED_RESOLVED -> R.string.snackbar_marked_resolved
+    // Resource keys keep their legacy `*_dismissed` / `*_snoozed` names (see strings.xml note);
+    // the rendered copy is "Dropped." / "Skipped." / "Pattern is back." per ux-copy.md.
+    PatternAction.DROP -> R.string.snackbar_dismissed
+
+    PatternAction.SKIP -> R.string.snackbar_snoozed_7_days
+
     PatternAction.RESTART -> R.string.snackbar_pattern_back
 }
 
-/** `null` when the action is terminal (no undo control); otherwise the `Undo` resource id. */
+/** `null` when the action carries no undo control; otherwise the `Undo` resource id. */
 @StringRes
 fun undoLabelResFor(undo: PatternUndo?): Int? = if (undo == null) null else R.string.pattern_undo
 
-/** Empty-state copy resource per `ux-copy.md` §"Pattern List / Empty states". */
-@StringRes
-fun emptyStateCopyRes(reason: PatternsListUiState.EmptyReason): Int = when (reason) {
-    PatternsListUiState.EmptyReason.NO_ENTRIES -> R.string.patterns_empty_no_entries
-    PatternsListUiState.EmptyReason.NO_PATTERNS -> R.string.patterns_empty_no_patterns
+/** Structured empty-state copy per `ux-copy.md` §"Pattern List / Empty states". */
+data class PatternEmptyCopy(
+    /** Format string expecting `entryCount` as its `%1$d` argument when non-null. */
+    @field:StringRes val eyebrowRes: Int?,
+    @field:StringRes val headerRes: Int,
+    @field:StringRes val bodyRes: Int,
+)
+
+fun emptyCopyFor(reason: PatternsListUiState.EmptyReason): PatternEmptyCopy = when (reason) {
+    PatternsListUiState.EmptyReason.NO_ENTRIES -> PatternEmptyCopy(
+        eyebrowRes = R.string.patterns_empty_day1_eyebrow,
+        headerRes = R.string.patterns_empty_day1_header,
+        bodyRes = R.string.patterns_empty_day1_body,
+    )
+
+    PatternsListUiState.EmptyReason.NO_PATTERNS -> PatternEmptyCopy(
+        eyebrowRes = null,
+        headerRes = R.string.patterns_empty_none_header,
+        bodyRes = R.string.patterns_empty_none_body,
+    )
 }
 
 /**
  * Terminal-state subline payload for the pattern detail screen. Returns `null` for non-terminal
- * states (the action row renders instead). UI composes the final string with
- * `stringResource(prefixRes, dateLabel)`.
+ * states (the action row renders instead). [days] is non-null only for `CLOSED` — it feeds the
+ * `No new entries matched in {N} days` clause and is the span from last sighting to closure.
  */
 fun terminalLabelFor(
     state: PatternState,
     stateChangedMs: Long,
+    lastSeenMs: Long,
     zone: ZoneId = ZoneId.systemDefault(),
 ): TerminalLabel? = when (state) {
-    PatternState.RESOLVED -> TerminalLabel(R.string.pattern_terminal_resolved, formatShortDate(stateChangedMs, zone))
-    PatternState.DISMISSED -> TerminalLabel(R.string.pattern_terminal_dismissed, formatShortDate(stateChangedMs, zone))
+    PatternState.CLOSED -> TerminalLabel(
+        prefixRes = R.string.pattern_terminal_resolved,
+        dateLabel = formatShortDate(stateChangedMs, zone),
+        days = ((stateChangedMs - lastSeenMs).coerceAtLeast(0) / MILLIS_PER_DAY).toInt(),
+    )
+
+    PatternState.DROPPED -> TerminalLabel(
+        prefixRes = R.string.pattern_terminal_dismissed,
+        dateLabel = formatShortDate(stateChangedMs, zone),
+    )
+
     PatternState.ACTIVE, PatternState.SNOOZED, PatternState.BELOW_THRESHOLD -> null
 }
 
-/** Format-string id + date payload for the terminal-state subline. */
-data class TerminalLabel(@field:StringRes val prefixRes: Int, val dateLabel: String)
+/** Format-string id + args for the terminal-state subline. [days] non-null only for `CLOSED`. */
+data class TerminalLabel(@field:StringRes val prefixRes: Int, val dateLabel: String, val days: Int? = null)
 
-/** ADR-003 terminals: DISMISSED + RESOLVED. SNOOZED is recoverable; BELOW_THRESHOLD is internal. */
-fun isTerminalState(state: PatternState): Boolean = state == PatternState.DISMISSED || state == PatternState.RESOLVED
+/** ADR-003 terminals: DROPPED (user) + CLOSED (model). SNOOZED is recoverable; BELOW_THRESHOLD internal. */
+fun isTerminalState(state: PatternState): Boolean = state == PatternState.DROPPED || state == PatternState.CLOSED
 
 /**
- * Per `spec-pattern-action-buttons.md`: ACTIVE patterns expose Drop + Skip; every other
- * user-visible state exposes Restart. MARKED_RESOLVED is system-only (`pattern-auto-close`,
- * v1.5) — never reachable from the action menu.
+ * Per `spec-pattern-action-buttons.md` §P0.1–P0.3: ACTIVE patterns expose Drop + Skip; every
+ * other user-visible state exposes Restart. The detail screen separately suppresses the action
+ * row for `CLOSED` (read-only, model-detected) — that gate lives at the call site, not here, so
+ * the list-card overflow can still Restart a closed card.
  */
 fun availableActionsFor(state: PatternState): Set<PatternAction> = when (state) {
-    PatternState.ACTIVE -> setOf(PatternAction.DISMISSED, PatternAction.SNOOZED)
+    PatternState.ACTIVE -> setOf(PatternAction.DROP, PatternAction.SKIP)
 
     PatternState.SNOOZED,
-    PatternState.DISMISSED,
-    PatternState.RESOLVED,
+    PatternState.DROPPED,
+    PatternState.CLOSED,
     -> setOf(PatternAction.RESTART)
 
     PatternState.BELOW_THRESHOLD -> emptySet()
@@ -82,23 +113,29 @@ fun availableActionsFor(state: PatternState): Set<PatternAction> = when (state) 
 
 /**
  * Map a persisted [PatternState] onto the Patterns-list section it belongs in. Returns `null`
- * for [PatternState.BELOW_THRESHOLD] — that's an internal-only state and never user-visible.
+ * for [PatternState.BELOW_THRESHOLD] — internal-only, never user-visible. `SNOOZED` maps to the
+ * SKIPPED section (user label is "Skip"; state name stays `SNOOZED` per ADR-003).
  */
 fun sectionFor(state: PatternState): PatternSection? = when (state) {
     PatternState.ACTIVE -> PatternSection.ACTIVE
-    PatternState.SNOOZED -> PatternSection.SNOOZED
-    PatternState.RESOLVED -> PatternSection.RESOLVED
-    PatternState.DISMISSED -> PatternSection.DISMISSED
+    PatternState.SNOOZED -> PatternSection.SKIPPED
+    PatternState.CLOSED -> PatternSection.CLOSED
+    PatternState.DROPPED -> PatternSection.DROPPED
     PatternState.BELOW_THRESHOLD -> null
 }
 
 /** Section header string resource per `ux-copy.md` §"Pattern List / Section headers". */
 @StringRes
 fun sectionHeaderRes(section: PatternSection): Int = when (section) {
+    // Resource keys keep legacy names; rendered values are ACTIVE / SKIPPED · ON HOLD /
+    // CLOSED · DONE / DROPPED per strings.xml.
     PatternSection.ACTIVE -> R.string.patterns_section_active
-    PatternSection.SNOOZED -> R.string.patterns_section_snoozed
-    PatternSection.RESOLVED -> R.string.patterns_section_resolved
-    PatternSection.DISMISSED -> R.string.patterns_section_dismissed
+
+    PatternSection.SKIPPED -> R.string.patterns_section_snoozed
+
+    PatternSection.CLOSED -> R.string.patterns_section_resolved
+
+    PatternSection.DROPPED -> R.string.patterns_section_dismissed
 }
 
 private const val MAX_SNIPPET_LEN = 60

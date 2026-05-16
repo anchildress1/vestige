@@ -2,36 +2,45 @@ package dev.anchildress1.vestige.ui.patterns
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.anchildress1.vestige.storage.EntryStore
 import dev.anchildress1.vestige.storage.PatternRepo
 import dev.anchildress1.vestige.storage.PatternStore
 import dev.anchildress1.vestige.ui.history.EntryDetailHost
+import kotlinx.coroutines.flow.StateFlow
 import java.time.ZoneId
 
-@Suppress("LongParameterList")
+@Suppress("LongMethod", "LongParameterList")
 @Composable
 fun PatternsHost(
     patternStore: PatternStore,
     patternRepo: PatternRepo,
     entryStore: EntryStore,
     zoneId: ZoneId,
+    dataRevision: StateFlow<Long>,
     onExit: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     var openPatternId by rememberSaveable { mutableStateOf<String?>(null) }
     var openEntryId by rememberSaveable { mutableStateOf<Long?>(null) }
     var highlightEntryOnOpen by rememberSaveable { mutableStateOf(false) }
+    val revision by dataRevision.collectAsStateWithLifecycle()
     val listViewModel = remember(patternStore, patternRepo, entryStore) {
         PatternsListViewModel(patternStore, patternRepo, entryStore)
     }
     val detailViewModel = remember(openPatternId, patternStore, patternRepo, entryStore) {
         openPatternId?.let { PatternDetailViewModel(it, patternStore, patternRepo, entryStore) }
+    }
+    LaunchedEffect(revision, detailViewModel) {
+        listViewModel.refresh()
+        detailViewModel?.refresh()
     }
 
     when {

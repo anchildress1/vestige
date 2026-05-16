@@ -171,7 +171,7 @@ sonar {
                     // + `$changed` instrumentation (kotlinx-kover #756); same source-of-truth
                     // list the kover `excludes { classes(...) }` block derives from.
                     composeScreenExclusions.map { "**/${it.replace('.', '/')}.kt" }
-            ).joinToString(","),
+                ).joinToString(","),
         )
         // Both pattern view-models share an action-dispatch + undo skeleton (dismiss /
         // snooze / markResolved / restart). The structural overlap is intentional for the

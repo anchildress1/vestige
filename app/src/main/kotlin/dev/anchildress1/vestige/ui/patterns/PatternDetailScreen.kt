@@ -19,15 +19,10 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.SnackbarDuration
-import androidx.compose.material3.SnackbarHostState
-import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -59,31 +54,7 @@ fun PatternDetailScreen(
     modifier: Modifier = Modifier,
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
-    val snackbarHostState = remember { SnackbarHostState() }
-
-    val droppedMessage = stringResource(R.string.snackbar_dismissed)
-    val skippedMessage = stringResource(R.string.snackbar_snoozed_7_days)
-    val restartMessage = stringResource(R.string.snackbar_pattern_back)
-    val undoLabel = stringResource(R.string.pattern_undo)
-
-    LaunchedEffect(viewModel, droppedMessage, skippedMessage, restartMessage, undoLabel) {
-        viewModel.events.collect { event ->
-            val message = when (event.action) {
-                PatternAction.DROP -> droppedMessage
-                PatternAction.SKIP -> skippedMessage
-                PatternAction.RESTART -> restartMessage
-            }
-            // Standard Material short-snackbar duration (~4s) — the undo affordance lifetime.
-            val result = snackbarHostState.showSnackbar(
-                message = message,
-                actionLabel = if (event.undo != null) undoLabel else null,
-                duration = SnackbarDuration.Short,
-            )
-            if (result == SnackbarResult.ActionPerformed && event.undo != null) {
-                viewModel.undo(event.undo)
-            }
-        }
-    }
+    val snackbarHostState = rememberPatternSnackbarHostState(viewModel.events, viewModel::undo)
 
     val backDescription = stringResource(R.string.pattern_back_description)
     VestigeScaffold(

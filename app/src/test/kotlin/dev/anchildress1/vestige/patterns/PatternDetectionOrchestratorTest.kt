@@ -128,35 +128,35 @@ class PatternDetectionOrchestratorTest {
     }
 
     @Test
-    fun `entries 1-9 do not trigger detection`() = runTest {
-        repeat(9) { commitOne() }
-        assertTrue("no detection until 10 entries committed", patternStore.all().isEmpty())
-        commitOne() // 10th — detection runs
+    fun `entries 1-2 do not trigger detection`() = runTest {
+        repeat(2) { commitOne() }
+        assertTrue("no detection until 3 entries committed", patternStore.all().isEmpty())
+        commitOne() // 3rd — detection runs
         assertTrue(patternStore.all().any { it.kind == PatternKind.TEMPLATE_RECURRENCE })
     }
 
     @Test
     fun `new pattern lands ACTIVE with a model-generated title`() = runTest {
-        repeat(10) { commitOne() }
+        repeat(3) { commitOne() }
         val pattern = patternStore.all().first { it.kind == PatternKind.TEMPLATE_RECURRENCE }
         assertEquals(PatternState.ACTIVE, pattern.state)
         assertEquals("Aftermath Loop", pattern.title)
         assertTrue(pattern.latestCalloutText.isNotBlank())
-        assertEquals(10, pattern.supportingEntries.size)
+        assertEquals(3, pattern.supportingEntries.size)
     }
 
     @Test
     fun `existing active pattern gets supportingEntries refreshed`() = runTest {
-        repeat(10) { commitOne() }
-        repeat(10) { commitOne() } // 20th entry → second detection run
+        repeat(3) { commitOne() }
+        repeat(3) { commitOne() } // 6th entry → second detection run
         val pattern = patternStore.all().single { it.kind == PatternKind.TEMPLATE_RECURRENCE }
-        assertEquals(20, pattern.supportingEntries.size)
+        assertEquals(6, pattern.supportingEntries.size)
     }
 
     @Test
     fun `dropped pattern's latestCalloutText is frozen on silent UPDATE branch`() = runTest {
-        // Drive 10 entries → detector inserts an ACTIVE pattern with a generated callout.
-        repeat(10) { commitOne() }
+        // Drive 3 entries → detector inserts an ACTIVE pattern with a generated callout.
+        repeat(3) { commitOne() }
         val initial = patternStore.all().single { it.kind == PatternKind.TEMPLATE_RECURRENCE }
         val frozenText = initial.latestCalloutText
         assertTrue("seeded callout must be non-blank", frozenText.isNotBlank())
@@ -164,11 +164,11 @@ class PatternDetectionOrchestratorTest {
         // User drops the pattern.
         patternStore.transitionState(initial.patternId, PatternState.DROPPED)
 
-        // Ten more matching entries → another detection run upserts the same patternId.
-        repeat(10) { commitOne() }
+        // Three more matching entries → another detection run upserts the same patternId.
+        repeat(3) { commitOne() }
         val pattern = patternStore.findByPatternId(initial.patternId)!!
         assertEquals(PatternState.DROPPED, pattern.state)
-        assertEquals(20, pattern.supportingEntries.size)
+        assertEquals(6, pattern.supportingEntries.size)
         assertEquals(
             "dropped pattern's callout text must not drift on silent update",
             frozenText,
@@ -445,8 +445,8 @@ class PatternDetectionOrchestratorTest {
 
     @Test
     fun `snoozed pattern with expired snoozedUntil auto-promotes to ACTIVE on detection run`() = runTest {
-        // Drive 10 entries → detector inserts ACTIVE pattern with model-generated title.
-        repeat(10) { commitOne() }
+        // Drive 3 entries → detector inserts ACTIVE pattern with model-generated title.
+        repeat(3) { commitOne() }
         val original = patternStore.all().single { it.kind == PatternKind.TEMPLATE_RECURRENCE }
 
         // User snoozes 7 days.
@@ -455,7 +455,7 @@ class PatternDetectionOrchestratorTest {
         assertEquals(PatternState.SNOOZED, patternStore.findByPatternId(original.patternId)!!.state)
 
         // Time advances past snoozedUntil; clock-bound store sees expiry. New orchestrator
-        // with later clock — detector runs again on the next 10-entry tick.
+        // with later clock — detector runs again on the next 3-entry tick.
         val laterClock = Clock.fixed(now.plusSeconds(8L * 24 * 60 * 60), ZoneOffset.UTC)
         val laterOrchestrator = PatternDetectionOrchestrator(
             boxStore = boxStore,
@@ -471,8 +471,8 @@ class PatternDetectionOrchestratorTest {
             clock = laterClock,
             zoneId = ZoneOffset.UTC,
         )
-        // Ten more matching entries → detection upserts and promotes the row to ACTIVE.
-        repeat(10) {
+        // Three more matching entries → detection upserts and promotes the row to ACTIVE.
+        repeat(3) {
             laterOrchestrator.onEntryCommitted(putEntry(templateLabel = TemplateLabel.AFTERMATH), Persona.WITNESS)
         }
         val promoted = patternStore.findByPatternId(original.patternId)!!
@@ -482,13 +482,13 @@ class PatternDetectionOrchestratorTest {
 
     @Test
     fun `snoozed pattern with unexpired snoozedUntil stays snoozed on detection run`() = runTest {
-        repeat(10) { commitOne() }
+        repeat(3) { commitOne() }
         val original = patternStore.all().single { it.kind == PatternKind.TEMPLATE_RECURRENCE }
 
         val snoozeUntil = now.toEpochMilli() + 7L * 24 * 60 * 60 * 1000
         patternStore.transitionState(original.patternId, PatternState.SNOOZED, snoozedUntilMs = snoozeUntil)
 
-        repeat(10) { commitOne() }
+        repeat(3) { commitOne() }
         val stillSnoozed = patternStore.findByPatternId(original.patternId)!!
         assertEquals(PatternState.SNOOZED, stillSnoozed.state)
         assertEquals(snoozeUntil, stillSnoozed.snoozedUntil)
@@ -498,7 +498,7 @@ class PatternDetectionOrchestratorTest {
     fun `new pattern inserts with deterministic title when generator returns null`() = runTest {
         // Title generator returns blank → orchestrator falls back to the deterministic title.
         coEvery { engine.generateText(any()) } returns ""
-        repeat(10) { commitOne() }
+        repeat(3) { commitOne() }
         val pattern = patternStore.all().first { it.kind == PatternKind.TEMPLATE_RECURRENCE }
         assertEquals(PatternState.ACTIVE, pattern.state)
         assertTrue("fallback title must be non-blank", pattern.title.isNotBlank())
@@ -511,7 +511,7 @@ class PatternDetectionOrchestratorTest {
     @Test
     fun `new pattern falls back to kind title and skips missing supporting rows when generator throws`() = runTest {
         val supporting = putEntry(templateLabel = TemplateLabel.AFTERMATH)
-        repeat(8) { putEntry(templateLabel = TemplateLabel.AFTERMATH) }
+        repeat(1) { putEntry(templateLabel = TemplateLabel.AFTERMATH) }
 
         val detector: PatternDetector = mockk()
         coEvery { engine.generateText(any()) } throws RuntimeException("boom")
@@ -550,8 +550,8 @@ class PatternDetectionOrchestratorTest {
     }
 
     @Test
-    fun `failed entries do not advance the every-10 completed-entry cadence`() = runTest {
-        repeat(8) { commitOne() }
+    fun `failed entries do not advance the every-3 completed-entry cadence`() = runTest {
+        repeat(2) { commitOne() }
         repeat(2) {
             orchestrator.onEntryCommitted(
                 putEntry(
@@ -564,7 +564,7 @@ class PatternDetectionOrchestratorTest {
 
         assertTrue("failed entries must not trigger detection", patternStore.all().isEmpty())
 
-        repeat(2) { commitOne() }
+        repeat(1) { commitOne() }
         assertTrue(patternStore.all().any { it.kind == PatternKind.TEMPLATE_RECURRENCE })
     }
 
@@ -600,7 +600,7 @@ class PatternDetectionOrchestratorTest {
 
     @Test(expected = CancellationException::class)
     fun `cancellation while generating a title is not swallowed`() = runTest {
-        repeat(9) { putEntry(templateLabel = TemplateLabel.AFTERMATH) }
+        repeat(2) { putEntry(templateLabel = TemplateLabel.AFTERMATH) }
         val detector: PatternDetector = mockk()
         every { detector.detect() } returns listOf(
             DetectedPattern(
@@ -634,14 +634,14 @@ class PatternDetectionOrchestratorTest {
 
     @Test
     fun `snoozed pattern without snoozedUntil does not auto-promote`() = runTest {
-        repeat(10) { commitOne() }
+        repeat(3) { commitOne() }
         val original = patternStore.all().single { it.kind == PatternKind.TEMPLATE_RECURRENCE }
         val row = patternStore.findByPatternId(original.patternId)!!
         row.state = PatternState.SNOOZED
         row.snoozedUntil = null
         patternStore.put(row)
 
-        repeat(10) { commitOne() }
+        repeat(3) { commitOne() }
         val persisted = patternStore.findByPatternId(original.patternId)!!
         assertEquals(PatternState.SNOOZED, persisted.state)
     }

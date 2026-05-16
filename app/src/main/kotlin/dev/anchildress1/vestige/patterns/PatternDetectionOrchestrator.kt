@@ -203,7 +203,7 @@ class PatternDetectionOrchestrator(
     }
 
     companion object {
-        const val DETECTION_INTERVAL: Long = 10
+        const val DETECTION_INTERVAL: Long = 3
         const val MAX_TITLE_CHARS: Int = 24
 
         private const val TAG = "VestigePatternOrch"

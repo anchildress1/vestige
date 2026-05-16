@@ -11,6 +11,14 @@ import org.junit.Test
 class MainActivityLaunchTargetTest {
 
     @Test
+    fun `modelStatusBackTarget returns Settings only for the Settings drill-down`() {
+        assertEquals(PostOnboardingScreen.Settings, modelStatusBackTarget(PostOnboardingScreen.Settings))
+        assertEquals(PostOnboardingScreen.Capture, modelStatusBackTarget(PostOnboardingScreen.Capture))
+        assertEquals(PostOnboardingScreen.Capture, modelStatusBackTarget(PostOnboardingScreen.Patterns))
+        assertEquals(PostOnboardingScreen.Capture, modelStatusBackTarget(PostOnboardingScreen.History))
+    }
+
+    @Test
     fun `resolvePostOnboardingLaunchTarget ignores unrelated launches`() {
         val entryStore = mockk<EntryStore>()
 

@@ -1,3 +1,7 @@
+// Post-onboarding nav root: a cluster of small screen-route composables; splitting the routing
+// across files hurts call-site readability (same rationale as PatternDetailScreen.kt).
+@file:Suppress("TooManyFunctions")
+
 package dev.anchildress1.vestige
 
 import android.content.Intent
@@ -90,7 +94,7 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-private enum class PostOnboardingScreen { Capture, Patterns, History, ModelStatus, Settings }
+internal enum class PostOnboardingScreen { Capture, Patterns, History, ModelStatus, Settings }
 
 private data class LaunchTargetController(val target: PostOnboardingLaunchTarget, val onConsumed: () -> Unit)
 
@@ -158,6 +162,7 @@ private fun MainPostOnboardingContent(
     onResetToOnboarding: () -> Unit,
 ) {
     var screen by rememberSaveable { mutableStateOf(PostOnboardingScreen.Capture) }
+    var modelStatusOrigin by rememberSaveable { mutableStateOf(PostOnboardingScreen.Capture) }
     var historyOpenRequest by remember { mutableStateOf<EntryDetailOpenRequest?>(null) }
     PostOnboardingResumeEffects(container)
     ConsumeLaunchTarget(
@@ -168,16 +173,53 @@ private fun MainPostOnboardingContent(
             historyOpenRequest = request
         },
     )
+    PostOnboardingScreenHost(
+        screen = screen,
+        container = container,
+        persona = persona,
+        clock = clock,
+        zoneId = zoneId,
+        onboardingPrefs = onboardingPrefs,
+        onPersonaChange = onPersonaChange,
+        onResetToOnboarding = onResetToOnboarding,
+        modelStatusOrigin = modelStatusOrigin,
+        historyOpenRequest = historyOpenRequest,
+        onNavigate = { screen = it },
+        onOpenModelStatusFrom = { origin ->
+            modelStatusOrigin = origin
+            screen = PostOnboardingScreen.ModelStatus
+        },
+        onHistoryOpenRequestConsumed = { historyOpenRequest = null },
+    )
+}
+
+@Suppress("LongParameterList") // Post-onboarding nav root — screen seams are intentionally co-located.
+@androidx.compose.runtime.Composable
+private fun PostOnboardingScreenHost(
+    screen: PostOnboardingScreen,
+    container: AppContainer,
+    persona: Persona,
+    clock: Clock,
+    zoneId: ZoneId,
+    onboardingPrefs: OnboardingPrefs,
+    onPersonaChange: (Persona) -> Unit,
+    onResetToOnboarding: () -> Unit,
+    modelStatusOrigin: PostOnboardingScreen,
+    historyOpenRequest: EntryDetailOpenRequest?,
+    onNavigate: (PostOnboardingScreen) -> Unit,
+    onOpenModelStatusFrom: (PostOnboardingScreen) -> Unit,
+    onHistoryOpenRequestConsumed: () -> Unit,
+) {
     when (screen) {
         PostOnboardingScreen.Capture -> CaptureRoute(
             container = container,
             persona = persona,
             clock = clock,
             zoneId = zoneId,
-            onOpenPatterns = { screen = PostOnboardingScreen.Patterns },
-            onOpenHistory = { screen = PostOnboardingScreen.History },
-            onOpenModelStatus = { screen = PostOnboardingScreen.ModelStatus },
-            onOpenSettings = { screen = PostOnboardingScreen.Settings },
+            onOpenPatterns = { onNavigate(PostOnboardingScreen.Patterns) },
+            onOpenHistory = { onNavigate(PostOnboardingScreen.History) },
+            onOpenModelStatus = { onOpenModelStatusFrom(PostOnboardingScreen.Capture) },
+            onOpenSettings = { onNavigate(PostOnboardingScreen.Settings) },
         )
 
         PostOnboardingScreen.Patterns -> PatternsHost(
@@ -186,24 +228,24 @@ private fun MainPostOnboardingContent(
             entryStore = container.entryStore,
             zoneId = zoneId,
             dataRevision = container.dataRevision,
-            onExit = { screen = PostOnboardingScreen.Capture },
+            onExit = { onNavigate(PostOnboardingScreen.Capture) },
             modifier = Modifier.fillMaxSize(),
         )
 
         PostOnboardingScreen.History -> HistoryHost(
             entryStore = container.entryStore,
             persona = persona,
-            onExit = { screen = PostOnboardingScreen.Capture },
+            onExit = { onNavigate(PostOnboardingScreen.Capture) },
             zoneId = zoneId,
             dataRevision = container.dataRevision,
             openRequest = historyOpenRequest,
-            onOpenRequestConsumed = { historyOpenRequest = null },
+            onOpenRequestConsumed = onHistoryOpenRequestConsumed,
             modifier = Modifier.fillMaxSize(),
         )
 
         PostOnboardingScreen.ModelStatus -> ModelStatusRoute(
             container = container,
-            onExit = { screen = PostOnboardingScreen.Capture },
+            onExit = { onNavigate(modelStatusBackTarget(modelStatusOrigin)) },
         )
 
         PostOnboardingScreen.Settings -> SettingsRoute(
@@ -212,8 +254,8 @@ private fun MainPostOnboardingContent(
             persona = persona,
             onPersonaChange = onPersonaChange,
             onResetToOnboarding = onResetToOnboarding,
-            onOpenModelStatus = { screen = PostOnboardingScreen.ModelStatus },
-            onExit = { screen = PostOnboardingScreen.Capture },
+            onOpenModelStatus = { onOpenModelStatusFrom(PostOnboardingScreen.Settings) },
+            onExit = { onNavigate(PostOnboardingScreen.Capture) },
         )
     }
 }

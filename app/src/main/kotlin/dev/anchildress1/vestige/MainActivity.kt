@@ -98,6 +98,13 @@ internal enum class PostOnboardingScreen { Capture, Patterns, History, ModelStat
 
 private data class LaunchTargetController(val target: PostOnboardingLaunchTarget, val onConsumed: () -> Unit)
 
+internal data class ResetOnboardingState(val onboardingComplete: Boolean, val selectedPersona: Persona)
+
+internal fun resetOnboardingState(defaultPersona: Persona): ResetOnboardingState = ResetOnboardingState(
+    onboardingComplete = false,
+    selectedPersona = defaultPersona,
+)
+
 @Composable
 private fun MainActivityContent(
     container: AppContainer,
@@ -132,7 +139,10 @@ private fun MainActivityContent(
             launchTargetController = launchTargetController,
             onboardingPrefs = onboardingPrefs,
             onPersonaChange = { selectedPersona = it },
-            onResetToOnboarding = { onboardingComplete = false },
+            onResetToOnboarding = { reset ->
+                onboardingComplete = reset.onboardingComplete
+                selectedPersona = reset.selectedPersona
+            },
         )
     }
 }
@@ -149,7 +159,7 @@ private fun PostOnboardingResumeEffects(container: AppContainer) {
     }
 }
 
-@Suppress("LongParameterList") // Post-onboarding nav root — host seams are intentionally co-located.
+@Suppress("LongParameterList", "kotlin:S107") // Post-onboarding nav root — host seams are intentionally co-located.
 @androidx.compose.runtime.Composable
 private fun MainPostOnboardingContent(
     container: AppContainer,
@@ -159,7 +169,7 @@ private fun MainPostOnboardingContent(
     launchTargetController: LaunchTargetController,
     onboardingPrefs: OnboardingPrefs,
     onPersonaChange: (Persona) -> Unit,
-    onResetToOnboarding: () -> Unit,
+    onResetToOnboarding: (ResetOnboardingState) -> Unit,
 ) {
     var screen by rememberSaveable { mutableStateOf(PostOnboardingScreen.Capture) }
     var modelStatusOrigin by rememberSaveable { mutableStateOf(PostOnboardingScreen.Capture) }
@@ -193,7 +203,7 @@ private fun MainPostOnboardingContent(
     )
 }
 
-@Suppress("LongParameterList") // Post-onboarding nav root — screen seams are intentionally co-located.
+@Suppress("LongParameterList", "kotlin:S107") // Post-onboarding nav root — screen seams are intentionally co-located.
 @androidx.compose.runtime.Composable
 private fun PostOnboardingScreenHost(
     screen: PostOnboardingScreen,
@@ -203,7 +213,7 @@ private fun PostOnboardingScreenHost(
     zoneId: ZoneId,
     onboardingPrefs: OnboardingPrefs,
     onPersonaChange: (Persona) -> Unit,
-    onResetToOnboarding: () -> Unit,
+    onResetToOnboarding: (ResetOnboardingState) -> Unit,
     modelStatusOrigin: PostOnboardingScreen,
     historyOpenRequest: EntryDetailOpenRequest?,
     onNavigate: (PostOnboardingScreen) -> Unit,
@@ -270,7 +280,7 @@ private fun SettingsRoute(
     onboardingPrefs: OnboardingPrefs,
     persona: Persona,
     onPersonaChange: (Persona) -> Unit,
-    onResetToOnboarding: () -> Unit,
+    onResetToOnboarding: (ResetOnboardingState) -> Unit,
     onOpenModelStatus: () -> Unit,
     onExit: () -> Unit,
 ) {
@@ -305,7 +315,7 @@ private fun SettingsRoute(
                 scope.launch {
                     container.wipeAllData()
                     onboardingPrefs.reset()
-                    onResetToOnboarding()
+                    onResetToOnboarding(resetOnboardingState(onboardingPrefs.defaultPersona))
                 }
             },
             onOpenModelStatus = onOpenModelStatus,
@@ -417,7 +427,7 @@ internal fun consumePostOnboardingLaunchTarget(
 internal const val EXTRA_OPEN_LATEST_IN_FLIGHT_ENTRY: String =
     "dev.anchildress1.vestige.extra.OPEN_LATEST_IN_FLIGHT_ENTRY"
 
-@Suppress("LongParameterList")
+@Suppress("LongParameterList", "kotlin:S107")
 @Composable
 private fun CaptureRoute(
     container: AppContainer,
@@ -461,10 +471,11 @@ private fun CaptureRoute(
         )
     }
     val viewModel: CaptureViewModel = viewModel(factory = factory)
-    // Pipe live model-readiness changes into the VM so REC enablement, the error band, and
-    // the inferring-vs-loading chrome stay in sync if the artifact transitions during the
-    // session (download completes, pauses, or is removed via Settings).
-    LaunchedEffect(viewModel, modelReadiness) { viewModel.setModelReadiness(modelReadiness) }
+    SyncCaptureViewModelState(
+        viewModel = viewModel,
+        persona = persona,
+        modelReadiness = modelReadiness,
+    )
     // `dataRevision` as a remember key forces re-derivation whenever AppContainer increments
     // it (entry write / pattern write / recovery sweep). Cheap — entryStore.countCompleted +
     // patternStore.findVisibleSortedByLastSeen are indexed reads.
@@ -484,6 +495,15 @@ private fun CaptureRoute(
             lastEntryFooter = lastEntryFooter,
         ),
     )
+}
+
+@Composable
+internal fun SyncCaptureViewModelState(viewModel: CaptureViewModel, persona: Persona, modelReadiness: ModelReadiness) {
+    LaunchedEffect(viewModel, persona) { viewModel.setPersona(persona) }
+    // Pipe live model-readiness changes into the VM so REC enablement, the error band, and
+    // the inferring-vs-loading chrome stay in sync if the artifact transitions during the
+    // session (download completes, pauses, or is removed via Settings).
+    LaunchedEffect(viewModel, modelReadiness) { viewModel.setModelReadiness(modelReadiness) }
 }
 
 @Suppress("LongParameterList")

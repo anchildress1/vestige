@@ -46,6 +46,7 @@ import dev.anchildress1.vestige.storage.VectorBackfillWorker
 import dev.anchildress1.vestige.storage.VestigeBoxStore
 import dev.anchildress1.vestige.ui.capture.ModelReadiness
 import io.objectbox.BoxStore
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -182,6 +183,7 @@ class AppContainer(
     private val vectorBackfillMaxRetries: Int = VECTOR_BACKFILL_MAX_RETRIES,
     private val vectorBackfillScheduleListener: (() -> Unit)? = null,
     private val scope: CoroutineScope = defaultScope(),
+    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) {
 
     /** Shared ObjectBox handle. Closed when the process dies; tests use [close]. */
@@ -480,56 +482,52 @@ class AppContainer(
             runMainModelMutation(name = "re-download model") {
                 resetBackgroundEngine()
                 val store = mainModelArtifactStore
-                val artifact = store.artifactFile
-                if (!File(
-                        artifact.parentFile,
-                        "${artifact.name}.part",
-                    ).delete()
-                ) {
-                    Log.w(TAG, "Failed to delete model part file")
-                }
-                if (!artifact.delete()) Log.w(TAG, "Failed to delete model artifact")
+                deleteArtifactFiles(store.artifactFile)
                 _modelReadinessFlow.value = ModelReadiness.Downloading(0)
                 networkGate.openForDownload(reason = "Model Status — user-requested re-download")
-                val result: ModelArtifactState? = try {
-                    store.download { current, expected ->
-                        val pct = if (expected > 0L) {
-                            ((current * PCT_MAX) / expected).toInt().coerceIn(0, PCT_MAX)
-                        } else {
-                            0
-                        }
-                        _modelReadinessFlow.value = ModelReadiness.Downloading(pct)
-                    }
-                } catch (cancel: kotlinx.coroutines.CancellationException) {
-                    throw cancel
-                } catch (@Suppress("TooGenericExceptionCaught") error: Exception) {
-                    Log.e(TAG, "Model re-download failed", error)
-                    null
-                } finally {
-                    networkGate.seal()
-                }
+                val result = runDownload(store)
                 // Honor the terminal result (Codex review #1/#3). The size-only probe would read
                 // a checksum-corrupt full-size file as Complete → false Ready, so discard it.
                 // Anything other than Complete must not stay Downloading — Model Status actions
                 // are disabled in that state — so drop to a non-Downloading readiness and let the
                 // probe resolve to Paused (.part remains) or Loading (discarded), keeping the
                 // retry/delete affordances live.
-                if (result is ModelArtifactState.Corrupt) {
-                    Log.e(TAG, "Re-download produced a checksum-corrupt artifact; discarding")
-                    if (!store.artifactFile.delete()) Log.w(TAG, "Failed to delete corrupt model artifact")
-                    if (!File(
-                            store.artifactFile.parentFile,
-                            "${store.artifactFile.name}.part",
-                        ).delete()
-                    ) {
-                        Log.w(TAG, "Failed to delete corrupt model part file")
-                    }
-                }
+                handleCorruptDownloadResult(store, result)
                 if (result != ModelArtifactState.Complete) {
                     _modelReadinessFlow.value = ModelReadiness.Paused
                 }
                 refreshModelReadiness()
             }
+        }
+    }
+
+    private fun deleteArtifactFiles(artifact: File) {
+        if (!File(artifact.parentFile, "${artifact.name}.part").delete()) {
+            Log.w(TAG, "Failed to delete model part file")
+        }
+        if (!artifact.delete()) Log.w(TAG, "Failed to delete model artifact")
+    }
+
+    private fun computeDownloadPercent(current: Long, expected: Long): Int =
+        if (expected > 0L) ((current * PCT_MAX) / expected).toInt().coerceIn(0, PCT_MAX) else 0
+
+    private suspend fun runDownload(store: ModelArtifactStore): ModelArtifactState? = try {
+        store.download { current, expected ->
+            _modelReadinessFlow.value = ModelReadiness.Downloading(computeDownloadPercent(current, expected))
+        }
+    } catch (cancel: kotlinx.coroutines.CancellationException) {
+        throw cancel
+    } catch (@Suppress("TooGenericExceptionCaught") error: Exception) {
+        Log.e(TAG, "Model re-download failed", error)
+        null
+    } finally {
+        networkGate.seal()
+    }
+
+    private fun handleCorruptDownloadResult(store: ModelArtifactStore, result: ModelArtifactState?) {
+        if (result is ModelArtifactState.Corrupt) {
+            Log.e(TAG, "Re-download produced a checksum-corrupt artifact; discarding")
+            deleteArtifactFiles(store.artifactFile)
         }
     }
 
@@ -540,7 +538,7 @@ class AppContainer(
      */
     suspend fun wipeAllData() {
         foregroundServiceStopper(foregroundServiceIntentFactory())
-        withContext(Dispatchers.IO) {
+        withContext(ioDispatcher) {
             boxStore.boxFor(EntryEntity::class.java).removeAll()
             boxStore.boxFor(PatternEntity::class.java).removeAll()
             boxStore.boxFor(TagEntity::class.java).removeAll()
@@ -556,7 +554,7 @@ class AppContainer(
 
     /** Stream a zip of every entry markdown file into [out] (caller owns/closes the stream). */
     suspend fun zipAllEntriesTo(out: OutputStream) {
-        withContext(Dispatchers.IO) {
+        withContext(ioDispatcher) {
             ZipOutputStream(out).use { zip ->
                 markdownStore.listAll().forEach { file ->
                     zip.putNextEntry(ZipEntry(file.name))

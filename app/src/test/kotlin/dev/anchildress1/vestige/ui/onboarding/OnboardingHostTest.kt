@@ -19,8 +19,14 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import dev.anchildress1.vestige.model.ModelArtifactState
 import dev.anchildress1.vestige.model.Persona
 import dev.anchildress1.vestige.ui.theme.VestigeTheme
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.joinAll
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.yield
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -241,6 +247,90 @@ class OnboardingHostTest {
         composeRule.waitForIdle()
         composeRule.onNodeWithText("CONTINUE").assertIsNotEnabled()
         assertFalse(prefs.isComplete)
+    }
+
+    @Test
+    fun `download chrome resets stale failure telemetry when re-entering ModelDownload`() {
+        val stale = downloadChromeOnStepEntry(
+            step = OnboardingStep.ModelDownload,
+            downloadMbps = 8.4f,
+            downloadStatus = DownloadStatus(phase = DownloadPhase.Failed, etaSeconds = 99L),
+        )
+
+        assertEquals(null, stale.downloadMbps)
+        assertEquals(DownloadStatus(), stale.downloadStatus)
+
+        val unchanged = downloadChromeOnStepEntry(
+            step = OnboardingStep.Wiring,
+            downloadMbps = 8.4f,
+            downloadStatus = DownloadStatus(phase = DownloadPhase.Failed, etaSeconds = 99L),
+        )
+
+        assertEquals(8.4f, unchanged.downloadMbps)
+        assertEquals(DownloadStatus(phase = DownloadPhase.Failed, etaSeconds = 99L), unchanged.downloadStatus)
+    }
+
+    @Test
+    fun `runDownloadIfNeededSingleFlight serializes overlapping retries`() = runTest {
+        val releaseFirstDownload = CompletableDeferred<Unit>()
+        val downloadMutex = Mutex()
+        var downloadCalls = 0
+        var concurrentDownloads = 0
+        var maxConcurrentDownloads = 0
+        val availability = object : ModelAvailability {
+            override suspend fun status(): ModelArtifactState = ModelArtifactState.Absent
+
+            override suspend fun download(onProgress: (Long, Long) -> Unit): ModelArtifactState {
+                downloadCalls += 1
+                concurrentDownloads += 1
+                maxConcurrentDownloads = maxOf(maxConcurrentDownloads, concurrentDownloads)
+                try {
+                    if (downloadCalls == 1) releaseFirstDownload.await()
+                    return ModelArtifactState.Partial(currentBytes = 1L, expectedBytes = 2L)
+                } finally {
+                    concurrentDownloads -= 1
+                }
+            }
+        }
+
+        val first = launch {
+            runDownloadIfNeededSingleFlight(
+                downloadMutex = downloadMutex,
+                step = OnboardingStep.ModelDownload,
+                wifiConnected = true,
+                modelAvailability = availability,
+                callbacks = DownloadCallbacks(
+                    onState = { _ -> },
+                    onSpeed = { _ -> },
+                    onStatus = { _ -> },
+                ),
+            )
+        }
+        yield()
+
+        val second = launch {
+            runDownloadIfNeededSingleFlight(
+                downloadMutex = downloadMutex,
+                step = OnboardingStep.ModelDownload,
+                wifiConnected = true,
+                modelAvailability = availability,
+                callbacks = DownloadCallbacks(
+                    onState = { _ -> },
+                    onSpeed = { _ -> },
+                    onStatus = { _ -> },
+                ),
+            )
+        }
+        yield()
+
+        assertEquals(1, downloadCalls)
+        assertEquals(1, maxConcurrentDownloads)
+
+        releaseFirstDownload.complete(Unit)
+        joinAll(first, second)
+
+        assertEquals(2, downloadCalls)
+        assertEquals(1, maxConcurrentDownloads)
     }
 
     @Test

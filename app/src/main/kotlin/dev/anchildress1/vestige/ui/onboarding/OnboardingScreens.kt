@@ -17,7 +17,7 @@ private const val PREVIEW_ENABLED_WITHOUT_MODEL = 2
 private const val PREVIEW_ENABLED_WITH_MODEL = 3
 
 @Composable
-@Suppress("LongParameterList") // Optional preview defaults — screen-host call site only passes the live seams.
+@Suppress("LongParameterList", "kotlin:S107") // Optional preview defaults — host passes only live seams.
 internal fun ModelDownloadPlaceholderScreen(
     modelState: ModelArtifactState,
     onContinue: () -> Unit,

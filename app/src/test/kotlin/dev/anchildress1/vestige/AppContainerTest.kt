@@ -470,6 +470,41 @@ class AppContainerTest {
     }
 
     @Test
+    fun `deleteMainModel closes the initialized engine so later work reinitializes it`(@TempDir tempRoot: File) =
+        runTest {
+            val modelFile = File(tempRoot, "main-model.litertlm").apply { writeText("xx") }
+            val artifactStore = fakeArtifactStore(artifactFile = modelFile, expectedByteSize = 2L)
+            val engine = mockk<LiteRtLmEngine>(relaxed = true)
+            val context = mockk<Context>(relaxed = true) {
+                every { filesDir } returns tempRoot
+                every { cacheDir } returns File(tempRoot, "cache").apply { mkdirs() }
+            }
+            val container = AppContainer(
+                applicationContext = context,
+                boxStoreFactory = { mockk<BoxStore>(relaxed = true) },
+                markdownStoreFactory = { mockk<MarkdownEntryStore>(relaxed = true) },
+                modelPathLoader = { modelFile.absolutePath },
+                backgroundEngineFactory = { _, _ -> engine },
+                mainModelArtifactStoreFactory = { _, _, _ -> artifactStore },
+                recoveredEntryIdsLoader = { emptyList() },
+                foregroundServiceIntentFactory = { Intent("dev.anchildress1.vestige.TEST_START") },
+                foregroundServiceStarter = {},
+                scope = this,
+            )
+
+            container.ensureBackgroundEngineInitialized()
+            container.deleteMainModel()
+            advanceUntilIdle()
+            container.ensureBackgroundEngineInitialized()
+
+            coVerifyOrder {
+                engine.initialize()
+                engine.close()
+                engine.initialize()
+            }
+        }
+
+    @Test
     fun `redownloadMainModel pulls a fresh artifact and settles readiness Ready`(@TempDir tempRoot: File) = runTest {
         val modelFile = File(tempRoot, "main-model.litertlm") // absent until the re-pull writes it
         val artifactStore = fakeArtifactStore(artifactFile = modelFile, expectedByteSize = 2L)
@@ -503,6 +538,50 @@ class AppContainerTest {
         coVerify(exactly = 1) { artifactStore.download(any()) }
         assertTrue(modelFile.exists(), "re-pull must land the artifact on disk")
         assertEquals(ModelReadiness.Ready, container.modelReadinessFlow.value)
+    }
+
+    @Test
+    fun `redownloadMainModel closes the initialized engine so the same wrapper can be reinitialized`(
+        @TempDir tempRoot: File,
+    ) = runTest {
+        val modelFile = File(tempRoot, "main-model.litertlm").apply { writeText("xx") }
+        val artifactStore = fakeArtifactStore(artifactFile = modelFile, expectedByteSize = 2L)
+        coEvery { artifactStore.download(any()) } coAnswers {
+            @Suppress("UNCHECKED_CAST")
+            val onProgress = firstArg<(Long, Long) -> Unit>()
+            onProgress(2L, 2L)
+            modelFile.writeText("yy")
+            ModelArtifactState.Complete
+        }
+        val engine = mockk<LiteRtLmEngine>(relaxed = true)
+        val context = mockk<Context>(relaxed = true) {
+            every { filesDir } returns tempRoot
+            every { cacheDir } returns File(tempRoot, "cache").apply { mkdirs() }
+        }
+        val container = AppContainer(
+            applicationContext = context,
+            boxStoreFactory = { mockk<BoxStore>(relaxed = true) },
+            markdownStoreFactory = { mockk<MarkdownEntryStore>(relaxed = true) },
+            modelPathLoader = { modelFile.absolutePath },
+            backgroundEngineFactory = { _, _ -> engine },
+            mainModelArtifactStoreFactory = { _, _, _ -> artifactStore },
+            recoveredEntryIdsLoader = { emptyList() },
+            foregroundServiceIntentFactory = { Intent("dev.anchildress1.vestige.TEST_START") },
+            foregroundServiceStarter = {},
+            scope = this,
+        )
+
+        container.ensureBackgroundEngineInitialized()
+        container.redownloadMainModel()
+        advanceUntilIdle()
+        container.ensureBackgroundEngineInitialized()
+
+        coVerifyOrder {
+            engine.initialize()
+            engine.close()
+            artifactStore.download(any())
+            engine.initialize()
+        }
     }
 
     @Test

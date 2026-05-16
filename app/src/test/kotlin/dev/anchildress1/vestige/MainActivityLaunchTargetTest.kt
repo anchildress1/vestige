@@ -1,6 +1,7 @@
 package dev.anchildress1.vestige
 
 import android.content.Intent
+import dev.anchildress1.vestige.model.Persona
 import dev.anchildress1.vestige.storage.EntryStore
 import io.mockk.every
 import io.mockk.mockk
@@ -9,6 +10,18 @@ import org.junit.Assert.assertEquals
 import org.junit.Test
 
 class MainActivityLaunchTargetTest {
+
+    @Test
+    fun `resetOnboardingState clears completion and restores the wiped default persona`() {
+        assertEquals(
+            ResetOnboardingState(onboardingComplete = false, selectedPersona = Persona.WITNESS),
+            resetOnboardingState(defaultPersona = Persona.WITNESS),
+        )
+        assertEquals(
+            ResetOnboardingState(onboardingComplete = false, selectedPersona = Persona.EDITOR),
+            resetOnboardingState(defaultPersona = Persona.EDITOR),
+        )
+    }
 
     @Test
     fun `modelStatusBackTarget returns Settings only for the Settings drill-down`() {

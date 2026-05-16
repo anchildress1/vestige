@@ -231,7 +231,7 @@ var skippedUntil: Long? = null  // epoch ms; null when not skipped
 State transition rules:
 
 | From | Action | Who | To | skippedUntil |
-|---|---|---|---|
+|---|---|---|---|---|
 | ACTIVE | Skip | User | SKIPPED | now + 7 days |
 | ACTIVE | Drop | User | DROPPED | null |
 | SKIPPED | Undo (skip) | User | ACTIVE | null |

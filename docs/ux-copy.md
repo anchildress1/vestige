@@ -177,7 +177,7 @@ Button label:
 Behavior (per `adrs/ADR-001-stack-and-build-infra.md` §Q8):
 - Single tap. No confirmation dialog, no long-press, no two-tap arming.
 - Screen returns to idle immediately. No snackbar, no `Discarded.` confirmation, no `Undo` affordance.
-- Visible only while `CaptureSession.state == RECORDING`. Hidden once the user has tapped `STOP · FILE IT` (foreground call is in flight).
+- Visible only while `CaptureUiState` is `Recording`. Hidden once the user has tapped `STOP · FILE IT` (foreground call is in flight).
 
 There is no error copy, no destructive confirmation copy, no post-discard toast. Silent dismissal is the contract.
 

@@ -300,20 +300,6 @@ The other significant trade-off is **mark-resolved sticky vs. auto-reopen**. Sti
 
 ---
 
-## Action Items
-
-**Ordering note.** Per PRD §"Build philosophy: build first, test at failure zones," there is no upfront validation phase — phases run inline with stop-and-test points. Pattern detection's stake is STT-C and STT-D: if the 3-lens extraction does not produce reliable `tags` and `template_label`, pattern detection has nothing to count, and the spec rebuilds.
-
-1. [ ] Phase 1 — add `Pattern` ObjectBox entity per the schema above. Includes `state="below_threshold"` enum value.
-2. [ ] Phase 1 — add `lastCalloutEntryId` / `lastCalloutTimestamp` to a singleton settings row.
-3. [ ] Phase 3 — implement the five primitives' detection passes in `:core-storage` (or `:core-inference` if the title-generation model call needs proximity to `InferenceCoordinator`; pick during scaffold).
-4. [ ] Phase 3 — implement the matching predicate as a per-entry hook (`onEntryCommitted`) so `recurrence_link` resolves cheaply.
-5. [ ] Phase 3 — pattern title generation via the observation-generation prompt (ADR-002 §3); cache title on insert, never regenerate in v1.
-6. [ ] Phase 3 — global cooldown enforcement on pattern-callout append.
-7. [ ] Phase 3 — Re-eval recompute path: on Re-eval commit, recompute matches and update `supportingEntryIds`; flip patterns to/from `below_threshold` as needed.
-8. [ ] Phase 3 — unit-test fixture suite mirroring ADR-002 Q4: synthetic entry sets covering each primitive's threshold edge, the cooldown reset, dismiss/snooze/resolved transitions, and the snoozed-until expiry path.
-9. [ ] Phase 4 — Patterns list / Pattern Detail UI per `design-guidelines.md` and `ux-copy.md`; un-snooze affordance lands here.
-10. [ ] Update `architecture-brief.md` §"AppContainer Ownership" — `PatternStore` ownership note now references this ADR for state-machine behavior.
 
 ---
 

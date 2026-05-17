@@ -84,10 +84,8 @@ class DefaultModelArtifactStore(
             check(artifactFile.delete()) { "Could not delete corrupt artifact at ${artifactFile.absolutePath}" }
         }
 
-        var attempt = 0
         var lastFailure: Throwable? = null
-        while (attempt < ModelArtifactStore.MAX_DOWNLOAD_ATTEMPTS) {
-            attempt++
+        for (attempt in 1..ModelArtifactStore.MAX_DOWNLOAD_ATTEMPTS) {
             try {
                 return@withContext downloadOnce(onProgress)
             } catch (cancellation: CancellationException) {

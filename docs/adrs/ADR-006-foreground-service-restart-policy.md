@@ -54,9 +54,3 @@ The narrow window where this matters: OS kills the service while the user has th
 
 ---
 
-## Action Items
-
-1. [x] **Phase 2** — `BackgroundExtractionService.onStartCommand` returns `START_NOT_STICKY`.
-2. [x] **Phase 2** — `VestigeBoxStore.findNonTerminalEntryIds(boxStore)` exposes the recovery query; caller owns the BoxStore lifecycle (avoids the duplicate-open crash once `EntryStore` lands).
-3. [x] **Phase 2** — `AppContainer` defaults `recoveredEntryIdsLoader` to `{ emptyList() }`; production wiring upgrades when `EntryStore` lands.
-4. [ ] **Future EntryStore story** — wire `EntryStore`-owned `BoxStore` into `AppContainer.recoveredEntryIdsLoader` via `VestigeBoxStore.findNonTerminalEntryIds(boxStore)`.

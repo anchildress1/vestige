@@ -22,6 +22,7 @@ import org.json.JSONTokener
  * Inferential `flags` are dropped — the schema makes this single-lens contract explicit and
  * propagating drift would corrupt convergence.
  */
+@Suppress("TooManyFunctions") // Small parsing helpers keep the repair path narrow and testable.
 internal object LensResponseParser {
 
     private val SCHEMA_KEYS: Set<String> = setOf(
@@ -85,12 +86,34 @@ internal object LensResponseParser {
             } else {
                 if (!isArrayWrapped(raw, open)) {
                     val candidate = raw.substring(open, close + 1)
-                    found = runCatching { JSONTokener(candidate).nextValue() as? JSONObject }.getOrNull()
+                    found = parseCandidateObject(candidate)
                 }
                 cursor = open + 1
             }
         }
         return found
+    }
+
+    private fun parseCandidateObject(candidate: String): JSONObject? {
+        parseJSONObject(candidate)?.let { return it }
+        return repairMissingObjectFieldCommas(candidate)
+            ?.let(::parseJSONObject)
+    }
+
+    private fun parseJSONObject(candidate: String): JSONObject? =
+        runCatching { JSONTokener(candidate).nextValue() as? JSONObject }.getOrNull()
+
+    /**
+     * LiteRT occasionally drops commas between top-level object fields while still emitting the
+     * full schema in order, e.g. `"state_shift": true\n"vocabulary_contradictions": [...]`.
+     * Repair only the narrow "value directly followed by the next quoted key" shape so genuine
+     * non-JSON garbage still fails closed.
+     */
+    private fun repairMissingObjectFieldCommas(candidate: String): String? {
+        val repaired = MISSING_FIELD_COMMA.replace(candidate) { match ->
+            "${match.groupValues[1]},${match.groupValues[2]}"
+        }
+        return repaired.takeIf { it != candidate }
     }
 
     /**
@@ -159,4 +182,12 @@ internal object LensResponseParser {
         is JSONArray -> List(value.length()) { idx -> normalize(value.opt(idx)) }
         else -> value
     }
+
+    // Group 1 is only the value's final char — the match span is replaced in place, so the
+    // preceding bytes are untouched and a single terminator (string/number/bool/null close,
+    // or `]`/`}`) reconstructs the comma identically without re-tokenizing the whole value.
+    // Over-broad matches re-parse-fail downstream, preserving the fail-closed contract.
+    private val MISSING_FIELD_COMMA = Regex(
+        """(["\]}\w])\s*("(?:\\.|[^"\\])+":)""",
+    )
 }

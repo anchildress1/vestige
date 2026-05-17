@@ -60,7 +60,7 @@ flowchart TB
     AC --> PS
     AC --> RR
     AC --> IC
-    AC --> SS["SessionState<br/>(capture-scoped: active persona + in-flight CaptureSession)"]
+    AC --> SS["SessionState<br/>(capture-scoped: active persona + CaptureViewModel.CaptureUiState)"]
 ```
 
 ---

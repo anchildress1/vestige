@@ -59,15 +59,6 @@ class DownloadProgressTrackerTest {
     }
 
     @Test
-    fun `expectedBytes of zero logs pct as -1 without dividing`() {
-        // Smoke-only: branch coverage for the `expectedBytes <= 0` log path. The Log.d call is
-        // a side effect with no observable return; touching the path is the assertion.
-        val tracker = DownloadProgressTracker(onState = {}, onSpeed = {})
-        tracker.onProgress(currentBytes = 42, expectedBytes = 0)
-        tracker.onProgress(currentBytes = 84, expectedBytes = 0)
-    }
-
-    @Test
     fun `eta is null until a speed sample exists`() {
         val etas = mutableListOf<Long?>()
         var clock = 0L

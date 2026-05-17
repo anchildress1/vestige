@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dev.anchildress1.vestige.inference.AudioChunk
 import dev.anchildress1.vestige.inference.ForegroundResult
+import dev.anchildress1.vestige.inference.ForegroundStreamEvent
 import dev.anchildress1.vestige.model.Persona
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -118,14 +119,24 @@ class CaptureViewModel(
         }
     }
 
+    /**
+     * Done tap. No-op while [CaptureUiState.Reviewing.streaming] — the entry is not yet persisted
+     * (save fires only on the terminal event), so acknowledging mid-stream would drop it on the
+     * subsequent `onCleared()` cancel. The UI also withholds Done until streaming ends; this guard
+     * is the state-machine backstop.
+     */
     fun acknowledgeReview() {
         _state.update { current ->
             when (current) {
-                is CaptureUiState.Reviewing -> CaptureUiState.Idle(
-                    persona = current.persona,
-                    modelReadiness = current.modelReadiness,
-                    lastReview = current.review,
-                )
+                is CaptureUiState.Reviewing -> if (current.streaming) {
+                    current
+                } else {
+                    CaptureUiState.Idle(
+                        persona = current.persona,
+                        modelReadiness = current.modelReadiness,
+                        lastReview = current.review,
+                    )
+                }
 
                 else -> current
             }
@@ -298,36 +309,55 @@ class CaptureViewModel(
         }
     }
 
-    // Shared foreground result handler for both the voice path (audio call) and the typed path
-    // (text call). `durationMs` is the audio length for voice, 0 for typed.
-    private suspend fun runForeground(persona: Persona, durationMs: Long, call: suspend () -> ForegroundResult) {
+    // `durationMs` is the audio length for voice, 0 for typed. A collector cancellation
+    // (navigate-away) discards the partial — only the Terminal event saves.
+    private suspend fun runForeground(persona: Persona, durationMs: Long, call: () -> Flow<ForegroundStreamEvent>) {
+        var transcription = ""
+        val followUp = StringBuilder()
         try {
-            when (val result = call()) {
-                is ForegroundResult.Success -> {
-                    saveAndExtract(
-                        result.transcription,
-                        ZonedDateTime.now(clock.withZone(zoneId)),
-                        persona,
-                        durationMs,
-                        result.followUp,
-                    )
-                    _state.update { c ->
-                        CaptureUiState.Reviewing(
-                            persona = c.persona,
-                            modelReadiness = c.modelReadiness,
-                            review = ReviewState(
-                                transcription = result.transcription,
-                                followUp = result.followUp,
-                                persona = c.persona,
-                                elapsedMs = result.elapsedMs,
-                            ),
-                        )
+            call().collect { event ->
+                when (event) {
+                    is ForegroundStreamEvent.Transcription -> {
+                        transcription = event.text
+                        showReviewing(transcription, followUp.toString(), elapsedMs = 0L, streaming = true)
+                    }
+
+                    is ForegroundStreamEvent.FollowUpDelta -> {
+                        followUp.append(event.text)
+                        showReviewing(transcription, followUp.toString(), elapsedMs = 0L, streaming = true)
+                    }
+
+                    is ForegroundStreamEvent.Terminal -> when (val result = event.result) {
+                        is ForegroundResult.Success -> {
+                            saveAndExtract(
+                                result.transcription,
+                                ZonedDateTime.now(clock.withZone(zoneId)),
+                                persona,
+                                durationMs,
+                                result.followUp,
+                            )
+                            showReviewing(result.transcription, result.followUp, result.elapsedMs, streaming = false)
+                        }
+
+                        is ForegroundResult.ParseFailure -> {
+                            val recovered = result.recoveredTranscription
+                            if (recovered.isNullOrBlank()) {
+                                emitInferenceError(CaptureError.InferenceFailed.Reason.PARSE_FAILED)
+                            } else {
+                                // Only follow_up failed to parse; the user's words came back
+                                // clean. Save them — losing the entry is the worse failure.
+                                saveAndExtract(
+                                    recovered,
+                                    ZonedDateTime.now(clock.withZone(zoneId)),
+                                    persona,
+                                    durationMs,
+                                    null,
+                                )
+                                showReviewing(recovered, "", result.elapsedMs, streaming = false)
+                            }
+                        }
                     }
                 }
-
-                is ForegroundResult.ParseFailure -> emitInferenceError(
-                    CaptureError.InferenceFailed.Reason.PARSE_FAILED,
-                )
             }
         } catch (timeout: TimeoutCancellationException) {
             Log.w(TAG, "Foreground inference timed out", timeout)
@@ -337,6 +367,22 @@ class CaptureViewModel(
         } catch (@Suppress("TooGenericExceptionCaught") error: Exception) {
             Log.e(TAG, "Foreground inference failed", error)
             emitInferenceError(CaptureError.InferenceFailed.Reason.ENGINE_FAILED)
+        }
+    }
+
+    private fun showReviewing(transcription: String, followUp: String, elapsedMs: Long, streaming: Boolean) {
+        _state.update { c ->
+            CaptureUiState.Reviewing(
+                persona = c.persona,
+                modelReadiness = c.modelReadiness,
+                review = ReviewState(
+                    transcription = transcription,
+                    followUp = followUp,
+                    persona = c.persona,
+                    elapsedMs = elapsedMs,
+                ),
+                streaming = streaming,
+            )
         }
     }
 
@@ -375,14 +421,14 @@ fun interface VoiceCapture {
     suspend operator fun invoke(onLevel: (Float) -> Unit, stopFlow: Flow<Unit>): AudioChunk?
 }
 
-/** Runs one foreground (single-turn) call against the local model for a voice entry. */
+/** Streams one foreground (single-turn) call against the local model for a voice entry. */
 fun interface ForegroundInferenceCall {
-    suspend operator fun invoke(audio: AudioChunk, persona: Persona): ForegroundResult
+    operator fun invoke(audio: AudioChunk, persona: Persona): Flow<ForegroundStreamEvent>
 }
 
-/** Runs one foreground (single-turn) call for a typed entry — text in, `{transcription, follow_up}` out. */
+/** Streams one foreground (single-turn) call for a typed entry — text in, progressive envelope out. */
 fun interface ForegroundTextInferenceCall {
-    suspend operator fun invoke(text: String, persona: Persona): ForegroundResult
+    operator fun invoke(text: String, persona: Persona): Flow<ForegroundStreamEvent>
 }
 
 /** Routes a transcription (voice or typed) into the two-tier save + background extraction pipeline. */

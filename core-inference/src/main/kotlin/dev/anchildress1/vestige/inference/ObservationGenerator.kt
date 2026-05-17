@@ -99,9 +99,10 @@ class ObservationGenerator(
     }
 
     private suspend fun runModelFallback(entryText: String, resolved: ResolvedExtraction): List<EntryObservation> {
-        val prompt = composeModelPrompt(entryText, resolved)
+        val systemInstruction = composeSystemInstruction(resolved)
+        val userText = entryText.trimEnd()
         repeat(MAX_MODEL_ATTEMPTS) { attempt ->
-            val raw = attemptModelCall(prompt, attempt + 1) ?: return@repeat
+            val raw = attemptModelCall(systemInstruction, userText, attempt + 1) ?: return@repeat
             val parsed = parser(raw)
             if (!parsed.isNullOrEmpty()) {
                 Log.d(TAG, "model attempt ${attempt + 1} produced ${parsed.size} observations")
@@ -113,8 +114,8 @@ class ObservationGenerator(
         return emptyList()
     }
 
-    private suspend fun attemptModelCall(prompt: String, attempt: Int): String? = try {
-        engine.generateText(prompt)
+    private suspend fun attemptModelCall(systemInstruction: String, userText: String, attempt: Int): String? = try {
+        engine.generateText(systemInstruction, userText)
     } catch (cancellation: CancellationException) {
         throw cancellation
     } catch (@Suppress("TooGenericExceptionCaught") engineError: Exception) {
@@ -125,15 +126,12 @@ class ObservationGenerator(
         null
     }
 
-    private fun composeModelPrompt(entryText: String, resolved: ResolvedExtraction): String = buildString {
+    private fun composeSystemInstruction(resolved: ResolvedExtraction): String = buildString {
         append(systemPromptLoader())
         append("\n\n")
         append(outputSchemaLoader())
         append("\n\n## RESOLVED FIELDS\n")
         append(renderResolved(resolved))
-        append("\n\n## ENTRY\n")
-        append(entryText.trimEnd())
-        append('\n')
     }
 
     private fun renderResolved(resolved: ResolvedExtraction): String {

@@ -3,12 +3,16 @@ package dev.anchildress1.vestige.ui.capture
 import app.cash.turbine.test
 import dev.anchildress1.vestige.inference.AudioChunk
 import dev.anchildress1.vestige.inference.ForegroundResult
+import dev.anchildress1.vestige.inference.ForegroundStreamEvent
 import dev.anchildress1.vestige.model.Persona
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.asFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
@@ -26,6 +30,7 @@ import java.time.ZoneOffset
 import java.util.concurrent.atomic.AtomicInteger
 
 @OptIn(ExperimentalCoroutinesApi::class)
+@Suppress("LargeClass") // One cohesive VM state-machine suite — mic/model/persona/record/type/stream paths.
 class CaptureViewModelTest {
 
     private val dispatcher = UnconfinedTestDispatcher()
@@ -96,6 +101,89 @@ class CaptureViewModelTest {
     }
 
     @Test
+    fun `multi-event stream reviews the authoritative Terminal result and saves once`() = runTest(dispatcher) {
+        // A full Transcription + deltas + Terminal script (vs the single-Terminal fakes used
+        // elsewhere) proves the VM folds a multi-event stream into one Reviewing and saves only
+        // at Terminal. StateFlow conflation under UnconfinedTestDispatcher collapses the
+        // intermediate beats (same constraint the `successful voice flow` test documents), so the
+        // terminal state is asserted via expectMostRecentItem; per-delta growth is pinned at the
+        // scanner tier (ForegroundStreamScannerTest).
+        val audio = AudioChunk(FloatArray(16), 16_000, isFinal = true)
+        val voice = FakeVoiceCapture(result = audio)
+        val scripted = listOf(
+            ForegroundStreamEvent.Transcription("i kept reopening it"),
+            ForegroundStreamEvent.FollowUpDelta("what "),
+            ForegroundStreamEvent.FollowUpDelta("were you avoiding"),
+            ForegroundStreamEvent.Terminal(successResult("i kept reopening it", "what were you avoiding")),
+        )
+        val save = RecordingSaveAndExtract()
+        val vm = newViewModel(
+            voice = voice,
+            inference = ForegroundInferenceCall { _, _ -> scripted.asFlow() },
+            save = save,
+            initialReadiness = ModelReadiness.Ready,
+        )
+
+        vm.state.test {
+            assertTrue(awaitItem() is CaptureUiState.Idle)
+            vm.startRecording()
+            assertTrue(awaitItem() is CaptureUiState.Recording)
+            voice.completeWithResult()
+
+            val reviewing = expectMostRecentItem() as CaptureUiState.Reviewing
+            assertEquals("i kept reopening it", reviewing.review.transcription)
+            assertEquals("what were you avoiding", reviewing.review.followUp)
+            cancelAndIgnoreRemainingEvents()
+        }
+        assertEquals("Terminal Success saves exactly once", 1, save.invocations.get())
+    }
+
+    @Test
+    fun `streaming Reviewing withholds save and acknowledge until the terminal event`() = runTest(dispatcher) {
+        // P1+P2 regression: a partial event puts the UI in Reviewing, but the entry isn't
+        // persisted until Terminal. Acknowledging mid-stream would drop it on onCleared()'s
+        // collector cancel, and re-applying later deltas after a premature Done would resurrect
+        // the review. The streaming flag gates both.
+        val audio = AudioChunk(FloatArray(16), 16_000, isFinal = true)
+        val voice = FakeVoiceCapture(result = audio)
+        val gate = CompletableDeferred<Unit>()
+        val save = RecordingSaveAndExtract()
+        val vm = newViewModel(
+            voice = voice,
+            inference = ForegroundInferenceCall { _, _ ->
+                flow {
+                    emit(ForegroundStreamEvent.Transcription("half a thought"))
+                    gate.await()
+                    emit(ForegroundStreamEvent.Terminal(successResult("half a thought", "and the rest")))
+                }
+            },
+            save = save,
+            initialReadiness = ModelReadiness.Ready,
+        )
+
+        vm.startRecording()
+        voice.completeWithResult()
+        advanceUntilIdle()
+
+        val streaming = vm.state.value as CaptureUiState.Reviewing
+        assertTrue("partial event marks Reviewing as streaming", streaming.streaming)
+        assertEquals("no save before terminal", 0, save.invocations.get())
+        vm.acknowledgeReview()
+        assertTrue("acknowledge while streaming is a no-op", vm.state.value is CaptureUiState.Reviewing)
+        assertEquals("still no save after a mid-stream Done", 0, save.invocations.get())
+
+        gate.complete(Unit)
+        advanceUntilIdle()
+
+        val terminal = vm.state.value as CaptureUiState.Reviewing
+        assertTrue("terminal clears the streaming flag", !terminal.streaming)
+        assertEquals("and the rest", terminal.review.followUp)
+        assertEquals("terminal saves exactly once", 1, save.invocations.get())
+        vm.acknowledgeReview()
+        assertEquals("half a thought", (vm.state.value as CaptureUiState.Idle).lastReview?.transcription)
+    }
+
+    @Test
     fun `voice flow passes audio durationMs to saveAndExtract`() = runTest(dispatcher) {
         // AudioChunk(FloatArray(16), 16_000) → durationMs = 16 * 1_000 / 16_000 = 1L
         val audio = AudioChunk(FloatArray(16), sampleRateHz = 16_000, isFinal = true)
@@ -144,6 +232,75 @@ class CaptureViewModelTest {
         assertEquals(
             CaptureError.InferenceFailed(CaptureError.InferenceFailed.Reason.PARSE_FAILED),
             (terminal as CaptureUiState.Idle).error,
+        )
+        assertEquals(0, save.invocations.get())
+    }
+
+    @Test
+    fun `ParseFailure with a recovered transcription saves the words instead of discarding them`() =
+        runTest(dispatcher) {
+            val audio = AudioChunk(FloatArray(16), 16_000, isFinal = true)
+            val voice = FakeVoiceCapture(result = audio)
+            val inference = FakeForegroundInference(
+                ForegroundResult.ParseFailure(
+                    persona = Persona.WITNESS,
+                    rawResponse = "<transcription>i kept reopening it</transcription>",
+                    elapsedMs = 100,
+                    completedAt = clock.instant(),
+                    reason = ForegroundResult.ParseReason.MISSING_FOLLOW_UP,
+                    recoveredTranscription = "i kept reopening it",
+                ),
+            )
+            val save = RecordingSaveAndExtract()
+            val vm = newViewModel(
+                voice = voice,
+                inference = inference,
+                save = save,
+                initialReadiness = ModelReadiness.Ready,
+            )
+            vm.startRecording()
+            voice.completeWithResult()
+            advanceUntilIdle()
+
+            val terminal = vm.state.value
+            assertTrue("expected Reviewing, was $terminal", terminal is CaptureUiState.Reviewing)
+            terminal as CaptureUiState.Reviewing
+            assertEquals("i kept reopening it", terminal.review.transcription)
+            assertEquals("", terminal.review.followUp)
+            assertEquals(1, save.invocations.get())
+            assertEquals("i kept reopening it", save.lastText)
+            assertNull("recovered save carries no follow-up", save.lastFollowUpText)
+        }
+
+    @Test
+    fun `ParseFailure with a blank recovered transcription still surfaces PARSE_FAILED`() = runTest(dispatcher) {
+        val audio = AudioChunk(FloatArray(16), 16_000, isFinal = true)
+        val voice = FakeVoiceCapture(result = audio)
+        val inference = FakeForegroundInference(
+            ForegroundResult.ParseFailure(
+                persona = Persona.WITNESS,
+                rawResponse = "",
+                elapsedMs = 100,
+                completedAt = clock.instant(),
+                reason = ForegroundResult.ParseReason.MISSING_TRANSCRIPTION,
+                recoveredTranscription = "   ",
+            ),
+        )
+        val save = RecordingSaveAndExtract()
+        val vm = newViewModel(
+            voice = voice,
+            inference = inference,
+            save = save,
+            initialReadiness = ModelReadiness.Ready,
+        )
+        vm.startRecording()
+        voice.completeWithResult()
+        advanceUntilIdle()
+
+        val terminal = vm.state.value as CaptureUiState.Idle
+        assertEquals(
+            CaptureError.InferenceFailed(CaptureError.InferenceFailed.Reason.PARSE_FAILED),
+            terminal.error,
         )
         assertEquals(0, save.invocations.get())
     }
@@ -226,7 +383,7 @@ class CaptureViewModelTest {
             voice = voice,
             inference = ForegroundInferenceCall { _, _ ->
                 inferenceCalls.incrementAndGet()
-                parseFailure()
+                terminal(parseFailure())
             },
             save = RecordingSaveAndExtract(),
             initialReadiness = ModelReadiness.Ready,
@@ -350,13 +507,15 @@ class CaptureViewModelTest {
         val vm = newViewModel(
             save = save,
             textInference = ForegroundTextInferenceCall { text, persona ->
-                ForegroundResult.Success(
-                    persona = persona,
-                    rawResponse = "<x/>",
-                    elapsedMs = 800,
-                    completedAt = clock.instant(),
-                    transcription = text,
-                    followUp = "and then what",
+                terminal(
+                    ForegroundResult.Success(
+                        persona = persona,
+                        rawResponse = "<x/>",
+                        elapsedMs = 800,
+                        completedAt = clock.instant(),
+                        transcription = text,
+                        followUp = "and then what",
+                    ),
                 )
             },
             initialReadiness = ModelReadiness.Ready,
@@ -379,7 +538,7 @@ class CaptureViewModelTest {
             save = save,
             textInference = ForegroundTextInferenceCall { _, _ ->
                 textCalls.incrementAndGet()
-                parseFailure()
+                terminal(parseFailure())
             },
             initialReadiness = ModelReadiness.Loading,
         )
@@ -397,7 +556,7 @@ class CaptureViewModelTest {
         val save = RecordingSaveAndExtract()
         val vm = newViewModel(
             save = save,
-            textInference = ForegroundTextInferenceCall { _, _ -> parseFailure() },
+            textInference = ForegroundTextInferenceCall { _, _ -> terminal(parseFailure()) },
             initialReadiness = ModelReadiness.Ready,
         )
 
@@ -641,15 +800,24 @@ class CaptureViewModelTest {
         completedAt = clock.instant(),
         reason = ForegroundResult.ParseReason.EMPTY_RESPONSE,
     )
+
+    // Wraps a final ForegroundResult as a single-Terminal stream — the streaming surface's
+    // collapsed shape for tests that only care about the terminal verdict, not live deltas.
+    private fun terminal(result: ForegroundResult): Flow<ForegroundStreamEvent> =
+        flowOf(ForegroundStreamEvent.Terminal(result))
 }
 
 private class FakeForegroundInference(private val result: ForegroundResult) : ForegroundInferenceCall {
-    override suspend fun invoke(audio: AudioChunk, persona: Persona): ForegroundResult = result
+    override fun invoke(audio: AudioChunk, persona: Persona): Flow<ForegroundStreamEvent> =
+        flowOf(ForegroundStreamEvent.Terminal(result))
 }
 
 private class SuspendingForegroundInference(private val pending: CompletableDeferred<ForegroundResult>) :
     ForegroundInferenceCall {
-    override suspend fun invoke(audio: AudioChunk, persona: Persona): ForegroundResult = pending.await()
+    // The flow body awaits `pending` before emitting, so the VM stays in Inferring until the
+    // test releases it — preserving the pre-streaming "suspended call" semantics these tests rely on.
+    override fun invoke(audio: AudioChunk, persona: Persona): Flow<ForegroundStreamEvent> =
+        flow { emit(ForegroundStreamEvent.Terminal(pending.await())) }
 }
 
 private class CountingLimitWarningCue : LimitWarningCue {
@@ -670,6 +838,8 @@ private class AdvancingClock(start: Instant = Instant.parse("2026-05-14T09:41:00
 private class RecordingSaveAndExtract : SaveAndExtract {
     val invocations: AtomicInteger = AtomicInteger(0)
     var lastDurationMs: Long = -1L
+    var lastText: String? = null
+    var lastFollowUpText: String? = null
     override suspend fun invoke(
         text: String,
         capturedAt: java.time.ZonedDateTime,
@@ -679,6 +849,8 @@ private class RecordingSaveAndExtract : SaveAndExtract {
     ) {
         invocations.incrementAndGet()
         lastDurationMs = durationMs
+        lastText = text
+        lastFollowUpText = followUpText
     }
 }
 

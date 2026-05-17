@@ -20,7 +20,7 @@ class SttAProbeTest {
     @Test
     fun `transcribeAudioBytesAsFloat32Le encodes samples and returns engine result`() = runTest {
         val engine = mockk<LiteRtLmEngine>()
-        coEvery { engine.sendMessageContents(any()) } returns "hello world"
+        coEvery { engine.sendMessageContents(any(), any()) } returns "hello world"
         val result = SttAProbe(engine).transcribeAudioBytesAsFloat32Le(floatArrayOf(0.5f, -0.5f))
         assertEquals("hello world", result)
     }
@@ -28,14 +28,14 @@ class SttAProbeTest {
     @Test
     fun `transcribeAudioBytesAsFloat32Le uses default prompt when none supplied`() = runTest {
         val engine = mockk<LiteRtLmEngine>()
-        coEvery { engine.sendMessageContents(any()) } returns "text"
+        coEvery { engine.sendMessageContents(any(), any()) } returns "text"
         SttAProbe(engine).transcribeAudioBytesAsFloat32Le(floatArrayOf(0.1f))
     }
 
     @Test
     fun `transcribeAudioFile delegates path to engine and returns result`() = runTest {
         val engine = mockk<LiteRtLmEngine>()
-        coEvery { engine.sendMessageContents(any()) } returns "file transcript"
+        coEvery { engine.sendMessageContents(any(), any()) } returns "file transcript"
         val result = SttAProbe(engine).transcribeAudioFile("/valid/path.wav")
         assertEquals("file transcript", result)
     }
@@ -43,7 +43,7 @@ class SttAProbeTest {
     @Test
     fun `transcribeViaTempWav writes wav calls engine and deletes temp file`(@TempDir dir: File) = runTest {
         val engine = mockk<LiteRtLmEngine>()
-        coEvery { engine.sendMessageContents(any()) } returns "wav transcript"
+        coEvery { engine.sendMessageContents(any(), any()) } returns "wav transcript"
         val result = SttAProbe(engine).transcribeViaTempWav(floatArrayOf(0.1f, 0.2f), 16_000, dir)
         assertEquals("wav transcript", result)
     }

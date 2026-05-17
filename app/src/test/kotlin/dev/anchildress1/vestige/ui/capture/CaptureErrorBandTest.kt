@@ -117,7 +117,10 @@ class CaptureErrorBandTest {
         }
         composeRule.onNodeWithText(CaptureCopy.BAND_LABEL_MIC).assertIsDisplayed()
         composeRule.onNodeWithText(CaptureCopy.MIC_DENIED_LINE).assertIsDisplayed()
-        composeRule.onNodeWithContentDescription("Mic permission denied.", substring = true).assertIsDisplayed()
+        val band = composeRule.onNodeWithContentDescription("Mic permission denied.", substring = true)
+        band.assertIsDisplayed()
+        band.assert(SemanticsMatcher.keyIsDefined(SemanticsProperties.LiveRegion))
+        band.assert(SemanticsMatcher.keyNotDefined(SemanticsActions.OnClick))
     }
 
     @Test
@@ -128,6 +131,10 @@ class CaptureErrorBandTest {
             }
         }
         composeRule.onNodeWithText(CaptureCopy.MIC_UNAVAILABLE_LINE).assertIsDisplayed()
+        val band = composeRule.onNodeWithContentDescription("Mic unavailable.", substring = true)
+        band.assertIsDisplayed()
+        band.assert(SemanticsMatcher.keyIsDefined(SemanticsProperties.LiveRegion))
+        band.assert(SemanticsMatcher.keyNotDefined(SemanticsActions.OnClick))
     }
 
     @Test
@@ -179,6 +186,10 @@ class CaptureErrorBandTest {
         }
         composeRule.onNodeWithText(CaptureCopy.BAND_LABEL_MODEL_LOADING).assertIsDisplayed()
         composeRule.onNodeWithText(CaptureCopy.MODEL_LOADING_LINE).assertIsDisplayed()
+        val band = composeRule.onNodeWithContentDescription("Model warming up.", substring = true)
+        band.assertIsDisplayed()
+        band.assert(SemanticsMatcher.keyIsDefined(SemanticsProperties.LiveRegion))
+        band.assert(SemanticsMatcher.keyNotDefined(SemanticsActions.OnClick))
     }
 
     @Test
@@ -189,6 +200,10 @@ class CaptureErrorBandTest {
             }
         }
         composeRule.onNodeWithText(CaptureCopy.MODEL_PAUSED_LINE).assertIsDisplayed()
+        val band = composeRule.onNodeWithContentDescription("Model paused.", substring = true)
+        band.assertIsDisplayed()
+        band.assert(SemanticsMatcher.keyIsDefined(SemanticsProperties.LiveRegion))
+        band.assert(SemanticsMatcher.keyNotDefined(SemanticsActions.OnClick))
     }
 
     @Test
@@ -200,6 +215,10 @@ class CaptureErrorBandTest {
         }
         composeRule.onNodeWithText("MODEL · 73%").assertIsDisplayed()
         composeRule.onNodeWithText("Downloading model · 73%").assertIsDisplayed()
+        val band = composeRule.onNodeWithContentDescription("Model downloading 73 percent.", substring = true)
+        band.assertIsDisplayed()
+        band.assert(SemanticsMatcher.keyIsDefined(SemanticsProperties.LiveRegion))
+        band.assert(SemanticsMatcher.keyNotDefined(SemanticsActions.OnClick))
     }
 
     @Test

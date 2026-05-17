@@ -750,16 +750,11 @@ the unit tier, no on-device cost.
 Implementation queued for post-Phase-4. Story file gets one entry per item above; tracking
 lives in stories, work-decision rationale lives here.
 
+### Addendum (2026-05-17) — goblin-hours addendum removed (cancels the §"personality + observation depth pass" persona-aware plan)
+
+The "**Goblin-hours addendum becomes persona-aware**" item in the 2026-05-15 addendum is **cancelled, not deferred** (operator decision). Rather than splitting `foreground/goblin-hours-addendum.txt` into per-persona variants to stop it flattening persona divergence at the demo, the addendum is **deleted entirely**: the resource, the `ForegroundInference` injection + `isGoblinHours`/`GOBLIN_HOURS_*` members, the `zoneId` constructor seam, `GoblinHoursAddendumSmokeTest`, and the `ForegroundInferenceTest` goblin cases. The follow-up no longer receives any time-of-day steering.
+
+Scope is the **addendum only**. The separate goblin-hours layers stay: `TemplateLabel.GOBLIN_HOURS` (this ADR §"template_label" closed enum), `ObservationGenerator.goblinHoursObservation`, `TemplateLabeler`, and ADR-003's `time_of_day_cluster` pattern are unaffected — they are not prompt steering and carry the user-facing Goblin Hours signal on their own. Prior decision sections above are unchanged per ADR discipline; this addendum is additive.
+
 ---
 
-## Action Items
-
-1. [ ] STT-B — verify foreground call returns transcription + follow-up reliably as structured output across multi-turn. Output decision: structured JSON vs markdown-with-headers.
-2. [ ] STT-C instrumentation — measure JSON-parse success rate across 10+ varied test dumps per lens as part of tag-consistency assessment. If parse <95%, switch all lens outputs to markdown-with-headers and update `:core-inference` parser accordingly. Parse reliability is the prerequisite that lets STT-C measure tag consistency at all; it is not a separate stop-and-test.
-3. [ ] STT-D — confirm 3-lens outputs differ meaningfully on at least 30% of test entries. If not, halt and replan.
-4. [ ] Phase 1 — implement `:core-inference` prompt composer with separate lens/surface module storage. Log composed prompts in dev builds.
-5. [ ] Phase 1 — implement convergence resolver as Kotlin code with the unit test suite specified in Q4.
-6. [ ] Phase 1 — implement background scheduler against the `extraction_status` / `attempt_count` / `last_error` fields and cold-start sweep defined in ADR-001 Q3.
-7. [ ] Phase 2 — wire foreground call to UI streaming or non-streaming per Q1 decision.
-8. [ ] Phase 4 — add re-eval cost confirmation per Q3.
-9. [x] Update root README's "Reading order" to link this ADR alongside ADR-001.

@@ -6,6 +6,7 @@ import androidx.compose.ui.test.assertHasClickAction
 import androidx.compose.ui.test.assertHeightIsAtLeast
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
@@ -14,10 +15,13 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.unit.dp
 import dev.anchildress1.vestige.inference.AudioChunk
 import dev.anchildress1.vestige.inference.ForegroundResult
+import dev.anchildress1.vestige.inference.ForegroundStreamEvent
 import dev.anchildress1.vestige.model.Persona
 import dev.anchildress1.vestige.ui.theme.VestigeTheme
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.setMain
@@ -139,6 +143,22 @@ class CaptureScreenTest {
     }
 
     @Test
+    fun `reviewing state withholds DONE while streaming`() {
+        val vm = streamingReviewingViewModel()
+        composeRule.setContent { VestigeTheme { captureScreen(vm) } }
+        composeRule.onAllNodesWithContentDescription("Done").assertCountEquals(0)
+    }
+
+    @Test
+    fun `reviewing state withholds History link while streaming`() {
+        val vm = streamingReviewingViewModel()
+        composeRule.setContent {
+            VestigeTheme { captureScreen(vm, chrome = IdleChromeCallbacks(onHistoryTap = {})) }
+        }
+        composeRule.onAllNodesWithContentDescription(CaptureCopy.HISTORY_LINK_A11Y).assertCountEquals(0)
+    }
+
+    @Test
     fun `reviewing state history link present when onOpenHistory provided`() {
         val vm = newReviewingViewModel()
         composeRule.setContent {
@@ -188,14 +208,39 @@ class CaptureScreenTest {
             initialPersona = Persona.WITNESS,
             recordVoice = VoiceCapture { _, _ -> audio },
             foregroundInference = ForegroundInferenceCall { _, _ ->
-                ForegroundResult.Success(
-                    persona = Persona.WITNESS,
-                    rawResponse = "",
-                    elapsedMs = 0L,
-                    completedAt = clock.instant(),
-                    transcription = "something happened",
-                    followUp = "sounds like a pattern",
+                flowOf(
+                    ForegroundStreamEvent.Terminal(
+                        ForegroundResult.Success(
+                            persona = Persona.WITNESS,
+                            rawResponse = "",
+                            elapsedMs = 0L,
+                            completedAt = clock.instant(),
+                            transcription = "something happened",
+                            followUp = "sounds like a pattern",
+                        ),
+                    ),
                 )
+            },
+            saveAndExtract = SaveAndExtract { _, _, _, _, _ -> },
+            foregroundTextInference = ForegroundTextInferenceCall { _, _ -> error("unused") },
+            clock = clock,
+            zoneId = ZoneOffset.UTC,
+            initialReadiness = ModelReadiness.Ready,
+        ).also { it.startRecording() }
+    }
+
+    // Emits a partial Transcription then parks before Terminal — the VM stays in
+    // Reviewing(streaming = true), the state the DONE-withhold gate targets.
+    private fun streamingReviewingViewModel(): CaptureViewModel {
+        val audio = AudioChunk(FloatArray(16), sampleRateHz = 16_000, isFinal = true)
+        return CaptureViewModel(
+            initialPersona = Persona.WITNESS,
+            recordVoice = VoiceCapture { _, _ -> audio },
+            foregroundInference = ForegroundInferenceCall { _, _ ->
+                flow {
+                    emit(ForegroundStreamEvent.Transcription("still talking"))
+                    kotlinx.coroutines.awaitCancellation() // park before Terminal
+                }
             },
             saveAndExtract = SaveAndExtract { _, _, _, _, _ -> },
             foregroundTextInference = ForegroundTextInferenceCall { _, _ -> error("unused") },
@@ -213,9 +258,9 @@ class CaptureScreenTest {
             // case which is reached only via a real engine path on-device.
             recordVoice = VoiceCapture { _, _ -> if (startInInferringPhase) audio else null },
             foregroundInference = ForegroundInferenceCall { _, _ ->
-                // Suspend forever for the Inferring-phase test — VM stays in Inferring until
-                // cancellation. The test only verifies that the route reaches the placeholder.
-                kotlinx.coroutines.suspendCancellableCoroutine { /* park */ }
+                // Cold flow that never emits — VM stays in Inferring until cancellation. The
+                // suspension lives inside the flow so the SAM stays non-suspend (S6309).
+                flow { kotlinx.coroutines.awaitCancellation() }
             },
             saveAndExtract = SaveAndExtract { _, _, _, _, _ -> },
             foregroundTextInference = ForegroundTextInferenceCall { _, _ -> error("unused") },

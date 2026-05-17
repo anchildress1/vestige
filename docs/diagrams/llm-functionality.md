@@ -55,7 +55,7 @@ sequenceDiagram
     accDescr: User stops recording. The foreground Gemma call returns transcription and follow-up. EntryStore persists markdown first then ObjectBox and marks extraction PENDING. The background pass runs three sequential lens calls, the resolver writes fields, entry observations are generated, then pattern detection runs if the threshold is met.
 
     actor U as User
-    participant Cap as CaptureSession
+    participant Cap as CaptureViewModel
     participant FG as Gemma (foreground)
     participant ES as EntryStore
     participant BG as Background pass

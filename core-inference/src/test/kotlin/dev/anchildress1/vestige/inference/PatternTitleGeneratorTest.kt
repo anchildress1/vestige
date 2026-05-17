@@ -40,20 +40,20 @@ class PatternTitleGeneratorTest {
 
     @Test
     fun `returns trimmed model output when valid`() = runTest {
-        coEvery { engine.generateText(any()) } returns "Tuesday Meetings"
+        coEvery { engine.generateText(any(), any()) } returns "Tuesday Meetings"
         val out = newGenerator().generate(Persona.WITNESS, samplePattern())
         assertEquals("Tuesday Meetings", out)
     }
 
     @Test
     fun `strips surrounding quotes and code fences`() = runTest {
-        coEvery { engine.generateText(any()) } returns "\"Goblin Hours\""
+        coEvery { engine.generateText(any(), any()) } returns "\"Goblin Hours\""
         assertEquals("Goblin Hours", newGenerator().generate(Persona.HARDASS, samplePattern()))
     }
 
     @Test
     fun `truncates to 24 chars on word boundary`() = runTest {
-        coEvery { engine.generateText(any()) } returns "Way Too Long Of A Pattern Title For This"
+        coEvery { engine.generateText(any(), any()) } returns "Way Too Long Of A Pattern Title For This"
         val out = newGenerator().generate(Persona.EDITOR, samplePattern())
         assertNotNull(out)
         assertTrue(out!!.length <= PatternTitleGenerator.MAX_TITLE_CHARS, "got '$out' (${out.length} chars)")
@@ -61,19 +61,19 @@ class PatternTitleGeneratorTest {
 
     @Test
     fun `takes only first line — model run-on is discarded`() = runTest {
-        coEvery { engine.generateText(any()) } returns "Aftermath Loop\nThis pattern means..."
+        coEvery { engine.generateText(any(), any()) } returns "Aftermath Loop\nThis pattern means..."
         assertEquals("Aftermath Loop", newGenerator().generate(Persona.WITNESS, samplePattern()))
     }
 
     @Test
     fun `returns null when output is empty`() = runTest {
-        coEvery { engine.generateText(any()) } returns "   "
+        coEvery { engine.generateText(any(), any()) } returns "   "
         assertNull(newGenerator().generate(Persona.WITNESS, samplePattern()))
     }
 
     @Test
     fun `returns null when forbidden phrase detected`() = runTest {
-        coEvery { engine.generateText(any()) } returns "Try This Now"
+        coEvery { engine.generateText(any(), any()) } returns "Try This Now"
         val out = newGenerator(forbidden = { it.lowercase().contains("try") })
             .generate(Persona.WITNESS, samplePattern())
         assertNull(out)
@@ -81,7 +81,7 @@ class PatternTitleGeneratorTest {
 
     @Test
     fun `swallows engine exceptions and returns null`() = runTest {
-        coEvery { engine.generateText(any()) } throws RuntimeException("oom")
+        coEvery { engine.generateText(any(), any()) } throws RuntimeException("oom")
         assertNull(newGenerator().generate(Persona.WITNESS, samplePattern()))
     }
 
@@ -89,13 +89,13 @@ class PatternTitleGeneratorTest {
     fun `strips disallowed punctuation per prompt contract`() = runTest {
         // ADR-compliant titles forbid punctuation except an optional hyphen. A model returning
         // `Aftermath Loop!` must not persist with the trailing exclamation.
-        coEvery { engine.generateText(any()) } returns "Aftermath Loop!"
+        coEvery { engine.generateText(any(), any()) } returns "Aftermath Loop!"
         assertEquals("Aftermath Loop", newGenerator().generate(Persona.WITNESS, samplePattern()))
     }
 
     @Test
     fun `preserves hyphen but drops periods commas semicolons`() = runTest {
-        coEvery { engine.generateText(any()) } returns "Tuesday-Loop, Again."
+        coEvery { engine.generateText(any(), any()) } returns "Tuesday-Loop, Again."
         assertEquals("Tuesday-Loop Again", newGenerator().generate(Persona.WITNESS, samplePattern()))
     }
 
@@ -104,13 +104,13 @@ class PatternTitleGeneratorTest {
         // The prior sanitizer only matched bare ```; a language-tagged fence
         // (```text\nAftermath\n```) kept the language token as the first line and persisted
         // it. Now the whole fence wrapper is dropped — inner content survives.
-        coEvery { engine.generateText(any()) } returns "```text\nAftermath Loop\n```"
+        coEvery { engine.generateText(any(), any()) } returns "```text\nAftermath Loop\n```"
         assertEquals("Aftermath Loop", newGenerator().generate(Persona.WITNESS, samplePattern()))
     }
 
     @Test
     fun `strips bare triple-backtick fence (regression of original case)`() = runTest {
-        coEvery { engine.generateText(any()) } returns "```\nGoblin Hours\n```"
+        coEvery { engine.generateText(any(), any()) } returns "```\nGoblin Hours\n```"
         assertEquals("Goblin Hours", newGenerator().generate(Persona.WITNESS, samplePattern()))
     }
 }

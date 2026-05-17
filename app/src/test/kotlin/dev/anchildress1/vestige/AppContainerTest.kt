@@ -5,6 +5,7 @@ import android.content.Intent
 import dev.anchildress1.vestige.inference.BackgroundExtractionResult
 import dev.anchildress1.vestige.inference.Embedder
 import dev.anchildress1.vestige.inference.ForegroundResult
+import dev.anchildress1.vestige.inference.ForegroundStreamEvent
 import dev.anchildress1.vestige.inference.HistoryChunk
 import dev.anchildress1.vestige.inference.LiteRtLmEngine
 import dev.anchildress1.vestige.lifecycle.BackgroundExtractionLifecycleState
@@ -34,6 +35,7 @@ import io.mockk.verify
 import io.objectbox.BoxStore
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
@@ -458,10 +460,12 @@ class AppContainerTest {
     fun `runForegroundTextCall initializes the engine then delegates to the foreground text path`(
         @TempDir tempRoot: File,
     ) = runTest {
-        // The relaxed engine returns "" from sendMessageContents, so the parser yields a
-        // ParseFailure — enough to prove the wiring (engine init + delegation to the text path).
-        // Response parsing itself is covered at the core-inference tier (ForegroundInferenceTest),
-        // where the litertlm Content type is on the classpath.
+        // Relaxed mock: streamMessageContents returns an empty Flow, so the terminal parse
+        // yields a ParseFailure — enough to prove the wiring (engine init + delegation to the
+        // streaming text path). The stub is intentionally NOT spelled out here: referencing
+        // streamMessageContents pulls litertlm's Content param type onto :app's test classpath,
+        // which it lacks. Response parsing is covered at the core-inference tier
+        // (ForegroundInferenceTest), where Content is on the classpath.
         val engine = mockk<LiteRtLmEngine>(relaxed = true)
         val modelFile = File(tempRoot, "ready-model.litertlm").apply { writeText("x") }
         val artifactStore = fakeArtifactStore(artifactFile = modelFile, expectedByteSize = 1L)
@@ -482,12 +486,13 @@ class AppContainerTest {
             scope = backgroundScope,
         )
 
-        val result = container.runForegroundTextCall(
+        val events = container.runForegroundTextCall(
             text = "typed it",
             persona = dev.anchildress1.vestige.model.Persona.EDITOR,
-        )
+        ).toList()
 
-        assertTrue(result is ForegroundResult.ParseFailure)
+        val terminal = events.filterIsInstance<ForegroundStreamEvent.Terminal>().single()
+        assertTrue(terminal.result is ForegroundResult.ParseFailure)
         coVerify { engine.initialize() }
     }
 

@@ -4,8 +4,10 @@ import com.google.ai.edge.litertlm.Content
 import com.google.ai.edge.litertlm.ExperimentalApi
 import com.google.ai.edge.litertlm.ExperimentalFlags
 import io.mockk.mockk
+import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Assertions.assertThrows
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
@@ -22,7 +24,7 @@ class LiteRtLmEngineTest {
     fun `generateText before initialize throws IllegalStateException`() {
         val engine = LiteRtLmEngine(modelPath = NOT_USED_PATH)
         val error = assertThrows(IllegalStateException::class.java) {
-            runTest { engine.generateText("hello") }
+            runTest { engine.generateText("sys", "hello") }
         }
         assertEquals(
             "LiteRtLmEngine.generateText called before initialize() (or after close()).",
@@ -34,10 +36,38 @@ class LiteRtLmEngineTest {
     fun `sendMessageContents before initialize throws IllegalStateException`() {
         val engine = LiteRtLmEngine(modelPath = NOT_USED_PATH)
         val error = assertThrows(IllegalStateException::class.java) {
-            runTest { engine.sendMessageContents(listOf(mockk<Content>())) }
+            runTest { engine.sendMessageContents("sys", listOf(mockk<Content>())) }
         }
         assertEquals(
             "LiteRtLmEngine.sendMessageContents called before initialize() (or after close()).",
+            error.message,
+        )
+    }
+
+    @Test
+    fun `streamMessageContents before initialize throws on collection`() {
+        val engine = LiteRtLmEngine(modelPath = NOT_USED_PATH)
+        val error = assertThrows(IllegalStateException::class.java) {
+            runTest { engine.streamMessageContents("sys", listOf(mockk<Content>())).toList() }
+        }
+        assertEquals(
+            "LiteRtLmEngine.streamMessageContents called before initialize() (or after close()).",
+            error.message,
+        )
+    }
+
+    @Test
+    fun `call after close is rejected by the closing gate`() {
+        // Exercises the drain-on-close gate: close() flips `closing`, so a later call fails its
+        // acquireEngine check rather than dereferencing a freed handle. JVM-safe — the rejection
+        // fires before any native crossing. (Concurrent in-flight drain is on-device only.)
+        val engine = LiteRtLmEngine(modelPath = NOT_USED_PATH)
+        engine.close()
+        val error = assertThrows(IllegalStateException::class.java) {
+            runTest { engine.generateText("sys", "hello") }
+        }
+        assertEquals(
+            "LiteRtLmEngine.generateText called before initialize() (or after close()).",
             error.message,
         )
     }
@@ -64,20 +94,13 @@ class LiteRtLmEngineTest {
     }
 
     @Test
-    fun `close before initialize is a no-op`() {
+    fun `close before initialize does not leave the wrapper permanently closing`() {
         val engine = LiteRtLmEngine(modelPath = NOT_USED_PATH)
         engine.close() // must not throw
         engine.close() // idempotent — must not throw on second call either
-    }
 
-    @Test
-    fun `default backends only set the primary engine backend`() {
-        // Constructor-default contract: Phase 1 lives on CPU until STT-A picks an accelerator,
-        // and audio/vision backends stay null unless the caller opts in.
-        val engine = LiteRtLmEngine(modelPath = NOT_USED_PATH)
-        // Indirect assertion: constructing without explicit backends must not throw.
-        engine.close()
-        assertTrue(true)
+        assertEquals(false, engine.readBoolean("closing"))
+        assertNull(engine.readNullable("drainGate"))
     }
 
     @Test
@@ -107,4 +130,16 @@ class LiteRtLmEngineTest {
         // Path is never actually opened — the tests assert pre-state checks fire first.
         const val NOT_USED_PATH = "/tmp/never-loaded.litertlm"
     }
+}
+
+private fun LiteRtLmEngine.readBoolean(name: String): Boolean {
+    val field = LiteRtLmEngine::class.java.getDeclaredField(name)
+    field.isAccessible = true
+    return field.getBoolean(this)
+}
+
+private fun LiteRtLmEngine.readNullable(name: String): Any? {
+    val field = LiteRtLmEngine::class.java.getDeclaredField(name)
+    field.isAccessible = true
+    return field.get(this)
 }

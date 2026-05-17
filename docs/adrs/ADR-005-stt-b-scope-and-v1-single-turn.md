@@ -176,10 +176,11 @@ time.
   note above clarifies the *current* product framing; it does not foreclose the SDK-stateful
   path returning later.
 
+### Addendum (2026-05-17) — CaptureSession / Transcript retired (implementation moved, decision stands)
+
+`CaptureSession` and `Transcript`/`Turn`/`Speaker` have been **deleted**. They were proven dead: zero production code constructed or drove them — the only callers were `CaptureSessionTest`, `TranscriptTest`, and two test helpers (`ForegroundInferenceTest`, `PerCapturePersonaSmokeTest`) that span up a session purely to pass a `Persona` straight through to `ForegroundInference`. Story 2.16 streaming made the live capture lifecycle `CaptureViewModel.CaptureUiState` (Idle / Recording / Inferring / Reviewing) over the `ForegroundStreamEvent` stream, with persistence via `saveAndExtract` / `EntryStore`; the `CaptureSession` state machine became an orphaned duplicate.
+
+This is an implementation removal, **not** a decision reversal. ADR-005's decision — v1 is single-turn-per-capture, one USER + one MODEL turn, non-recoverable discard (ADR-001 §Q8) — still holds; it is now realized by `CaptureViewModel` rather than `CaptureSession`. Prior decision/record sections above (incl. §"v1-scope decision executed", the `CaptureSession` rows) are unchanged per ADR discipline — they remain the historical record of how the decision shipped. The deleted-test/dead-code provenance lives in the commit, not here.
+
 ---
 
-## Action Items
-
-1. [x] Land the v1 single-turn scope decision across docs + code. _(Done across the `docs/stt-b-fallback-and-adr-004` branch commits enumerated above.)_
-2. [ ] When the docs branch merges to main, the next round of doc work re-reading ADR-002 should land here first via the cross-references already embedded in `concept-locked.md`, `PRD.md`, Story 2.4, and the inference-class KDocs.
-3. [ ] If multi-turn revival begins post-v1, treat this ADR as the predecessor; supersede it with a new ADR documenting whichever SDK-stateful test outcome lands.

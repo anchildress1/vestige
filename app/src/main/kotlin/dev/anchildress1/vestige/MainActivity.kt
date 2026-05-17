@@ -35,6 +35,7 @@ import dev.anchildress1.vestige.ui.capture.CaptureScreen
 import dev.anchildress1.vestige.ui.capture.CaptureViewModel
 import dev.anchildress1.vestige.ui.capture.ForegroundInferenceCall
 import dev.anchildress1.vestige.ui.capture.ForegroundTextInferenceCall
+import dev.anchildress1.vestige.ui.capture.HistoryRetrieval
 import dev.anchildress1.vestige.ui.capture.IdleChromeCallbacks
 import dev.anchildress1.vestige.ui.capture.ModelReadiness
 import dev.anchildress1.vestige.ui.capture.RealVoiceCapture
@@ -452,18 +453,20 @@ private fun CaptureRoute(
             foregroundInference = ForegroundInferenceCall { audio, sel ->
                 container.runForegroundCall(audio = audio, persona = sel)
             },
-            saveAndExtract = SaveAndExtract { text, capturedAt, personaSel, durationMs, followUpText ->
+            saveAndExtract = SaveAndExtract { text, capturedAt, personaSel, durationMs, followUpText, history ->
                 container.saveAndExtract(
                     entryText = text,
                     capturedAt = capturedAt,
+                    retrievedHistory = history,
                     persona = personaSel,
                     durationMs = durationMs,
                     followUpText = followUpText,
                 )
             },
-            foregroundTextInference = ForegroundTextInferenceCall { text, personaSel ->
-                container.runForegroundTextCall(text = text, persona = personaSel)
+            foregroundTextInference = ForegroundTextInferenceCall { text, personaSel, history ->
+                container.runForegroundTextCall(text = text, persona = personaSel, retrievedHistory = history)
             },
+            retrieveHistory = HistoryRetrieval { query -> container.retrieveHistory(query) },
             clock = clock,
             zoneId = zoneId,
             initialReadiness = container.modelReadinessFlow.value,
@@ -513,6 +516,7 @@ private class CaptureViewModelFactory(
     private val foregroundInference: ForegroundInferenceCall,
     private val saveAndExtract: SaveAndExtract,
     private val foregroundTextInference: ForegroundTextInferenceCall,
+    private val retrieveHistory: HistoryRetrieval,
     private val clock: Clock,
     private val zoneId: ZoneId,
     private val initialReadiness: ModelReadiness,
@@ -529,6 +533,7 @@ private class CaptureViewModelFactory(
             foregroundInference = foregroundInference,
             saveAndExtract = saveAndExtract,
             foregroundTextInference = foregroundTextInference,
+            retrieveHistory = retrieveHistory,
             clock = clock,
             zoneId = zoneId,
             initialReadiness = initialReadiness,

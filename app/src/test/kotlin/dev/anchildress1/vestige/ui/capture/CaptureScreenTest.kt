@@ -79,8 +79,8 @@ class CaptureScreenTest {
                 kotlinx.coroutines.suspendCancellableCoroutine { /* park */ }
             },
             foregroundInference = ForegroundInferenceCall { _, _ -> error("unreached") },
-            saveAndExtract = SaveAndExtract { _, _, _, _, _ -> },
-            foregroundTextInference = ForegroundTextInferenceCall { _, _ -> error("unused") },
+            saveAndExtract = SaveAndExtract { _, _, _, _, _, _ -> },
+            foregroundTextInference = ForegroundTextInferenceCall { _, _, _ -> error("unused") },
             clock = clock,
             zoneId = ZoneOffset.UTC,
             initialReadiness = ModelReadiness.Ready,
@@ -207,7 +207,12 @@ class CaptureScreenTest {
         return CaptureViewModel(
             initialPersona = Persona.WITNESS,
             recordVoice = VoiceCapture { _, _ -> audio },
+            // Option-C voice: call 1 yields the transcription, call 2 the follow-up.
             foregroundInference = ForegroundInferenceCall { _, _ ->
+                flowOf(ForegroundStreamEvent.Transcription("something happened"))
+            },
+            saveAndExtract = SaveAndExtract { _, _, _, _, _, _ -> },
+            foregroundTextInference = ForegroundTextInferenceCall { text, _, _ ->
                 flowOf(
                     ForegroundStreamEvent.Terminal(
                         ForegroundResult.Success(
@@ -215,14 +220,12 @@ class CaptureScreenTest {
                             rawResponse = "",
                             elapsedMs = 0L,
                             completedAt = clock.instant(),
-                            transcription = "something happened",
+                            transcription = text,
                             followUp = "sounds like a pattern",
                         ),
                     ),
                 )
             },
-            saveAndExtract = SaveAndExtract { _, _, _, _, _ -> },
-            foregroundTextInference = ForegroundTextInferenceCall { _, _ -> error("unused") },
             clock = clock,
             zoneId = ZoneOffset.UTC,
             initialReadiness = ModelReadiness.Ready,
@@ -236,14 +239,19 @@ class CaptureScreenTest {
         return CaptureViewModel(
             initialPersona = Persona.WITNESS,
             recordVoice = VoiceCapture { _, _ -> audio },
+            // Option-C voice: call 1 yields the transcription immediately.
             foregroundInference = ForegroundInferenceCall { _, _ ->
+                flowOf(ForegroundStreamEvent.Transcription("still talking"))
+            },
+            saveAndExtract = SaveAndExtract { _, _, _, _, _, _ -> },
+            // Call 2 starts the history-conditioned follow-up, emits a partial delta, then
+            // parks before Terminal so the VM stays in Reviewing(streaming = true).
+            foregroundTextInference = ForegroundTextInferenceCall { _, _, _ ->
                 flow {
-                    emit(ForegroundStreamEvent.Transcription("still talking"))
-                    kotlinx.coroutines.awaitCancellation() // park before Terminal
+                    emit(ForegroundStreamEvent.FollowUpDelta("thinking..."))
+                    kotlinx.coroutines.awaitCancellation()
                 }
             },
-            saveAndExtract = SaveAndExtract { _, _, _, _, _ -> },
-            foregroundTextInference = ForegroundTextInferenceCall { _, _ -> error("unused") },
             clock = clock,
             zoneId = ZoneOffset.UTC,
             initialReadiness = ModelReadiness.Ready,
@@ -262,8 +270,8 @@ class CaptureScreenTest {
                 // suspension lives inside the flow so the SAM stays non-suspend (S6309).
                 flow { kotlinx.coroutines.awaitCancellation() }
             },
-            saveAndExtract = SaveAndExtract { _, _, _, _, _ -> },
-            foregroundTextInference = ForegroundTextInferenceCall { _, _ -> error("unused") },
+            saveAndExtract = SaveAndExtract { _, _, _, _, _, _ -> },
+            foregroundTextInference = ForegroundTextInferenceCall { _, _, _ -> error("unused") },
             clock = clock,
             zoneId = ZoneOffset.UTC,
             initialReadiness = readiness,

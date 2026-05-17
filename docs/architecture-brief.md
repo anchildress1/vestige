@@ -208,6 +208,8 @@ The consequence: the foreground response the user sees immediately after recordi
 
 **Correct behavior:** run `RetrievalRepo.query(transcription)` after the foreground transcription is available but before the follow-up is generated — or restructure the foreground call to accept prior context. Story 2.18 carries the fix.
 
+**Resolved 2026-05-17 (Story 2.18, option C).** The foreground voice path is now two model calls: call 1 streams the transcription from the audio and is cancelled at the `Transcription` event (no wasted follow-up generation; the temp WAV is still discarded by `ForegroundInference`'s `finally`); `AppContainer.retrieveHistory(transcription)` then runs `RetrievalRepo.query(query, topN = 3)` on `Dispatchers.Default`; call 2 (`runForegroundTextCall`) streams a follow-up conditioned on a `## PRIOR ENTRIES` prompt block (same budget as `PromptComposer`'s background history). The call-1 transcription is authoritative — call 2's echo never overwrites the verbatim user words. Typed entries are single-call (text known up front). Retrieved history is also threaded into `saveAndExtract`, so background extraction is context-aware too. Retrieval degrades to empty (capture never blocked) at two layers — `AppContainer.retrieveHistory` and `CaptureViewModel.retrieveHistorySafely`. Operator-accepted cost: the voice path is two calls; call-1 latency is masked because the transcription streams immediately. Two-call wall-clock on the reference S24 Ultra is an unrecorded manual-check measurement.
+
 ---
 
 ## Phase-1 Build Sequence

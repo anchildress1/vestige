@@ -54,13 +54,13 @@ stt-N : conditional on stop-and-test outcome (see PRD §"Build philosophy: build
 | ~~`backfill-on-artifact-complete`~~ | — | — | **Resolved 2026-05-12.** `AppContainer.launchVectorBackfillIfReady()` now keeps one bounded in-process drain loop alive: if backlog exists before artifacts are complete, it retries for up to 12 delayed passes (60 s budget at 5 s intervals), then exits cleanly. A later save or cold start retriggers the worker. No Phase 4 download-complete event hook is required for correctness. | n/a — closed |
 | `pattern-auto-close` | v1.5 | patterns | PatternEngine detects and updates patterns forward but has no staleness scan; nothing currently transitions a pattern from active → Closed; demo scenario doesn't require auto-removal; v1 user actions are Snooze and Drop only (Closed is model-detected per ADR-011 UX direction) | post-v1 usage data shows patterns accumulating without removal; or Phase 5 UX audit surfaces the missing lifecycle transition |
 | `discard-after-stop` | v2 | capture | **Out of scope per ADR-001 §Q8.** Once STOP fires, the foreground inference call is in flight and not cancellable. Q8 explicitly defers in-flight-call cancellation; streaming would reopen the contract and require a new ADR | A streaming inference path lands AND user research shows accidental-STOP as a real pain point |
-| `archetype-template-labeling` | v1.5 | extraction | **Yanked 2026-05-17 — structurally broken on realistic input.** `TemplateLabeler` only consumes CANONICAL fields; CANONICAL requires ≥2-of-3 lens agreement; the archetype triggers (`energy_descriptor=="crashed"`, `state_shift`, tags `tunnel-exit`/`decision-loop`/`stuck`/`late-night`) are all inferences only the Inferential lens emits, which resolves to CANDIDATE and is discarded. Every realistic entry falls through to `AUDIT`; the feature only produces a real label when the user speaks the exact internal vocabulary (Literal then also emits it → 2-lens agreement). Code retained but inert through Phase 2/3; UI rendering yanked in Phase 4 (story 4.16). See detail block | A redesigned multi-lens contract: label demoted from canonical pattern-grouping key to a display-only single-lens hint (Inferential-sourced CANDIDATE accepted), superseding the ADR-002 resolver-contract coupling. New ADR required |
+| `archetype-template-labeling` | v1.5 | extraction | **Structurally broken on realistic input (traced 2026-05-17).** `TemplateLabeler` only consumes CANONICAL fields; CANONICAL requires ≥2-of-3 lens agreement; the archetype triggers (`energy_descriptor=="crashed"`, `state_shift`, tags `tunnel-exit`/`decision-loop`/`stuck`/`late-night`) are all inferences only the Inferential lens emits, which resolves to CANDIDATE and is discarded. Every realistic entry falls through to `AUDIT`; the feature only produces a real label when the user speaks the exact internal vocabulary (Literal then also emits it → 2-lens agreement). Code retained but inert through Phase 2/3; the **UI yank is queued** in Phase 4 (Story 4.16) and has **not** landed on this branch yet. See detail block | A redesigned multi-lens contract: label demoted from canonical pattern-grouping key to a display-only single-lens hint (Inferential-sourced CANDIDATE accepted), superseding the ADR-002 resolver-contract coupling. New ADR required |
 
 ## Detail blocks
 
 Only items where the index row drops information needed to disambiguate.
 
-### `archetype-template-labeling` (yanked from UI in v1; redesign is v1.5)
+### `archetype-template-labeling` (UI yank queued for v1; redesign is v1.5)
 
 ```
 root-cause (2026-05-17, traced through ConvergenceResolver.kt + TemplateLabeler.kt):
@@ -89,12 +89,14 @@ why-not-an-easy-fix:
   "crashed" from an Inferential guess (fragile, untestable without keyword
   stuffing).
 v1-decision:
-  Yank from UI in Phase 4 (story 4.16). Code (`TemplateLabeler`, `template_label`
-  field, `BackgroundExtractionResult.templateLabel`) stays inert through Phase
-  2/3 — removing it mid-phase is a cross-cutting change with no demo value.
-  Phase 4 already specs a date fallback for "no template label resolved"
-  (phase-4-ux-surface.md §Story 4.15) — that fallback becomes the only path.
-  Patterns are unaffected: they group on tags / recurrence, not the label.
+  Queue the UI yank in Phase 4 (Story 4.16); it is not landed on this branch
+  yet. Code (`TemplateLabeler`, `template_label` field,
+  `BackgroundExtractionResult.templateLabel`) stays inert through Phase 2/3 —
+  removing it mid-phase is a cross-cutting change with no demo value. Phase 4
+  already specs a date fallback for "no template label resolved"
+  (`phase-4-ux-surface.md` §Story 4.15) — that fallback becomes the only path
+  once the yank lands. Patterns are unaffected: they group on tags / recurrence,
+  not the label.
 unblock-condition:
   New ADR superseding the ADR-002 resolver coupling: label demoted to a
   display-only hint, single-lens (Inferential CANDIDATE) accepted, decoupled

@@ -174,7 +174,7 @@ SonarCloud analysis runs through the Gradle `sonar` task in CI rather than a sta
 ### Build
 
 ```bash
-make install    # bootstrap gradle wrapper, install lefthook hooks
+make setup      # bootstrap gradle wrapper, install lefthook hooks
 make doctor     # verify local toolchain and environment variables
 make build      # assemble debug APK
 make test       # unit tests + Kover XML coverage + 80% verification
@@ -184,9 +184,16 @@ make ci         # full local check (lint + test + build)
 make clean
 ```
 
+`make setup` is the hook/bootstrap target. `make install` is now device-only and requires `adb`; it does not install lefthook anymore.
+
 ### Run on a device
 
 Reference device: Galaxy S24 Ultra. External devices are best-effort; submission promise is Android 14+, 8 GB RAM, 6 GB free storage.
+
+```bash
+make install    # assemble + adb install debug APK without wiping app data
+make reinstall  # reinstall APK, push models, seed debug fixtures, tail logcat
+```
 
 **One-time phone setup**
 

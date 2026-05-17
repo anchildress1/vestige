@@ -30,6 +30,7 @@ import dev.anchildress1.vestige.model.ModelManifest
 import dev.anchildress1.vestige.model.NetworkGate
 import dev.anchildress1.vestige.model.Persona
 import dev.anchildress1.vestige.patterns.PatternDetectionOrchestrator
+import dev.anchildress1.vestige.save.BackgroundExtractionLifecycleCallbacks
 import dev.anchildress1.vestige.save.BackgroundExtractionSaveFlow
 import dev.anchildress1.vestige.save.SaveOutcome
 import dev.anchildress1.vestige.storage.CalloutCooldownEntity
@@ -148,7 +149,7 @@ class AppContainer(
         EntryStore,
         BackgroundExtractionWorker,
         ObservationGenerator,
-        (Long) -> ExtractionStatusListener,
+        BackgroundExtractionLifecycleCallbacks,
         CoroutineScope,
         PatternDetectionOrchestrator?,
     ) -> BackgroundExtractionSaveFlow =
@@ -156,7 +157,7 @@ class AppContainer(
                 entryStore,
                 worker,
                 observationGenerator,
-                listenerFactory,
+                lifecycleCallbacks,
                 extractionScope,
                 orchestrator,
             ->
@@ -164,7 +165,7 @@ class AppContainer(
                 entryStore = entryStore,
                 worker = worker,
                 observationGenerator = observationGenerator,
-                listenerFactory = listenerFactory,
+                lifecycleCallbacks = lifecycleCallbacks,
                 scope = extractionScope,
                 patternOrchestrator = orchestrator,
             )
@@ -316,7 +317,10 @@ class AppContainer(
             entryStore,
             backgroundExtractionWorker,
             observationGenerator,
-            ::extractionStatusListener,
+            BackgroundExtractionLifecycleCallbacks(
+                listenerFactory = ::extractionStatusListener,
+                onEntryFinalized = { launchVectorBackfillIfReady() },
+            ),
             scope,
             patternDetectionOrchestrator,
         )
@@ -774,15 +778,20 @@ class AppContainer(
             // most cold starts and steady-state save completions have nothing to backfill.
             if (!worker.hasPendingWork()) return@withLock VectorBackfillOutcome.IDLE
 
-            val modelState = embeddingModelArtifactStore.currentState()
-            val tokenizerState = embeddingTokenizerArtifactStore.currentState()
-            if (modelState !is ModelArtifactState.Complete ||
-                tokenizerState !is ModelArtifactState.Complete
-            ) {
-                Log.i(TAG, "Vector backfill delayed — embedding artifacts not yet complete")
-                return@withLock VectorBackfillOutcome.RETRY_LATER
+            if (worker.hasPendingEmbeddings()) {
+                val modelState = embeddingModelArtifactStore.currentState()
+                val tokenizerState = embeddingTokenizerArtifactStore.currentState()
+                if (modelState !is ModelArtifactState.Complete ||
+                    tokenizerState !is ModelArtifactState.Complete
+                ) {
+                    Log.i(TAG, "Vector backfill delayed — embedding artifacts not yet complete")
+                    return@withLock VectorBackfillOutcome.RETRY_LATER
+                }
             }
-            worker.backfill()
+            val stats = worker.backfill()
+            if (stats.failed > 0) {
+                Log.e(TAG, "Vector backfill: ${stats.failed}/${stats.total} failures; will retry on next trigger")
+            }
             VectorBackfillOutcome.COMPLETE
         }
     }

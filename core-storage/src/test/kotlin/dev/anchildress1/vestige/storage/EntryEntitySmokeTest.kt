@@ -67,6 +67,8 @@ class EntryEntitySmokeTest {
         assertEquals(ExtractionStatus.PENDING, readBack.extractionStatus)
         assertEquals(0, readBack.attemptCount)
         assertNull(readBack.lastError)
+        assertNull(readBack.vector)
+        assertEquals(0, readBack.vectorSchemaVersion)
     }
 
     @Test

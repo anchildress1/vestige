@@ -16,15 +16,15 @@ Build the end-to-end capture loop: user records or types → foreground call ret
 
 ## Phase-level acceptance criteria
 
-- [ ] Capture session can run record → transcription + follow-up → save end-to-end on the reference device.
-- [ ] **STT-B passes** (or has an explicit fallback recorded): multi-turn conversation maintains context across 3+ exchanges on E4B. If broken, single-turn fallback is implemented and the spec is updated.
+- [x] Capture session can run record → transcription + follow-up → save end-to-end on the reference device.
+- [\] **STT-B passes** (or has an explicit fallback recorded): multi-turn conversation maintains context across 3+ exchanges on E4B. If broken, single-turn fallback is implemented and the spec is updated.
 - [x] **STT-D passes** (or the architecture is dropped): the 3-lens pipeline produces meaningfully different outputs on at least 30% of the prepared sample transcripts. If lenses always agree, multi-lens drops to single-pass and the Reading section is removed from the entry detail spec. _(2026-05-10 — 5/6 entries (83%) on E4B CPU. See Story 2.7.)_
 - [x] **STT-C passes**: tag extraction is stable (≥80% same-tag emission on equivalent test dumps). If unstable, prompts have been tightened until stable, or the limitation is documented. _(2026-05-11 — **PASSED at 1.00** on S24 Ultra GPU. 41/41 (entry, tag) pairs stable across 3 runs over 17 of 18 corpus entries. C2 produced zero tags on all 3 runs (INFERENTIAL + SKEPTICAL parse-fail × 2 retries on GPU) — same regression flagged in Story 2.7's GPU re-run. Stability gate is unaffected; C2 parse-rate is tracked separately.)_
-- [ ] Convergence resolver implementation lands into Story 1.12's test scaffolding and all happy-path tests pass.
+- [x] Convergence resolver implementation lands into Story 1.12's test scaffolding and all happy-path tests pass.
 - [ ] Agent-emitted template labels work for all six archetypes on representative sample transcripts.
 - [x] Background extraction populates the canonical schema on the reference device. **Latency target is ADR-002 sequential for v1** — a scope position, not an SDK limit (ADR-008 concurrent multi-context is restored; adoption gated on Story 2.6.6 / 2.19 measurement). Story 2.7's device record stands as the measured baseline: ~5–7 s per lens, 25–55 s per entry on E4B GPU after the `libOpenCL.so` manifest fix. The 30–90s ceiling remains the timeout guard. _(2026-05-11 — measured under Story 2.7 GPU re-run.)_
 - [ ] Background extraction lifecycle service is wired per ADR-004 (conditional foreground service): app promotes when extraction begins, demotes after 30-second keep-alive once all extractions reach terminal status. Notification text matches `ux-copy.md` §"Loading States".
-- [ ] Personas (Witness / Hardass / Editor) demonstrably affect tone on the foreground response without affecting structured field extraction.
+- [x] Personas (Witness / Hardass / Editor) demonstrably affect tone on the foreground response without affecting structured field extraction.
 
 ---
 

@@ -176,6 +176,29 @@ class AppContainerTest {
     }
 
     @Test
+    fun `extractionStatusListener never schedules vector backfill directly`() = runTest {
+        var scheduled = 0
+        val container = AppContainer(
+            applicationContext = mockk<Context>(relaxed = true),
+            boxStoreFactory = { mockk(relaxed = true) },
+            markdownStoreFactory = { mockk<MarkdownEntryStore>(relaxed = true) },
+            recoveredEntryIdsLoader = { emptyList() },
+            foregroundServiceIntentFactory = { Intent("dev.anchildress1.vestige.TEST_START") },
+            foregroundServiceStarter = {},
+            vectorBackfillScheduleListener = { scheduled += 1 },
+            scope = backgroundScope,
+        )
+
+        val listener = container.extractionStatusListener(entryId = 7L)
+
+        listener.onUpdate(ExtractionStatus.COMPLETED, entryAttemptCount = 0, lastError = null)
+        listener.onUpdate(ExtractionStatus.FAILED, entryAttemptCount = 1, lastError = "boom")
+        listener.onUpdate(ExtractionStatus.TIMED_OUT, entryAttemptCount = 2, lastError = "slow")
+
+        assertEquals(0, scheduled, "save-flow finalization owns backfill scheduling now")
+    }
+
+    @Test
     fun `backgroundExtractionSaveFlow is exposed from the production container wiring`() {
         val container = AppContainer(
             applicationContext = mockk<Context>(relaxed = true),
@@ -189,6 +212,35 @@ class AppContainerTest {
         )
 
         assertNotNull(container.backgroundExtractionSaveFlow)
+    }
+
+    @Test
+    fun `backgroundExtractionSaveFlow finalization callback schedules vector backfill`() {
+        val saveFlow = mockk<BackgroundExtractionSaveFlow>(relaxed = true)
+        var scheduled = 0
+        var lifecycleCallbacks: dev.anchildress1.vestige.save.BackgroundExtractionLifecycleCallbacks? = null
+        val container = AppContainer(
+            applicationContext = mockk<Context>(relaxed = true),
+            boxStoreFactory = { mockk<BoxStore>(relaxed = true) },
+            markdownStoreFactory = { mockk<MarkdownEntryStore>(relaxed = true) },
+            modelPathLoader = { "/tmp/fake-model.litertlm" },
+            backgroundEngineFactory = { _, _ -> mockk<LiteRtLmEngine>(relaxed = true) },
+            backgroundExtractionSaveFlowFactory = { _, _, _, callbacks, _, _ ->
+                lifecycleCallbacks = callbacks
+                saveFlow
+            },
+            recoveredEntryIdsLoader = { emptyList() },
+            foregroundServiceIntentFactory = { Intent("dev.anchildress1.vestige.TEST_START") },
+            foregroundServiceStarter = {},
+            vectorBackfillScheduleListener = { scheduled += 1 },
+        )
+
+        container.backgroundExtractionSaveFlow
+        assertNotNull(lifecycleCallbacks)
+
+        lifecycleCallbacks!!.onEntryFinalized(7L)
+
+        assertEquals(1, scheduled)
     }
 
     @Test
@@ -938,6 +990,7 @@ class AppContainerTest {
             ModelArtifactState.Complete,
         )
         every { worker.hasPendingWork() } returnsMany listOf(true, true)
+        every { worker.hasPendingEmbeddings() } returnsMany listOf(true, true)
         coEvery { worker.backfill() } returns VectorBackfillWorker.BackfillStats(1, 1, 0, 1)
         val container = AppContainer(
             applicationContext = context,
@@ -1015,6 +1068,39 @@ class AppContainerTest {
     }
 
     @Test
+    fun `launchVectorBackfillIfReady runs cleanup-only work without probing artifact state`() = runTest {
+        val modelStore = mockk<ModelArtifactStore>()
+        val tokenizerStore = mockk<ModelArtifactStore>()
+        val worker = mockk<VectorBackfillWorker>()
+        val context = mockk<Context>(relaxed = true) {
+            every { filesDir } returns java.io.File("/tmp/app-files-stub")
+        }
+        every { worker.hasPendingWork() } returns true
+        every { worker.hasPendingEmbeddings() } returns false
+        coEvery { worker.backfill() } returns VectorBackfillWorker.BackfillStats(1, 0, 0, 1, skipped = 1)
+        val container = AppContainer(
+            applicationContext = context,
+            boxStoreFactory = { mockk(relaxed = true) },
+            markdownStoreFactory = { mockk<MarkdownEntryStore>(relaxed = true) },
+            embeddingArtifactManifestLoader = { EmbeddingArtifactManifest.loadDefault() },
+            embeddingModelArtifactStoreFactory = { _, _, _ -> modelStore },
+            embeddingTokenizerArtifactStoreFactory = { _, _, _ -> tokenizerStore },
+            vectorBackfillWorkerFactory = { _, _ -> worker },
+            recoveredEntryIdsLoader = { emptyList() },
+            foregroundServiceIntentFactory = { Intent("dev.anchildress1.vestige.TEST_START") },
+            foregroundServiceStarter = {},
+            scope = this,
+        )
+
+        container.launchVectorBackfillIfReady()
+        advanceUntilIdle()
+
+        coVerify(exactly = 1) { worker.backfill() }
+        coVerify(exactly = 0) { modelStore.currentState() }
+        coVerify(exactly = 0) { tokenizerStore.currentState() }
+    }
+
+    @Test
     fun `launchVectorBackfillIfReady drains a second trigger that lands during an active pass`() = runTest {
         val modelStore = mockk<ModelArtifactStore>()
         val tokenizerStore = mockk<ModelArtifactStore>()
@@ -1027,6 +1113,7 @@ class AppContainerTest {
         coEvery { modelStore.currentState() } returns ModelArtifactState.Complete
         coEvery { tokenizerStore.currentState() } returns ModelArtifactState.Complete
         every { worker.hasPendingWork() } returnsMany listOf(true, true)
+        every { worker.hasPendingEmbeddings() } returnsMany listOf(true, true)
         coEvery { worker.backfill() } coAnswers {
             if (backfillCalls++ == 0) {
                 container.launchVectorBackfillIfReady()
@@ -1064,6 +1151,7 @@ class AppContainerTest {
         coEvery { modelStore.currentState() } returns ModelArtifactState.Partial(1L, 2L)
         coEvery { tokenizerStore.currentState() } returns ModelArtifactState.Partial(1L, 2L)
         every { worker.hasPendingWork() } returns true
+        every { worker.hasPendingEmbeddings() } returns true
         val container = AppContainer(
             applicationContext = context,
             boxStoreFactory = { mockk(relaxed = true) },

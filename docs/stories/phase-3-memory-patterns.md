@@ -92,11 +92,11 @@ Query-side tag extraction goes beyond exact-substring match: a free-form query b
 
 **Done when:**
 - [x] `Entry` ObjectBox entity gains a `vector: FloatArray` field with the appropriate `@HnswIndex` annotation per ObjectBox vector-search docs. (Nullable `FloatArray?` with `@HnswIndex(dimensions = 768, distanceType = COSINE)` — null until backfill / save-time embedding populates it.)
-- [x] A one-time backfill task computes vectors for all existing entries on first launch after the schema migration. (`VectorBackfillWorker` in `:core-storage`; `AppContainer.launchVectorBackfillIfReady()` triggers from `VestigeApplication.onCreate`. Idempotent across cold starts; if artifacts are still incomplete, one in-process runner retries for up to 12 delayed passes before yielding and letting the next save / cold start retrigger.)
+- [x] A one-time backfill task computes vectors for all existing entries on first launch after the schema migration. (`VectorBackfillWorker` in `:core-storage`; `AppContainer.launchVectorBackfillIfReady()` triggers from `VestigeApplication.onCreate`. Idempotent across cold starts; if artifacts are still incomplete, one in-process runner retries for up to 12 delayed passes before yielding and letting the next save / cold start retrigger. Legacy non-`COMPLETED` rows that still carry raw-transcript vectors are cleared and schema-stamped immediately, even before artifacts finish downloading.)
 - [x] `RetrievalRepo.query(...)` from Story 3.1 augments its ranking with cosine similarity from the vector index, weighted per ADR-002 §Q2 (default settings, tunable). (`embeddingWeight` default 1.0, tunable.)
 - [x] Hybrid retrieval (keyword + tags + recency + vector) is the new default. Pure-tag-only mode is removed; the test path from Story 3.3 was a one-time comparison. (`queryHybrid()` deleted; single suspending `query()` is the hybrid path.)
 - [x] The model manifest (per Story 1.9) includes the EmbeddingGemma artifact alongside the main model. (`embeddingModelArtifactStore` + `embeddingTokenizerArtifactStore` already wired into `AppContainer` from Story 3.2.)
-- [x] APK builds, installs, and runs on the reference S24 Ultra with the new schema. (Installed + launched cleanly 2026-05-12 — schema migration adds the vector index with no crash; backfill correctly skips when artifacts are not yet downloaded. `SttEEmbeddingComparisonTest` regression run on-device confirms hybrid `query()` surfaces ≥2 cohort-relevant in top-5 across all four queries.)
+- [x] APK builds, installs, and runs on the reference S24 Ultra with the new schema. (Installed + launched cleanly 2026-05-12 — schema migration adds the vector index with no crash; embedding work waits for artifacts, while legacy stale vectors on non-`COMPLETED` rows are cleared immediately. `SttEEmbeddingComparisonTest` regression run on-device confirms hybrid `query()` surfaces ≥2 cohort-relevant in top-5 across all four queries.)
 
 **Notes / risks:** Per ADR-001 Q6, the submitted APK has exactly one schema shape. After this story lands, that shape includes the vector field permanently for v1. Do not introduce a feature flag that toggles the vector field at runtime.
 
@@ -212,16 +212,16 @@ Query-side tag extraction goes beyond exact-substring match: a free-form query b
 **The bug:** `VectorBackfillWorker` calls `embedder(entry.entryText)` — the verbatim transcription. A 30s ADHD voice entry is stream-of-consciousness; its semantic centroid captures noise. Tags, observations, and commitment topics are the model's distillation of what the entry is about — none of them are in the current vector.
 
 **Done when:**
-- [ ] Add `buildEmbeddingText(entity: EntryEntity): String` in `:core-storage`. Constructs the embedding target from resolved fields:
+- [x] Add `buildEmbeddingText(entity: EntryEntity): String` in `:core-storage`. Constructs the embedding target from resolved fields:
   - Tags: join `TagEntity` labels space-separated (e.g., `"tuesday-meeting standup flattened"`)
   - Observation texts: join each `text` field from `entryObservationsJson` with `. `
   - Commitment topic: append `topic_or_person` from `statedCommitmentJson` if non-null
   - Result: `"{tags}. {observations}. {commitment topic}"` — omit any empty component and its separator
-- [ ] `VectorBackfillWorker` calls `embedder(buildEmbeddingText(entry))` instead of `embedder(entry.entryText)`. Entries where `extractionStatus != COMPLETED` are skipped and re-swept when extraction completes.
-- [ ] Existing entries with `vector != null` are treated as stale and re-backfilled. Simplest implementation: add `vectorSchemaVersion: Int` to `EntryEntity` (default `0`); current correct version is `1`; re-backfill any entry at `< 1`. After re-backfill, set to `1`.
-- [ ] `AppContainer.launchVectorBackfillIfReady()` triggers the sweep on cold start. Processes in batches to avoid main-thread contention.
-- [ ] `RetrievalRepo.query(text: String, ...)` query-side embedding unchanged — raw user query string embeds as-is.
-- [ ] Unit test: `VectorBackfillWorkerTest` verifies `embedder` is called with the synthesized string (not `entryText`) for a fixture with populated tags + observations; verifies incomplete entries are skipped; verifies already-current `vectorSchemaVersion` entries are skipped on re-run.
+- [x] `VectorBackfillWorker` calls `embedder(buildEmbeddingText(entry))` instead of `embedder(entry.entryText)`. Legacy non-`COMPLETED` rows with stale vectors are cleared and schema-stamped; rows without any vector are left alone and still embed normally once extraction completes.
+- [x] Existing entries with `vector != null` are treated as stale and re-backfilled. Simplest implementation: add `vectorSchemaVersion: Int` to `EntryEntity` (default `0`); current correct version is `1`; re-backfill any entry at `< 1`. After re-backfill, set to `1`.
+- [x] `AppContainer.launchVectorBackfillIfReady()` triggers the sweep on cold start. Processes paged batches so the worker does not materialize the whole stale set up-front.
+- [x] `RetrievalRepo.query(text: String, ...)` query-side embedding unchanged — raw user query string embeds as-is.
+- [x] Unit test: `VectorBackfillWorkerTest` verifies `embedder` is called with the synthesized string (not `entryText`) for a fixture with populated tags + observations; verifies incomplete entries are skipped; verifies already-current `vectorSchemaVersion` entries are skipped on re-run.
 - [ ] On-device: after re-backfill, run STT-E corpus (same 4 cohort queries, same 18-entry set) against the corrected vectors and record new hybrid vs tag-only numbers in ADR-001 §"Addendum (2026-05-12)". This is the STT-E re-run required before Phase 4 starts.
 
 **Notes / risks:** `vectorSchemaVersion` is an operational field — does not appear in markdown source-of-truth. If ObjectBox is rebuilt from markdown, it defaults to `0` and the re-backfill runs, which is correct.

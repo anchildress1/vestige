@@ -18,6 +18,11 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import java.time.ZonedDateTime
 
+data class BackgroundExtractionLifecycleCallbacks(
+    val listenerFactory: (Long) -> ExtractionStatusListener,
+    val onEntryFinalized: (Long) -> Unit = {},
+)
+
 /**
  * Glues [EntryStore] + [BackgroundExtractionWorker] + the per-entry status listener into one
  * call. Two-tier per ADR-002 §"Two-Tier Processing Contract": the caller-facing [saveAndExtract]
@@ -35,13 +40,15 @@ import java.time.ZonedDateTime
  *   5. Detached: terminal worker states are buffered until persistence succeeds.
  *   6. Detached: `Success` → `EntryStore.completeEntry`; `Failed` / `TimedOut` → `failEntry`.
  *   7. Detached: once storage succeeds, the buffered terminal state is forwarded to the listener.
+ *   8. Detached: success-only post-processing finishes, then [onEntryFinalized] fires for
+ *      derived-work follow-ons like vector backfill.
  */
 @Suppress("TooManyFunctions") // Pipeline + handlers + helpers; splitting hides the linear flow.
 class BackgroundExtractionSaveFlow(
     private val entryStore: EntryStore,
     private val worker: BackgroundExtractionWorker,
     private val observationGenerator: ObservationGenerator,
-    private val listenerFactory: (Long) -> ExtractionStatusListener,
+    private val lifecycleCallbacks: BackgroundExtractionLifecycleCallbacks,
     private val scope: CoroutineScope,
     private val patternOrchestrator: PatternDetectionOrchestrator? = null,
 ) {
@@ -69,7 +76,7 @@ class BackgroundExtractionSaveFlow(
             followUpText = followUpText,
             persona = persona,
         )
-        val terminalRelay = DeferredTerminalRelay(listenerFactory(entryId))
+        val terminalRelay = DeferredTerminalRelay(lifecycleCallbacks.listenerFactory(entryId))
         // Emit PENDING before launching the detached coroutine — otherwise a fast-failing
         // extraction can emit RUNNING/FAILED first and this report would overwrite the
         // terminal state, leaving the entry stuck in-flight until process restart.
@@ -99,7 +106,7 @@ class BackgroundExtractionSaveFlow(
         capturedAt: ZonedDateTime,
         persona: Persona = Persona.WITNESS,
     ): Job {
-        val terminalRelay = DeferredTerminalRelay(listenerFactory(entryId))
+        val terminalRelay = DeferredTerminalRelay(lifecycleCallbacks.listenerFactory(entryId))
         terminalRelay.workerListener.onUpdate(ExtractionStatus.PENDING, 0, null)
         val request = BackgroundExtractionRequest(
             entryText = entryText,
@@ -175,7 +182,7 @@ class BackgroundExtractionSaveFlow(
         terminalRelay: DeferredTerminalRelay,
         persona: Persona,
     ) {
-        val observations = runObservations(entryText, result, capturedAt)
+        val observations = runObservations(entryId, entryText, result, capturedAt)
         persistTerminalState(
             entryId = entryId,
             entryAttemptCount = entryAttemptCount,
@@ -188,9 +195,7 @@ class BackgroundExtractionSaveFlow(
         // Runs after the terminal commit so a callout failure can't unwind the resolved
         // entry. Best-effort — failures are swallowed in runPatternOrchestration.
         runPatternOrchestration(entryId, persona)
-        if (patternOrchestrator != null) {
-            terminalRelay.emitTerminal(ExtractionStatus.COMPLETED, entryAttemptCount, null)
-        }
+        runEntryFinalization(entryId)
     }
 
     private suspend fun runPatternOrchestration(entryId: Long, persona: Persona): EntryObservation? {
@@ -247,6 +252,21 @@ class BackgroundExtractionSaveFlow(
         }
     }
 
+    private fun runEntryFinalization(entryId: Long) {
+        try {
+            lifecycleCallbacks.onEntryFinalized(entryId)
+        } catch (cancellation: CancellationException) {
+            throw cancellation
+        } catch (@Suppress("TooGenericExceptionCaught") error: Exception) {
+            // Post-save follow-ons must never rewrite a persisted COMPLETED entry into a
+            // failure. Log and move on; the next save / cold start can retrigger downstream work.
+            Log.w(
+                TAG,
+                "onEntryFinalized failed for entryId=$entryId: ${error.javaClass.simpleName} ${error.message}",
+            )
+        }
+    }
+
     private suspend fun handleFailure(
         entryId: Long,
         entryAttemptCount: Int,
@@ -283,6 +303,7 @@ class BackgroundExtractionSaveFlow(
     }
 
     private suspend fun runObservations(
+        entryId: Long,
         entryText: String,
         success: BackgroundExtractionResult.Success,
         capturedAt: ZonedDateTime,
@@ -294,7 +315,7 @@ class BackgroundExtractionSaveFlow(
         // Generator failures must not block the save — the entry's resolved fields are the
         // load-bearing surface; observations are additive and may be regenerated later under
         // re-eval (Phase 4). Persist an empty list and move on.
-        Log.w(TAG, "ObservationGenerator threw ${error.javaClass.simpleName}: ${error.message}")
+        Log.w(TAG, "ObservationGenerator threw ${error.javaClass.simpleName} for entryId=$entryId")
         emptyList()
     }
 

@@ -59,6 +59,9 @@
 ## Compose work
 - Anything touching `@Composable`, `LaunchedEffect` / `DisposableEffect` / `rememberCoroutineScope`, state modeling, Compose perf / a11y / theming, or onboarding-flow architecture → invoke `/compose-skill` first.
 
+## LiteRT-LM work
+- Anything touching `LiteRtLmEngine`, `GemmaTextEmbedder`, `ForegroundInference`, `BackgroundExtractionWorker`, `EmbeddingArtifactManifest`, model loading, audio path (`audioBackend`), inference config, or model artifact management → invoke `/litertlm-android-sdk` first.
+
 ## Stack constraints
 - Android-only. Do not introduce KMP / CMP / `commonMain` / `iosMain` / `expect`-`actual` / Nav 3 migration / new architecture frameworks.
 - Don't force MVI / MVVM if existing conventions are coherent.

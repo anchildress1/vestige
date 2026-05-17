@@ -67,16 +67,32 @@ class EntryEntity(
     var lastError: String? = null,
 
     /**
-     * EmbeddingGemma 300M cosine-space vector over [entryText]. Null until the backfill worker
-     * (or save-time embedding) populates it. Hybrid retrieval treats a null vector as a zero
-     * cosine contribution so un-embedded rows still rank on keyword/tag/recency.
+     * EmbeddingGemma 300M cosine-space vector over the entry's distilled semantic fields
+     * (see [buildEmbeddingText]) — not the raw [entryText]. Null until the backfill worker
+     * populates it. Hybrid retrieval treats a null vector as a zero cosine contribution so
+     * un-embedded rows still rank on keyword/tag/recency.
      */
     @HnswIndex(dimensions = EMBEDDING_DIMENSIONS, distanceType = VectorDistanceType.COSINE)
     var vector: FloatArray? = null,
+
+    /**
+     * Schema version of [vector]. Bumped when the embedding *source* changes (not the model)
+     * so previously-embedded rows are recognized as stale and re-backfilled. Operational
+     * field — absent from the markdown source-of-truth; a rebuild-from-markdown defaults it
+     * to 0 and the backfill sweep correctly re-runs.
+     */
+    var vectorSchemaVersion: Int = 0,
 ) {
     lateinit var tags: ToMany<TagEntity>
 
     companion object {
         const val EMBEDDING_DIMENSIONS = 768L
+
+        /**
+         * Current correct [vectorSchemaVersion]. Rows below this embedded against the old raw
+         * `entryText` source (Story 3.11) and are re-swept. Bump when the embedding source or
+         * synthesis in [buildEmbeddingText] changes.
+         */
+        const val CURRENT_VECTOR_SCHEMA_VERSION = 1
     }
 }

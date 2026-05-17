@@ -1,5 +1,6 @@
 package dev.anchildress1.vestige.debug
 
+import dev.anchildress1.vestige.storage.CalloutCooldownEntity
 import dev.anchildress1.vestige.storage.EntryStore
 import dev.anchildress1.vestige.storage.MarkdownEntryStore
 import dev.anchildress1.vestige.storage.PatternStore
@@ -54,5 +55,21 @@ class DebugPatternSeederTest {
         assertEquals(12L, entryStore.countCompleted())
         assertEquals(12, markdownStore.listAll().size)
         assertEquals(2, patternStore.findVisibleSortedByLastSeen().size)
+    }
+
+    @Test
+    fun `seed clears stale callout cooldown state before rebuilding fixtures`() {
+        boxStore.boxFor(CalloutCooldownEntity::class.java).put(
+            CalloutCooldownEntity(
+                remainingSuppression = 3,
+                pendingCalloutEntryId = 99L,
+                lastCalloutEntryId = 42L,
+                lastCalloutTimestamp = 1234L,
+            ),
+        )
+
+        DebugPatternSeeder.seed(filesDir, boxStore, patternStore)
+
+        assertEquals(0, boxStore.boxFor(CalloutCooldownEntity::class.java).count())
     }
 }

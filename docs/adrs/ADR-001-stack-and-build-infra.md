@@ -303,7 +303,20 @@ The 3.66 GB E4B model is the largest single asset in the build. How it ships aff
 
 Storage row in §"Locked Stack" now records a ships-in-v1 schema with the HNSW vector index on `EntryEntity.vector` (one vector per entry, embedded from distilled fields — see `architecture-brief.md` §"Embedding Strategy"). The minimum-free-storage requirement bumps from 6 GB to 7 GB (model 3.66 GB + EmbeddingGemma artifact ~180 MB + tokenizer ~5 MB + headroom). `backlog.md` `embeddings-fallback` closes out — there is no v1.5 fallback to keep open.
 
-**Note (2026-05-16):** STT-E was run with the embedding source bug present (`entry.entryText` verbatim, not distilled fields). The pass verdict still justifies shipping EmbeddingGemma in v1, but the benchmark numbers above reflect noisy embeddings. STT-E should be re-run after Story 3.11 fixes the embedding source. Story 3.11's on-device spot-check is the minimum; a structured re-run against the same STT-E corpus is the correct verification before Phase 4 starts.
+**Note (2026-05-16):** STT-E was run with the embedding source bug present (`entry.entryText` verbatim, not distilled fields). The pass verdict still justifies shipping EmbeddingGemma in v1, but the benchmark numbers above reflect noisy embeddings. Re-run completed after Story 3.11 — see Addendum (2026-05-16) below.
+
+### Addendum (2026-05-16) — STT-E re-run on corrected embedding source
+
+`SttEEmbeddingComparisonTest` re-ran the same four cohort queries against the same 18-entry corpus on the reference S24 Ultra after Story 3.11 corrected the embedding source from `entry.entryText` verbatim to the distilled triple (`summary + themes + rawHighlights`). Result: hybrid won 3/4 queries; tied 1; lost 0. Verdict unchanged.
+
+| Query | Baseline relevant in top-5 | Hybrid relevant in top-5 | Novel relevant (hybrid-only) | Outcome |
+|---|---|---|---|---|
+| Q_aftermath | 2/6 | 3/6 | A2, A1 | Win |
+| Q_invoice | 3/3 | 3/3 | — | Tie |
+| Q_decision | 1/3 | 2/3 | C2 | Win |
+| Q_lateNight | 1/3 | 2/3 | D2 | Win |
+
+The 50% gate is cleared on corrected vectors. Phase 4 is unblocked. The tie on Q_invoice is structurally expected — tag recall is already perfect at 3/3 for that cohort; cosine adds nothing on exact-match queries.
 
 ### Q7. Privacy / network enforcement (the P0 marketing claim has to be code, not vibes)
 

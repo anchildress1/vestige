@@ -1,8 +1,11 @@
 package dev.anchildress1.vestige.model
 
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.IOException
@@ -85,11 +88,11 @@ class DefaultModelArtifactStore(
         var lastFailure: Throwable? = null
         while (attempt < ModelArtifactStore.MAX_DOWNLOAD_ATTEMPTS) {
             attempt++
-            val outcome = runCatching { downloadOnce(onProgress) }
-            outcome.onSuccess { result ->
-                return@withContext result
-            }
-            outcome.onFailure { error ->
+            try {
+                return@withContext downloadOnce(onProgress)
+            } catch (cancellation: CancellationException) {
+                throw cancellation
+            } catch (@Suppress("TooGenericExceptionCaught") error: Exception) {
                 lastFailure = error
                 if (attempt >= ModelArtifactStore.MAX_DOWNLOAD_ATTEMPTS) {
                     throw IOException("Model download failed after $attempt attempts", error)
@@ -116,7 +119,7 @@ class DefaultModelArtifactStore(
         return artifactFile
     }
 
-    private fun downloadOnce(onProgress: (Long, Long) -> Unit): ModelArtifactState {
+    private suspend fun downloadOnce(onProgress: (Long, Long) -> Unit): ModelArtifactState {
         streamPayloadToPartFile(partFile, onProgress)
         promotePartToArtifact(partFile)
 
@@ -128,7 +131,7 @@ class DefaultModelArtifactStore(
         }
     }
 
-    private fun streamPayloadToPartFile(partFile: File, onProgress: (Long, Long) -> Unit) {
+    private suspend fun streamPayloadToPartFile(partFile: File, onProgress: (Long, Long) -> Unit) {
         val resumeFrom = if (partFile.exists()) partFile.length() else 0L
         val response = httpClient.open(manifest.downloadUrl, resumeFrom)
         response.use {
@@ -144,7 +147,7 @@ class DefaultModelArtifactStore(
         }
     }
 
-    private fun writeBodyToFile(
+    private suspend fun writeBodyToFile(
         body: java.io.InputStream,
         partFile: File,
         appendMode: Boolean,
@@ -161,6 +164,7 @@ class DefaultModelArtifactStore(
                 sink.write(buffer, 0, read)
                 totalWritten += read
                 onProgress(totalWritten, expected)
+                currentCoroutineContext().ensureActive()
             }
         }
     }

@@ -2,6 +2,7 @@ package dev.anchildress1.vestige.model
 
 import com.sun.net.httpserver.HttpExchange
 import com.sun.net.httpserver.HttpServer
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
@@ -102,6 +103,24 @@ class DefaultModelArtifactStoreTest {
         val state = store.download()
         assertEquals(ModelArtifactState.Complete, state)
         assertEquals(3, client.openCalls)
+    }
+
+    @Test
+    fun `download rethrows CancellationException instead of wrapping it as IOException`() = runTest {
+        val client = CancellingHttpClient()
+        val store = DefaultModelArtifactStore(
+            manifest = manifest(SHORT_BYTES.size.toLong(), sha256Of(SHORT_BYTES)),
+            baseDir = baseDir,
+            httpClient = client,
+            backoff = ZeroBackoff,
+        )
+
+        val raised = runCatching { store.download() }
+
+        assertTrue(raised.exceptionOrNull() is CancellationException) {
+            "Expected CancellationException, got ${raised.exceptionOrNull()}"
+        }
+        assertEquals(1, client.openCalls)
     }
 
     @Test
@@ -573,6 +592,14 @@ class DefaultModelArtifactStoreTest {
             openCalls++
             if (openCalls <= failures) throw IOException("simulated transient error #$openCalls")
             return InMemoryResponse(200, ByteArrayInputStream(payload))
+        }
+    }
+
+    private class CancellingHttpClient : HttpClient {
+        var openCalls = 0
+        override fun open(url: String, resumeFromByte: Long): HttpResponse {
+            openCalls++
+            throw CancellationException("cancelled download")
         }
     }
 

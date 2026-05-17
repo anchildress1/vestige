@@ -3,20 +3,19 @@ package dev.anchildress1.vestige.debug
 import dev.anchildress1.vestige.model.ExtractionStatus
 import dev.anchildress1.vestige.model.PatternKind
 import dev.anchildress1.vestige.model.PatternState
+import dev.anchildress1.vestige.storage.CalloutCooldownEntity
 import dev.anchildress1.vestige.storage.EntryEntity
 import dev.anchildress1.vestige.storage.MarkdownEntryStore
 import dev.anchildress1.vestige.storage.PatternEntity
 import dev.anchildress1.vestige.storage.PatternStore
+import dev.anchildress1.vestige.storage.TagEntity
 import io.objectbox.BoxStore
 import java.io.File
 import java.security.MessageDigest
 
 /**
- * Debug-only fixture seeder. Lets the dev surface verify the Stories 3.9 / 3.10 pattern UI with
- * real cards on a device before Phase 4's capture UI ships. Idempotent — re-running clears the
- * box first so the dev gets a fresh, well-formed corpus every time.
- *
- * Not wired into any release path; the call site in `PhaseOneShell` is `FLAG_DEBUGGABLE`-gated.
+ * Debug-only fixture seeder. Lets the dev verify the pattern UI with real cards on a device.
+ * Idempotent — re-running clears the box first so the dev gets a fresh, well-formed corpus.
  */
 object DebugPatternSeeder {
 
@@ -37,6 +36,8 @@ object DebugPatternSeeder {
             markdownStore.listAll().forEach(File::delete)
             boxStore.boxFor(EntryEntity::class.java).removeAll()
             boxStore.boxFor(PatternEntity::class.java).removeAll()
+            boxStore.boxFor(TagEntity::class.java).removeAll()
+            boxStore.boxFor(CalloutCooldownEntity::class.java).removeAll()
 
             data class SeedEntry(val text: String, val durationMs: Long)
             val seedEntries = listOf(
@@ -62,8 +63,10 @@ object DebugPatternSeeder {
                     durationMs = seed.durationMs,
                     extractionStatus = ExtractionStatus.COMPLETED,
                 ).also {
-                    markdownStore.write(it)
+                    // put first so ObjectBox initializes the lateinit ToMany<TagEntity> field
+                    // before MarkdownEntryStore.write() iterates entry.tags
                     boxStore.boxFor(EntryEntity::class.java).put(it)
+                    markdownStore.write(it)
                 }
             }
 

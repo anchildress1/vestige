@@ -1,4 +1,36 @@
-# STT-D evidence archive
+# STT evidence archive
+
+## STT-E — embedding retrieval comparison
+
+Captures of `SttEEmbeddingComparisonTest` runs against the 18-entry corpus from
+`docs/stt-e-manifest.example.txt`. Compares hybrid retrieval (tag + keyword + recency + cosine)
+against a tag-only baseline across four scenario queries.
+
+### Filename format
+
+`stt-e-<YYYY-MM-DD>.md` (no backend suffix — embedder runs on CPU only)
+
+### Contents
+
+Each capture file includes:
+
+1. **Setup** — date, device, embedding model, manifest, pass threshold, context
+2. **Verdict** — win count vs threshold, pass/fail
+3. **Per-query table** — baseline relevant/5, hybrid relevant/5, novel entries, outcome
+4. **Raw evidence** — per-query top-5 lists and observations
+5. **Pipeline** — exact commands to reproduce
+
+### Log tag
+
+`VestigeSttE` — emits per-query baseline and hybrid top-5 with relevant counts and novel relevant
+entry IDs, plus a final `STT-E win-rate: N/M queries` summary line.
+
+---
+
+## STT-D — lens divergence
+
+Captures of `SttDLensDivergenceTest` runs against the canonical-plus-extras corpus from
+`docs/stt-d-manifest.example.txt`. One file per backend per device-run.
 
 Captures of `SttDLensDivergenceTest` runs against the canonical-plus-extras corpus from
 `docs/stt-d-manifest.example.txt`. One file per backend per device-run.

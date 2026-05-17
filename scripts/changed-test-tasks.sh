@@ -13,6 +13,14 @@ STAGED=$(git diff --name-only --cached 2>/dev/null || true)
 UNSTAGED=$(git diff --name-only 2>/dev/null || true)
 CHANGED=$(printf '%s\n%s\n%s\n' "$COMMITTED" "$STAGED" "$UNSTAGED")
 
+ALL_TASKS=":core-model:test :core-inference:testDebugUnitTest :core-storage:testDebugUnitTest :app:testDebugUnitTest"
+
+# Root-level Gradle config changes affect all modules — run everything.
+if echo "$CHANGED" | grep -qE '^(build\.gradle\.kts|settings\.gradle\.kts|gradle\.properties|gradlew[^/]*|gradle/)'; then
+    printf '%s\n' "$ALL_TASKS"
+    exit 0
+fi
+
 has_change() { echo "$CHANGED" | grep -q "^${1}/" ; }
 
 tasks=""

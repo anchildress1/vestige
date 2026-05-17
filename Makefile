@@ -125,7 +125,7 @@ assemble:
 # Incremental: only tests modules with files changed vs origin/main.
 # koverXmlReport + koverVerify are skipped on partial runs — root-level kover
 # aggregates all four modules and will undercount coverage for unchanged ones.
-# Use `make test-full` (or `make ci`) when you need the coverage gate enforced.
+# Use `make test-full` or `make verify` when you need the coverage gate enforced.
 test:
 	@tasks=$$(./scripts/changed-test-tasks.sh); \
 	if [ -z "$$tasks" ]; then \

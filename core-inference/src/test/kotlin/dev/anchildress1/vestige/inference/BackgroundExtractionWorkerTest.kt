@@ -42,6 +42,39 @@ class BackgroundExtractionWorkerTest {
         ComposedPrompt(lens = lens, text = "prompt-for-$lens", tokenEstimate = 100)
     }
 
+    private fun compactSuccessJson(stateShift: Boolean): String = """
+        {"tags":["sink"],"energy_descriptor":null,"state_shift":$stateShift,"vocabulary_contradictions":[],"stated_commitment":null,"recurrence_link":null,"recurrence_kind":null,"flags":[]}
+    """.trimIndent()
+
+    private fun malformedSkepticalJson(): String = """
+        {
+        "tags": ["sink", "noon", "1pm", "three-hours-later"],
+        "energy_descriptor": null,
+        "state_shift": true
+        "vocabulary_contradictions": [
+        {
+        "term_a": "fine",
+        "term_b": "not tired exactly",
+        "snippet": "completely fine by 1pm i was gone not tired exactly"
+        }
+        ]
+        "stated_commitment": null
+        "recurrence_link": null
+        "recurrence_kind": null
+        "flags": [
+        {
+        "kind": "vocabulary-contradiction",
+        "snippet": "completely fine by 1pm i was gone not tired exactly",
+        "note": "The user describes a state of being fine then immediately negates it with 'not tired exactly'."
+        }
+        ]
+        }
+    """.trimIndent()
+
+    private fun skepticalFlag(): String =
+        "vocabulary-contradiction:completely fine by 1pm i was gone not tired exactly:" +
+            "The user describes a state of being fine then immediately negates it with 'not tired exactly'."
+
     private class RecordingResolver(val resolved: ResolvedExtraction) : ConvergenceResolver {
         var captured: List<LensExtraction> = emptyList()
         override fun resolve(extractions: List<LensExtraction>): ResolvedExtraction {
@@ -112,6 +145,43 @@ class BackgroundExtractionWorkerTest {
         )
         // Listener fires exactly twice on the happy path: initial RUNNING and terminal COMPLETED.
         // No retry events since every lens parsed cleanly on attempt 1.
+        assertEquals(
+            listOf(
+                RecordingListener.Update(ExtractionStatus.RUNNING, 0, null),
+                RecordingListener.Update(ExtractionStatus.COMPLETED, 0, null),
+            ),
+            listener.updates,
+        )
+    }
+
+    @Test
+    fun `worker parses malformed skeptical near-json without burning retries`() = runTest {
+        val engine = mockk<LiteRtLmEngine>()
+        coEvery { engine.generateText("prompt-for-LITERAL") } returns compactSuccessJson(stateShift = true)
+        coEvery { engine.generateText("prompt-for-INFERENTIAL") } returns compactSuccessJson(stateShift = false)
+        coEvery { engine.generateText("prompt-for-SKEPTICAL") } returns malformedSkepticalJson()
+        val listener = RecordingListener()
+
+        val result = BackgroundExtractionWorker(
+            engine = engine,
+            resolver = RecordingResolver(resolved),
+            composer = fakeComposer(),
+        ).extract(request = request, listener = listener)
+
+        val success = assertInstanceOf(BackgroundExtractionResult.Success::class.java, result)
+        val skepticalResult = success.lensResults.first { it.lens == Lens.SKEPTICAL }
+        assertAll(
+            { assertNotNull(skepticalResult.extraction) },
+            { assertEquals(1, skepticalResult.attemptCount) },
+            { assertNull(skepticalResult.lastError) },
+            {
+                assertEquals(
+                    listOf(skepticalFlag()),
+                    skepticalResult.extraction!!.flags,
+                )
+            },
+            { assertEquals(3, success.modelCallCount) },
+        )
         assertEquals(
             listOf(
                 RecordingListener.Update(ExtractionStatus.RUNNING, 0, null),

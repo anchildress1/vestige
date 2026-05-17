@@ -14,10 +14,12 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.unit.dp
 import dev.anchildress1.vestige.inference.AudioChunk
 import dev.anchildress1.vestige.inference.ForegroundResult
+import dev.anchildress1.vestige.inference.ForegroundStreamEvent
 import dev.anchildress1.vestige.model.Persona
 import dev.anchildress1.vestige.ui.theme.VestigeTheme
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.setMain
@@ -188,13 +190,17 @@ class CaptureScreenTest {
             initialPersona = Persona.WITNESS,
             recordVoice = VoiceCapture { _, _ -> audio },
             foregroundInference = ForegroundInferenceCall { _, _ ->
-                ForegroundResult.Success(
-                    persona = Persona.WITNESS,
-                    rawResponse = "",
-                    elapsedMs = 0L,
-                    completedAt = clock.instant(),
-                    transcription = "something happened",
-                    followUp = "sounds like a pattern",
+                flowOf(
+                    ForegroundStreamEvent.Terminal(
+                        ForegroundResult.Success(
+                            persona = Persona.WITNESS,
+                            rawResponse = "",
+                            elapsedMs = 0L,
+                            completedAt = clock.instant(),
+                            transcription = "something happened",
+                            followUp = "sounds like a pattern",
+                        ),
+                    ),
                 )
             },
             saveAndExtract = SaveAndExtract { _, _, _, _, _ -> },

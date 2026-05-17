@@ -150,6 +150,55 @@ class LiteRtLmEngine(
     }.flowOn(ioDispatcher)
 
     /**
+     * Streaming counterpart to [sendMessageContents] — the multimodal `AudioFile + Text`
+     * foreground path. Mirrors [streamText]: one conversation per call, closed on flow
+     * completion or cancellation. Each emitted chunk is one SDK [com.google.ai.edge.litertlm.Message]
+     * rendered to text.
+     */
+    fun streamMessageContents(parts: List<Content>): Flow<String> = flow {
+        require(parts.isNotEmpty()) { "streamMessageContents requires at least one Content part." }
+
+        @Suppress("SpreadOperator") // Contents.of is a vararg factory; no List-accepting overload.
+        val contents = Contents.of(*parts.toTypedArray())
+        callMutex.withLock {
+            val active = checkNotNull(engine) {
+                "LiteRtLmEngine.streamMessageContents called before initialize() (or after close())."
+            }
+            val conversation = active.createConversation(conversationConfig())
+            val started = System.nanoTime()
+            var charsEmitted = 0
+            try {
+                conversation.sendMessageAsync(contents).collect { message ->
+                    val chunk = message.toString()
+                    charsEmitted += chunk.length
+                    emit(chunk)
+                }
+                val elapsedMs = (System.nanoTime() - started) / NANOS_PER_MILLI
+                Log.d(
+                    TAG,
+                    "streamMessageContents completed in ${elapsedMs}ms (parts=${parts.size}, " +
+                        "emitted=${charsEmitted}c)",
+                )
+            } catch (@Suppress("TooGenericExceptionCaught") error: Throwable) {
+                // Log-and-rethrow, same rationale as streamText: native SDK + coroutine
+                // cancellation share no exception hierarchy worth enumerating.
+                val elapsedMs = (System.nanoTime() - started) / NANOS_PER_MILLI
+                Log.d(
+                    TAG,
+                    "streamMessageContents failed (${error.javaClass.simpleName}) in ${elapsedMs}ms " +
+                        "(parts=${parts.size}, emitted=${charsEmitted}c)",
+                )
+                throw error
+            } finally {
+                runCatching { conversation.close() }
+                    .onFailure {
+                        Log.w(TAG, "conversation.close() after streamMessageContents failed: ${it.message}")
+                    }
+            }
+        }
+    }.flowOn(ioDispatcher)
+
+    /**
      * Multimodal one-shot for `Content.AudioBytes` / `Content.AudioFile` alongside a text prompt.
      * Opens and closes a conversation per call.
      */

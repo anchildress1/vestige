@@ -6,7 +6,10 @@ import dev.anchildress1.vestige.model.Persona
 import dev.anchildress1.vestige.model.TemplateLabel
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.FlowCollector
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.flowOn
 import java.io.File
 import java.time.Clock
 import java.time.ZoneId
@@ -27,79 +30,93 @@ class ForegroundInference(
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) {
 
-    // Engine handle is single-threaded; do not call concurrently against the same engine.
-    suspend fun runForegroundCall(audio: AudioChunk, persona: Persona): ForegroundResult = withContext(ioDispatcher) {
+    /**
+     * Streaming voice path: persona prompt + audio → progressive [ForegroundStreamEvent]s. The
+     * transcription surfaces once its close tag lands, follow-up text streams per chunk, and a
+     * final [ForegroundStreamEvent.Terminal] carries the authoritative parsed result. The temp
+     * WAV is discarded in `finally` — on normal completion, parse failure, or collector
+     * cancellation alike. Engine handle is single-threaded; do not collect concurrently against
+     * the same engine.
+     */
+    fun runForegroundCall(audio: AudioChunk, persona: Persona): Flow<ForegroundStreamEvent> {
         require(audio.samples.isNotEmpty()) { "ForegroundInference requires non-empty audio samples." }
         require(audio.isFinal) {
             "runForegroundCall requires audio.isFinal == true (AudioCapture caps recordings at 30 s)."
         }
         require(cacheDir.isDirectory) { "cacheDir must be an existing directory: $cacheDir" }
 
-        val callStartedAt = clock.instant()
-        val systemPrompt = composeSystemPrompt(persona, callStartedAt)
-        val temp = synchronized(tempWavLock) {
-            sweepStaleTempWavs()
-            File.createTempFile(TEMP_PREFIX, TEMP_SUFFIX, cacheDir).also {
-                activeTempWavs += it.absolutePath
+        return flow {
+            val systemPrompt = composeSystemPrompt(persona, clock.instant())
+            val temp = synchronized(tempWavLock) {
+                sweepStaleTempWavs()
+                File.createTempFile(TEMP_PREFIX, TEMP_SUFFIX, cacheDir).also {
+                    activeTempWavs += it.absolutePath
+                }
             }
-        }
-        val started = System.nanoTime()
-        val rawResponse = try {
-            WavWriter.writeMonoFloatWav(temp, audio.samples, audio.sampleRateHz)
-            engine.sendMessageContents(
-                listOf(
-                    Content.Text(systemPrompt),
-                    Content.AudioFile(temp.absolutePath),
-                ),
-            )
-        } finally {
-            discardTempWav(temp)
-            activeTempWavs -= temp.absolutePath
-        }
-        val elapsedMs = (System.nanoTime() - started) / NANOS_PER_MILLI
-        Log.d(
-            TAG,
-            "runForegroundCall persona=$persona elapsed=${elapsedMs}ms raw=${rawResponse.length}c",
-        )
-
-        ForegroundResponseParser.parse(
-            raw = rawResponse,
-            persona = persona,
-            elapsedMs = elapsedMs,
-            completedAt = clock.instant(),
-        )
+            try {
+                WavWriter.writeMonoFloatWav(temp, audio.samples, audio.sampleRateHz)
+                emitEnvelope(
+                    persona = persona,
+                    label = "runForegroundCall",
+                    parts = listOf(Content.Text(systemPrompt), Content.AudioFile(temp.absolutePath)),
+                )
+            } finally {
+                discardTempWav(temp)
+                activeTempWavs -= temp.absolutePath
+            }
+        }.flowOn(ioDispatcher)
     }
 
     /**
-     * Typed-entry counterpart of [runForegroundCall]. Same persona system prompt + same
-     * `{transcription, follow_up}` parser, so a typed entry produces the identical Reviewing
-     * surface a voice entry does — no temp WAV because there is no audio to hand off. The model
-     * is required (no model-free typed path); the caller gates on readiness.
+     * Typed-entry counterpart of [runForegroundCall]. Same persona system prompt + same streaming
+     * envelope, so a typed entry produces the identical progressive Reviewing surface a voice
+     * entry does — no temp WAV because there is no audio to hand off. The model is required (no
+     * model-free typed path); the caller gates on readiness.
      */
-    // Engine handle is single-threaded; do not call concurrently against the same engine.
-    suspend fun runForegroundTextCall(text: String, persona: Persona): ForegroundResult = withContext(ioDispatcher) {
+    fun runForegroundTextCall(text: String, persona: Persona): Flow<ForegroundStreamEvent> {
         require(text.isNotBlank()) { "ForegroundInference requires non-blank typed text." }
 
-        val callStartedAt = clock.instant()
-        val systemPrompt = composeSystemPrompt(persona, callStartedAt)
-        val started = System.nanoTime()
-        val rawResponse = engine.sendMessageContents(
-            listOf(
-                Content.Text(systemPrompt),
-                Content.Text(text),
-            ),
-        )
-        val elapsedMs = (System.nanoTime() - started) / NANOS_PER_MILLI
-        Log.d(
-            TAG,
-            "runForegroundTextCall persona=$persona elapsed=${elapsedMs}ms raw=${rawResponse.length}c",
-        )
+        return flow {
+            val systemPrompt = composeSystemPrompt(persona, clock.instant())
+            emitEnvelope(
+                persona = persona,
+                label = "runForegroundTextCall",
+                parts = listOf(Content.Text(systemPrompt), Content.Text(text)),
+            )
+        }.flowOn(ioDispatcher)
+    }
 
-        ForegroundResponseParser.parse(
-            raw = rawResponse,
-            persona = persona,
-            elapsedMs = elapsedMs,
-            completedAt = clock.instant(),
+    // Streams the engine envelope, surfacing the transcription + follow-up deltas through the
+    // scanner, then parsing the complete buffer for the authoritative terminal verdict. Shared
+    // by the voice and typed paths so scan/parse logic exists once.
+    private suspend fun FlowCollector<ForegroundStreamEvent>.emitEnvelope(
+        persona: Persona,
+        label: String,
+        parts: List<Content>,
+    ) {
+        val scanner = ForegroundStreamScanner()
+        val started = System.nanoTime()
+        var firstTokenAtNanos = 0L
+        engine.streamMessageContents(parts).collect { chunk ->
+            val events = scanner.accept(chunk)
+            if (events.isNotEmpty() && firstTokenAtNanos == 0L) {
+                firstTokenAtNanos = System.nanoTime()
+                Log.d(TAG, "$label persona=$persona ttft=${(firstTokenAtNanos - started) / NANOS_PER_MILLI}ms")
+            }
+            events.forEach { emit(it) }
+        }
+        val elapsedMs = (System.nanoTime() - started) / NANOS_PER_MILLI
+        val raw = scanner.accumulated
+        Log.d(TAG, "$label persona=$persona elapsed=${elapsedMs}ms raw=${raw.length}c")
+        emit(
+            ForegroundStreamEvent.Terminal(
+                ForegroundResponseParser.parse(
+                    raw = raw,
+                    persona = persona,
+                    elapsedMs = elapsedMs,
+                    completedAt = clock.instant(),
+                ),
+            ),
         )
     }
 

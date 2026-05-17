@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dev.anchildress1.vestige.inference.AudioChunk
 import dev.anchildress1.vestige.inference.ForegroundResult
+import dev.anchildress1.vestige.inference.ForegroundStreamEvent
 import dev.anchildress1.vestige.model.Persona
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -298,36 +299,47 @@ class CaptureViewModel(
         }
     }
 
-    // Shared foreground result handler for both the voice path (audio call) and the typed path
-    // (text call). `durationMs` is the audio length for voice, 0 for typed.
-    private suspend fun runForeground(persona: Persona, durationMs: Long, call: suspend () -> ForegroundResult) {
+    // Shared streaming handler for the voice (audio) and typed (text) paths. The scanner-driven
+    // deltas grow the Reviewing transcript live; the terminal event carries the authoritative
+    // parsed result and is the only thing that saves. `durationMs` is the audio length for voice,
+    // 0 for typed. A collector cancellation (navigate-away) throws out the partial — no save.
+    private suspend fun runForeground(
+        persona: Persona,
+        durationMs: Long,
+        call: suspend () -> Flow<ForegroundStreamEvent>,
+    ) {
+        var transcription = ""
+        val followUp = StringBuilder()
         try {
-            when (val result = call()) {
-                is ForegroundResult.Success -> {
-                    saveAndExtract(
-                        result.transcription,
-                        ZonedDateTime.now(clock.withZone(zoneId)),
-                        persona,
-                        durationMs,
-                        result.followUp,
-                    )
-                    _state.update { c ->
-                        CaptureUiState.Reviewing(
-                            persona = c.persona,
-                            modelReadiness = c.modelReadiness,
-                            review = ReviewState(
-                                transcription = result.transcription,
-                                followUp = result.followUp,
-                                persona = c.persona,
-                                elapsedMs = result.elapsedMs,
-                            ),
+            call().collect { event ->
+                when (event) {
+                    is ForegroundStreamEvent.Transcription -> {
+                        transcription = event.text
+                        showReviewing(transcription, followUp.toString(), elapsedMs = 0L)
+                    }
+
+                    is ForegroundStreamEvent.FollowUpDelta -> {
+                        followUp.append(event.text)
+                        showReviewing(transcription, followUp.toString(), elapsedMs = 0L)
+                    }
+
+                    is ForegroundStreamEvent.Terminal -> when (val result = event.result) {
+                        is ForegroundResult.Success -> {
+                            saveAndExtract(
+                                result.transcription,
+                                ZonedDateTime.now(clock.withZone(zoneId)),
+                                persona,
+                                durationMs,
+                                result.followUp,
+                            )
+                            showReviewing(result.transcription, result.followUp, result.elapsedMs)
+                        }
+
+                        is ForegroundResult.ParseFailure -> emitInferenceError(
+                            CaptureError.InferenceFailed.Reason.PARSE_FAILED,
                         )
                     }
                 }
-
-                is ForegroundResult.ParseFailure -> emitInferenceError(
-                    CaptureError.InferenceFailed.Reason.PARSE_FAILED,
-                )
             }
         } catch (timeout: TimeoutCancellationException) {
             Log.w(TAG, "Foreground inference timed out", timeout)
@@ -337,6 +349,21 @@ class CaptureViewModel(
         } catch (@Suppress("TooGenericExceptionCaught") error: Exception) {
             Log.e(TAG, "Foreground inference failed", error)
             emitInferenceError(CaptureError.InferenceFailed.Reason.ENGINE_FAILED)
+        }
+    }
+
+    private fun showReviewing(transcription: String, followUp: String, elapsedMs: Long) {
+        _state.update { c ->
+            CaptureUiState.Reviewing(
+                persona = c.persona,
+                modelReadiness = c.modelReadiness,
+                review = ReviewState(
+                    transcription = transcription,
+                    followUp = followUp,
+                    persona = c.persona,
+                    elapsedMs = elapsedMs,
+                ),
+            )
         }
     }
 
@@ -375,14 +402,14 @@ fun interface VoiceCapture {
     suspend operator fun invoke(onLevel: (Float) -> Unit, stopFlow: Flow<Unit>): AudioChunk?
 }
 
-/** Runs one foreground (single-turn) call against the local model for a voice entry. */
+/** Streams one foreground (single-turn) call against the local model for a voice entry. */
 fun interface ForegroundInferenceCall {
-    suspend operator fun invoke(audio: AudioChunk, persona: Persona): ForegroundResult
+    suspend operator fun invoke(audio: AudioChunk, persona: Persona): Flow<ForegroundStreamEvent>
 }
 
-/** Runs one foreground (single-turn) call for a typed entry — text in, `{transcription, follow_up}` out. */
+/** Streams one foreground (single-turn) call for a typed entry — text in, progressive envelope out. */
 fun interface ForegroundTextInferenceCall {
-    suspend operator fun invoke(text: String, persona: Persona): ForegroundResult
+    suspend operator fun invoke(text: String, persona: Persona): Flow<ForegroundStreamEvent>
 }
 
 /** Routes a transcription (voice or typed) into the two-tier save + background extraction pipeline. */

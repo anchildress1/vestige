@@ -3,12 +3,16 @@ package dev.anchildress1.vestige.ui.capture
 import app.cash.turbine.test
 import dev.anchildress1.vestige.inference.AudioChunk
 import dev.anchildress1.vestige.inference.ForegroundResult
+import dev.anchildress1.vestige.inference.ForegroundStreamEvent
 import dev.anchildress1.vestige.model.Persona
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.asFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
@@ -93,6 +97,48 @@ class CaptureViewModelTest {
             cancelAndIgnoreRemainingEvents()
         }
         assertEquals(1, save.invocations.get())
+    }
+
+    @Test
+    fun `streaming deltas grow Reviewing follow-up and only Terminal saves`() = runTest(dispatcher) {
+        val audio = AudioChunk(FloatArray(16), 16_000, isFinal = true)
+        val voice = FakeVoiceCapture(result = audio)
+        val scripted = listOf(
+            ForegroundStreamEvent.Transcription("i kept reopening it"),
+            ForegroundStreamEvent.FollowUpDelta("what "),
+            ForegroundStreamEvent.FollowUpDelta("were you avoiding"),
+            ForegroundStreamEvent.Terminal(successResult("i kept reopening it", "what were you avoiding")),
+        )
+        val save = RecordingSaveAndExtract()
+        val vm = newViewModel(
+            voice = voice,
+            inference = ForegroundInferenceCall { _, _ -> scripted.asFlow() },
+            save = save,
+            initialReadiness = ModelReadiness.Ready,
+        )
+
+        vm.state.test {
+            assertTrue(awaitItem() is CaptureUiState.Idle)
+            vm.startRecording()
+            assertTrue(awaitItem() is CaptureUiState.Recording)
+            voice.completeWithResult()
+
+            val transcriptionOnly = awaitItem() as CaptureUiState.Reviewing
+            assertEquals("i kept reopening it", transcriptionOnly.review.transcription)
+            assertEquals("", transcriptionOnly.review.followUp)
+            assertEquals("save must not fire on the transcription event", 0, save.invocations.get())
+
+            val firstDelta = awaitItem() as CaptureUiState.Reviewing
+            assertEquals("what ", firstDelta.review.followUp)
+            val secondDelta = awaitItem() as CaptureUiState.Reviewing
+            assertEquals("what were you avoiding", secondDelta.review.followUp)
+            assertEquals("save must not fire mid-stream", 0, save.invocations.get())
+
+            val terminal = awaitItem() as CaptureUiState.Reviewing
+            assertEquals("what were you avoiding", terminal.review.followUp)
+            cancelAndIgnoreRemainingEvents()
+        }
+        assertEquals("Terminal Success saves exactly once", 1, save.invocations.get())
     }
 
     @Test
@@ -226,7 +272,7 @@ class CaptureViewModelTest {
             voice = voice,
             inference = ForegroundInferenceCall { _, _ ->
                 inferenceCalls.incrementAndGet()
-                parseFailure()
+                terminal(parseFailure())
             },
             save = RecordingSaveAndExtract(),
             initialReadiness = ModelReadiness.Ready,
@@ -350,13 +396,15 @@ class CaptureViewModelTest {
         val vm = newViewModel(
             save = save,
             textInference = ForegroundTextInferenceCall { text, persona ->
-                ForegroundResult.Success(
-                    persona = persona,
-                    rawResponse = "<x/>",
-                    elapsedMs = 800,
-                    completedAt = clock.instant(),
-                    transcription = text,
-                    followUp = "and then what",
+                terminal(
+                    ForegroundResult.Success(
+                        persona = persona,
+                        rawResponse = "<x/>",
+                        elapsedMs = 800,
+                        completedAt = clock.instant(),
+                        transcription = text,
+                        followUp = "and then what",
+                    ),
                 )
             },
             initialReadiness = ModelReadiness.Ready,
@@ -379,7 +427,7 @@ class CaptureViewModelTest {
             save = save,
             textInference = ForegroundTextInferenceCall { _, _ ->
                 textCalls.incrementAndGet()
-                parseFailure()
+                terminal(parseFailure())
             },
             initialReadiness = ModelReadiness.Loading,
         )
@@ -397,7 +445,7 @@ class CaptureViewModelTest {
         val save = RecordingSaveAndExtract()
         val vm = newViewModel(
             save = save,
-            textInference = ForegroundTextInferenceCall { _, _ -> parseFailure() },
+            textInference = ForegroundTextInferenceCall { _, _ -> terminal(parseFailure()) },
             initialReadiness = ModelReadiness.Ready,
         )
 
@@ -641,15 +689,24 @@ class CaptureViewModelTest {
         completedAt = clock.instant(),
         reason = ForegroundResult.ParseReason.EMPTY_RESPONSE,
     )
+
+    // Wraps a final ForegroundResult as a single-Terminal stream — the streaming surface's
+    // collapsed shape for tests that only care about the terminal verdict, not live deltas.
+    private fun terminal(result: ForegroundResult): Flow<ForegroundStreamEvent> =
+        flowOf(ForegroundStreamEvent.Terminal(result))
 }
 
 private class FakeForegroundInference(private val result: ForegroundResult) : ForegroundInferenceCall {
-    override suspend fun invoke(audio: AudioChunk, persona: Persona): ForegroundResult = result
+    override suspend fun invoke(audio: AudioChunk, persona: Persona): Flow<ForegroundStreamEvent> =
+        flowOf(ForegroundStreamEvent.Terminal(result))
 }
 
 private class SuspendingForegroundInference(private val pending: CompletableDeferred<ForegroundResult>) :
     ForegroundInferenceCall {
-    override suspend fun invoke(audio: AudioChunk, persona: Persona): ForegroundResult = pending.await()
+    // The flow body awaits `pending` before emitting, so the VM stays in Inferring until the
+    // test releases it — preserving the pre-streaming "suspended call" semantics these tests rely on.
+    override suspend fun invoke(audio: AudioChunk, persona: Persona): Flow<ForegroundStreamEvent> =
+        flow { emit(ForegroundStreamEvent.Terminal(pending.await())) }
 }
 
 private class CountingLimitWarningCue : LimitWarningCue {

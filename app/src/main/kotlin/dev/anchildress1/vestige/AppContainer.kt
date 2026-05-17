@@ -10,7 +10,7 @@ import dev.anchildress1.vestige.inference.DefaultConvergenceResolver
 import dev.anchildress1.vestige.inference.Embedder
 import dev.anchildress1.vestige.inference.ExtractionStatusListener
 import dev.anchildress1.vestige.inference.ForegroundInference
-import dev.anchildress1.vestige.inference.ForegroundResult
+import dev.anchildress1.vestige.inference.ForegroundStreamEvent
 import dev.anchildress1.vestige.inference.GemmaTextEmbedder
 import dev.anchildress1.vestige.inference.HistoryChunk
 import dev.anchildress1.vestige.inference.LiteRtLmEngine
@@ -54,6 +54,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -275,7 +276,7 @@ class AppContainer(
      * initialized before the call so the screen doesn't have to thread an init step into its
      * recording lifecycle.
      */
-    suspend fun runForegroundCall(audio: AudioChunk, persona: Persona): ForegroundResult {
+    suspend fun runForegroundCall(audio: AudioChunk, persona: Persona): Flow<ForegroundStreamEvent> {
         ensureBackgroundEngineInitialized()
         return foregroundInference.runForegroundCall(audio, persona)
     }
@@ -284,7 +285,7 @@ class AppContainer(
      * Typed-entry foreground call — same engine + parser as the voice path so a typed entry
      * reviews identically. The model is required; the capture screen gates on readiness.
      */
-    suspend fun runForegroundTextCall(text: String, persona: Persona): ForegroundResult {
+    suspend fun runForegroundTextCall(text: String, persona: Persona): Flow<ForegroundStreamEvent> {
         ensureBackgroundEngineInitialized()
         return foregroundInference.runForegroundTextCall(text, persona)
     }

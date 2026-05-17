@@ -6,16 +6,17 @@ import com.google.ai.edge.litertlm.ExperimentalApi
 import com.google.ai.edge.litertlm.ExperimentalFlags
 import io.mockk.mockk
 import io.mockk.verify
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Assertions.assertEquals
-import org.junit.jupiter.api.Assertions.assertFalse
-import org.junit.jupiter.api.Assertions.assertNotNull
 import org.junit.jupiter.api.Assertions.assertSame
 import org.junit.jupiter.api.Assertions.assertThrows
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.Timeout
 import org.junit.jupiter.api.assertDoesNotThrow
+import java.util.concurrent.TimeUnit
 
 /**
  * Lifecycle-invariant tests for [LiteRtLmEngine]. The pre-state checks fail before any SDK call,
@@ -93,7 +94,16 @@ class LiteRtLmEngineTest {
         engine.close() // idempotent — must not throw on second call either
     }
 
+    // Concurrency regression: two close() calls racing the drain branch must share ONE token and
+    // both return; the native engine must close exactly once. Determinism (no wall-clock
+    // poll deadlines, which false-fail under CI load): each closer is sequenced by waiting until
+    // its thread is genuinely parked in `pending.await()` (Thread.State WAITING/TIMED_WAITING),
+    // which means it has already executed the `lifecycleLock` drain branch — so `drained` is
+    // observed only after the second closer's reuse-or-overwrite decision, making a regressed
+    // (overwrite) impl fail deterministically rather than flakily. @Timeout is the only time
+    // bound: a true hang regression fails cleanly instead of wedging the suite.
     @Test
+    @Timeout(value = 30, unit = TimeUnit.SECONDS)
     fun `concurrent close calls reuse one drain and both return after the final reader exits`() {
         val engine = LiteRtLmEngine(modelPath = NOT_USED_PATH)
         val nativeEngine = mockk<Engine>(relaxed = true)
@@ -102,20 +112,23 @@ class LiteRtLmEngineTest {
 
         val firstClose = Thread { engine.close() }
         firstClose.start()
-        val firstDrain = waitForField<kotlinx.coroutines.CompletableDeferred<Unit>>(engine, "drained")
+        awaitParked(firstClose)
+        val firstDrain = drainToken(engine)
 
         val secondClose = Thread { engine.close() }
         secondClose.start()
-        val currentDrain = waitForField<kotlinx.coroutines.CompletableDeferred<Unit>>(engine, "drained")
+        awaitParked(secondClose)
+        val currentDrain = drainToken(engine)
+
+        // Asserted before completing the token: on a regressed (overwrite) impl currentDrain is a
+        // different object, so this fails deterministically — not on a timing fluke.
+        assertSame(firstDrain, currentDrain, "every close() waiter must share the same drain token")
 
         firstDrain.complete(Unit)
-        if (currentDrain !== firstDrain) currentDrain.complete(Unit)
-        firstClose.join(JOIN_TIMEOUT_MS)
-        secondClose.join(JOIN_TIMEOUT_MS)
+        if (currentDrain !== firstDrain) currentDrain.complete(Unit) // unblock a regressed impl too
+        firstClose.join()
+        secondClose.join()
 
-        assertSame(firstDrain, currentDrain, "every close() waiter must share the same drain token")
-        assertFalse(firstClose.isAlive, "first close() should return once the drain completes")
-        assertFalse(secondClose.isAlive, "second close() should return once the same drain completes")
         verify(exactly = 1) { nativeEngine.close() }
     }
 
@@ -155,9 +168,7 @@ class LiteRtLmEngineTest {
     private companion object {
         // Path is never actually opened — the tests assert pre-state checks fire first.
         const val NOT_USED_PATH = "/tmp/never-loaded.litertlm"
-        const val JOIN_TIMEOUT_MS = 1_000L
-        const val POLL_SLEEP_MS = 10L
-        const val FIELD_WAIT_MS = 1_000L
+        const val POLL_SLEEP_MS = 5L
     }
 
     private fun setField(target: Any, name: String, value: Any?) {
@@ -172,20 +183,22 @@ class LiteRtLmEngineTest {
         field.setInt(target, value)
     }
 
-    @Suppress("UNCHECKED_CAST")
-    private fun <T> waitForField(target: Any, name: String): T {
-        val deadline = System.currentTimeMillis() + FIELD_WAIT_MS
-        while (System.currentTimeMillis() < deadline) {
-            val field = target.javaClass.getDeclaredField(name)
-            field.isAccessible = true
-            val value = field.get(target) as T?
-            if (value != null) return value
+    // Blocks until [thread] is parked (the closer reached `pending.await()`, i.e. already ran the
+    // lifecycleLock drain branch). No wall-clock bound — the method @Timeout backstops a true hang.
+    private fun awaitParked(thread: Thread) {
+        while (thread.state != Thread.State.WAITING && thread.state != Thread.State.TIMED_WAITING) {
             Thread.sleep(POLL_SLEEP_MS)
         }
-        val field = target.javaClass.getDeclaredField(name)
+    }
+
+    // Reads the engine's private `drained` token. Only called after [awaitParked], so the closer
+    // has passed the branch that assigns it — the field is guaranteed non-null here.
+    @Suppress("UNCHECKED_CAST")
+    private fun drainToken(engine: LiteRtLmEngine): CompletableDeferred<Unit> {
+        val field = engine.javaClass.getDeclaredField("drained")
         field.isAccessible = true
-        val value = field.get(target)
-        assertNotNull(value, "field '$name' never became non-null")
-        return value as T
+        return checkNotNull(field.get(engine) as CompletableDeferred<Unit>?) {
+            "drained must be set once a close() thread is parked in await()"
+        }
     }
 }

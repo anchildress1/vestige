@@ -29,6 +29,7 @@ Wrap the app in a coherent, dark, atmospheric UX that meets the 10-second judge 
 - [x] Top three error states polished: download fail/stall, inference timeout/fail, mic permission denied/unavailable. _(Story 4.11 — incl. new system-level mic-blocked + "Use typed entry instead"; download fail/stall via 4.3.)_
 - [ ] Notification permission flow ships in onboarding as the optional Wiring switch; notification tap target lands on the entry detail of the most-recent-in-flight extraction. Lifecycle fallback evaluation per ADR-004 §"Fallback Trigger" recorded by end of Phase 4 day 1 if invoked.
 - [ ] P1 stories shipped or explicitly punted to v1.5 with a recorded reason (scope held / didn't hold).
+- [ ] Demo-gate UI polish pass (Story 4.15) complete — every post-onboarding surface consumes `AppTop` + the Scoreboard primitives shipped in 4.1.5, no Material `TopAppBar` / `Button` / `OutlinedButton` / `TextButton` left in `:app/src/main/kotlin/dev/anchildress1/vestige/ui/**` for in-app affordances, and the primitive-reuse grep audit lands in the PR description.
 
 ---
 
@@ -360,6 +361,83 @@ Checked bullets above are the historical record that the Mist tokens shipped to 
 
 ---
 
+### Story 4.15 — Demo-gate UI polish pass
+
+**Status:** Not started. Forcing-function story written 2026-05-16 after an on-device build (Downloads/Photos-3-001/Screenshot_20260516_22*.png) showed the surfaces compile and route correctly but render visibly off the Scoreboard POC: shell chrome inconsistent across screens, primitives shipped in Story 4.1.5 not reused on Patterns / Pattern Detail / Settings / Model Status, several headers and action affordances ad-hoc instead of token-driven. Story 4.1.5 stays checked — the primitives exist (`ScoreboardPrimitives.kt`, `TraceBarE.kt`, `AccentModifiers.kt`); the failure is at the **call sites**, not the foundation.
+
+**References:** `poc/Energy Direction.html`, `poc/energy-tokens.jsx`, `poc/energy-screens.jsx`, `poc/screens-capture.jsx`, `poc/screens-patterns.jsx`, `poc/screens-reading.jsx`, `poc/screens-roast.jsx`, `poc/screenshots/{capture-ready,capture-running,patterns,pattern-detail,scorecard,history,history-bottom,details,onboarding-*}.png` (visual authority), `ux-copy.md` (text authority — every string in this story resolves to a `ux-copy.md` section, no inline invention), `adrs/ADR-011-design-language-scoreboard-pivot.md`, `design-guidelines.md` §"Capture Screen / AppTop status pill", `AGENTS.md` §"UI discipline" (no per-surface overrides — recurring bugs fix the owning theme token / shared primitive).
+
+**As** the AI implementor staring at the gap between `poc/screenshots/*.png` (canonical visual) and `Downloads/Photos-3-001/*.png` (on-device build), **I need** the demo-critical surfaces re-skinned to actually consume the Scoreboard primitives shipped in Story 4.1.5 — `AppTop`, `BigStat`, `Pill`, `StatRibbon`, `TraceBarE`, `EyebrowE`, the `DisplayBig` / Anton title slot, the lime / coral accent modifiers — **so that** the 10-second judge test passes on every screen a judge can reach in the 90 s pitch + 5 min walkthrough, not just the Capture idle screen.
+
+**Scope gate (AGENTS.md §"Demo gate"):** every bullet below either improves the 90 s pitch or the 5 min walkthrough. Surfaces a judge never reaches in either path are out of scope and stay in `backlog.md` for v1.5.
+
+**Done when:**
+
+- [ ] **Shared chrome on every post-onboarding surface.** `AppTop` (Scoreboard pill + persona dropdown) renders at the top of `PatternsListScreen`, `PatternDetailScreen`, `SettingsScreen`, `ModelStatusScreen` — currently `PatternsListScreen` uses Material's `TopAppBar` with a plain `R.string.patterns_title` text title (`PatternsListScreen.kt:64`), the others ship without any shell chrome at all. After this bullet: Capture / Live / Reviewing / History / Entry Detail / Patterns List / Pattern Detail / Settings / Model Status all open with the same `GEMMA 4 · LOCAL ONLY` pill + persona pill in the same position. Status mapping per `appTopStatusFor(ModelReadiness)` (Story 4.4); persona pill is non-interactive outside Capture. No screen invents its own top bar. Material `TopAppBar` imports deleted from these files.
+
+- [ ] **Patterns List body uses Scoreboard primitives end-to-end** per `poc/screenshots/patterns.png` + `poc/screens-patterns.jsx`:
+  - Header: `EyebrowE` `TRACKING · LAST 30D` + `DisplayBig` (Anton) `PATTERNS` title. Not Material `headlineMedium`.
+  - `StatRibbon` directly under the header with the four counters (current `+{N} HITS THIS WK` / `{N} ACTIVE` / `{N} SNOOZED` / `{N} RESOLVED`). Reuse the exact ribbon primitive from `IdleLayout`; if a section needs different cells, parameterize the existing `StatRibbon`, don't fork it.
+  - Section dividers (`▼ ACTIVE — STILL HITTING {N}` / `▼ RESOLVED — FADED {N}`) use mono eyebrow + count-on-right per POC.
+  - Pattern card title renders the pattern's template label in `DisplayBig` (Anton, ~32 sp) — current build uses `headlineSmall` sans bold ("Audit Template" reads like a Material card). The `#01 AFTERMATH` / `#02 CONCRETE SHOES` mono eyebrow above the title is **out of scope** (pattern numbering is not a Phase 4 invariant; if and when it ships, it's a separate story).
+  - `BigStat` "of N" affordance lives at top-right of each card (e.g. `4 / OF 12`) — replace the inline `3 of 3 entries · Last seen May 16` prose body, which moves to the bottom-row metadata.
+  - `TraceBarE` renders the 30-day intensity sparkbar on every card with `state ∈ {ACTIVE, SNOOZED, CLOSED, DROPPED}` per `cardSectionToneFor` (already wired). The current build's audit-template card shows a dotted hairline instead of bars — verify the bars actually render on a card with ≥1 hit; if `TraceBarE` is being passed an empty series, fix the data plumbing in `PatternsListViewModel` so the call site gets the same shape `IdleLayout` consumes.
+
+- [ ] **Pattern Detail body re-skinned** per `poc/screenshots/pattern-detail.png` + `poc/screens-patterns.jsx`:
+  - Header: `EyebrowE` `← PATTERNS` (left) + `SHEET · 01 OF {N}` (right). The current build's bare `←` back arrow with no breadcrumb is replaced.
+  - Title block: `EyebrowE` `● ACTIVE · {TEMPLATE_LABEL_UPPER}` + `DisplayBig` rendering the pattern's display name (Anton, two-line allowed, lime accent on the trailing punctuation per `heroAnnotated` pattern from `CaptureScreen`).
+  - State-transition line below title: gated on `EnergyDescriptor` being present (Story 2.13 wiring); if `null`, the line is omitted (don't ship a placeholder string).
+  - `StatRibbon` row (`{N} OF {DENOM} ENT` / `{PCT}% ON {DAY}` / `{N}W STREAK` / `~{Nm} TO CRASH`). Cells gated on data availability — missing cells collapse, the ribbon never renders a zero placeholder.
+  - `TraceBarE` 30-day intensity strip with the `▼` peak marker per POC.
+  - `Seen in: {N} ENT` section uses the existing source-row primitive; rows already navigate to Entry Detail per Story 4.7 wiring.
+  - Action row at bottom uses `Pill` primitive for `Drop` (coral rule) / `Skip` (lime rule on ACTIVE → flip to teal on SNOOZED) / `Restart` (lime fill on non-ACTIVE) per ADR-011 accent system. The current dropdown-menu fallback (three-dot overflow with bare-text `Drop` / `Skip`) is replaced by the inline action row — keep the overflow menu reachable for parity but the row is the primary affordance.
+  - Words-You-Used vocabulary chips stay punted per Story 4.8 (STT-E gated, P1).
+
+- [ ] **Capture idle screen tightened** per `poc/screenshots/capture-ready.png` + `poc/screens-capture.jsx`:
+  - `StatRibbon` cells' label color lifts from `faint` (currently barely legible — `KEPT` / `HITS/MO` / `CLOUD` are illegible against `s1` in `Screenshot_20260516_220452_Vestige.png`) to `dim` to clear WCAG AA on `s1`. Token swap only; no per-surface override. If the contrast fix breaks any other primitive consumer, fix the token, not the call site (AGENTS.md §"UI discipline").
+  - REC button outer ring shrinks from the current ~38% vertical occupancy to POC's ~26% (the hero question must sit above the ring with comfortable breathing room, not pushed against it).
+  - Bottom-nav row (`PATTERNS →` / `Settings` / `History`) reduces to one shared `NavLink` primitive — current build ships three different visual treatments (Patterns with arrow eyebrow, Settings as bare dim text, History as outlined box). Pick the POC's bare-text-with-arrow treatment; one composable, three call sites.
+  - `OR TYPE` affordance drops the outlined box, uses the bare `EyebrowE` + `→` arrow treatment per POC.
+
+- [ ] **Entry Detail header re-skinned** per `poc/screenshots/details.png`:
+  - Display title renders the entry's **template label** (e.g. `AUDIT TEMPLATE.`) in `DisplayBig`, not the sequential `ENTRY #{N}` placeholder currently rendered. If no template label is resolved, fall back to the entry's date in `DisplayBig` (`MAY 16.`), not a counter. Document the fallback in `ux-copy.md` §"Entry detail" as the same-commit doc update.
+  - `AUDIT` pill in the header (currently a coral outline) is removed — it's an ad-hoc affordance with no `ux-copy.md` anchor and no spec home. If a "re-read" affordance is wanted, it belongs in Story 4.13 (P1 Reading/Re-eval) and ships with that story's microcopy + confirm flow, not as a one-off button here.
+  - `WITNESS · READING` callout card keeps its lime left-rule but loses the current full-card lime tint creep — apply `limeLeftRuleForActive` cleanly, no body-fill bleed.
+  - `FILED · {HH:MM}` + `{AUDIO}` / `{WORDS}` stat ribbon stays.
+
+- [ ] **Settings screen normalized** per `poc/screens-roast.jsx` / `poc/Energy Direction.html`:
+  - Persona rows render with `Pill` primitive (matching the AppTop persona dropdown style) — outlined for unselected, lime-filled for the active default. The current treatment (selected = lime body text, unselected = bare `dim` text) reads as a list with one highlighted row, not as a control surface.
+  - Section eyebrows (`PERSONA` / `DATA` / `MODEL` / `ABOUT`) align to `EyebrowE` mono 9.5px / 0.20em — current build's `SETTINGS` header eyebrow uses a different tracking value.
+  - `Delete all data` action keeps its coral fill on the destructive confirm (already correct); the surface row uses `Pill` outlined-coral, not bare coral text.
+  - `Source code` / `v1.0.0` / `Polyform Shield 1.0.0` stay as plain `P` rows — no `Pill` here.
+
+- [ ] **Model Status screen brought into the system:**
+  - `AppTop` shell at the top (covered by the first bullet).
+  - Title uses `EyebrowE` `MODEL STATUS` + `DisplayBig` `MODEL STATUS.` per the Settings pattern.
+  - `Re-download model` action becomes a `Pill` outlined-lime; `Delete model` becomes `Pill` outlined-coral. Current build ships them as two differently-sized bordered rectangles — neither matches a documented primitive.
+
+- [ ] **Primitive-reuse gate.** Grep audit recorded as evidence in the PR description:
+  - `Material3.TopAppBar` usages in `:app/src/main/kotlin/dev/anchildress1/vestige/ui/**` drops to **0** (every screen consumes `AppTop`).
+  - `Material3.OutlinedButton` / `Button` / `TextButton` usages in `:app/src/main/kotlin/dev/anchildress1/vestige/ui/**` drops to **0** for in-app affordances (every action surface consumes `Pill`). Material `AlertDialog` action slots are the documented exception — they stay Material per ADR-011 retain-Material-system-dialogs rule.
+  - `Modifier.background(VestigeTheme.colors.s1)` and similar token-direct background applications outside `VestigeSurface` / `Pill` / `BigStat` drop to **0** — surfaces compose via the primitives, not raw token modifiers.
+  - No `Newsreader` or `MistHero` / `Glow` / `Vapor` / `Pulse(Mist)` symbol references remain in `:app` (Story 4.1.5 invariant — re-verified here).
+
+- [ ] **Same-commit doc updates** per AGENTS.md §"Tests + docs ship together":
+  - `ux-copy.md` §"Entry detail" gets the template-label-as-display rule + fallback recorded.
+  - `ux-copy.md` §"Pattern List / Card structure" + §"Pattern Detail / Layout" get the `StatRibbon` / `BigStat` cell ordering recorded — currently absent.
+  - `design-guidelines.md` §"AppTop status pill" extended to record that the pill is mandatory chrome on every post-onboarding surface (not just Capture).
+  - This story's checkboxes tick as bullets land. No new ADR — ADR-011 already authorizes the primitive set; this story is enforcement, not architecture.
+
+- [ ] **Coverage shape per AGENTS.md §"Tests + docs ship together":**
+  - Per re-skinned screen: pos / neg test asserting `AppTop` presence + persona / status slot wiring.
+  - Pattern card / detail: a11y assertions on `TraceBarE` (`role`, `contentDescription` carrying `{N} hits over 30 days` semantic) — currently `TraceBarE` has no a11y coverage.
+  - Settings persona pill: selection-state semantics (`role = RadioButton`, `selected = true/false`) asserted at unit tier.
+  - No new instrumentation work — all assertions JVM / Robolectric where the existing suites already run.
+
+**Notes / risks:** This is a polish + reuse story, not a redesign story. If a bullet requires a new primitive that isn't already in `ScoreboardPrimitives.kt` / `TraceBarE.kt` / `AccentModifiers.kt`, **stop and add it to Story 4.1.5 as an addendum** rather than inventing it in a screen file — primitives live in one place by ADR-011. If a POC composition can't be matched without a new primitive and the addition feels speculative, push the bullet to `backlog.md` candidate `phase-4-15-{surface}-polish` instead of shipping a one-off. `Newsreader` re-introduction (e.g. the History screen's serif "HISTORY" title in `Screenshot_20260516_220548_Vestige.png` reads serif — verify it's `DisplayBig` Anton, not a font-fallback leak; if a leak, fix the font alias in `VestigeFonts`, don't paper over per-surface). No new stat semantics, no new copy invented inline; every string traces to `ux-copy.md`.
+
+---
+
 ## What is explicitly NOT in Phase 4
 
 - No demo storyboard work — Phase 5 owns it.
@@ -380,7 +458,7 @@ If a Phase 4 story starts pulling a backlog entry or a Phase 5/6 task, stop. Ref
 
 Phase 5 starts when all the following are true:
 
-- [ ] Stories 4.1 – 4.11 plus 4.4.5 are Done. (Stories 4.12 – 4.14 are P1; their state is recorded as Done or Punted-to-v1.5 with a reason.)
+- [ ] Stories 4.1 – 4.11 plus 4.4.5 plus 4.15 are Done. (Stories 4.12 – 4.14 are P1; their state is recorded as Done or Punted-to-v1.5 with a reason.)
 - [ ] ADR-004 lifecycle decision recorded inline in the ADR (conditional state machine kept, or fallback applied with date + reason).
 - [ ] Onboarding flow runs end-to-end on a fresh install on the reference S24 Ultra.
 - [ ] Capture screen, History list, Entry Detail, Pattern List, Pattern Detail, Local Model Status, and Settings all load and navigate correctly.

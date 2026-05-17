@@ -106,8 +106,8 @@ seed-entries:
 logcat:
 	@command -v adb >/dev/null 2>&1 || { echo "❌ adb not found. Install Android platform-tools."; exit 1; }
 	@adb get-state >/dev/null 2>&1 || { echo "❌ no device connected. Run 'adb devices' to check."; exit 1; }
-	@adb shell am start -n dev.anchildress1.vestige/.MainActivity >/dev/null 2>&1 || true
-	@pid=""; for i in 1 2 3 4 5; do \
+	@adb shell monkey -p "$(VESTIGE_PACKAGE)" -c android.intent.category.LAUNCHER 1 >/dev/null 2>&1 || true
+	@pid=""; for i in 1 2 3 4 5 6 7 8 9 10; do \
 		pid=$$(adb shell pidof dev.anchildress1.vestige | tr -d '\r'); \
 		[ -n "$$pid" ] && break; sleep 1; \
 	done; \

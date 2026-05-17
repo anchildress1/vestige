@@ -21,20 +21,19 @@ import java.time.ZonedDateTime
  * 2026-05-17). Measures PSS before/after a 3-lens concurrent extraction and logs the realized
  * wall-clock. Numbers feed the ADR-008 record; there are no hard pass/fail thresholds.
  *
- * Run:
+ * Run (each line is one shell token — never let the class arg wrap mid-name):
  *   adb logcat -c
  *   ./gradlew :app:connectedDebugAndroidTest \
  *     -PmodelPath=/data/local/tmp/gemma-4-E4B-it.litertlm \
  *     -PinferenceBackend=gpu \
- *     -Pandroid.testInstrumentationRunnerArguments.class=\
- *dev.anchildress1.vestige.ConcurrentContextRamWallClockTest
+ *     -Pandroid.testInstrumentationRunnerArguments.class=dev.anchildress1.vestige.RamWallClockProbeTest
  *   adb logcat -d -s VestigeLiteRtLm
  */
 @RunWith(AndroidJUnit4::class)
-class ConcurrentContextRamWallClockTest {
+class RamWallClockProbeTest {
 
     @Test
-    fun measureConcurrentContextRamAndWallClock() = runBlocking {
+    fun measureRamAndWallClock() = runBlocking {
         val args = InstrumentationRegistry.getArguments()
         val modelPath = args.getString("modelPath")
         assumeTrue("modelPath instrumentation argument not provided", modelPath != null)

@@ -16,10 +16,8 @@ class SttAProbe(private val engine: LiteRtLmEngine) {
         require(samples.isNotEmpty()) { "STT-A probe requires non-empty audio samples." }
         val bytes = floatsToLittleEndianBytes(samples)
         return engine.sendMessageContents(
-            listOf(
-                Content.Text(prompt),
-                Content.AudioBytes(bytes),
-            ),
+            prompt,
+            listOf(Content.AudioBytes(bytes)),
         )
     }
 
@@ -27,10 +25,8 @@ class SttAProbe(private val engine: LiteRtLmEngine) {
     suspend fun transcribeAudioFile(path: String, prompt: String = DEFAULT_PROMPT): String {
         require(path.isNotBlank()) { "STT-A probe requires a non-blank audio file path." }
         return engine.sendMessageContents(
-            listOf(
-                Content.Text(prompt),
-                Content.AudioFile(path),
-            ),
+            prompt,
+            listOf(Content.AudioFile(path)),
         )
     }
 
@@ -47,10 +43,8 @@ class SttAProbe(private val engine: LiteRtLmEngine) {
         try {
             WavWriter.writeMonoFloatWav(temp, samples, sampleRateHz)
             return engine.sendMessageContents(
-                listOf(
-                    Content.Text(prompt),
-                    Content.AudioFile(temp.absolutePath),
-                ),
+                prompt,
+                listOf(Content.AudioFile(temp.absolutePath)),
             )
         } finally {
             if (!temp.delete()) {

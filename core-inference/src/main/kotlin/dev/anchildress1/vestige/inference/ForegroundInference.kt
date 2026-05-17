@@ -52,7 +52,8 @@ class ForegroundInference(
                 emitEnvelope(
                     persona = persona,
                     label = "runForegroundCall",
-                    parts = listOf(Content.Text(systemPrompt), Content.AudioFile(temp.absolutePath)),
+                    systemInstruction = systemPrompt,
+                    parts = listOf(Content.AudioFile(temp.absolutePath)),
                 )
             } finally {
                 discardTempWav(temp)
@@ -70,7 +71,8 @@ class ForegroundInference(
             emitEnvelope(
                 persona = persona,
                 label = "runForegroundTextCall",
-                parts = listOf(Content.Text(systemPrompt), Content.Text(text)),
+                systemInstruction = systemPrompt,
+                parts = listOf(Content.Text(text)),
             )
         }.flowOn(ioDispatcher)
     }
@@ -79,12 +81,13 @@ class ForegroundInference(
     private suspend fun FlowCollector<ForegroundStreamEvent>.emitEnvelope(
         persona: Persona,
         label: String,
+        systemInstruction: String,
         parts: List<Content>,
     ) {
         val scanner = ForegroundStreamScanner()
         val started = System.nanoTime()
         var firstTokenAtNanos = 0L
-        engine.streamMessageContents(parts).collect { chunk ->
+        engine.streamMessageContents(systemInstruction, parts).collect { chunk ->
             // TTFT is the model's first emitted chunk, not the scanner's first surfaced event —
             // the scanner withholds until a tag closes, which would inflate the metric by the
             // whole transcription block and misrepresent the latency this story validates.

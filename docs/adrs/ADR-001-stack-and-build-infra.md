@@ -425,6 +425,17 @@ Without these, Android 12+'s vendor namespace isolation blocks GPU access and th
 
 **Tool use API exists (`@Tool`, `@ToolParam`, `OpenApiTool`).** Out of scope per `concept-locked.md` §"Out of scope — multi-step agentic tool chains". Documented here so a future ADR doesn't re-research from scratch.
 
+### Addendum (2026-05-17) — systemInstruction separation + concurrent-engine drain-on-close
+
+Supersedes the "Post-v1 consideration only" disposition of the `ConversationConfig.systemInstruction` finding above (additive — the prior paragraph stays as the historical record of the deferral and its rationale).
+
+**Decision (operator-directed, accepting the submission-window risk the prior finding flagged):**
+
+- `LiteRtLmEngine` calls now pass the role/schema/context block via `ConversationConfig.systemInstruction`; the message body carries only the user payload (entry text / audio / typed text / signature). Every caller split accordingly: `ForegroundInference`, `PromptComposer`/`BackgroundExtractionWorker`, `ObservationGenerator`, `PatternTitleGenerator`, `SttAProbe`. `ComposedPrompt` now carries `systemInstruction` + `userText` instead of one fused `text`.
+- The per-call serializing `callMutex` is replaced by a drain-on-close model: independent `Conversation` contexts run concurrently on the shared `Engine` (per ADR-008 §Correction / the 2026-05-16 bytecode probe above); `close()` flips a `closing` gate and waits for in-flight calls to drain before freeing the native handle. Only teardown is exclusive.
+
+**Manual-check stop (not self-ticked):** moving the prompt out of the message body changes the model's input structure. On-device re-validation on the reference S24 Ultra is required and owns the verdict — STT-B (foreground capture round-trip) and STT-D / ADR-002 multi-lens convergence (gated, multi-run). JVM suites cover the wiring/lifecycle invariants only; they cannot speak to extraction quality. Until that on-device pass lands, the behavioral correctness of this change is **UNVERIFIED**.
+
 ---
 
 ## Trade-off Analysis

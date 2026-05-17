@@ -67,7 +67,7 @@ class PatternDetectionOrchestratorTest {
             templateLoader = { "T" },
             forbiddenPhraseDetector = { false },
         )
-        coEvery { engine.generateText(any()) } returns "Aftermath Loop"
+        coEvery { engine.generateText(any(), any()) } returns "Aftermath Loop"
         orchestrator = PatternDetectionOrchestrator(
             boxStore = boxStore,
             detector = detector,
@@ -497,7 +497,7 @@ class PatternDetectionOrchestratorTest {
     @Test
     fun `new pattern inserts with deterministic title when generator returns null`() = runTest {
         // Title generator returns blank → orchestrator falls back to the deterministic title.
-        coEvery { engine.generateText(any()) } returns ""
+        coEvery { engine.generateText(any(), any()) } returns ""
         repeat(3) { commitOne() }
         val pattern = patternStore.all().first { it.kind == PatternKind.TEMPLATE_RECURRENCE }
         assertEquals(PatternState.ACTIVE, pattern.state)
@@ -514,7 +514,7 @@ class PatternDetectionOrchestratorTest {
         repeat(1) { putEntry(templateLabel = TemplateLabel.AFTERMATH) }
 
         val detector: PatternDetector = mockk()
-        coEvery { engine.generateText(any()) } throws RuntimeException("boom")
+        coEvery { engine.generateText(any(), any()) } throws RuntimeException("boom")
         every { detector.detect() } returns listOf(
             DetectedPattern(
                 patternId = "z".repeat(64),
@@ -613,7 +613,7 @@ class PatternDetectionOrchestratorTest {
                 lastSeenTimestamp = now.toEpochMilli(),
             ),
         )
-        coEvery { engine.generateText(any()) } throws CancellationException("stop")
+        coEvery { engine.generateText(any(), any()) } throws CancellationException("stop")
         val cancelOrchestrator = PatternDetectionOrchestrator(
             boxStore = boxStore,
             detector = detector,

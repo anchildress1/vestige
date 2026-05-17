@@ -26,9 +26,8 @@ class PatternTitleGenerator(
 
     /** Returns a cleaned title ≤24 chars, or `null` when the model output cannot be salvaged. */
     suspend fun generate(persona: Persona, pattern: DetectedPattern): String? = withContext(ioDispatcher) {
-        val prompt = buildPrompt(persona, pattern)
         val raw = try {
-            engine.generateText(prompt)
+            engine.generateText(buildSystemInstruction(persona), buildSignature(pattern))
         } catch (cancellation: CancellationException) {
             throw cancellation
         } catch (@Suppress("TooGenericExceptionCaught") error: Exception) {
@@ -43,14 +42,16 @@ class PatternTitleGenerator(
         cleaned
     }
 
-    private fun buildPrompt(persona: Persona, pattern: DetectedPattern): String = buildString {
+    private fun buildSystemInstruction(persona: Persona): String = buildString {
         append(personaPromptComposer(persona).trimEnd())
         append("\n\n")
         append(templateLoader().trimEnd())
-        append("\n\n## SIGNATURE\n")
+    }
+
+    private fun buildSignature(pattern: DetectedPattern): String = buildString {
+        append("## SIGNATURE\n")
         append("kind: ${pattern.kind.serial}\n")
-        append("signature: ${pattern.signatureJson}\n")
-        append('\n')
+        append("signature: ${pattern.signatureJson}")
     }
 
     private fun sanitize(raw: String): String? {

@@ -47,7 +47,7 @@ class LiteRtLmStreamingTextSmokeTest {
             var firstChunkAtNs: Long? = null
             val chunks = mutableListOf<String>()
 
-            it.streamText(PROMPT).collect { chunk ->
+            it.streamText("You are a smoke-test probe. Follow the instruction exactly.", PROMPT).collect { chunk ->
                 if (firstChunkAtNs == null) firstChunkAtNs = System.nanoTime()
                 chunks += chunk
             }

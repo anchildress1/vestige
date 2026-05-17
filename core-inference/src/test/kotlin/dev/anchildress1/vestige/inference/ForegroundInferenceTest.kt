@@ -47,7 +47,7 @@ class ForegroundInferenceTest {
 
     // streamMessageContents is a cold Flow (not suspend) — stub with `every`, emit chunks.
     private fun engineEmitting(vararg chunks: String): LiteRtLmEngine = mockk {
-        every { streamMessageContents(any()) } returns flowOf(*chunks)
+        every { streamMessageContents(any(), any()) } returns flowOf(*chunks)
     }
 
     // Drives a foreground stream to its terminal ForegroundResult so the envelope-contract
@@ -86,7 +86,7 @@ class ForegroundInferenceTest {
         @TempDir cacheDir: File,
     ) = runTest {
         val engine = mockk<LiteRtLmEngine> {
-            every { streamMessageContents(any()) } returns flowOf(
+            every { streamMessageContents(any(), any()) } returns flowOf(
                 "<transcription>i kept reopening the ticket</transcription>",
                 "<follow_up>what",
                 " were you checking",
@@ -132,7 +132,7 @@ class ForegroundInferenceTest {
     @Test
     fun `a close tag split across two chunks still surfaces one Transcription`(@TempDir cacheDir: File) = runTest {
         val engine = mockk<LiteRtLmEngine> {
-            every { streamMessageContents(any()) } returns flowOf(
+            every { streamMessageContents(any(), any()) } returns flowOf(
                 "<transcription>verbatim words</transcr",
                 "iption><follow_up>and a question?</follow_up>",
             )
@@ -159,7 +159,7 @@ class ForegroundInferenceTest {
     @Test
     fun `mid-stream cancellation deletes the temp WAV and never emits Terminal`(@TempDir cacheDir: File) = runTest {
         val engine = mockk<LiteRtLmEngine> {
-            every { streamMessageContents(any()) } returns flowOf(
+            every { streamMessageContents(any(), any()) } returns flowOf(
                 "<transcription>partial words</transcription>",
                 "<follow_up>this never finis",
             )
@@ -223,7 +223,7 @@ class ForegroundInferenceTest {
     ) = runTest {
         val captured = slot<List<Content>>()
         val engine = mockk<LiteRtLmEngine> {
-            every { streamMessageContents(capture(captured)) } returns flowOf(rawSuccess("a", "b"))
+            every { streamMessageContents(any(), capture(captured)) } returns flowOf(rawSuccess("a", "b"))
         }
 
         ForegroundInference(engine, cacheDir, clock = fixedClock)
@@ -232,10 +232,9 @@ class ForegroundInferenceTest {
 
         val parts = captured.captured
         assertAll(
-            { assertEquals(2, parts.size) },
+            { assertEquals(1, parts.size, "system prompt now rides systemInstruction, not the message body") },
             { assertInstanceOf(Content.Text::class.java, parts[0]) },
-            { assertInstanceOf(Content.Text::class.java, parts[1]) },
-            { assertEquals("the literal typed words", (parts[1] as Content.Text).text) },
+            { assertEquals("the literal typed words", (parts[0] as Content.Text).text) },
             { assertTrue(parts.none { it is Content.AudioFile }, "Typed path must not hand off audio") },
             { assertEquals(0, cacheDir.listFiles().orEmpty().size, "Typed path writes no temp WAV") },
         )
@@ -271,7 +270,7 @@ class ForegroundInferenceTest {
         @TempDir cacheDir: File,
     ) = runTest {
         val engine = mockk<LiteRtLmEngine> {
-            every { streamMessageContents(any()) } returns flowOf(
+            every { streamMessageContents(any(), any()) } returns flowOf(
                 "<transcription>verbatim user text</transcription>",
                 "<follow_up>model trailed off and the stream end",
             )
@@ -290,16 +289,16 @@ class ForegroundInferenceTest {
     fun `composed prompt embeds persona shared rules, the active persona tag, and the output schema`(
         @TempDir cacheDir: File,
     ) = runTest {
-        val captured = slot<List<Content>>()
+        val captured = slot<String>()
         val engine = mockk<LiteRtLmEngine> {
-            every { streamMessageContents(capture(captured)) } returns flowOf(rawSuccess("a", "b"))
+            every { streamMessageContents(capture(captured), any()) } returns flowOf(rawSuccess("a", "b"))
         }
 
         ForegroundInference(engine, cacheDir, clock = fixedClock)
             .runForegroundCall(audio = audioChunk(), persona = Persona.EDITOR)
             .terminal()
 
-        val systemPrompt = (captured.captured[0] as Content.Text).text
+        val systemPrompt = captured.captured
         assertAll(
             { assertTrue(systemPrompt.contains("Persona: Editor")) },
             { assertTrue(systemPrompt.contains("cognition tracker")) },
@@ -315,7 +314,7 @@ class ForegroundInferenceTest {
     fun `audio handoff goes through Content_AudioFile pointing inside cacheDir`(@TempDir cacheDir: File) = runTest {
         val captured = slot<List<Content>>()
         val engine = mockk<LiteRtLmEngine> {
-            every { streamMessageContents(capture(captured)) } returns flowOf(rawSuccess("a", "b"))
+            every { streamMessageContents(any(), capture(captured)) } returns flowOf(rawSuccess("a", "b"))
         }
 
         ForegroundInference(engine, cacheDir, clock = fixedClock)
@@ -324,11 +323,10 @@ class ForegroundInferenceTest {
 
         val parts = captured.captured
         assertAll(
-            { assertEquals(2, parts.size) },
-            { assertInstanceOf(Content.Text::class.java, parts[0]) },
-            { assertInstanceOf(Content.AudioFile::class.java, parts[1]) },
+            { assertEquals(1, parts.size, "audio is the only message part; system prompt rides systemInstruction") },
+            { assertInstanceOf(Content.AudioFile::class.java, parts[0]) },
         )
-        val audioPath = (parts[1] as Content.AudioFile).absolutePath
+        val audioPath = (parts[0] as Content.AudioFile).absolutePath
         assertTrue(
             audioPath.startsWith(cacheDir.absolutePath),
             "Temp WAV path $audioPath must live inside cacheDir ${cacheDir.absolutePath}",
@@ -349,7 +347,7 @@ class ForegroundInferenceTest {
     @Test
     fun `temp WAV is deleted even when the stream throws`(@TempDir cacheDir: File) = runTest {
         val engine = mockk<LiteRtLmEngine> {
-            every { streamMessageContents(any()) } returns flow { error("model crashed") }
+            every { streamMessageContents(any(), any()) } returns flow { error("model crashed") }
         }
         val inference = ForegroundInference(engine, cacheDir, clock = fixedClock)
 
@@ -398,9 +396,9 @@ class ForegroundInferenceTest {
         val releaseFirstCall = CompletableDeferred<Unit>()
         var invocationCount = 0
         val engine = mockk<LiteRtLmEngine> {
-            every { streamMessageContents(any()) } answers {
-                val parts = firstArg<List<Content>>()
-                val audioPath = (parts[1] as Content.AudioFile).absolutePath
+            every { streamMessageContents(any(), any()) } answers {
+                val parts = secondArg<List<Content>>()
+                val audioPath = (parts[0] as Content.AudioFile).absolutePath
                 invocationCount += 1
                 when (invocationCount) {
                     1 -> flow {
@@ -512,9 +510,9 @@ class ForegroundInferenceTest {
 
     @Test
     fun `per-capture persona reaches the engine prompt`(@TempDir cacheDir: File) = runTest {
-        val captured = mutableListOf<List<Content>>()
+        val captured = mutableListOf<String>()
         val engine = mockk<LiteRtLmEngine> {
-            every { streamMessageContents(capture(captured)) } returns flowOf(rawSuccess("u", "f"))
+            every { streamMessageContents(capture(captured), any()) } returns flowOf(rawSuccess("u", "f"))
         }
         val inference = ForegroundInference(engine, cacheDir, clock = fixedClock)
 
@@ -529,8 +527,8 @@ class ForegroundInferenceTest {
         inference.runForegroundCall(audioChunk(), editorSession.activePersona).terminal()
 
         assertEquals(2, captured.size)
-        val firstPrompt = (captured[0][0] as Content.Text).text
-        val secondPrompt = (captured[1][0] as Content.Text).text
+        val firstPrompt = captured[0]
+        val secondPrompt = captured[1]
         assertAll(
             { assertTrue(firstPrompt.contains("Persona: Witness")) },
             { assertFalse(firstPrompt.contains("Persona: Editor")) },
@@ -559,9 +557,9 @@ class ForegroundInferenceTest {
         runTest {
             // 08:00 UTC = 03:00 America/Chicago — goblin under local zone, not under UTC.
             val utcEightAm = Instant.parse("2026-05-09T08:00:00Z")
-            val captured = mutableListOf<List<Content>>()
+            val captured = mutableListOf<String>()
             val engine = mockk<LiteRtLmEngine> {
-                every { streamMessageContents(capture(captured)) } returns flowOf(rawSuccess("a", "b"))
+                every { streamMessageContents(capture(captured), any()) } returns flowOf(rawSuccess("a", "b"))
             }
 
             ForegroundInference(
@@ -570,7 +568,7 @@ class ForegroundInferenceTest {
                 clock = Clock.fixed(utcEightAm, ZoneOffset.UTC),
                 zoneId = ZoneId.of("America/Chicago"),
             ).runForegroundCall(audioChunk(), Persona.WITNESS).terminal()
-            val localCallPrompt = (captured[0][0] as Content.Text).text
+            val localCallPrompt = captured[0]
 
             ForegroundInference(
                 engine = engine,
@@ -578,7 +576,7 @@ class ForegroundInferenceTest {
                 clock = Clock.fixed(utcEightAm, ZoneOffset.UTC),
                 zoneId = ZoneOffset.UTC,
             ).runForegroundCall(audioChunk(), Persona.WITNESS).terminal()
-            val utcCallPrompt = (captured[1][0] as Content.Text).text
+            val utcCallPrompt = captured[1]
 
             assertAll(
                 {
@@ -598,9 +596,9 @@ class ForegroundInferenceTest {
 
     @Test
     fun `goblin-hours addendum is absent outside the midnight to 5am window`(@TempDir cacheDir: File) = runTest {
-        val captured = slot<List<Content>>()
+        val captured = slot<String>()
         val engine = mockk<LiteRtLmEngine> {
-            every { streamMessageContents(capture(captured)) } returns flowOf(rawSuccess("a", "b"))
+            every { streamMessageContents(capture(captured), any()) } returns flowOf(rawSuccess("a", "b"))
         }
         val zone = ZoneId.of("America/Chicago")
         val noonCentral = java.time.LocalDateTime.of(2026, 5, 9, 12, 0).atZone(zone).toInstant()
@@ -612,16 +610,16 @@ class ForegroundInferenceTest {
             zoneId = zone,
         ).runForegroundCall(audioChunk(), Persona.WITNESS).terminal()
 
-        val systemPrompt = (captured.captured[0] as Content.Text).text
+        val systemPrompt = captured.captured
         assertFalse(systemPrompt.contains("Time-of-day context"))
         assertFalse(systemPrompt.contains("midnight and 5am"))
     }
 
     @Test
     fun `goblin-hours addendum is present inside the window`(@TempDir cacheDir: File) = runTest {
-        val captured = slot<List<Content>>()
+        val captured = slot<String>()
         val engine = mockk<LiteRtLmEngine> {
-            every { streamMessageContents(capture(captured)) } returns flowOf(rawSuccess("a", "b"))
+            every { streamMessageContents(capture(captured), any()) } returns flowOf(rawSuccess("a", "b"))
         }
         val zone = ZoneId.of("America/Chicago")
         val threeAmCentral = java.time.LocalDateTime.of(2026, 5, 9, 3, 0).atZone(zone).toInstant()
@@ -633,7 +631,7 @@ class ForegroundInferenceTest {
             zoneId = zone,
         ).runForegroundCall(audioChunk(), Persona.WITNESS).terminal()
 
-        val systemPrompt = (captured.captured[0] as Content.Text).text
+        val systemPrompt = captured.captured
         assertAll(
             { assertTrue(systemPrompt.contains("Time-of-day context")) },
             { assertTrue(systemPrompt.contains("midnight and 5am")) },
@@ -649,9 +647,9 @@ class ForegroundInferenceTest {
 
     @Test
     fun `5am local time is outside the goblin window`(@TempDir cacheDir: File) = runTest {
-        val captured = slot<List<Content>>()
+        val captured = slot<String>()
         val engine = mockk<LiteRtLmEngine> {
-            every { streamMessageContents(capture(captured)) } returns flowOf(rawSuccess("a", "b"))
+            every { streamMessageContents(capture(captured), any()) } returns flowOf(rawSuccess("a", "b"))
         }
         val zone = ZoneId.of("America/Chicago")
         val fiveAmCentral = java.time.LocalDateTime.of(2026, 5, 9, 5, 0).atZone(zone).toInstant()
@@ -663,7 +661,7 @@ class ForegroundInferenceTest {
             zoneId = zone,
         ).runForegroundCall(audioChunk(), Persona.WITNESS).terminal()
 
-        val systemPrompt = (captured.captured[0] as Content.Text).text
+        val systemPrompt = captured.captured
         assertFalse(systemPrompt.contains("Time-of-day context"))
     }
 }

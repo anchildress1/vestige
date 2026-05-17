@@ -7,6 +7,8 @@ import com.google.ai.edge.litertlm.Contents
 import com.google.ai.edge.litertlm.ConversationConfig
 import com.google.ai.edge.litertlm.Engine
 import com.google.ai.edge.litertlm.EngineConfig
+import com.google.ai.edge.litertlm.ExperimentalApi
+import com.google.ai.edge.litertlm.ExperimentalFlags
 import com.google.ai.edge.litertlm.LogSeverity
 import com.google.ai.edge.litertlm.SamplerConfig
 import kotlinx.coroutines.CoroutineDispatcher
@@ -47,13 +49,18 @@ class LiteRtLmEngine(
     private var engine: Engine? = null
     private val callMutex = Mutex()
 
+    @OptIn(ExperimentalApi::class)
     suspend fun initialize() = withContext(ioDispatcher) {
         check(engine == null) { "LiteRtLmEngine already initialized; close() before re-init." }
+        // MTP single-position speculative decoding — process-global SDK flag, must be set before
+        // any Engine is constructed. Idempotent across re-init. Decode-path only: prompt, sampler,
+        // and output format are unaffected, so it stays on for CPU and GPU alike.
+        ExperimentalFlags.enableSpeculativeDecoding = true
         Log.d(
             TAG,
             "Loading $modelPath backend=${backend.label} " +
                 "audio=${audioBackend?.label ?: "off"} vision=${visionBackend?.label ?: "off"} " +
-                "maxTokens=$maxNumTokens sampler=topK=${samplerConfig.topK}," +
+                "maxTokens=$maxNumTokens speculativeDecoding=on sampler=topK=${samplerConfig.topK}," +
                 "topP=${samplerConfig.topP},temp=${samplerConfig.temperature},seed=${samplerConfig.seed}",
         )
         Engine.setNativeMinLogSeverity(LogSeverity.INFO)

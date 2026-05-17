@@ -1,6 +1,8 @@
 package dev.anchildress1.vestige.inference
 
 import com.google.ai.edge.litertlm.Content
+import com.google.ai.edge.litertlm.ExperimentalApi
+import com.google.ai.edge.litertlm.ExperimentalFlags
 import io.mockk.mockk
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Assertions.assertEquals
@@ -38,6 +40,20 @@ class LiteRtLmEngineTest {
             "LiteRtLmEngine.sendMessageContents called before initialize() (or after close()).",
             error.message,
         )
+    }
+
+    @OptIn(ExperimentalApi::class)
+    @Test
+    fun `initialize turns on MTP speculative decoding before engine construction`() {
+        ExperimentalFlags.enableSpeculativeDecoding = false
+        val engine = LiteRtLmEngine(modelPath = NOT_USED_PATH)
+        // initialize() flips the flag as its first statement, then crosses the native
+        // Engine/Log boundary the JVM can't satisfy without the 3.66 GB model. The catch
+        // scopes this test to exactly the pre-native flag-set, matching the file's
+        // JVM-vs-on-device split documented above.
+        runCatching { runTest { engine.initialize() } }
+        assertEquals(true, ExperimentalFlags.enableSpeculativeDecoding)
+        engine.close()
     }
 
     @Test

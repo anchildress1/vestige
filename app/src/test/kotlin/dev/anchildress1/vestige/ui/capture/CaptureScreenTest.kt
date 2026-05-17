@@ -239,14 +239,19 @@ class CaptureScreenTest {
         return CaptureViewModel(
             initialPersona = Persona.WITNESS,
             recordVoice = VoiceCapture { _, _ -> audio },
+            // Option-C voice: call 1 yields the transcription immediately.
             foregroundInference = ForegroundInferenceCall { _, _ ->
-                flow {
-                    emit(ForegroundStreamEvent.Transcription("still talking"))
-                    kotlinx.coroutines.awaitCancellation() // park before Terminal
-                }
+                flowOf(ForegroundStreamEvent.Transcription("still talking"))
             },
             saveAndExtract = SaveAndExtract { _, _, _, _, _, _ -> },
-            foregroundTextInference = ForegroundTextInferenceCall { _, _, _ -> error("unused") },
+            // Call 2 starts the history-conditioned follow-up, emits a partial delta, then
+            // parks before Terminal so the VM stays in Reviewing(streaming = true).
+            foregroundTextInference = ForegroundTextInferenceCall { _, _, _ ->
+                flow {
+                    emit(ForegroundStreamEvent.FollowUpDelta("thinking..."))
+                    kotlinx.coroutines.awaitCancellation()
+                }
+            },
             clock = clock,
             zoneId = ZoneOffset.UTC,
             initialReadiness = ModelReadiness.Ready,

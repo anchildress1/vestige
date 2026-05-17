@@ -3,17 +3,23 @@
 # Exits 0 with empty output when nothing changed (caller should skip test run).
 set -euo pipefail
 
-BASE=$(git merge-base HEAD "origin/main" 2>/dev/null \
-    || git merge-base HEAD "origin/master" 2>/dev/null \
-    || git rev-parse "HEAD^" 2>/dev/null \
-    || git rev-parse HEAD)
-
-COMMITTED=$(git diff --name-only "${BASE}...HEAD" 2>/dev/null || true)
-STAGED=$(git diff --name-only --cached 2>/dev/null || true)
-UNSTAGED=$(git diff --name-only 2>/dev/null || true)
-CHANGED=$(printf '%s\n%s\n%s\n' "$COMMITTED" "$STAGED" "$UNSTAGED")
-
 ALL_TASKS=":core-model:test :core-inference:testDebugUnitTest :core-storage:testDebugUnitTest :app:testDebugUnitTest"
+
+BASE=$(git merge-base HEAD "origin/main" 2>/dev/null \
+    || git merge-base HEAD "origin/master" 2>/dev/null)
+
+# No remote base available — can't determine scope safely, run everything.
+if [ -z "$BASE" ]; then
+    printf '%s\n' "$ALL_TASKS"
+    exit 0
+fi
+
+# --no-renames treats renames as delete+add so both source and destination
+# paths appear; prevents cross-module moves from being detected as app-only.
+COMMITTED=$(git diff --name-only --no-renames "${BASE}...HEAD" 2>/dev/null || true)
+STAGED=$(git diff --name-only --no-renames --cached 2>/dev/null || true)
+UNSTAGED=$(git diff --name-only --no-renames 2>/dev/null || true)
+CHANGED=$(printf '%s\n%s\n%s\n' "$COMMITTED" "$STAGED" "$UNSTAGED")
 
 # Root-level Gradle config changes affect all modules — run everything.
 if echo "$CHANGED" | grep -qE '^(build\.gradle\.kts|settings\.gradle\.kts|gradle\.properties|gradlew[^/]*|gradle/)'; then

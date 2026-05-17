@@ -183,7 +183,11 @@ internal object LensResponseParser {
         else -> value
     }
 
+    // Group 1 is only the value's final char — the match span is replaced in place, so the
+    // preceding bytes are untouched and a single terminator (string/number/bool/null close,
+    // or `]`/`}`) reconstructs the comma identically without re-tokenizing the whole value.
+    // Over-broad matches re-parse-fail downstream, preserving the fail-closed contract.
     private val MISSING_FIELD_COMMA = Regex(
-        """((?:"(?:\\.|[^"\\])*")|true|false|null|-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?|\]|\})\s*("(?:(?:\\.|[^"\\])+)":)""",
+        """(["\]}\w])\s*("(?:\\.|[^"\\])+":)""",
     )
 }

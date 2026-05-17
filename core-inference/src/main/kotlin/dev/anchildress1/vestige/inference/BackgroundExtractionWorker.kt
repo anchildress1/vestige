@@ -136,7 +136,7 @@ class BackgroundExtractionWorker(
     }
 
     private suspend fun attemptOnce(lens: Lens, composed: ComposedPrompt, attempt: Int): AttemptOutcome = try {
-        AttemptOutcome(raw = engine.generateText(composed.text), error = null)
+        AttemptOutcome(raw = engine.generateText(composed.systemInstruction, composed.userText), error = null)
     } catch (cancellation: CancellationException) {
         throw cancellation
     } catch (@Suppress("TooGenericExceptionCaught") engineError: Exception) {

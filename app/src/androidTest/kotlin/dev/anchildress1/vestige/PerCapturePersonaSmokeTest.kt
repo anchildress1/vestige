@@ -5,11 +5,10 @@ import androidx.test.platform.app.InstrumentationRegistry
 import dev.anchildress1.vestige.inference.AudioCapture
 import dev.anchildress1.vestige.inference.AudioChunk
 import dev.anchildress1.vestige.inference.BackendChoice
-import dev.anchildress1.vestige.inference.CaptureSession
 import dev.anchildress1.vestige.inference.ForegroundInference
 import dev.anchildress1.vestige.inference.ForegroundResult
+import dev.anchildress1.vestige.inference.ForegroundStreamEvent
 import dev.anchildress1.vestige.inference.LiteRtLmEngine
-import dev.anchildress1.vestige.inference.Speaker
 import dev.anchildress1.vestige.model.Persona
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
@@ -25,9 +24,9 @@ import java.nio.ByteOrder
 /**
  * Per-capture persona smoke test (manual, on-device, visual inspection).
  *
- * Drives the foreground path three times — one fresh [CaptureSession] per persona — against
- * the same audio buffer. Asserts each follow-up is non-blank, pairwise-different, and the
- * recorded `Turn.persona` matches the capture's persona. Operator inspects logcat for tone.
+ * Drives the foreground path three times — once per persona — against the same audio buffer.
+ * Asserts each follow-up is non-blank, pairwise-different, and the [ForegroundResult.Success]
+ * carries the capture's persona. Operator inspects logcat for tone.
  *
  * Push artifacts then run:
  *
@@ -101,27 +100,23 @@ class PerCapturePersonaSmokeTest {
     }
 
     /**
-     * Drive one fresh [CaptureSession] under [persona]. Returns the follow-up text + measured
-     * per-call latency for the caller's divergence + budget assertions.
+     * Drive one foreground call under [persona], folding the stream to its terminal result.
+     * Returns the follow-up text + measured per-call latency for the caller's divergence +
+     * budget assertions.
      */
     private suspend fun runOneCaptureUnderPersona(
         inference: ForegroundInference,
         chunk: AudioChunk,
         persona: Persona,
     ): CaptureResult {
-        val session = CaptureSession(defaultPersona = persona)
-        assertEquals(persona, session.activePersona)
-
-        session.startRecording()
-        session.submitForInference()
-        val result = inference.runForegroundCall(chunk, session.activePersona)
+        var terminal: ForegroundResult? = null
+        inference.runForegroundCall(chunk, persona).collect { event ->
+            if (event is ForegroundStreamEvent.Terminal) terminal = event.result
+        }
+        val result = checkNotNull(terminal) { "${persona.name} capture produced no Terminal event" }
         assertTrue("${persona.name} capture must succeed; was $result", result is ForegroundResult.Success)
         val success = result as ForegroundResult.Success
-        session.recordTranscription(success.transcription)
-        session.recordModelResponse(success.followUp, success.persona)
-
-        val modelTurn = session.transcript.turns.single { it.speaker == Speaker.MODEL }
-        assertEquals("Recorded model turn must carry the capture's persona", persona, modelTurn.persona)
+        assertEquals("Result must carry the capture's persona", persona, success.persona)
 
         android.util.Log.i(TAG, "=== ${persona.name} follow-up (${success.elapsedMs}ms) ===")
         android.util.Log.i(TAG, success.followUp)

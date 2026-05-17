@@ -60,6 +60,8 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.emitAll
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.joinAll
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
@@ -279,22 +281,22 @@ class AppContainer(
      * initialized before the call so the screen doesn't have to thread an init step into its
      * recording lifecycle.
      */
-    suspend fun runForegroundCall(audio: AudioChunk, persona: Persona): Flow<ForegroundStreamEvent> {
+    fun runForegroundCall(audio: AudioChunk, persona: Persona): Flow<ForegroundStreamEvent> = flow {
         ensureBackgroundEngineInitialized()
-        return foregroundInference.runForegroundCall(audio, persona)
+        emitAll(foregroundInference.runForegroundCall(audio, persona))
     }
 
     /**
      * Typed-entry foreground call — same engine + parser as the voice path so a typed entry
      * reviews identically. The model is required; the capture screen gates on readiness.
      */
-    suspend fun runForegroundTextCall(
+    fun runForegroundTextCall(
         text: String,
         persona: Persona,
         retrievedHistory: List<HistoryChunk> = emptyList(),
-    ): Flow<ForegroundStreamEvent> {
+    ): Flow<ForegroundStreamEvent> = flow {
         ensureBackgroundEngineInitialized()
-        return foregroundInference.runForegroundTextCall(text, persona, retrievedHistory)
+        emitAll(foregroundInference.runForegroundTextCall(text, persona, retrievedHistory))
     }
 
     private val retrievalRepo: RetrievalRepo by lazy {
@@ -466,7 +468,7 @@ class AppContainer(
         scope.launch {
             // Serialize probe→compare→set so concurrent callers (lifecycle resume + a model
             // action) can't interleave and let an older probe overwrite a newer readiness.
-            // Each caller queues and re-probes after the prior completes (Codex review #4).
+            // Each caller queues and re-probes after the prior completes.
             readinessRefreshMutex.withLock {
                 val previous = _modelReadinessFlow.value
                 val current = probeModelReadiness(previous)
@@ -524,7 +526,7 @@ class AppContainer(
                 _modelReadinessFlow.value = ModelReadiness.Downloading(0)
                 networkGate.openForDownload(reason = "Model Status — user-requested re-download")
                 val result = runDownload(store)
-                // Honor the terminal result (Codex review #1/#3). The size-only probe would read
+                // Honor the terminal result. The size-only probe would read
                 // a checksum-corrupt full-size file as Complete → false Ready, so discard it.
                 // Anything other than Complete must not stay Downloading — Model Status actions
                 // are disabled in that state — so drop to a non-Downloading readiness and let the

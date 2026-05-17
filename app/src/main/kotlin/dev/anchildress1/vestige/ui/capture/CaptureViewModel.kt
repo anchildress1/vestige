@@ -123,14 +123,24 @@ class CaptureViewModel(
         }
     }
 
+    /**
+     * Done tap. No-op while [CaptureUiState.Reviewing.streaming] — the entry is not yet persisted
+     * (save fires only on the terminal event), so acknowledging mid-stream would drop it on the
+     * subsequent `onCleared()` cancel. The UI also withholds Done until streaming ends; this guard
+     * is the state-machine backstop.
+     */
     fun acknowledgeReview() {
         _state.update { current ->
             when (current) {
-                is CaptureUiState.Reviewing -> CaptureUiState.Idle(
-                    persona = current.persona,
-                    modelReadiness = current.modelReadiness,
-                    lastReview = current.review,
-                )
+                is CaptureUiState.Reviewing -> if (current.streaming) {
+                    current
+                } else {
+                    CaptureUiState.Idle(
+                        persona = current.persona,
+                        modelReadiness = current.modelReadiness,
+                        lastReview = current.review,
+                    )
+                }
 
                 else -> current
             }
@@ -314,7 +324,7 @@ class CaptureViewModel(
         durationMs: Long,
         retrievedHistory: List<HistoryChunk>,
         transcriptionOverride: String?,
-        call: suspend () -> Flow<ForegroundStreamEvent>,
+        call: () -> Flow<ForegroundStreamEvent>,
     ) {
         var transcription = transcriptionOverride.orEmpty()
         val followUp = StringBuilder()
@@ -323,12 +333,12 @@ class CaptureViewModel(
                 when (event) {
                     is ForegroundStreamEvent.Transcription -> {
                         transcription = transcriptionOverride ?: event.text
-                        showReviewing(transcription, followUp.toString(), elapsedMs = 0L)
+                        showReviewing(transcription, followUp.toString(), elapsedMs = 0L, streaming = true)
                     }
 
                     is ForegroundStreamEvent.FollowUpDelta -> {
                         followUp.append(event.text)
-                        showReviewing(transcription, followUp.toString(), elapsedMs = 0L)
+                        showReviewing(transcription, followUp.toString(), elapsedMs = 0L, streaming = true)
                     }
 
                     is ForegroundStreamEvent.Terminal -> when (val result = event.result) {
@@ -342,7 +352,7 @@ class CaptureViewModel(
                                 result.followUp,
                                 retrievedHistory,
                             )
-                            showReviewing(saved, result.followUp, result.elapsedMs)
+                            showReviewing(saved, result.followUp, result.elapsedMs, streaming = false)
                         }
 
                         is ForegroundResult.ParseFailure -> {
@@ -358,8 +368,9 @@ class CaptureViewModel(
                                     persona,
                                     durationMs,
                                     null,
+                                    retrievedHistory,
                                 )
-                                showReviewing(recovered, "", result.elapsedMs)
+                                showReviewing(recovered, "", result.elapsedMs, streaming = false)
                             }
                         }
                     }
@@ -393,7 +404,7 @@ class CaptureViewModel(
                 emitInferenceError(CaptureError.InferenceFailed.Reason.PARSE_FAILED)
                 return
             }
-            showReviewing(transcription, followUp = "", elapsedMs = 0L)
+            showReviewing(transcription, followUp = "", elapsedMs = 0L, streaming = true)
             val history = retrieveHistorySafely(transcription)
             runForeground(persona, audio.durationMs, history, transcriptionOverride = transcription) {
                 foregroundTextInference(transcription, persona, history)
@@ -421,7 +432,7 @@ class CaptureViewModel(
         emptyList()
     }
 
-    private fun showReviewing(transcription: String, followUp: String, elapsedMs: Long) {
+    private fun showReviewing(transcription: String, followUp: String, elapsedMs: Long, streaming: Boolean) {
         _state.update { c ->
             CaptureUiState.Reviewing(
                 persona = c.persona,
@@ -432,6 +443,7 @@ class CaptureViewModel(
                     persona = c.persona,
                     elapsedMs = elapsedMs,
                 ),
+                streaming = streaming,
             )
         }
     }
@@ -473,7 +485,7 @@ fun interface VoiceCapture {
 
 /** Streams one foreground (single-turn) call against the local model for a voice entry. */
 fun interface ForegroundInferenceCall {
-    suspend operator fun invoke(audio: AudioChunk, persona: Persona): Flow<ForegroundStreamEvent>
+    operator fun invoke(audio: AudioChunk, persona: Persona): Flow<ForegroundStreamEvent>
 }
 
 /**
@@ -483,7 +495,7 @@ fun interface ForegroundInferenceCall {
  * `ForegroundInference`.
  */
 fun interface ForegroundTextInferenceCall {
-    suspend operator fun invoke(
+    operator fun invoke(
         text: String,
         persona: Persona,
         retrievedHistory: List<HistoryChunk>,

@@ -16,7 +16,7 @@ Authority order if anything here disagrees with prose: the ADRs and `concept-loc
 | [architecture.md](architecture.md) | 4-module split, `AppContainer` DI, `NetworkGate`, capture→storage dataflow |
 | [llm-functionality.md](llm-functionality.md) | Gemma 4 E4B + LiteRT-LM, 3-lens × 5-surface, two-tier processing, convergence, personas, embeddings |
 | [user-flows.md](user-flows.md) | Onboarding, voice + typed capture, history, patterns, settings, model lifecycle |
-| [state-diagrams.md](state-diagrams.md) | CaptureSession, pattern lifecycle, ModelReadiness, download phases, extraction status, foreground service |
+| [state-diagrams.md](state-diagrams.md) | capture UI state, pattern lifecycle, ModelReadiness, download phases, extraction status, foreground service |
 | [adr-decisions.md](adr-decisions.md) | ADR-001…013 — decision + diagram per ADR, plus the supersession graph |
 
 ---

@@ -46,7 +46,10 @@ class LiteRtLmTextSmokeTest {
         )
         engine.use {
             it.initialize()
-            val response = it.generateText("Respond with the single word OK.")
+            val response = it.generateText(
+                "You are a smoke-test probe. Follow the instruction exactly.",
+                "Respond with the single word OK.",
+            )
             assertTrue("Response was blank", response.isNotBlank())
         }
     }

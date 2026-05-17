@@ -1,4 +1,4 @@
-.PHONY: setup install bootstrap-wrapper doctor build assemble reinstall _reinstall_base push-model seed-entries logcat test lint format ktlint-format ktlint-check detekt android-lint secret-scan commitlint verify-no-telemetry verify ci clean
+.PHONY: setup install bootstrap-wrapper doctor build assemble reinstall _reinstall_base push-model seed-entries logcat test test-full lint format ktlint-format ktlint-check detekt android-lint secret-scan commitlint verify-no-telemetry verify ci clean
 
 GRADLE := ./gradlew
 KTLINT := $(or $(shell command -v ktlint 2>/dev/null), $(HOME)/.local/bin/ktlint)
@@ -122,7 +122,21 @@ logcat:
 assemble:
 	$(GRADLE) :app:assembleRelease
 
+# Incremental: only tests modules with files changed vs origin/main.
+# koverXmlReport + koverVerify are skipped on partial runs — root-level kover
+# aggregates all four modules and will undercount coverage for unchanged ones.
+# Use `make test-full` or `make verify` when you need the coverage gate enforced.
 test:
+	@tasks=$$(./scripts/changed-test-tasks.sh); \
+	if [ -z "$$tasks" ]; then \
+		echo "→ no module sources changed; skipping unit tests"; \
+	else \
+		echo "→ changed modules: $$tasks"; \
+		$(GRADLE) $$tasks; \
+	fi
+
+# Full run: all modules + coverage verification. Used by ci and verify targets.
+test-full:
 	$(GRADLE) :core-model:test :core-inference:testDebugUnitTest :core-storage:testDebugUnitTest :app:testDebugUnitTest koverXmlReport koverVerify
 
 lint: ktlint-check detekt android-lint
@@ -159,7 +173,7 @@ commitlint:
 verify-no-telemetry:
 	$(GRADLE) verifyNoTelemetry
 
-verify: lint test build secret-scan verify-no-telemetry
+verify: lint test-full build secret-scan verify-no-telemetry
 
 ci: lint test build verify-no-telemetry
 

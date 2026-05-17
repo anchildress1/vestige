@@ -31,7 +31,7 @@ import java.time.ZoneOffset
 import java.util.concurrent.atomic.AtomicInteger
 
 @OptIn(ExperimentalCoroutinesApi::class)
-@Suppress("LargeClass") // Cohesive state-machine suite; splitting would fragment the lifecycle coverage.
+@Suppress("LargeClass") // One cohesive VM state-machine suite — mic/model/persona/record/type/stream paths.
 class CaptureViewModelTest {
 
     private val dispatcher = UnconfinedTestDispatcher()
@@ -128,6 +128,51 @@ class CaptureViewModelTest {
         }
         assertEquals(1, save.invocations.get())
         assertEquals("save persists the call-1 transcription, not call-2's echo", "i kept reopening it", save.lastText)
+    }
+
+    @Test
+    fun `streaming Reviewing withholds save and acknowledge until the terminal event`() = runTest(dispatcher) {
+        // P1+P2 regression: a partial event puts the UI in Reviewing, but the entry isn't
+        // persisted until Terminal. Acknowledging mid-stream would drop it on onCleared()'s
+        // collector cancel, and re-applying later deltas after a premature Done would resurrect
+        // the review. The streaming flag gates both.
+        val audio = AudioChunk(FloatArray(16), 16_000, isFinal = true)
+        val voice = FakeVoiceCapture(result = audio)
+        val gate = CompletableDeferred<Unit>()
+        val save = RecordingSaveAndExtract()
+        val vm = newViewModel(
+            voice = voice,
+            inference = ForegroundInferenceCall { _, _ ->
+                flow {
+                    emit(ForegroundStreamEvent.Transcription("half a thought"))
+                    gate.await()
+                    emit(ForegroundStreamEvent.Terminal(successResult("half a thought", "and the rest")))
+                }
+            },
+            save = save,
+            initialReadiness = ModelReadiness.Ready,
+        )
+
+        vm.startRecording()
+        voice.completeWithResult()
+        advanceUntilIdle()
+
+        val streaming = vm.state.value as CaptureUiState.Reviewing
+        assertTrue("partial event marks Reviewing as streaming", streaming.streaming)
+        assertEquals("no save before terminal", 0, save.invocations.get())
+        vm.acknowledgeReview()
+        assertTrue("acknowledge while streaming is a no-op", vm.state.value is CaptureUiState.Reviewing)
+        assertEquals("still no save after a mid-stream Done", 0, save.invocations.get())
+
+        gate.complete(Unit)
+        advanceUntilIdle()
+
+        val terminal = vm.state.value as CaptureUiState.Reviewing
+        assertTrue("terminal clears the streaming flag", !terminal.streaming)
+        assertEquals("and the rest", terminal.review.followUp)
+        assertEquals("terminal saves exactly once", 1, save.invocations.get())
+        vm.acknowledgeReview()
+        assertEquals("half a thought", (vm.state.value as CaptureUiState.Idle).lastReview?.transcription)
     }
 
     @Test
@@ -850,7 +895,7 @@ class CaptureViewModelTest {
 // rest and runs call 2 for the follow-up); a ParseFailure surfaces as a Terminal with no
 // Transcription, which the VM maps to PARSE_FAILED.
 private class FakeForegroundInference(private val result: ForegroundResult) : ForegroundInferenceCall {
-    override suspend fun invoke(audio: AudioChunk, persona: Persona): Flow<ForegroundStreamEvent> = when (result) {
+    override fun invoke(audio: AudioChunk, persona: Persona): Flow<ForegroundStreamEvent> = when (result) {
         is ForegroundResult.Success -> flowOf(ForegroundStreamEvent.Transcription(result.transcription))
         is ForegroundResult.ParseFailure -> flowOf(ForegroundStreamEvent.Terminal(result))
     }
@@ -860,7 +905,7 @@ private class SuspendingForegroundInference(private val pending: CompletableDefe
     ForegroundInferenceCall {
     // The flow body awaits `pending` before emitting, so the VM stays in Inferring until the
     // test releases it — preserving the pre-streaming "suspended call" semantics these tests rely on.
-    override suspend fun invoke(audio: AudioChunk, persona: Persona): Flow<ForegroundStreamEvent> =
+    override fun invoke(audio: AudioChunk, persona: Persona): Flow<ForegroundStreamEvent> =
         flow { emit(ForegroundStreamEvent.Terminal(pending.await())) }
 }
 

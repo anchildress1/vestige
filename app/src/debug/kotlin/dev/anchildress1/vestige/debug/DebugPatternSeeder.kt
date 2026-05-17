@@ -3,10 +3,12 @@ package dev.anchildress1.vestige.debug
 import dev.anchildress1.vestige.model.ExtractionStatus
 import dev.anchildress1.vestige.model.PatternKind
 import dev.anchildress1.vestige.model.PatternState
+import dev.anchildress1.vestige.storage.CalloutCooldownEntity
 import dev.anchildress1.vestige.storage.EntryEntity
 import dev.anchildress1.vestige.storage.MarkdownEntryStore
 import dev.anchildress1.vestige.storage.PatternEntity
 import dev.anchildress1.vestige.storage.PatternStore
+import dev.anchildress1.vestige.storage.TagEntity
 import io.objectbox.BoxStore
 import java.io.File
 import java.security.MessageDigest
@@ -34,6 +36,8 @@ object DebugPatternSeeder {
             markdownStore.listAll().forEach(File::delete)
             boxStore.boxFor(EntryEntity::class.java).removeAll()
             boxStore.boxFor(PatternEntity::class.java).removeAll()
+            boxStore.boxFor(TagEntity::class.java).removeAll()
+            boxStore.boxFor(CalloutCooldownEntity::class.java).removeAll()
 
             data class SeedEntry(val text: String, val durationMs: Long)
             val seedEntries = listOf(

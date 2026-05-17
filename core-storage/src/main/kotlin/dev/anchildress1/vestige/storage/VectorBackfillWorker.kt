@@ -81,7 +81,7 @@ class VectorBackfillWorker(private val boxStore: BoxStore, private val embedder:
             BackfillProgress(processed = 0, failed = 0, skipped = 1)
         } else {
             embedAndPersist(entryBox, entry, text)
-            BackfillProgress(processed = 1, failed = 0)
+            BackfillProgress(processed = 1, failed = 0, skipped = 0)
         }
     } catch (cancel: CancellationException) {
         // Coroutine cancellation must not look like an embedder failure — rethrow so the outer
@@ -89,7 +89,7 @@ class VectorBackfillWorker(private val boxStore: BoxStore, private val embedder:
         throw cancel
     } catch (@Suppress("TooGenericExceptionCaught") error: Exception) {
         Log.w(TAG, "Vector backfill failed for entry ${entry.id}", error)
-        BackfillProgress(processed = 0, failed = 1)
+        BackfillProgress(processed = 0, failed = 1, skipped = 0)
     }
 
     private fun stampCurrentSchema(entryBox: Box<EntryEntity>, entry: EntryEntity) {

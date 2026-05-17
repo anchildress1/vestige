@@ -160,7 +160,7 @@ Per-entry extraction drops from ~15–21s to ~7–9s. Queue concern dissolves. T
 
 ---
 
-## Addendum (2026-05-17) — Operator adoption; implemented mechanism
+## Addendum (2026-05-17) — operator adoption and implemented mechanism
 
 The §Correction (2026-05-16) framed v1 adoption of concurrent multi-context as a measured scope call owned by Story 2.6.6 / 2.19. **On 2026-05-17 the operator made that call by directive ("we do not want to ship sequential"; streaming required).** Concurrency is now implemented; this addendum records the realized mechanism additively (the prior decision/correction text is unchanged).
 

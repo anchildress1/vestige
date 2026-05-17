@@ -311,11 +311,7 @@ class CaptureViewModel(
 
     // `durationMs` is the audio length for voice, 0 for typed. A collector cancellation
     // (navigate-away) discards the partial — only the Terminal event saves.
-    private suspend fun runForeground(
-        persona: Persona,
-        durationMs: Long,
-        call: suspend () -> Flow<ForegroundStreamEvent>,
-    ) {
+    private suspend fun runForeground(persona: Persona, durationMs: Long, call: () -> Flow<ForegroundStreamEvent>) {
         var transcription = ""
         val followUp = StringBuilder()
         try {
@@ -427,12 +423,12 @@ fun interface VoiceCapture {
 
 /** Streams one foreground (single-turn) call against the local model for a voice entry. */
 fun interface ForegroundInferenceCall {
-    suspend operator fun invoke(audio: AudioChunk, persona: Persona): Flow<ForegroundStreamEvent>
+    operator fun invoke(audio: AudioChunk, persona: Persona): Flow<ForegroundStreamEvent>
 }
 
 /** Streams one foreground (single-turn) call for a typed entry — text in, progressive envelope out. */
 fun interface ForegroundTextInferenceCall {
-    suspend operator fun invoke(text: String, persona: Persona): Flow<ForegroundStreamEvent>
+    operator fun invoke(text: String, persona: Persona): Flow<ForegroundStreamEvent>
 }
 
 /** Routes a transcription (voice or typed) into the two-tier save + background extraction pipeline. */

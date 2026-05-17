@@ -808,7 +808,7 @@ class CaptureViewModelTest {
 }
 
 private class FakeForegroundInference(private val result: ForegroundResult) : ForegroundInferenceCall {
-    override suspend fun invoke(audio: AudioChunk, persona: Persona): Flow<ForegroundStreamEvent> =
+    override fun invoke(audio: AudioChunk, persona: Persona): Flow<ForegroundStreamEvent> =
         flowOf(ForegroundStreamEvent.Terminal(result))
 }
 
@@ -816,7 +816,7 @@ private class SuspendingForegroundInference(private val pending: CompletableDefe
     ForegroundInferenceCall {
     // The flow body awaits `pending` before emitting, so the VM stays in Inferring until the
     // test releases it — preserving the pre-streaming "suspended call" semantics these tests rely on.
-    override suspend fun invoke(audio: AudioChunk, persona: Persona): Flow<ForegroundStreamEvent> =
+    override fun invoke(audio: AudioChunk, persona: Persona): Flow<ForegroundStreamEvent> =
         flow { emit(ForegroundStreamEvent.Terminal(pending.await())) }
 }
 

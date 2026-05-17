@@ -1,11 +1,9 @@
 package dev.anchildress1.vestige.inference
 
 /**
- * Progressive output of a streaming foreground call. [Transcription] fires once the
- * `</transcription>` close tag lands; [FollowUpDelta] fires per streamed chunk of follow-up body
- * text; [Terminal] carries the authoritative [ForegroundResult] parsed from the complete buffer
- * by [ForegroundResponseParser] — the streamed deltas are a UI approximation, the terminal value
- * is the one that gets saved.
+ * Progressive output of a streaming foreground call. Streamed [Transcription]/[FollowUpDelta] are
+ * a UI approximation; [Terminal]'s parsed [ForegroundResult] is authoritative and the only thing
+ * saved.
  */
 sealed interface ForegroundStreamEvent {
     data class Transcription(val text: String) : ForegroundStreamEvent

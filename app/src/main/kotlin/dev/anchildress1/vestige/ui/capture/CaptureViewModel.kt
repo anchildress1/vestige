@@ -345,9 +345,23 @@ class CaptureViewModel(
                             showReviewing(saved, result.followUp, result.elapsedMs)
                         }
 
-                        is ForegroundResult.ParseFailure -> emitInferenceError(
-                            CaptureError.InferenceFailed.Reason.PARSE_FAILED,
-                        )
+                        is ForegroundResult.ParseFailure -> {
+                            val recovered = result.recoveredTranscription
+                            if (recovered.isNullOrBlank()) {
+                                emitInferenceError(CaptureError.InferenceFailed.Reason.PARSE_FAILED)
+                            } else {
+                                // Only follow_up failed to parse; the user's words came back
+                                // clean. Save them — losing the entry is the worse failure.
+                                saveAndExtract(
+                                    recovered,
+                                    ZonedDateTime.now(clock.withZone(zoneId)),
+                                    persona,
+                                    durationMs,
+                                    null,
+                                )
+                                showReviewing(recovered, "", result.elapsedMs)
+                            }
+                        }
                     }
                 }
             }

@@ -161,6 +161,47 @@ class LensResponseParserTest {
     }
 
     @Test
+    fun `repairs missing commas between sibling object fields in skeptical payload`() {
+        val raw = """
+            {
+            "tags": ["sink", "noon", "1pm", "three-hours-later"],
+            "energy_descriptor": null,
+            "state_shift": true
+            "vocabulary_contradictions": [
+            {
+            "term_a": "fine",
+            "term_b": "not tired exactly",
+            "snippet": "completely fine by 1pm i was gone not tired exactly"
+            }
+            ]
+            "stated_commitment": null
+            "recurrence_link": null
+            "recurrence_kind": null
+            "flags": [
+            {
+            "kind": "vocabulary-contradiction",
+            "snippet": "completely fine by 1pm i was gone not tired exactly",
+            "note": "The user describes a state of being fine then immediately negates it with 'not tired exactly'."
+            }
+            ]
+            }
+        """.trimIndent()
+
+        val extraction = LensResponseParser.parse(Lens.SKEPTICAL, raw)
+
+        assertNotNull(extraction)
+        assertEquals(listOf("sink", "noon", "1pm", "three-hours-later"), extraction!!.fields["tags"])
+        assertEquals(true, extraction.fields["state_shift"])
+        assertEquals(
+            listOf(
+                "vocabulary-contradiction:completely fine by 1pm i was gone not tired exactly:" +
+                    "The user describes a state of being fine then immediately negates it with 'not tired exactly'.",
+            ),
+            extraction.flags,
+        )
+    }
+
+    @Test
     fun `returns null when the payload is a JSON array, not an object`() {
         // Schema requires an object; an array at the top level is a parse failure (the worker
         // treats this lens as "no opinion" per ADR-002 §"Convergence edge cases").

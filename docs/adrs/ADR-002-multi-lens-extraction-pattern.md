@@ -758,14 +758,3 @@ Scope is the **addendum only**. The separate goblin-hours layers stay: `Template
 
 ---
 
-## Action Items
-
-1. [ ] STT-B — verify foreground call returns transcription + follow-up reliably as structured output across multi-turn. Output decision: structured JSON vs markdown-with-headers.
-2. [ ] STT-C instrumentation — measure JSON-parse success rate across 10+ varied test dumps per lens as part of tag-consistency assessment. If parse <95%, switch all lens outputs to markdown-with-headers and update `:core-inference` parser accordingly. Parse reliability is the prerequisite that lets STT-C measure tag consistency at all; it is not a separate stop-and-test.
-3. [ ] STT-D — confirm 3-lens outputs differ meaningfully on at least 30% of test entries. If not, halt and replan.
-4. [ ] Phase 1 — implement `:core-inference` prompt composer with separate lens/surface module storage. Log composed prompts in dev builds.
-5. [ ] Phase 1 — implement convergence resolver as Kotlin code with the unit test suite specified in Q4.
-6. [ ] Phase 1 — implement background scheduler against the `extraction_status` / `attempt_count` / `last_error` fields and cold-start sweep defined in ADR-001 Q3.
-7. [ ] Phase 2 — wire foreground call to UI streaming or non-streaming per Q1 decision.
-8. [ ] Phase 4 — add re-eval cost confirmation per Q3.
-9. [x] Update root README's "Reading order" to link this ADR alongside ADR-001.

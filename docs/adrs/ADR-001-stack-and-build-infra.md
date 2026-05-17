@@ -481,15 +481,3 @@ The dominant trade-off is **deadline vs. correctness**. Every flag and every mod
 
 ---
 
-## Action Items
-
-**Ordering note.** PRD §"Build philosophy: build first, test at failure zones" replaces the prior Phase-0 validation phase. Build directly. Risk is mitigated through the five stop-and-test points (STT-A–E) embedded in phases 1–3. STT-A (audio plumbing, Phase 1) is the existential one — time-box hard. The Phase 1 items below run as Phase 1, not as a separate validation gate.
-
-1. [ ] Replace `gradle.properties` with the proposed file above.
-2. [ ] Phase-1 smoke test: configuration cache against the pinned ObjectBox plugin version. If clean, flip the flag and record version here.
-3. [x] Create `architecture-brief.md` with the four-module layout and `AppContainer` ownership from Q1/Q2, the audio-chunking contract from Q4, and the background-extraction recovery contract from Q3.
-4. [ ] **Phase 1:** build a signed dummy release APK and install it on the reference S24 Ultra (per Q5). Do this before any product code lands.
-5. [ ] **Phase 1:** add `network_security_config.xml`, StrictMode network detection in dev builds, and grep transitive deps for telemetry libraries (per Q7).
-6. [ ] **Phase 1 (storage + load contract only):** implement the `ModelArtifactStore` interface — file-on-disk location, SHA-256 verification on load, corruption surfacing, retry-with-backoff for downloads. Onboarding UX (Wi-Fi gate, progress UI, copy strings) is Phase 4 work and stays out of Phase 1's scope. Embedding artifact wiring stays gated on STT-E.
-7. [ ] Add `extraction_status`, `attempt_count`, `last_error` to the ObjectBox `Entry` entity in Phase 1 (per Q3). Cold-start sweep ships in the same phase.
-8. [x] Update root README to point to this ADR for stack/infra and remove stale missing-doc references.

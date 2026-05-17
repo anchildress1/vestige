@@ -184,8 +184,3 @@ This is an implementation removal, **not** a decision reversal. ADR-005's decisi
 
 ---
 
-## Action Items
-
-1. [x] Land the v1 single-turn scope decision across docs + code. _(Done across the `docs/stt-b-fallback-and-adr-004` branch commits enumerated above.)_
-2. [ ] When the docs branch merges to main, the next round of doc work re-reading ADR-002 should land here first via the cross-references already embedded in `concept-locked.md`, `PRD.md`, Story 2.4, and the inference-class KDocs.
-3. [ ] If multi-turn revival begins post-v1, treat this ADR as the predecessor; supersede it with a new ADR documenting whichever SDK-stateful test outcome lands.

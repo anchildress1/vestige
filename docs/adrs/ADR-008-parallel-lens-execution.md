@@ -160,15 +160,6 @@ Per-entry extraction drops from ~15–21s to ~7–9s. Queue concern dissolves. T
 
 ---
 
-## Action Items
-
-1. [ ] Phase 2 Story 2.6 — rewrite to build base Session + 3 cloned Sessions + fire parallel. Drop the "sequential, not parallel" line. Reference this ADR.
-2. [ ] `architecture-brief.md` §"AppContainer Ownership" — rename `ModelHandle` row to **Engine** semantics; expand `InferenceCoordinator` row per this ADR.
-3. [ ] ADR-002 §"Background pass" — add a header note "Superseded by ADR-008 for sequencing. Independence rationale below is preserved; sequencing is now parallel via Session cloning."
-4. [ ] ADR-002 §"Why three calls and not one combined call" — add a footer note that Session cloning preserves the independence argument while enabling parallelism.
-5. [ ] README + PRD §"Authoritative documents" — add ADR-008 entry.
-6. [ ] First failure in Phase 2 implementation that suggests Session cloning isn't working on E4B-audio — STOP and write a superseding ADR rather than silently reverting to sequential.
-
 ---
 
 ## Sources

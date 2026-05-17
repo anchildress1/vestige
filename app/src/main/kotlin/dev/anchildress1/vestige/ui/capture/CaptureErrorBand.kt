@@ -115,7 +115,7 @@ internal sealed interface BandKind {
         override val contentDescription = "Mic permission denied. $body"
     }
 
-    data object MicBlocked : BandKind {
+    object MicBlocked : BandKind {
         override val eyebrow = CaptureCopy.BAND_LABEL_MIC
         override val body = "${CaptureCopy.MIC_BLOCKED_LINE}\n${CaptureCopy.MIC_BLOCKED_SETTINGS_LINE}"
         override val isError = true
@@ -123,7 +123,7 @@ internal sealed interface BandKind {
             "${CaptureCopy.MIC_BLOCKED_LINE} ${CaptureCopy.MIC_BLOCKED_SETTINGS_LINE}"
     }
 
-    data object MicUnavailable : BandKind {
+    object MicUnavailable : BandKind {
         override val eyebrow = CaptureCopy.BAND_LABEL_MIC
         override val body = CaptureCopy.MIC_UNAVAILABLE_LINE
         override val isError = true

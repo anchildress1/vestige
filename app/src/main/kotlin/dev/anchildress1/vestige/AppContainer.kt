@@ -439,7 +439,7 @@ class AppContainer(
         scope.launch {
             // Serialize probe→compare→set so concurrent callers (lifecycle resume + a model
             // action) can't interleave and let an older probe overwrite a newer readiness.
-            // Each caller queues and re-probes after the prior completes (Codex review #4).
+            // Each caller queues and re-probes after the prior completes.
             readinessRefreshMutex.withLock {
                 val previous = _modelReadinessFlow.value
                 val current = probeModelReadiness(previous)
@@ -497,7 +497,7 @@ class AppContainer(
                 _modelReadinessFlow.value = ModelReadiness.Downloading(0)
                 networkGate.openForDownload(reason = "Model Status — user-requested re-download")
                 val result = runDownload(store)
-                // Honor the terminal result (Codex review #1/#3). The size-only probe would read
+                // Honor the terminal result. The size-only probe would read
                 // a checksum-corrupt full-size file as Complete → false Ready, so discard it.
                 // Anything other than Complete must not stay Downloading — Model Status actions
                 // are disabled in that state — so drop to a non-Downloading readiness and let the

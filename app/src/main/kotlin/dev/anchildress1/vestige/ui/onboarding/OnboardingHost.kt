@@ -419,7 +419,7 @@ private fun kotlinx.coroutines.CoroutineScope.launchDownloadWatchdog(
         delay(WATCHDOG_TICK_MS)
         val current = getStatus()
         // Reacquiring is an active transfer too (the corrupt-artifact auto re-pull); a hang
-        // there must still surface stall + Retry, not be suppressed (Codex review #5).
+        // there must still surface stall + Retry, not be suppressed.
         if ((current.phase == DownloadPhase.Active || current.phase == DownloadPhase.Reacquiring) &&
             isStalled(lastProgressAtMs.get(), System.currentTimeMillis())
         ) {

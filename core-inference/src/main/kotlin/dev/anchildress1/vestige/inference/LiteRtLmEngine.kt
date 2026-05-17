@@ -50,10 +50,10 @@ class LiteRtLmEngine(
     @Volatile
     private var engine: Engine? = null
 
-    // Concurrency model (ADR-008 §Correction / ADR-001:424): independent Conversation contexts
-    // run in parallel on the shared Engine. [stateMutex] is held only microscopically — to read
-    // the engine pointer and adjust the in-flight count — never across an inference. [close]
-    // flips [closing], then drains in-flight calls before freeing the native handle.
+    // Concurrency model: independent Conversation contexts run in parallel on the shared
+    // Engine. [stateMutex] is held only microscopically — to read the engine pointer and
+    // adjust the in-flight count — never across an inference. [close] flips [closing], then
+    // drains in-flight calls before freeing the native handle.
     private val stateMutex = Mutex()
 
     @Volatile

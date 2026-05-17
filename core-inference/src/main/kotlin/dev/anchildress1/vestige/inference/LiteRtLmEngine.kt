@@ -261,12 +261,14 @@ class LiteRtLmEngine(
                     activeCalls == 0 -> {
                         engine?.close()
                         engine = null
+                        drained = null
+                        closing = false
                         null
                     }
 
                     else -> {
                         closing = true
-                        CompletableDeferred<Unit>().also { drained = it }
+                        drained ?: CompletableDeferred<Unit>().also { drained = it }
                     }
                 }
             }

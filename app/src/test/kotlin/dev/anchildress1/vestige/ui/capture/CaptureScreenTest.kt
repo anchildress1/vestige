@@ -157,6 +157,16 @@ class CaptureScreenTest {
     }
 
     @Test
+    fun `progressive review hides Done and History actions until the terminal follow-up lands`() {
+        val vm = newProgressiveReviewingViewModel()
+        composeRule.setContent {
+            VestigeTheme { captureScreen(vm, chrome = IdleChromeCallbacks(onHistoryTap = {})) }
+        }
+        composeRule.onAllNodesWithText("DONE · NEW ENTRY").assertCountEquals(0)
+        composeRule.onAllNodesWithText(CaptureCopy.HISTORY_LINK).assertCountEquals(0)
+    }
+
+    @Test
     fun `History link tap target is at least 48 dp tall`() {
         val vm = newViewModel(readiness = ModelReadiness.Ready)
         val footer = LastEntryFooter(monthLabel = "JAN", dayLabel = "27", durationLabel = "4m 02s")
@@ -207,6 +217,24 @@ class CaptureScreenTest {
                         ),
                     ),
                 )
+            },
+            clock = clock,
+            zoneId = ZoneOffset.UTC,
+            initialReadiness = ModelReadiness.Ready,
+        ).also { it.startRecording() }
+    }
+
+    private fun newProgressiveReviewingViewModel(): CaptureViewModel {
+        val audio = AudioChunk(FloatArray(16), sampleRateHz = 16_000, isFinal = true)
+        return CaptureViewModel(
+            initialPersona = Persona.WITNESS,
+            recordVoice = VoiceCapture { _, _ -> audio },
+            foregroundInference = ForegroundInferenceCall { _, _ ->
+                flowOf(ForegroundStreamEvent.Transcription("something happened"))
+            },
+            saveAndExtract = SaveAndExtract { _, _, _, _, _, _ -> },
+            foregroundTextInference = ForegroundTextInferenceCall { _, _, _ ->
+                kotlinx.coroutines.suspendCancellableCoroutine { /* park */ }
             },
             clock = clock,
             zoneId = ZoneOffset.UTC,

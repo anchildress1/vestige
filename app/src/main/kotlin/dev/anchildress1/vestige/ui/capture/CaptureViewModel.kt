@@ -126,11 +126,16 @@ class CaptureViewModel(
     fun acknowledgeReview() {
         _state.update { current ->
             when (current) {
-                is CaptureUiState.Reviewing -> CaptureUiState.Idle(
-                    persona = current.persona,
-                    modelReadiness = current.modelReadiness,
-                    lastReview = current.review,
-                )
+                is CaptureUiState.Reviewing ->
+                    if (current.review.isTerminal) {
+                        CaptureUiState.Idle(
+                            persona = current.persona,
+                            modelReadiness = current.modelReadiness,
+                            lastReview = current.review,
+                        )
+                    } else {
+                        current
+                    }
 
                 else -> current
             }
@@ -323,12 +328,12 @@ class CaptureViewModel(
                 when (event) {
                     is ForegroundStreamEvent.Transcription -> {
                         transcription = transcriptionOverride ?: event.text
-                        showReviewing(transcription, followUp.toString(), elapsedMs = 0L)
+                        showReviewing(transcription, followUp.toString(), elapsedMs = 0L, isTerminal = false)
                     }
 
                     is ForegroundStreamEvent.FollowUpDelta -> {
                         followUp.append(event.text)
-                        showReviewing(transcription, followUp.toString(), elapsedMs = 0L)
+                        showReviewing(transcription, followUp.toString(), elapsedMs = 0L, isTerminal = false)
                     }
 
                     is ForegroundStreamEvent.Terminal -> when (val result = event.result) {
@@ -342,7 +347,7 @@ class CaptureViewModel(
                                 result.followUp,
                                 retrievedHistory,
                             )
-                            showReviewing(saved, result.followUp, result.elapsedMs)
+                            showReviewing(saved, result.followUp, result.elapsedMs, isTerminal = true)
                         }
 
                         is ForegroundResult.ParseFailure -> emitInferenceError(
@@ -379,7 +384,7 @@ class CaptureViewModel(
                 emitInferenceError(CaptureError.InferenceFailed.Reason.PARSE_FAILED)
                 return
             }
-            showReviewing(transcription, followUp = "", elapsedMs = 0L)
+            showReviewing(transcription, followUp = "", elapsedMs = 0L, isTerminal = false)
             val history = retrieveHistorySafely(transcription)
             runForeground(persona, audio.durationMs, history, transcriptionOverride = transcription) {
                 foregroundTextInference(transcription, persona, history)
@@ -407,7 +412,7 @@ class CaptureViewModel(
         emptyList()
     }
 
-    private fun showReviewing(transcription: String, followUp: String, elapsedMs: Long) {
+    private fun showReviewing(transcription: String, followUp: String, elapsedMs: Long, isTerminal: Boolean) {
         _state.update { c ->
             CaptureUiState.Reviewing(
                 persona = c.persona,
@@ -417,6 +422,7 @@ class CaptureViewModel(
                     followUp = followUp,
                     persona = c.persona,
                     elapsedMs = elapsedMs,
+                    isTerminal = isTerminal,
                 ),
             )
         }

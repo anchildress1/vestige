@@ -1,12 +1,17 @@
 package dev.anchildress1.vestige.inference
 
 import com.google.ai.edge.litertlm.Content
+import com.google.ai.edge.litertlm.Engine
 import com.google.ai.edge.litertlm.ExperimentalApi
 import com.google.ai.edge.litertlm.ExperimentalFlags
 import io.mockk.mockk
+import io.mockk.verify
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertFalse
+import org.junit.jupiter.api.Assertions.assertNotNull
+import org.junit.jupiter.api.Assertions.assertSame
 import org.junit.jupiter.api.Assertions.assertThrows
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
@@ -89,6 +94,32 @@ class LiteRtLmEngineTest {
     }
 
     @Test
+    fun `concurrent close calls reuse one drain and both return after the final reader exits`() {
+        val engine = LiteRtLmEngine(modelPath = NOT_USED_PATH)
+        val nativeEngine = mockk<Engine>(relaxed = true)
+        setField(engine, "engine", nativeEngine)
+        setIntField(engine, "activeCalls", 1)
+
+        val firstClose = Thread { engine.close() }
+        firstClose.start()
+        val firstDrain = waitForField<kotlinx.coroutines.CompletableDeferred<Unit>>(engine, "drained")
+
+        val secondClose = Thread { engine.close() }
+        secondClose.start()
+        val currentDrain = waitForField<kotlinx.coroutines.CompletableDeferred<Unit>>(engine, "drained")
+
+        firstDrain.complete(Unit)
+        if (currentDrain !== firstDrain) currentDrain.complete(Unit)
+        firstClose.join(JOIN_TIMEOUT_MS)
+        secondClose.join(JOIN_TIMEOUT_MS)
+
+        assertSame(firstDrain, currentDrain, "every close() waiter must share the same drain token")
+        assertFalse(firstClose.isAlive, "first close() should return once the drain completes")
+        assertFalse(secondClose.isAlive, "second close() should return once the same drain completes")
+        verify(exactly = 1) { nativeEngine.close() }
+    }
+
+    @Test
     fun `default backends only set the primary engine backend`() {
         // Constructor-default contract: Phase 1 lives on CPU until STT-A picks an accelerator,
         // and audio/vision backends stay null unless the caller opts in.
@@ -124,5 +155,37 @@ class LiteRtLmEngineTest {
     private companion object {
         // Path is never actually opened — the tests assert pre-state checks fire first.
         const val NOT_USED_PATH = "/tmp/never-loaded.litertlm"
+        const val JOIN_TIMEOUT_MS = 1_000L
+        const val POLL_SLEEP_MS = 10L
+        const val FIELD_WAIT_MS = 1_000L
+    }
+
+    private fun setField(target: Any, name: String, value: Any?) {
+        val field = target.javaClass.getDeclaredField(name)
+        field.isAccessible = true
+        field.set(target, value)
+    }
+
+    private fun setIntField(target: Any, name: String, value: Int) {
+        val field = target.javaClass.getDeclaredField(name)
+        field.isAccessible = true
+        field.setInt(target, value)
+    }
+
+    @Suppress("UNCHECKED_CAST")
+    private fun <T> waitForField(target: Any, name: String): T {
+        val deadline = System.currentTimeMillis() + FIELD_WAIT_MS
+        while (System.currentTimeMillis() < deadline) {
+            val field = target.javaClass.getDeclaredField(name)
+            field.isAccessible = true
+            val value = field.get(target) as T?
+            if (value != null) return value
+            Thread.sleep(POLL_SLEEP_MS)
+        }
+        val field = target.javaClass.getDeclaredField(name)
+        field.isAccessible = true
+        val value = field.get(target)
+        assertNotNull(value, "field '$name' never became non-null")
+        return value as T
     }
 }

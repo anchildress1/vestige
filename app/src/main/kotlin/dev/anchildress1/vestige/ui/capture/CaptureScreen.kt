@@ -177,15 +177,17 @@ private fun ReviewingPane(
             TranscriptTurn(label = state.persona.name, body = state.review.followUp, bodyColor = colors.ink)
         }
         Spacer(modifier = Modifier.weight(1f))
-        DoneButton(onClick = onAcknowledge)
-        if (onOpenHistory != null) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 18.dp, vertical = 8.dp),
-                contentAlignment = Alignment.Center,
-            ) {
-                HistoryLink(onClick = onOpenHistory)
+        if (state.review.isTerminal) {
+            DoneButton(onClick = onAcknowledge)
+            if (onOpenHistory != null) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 18.dp, vertical = 8.dp),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    HistoryLink(onClick = onOpenHistory)
+                }
             }
         }
         Spacer(Modifier.windowInsetsBottomHeight(WindowInsets.navigationBars))

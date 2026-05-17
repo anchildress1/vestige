@@ -228,38 +228,37 @@ class CaptureViewModelTest {
         }
 
     @Test
-    fun `ParseFailure with a blank recovered transcription still surfaces PARSE_FAILED`() =
-        runTest(dispatcher) {
-            val audio = AudioChunk(FloatArray(16), 16_000, isFinal = true)
-            val voice = FakeVoiceCapture(result = audio)
-            val inference = FakeForegroundInference(
-                ForegroundResult.ParseFailure(
-                    persona = Persona.WITNESS,
-                    rawResponse = "",
-                    elapsedMs = 100,
-                    completedAt = clock.instant(),
-                    reason = ForegroundResult.ParseReason.MISSING_TRANSCRIPTION,
-                    recoveredTranscription = "   ",
-                ),
-            )
-            val save = RecordingSaveAndExtract()
-            val vm = newViewModel(
-                voice = voice,
-                inference = inference,
-                save = save,
-                initialReadiness = ModelReadiness.Ready,
-            )
-            vm.startRecording()
-            voice.completeWithResult()
-            advanceUntilIdle()
+    fun `ParseFailure with a blank recovered transcription still surfaces PARSE_FAILED`() = runTest(dispatcher) {
+        val audio = AudioChunk(FloatArray(16), 16_000, isFinal = true)
+        val voice = FakeVoiceCapture(result = audio)
+        val inference = FakeForegroundInference(
+            ForegroundResult.ParseFailure(
+                persona = Persona.WITNESS,
+                rawResponse = "",
+                elapsedMs = 100,
+                completedAt = clock.instant(),
+                reason = ForegroundResult.ParseReason.MISSING_TRANSCRIPTION,
+                recoveredTranscription = "   ",
+            ),
+        )
+        val save = RecordingSaveAndExtract()
+        val vm = newViewModel(
+            voice = voice,
+            inference = inference,
+            save = save,
+            initialReadiness = ModelReadiness.Ready,
+        )
+        vm.startRecording()
+        voice.completeWithResult()
+        advanceUntilIdle()
 
-            val terminal = vm.state.value as CaptureUiState.Idle
-            assertEquals(
-                CaptureError.InferenceFailed(CaptureError.InferenceFailed.Reason.PARSE_FAILED),
-                terminal.error,
-            )
-            assertEquals(0, save.invocations.get())
-        }
+        val terminal = vm.state.value as CaptureUiState.Idle
+        assertEquals(
+            CaptureError.InferenceFailed(CaptureError.InferenceFailed.Reason.PARSE_FAILED),
+            terminal.error,
+        )
+        assertEquals(0, save.invocations.get())
+    }
 
     @Test
     fun `inference engine failure surfaces InferenceFailed ENGINE_FAILED`() = runTest(dispatcher) {

@@ -182,8 +182,7 @@ class LiteRtLmEngine(
     fun streamMessageContents(systemInstruction: String, parts: List<Content>): Flow<String> = flow {
         require(parts.isNotEmpty()) { "streamMessageContents requires at least one Content part." }
 
-        @Suppress("SpreadOperator") // Contents.of is a vararg factory; no List-accepting overload.
-        val contents = Contents.of(*parts.toTypedArray())
+        val contents = Contents.of(parts)
         val active = acquireEngine(
             "LiteRtLmEngine.streamMessageContents called before initialize() (or after close()).",
         )
@@ -236,10 +235,9 @@ class LiteRtLmEngine(
                 "LiteRtLmEngine.sendMessageContents called before initialize() (or after close()).",
             )
 
-            @Suppress("SpreadOperator") // Contents.of is a vararg factory; no List-accepting overload.
             val response = try {
                 active.createConversation(conversationConfig(systemInstruction)).use { conversation ->
-                    conversation.sendMessage(Contents.of(*parts.toTypedArray())).toString()
+                    conversation.sendMessage(Contents.of(parts)).toString()
                 }
             } finally {
                 releaseEngine()

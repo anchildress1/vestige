@@ -299,10 +299,8 @@ class CaptureViewModel(
         }
     }
 
-    // Shared streaming handler for the voice (audio) and typed (text) paths. The scanner-driven
-    // deltas grow the Reviewing transcript live; the terminal event carries the authoritative
-    // parsed result and is the only thing that saves. `durationMs` is the audio length for voice,
-    // 0 for typed. A collector cancellation (navigate-away) throws out the partial — no save.
+    // `durationMs` is the audio length for voice, 0 for typed. A collector cancellation
+    // (navigate-away) discards the partial — only the Terminal event saves.
     private suspend fun runForeground(
         persona: Persona,
         durationMs: Long,
@@ -335,9 +333,23 @@ class CaptureViewModel(
                             showReviewing(result.transcription, result.followUp, result.elapsedMs)
                         }
 
-                        is ForegroundResult.ParseFailure -> emitInferenceError(
-                            CaptureError.InferenceFailed.Reason.PARSE_FAILED,
-                        )
+                        is ForegroundResult.ParseFailure -> {
+                            val recovered = result.recoveredTranscription
+                            if (recovered.isNullOrBlank()) {
+                                emitInferenceError(CaptureError.InferenceFailed.Reason.PARSE_FAILED)
+                            } else {
+                                // Only follow_up failed to parse; the user's words came back
+                                // clean. Save them — losing the entry is the worse failure.
+                                saveAndExtract(
+                                    recovered,
+                                    ZonedDateTime.now(clock.withZone(zoneId)),
+                                    persona,
+                                    durationMs,
+                                    null,
+                                )
+                                showReviewing(recovered, "", result.elapsedMs)
+                            }
+                        }
                     }
                 }
             }

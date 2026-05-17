@@ -30,6 +30,7 @@ import java.time.ZoneOffset
 import java.util.concurrent.atomic.AtomicInteger
 
 @OptIn(ExperimentalCoroutinesApi::class)
+@Suppress("LargeClass") // One cohesive VM state-machine suite — mic/model/persona/record/type/stream paths.
 class CaptureViewModelTest {
 
     private val dispatcher = UnconfinedTestDispatcher()
@@ -189,6 +190,76 @@ class CaptureViewModelTest {
         )
         assertEquals(0, save.invocations.get())
     }
+
+    @Test
+    fun `ParseFailure with a recovered transcription saves the words instead of discarding them`() =
+        runTest(dispatcher) {
+            val audio = AudioChunk(FloatArray(16), 16_000, isFinal = true)
+            val voice = FakeVoiceCapture(result = audio)
+            val inference = FakeForegroundInference(
+                ForegroundResult.ParseFailure(
+                    persona = Persona.WITNESS,
+                    rawResponse = "<transcription>i kept reopening it</transcription>",
+                    elapsedMs = 100,
+                    completedAt = clock.instant(),
+                    reason = ForegroundResult.ParseReason.MISSING_FOLLOW_UP,
+                    recoveredTranscription = "i kept reopening it",
+                ),
+            )
+            val save = RecordingSaveAndExtract()
+            val vm = newViewModel(
+                voice = voice,
+                inference = inference,
+                save = save,
+                initialReadiness = ModelReadiness.Ready,
+            )
+            vm.startRecording()
+            voice.completeWithResult()
+            advanceUntilIdle()
+
+            val terminal = vm.state.value
+            assertTrue("expected Reviewing, was $terminal", terminal is CaptureUiState.Reviewing)
+            terminal as CaptureUiState.Reviewing
+            assertEquals("i kept reopening it", terminal.review.transcription)
+            assertEquals("", terminal.review.followUp)
+            assertEquals(1, save.invocations.get())
+            assertEquals("i kept reopening it", save.lastText)
+            assertNull("recovered save carries no follow-up", save.lastFollowUpText)
+        }
+
+    @Test
+    fun `ParseFailure with a blank recovered transcription still surfaces PARSE_FAILED`() =
+        runTest(dispatcher) {
+            val audio = AudioChunk(FloatArray(16), 16_000, isFinal = true)
+            val voice = FakeVoiceCapture(result = audio)
+            val inference = FakeForegroundInference(
+                ForegroundResult.ParseFailure(
+                    persona = Persona.WITNESS,
+                    rawResponse = "",
+                    elapsedMs = 100,
+                    completedAt = clock.instant(),
+                    reason = ForegroundResult.ParseReason.MISSING_TRANSCRIPTION,
+                    recoveredTranscription = "   ",
+                ),
+            )
+            val save = RecordingSaveAndExtract()
+            val vm = newViewModel(
+                voice = voice,
+                inference = inference,
+                save = save,
+                initialReadiness = ModelReadiness.Ready,
+            )
+            vm.startRecording()
+            voice.completeWithResult()
+            advanceUntilIdle()
+
+            val terminal = vm.state.value as CaptureUiState.Idle
+            assertEquals(
+                CaptureError.InferenceFailed(CaptureError.InferenceFailed.Reason.PARSE_FAILED),
+                terminal.error,
+            )
+            assertEquals(0, save.invocations.get())
+        }
 
     @Test
     fun `inference engine failure surfaces InferenceFailed ENGINE_FAILED`() = runTest(dispatcher) {
@@ -723,6 +794,8 @@ private class AdvancingClock(start: Instant = Instant.parse("2026-05-14T09:41:00
 private class RecordingSaveAndExtract : SaveAndExtract {
     val invocations: AtomicInteger = AtomicInteger(0)
     var lastDurationMs: Long = -1L
+    var lastText: String? = null
+    var lastFollowUpText: String? = null
     override suspend fun invoke(
         text: String,
         capturedAt: java.time.ZonedDateTime,
@@ -732,6 +805,8 @@ private class RecordingSaveAndExtract : SaveAndExtract {
     ) {
         invocations.incrementAndGet()
         lastDurationMs = durationMs
+        lastText = text
+        lastFollowUpText = followUpText
     }
 }
 

@@ -35,7 +35,6 @@ import io.mockk.verify
 import io.objectbox.BoxStore
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.advanceUntilIdle
@@ -461,13 +460,13 @@ class AppContainerTest {
     fun `runForegroundTextCall initializes the engine then delegates to the foreground text path`(
         @TempDir tempRoot: File,
     ) = runTest {
-        // The engine streams "" so the terminal parse yields a ParseFailure — enough to prove
-        // the wiring (engine init + delegation to the streaming text path). Response parsing
-        // itself is covered at the core-inference tier (ForegroundInferenceTest), where the
-        // litertlm Content type is on the classpath.
-        val engine = mockk<LiteRtLmEngine>(relaxed = true) {
-            every { streamMessageContents(any()) } returns flowOf("")
-        }
+        // Relaxed mock: streamMessageContents returns an empty Flow, so the terminal parse
+        // yields a ParseFailure — enough to prove the wiring (engine init + delegation to the
+        // streaming text path). The stub is intentionally NOT spelled out here: referencing
+        // streamMessageContents pulls litertlm's Content param type onto :app's test classpath,
+        // which it lacks. Response parsing is covered at the core-inference tier
+        // (ForegroundInferenceTest), where Content is on the classpath.
+        val engine = mockk<LiteRtLmEngine>(relaxed = true)
         val modelFile = File(tempRoot, "ready-model.litertlm").apply { writeText("x") }
         val artifactStore = fakeArtifactStore(artifactFile = modelFile, expectedByteSize = 1L)
         val context = mockk<Context>(relaxed = true) {

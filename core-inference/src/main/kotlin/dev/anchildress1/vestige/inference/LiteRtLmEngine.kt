@@ -265,7 +265,7 @@ class LiteRtLmEngine(
                     closing = false
                     null
                 } else {
-                    CompletableDeferred<Unit>().also { drainGate = it }
+                    drainGate ?: CompletableDeferred<Unit>().also { drainGate = it }
                 }
             }
             if (gate != null) {

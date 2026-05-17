@@ -791,7 +791,7 @@ class BackgroundExtractionSaveFlowTest {
 
         flowWithCallback.saveAndExtract(SAMPLE_TEXT, SAMPLE_TIMESTAMP)
 
-        assertEquals("Failed extraction must not trigger vector backfill", 0, finalizedCount)
+        assertEquals(0, finalizedCount, "Failed extraction must not trigger vector backfill")
     }
 
     @Test
@@ -817,7 +817,7 @@ class BackgroundExtractionSaveFlowTest {
 
         flowWithCallback.saveAndExtract(SAMPLE_TEXT, SAMPLE_TIMESTAMP)
 
-        assertEquals("TimedOut extraction must not trigger vector backfill", 0, finalizedCount)
+        assertEquals(0, finalizedCount, "TimedOut extraction must not trigger vector backfill")
     }
 
     @Test
@@ -849,7 +849,7 @@ class BackgroundExtractionSaveFlowTest {
 
         flowWithCallback.saveAndExtract(SAMPLE_TEXT, SAMPLE_TIMESTAMP)
 
-        assertEquals("Persistence failure in success path must not trigger vector backfill", 0, finalizedCount)
+        assertEquals(0, finalizedCount, "Persistence failure in success path must not trigger vector backfill")
     }
 
     @Test

@@ -150,9 +150,10 @@ class ForegroundInference(
         }
     }
 
-    // Mirrors PromptComposer's background history block (cap 3 chunks, 600 chars each) so the
-    // foreground follow-up sees the same prior-entry context the lens pass does. Empty history
-    // skips the block entirely — callers must not pass blanks expecting a sentinel.
+    // Matches PromptComposer's background history budget (cap 3 chunks, 600 chars each) so the
+    // foreground follow-up sees the same prior-entry context the lens pass does. Header wording
+    // differs from PromptComposer's block intentionally (voice/typed context vs. pattern lens).
+    // Empty history skips the block entirely — callers must not pass blanks expecting a sentinel.
     private fun renderForegroundHistory(history: List<HistoryChunk>): String {
         val capped = history.take(MAX_HISTORY_CHUNKS).map { chunk ->
             if (chunk.text.length <= MAX_HISTORY_CHARS_PER_CHUNK) {

@@ -97,7 +97,9 @@ class RamWallClockProbeTest {
         return info.totalPss.toLong()
     }
 
-    private fun log(msg: String) = android.util.Log.i(TAG, msg)
+    private fun log(msg: String) {
+        android.util.Log.i(TAG, msg)
+    }
 
     private companion object {
         const val TAG = "VestigeLiteRtLm"

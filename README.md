@@ -47,7 +47,7 @@
 
 Vestige observes behavioral traces and surfaces patterns without therapy framing, mood scoring, or wellness vocabulary. It runs Gemma 4 E4B locally via LiteRT-LM — your voice never leaves the device, the audio bytes are discarded after inference, and entries are stored as plain markdown you can export at any time.
 
-The positioning is deliberate: cognition tracker, not journal app. Templates (`Crashed`, `Deep Space`, `Busy Stalling`, `Nonstop Spiral`, `Goblin Hours`, `Brain Dump`) are agent-emitted labels, not user-picked moods. Patterns are sourced — every claim cites the entries it counted. Full product spec: [`docs/concept-locked.md`](docs/concept-locked.md).
+The positioning is deliberate: cognition tracker, not journal app. Patterns are sourced — every claim cites the entries it counted. Full product spec: [`docs/concept-locked.md`](docs/concept-locked.md). _(The current branch still renders agent-emitted archetype template labels in the UI, but the label logic is structurally broken on realistic input; the UI yank is queued in Story 4.16 and the actual redesign is v1.5 — see [`docs/backlog.md`](docs/backlog.md) §`archetype-template-labeling`.)_
 
 ---
 

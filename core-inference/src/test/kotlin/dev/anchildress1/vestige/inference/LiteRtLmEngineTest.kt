@@ -45,15 +45,22 @@ class LiteRtLmEngineTest {
     @OptIn(ExperimentalApi::class)
     @Test
     fun `initialize turns on MTP speculative decoding before engine construction`() {
-        ExperimentalFlags.enableSpeculativeDecoding = false
-        val engine = LiteRtLmEngine(modelPath = NOT_USED_PATH)
-        // initialize() flips the flag as its first statement, then crosses the native
-        // Engine/Log boundary the JVM can't satisfy without the 3.66 GB model. The catch
-        // scopes this test to exactly the pre-native flag-set, matching the file's
-        // JVM-vs-on-device split documented above.
-        runCatching { runTest { engine.initialize() } }
-        assertEquals(true, ExperimentalFlags.enableSpeculativeDecoding)
-        engine.close()
+        // ExperimentalFlags is a process-global object — save and restore so this test
+        // can't leak the flipped flag into other tests sharing the JVM fork.
+        val original = ExperimentalFlags.enableSpeculativeDecoding
+        try {
+            ExperimentalFlags.enableSpeculativeDecoding = false
+            val engine = LiteRtLmEngine(modelPath = NOT_USED_PATH)
+            // initialize() flips the flag as its first statement, then crosses the native
+            // Engine/Log boundary the JVM can't satisfy without the 3.66 GB model. The catch
+            // scopes this test to exactly the pre-native flag-set, matching the file's
+            // JVM-vs-on-device split documented above.
+            runCatching { runTest { engine.initialize() } }
+            assertEquals(true, ExperimentalFlags.enableSpeculativeDecoding)
+            engine.close()
+        } finally {
+            ExperimentalFlags.enableSpeculativeDecoding = original
+        }
     }
 
     @Test

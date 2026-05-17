@@ -54,10 +54,64 @@ stt-N : conditional on stop-and-test outcome (see PRD §"Build philosophy: build
 | ~~`backfill-on-artifact-complete`~~ | — | — | **Resolved 2026-05-12.** `AppContainer.launchVectorBackfillIfReady()` now keeps one bounded in-process drain loop alive: if backlog exists before artifacts are complete, it retries for up to 12 delayed passes (60 s budget at 5 s intervals), then exits cleanly. A later save or cold start retriggers the worker. No Phase 4 download-complete event hook is required for correctness. | n/a — closed |
 | `pattern-auto-close` | v1.5 | patterns | PatternEngine detects and updates patterns forward but has no staleness scan; nothing currently transitions a pattern from active → Closed; demo scenario doesn't require auto-removal; v1 user actions are Snooze and Drop only (Closed is model-detected per ADR-011 UX direction) | post-v1 usage data shows patterns accumulating without removal; or Phase 5 UX audit surfaces the missing lifecycle transition |
 | `discard-after-stop` | v2 | capture | **Out of scope per ADR-001 §Q8.** Once STOP fires, the foreground inference call is in flight and not cancellable. Q8 explicitly defers in-flight-call cancellation; streaming would reopen the contract and require a new ADR | A streaming inference path lands AND user research shows accidental-STOP as a real pain point |
+| `patterns-stat-ribbon-header` | v1.5 | design | **Deferred 2026-05-17 (Story 4.15 triage).** POC pattern (`poc/screenshots/patterns.png`) renders a `StatRibbon` of counters (`+{N} HITS THIS WK` / `{N} ACTIVE` / `{N} SNOOZED` / `{N} RESOLVED`) under the Patterns header. Adds visual density but no demo-blocking gap — current build's section dividers already convey active/snoozed/resolved counts adequately for the 90 s pitch | Post-submission polish window OR walkthrough script explicitly anchors on weekly-hit count |
+| `pattern-card-bigstat-of-n` | v1.5 | design | **Deferred 2026-05-17 (Story 4.15 triage).** POC pattern cards render `BigStat` "of N" affordance at top-right (e.g. `4 / OF 12`). Cosmetic addition — pattern card still reads the entry count correctly via bottom-row metadata; the `BigStat` slot is decoration, not information the user lacks | Post-submission polish window |
+| `pattern-detail-energy-stats` | v1.5 | design | **Deferred 2026-05-17 (Story 4.15 triage).** POC Pattern Detail (`poc/screenshots/pattern-detail.png`) renders `StatRibbon` cells like `100% ON TUES` / `6W STREAK` / `~85m TO CRASH`. These require `EnergyDescriptor` data wiring per Story 2.13 — gated by upstream work, not by UI capacity | Story 2.13 `EnergyDescriptor` plumbing lands AND post-submission polish window |
+| `pattern-detail-trace-peak` | v1.5 | design | **Deferred 2026-05-17 (Story 4.15 triage).** POC Pattern Detail trace strip renders a `▼` peak marker above the highest-intensity bar. Decorative — the bars themselves already convey the same information | Post-submission polish window |
+| `tag-chip-primitive-split` | v1.5 | design | **Deferred 2026-05-17 (Story 4.15 triage).** Entry Detail tags (`battery-yanked`, `fell-out`, `meeting`) and Pattern Detail action buttons (`Drop`, `Skip`) both render via the `Pill` primitive, creating a passive-vs-interactive semantic conflict at the call sites. Real but marginal demo risk — tags sit in a clearly subordinate position (bottom of Entry Detail, smaller scale). New `Chip` primitive is new infrastructure for low demo lift | Post-submission infra work OR user feedback that tags are mistaken for actions |
+| `recording-screen-density` | v1.5 | design | **Deferred 2026-05-17 (Story 4.15 triage).** Recording-screen layout (`Screenshot_20260516_220422_Vestige.png`) has ~50% dead vertical space between the chunk progress bar and the `LEVEL · LIVE` audio meter. Active surface during the 30 s record window — functional, just sparse. Reorder is cheap but not demo-blocking | Post-submission polish window |
+| `settings-back-affordance` | v1.5 | design | **Deferred 2026-05-17 (Story 4.15 triage).** Settings ships without an explicit `← BACK` link — only predictive-back gesture exits the surface. Discoverability concern for non-Android-power users; not a 90 s pitch or 5 min walkthrough blocker (judge uses predictive-back or system gesture) | First-run usability data shows users stranded on Settings, or Settings is added to the demo walkthrough script |
+| `mtp-latency-ab` | v1.5 | inference | **Deferred 2026-05-17 — non-gating measurement.** Story 2.15's MTP fore/background latency A/B decides nothing (MTP ships enabled regardless of the ratio per the story's own rule), is not demo-visible, and correctness is already pinned by `LiteRtLmEngineTest`. Measuring needs two invasive builds (no runtime MTP toggle). Pure verification debt — fails the demo-impact test | A v1.5 perf-tuning pass that actually acts on the number, or a `macrobenchmark` module if decode latency becomes a real regression surface |
+| `archetype-template-labeling` | v1.5 | extraction | **Structurally broken on realistic input (traced 2026-05-17).** `TemplateLabeler` only consumes CANONICAL fields; CANONICAL requires ≥2-of-3 lens agreement; the archetype triggers (`energy_descriptor=="crashed"`, `state_shift`, tags `tunnel-exit`/`decision-loop`/`stuck`/`late-night`) are all inferences only the Inferential lens emits, which resolves to CANDIDATE and is discarded. Every realistic entry falls through to `AUDIT`; the feature only produces a real label when the user speaks the exact internal vocabulary (Literal then also emits it → 2-lens agreement). Code retained but inert through Phase 2/3; the **UI yank is queued** in Phase 4 (Story 4.16) and has **not** landed on this branch yet. See detail block | A redesigned multi-lens contract: label demoted from canonical pattern-grouping key to a display-only single-lens hint (Inferential-sourced CANDIDATE accepted), superseding the ADR-002 resolver-contract coupling. New ADR required |
 
 ## Detail blocks
 
 Only items where the index row drops information needed to disambiguate.
+
+### `archetype-template-labeling` (UI yank queued for v1; redesign is v1.5)
+
+```
+root-cause (2026-05-17, traced through ConvergenceResolver.kt + TemplateLabeler.kt):
+  - TemplateLabeler.isLoadBearing() accepts only CANONICAL / CANONICAL_WITH_CONFLICT;
+    CANDIDATE and AMBIGUOUS fields are discarded before label selection.
+  - DefaultConvergenceResolver mints CANONICAL only on >=2-of-3 lens agreement
+    (one lens alone -> CANDIDATE; no majority -> AMBIGUOUS).
+  - The three lenses cannot corroborate an archetype signal from natural language:
+      Literal     — strict, "null is a real answer"; emits the trigger token only
+                    if the user said the literal word.
+      Inferential — the only lens that infers archetype tags / energy=crashed /
+                    state_shift from behavior; but Inferential-only is CANDIDATE
+                    by documented contract (inferential.txt).
+      Skeptical   — adversarial; emits `flags`, not a second corroborating value.
+  - Net: every archetype trigger is single-lens (Inferential) -> CANDIDATE ->
+    discarded -> entry falls through to AUDIT. A non-AUDIT label only appears
+    when the user speaks the exact internal vocabulary, at which point Literal
+    ALSO emits it and 2-lens agreement mints CANONICAL. That is the
+    keyword-stuffed fixture, not a real test.
+why-not-an-easy-fix:
+  Accepting Inferential-sourced CANDIDATE in TemplateLabeler is ~3 lines but
+  contradicts the documented contract ("the template label feeds pattern
+  grouping" — concept-locked.md / ADR-002). Pattern grouping would then key off
+  single-lens guesses — an ADR-level pivot, not a token tweak. It also does not
+  fix AFTERMATH, which needs energy_descriptor to normalize to the exact string
+  "crashed" from an Inferential guess (fragile, untestable without keyword
+  stuffing).
+v1-decision:
+  Queue the UI yank in Phase 4 (Story 4.16); it is not landed on this branch
+  yet. Code (`TemplateLabeler`, `template_label` field,
+  `BackgroundExtractionResult.templateLabel`) stays inert through Phase 2/3 —
+  removing it mid-phase is a cross-cutting change with no demo value. Phase 4
+  already specs a date fallback for "no template label resolved"
+  (`phase-4-ux-surface.md` §Story 4.15) — that fallback becomes the only path
+  once the yank lands. Patterns are unaffected: they group on tags / recurrence,
+  not the label.
+unblock-condition:
+  New ADR superseding the ADR-002 resolver coupling: label demoted to a
+  display-only hint, single-lens (Inferential CANDIDATE) accepted, decoupled
+  from canonical pattern grouping. Out of v1 scope (no quick fixes — AGENTS.md).
+spec-ref: concept-locked.md §"Templates"; adrs/ADR-002-multi-lens-extraction-pattern.md
+          §"Convergence Resolver Contract"; docs/stories/phase-2-core-loop.md §Story 2.10
+```
 
 ### `multi-chunk-foreground` (high priority — first v1.5 input-path work)
 

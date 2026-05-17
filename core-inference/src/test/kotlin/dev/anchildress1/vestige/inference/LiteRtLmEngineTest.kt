@@ -7,6 +7,7 @@ import io.mockk.mockk
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Assertions.assertThrows
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
@@ -93,10 +94,13 @@ class LiteRtLmEngineTest {
     }
 
     @Test
-    fun `close before initialize is a no-op`() {
+    fun `close before initialize does not leave the wrapper permanently closing`() {
         val engine = LiteRtLmEngine(modelPath = NOT_USED_PATH)
         engine.close() // must not throw
         engine.close() // idempotent — must not throw on second call either
+
+        assertEquals(false, engine.readBoolean("closing"))
+        assertNull(engine.readNullable("drainGate"))
     }
 
     @Test
@@ -126,4 +130,16 @@ class LiteRtLmEngineTest {
         // Path is never actually opened — the tests assert pre-state checks fire first.
         const val NOT_USED_PATH = "/tmp/never-loaded.litertlm"
     }
+}
+
+private fun LiteRtLmEngine.readBoolean(name: String): Boolean {
+    val field = LiteRtLmEngine::class.java.getDeclaredField(name)
+    field.isAccessible = true
+    return field.getBoolean(this)
+}
+
+private fun LiteRtLmEngine.readNullable(name: String): Any? {
+    val field = LiteRtLmEngine::class.java.getDeclaredField(name)
+    field.isAccessible = true
+    return field.get(this)
 }

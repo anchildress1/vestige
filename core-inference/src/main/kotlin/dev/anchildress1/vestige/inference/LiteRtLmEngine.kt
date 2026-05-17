@@ -261,6 +261,8 @@ class LiteRtLmEngine(
                 if (inFlight == 0) {
                     engine?.close()
                     engine = null
+                    drainGate = null
+                    closing = false
                     null
                 } else {
                     CompletableDeferred<Unit>().also { drainGate = it }
@@ -271,6 +273,8 @@ class LiteRtLmEngine(
                 stateMutex.withLock {
                     engine?.close()
                     engine = null
+                    drainGate = null
+                    closing = false
                 }
             }
         }

@@ -186,3 +186,5 @@ Pass condition:
 - Embedding mode places at least 4 relevant A-entries in the top 5.
 - No more than 1 X distractor appears before the fourth relevant A-entry.
 - The difference from baseline is visible without explaining vector math for 90 seconds. If tag-only already looks just as good, cut EmbeddingGemma to v1.5 and enjoy the saved 200 MB.
+
+> **No template-label fixture.** A draft STT-F template-label smoke test was removed 2026-05-17: template assignment is structurally always `AUDIT` on realistic input (root cause: `backlog.md` §`archetype-template-labeling`). Any fixture that produces a non-AUDIT label only does so by feeding the exact internal trigger vocabulary — a fake test. The UI yank is **queued** in `docs/stories/phase-4-ux-surface.md` §Story 4.16 and has not landed on this branch yet; a real fixture is gated on the v1.5 redesign.

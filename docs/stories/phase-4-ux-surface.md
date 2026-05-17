@@ -30,6 +30,7 @@ Wrap the app in a coherent, dark, atmospheric UX that meets the 10-second judge 
 - [ ] Notification permission flow ships in onboarding as the optional Wiring switch; notification tap target lands on the entry detail of the most-recent-in-flight extraction. Lifecycle fallback evaluation per ADR-004 §"Fallback Trigger" recorded by end of Phase 4 day 1 if invoked.
 - [ ] P1 stories shipped or explicitly punted to v1.5 with a recorded reason (scope held / didn't hold).
 - [ ] Demo-gate UI polish pass (Story 4.15) complete — every post-onboarding surface consumes `AppTop` + the Scoreboard primitives shipped in 4.1.5, no Material `TopAppBar` / `Button` / `OutlinedButton` / `TextButton` left in `:app/src/main/kotlin/dev/anchildress1/vestige/ui/**` for in-app affordances, and the primitive-reuse grep audit lands in the PR description.
+- [ ] Vestiges unified viewing surface (Story 4.17) ships — `PatternDetailScreen.kt` and `EntryDetailScreen.kt` deleted, `HistoryScreen.kt` either deleted or downgraded to forwarder, all nav routes repointed, notification deep-link updated per ADR-004 amendment, `ux-copy.md` + `design-guidelines.md` + `ADR-011` addendum land in the same commit.
 
 ---
 
@@ -377,18 +378,14 @@ Checked bullets above are the historical record that the Mist tokens shipped to 
 
 - [ ] **Patterns List body uses Scoreboard primitives end-to-end** per `poc/screenshots/patterns.png` + `poc/screens-patterns.jsx`:
   - Header: `EyebrowE` `TRACKING · LAST 30D` + `DisplayBig` (Anton) `PATTERNS` title. Not Material `headlineMedium`.
-  - `StatRibbon` directly under the header with the four counters (current `+{N} HITS THIS WK` / `{N} ACTIVE` / `{N} SNOOZED` / `{N} RESOLVED`). Reuse the exact ribbon primitive from `IdleLayout`; if a section needs different cells, parameterize the existing `StatRibbon`, don't fork it.
   - Section dividers (`▼ ACTIVE — STILL HITTING {N}` / `▼ RESOLVED — FADED {N}`) use mono eyebrow + count-on-right per POC.
   - Pattern card title renders the pattern's **own display name** in `DisplayBig` (Anton, ~32 sp) — current build uses `headlineSmall` sans bold ("Audit Template" reads like a Material card). _(**Changed per §Story 4.16** — was "renders the pattern's template label"; the label is structurally always `AUDIT` so every card would read the same. Title is the pattern name; no template label, no `#01 AFTERMATH` eyebrow — pattern numbering remains out of scope.)_
-  - `BigStat` "of N" affordance lives at top-right of each card (e.g. `4 / OF 12`) — replace the inline `3 of 3 entries · Last seen May 16` prose body, which moves to the bottom-row metadata.
   - `TraceBarE` renders the 30-day intensity sparkbar on every card with `state ∈ {ACTIVE, SNOOZED, CLOSED, DROPPED}` per `cardSectionToneFor` (already wired). The current build's audit-template card shows a dotted hairline instead of bars — verify the bars actually render on a card with ≥1 hit; if `TraceBarE` is being passed an empty series, fix the data plumbing in `PatternsListViewModel` so the call site gets the same shape `IdleLayout` consumes.
 
 - [ ] **Pattern Detail body re-skinned** per `poc/screenshots/pattern-detail.png` + `poc/screens-patterns.jsx`:
   - Header: `EyebrowE` `← PATTERNS` (left) + `SHEET · 01 OF {N}` (right). The current build's bare `←` back arrow with no breadcrumb is replaced.
   - Title block: `EyebrowE` `● ACTIVE` + `DisplayBig` rendering the pattern's display name (Anton, two-line allowed, lime accent on the trailing punctuation per `heroAnnotated` pattern from `CaptureScreen`). _(**Per §Story 4.16** — the template-label segment of the eyebrow is dropped; the dot + state word stands alone.)_
   - State-transition line below title: gated on `EnergyDescriptor` being present (Story 2.13 wiring); if `null`, the line is omitted (don't ship a placeholder string).
-  - `StatRibbon` row (`{N} OF {DENOM} ENT` / `{PCT}% ON {DAY}` / `{N}W STREAK` / `~{Nm} TO CRASH`). Cells gated on data availability — missing cells collapse, the ribbon never renders a zero placeholder.
-  - `TraceBarE` 30-day intensity strip with the `▼` peak marker per POC.
   - `Seen in: {N} ENT` section uses the existing source-row primitive; rows already navigate to Entry Detail per Story 4.7 wiring.
   - Action row at bottom uses `Pill` primitive for `Drop` (coral rule) / `Skip` (lime rule on ACTIVE → flip to teal on SNOOZED) / `Restart` (lime fill on non-ACTIVE) per ADR-011 accent system. The current dropdown-menu fallback (three-dot overflow with bare-text `Drop` / `Skip`) is replaced by the inline action row — keep the overflow menu reachable for parity but the row is the primary affordance.
   - Words-You-Used vocabulary chips stay punted per Story 4.8 (STT-E gated, P1).
@@ -396,8 +393,7 @@ Checked bullets above are the historical record that the Mist tokens shipped to 
 - [ ] **Capture idle screen tightened** per `poc/screenshots/capture-ready.png` + `poc/screens-capture.jsx`:
   - `StatRibbon` cells' label color lifts from `faint` (currently barely legible — `KEPT` / `HITS/MO` / `CLOUD` are illegible against `s1` in `Screenshot_20260516_220452_Vestige.png`) to `dim` to clear WCAG AA on `s1`. Token swap only; no per-surface override. If the contrast fix breaks any other primitive consumer, fix the token, not the call site (AGENTS.md §"UI discipline").
   - REC button outer ring shrinks from the current ~38% vertical occupancy to POC's ~26% (the hero question must sit above the ring with comfortable breathing room, not pushed against it).
-  - Bottom-nav row (`PATTERNS →` / `Settings` / `History`) reduces to one shared `NavLink` primitive — current build ships three different visual treatments (Patterns with arrow eyebrow, Settings as bare dim text, History as outlined box). Pick the POC's bare-text-with-arrow treatment; one composable, three call sites.
-  - `OR TYPE` affordance drops the outlined box, uses the bare `EyebrowE` + `→` arrow treatment per POC.
+  - Bottom-nav row (`PATTERNS →` / `Settings` / `History`) reduces to one shared `NavLink` primitive — current build ships three different visual treatments (Patterns with arrow eyebrow, Settings as bare dim text, History as outlined box). Pick the POC's bare-text-with-arrow treatment; one composable, three call sites. `OR TYPE` adopts the same `NavLink` treatment, dropping its outlined box.
 
 - [ ] **Entry Detail header re-skinned** per `poc/screenshots/details.png`:
   - Display title renders the entry's **date** in `DisplayBig` (`MAY 16.`), not the sequential `ENTRY #{N}` placeholder currently rendered. _(**Changed per §Story 4.16** — was "renders the entry's template label, date fallback if unresolved"; the label is structurally always `AUDIT`, so the date fallback is now the only path. The label is never rendered.)_ Document the date-as-title rule in `ux-copy.md` §"Entry detail" as the same-commit doc update.
@@ -442,10 +438,7 @@ Checked bullets above are the historical record that the Mist tokens shipped to 
 - [ ] **Screen-transition affordances** (loading / sheet / chrome transitions that currently look broken):
   - **Reading the entry placeholder needs visible progress** (`Screenshot_20260516_220428_Vestige.png`): currently flat dim text `Reading the entry.` for the 24–33 s inference window (per Story 2.3 device record). No shimmer, no spinner, no `StatusDot` pulse. The user has no indication the app isn't frozen. After: `READING · GEMMA 4` mono eyebrow above the placeholder with `StatusDot(blink = true)` lime pulse using the `sbPulse` keyframe shipped in 4.1.5 — the same motion that animates the AppTop pill. No spinner widget, no progress bar (inference duration is non-deterministic) — the pulse alone says "alive, working."
   - **Typed entry sheet doesn't scrim the REC button beneath** (`Screenshot_20260516_220533_Vestige.png`): the sheet half-overlays the REC button with no backdrop dim, so the coral REC ring bleeds through the sheet's `s1` surface creating a broken transparency stack. After: `ModalBottomSheet` `scrimColor` set to `colors.floor.copy(alpha = 0.6f)` — same scrim every modal sheet in the app uses (centralize on the primitive). The REC button beneath fades to invisible behind the scrim.
-  - **Settings has no back affordance** (`Screenshot_20260516_220500_Vestige.png`): only predictive-back gesture is wired, no `← BACK` chrome. New users won't discover predictive-back as the only exit. After: AppTop's persona slot doubles as the post-onboarding context; bottom rail carries `← BACK` `EyebrowE` link (matches the Entry Detail rail treatment). Same primitive, three call sites.
   - **Entry Detail has TWO back arrows of different kinds** (`Screenshot_20260516_220853_Vestige.png`): top-left `←` arrow above the title AND bottom-left implicit-via-predictive-back. After: top arrow is deleted (per the footer-rail bullet in the alignment group above); bottom rail carries the single `← BACK` link. One back affordance per screen, always on the bottom rail.
-  - **Recording screen has ~50% dead vertical space** (`Screenshot_20260516_220422_Vestige.png`): between the chunk progress bar (0s–30s ticks) and the `LEVEL · LIVE` strip there's a vast empty gap. After: `LiveLayout` reorders so `AudioMeter` sits directly under the chunk progress bar (no gap), then `WORD COUNT · EST` card, then dead space (acceptable — the dead space lives below the data, not between two data clusters).
-  - **Tag pills on Entry Detail look like action pills** (`Screenshot_20260516_220613_Vestige.png` `battery-yanked` chip vs `Screenshot_20260516_221041_Vestige.png` `Drop` / `Skip` action pills): same `Pill` primitive used for "this content is tagged X" (passive, informational) and "tap me to do X" (action, interactive). Visual semantic conflict — user can't tell tags from actions at glance. After: tags use a distinct `Chip` primitive (smaller, mono `JetBrains Mono`, no border, `dim` ink on `s2` fill) clearly visually subordinate to `Pill` actions. The `Pill` primitive is reserved for interactive affordances only.
 
 - [ ] **Primitive-reuse gate.** Grep audit recorded as evidence in the PR description:
   - `Material3.TopAppBar` usages in `:app/src/main/kotlin/dev/anchildress1/vestige/ui/**` drops to **0** (every screen consumes `AppTop`).
@@ -455,7 +448,7 @@ Checked bullets above are the historical record that the Mist tokens shipped to 
 
 - [ ] **Same-commit doc updates** per AGENTS.md §"Tests + docs ship together":
   - `ux-copy.md` §"Entry detail" gets the date-as-display-title rule recorded (no template label — per §Story 4.16).
-  - `ux-copy.md` §"Pattern List / Card structure" + §"Pattern Detail / Layout" get the `StatRibbon` / `BigStat` cell ordering recorded — currently absent.
+  - `ux-copy.md` §"Pattern List / Card structure" + §"Pattern Detail / Layout" get the card title source (pattern's display name per §Story 4.16) and the card body source recorded — currently absent. `StatRibbon` / `BigStat` cell ordering is **not** in scope here (cell additions are deferred to backlog v1.5 entries `patterns-stat-ribbon-header`, `pattern-card-bigstat-of-n`, `pattern-detail-energy-stats`).
   - `design-guidelines.md` §"AppTop status pill" extended to record that the pill is mandatory chrome on every post-onboarding surface (not just Capture).
   - This story's checkboxes tick as bullets land. No new ADR — ADR-011 already authorizes the primitive set; this story is enforcement, not architecture.
 
@@ -492,6 +485,119 @@ Checked bullets above are the historical record that the Mist tokens shipped to 
 
 ---
 
+### Story 4.17 — Vestiges: unified viewing surface (supersedes Pattern Detail + Entry Detail + History as separate screens)
+
+**Status:** Not started. Written 2026-05-17 after a screen-by-screen audit (`Downloads/Photos-3-001/Screenshot_20260516_22*.png`) confirmed the on-device build ships four separate viewing surfaces (Patterns list, Pattern Detail, Entry Detail, History) that show the same data with different chrome — and that the user can't distinguish a Pattern Detail from an Entry Detail at glance. The fix is structural: kill the detail screens, fold their content into inline expansion on a single viewing surface.
+
+**Supersedes:** Story 4.7 (Entry Detail screen) — Entry Detail ceases to exist as a screen; its content becomes inline-expanded source rows on Vestiges. Story 4.8 (Pattern List + Pattern Detail polished) — Pattern Detail ceases to exist; its content becomes inline-expanded pattern cards on Vestiges; Pattern List polish folds into Vestiges. Story 4.6 (History list) — History as a separate destination ceases; chronological browsing is a sort mode on Vestiges (loose entries section). Story 4.15 bullets that referenced Pattern Detail / Entry Detail / History chrome are moot once this lands (audit and strike them in the same commit). Story 4.16 (template-label yank) is unchanged — template label was already absent from this design.
+
+**References:** `Downloads/Photos-3-001/Screenshot_20260516_22*.png` (current build, the four screens being collapsed), `poc/screenshots/{patterns,pattern-detail,details,history}.png` (POC visual sources for the existing four screens — Vestiges composes from their primitives), `ux-copy.md` (text authority for every label), `adrs/ADR-011-design-language-scoreboard-pivot.md` (visual system), `AGENTS.md` §"Demo gate" (the merge passes the gate because it improves both pitch and walkthrough by reducing nav friction and surface count).
+
+**As** an ADHD-flavored adult using Vestige, **I need** one viewing surface that shows me both the patterns the model has found AND the individual entries those patterns came from — with no screen-to-screen navigation to drill in — **so that** seeing what's happening with me is one tap from Capture and zero taps from there to see the evidence, instead of `tap → screen → tap → screen → tap → screen` for every piece of context.
+
+**Why this exists:** the on-device audit found four viewing surfaces (Patterns / Pattern Detail / Entry Detail / History) that share ~80% of their composition (rounded `s1` cards, mono eyebrows, lone back arrow chrome, two-pill bottom rails). The visual disambiguation work in Story 4.15 was treating the symptom; the disease is too many surfaces. Collapsing them removes the navigation problem entirely, removes the duplicate-card problem on Pattern Detail (you can't duplicate a card you don't navigate into), removes the duplicate-back-arrow problem on Entry Detail, removes the History-vs-Patterns redundancy, and removes the deep-link target ambiguity for ADR-004 notifications.
+
+**The design:**
+
+**Top-level destinations reduce to three:**
+- **Capture** — the doing surface (record, type, get reading). Unchanged.
+- **Vestiges** — the viewing surface (this story). Replaces Patterns / Pattern Detail / Entry Detail / History.
+- **Settings** — settings. Unchanged. Reaches Model Status as a sub-destination.
+
+**Vestiges page composition (top to bottom):**
+
+```
+┌─────────────────────────────────────────┐
+│ ● GEMMA 4 · LOCAL ONLY    WITNESS ▾    │  AppTop chrome (shared)
+├─────────────────────────────────────────┤
+│ TRACKING · {N} VESTIGES · 30 DAYS       │  EyebrowE
+│                                         │
+│ VESTIGES                                │  DisplayBig (Anton)
+│                                         │
+│ ─── hair divider ───                    │
+│                                         │
+│ ● ACTIVE                                │  Section eyebrow
+│   [Pattern card collapsed]              │  one per pattern
+│   [Pattern card collapsed]              │
+│   [Pattern card EXPANDED]               │  selected pattern, see below
+│                                         │
+│ ─── hair divider ───                    │
+│                                         │
+│ ● LOOSE ENTRIES                         │  Section eyebrow (entries not in a pattern)
+│   [Entry row collapsed]                 │
+│   [Entry row EXPANDED]                  │  selected entry, see below
+│                                         │
+│ ─── hair divider ───                    │
+│                                         │
+│ ● SETTLED                               │  Snoozed / dropped patterns, dim ink
+│   [Pattern card collapsed]              │
+│                                         │
+│                              [Capture →]│  bottom-rail back-to-Capture
+└─────────────────────────────────────────┘
+```
+
+**Pattern card — collapsed state (what you see by default):**
+- Title (`DisplayBig` Anton ~24sp): pattern's display name from `PatternEntity.title`.
+- Body (`P` 15sp `dim`): pattern's callout from `PatternEntity.callout`, one line, ellipsized.
+- `TraceBarE` 30-day strip.
+- Metadata row (`EyebrowE` mono): `{N} ENT · LAST {MMM D}`.
+- Lime left-rule on ACTIVE, ember on SNOOZED, teal on CLOSED / DROPPED.
+- Tap target: whole card.
+
+**Pattern card — expanded state (after tap):**
+- Same title + callout (callout grows from one line to full body if multi-sentence).
+- Same `TraceBarE` but full-width.
+- `SEEN IN · {N} ENT` mono eyebrow.
+- Source rows below (each is the same `EntryRow` primitive used in Loose Entries section — collapsed by default, tap to expand).
+- Action row at bottom of card (inside the card, not floating): `Pill` `Skip 7d` (lime outline on ACTIVE / teal on SNOOZED) + `Pill` `Drop` (coral outline) + `Pill` `Restart` (lime outline, only on non-ACTIVE) per ADR-011 accents. Three pills on ACTIVE, two on non-ACTIVE.
+- Tap title again (or scroll out): collapses back to default.
+
+**Entry row — collapsed state:**
+- Date + time (`EyebrowE` mono): `MAY 16 · 22:04`.
+- Snippet (`P` 15sp `dim`): first ~80 chars of `entry_text`, ellipsized.
+- Tap target: whole row.
+
+**Entry row — expanded state:**
+- Same date + time eyebrow at top of expanded block.
+- `YOU` mono label + transcript (`P` `dim`).
+- `WITNESS` (or active persona name) mono label + model follow-up (`P` `ink`).
+- `OBSERVATION` mono label + the per-entry observation (`P` `ink`) **only if `EnergyDescriptor` / observation field is non-null** — otherwise the whole observation block is omitted (no "no observation" placeholder string; Story 4.10 rule).
+- Tag chips below (small mono, `dim` ink on `s2` fill — uses the `Chip` primitive backlogged in `tag-chip-primitive-split`; if that primitive doesn't ship, use `Pill` outlined-dim as the interim).
+- Tap row again (or scroll out): collapses back.
+
+**Sort order:** active patterns first (by most-recent hit), then loose entries (reverse chronological), then settled patterns (snoozed/dropped, by snoozed-until or dropped date). Per `PatternStore.listAll()` filtered + the `EntryStore.listCompleted()` minus pattern-source entries.
+
+**Empty state (no entries):** `EyebrowE` `VESTIGES · 0 ENTRIES · 30 DAYS` + `DisplayBig` `Nothing yet.` + `P` `First one takes 30 seconds.` — same locked copy as the current History empty state in `ux-copy.md` §"Empty States · Capture history" (reuses the string, retargeted to Vestiges).
+
+**Empty state (entries but no patterns):** `Loose Entries` section renders normally; `Active` and `Settled` sections render with `Patterns surface after 10 entries. Keep recording.` per current Patterns empty copy.
+
+**Notification deep-link (ADR-004 §"Notification Contract"):** tapping the system-shade `Reading the entry.` notification opens Vestiges, scrolls to the just-completed entry (always a loose entry on first surface; promoted to a pattern source on later passes), and auto-expands that entry's row. Falls back to top of Vestiges if no in-flight entry exists at tap time.
+
+**Done when:**
+- [ ] `PatternDetailScreen.kt` is deleted. All call sites that navigated to it (`PatternsHost`, `MainActivity`, any `NavController` route) are repointed to the Vestiges expanded-pattern state.
+- [ ] `EntryDetailScreen.kt` is deleted. All call sites that navigated to it (notification handler, History row tap, pattern source-row tap) are repointed to the Vestiges expanded-entry state.
+- [ ] `HistoryScreen.kt` is either deleted (preferred) or downgraded to a thin wrapper that forwards to Vestiges. Bottom-nav from Capture goes to Vestiges, not History.
+- [ ] `VestigesScreen.kt` + `VestigesViewModel.kt` exist under `:app/src/main/kotlin/dev/anchildress1/vestige/ui/vestiges/`. View model exposes one flow combining `PatternStore.listAll()` + `EntryStore.listCompleted()` into a single sorted list of `VestigeItem.Pattern` | `VestigeItem.LooseEntry`.
+- [ ] Expansion state is `rememberSaveable` per item — surviving config change + process death. One item expanded at a time per section (tapping a new card auto-collapses the previous one) — keeps the screen scannable.
+- [ ] AppTop ships on the surface per Story 4.15's chrome bullet (Vestiges is post-onboarding, gets the same pill + persona).
+- [ ] All Story 4.15 alignment + duplicate-content + screen-transition bullets that referenced Pattern Detail / Entry Detail / History are struck through with `superseded by Story 4.17` notes in the same commit.
+- [ ] `ux-copy.md` same-commit: new §"Vestiges" section with all locked strings (eyebrow, display title, section eyebrows, empty states, action labels). The old §"Pattern List", §"Pattern Detail", §"Entry detail", §"History" sections are deleted (their copy lives in §Vestiges).
+- [ ] `design-guidelines.md` same-commit: §"Screen list" reduces from 9 surfaces to 6 (Capture, Vestiges, Settings, Model Status, Onboarding, Roast bottom-sheet). §"Pattern Detail" / §"Entry detail" sections deleted (folded into §Vestiges).
+- [ ] `ADR-011` gets an addendum recording the surface collapse (one-paragraph addendum, not a new ADR — visual language is unchanged, only navigation model).
+- [ ] `ADR-004` notification deep-link contract updated: tap target is Vestiges with scroll + auto-expand, not Entry Detail.
+- [ ] Coverage shape: `VestigesScreen` ships with `LazyColumn` scroll + expansion state assertions, pattern-card / entry-row a11y assertions (`role`, `contentDescription`, expansion-state announcement on tap), and one integration test per supersession (notification tap → Vestiges with right entry expanded; pattern-card tap → callout + sources rendered inline; source-row tap → transcript + observation rendered inline).
+
+**Notes / risks:**
+- This is **the** architectural redesign for the Phase 4 viewing surfaces. It is bigger than a polish story. It pays for itself by deleting two `*Screen.kt` files + their view models + their nav routes + their host wrappers + their tests, and by removing all the Story 4.15 work that was about disambiguating now-deleted screens.
+- The `LazyColumn` with nested expandable items needs careful state hoisting — expansion state lives in the view model, not in the composable, so config change + process death survive cleanly. Recompose discipline matters here.
+- The `OBSERVATION` block on expanded entry rows currently has no data source on most entries (Story 2.13 wiring is partial). The block omits when null per the design — no placeholder. If observations never land for v1, the block is structurally dead but the design still works (entry row just shows transcript + WITNESS turn).
+- The bottom-rail "Capture →" link is the only navigation off Vestiges. Predictive-back gesture also returns to Capture. One way in, one way out.
+- If implementation surfaces a `LazyColumn` perf problem at the 100+ entry mark (Story 4.6's perf bullet), measure before optimizing — the dataset is bounded by 30-day window + active patterns, so realistic count is ~30 patterns + ~200 entries max. Compose `LazyColumn` handles that natively.
+- This story does **not** invent new ux-copy. Every string is either reused from existing `ux-copy.md` sections (retargeted to Vestiges) or pulled from POC source files. If a slot needs new copy, stop and add it to `ux-copy.md` first.
+- The "Roast me" affordance (Story 4.14, P1) lives on Vestiges as a top-right action button in the header chrome if it ships at all.
+
+---
+
 ## What is explicitly NOT in Phase 4
 
 - No demo storyboard work — Phase 5 owns it.
@@ -512,7 +618,7 @@ If a Phase 4 story starts pulling a backlog entry or a Phase 5/6 task, stop. Ref
 
 Phase 5 starts when all the following are true:
 
-- [ ] Stories 4.1 – 4.11 plus 4.4.5 plus 4.15 are Done. (Stories 4.12 – 4.14 are P1; their state is recorded as Done or Punted-to-v1.5 with a reason.)
+- [ ] Stories 4.1 – 4.5, 4.9 – 4.11, 4.4.5, 4.15, 4.16, 4.17 are Done. (Stories 4.6 / 4.7 / 4.8 are superseded by 4.17 — recorded as Superseded with date + reason, not Done. Stories 4.12 – 4.14 are P1; their state is recorded as Done or Punted-to-v1.5 with a reason.)
 - [ ] ADR-004 lifecycle decision recorded inline in the ADR (conditional state machine kept, or fallback applied with date + reason).
 - [ ] Onboarding flow runs end-to-end on a fresh install on the reference S24 Ultra.
 - [ ] Capture screen, History list, Entry Detail, Pattern List, Pattern Detail, Local Model Status, and Settings all load and navigate correctly.

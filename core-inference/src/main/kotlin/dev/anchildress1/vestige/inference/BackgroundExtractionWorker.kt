@@ -201,8 +201,7 @@ class BackgroundExtractionWorker(
 
             else -> {
                 val terminalError = (resolved as? Resolution.Failure)?.error
-                    ?: lensLastError
-                    ?: "all-lenses-failed"
+                    ?: requireNotNull(lensLastError)
                 Log.w(
                     TAG,
                     "extract failed (model_calls=$modelCallCount " +

@@ -9,8 +9,8 @@ import dev.anchildress1.vestige.model.ResolvedField
 import dev.anchildress1.vestige.model.TemplateLabel
 import io.mockk.coEvery
 import io.mockk.mockk
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.test.runTest
-import kotlinx.coroutines.yield
 import org.junit.jupiter.api.Assertions.assertAll
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertInstanceOf
@@ -159,6 +159,30 @@ class BackgroundExtractionWorkerTest {
             ),
             listener.updates,
         )
+    }
+
+    @Test
+    fun `the three lenses run concurrently, not serialized`() = runTest {
+        val engine = mockk<LiteRtLmEngine>()
+        val inFlight = AtomicInteger(0)
+        var maxInFlight = 0
+        coEvery { engine.generateText(any(), any()) } coAnswers {
+            inFlight.incrementAndGet().also { if (it > maxInFlight) maxInFlight = it }
+            delay(10)
+            inFlight.decrementAndGet()
+            "raw"
+        }
+
+        BackgroundExtractionWorker(
+            engine = engine,
+            resolver = RecordingResolver(resolved),
+            parser = { lens, _ -> extraction(lens) },
+            composer = fakeComposer(),
+        ).extract(
+            request = BackgroundExtractionRequest(entryText = "user words", capturedAt = capturedAt),
+        )
+
+        assertEquals(3, maxInFlight, "expected all 3 lenses in-flight concurrently but max was $maxInFlight")
     }
 
     @Test

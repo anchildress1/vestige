@@ -6,6 +6,7 @@ import androidx.compose.ui.test.assertHasClickAction
 import androidx.compose.ui.test.assertHeightIsAtLeast
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
@@ -19,6 +20,7 @@ import dev.anchildress1.vestige.model.Persona
 import dev.anchildress1.vestige.ui.theme.VestigeTheme
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.resetMain
@@ -141,6 +143,13 @@ class CaptureScreenTest {
     }
 
     @Test
+    fun `reviewing state withholds DONE while streaming`() {
+        val vm = streamingReviewingViewModel()
+        composeRule.setContent { VestigeTheme { captureScreen(vm) } }
+        composeRule.onAllNodesWithContentDescription("Done").assertCountEquals(0)
+    }
+
+    @Test
     fun `reviewing state history link present when onOpenHistory provided`() {
         val vm = newReviewingViewModel()
         composeRule.setContent {
@@ -202,6 +211,27 @@ class CaptureScreenTest {
                         ),
                     ),
                 )
+            },
+            saveAndExtract = SaveAndExtract { _, _, _, _, _ -> },
+            foregroundTextInference = ForegroundTextInferenceCall { _, _ -> error("unused") },
+            clock = clock,
+            zoneId = ZoneOffset.UTC,
+            initialReadiness = ModelReadiness.Ready,
+        ).also { it.startRecording() }
+    }
+
+    // Emits a partial Transcription then parks before Terminal — the VM stays in
+    // Reviewing(streaming = true), the state the DONE-withhold gate targets.
+    private fun streamingReviewingViewModel(): CaptureViewModel {
+        val audio = AudioChunk(FloatArray(16), sampleRateHz = 16_000, isFinal = true)
+        return CaptureViewModel(
+            initialPersona = Persona.WITNESS,
+            recordVoice = VoiceCapture { _, _ -> audio },
+            foregroundInference = ForegroundInferenceCall { _, _ ->
+                flow {
+                    emit(ForegroundStreamEvent.Transcription("still talking"))
+                    kotlinx.coroutines.suspendCancellableCoroutine { /* park before Terminal */ }
+                }
             },
             saveAndExtract = SaveAndExtract { _, _, _, _, _ -> },
             foregroundTextInference = ForegroundTextInferenceCall { _, _ -> error("unused") },

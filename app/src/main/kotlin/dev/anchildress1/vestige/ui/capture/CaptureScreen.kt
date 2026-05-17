@@ -177,7 +177,11 @@ private fun ReviewingPane(
             TranscriptTurn(label = state.persona.name, body = state.review.followUp, bodyColor = colors.ink)
         }
         Spacer(modifier = Modifier.weight(1f))
-        DoneButton(onClick = onAcknowledge)
+        // Withheld until the terminal event lands (state.streaming == false): the entry is not
+        // persisted until then, so an early Done would be lost to onCleared()'s collector cancel.
+        if (!state.streaming) {
+            DoneButton(onClick = onAcknowledge)
+        }
         if (onOpenHistory != null) {
             Box(
                 modifier = Modifier

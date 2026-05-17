@@ -85,12 +85,14 @@ class ForegroundInference(
         val started = System.nanoTime()
         var firstTokenAtNanos = 0L
         engine.streamMessageContents(parts).collect { chunk ->
-            val events = scanner.accept(chunk)
-            if (events.isNotEmpty() && firstTokenAtNanos == 0L) {
+            // TTFT is the model's first emitted chunk, not the scanner's first surfaced event —
+            // the scanner withholds until a tag closes, which would inflate the metric by the
+            // whole transcription block and misrepresent the latency this story validates.
+            if (firstTokenAtNanos == 0L) {
                 firstTokenAtNanos = System.nanoTime()
                 Log.d(TAG, "$label persona=$persona ttft=${(firstTokenAtNanos - started) / NANOS_PER_MILLI}ms")
             }
-            events.forEach { emit(it) }
+            scanner.accept(chunk).forEach { emit(it) }
         }
         val elapsedMs = (System.nanoTime() - started) / NANOS_PER_MILLI
         val raw = scanner.accumulated

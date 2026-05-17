@@ -119,14 +119,24 @@ class CaptureViewModel(
         }
     }
 
+    /**
+     * Done tap. No-op while [CaptureUiState.Reviewing.streaming] — the entry is not yet persisted
+     * (save fires only on the terminal event), so acknowledging mid-stream would drop it on the
+     * subsequent `onCleared()` cancel. The UI also withholds Done until streaming ends; this guard
+     * is the state-machine backstop.
+     */
     fun acknowledgeReview() {
         _state.update { current ->
             when (current) {
-                is CaptureUiState.Reviewing -> CaptureUiState.Idle(
-                    persona = current.persona,
-                    modelReadiness = current.modelReadiness,
-                    lastReview = current.review,
-                )
+                is CaptureUiState.Reviewing -> if (current.streaming) {
+                    current
+                } else {
+                    CaptureUiState.Idle(
+                        persona = current.persona,
+                        modelReadiness = current.modelReadiness,
+                        lastReview = current.review,
+                    )
+                }
 
                 else -> current
             }
@@ -313,12 +323,12 @@ class CaptureViewModel(
                 when (event) {
                     is ForegroundStreamEvent.Transcription -> {
                         transcription = event.text
-                        showReviewing(transcription, followUp.toString(), elapsedMs = 0L)
+                        showReviewing(transcription, followUp.toString(), elapsedMs = 0L, streaming = true)
                     }
 
                     is ForegroundStreamEvent.FollowUpDelta -> {
                         followUp.append(event.text)
-                        showReviewing(transcription, followUp.toString(), elapsedMs = 0L)
+                        showReviewing(transcription, followUp.toString(), elapsedMs = 0L, streaming = true)
                     }
 
                     is ForegroundStreamEvent.Terminal -> when (val result = event.result) {
@@ -330,7 +340,7 @@ class CaptureViewModel(
                                 durationMs,
                                 result.followUp,
                             )
-                            showReviewing(result.transcription, result.followUp, result.elapsedMs)
+                            showReviewing(result.transcription, result.followUp, result.elapsedMs, streaming = false)
                         }
 
                         is ForegroundResult.ParseFailure -> {
@@ -347,7 +357,7 @@ class CaptureViewModel(
                                     durationMs,
                                     null,
                                 )
-                                showReviewing(recovered, "", result.elapsedMs)
+                                showReviewing(recovered, "", result.elapsedMs, streaming = false)
                             }
                         }
                     }
@@ -364,7 +374,7 @@ class CaptureViewModel(
         }
     }
 
-    private fun showReviewing(transcription: String, followUp: String, elapsedMs: Long) {
+    private fun showReviewing(transcription: String, followUp: String, elapsedMs: Long, streaming: Boolean) {
         _state.update { c ->
             CaptureUiState.Reviewing(
                 persona = c.persona,
@@ -375,6 +385,7 @@ class CaptureViewModel(
                     persona = c.persona,
                     elapsedMs = elapsedMs,
                 ),
+                streaming = streaming,
             )
         }
     }

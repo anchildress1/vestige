@@ -139,6 +139,51 @@ class CaptureViewModelTest {
     }
 
     @Test
+    fun `streaming Reviewing withholds save and acknowledge until the terminal event`() = runTest(dispatcher) {
+        // P1+P2 regression: a partial event puts the UI in Reviewing, but the entry isn't
+        // persisted until Terminal. Acknowledging mid-stream would drop it on onCleared()'s
+        // collector cancel, and re-applying later deltas after a premature Done would resurrect
+        // the review. The streaming flag gates both.
+        val audio = AudioChunk(FloatArray(16), 16_000, isFinal = true)
+        val voice = FakeVoiceCapture(result = audio)
+        val gate = CompletableDeferred<Unit>()
+        val save = RecordingSaveAndExtract()
+        val vm = newViewModel(
+            voice = voice,
+            inference = ForegroundInferenceCall { _, _ ->
+                flow {
+                    emit(ForegroundStreamEvent.Transcription("half a thought"))
+                    gate.await()
+                    emit(ForegroundStreamEvent.Terminal(successResult("half a thought", "and the rest")))
+                }
+            },
+            save = save,
+            initialReadiness = ModelReadiness.Ready,
+        )
+
+        vm.startRecording()
+        voice.completeWithResult()
+        advanceUntilIdle()
+
+        val streaming = vm.state.value as CaptureUiState.Reviewing
+        assertTrue("partial event marks Reviewing as streaming", streaming.streaming)
+        assertEquals("no save before terminal", 0, save.invocations.get())
+        vm.acknowledgeReview()
+        assertTrue("acknowledge while streaming is a no-op", vm.state.value is CaptureUiState.Reviewing)
+        assertEquals("still no save after a mid-stream Done", 0, save.invocations.get())
+
+        gate.complete(Unit)
+        advanceUntilIdle()
+
+        val terminal = vm.state.value as CaptureUiState.Reviewing
+        assertTrue("terminal clears the streaming flag", !terminal.streaming)
+        assertEquals("and the rest", terminal.review.followUp)
+        assertEquals("terminal saves exactly once", 1, save.invocations.get())
+        vm.acknowledgeReview()
+        assertEquals("half a thought", (vm.state.value as CaptureUiState.Idle).lastReview?.transcription)
+    }
+
+    @Test
     fun `voice flow passes audio durationMs to saveAndExtract`() = runTest(dispatcher) {
         // AudioChunk(FloatArray(16), 16_000) → durationMs = 16 * 1_000 / 16_000 = 1L
         val audio = AudioChunk(FloatArray(16), sampleRateHz = 16_000, isFinal = true)

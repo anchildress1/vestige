@@ -100,16 +100,6 @@ class LiteRtLmEngineTest {
     }
 
     @Test
-    fun `default backends only set the primary engine backend`() {
-        // Constructor-default contract: Phase 1 lives on CPU until STT-A picks an accelerator,
-        // and audio/vision backends stay null unless the caller opts in.
-        val engine = LiteRtLmEngine(modelPath = NOT_USED_PATH)
-        // Indirect assertion: constructing without explicit backends must not throw.
-        engine.close()
-        assertTrue(true)
-    }
-
-    @Test
     fun `Npu backend requires native library dir`() {
         val choice = BackendChoice.Npu(nativeLibraryDir = "/data/app/native")
         assertEquals("/data/app/native", choice.nativeLibraryDir)

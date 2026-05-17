@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Sequential runner for the curated default subset of instrumented test classes on the
 # connected device. PatternEngineSmokeTest is omitted by default (see the comment block
-# below the GoblinHoursAddendumSmokeTest invocation for the on-demand command).
+# below the SttC invocations for its on-demand command).
 #
 # Each test class needs different instrumentation args; gradle can't run them all in
 # one invocation without arg conflicts (manifestPath, modelPath, audioPath collide).
@@ -75,10 +75,6 @@ run_test PersonaToneSmokeTest PersonaToneSmokeTest \
   -PmodelPath=$MODEL
 
 run_test PerCapturePersonaSmokeTest PerCapturePersonaSmokeTest \
-  -PmodelPath=$MODEL \
-  -PaudioPath=$AUDIO
-
-run_test GoblinHoursAddendumSmokeTest GoblinHoursAddendumSmokeTest \
   -PmodelPath=$MODEL \
   -PaudioPath=$AUDIO
 

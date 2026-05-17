@@ -36,7 +36,6 @@ import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -44,44 +43,7 @@ import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
 import dev.anchildress1.vestige.ui.motion.VestigeMotion
 import dev.anchildress1.vestige.ui.motion.rememberSbBlink
-import dev.anchildress1.vestige.ui.theme.VestigeFonts
 import dev.anchildress1.vestige.ui.theme.VestigeTheme
-
-/**
- * Big Anton-condensed stat for hero numbers (capture stats, pattern detail count, scorecard).
- * Tabular nums via the style override on caller side; this primitive defers font selection.
- */
-@Composable
-fun BigStat(
-    value: String,
-    modifier: Modifier = Modifier,
-    label: String? = null,
-    color: Color = Color.Unspecified,
-    size: Int = BIG_STAT_DEFAULT_SP,
-) {
-    require(size > 0) { "BigStat size must be positive (was $size)" }
-    val lineHeightSp = size * BIG_STAT_LINE_HEIGHT_RATIO
-    // Color.Unspecified falls through to LocalContentColor from the enclosing surface; the eyebrow
-    // label reads the semantic "secondary" slot directly. No token imports at the call site.
-    Column(modifier = modifier, horizontalAlignment = Alignment.Start) {
-        Text(
-            text = value,
-            style = VestigeTheme.typography.displayBig.copy(fontSize = size.sp, lineHeight = lineHeightSp.sp),
-            color = color,
-        )
-        if (label != null) {
-            Text(
-                text = label,
-                modifier = Modifier.padding(top = 4.dp),
-                style = VestigeTheme.typography.eyebrow,
-                color = VestigeTheme.colors.dim,
-            )
-        }
-    }
-}
-
-private const val BIG_STAT_DEFAULT_SP: Int = 56
-private const val BIG_STAT_LINE_HEIGHT_RATIO: Float = 0.85f
 
 /**
  * Mono uppercase eyebrow row — defaults to the `dim` slot. Accepts an optional [color] override
@@ -198,54 +160,8 @@ fun Pill(
 
 private val PillDotSize: Dp = 6.dp
 
-/** ▲N / ▼N delta tag. Lime for positive, coral for negative. Zero renders as `—`. */
-@Composable
-fun Delta(value: Int, modifier: Modifier = Modifier, label: String? = null) {
-    val positive = value > 0
-    val negative = value < 0
-    val colors = VestigeTheme.colors
-    val color = when {
-        positive -> colors.lime
-        negative -> colors.coral
-        else -> colors.dim
-    }
-    val glyph = when {
-        positive -> "▲$value"
-        negative -> "▼${-value}"
-        else -> "—"
-    }
-    val a11y = when {
-        positive -> "up $value${label?.let { " $it" }.orEmpty()}"
-        negative -> "down ${-value}${label?.let { " $it" }.orEmpty()}"
-        else -> "no change${label?.let { ", $it" }.orEmpty()}"
-    }
-    Row(
-        modifier = modifier.semantics(mergeDescendants = true) { contentDescription = a11y },
-        verticalAlignment = Alignment.Bottom,
-        horizontalArrangement = Arrangement.spacedBy(4.dp),
-    ) {
-        Text(
-            text = glyph,
-            style = TextStyle(
-                fontFamily = VestigeFonts.Display,
-                fontSize = 14.sp,
-                lineHeight = 14.sp,
-                letterSpacing = 0.02.em,
-            ),
-            color = color,
-        )
-        if (label != null) {
-            Text(
-                text = label,
-                style = VestigeTheme.typography.eyebrow.copy(fontWeight = FontWeight.Medium),
-                color = VestigeTheme.colors.dim,
-            )
-        }
-    }
-}
-
 /**
- * Newsroom mini-stat row — [BigStat]-style numbers grouped under mono eyebrow labels, divided by
+ * Newsroom mini-stat row — condensed stat numbers grouped under mono eyebrow labels, divided by
  * hairline columns. Tape-grain backdrop reads as a printed scoreboard ribbon. Values inherit
  * `LocalContentColor` from the surrounding surface; per-item accent only kicks in when the
  * caller passes an explicit override (e.g. coral for "heat" stats on the Roast scorecard).

@@ -85,8 +85,8 @@ internal object ObservationResponseParser {
             val open = raw.indexOf('{', cursor).takeIf { it >= 0 } ?: return null
             val close = scanBalancedClose(raw, open)
             // Unbalanced first `{` (e.g. stray prose-brace or unclosed code fence) must not
-            // abort the search — advance past it and look for the next candidate. Returning
-            // null here was the bug Copilot caught on PR #18.
+            // abort the search — advance past it and look for the next candidate, not return
+            // null, which would drop a balanced object appearing later in the string.
             if (close == null) {
                 cursor = open + 1
                 continue

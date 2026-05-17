@@ -330,7 +330,7 @@ Checked bullets above are the historical record that the Mist tokens shipped to 
 
 **Done when:**
 - [ ] Tapping the persona dropdown in the capture screen chrome opens a small selector (segmented control or list) with the three personas and a checkmark on the currently-selected one.
-- [ ] Selecting a different persona updates the next capture's active persona — the UI constructs a fresh `CaptureSession(defaultPersona = selectedPersona)` when the user next taps record (Story 2.3's `setPersona(persona)` API can also be called on an idle session before `startRecording`; either path is acceptable).
+- [ ] Selecting a different persona updates the next capture's active persona — `CaptureViewModel.setPersona(selectedPersona)` on the idle screen sets the persona the next `startRecording` carries into the foreground call. (`CaptureSession` was retired 2026-05-17; ADR-005 §Addendum.)
 - [ ] The chrome label updates to reflect the newly-selected persona (`WITNESS ▾` → `HARDASS ▾`).
 - [ ] Selection does not affect prior entries. Each saved entry's `Turn.persona` records the persona that authored it (Story 2.3 invariant).
 - [ ] The selection does not persist as a default — that's a separate Settings action (Story 4.9). It's per-capture-scoped.

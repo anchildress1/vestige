@@ -425,6 +425,28 @@ Without these, Android 12+'s vendor namespace isolation blocks GPU access and th
 
 **Tool use API exists (`@Tool`, `@ToolParam`, `OpenApiTool`).** Out of scope per `concept-locked.md` §"Out of scope — multi-step agentic tool chains". Documented here so a future ADR doesn't re-research from scratch.
 
+### Addendum (2026-05-17) — systemInstruction separation + concurrent-engine drain-on-close
+
+Supersedes the "Post-v1 consideration only" disposition of the `ConversationConfig.systemInstruction` finding above (additive — the prior paragraph stays as the historical record of the deferral and its rationale).
+
+**Decision (operator-directed, accepting the submission-window risk the prior finding flagged):**
+
+- `LiteRtLmEngine` calls now pass the role/schema/context block via `ConversationConfig.systemInstruction`; the message body carries only the user payload (entry text / audio / typed text / signature). Every caller split accordingly: `ForegroundInference`, `PromptComposer`/`BackgroundExtractionWorker`, `ObservationGenerator`, `PatternTitleGenerator`, `SttAProbe`. `ComposedPrompt` now carries `systemInstruction` + `userText` instead of one fused `text`.
+- The per-call serializing `callMutex` is replaced by a drain-on-close model: independent `Conversation` contexts run concurrently on the shared `Engine` (per ADR-008 §Correction / the 2026-05-16 bytecode probe above); `close()` flips a `closing` gate and waits for in-flight calls to drain before freeing the native handle. Only teardown is exclusive.
+
+**Manual-check stop (not self-ticked):** moving the prompt out of the message body changes the model's input structure. On-device re-validation on the reference S24 Ultra is required and owns the verdict — STT-B (foreground capture round-trip) and STT-D / ADR-002 multi-lens convergence (gated, multi-run). JVM suites cover the wiring/lifecycle invariants only; they cannot speak to extraction quality. Until that on-device pass lands, the behavioral correctness of this change is **UNVERIFIED**.
+
+### Addendum (2026-05-17) — published SDK page is an incomplete subset; pinned-0.11.0 conformance verified
+
+Corrects two cited facts in the 2026-05-16 addendum above (additive — that addendum stays as the historical record):
+
+- It cites `https://ai.google.dev/edge/litert-lm/android` as "last updated 2026-03-30 UTC." The live page footer now reads **2026-05-05 UTC**.
+- That page is a *getting-started subset*, not the full API surface. An audit that treated it as authoritative produced false BLOCKERs against APIs the page simply omits.
+
+**Verification (independent, version-matched).** Decompiling the pinned `litertlm-android:0.11.0` AAR and reading Google's own source at GitHub tag `v0.11.0` confirms these exist on the shipped artifact and are used correctly in `LiteRtLmEngine`: `EngineConfig.maxNumTokens` / `maxNumImages`; `SamplerConfig(topK, topP, temperature, seed)` with `Double` topP/temperature; `Conversation.sendMessage(Contents)` and `sendMessageAsync(Contents): Flow<Message>`; `Contents.of(List<Content>)`. The `EngineConfig` / `SamplerConfig` / streaming / `systemInstruction` / MTP-ordering wiring conforms to the documented v0.11.0 API.
+
+**Consequence.** The authoritative reference for SDK conformance is the version-matched Google source at tag `v0.11.0` (or the AAR itself), not the getting-started page. Do not "fix" code to match that page — it under-documents the artifact.
+
 ---
 
 ## Trade-off Analysis
@@ -459,15 +481,3 @@ The dominant trade-off is **deadline vs. correctness**. Every flag and every mod
 
 ---
 
-## Action Items
-
-**Ordering note.** PRD §"Build philosophy: build first, test at failure zones" replaces the prior Phase-0 validation phase. Build directly. Risk is mitigated through the five stop-and-test points (STT-A–E) embedded in phases 1–3. STT-A (audio plumbing, Phase 1) is the existential one — time-box hard. The Phase 1 items below run as Phase 1, not as a separate validation gate.
-
-1. [ ] Replace `gradle.properties` with the proposed file above.
-2. [ ] Phase-1 smoke test: configuration cache against the pinned ObjectBox plugin version. If clean, flip the flag and record version here.
-3. [x] Create `architecture-brief.md` with the four-module layout and `AppContainer` ownership from Q1/Q2, the audio-chunking contract from Q4, and the background-extraction recovery contract from Q3.
-4. [ ] **Phase 1:** build a signed dummy release APK and install it on the reference S24 Ultra (per Q5). Do this before any product code lands.
-5. [ ] **Phase 1:** add `network_security_config.xml`, StrictMode network detection in dev builds, and grep transitive deps for telemetry libraries (per Q7).
-6. [ ] **Phase 1 (storage + load contract only):** implement the `ModelArtifactStore` interface — file-on-disk location, SHA-256 verification on load, corruption surfacing, retry-with-backoff for downloads. Onboarding UX (Wi-Fi gate, progress UI, copy strings) is Phase 4 work and stays out of Phase 1's scope. Embedding artifact wiring stays gated on STT-E.
-7. [ ] Add `extraction_status`, `attempt_count`, `last_error` to the ObjectBox `Entry` entity in Phase 1 (per Q3). Cold-start sweep ships in the same phase.
-8. [x] Update root README to point to this ADR for stack/infra and remove stale missing-doc references.

@@ -35,11 +35,16 @@ sealed interface CaptureUiState {
         val startedAtEpochMs: Long,
     ) : CaptureUiState
 
-    /** Single-turn transcript per STT-B v1 scope: one USER + one MODEL turn from the foreground call. */
+    /**
+     * Single-turn transcript per STT-B v1 scope: one USER + one MODEL turn from the foreground call.
+     * [streaming] true while partial deltas are still arriving — the entry is not yet persisted, so
+     * Done is withheld until the terminal event flips this to false (gates premature acknowledge).
+     */
     data class Reviewing(
         override val persona: Persona,
         override val modelReadiness: ModelReadiness,
         val review: ReviewState,
+        val streaming: Boolean,
     ) : CaptureUiState
 }
 

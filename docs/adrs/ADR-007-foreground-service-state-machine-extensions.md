@@ -109,9 +109,3 @@ Both layers are required. State-machine-only coverage is insufficient for the fa
 
 ---
 
-## Action Items
-
-1. [x] **Phase 2** — extend the state machine with the three pathways (`onForegroundStartFailed`, `onServiceKilled`, DEMOTING→PROMOTING bounce in `onForegroundStopConfirmed`).
-2. [x] **Phase 2** — wire `Service.onDestroy` to call `onServiceKilled` when `shutdownHandled == false`.
-3. [x] **Phase 2** — Robolectric integration test (`BackgroundExtractionServiceIntegrationTest`) covering the four handshake rows above.
-4. [x] **Phase 2** — Story 2.6.5 checklist references ADR-007 extensions; cross-doc scrub of `architecture-brief.md` defers until that doc next changes (the brief reads "per ADR-004" — superseding ADRs amend by reference, no in-place edit needed).

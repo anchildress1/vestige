@@ -14,8 +14,8 @@ class PromptComposerTest {
 
     @Test
     fun `lens swap differs only in the lens framing block`() {
-        val literal = PromptComposer.compose(Lens.LITERAL, entry).text
-        val skeptical = PromptComposer.compose(Lens.SKEPTICAL, entry).text
+        val literal = PromptComposer.compose(Lens.LITERAL, entry).systemInstruction
+        val skeptical = PromptComposer.compose(Lens.SKEPTICAL, entry).systemInstruction
 
         assertNotEquals(literal, skeptical)
 
@@ -34,7 +34,7 @@ class PromptComposerTest {
 
     @Test
     fun `composed prompt contains all five surfaces in canonical order`() {
-        val text = PromptComposer.compose(Lens.LITERAL, entry).text
+        val text = PromptComposer.compose(Lens.LITERAL, entry).systemInstruction
         val ordered = listOf(
             "## Surface: Behavioral",
             "## Surface: State",
@@ -53,17 +53,18 @@ class PromptComposerTest {
     @Test
     fun `composed prompt contains the JSON output schema and entry text`() {
         val composed = PromptComposer.compose(Lens.INFERENTIAL, entry)
-        assertTrue(composed.text.contains("## Output schema"))
-        assertTrue(composed.text.contains("## ENTRY"))
-        assertTrue(composed.text.contains(entry))
-        assertTrue(composed.text.contains("`stated_commitment`: object `{text, topic_or_person}` or `null`."))
+        assertTrue(composed.systemInstruction.contains("## Output schema"))
+        assertEquals(entry, composed.userText)
+        assertTrue(
+            composed.systemInstruction.contains("`stated_commitment`: object `{text, topic_or_person}` or `null`."),
+        )
     }
 
     @Test
     fun `persona modules never appear in extraction prompts`() {
         // AGENTS.md guardrail 9 + ADR-002: extraction is persona-agnostic.
         Lens.entries.forEach { lens ->
-            val text = PromptComposer.compose(lens, entry).text
+            val text = PromptComposer.compose(lens, entry).systemInstruction
             assertFalse(text.contains("Persona: Witness"))
             assertFalse(text.contains("Persona: Hardass"))
             assertFalse(text.contains("Persona: Editor"))
@@ -73,7 +74,7 @@ class PromptComposerTest {
     @Test
     fun `retrieved history is capped at three chunks`() {
         val chunks = (1..6).map { HistoryChunk(patternId = "p$it", text = "chunk $it text") }
-        val text = PromptComposer.compose(Lens.LITERAL, entry, retrievedHistory = chunks).text
+        val text = PromptComposer.compose(Lens.LITERAL, entry, retrievedHistory = chunks).systemInstruction
 
         assertTrue(text.contains("pattern_id=p1"))
         assertTrue(text.contains("pattern_id=p2"))
@@ -87,7 +88,7 @@ class PromptComposerTest {
     fun `oversize history chunks are truncated strictly under the per-chunk char cap`() {
         val giant = "x".repeat(2000)
         val chunks = listOf(HistoryChunk(patternId = "big", text = giant))
-        val text = PromptComposer.compose(Lens.LITERAL, entry, retrievedHistory = chunks).text
+        val text = PromptComposer.compose(Lens.LITERAL, entry, retrievedHistory = chunks).systemInstruction
 
         assertFalse(text.contains(giant))
         assertTrue(text.contains("…"))
@@ -103,14 +104,14 @@ class PromptComposerTest {
 
     @Test
     fun `empty history renders the no-history sentinel`() {
-        val text = PromptComposer.compose(Lens.LITERAL, entry).text
+        val text = PromptComposer.compose(Lens.LITERAL, entry).systemInstruction
         assertTrue(text.contains("(no prior entries)"))
     }
 
     @Test
     fun `chunks without a pattern id render as context only`() {
         val chunks = listOf(HistoryChunk(patternId = null, text = "ad-hoc historical chunk"))
-        val text = PromptComposer.compose(Lens.LITERAL, entry, retrievedHistory = chunks).text
+        val text = PromptComposer.compose(Lens.LITERAL, entry, retrievedHistory = chunks).systemInstruction
         assertTrue(text.contains("pattern_id unavailable; context-only"))
         assertFalse(text.contains("pattern_id=null"))
     }
@@ -144,20 +145,22 @@ class PromptComposerTest {
         // doesn't blow up in the no-op path. (Gate-open behavior is verified manually on-device
         // via `adb shell setprop log.tag.VestigePromptComposer VERBOSE`.)
         val composed = PromptComposer.compose(Lens.SKEPTICAL, "x".repeat(8000))
-        assertTrue(composed.text.length > 8000)
+        assertTrue(composed.userText.length >= 8000)
+        assertTrue(composed.systemInstruction.isNotEmpty())
     }
 
     @Test
     fun `compose is idempotent for identical inputs`() {
-        val first = PromptComposer.compose(Lens.LITERAL, entry).text
-        val second = PromptComposer.compose(Lens.LITERAL, entry).text
-        assertEquals(first, second)
+        val first = PromptComposer.compose(Lens.LITERAL, entry)
+        val second = PromptComposer.compose(Lens.LITERAL, entry)
+        assertEquals(first.systemInstruction, second.systemInstruction)
+        assertEquals(first.userText, second.userText)
     }
 
     @Test
     fun `every lens loads its own framing block`() {
         Lens.entries.forEach { lens ->
-            val text = PromptComposer.compose(lens, entry).text
+            val text = PromptComposer.compose(lens, entry).systemInstruction
             val expectedHeader = when (lens) {
                 Lens.LITERAL -> "## Lens: Literal"
                 Lens.INFERENTIAL -> "## Lens: Inferential"

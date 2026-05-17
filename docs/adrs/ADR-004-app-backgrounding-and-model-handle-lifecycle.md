@@ -228,17 +228,3 @@ Cross-doc sources of truth updated alongside this addendum:
 
 ---
 
-## Action Items
-
-**Ordering note:** the repo no longer has a Phase 0; build-first is the standing rule. This lifecycle work lands in **Phase 2** after STT-A proves the audio path exists, because the service only matters once foreground capture is already producing entries that can queue background extraction.
-
-1. [ ] **Phase 2** — declare a `LifecycleService` (e.g., `BackgroundExtractionService`) in AndroidManifest with `foregroundServiceType="dataSync"` (or the v15-current equivalent). Wire to `AppContainer`.
-2. [ ] **Phase 2** — add the state-machine implementation per the §"State Machine" pseudocode above. Unit-test the transition table.
-3. [ ] **Phase 2** — define notification channel `vestige.local_processing` at `Application.onCreate`. Importance LOW.
-4. [ ] **Phase 2** — runtime-permission helper for `POST_NOTIFICATIONS` (Android 13+). Used by onboarding screen 3.5.
-5. [ ] **Phase 4 day 1** — evaluate state-machine progress against §"Fallback Trigger" criteria. If triggered, apply the fallback action and record the date here.
-6. [ ] **Phase 4** — onboarding screen 3.5 implementation per §"Permission Flow." Cross-doc updates (`ux-copy.md`, `concept-locked.md` §Onboarding, `PRD.md` §P0 UX shell) committed alongside.
-7. [ ] **Phase 4** — wire notification tap target to History screen with deep-link to most-recent-in-flight entry.
-8. [ ] **Phase 4** — verify `ModelHandle` ownership in `AppContainer` is consistent with the service lifecycle: model is process-scoped (matches existing architecture-brief), service controls priority but not handle existence.
-9. [ ] **Phase 6** — privacy proof clip (per ADR-001 Q7) captures the notification appearing during a normal capture and disappearing after extraction completes. Bonus ambient signal alongside the `tcpdump` chapter.
-10. [ ] Update `architecture-brief.md` §"AppContainer Ownership" — `ModelHandle` row references this ADR for backgrounding behavior.

@@ -164,7 +164,7 @@ Per-entry extraction drops from ~15–21s to ~7–9s. Queue concern dissolves. T
 
 The §Correction (2026-05-16) framed v1 adoption of concurrent multi-context as a measured scope call owned by Story 2.6.6 / 2.19. **On 2026-05-17 the operator made that call by directive ("we do not want to ship sequential"; streaming required).** Concurrency is now implemented; this addendum records the realized mechanism additively (the prior decision/correction text is unchanged).
 
-**Realized mechanism.** `LiteRtLmEngine`'s exclusive per-call `Mutex` is replaced with a readers/writer guard (`withEngine`): inference calls are concurrent "readers", each opening its own **independent** SDK conversation off the single Engine (`createConversation`; no `Session.clone()`, no CoW shared prefix — consistent with §Correction); `close()` is the exclusive "writer" that stops admitting calls and drains in-flight ones before freeing the native handle. `BackgroundExtractionWorker` fans the three lenses out (`coroutineScope { … async … }.awaitAll()`); `runLens` is pure (no shared state, no per-lens listener) so concurrent lenses cannot race; `modelCallCount` / `lastError` are derived post-fan-out; a `CopyOnWriteArrayList` accumulator preserves partial-results-on-timeout under structured-concurrency cancellation; `RUNNING` is emitted once at fan-out. The same engine change makes the foreground path non-blocking on background (Story 2.19 — there is no longer a shared exclusive call mutex).
+**Realized mechanism.** `LiteRtLmEngine`'s exclusive per-call mutex is replaced with a readers/writer guard: inference calls are concurrent "readers", each opening its own **independent** SDK conversation off the single Engine (`createConversation`; no `Session.clone()`, no CoW shared prefix — consistent with §Correction); `close()` is the exclusive "writer" that stops admitting calls and drains in-flight ones before freeing the native handle. `BackgroundExtractionWorker` fans the three lenses out (`coroutineScope { … async … }.awaitAll()`); `runLens` is pure (no shared state, no per-lens listener) so concurrent lenses cannot race; `modelCallCount` / `lastError` are derived post-fan-out; a `CopyOnWriteArrayList` accumulator preserves partial-results-on-timeout under structured-concurrency cancellation; `RUNNING` is emitted once at fan-out. The same engine change makes the foreground path non-blocking on background (Story 2.19 — there is no longer a shared exclusive call mutex).
 
 **Performance premise (unchanged from §Correction).** A single GPU still serializes at its hardware command queue, so this is **not** a literal 3× wall-clock speedup — the win is non-blocking preemption / structure. Net concurrent-context RAM on the reference S24 Ultra and realized background wall-clock remain **unmeasured**; that figure is a manual-check stop tracked on Story 2.6.6 / 2.19 and is not self-reported. JVM tier is fully covered (incl. a max-in-flight probe proving genuine concurrency); on-device RAM/wall-clock is the remaining open measurement.
 
@@ -172,12 +172,12 @@ The §Correction (2026-05-16) framed v1 adoption of concurrent multi-context as 
 
 ## Action Items
 
-1. [ ] Phase 2 Story 2.6 — rewrite to build base Session + 3 cloned Sessions + fire parallel. Drop the "sequential, not parallel" line. Reference this ADR.
+1. [ ] Phase 2 Story 2.6 — rewrite to describe the shipped independent multi-context fan-out. Drop the "sequential, not parallel" line. Reference this ADR.
 2. [ ] `architecture-brief.md` §"AppContainer Ownership" — rename `ModelHandle` row to **Engine** semantics; expand `InferenceCoordinator` row per this ADR.
-3. [ ] ADR-002 §"Background pass" — add a header note "Superseded by ADR-008 for sequencing. Independence rationale below is preserved; sequencing is now parallel via Session cloning."
-4. [ ] ADR-002 §"Why three calls and not one combined call" — add a footer note that Session cloning preserves the independence argument while enabling parallelism.
+3. [ ] ADR-002 §"Background pass" — add a header note "Superseded by ADR-008 for sequencing. Independence rationale below is preserved; sequencing is now parallel via independent multi-context."
+4. [ ] ADR-002 §"Why three calls and not one combined call" — add a footer note that independent multi-context preserves the independence argument while enabling parallelism.
 5. [ ] README + PRD §"Authoritative documents" — add ADR-008 entry.
-6. [ ] First failure in Phase 2 implementation that suggests Session cloning isn't working on E4B-audio — STOP and write a superseding ADR rather than silently reverting to sequential.
+6. [ ] First failure in Phase 2 implementation that suggests independent multi-context is broken on E4B-audio — STOP and write a superseding ADR rather than silently reverting to sequential.
 
 ---
 

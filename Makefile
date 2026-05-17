@@ -1,14 +1,23 @@
-.PHONY: install bootstrap-wrapper doctor build assemble reinstall _reinstall_base push-model seed-entries logcat test lint format ktlint-format ktlint-check detekt android-lint secret-scan commitlint verify-no-telemetry verify ci clean
+.PHONY: setup install bootstrap-wrapper doctor build assemble reinstall _reinstall_base push-model seed-entries logcat test lint format ktlint-format ktlint-check detekt android-lint secret-scan commitlint verify-no-telemetry verify ci clean
 
 GRADLE := ./gradlew
 KTLINT := $(or $(shell command -v ktlint 2>/dev/null), $(HOME)/.local/bin/ktlint)
 DETEKT := $(or $(shell command -v detekt 2>/dev/null), $(HOME)/.local/bin/detekt)
 DETEKT_INPUTS := app/src,core-model/src,core-inference/src,core-storage/src
 
-install:
+# One-time dev environment bootstrap — installs git hooks via lefthook.
+setup:
 	@if [ ! -f gradle/wrapper/gradle-wrapper.jar ]; then $(MAKE) bootstrap-wrapper; fi
 	@command -v lefthook >/dev/null 2>&1 || { echo "❌ lefthook not found. Install: https://github.com/evilmartians/lefthook"; exit 1; }
 	lefthook install
+
+# Build + install APK only. Preserves app data, model, and seeded fixtures.
+# Use this for code-only iterations where a full data reset is not needed.
+install:
+	@command -v adb >/dev/null 2>&1 || { echo "❌ adb not found. Install Android platform-tools."; exit 1; }
+	@adb get-state >/dev/null 2>&1 || { echo "❌ no device connected. Run 'adb devices' to check."; exit 1; }
+	$(GRADLE) :app:assembleDebug
+	adb install -r -d app/build/outputs/apk/debug/app-debug.apk
 
 doctor:
 	./scripts/doctor.sh

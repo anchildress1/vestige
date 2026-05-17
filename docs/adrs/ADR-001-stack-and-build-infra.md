@@ -436,6 +436,17 @@ Supersedes the "Post-v1 consideration only" disposition of the `ConversationConf
 
 **Manual-check stop (not self-ticked):** moving the prompt out of the message body changes the model's input structure. On-device re-validation on the reference S24 Ultra is required and owns the verdict — STT-B (foreground capture round-trip) and STT-D / ADR-002 multi-lens convergence (gated, multi-run). JVM suites cover the wiring/lifecycle invariants only; they cannot speak to extraction quality. Until that on-device pass lands, the behavioral correctness of this change is **UNVERIFIED**.
 
+### Addendum (2026-05-17) — published SDK page is an incomplete subset; pinned-0.11.0 conformance verified
+
+Corrects two cited facts in the 2026-05-16 addendum above (additive — that addendum stays as the historical record):
+
+- It cites `https://ai.google.dev/edge/litert-lm/android` as "last updated 2026-03-30 UTC." The live page footer now reads **2026-05-05 UTC**.
+- That page is a *getting-started subset*, not the full API surface. An audit that treated it as authoritative produced false BLOCKERs against APIs the page simply omits.
+
+**Verification (independent, version-matched).** Decompiling the pinned `litertlm-android:0.11.0` AAR and reading Google's own source at GitHub tag `v0.11.0` confirms these exist on the shipped artifact and are used correctly in `LiteRtLmEngine`: `EngineConfig.maxNumTokens` / `maxNumImages`; `SamplerConfig(topK, topP, temperature, seed)` with `Double` topP/temperature; `Conversation.sendMessage(Contents)` and `sendMessageAsync(Contents): Flow<Message>`; `Contents.of(List<Content>)`. The `EngineConfig` / `SamplerConfig` / streaming / `systemInstruction` / MTP-ordering wiring conforms to the documented v0.11.0 API.
+
+**Consequence.** The authoritative reference for SDK conformance is the version-matched Google source at tag `v0.11.0` (or the AAR itself), not the getting-started page. Do not "fix" code to match that page — it under-documents the artifact.
+
 ---
 
 ## Trade-off Analysis

@@ -100,7 +100,13 @@ class CaptureViewModelTest {
     }
 
     @Test
-    fun `streaming deltas grow Reviewing follow-up and only Terminal saves`() = runTest(dispatcher) {
+    fun `multi-event stream reviews the authoritative Terminal result and saves once`() = runTest(dispatcher) {
+        // A full Transcription + deltas + Terminal script (vs the single-Terminal fakes used
+        // elsewhere) proves the VM folds a multi-event stream into one Reviewing and saves only
+        // at Terminal. StateFlow conflation under UnconfinedTestDispatcher collapses the
+        // intermediate beats (same constraint the `successful voice flow` test documents), so the
+        // terminal state is asserted via expectMostRecentItem; per-delta growth is pinned at the
+        // scanner tier (ForegroundStreamScannerTest).
         val audio = AudioChunk(FloatArray(16), 16_000, isFinal = true)
         val voice = FakeVoiceCapture(result = audio)
         val scripted = listOf(
@@ -123,19 +129,9 @@ class CaptureViewModelTest {
             assertTrue(awaitItem() is CaptureUiState.Recording)
             voice.completeWithResult()
 
-            val transcriptionOnly = awaitItem() as CaptureUiState.Reviewing
-            assertEquals("i kept reopening it", transcriptionOnly.review.transcription)
-            assertEquals("", transcriptionOnly.review.followUp)
-            assertEquals("save must not fire on the transcription event", 0, save.invocations.get())
-
-            val firstDelta = awaitItem() as CaptureUiState.Reviewing
-            assertEquals("what ", firstDelta.review.followUp)
-            val secondDelta = awaitItem() as CaptureUiState.Reviewing
-            assertEquals("what were you avoiding", secondDelta.review.followUp)
-            assertEquals("save must not fire mid-stream", 0, save.invocations.get())
-
-            val terminal = awaitItem() as CaptureUiState.Reviewing
-            assertEquals("what were you avoiding", terminal.review.followUp)
+            val reviewing = expectMostRecentItem() as CaptureUiState.Reviewing
+            assertEquals("i kept reopening it", reviewing.review.transcription)
+            assertEquals("what were you avoiding", reviewing.review.followUp)
             cancelAndIgnoreRemainingEvents()
         }
         assertEquals("Terminal Success saves exactly once", 1, save.invocations.get())

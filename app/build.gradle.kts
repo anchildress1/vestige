@@ -29,7 +29,7 @@ val keystoreProps: Properties? = if (keystorePropsFile.exists()) {
 
 // Derived so a single release-please bump on versionName auto-bumps versionCode too.
 // Format: MAJOR * 10000 + MINOR * 100 + PATCH. Caps at 99 minor / 99 patch — fine for v1.x.
-val appVersionName = "1.0.0" // x-release-please-version
+val appVersionName = "0.1.0" // x-release-please-version
 val appVersionCode = appVersionName.split(".").let { (major, minor, patch) ->
     major.toInt() * 10_000 + minor.toInt() * 100 + patch.toInt()
 }

@@ -17,42 +17,55 @@ import kotlinx.coroutines.yield
  * One-shot, idempotent vector backfill. Embeds and persists any COMPLETED [EntryEntity] whose
  * [EntryEntity.vectorSchemaVersion] is behind [EntryEntity.CURRENT_VECTOR_SCHEMA_VERSION] —
  * which covers both never-embedded rows (default 0) and rows embedded against the old raw
- * `entryText` source before Story 3.11. Non-COMPLETED rows are skipped: their distilled
- * fields don't exist yet, so they're re-swept when extraction completes.
+ * `entryText` source before Story 3.11. Legacy non-COMPLETED rows that still carry a vector
+ * are cleaned in the same sweep: their old raw-transcript signal is cleared and the schema is
+ * stamped current so retrieval stops ranking data the extraction never actually finished.
  *
  * The embedding target is [buildEmbeddingText] (tags + observation texts + commitment topic),
  * not the verbatim transcription. Cooperative with cancellation — if the parent scope is
  * cancelled mid-pass, committed progress survives and the remaining stale rows get picked up
  * on the next invocation.
  */
+@Suppress("TooManyFunctions") // Query builders + paged batch helpers are the worker's whole job.
 class VectorBackfillWorker(private val boxStore: BoxStore, private val embedder: suspend (String) -> FloatArray) {
 
+    /** Cheap presence check for any stale vector work: embedding or legacy-vector cleanup. */
+    fun hasPendingWork(): Boolean = pendingEmbeddingCount() > 0 || pendingLegacyCleanupCount() > 0
+
     /**
-     * Cheap presence check: true iff at least one COMPLETED entry is at a stale
-     * [EntryEntity.vectorSchemaVersion]. Callers use this to gate expensive setup (artifact
-     * SHA-256 verification, embedder construction) so a cold start with no pending work pays
-     * no IO.
+     * Cheap presence check: true iff at least one COMPLETED entry still needs embedding work.
+     * Callers use this to gate expensive setup (artifact SHA-256 verification, embedder
+     * construction) so cleanup-only sweeps can still run while artifacts are absent.
      */
-    fun hasPendingWork(): Boolean = pendingQuery().use { it.count() > 0 }
+    fun hasPendingEmbeddings(): Boolean = pendingEmbeddingCount() > 0
 
     suspend fun backfill(batchSize: Int = DEFAULT_BATCH_SIZE): BackfillStats = coroutineScope {
         require(batchSize > 0) { "VectorBackfillWorker.backfill batchSize must be > 0 (got $batchSize)" }
         val entryBox = boxStore.boxFor<EntryEntity>()
-        val pending = pendingEntries()
-        if (pending.isEmpty()) {
+        val pendingEmbeddings = pendingEmbeddingCount()
+        val pendingLegacyCleanup = pendingLegacyCleanupCount()
+        val total = pendingEmbeddings + pendingLegacyCleanup
+        if (total == 0L) {
             return@coroutineScope BackfillStats.empty()
         }
-        Log.i(TAG, "Vector backfill: ${pending.size} entries pending")
+        Log.i(
+            TAG,
+            "Vector backfill: $pendingEmbeddings embeddings + $pendingLegacyCleanup legacy cleanups pending",
+        )
         val started = System.currentTimeMillis()
         var progress = BackfillProgress.empty()
-        for (batch in pending.chunked(batchSize)) {
-            progress += processBatch(entryBox, batch)
-            // Cooperative yield between batches so a large backlog can't monopolize the shared
-            // container dispatcher and starve foreground inference.
-            yield()
-        }
+        progress += processPaged(
+            batchSize = batchSize,
+            loadBatch = ::loadLegacyCleanupBatch,
+            processBatch = { batch -> processLegacyCleanupBatch(entryBox, batch) },
+        )
+        progress += processPaged(
+            batchSize = batchSize,
+            loadBatch = ::loadEmbeddingBatch,
+            processBatch = { batch -> processEmbeddingBatch(entryBox, batch) },
+        )
         val stats = BackfillStats(
-            total = pending.size,
+            total = total.toInt(),
             processed = progress.processed,
             failed = progress.failed,
             durationMs = System.currentTimeMillis() - started,
@@ -62,22 +75,49 @@ class VectorBackfillWorker(private val boxStore: BoxStore, private val embedder:
         stats
     }
 
-    private fun pendingEntries(): List<EntryEntity> = pendingQuery().use { it.find() }
+    private suspend fun processPaged(
+        batchSize: Int,
+        loadBatch: (Long, Long) -> List<EntryEntity>,
+        processBatch: suspend (List<EntryEntity>) -> BackfillProgress,
+    ): BackfillProgress {
+        var progress = BackfillProgress.empty()
+        var lastSeenId = 0L
+        while (true) {
+            val batch = loadBatch(lastSeenId, batchSize.toLong())
+            if (batch.isEmpty()) return progress
+            progress += processBatch(batch)
+            lastSeenId = batch.last().id
+            // Cooperative yield between batches so a large backlog can't monopolize the shared
+            // container dispatcher and starve foreground inference.
+            yield()
+        }
+    }
 
-    private suspend fun processBatch(entryBox: Box<EntryEntity>, batch: List<EntryEntity>): BackfillProgress {
+    private suspend fun processLegacyCleanupBatch(
+        entryBox: Box<EntryEntity>,
+        batch: List<EntryEntity>,
+    ): BackfillProgress {
+        batch.forEach { entry ->
+            currentCoroutineContext().ensureActive()
+            clearLegacyVector(entryBox, entry)
+        }
+        return BackfillProgress(processed = 0, failed = 0, skipped = batch.size)
+    }
+
+    private suspend fun processEmbeddingBatch(entryBox: Box<EntryEntity>, batch: List<EntryEntity>): BackfillProgress {
         var progress = BackfillProgress.empty()
         for (entry in batch) {
             currentCoroutineContext().ensureActive()
-            progress += processEntry(entryBox, entry)
+            progress += processEmbeddingEntry(entryBox, entry)
         }
         return progress
     }
 
-    private suspend fun processEntry(entryBox: Box<EntryEntity>, entry: EntryEntity): BackfillProgress = try {
+    private suspend fun processEmbeddingEntry(entryBox: Box<EntryEntity>, entry: EntryEntity): BackfillProgress = try {
         val text = buildEmbeddingText(entry)
         if (text.isBlank()) {
             Log.d(TAG, "Skipped embedding for entry ${entry.id} — no embeddable text after distillation")
-            stampCurrentSchema(entryBox, entry)
+            clearLegacyVector(entryBox, entry)
             BackfillProgress(processed = 0, failed = 0, skipped = 1)
         } else {
             embedAndPersist(entryBox, entry, text)
@@ -92,10 +132,11 @@ class VectorBackfillWorker(private val boxStore: BoxStore, private val embedder:
         BackfillProgress(processed = 0, failed = 1, skipped = 0)
     }
 
-    private fun stampCurrentSchema(entryBox: Box<EntryEntity>, entry: EntryEntity) {
-        // COMPLETED but the model distilled nothing embeddable. Stamp to the current schema so
-        // the sweep terminates instead of re-selecting this row every cold start; leave `vector`
-        // null (zero cosine contribution).
+    private fun clearLegacyVector(entryBox: Box<EntryEntity>, entry: EntryEntity) {
+        // A stale row with no valid distilled target must contribute zero cosine signal. Clear
+        // any legacy vector before stamping the current schema so retrieval cannot keep ranking
+        // raw-transcript leftovers forever.
+        entry.vector = null
         entry.vectorSchemaVersion = EntryEntity.CURRENT_VECTOR_SCHEMA_VERSION
         entryBox.put(entry)
     }
@@ -110,17 +151,49 @@ class VectorBackfillWorker(private val boxStore: BoxStore, private val embedder:
         entryBox.put(entry)
     }
 
-    private fun pendingQuery(): Query<EntryEntity> = boxStore.boxFor<EntryEntity>().query()
-        .equal(
-            EntryEntity_.extractionStatus,
-            ExtractionStatus.COMPLETED.name,
-            QueryBuilder.StringOrder.CASE_SENSITIVE,
-        )
-        .less(
-            EntryEntity_.vectorSchemaVersion,
-            EntryEntity.CURRENT_VECTOR_SCHEMA_VERSION.toLong(),
-        )
-        .build()
+    private fun pendingEmbeddingCount(): Long = pendingEmbeddingQuery().use { it.count() }
+
+    private fun pendingLegacyCleanupCount(): Long = pendingLegacyCleanupQuery().use { it.count() }
+
+    private fun loadEmbeddingBatch(afterIdExclusive: Long, limit: Long): List<EntryEntity> = pendingEmbeddingQuery(
+        afterIdExclusive = afterIdExclusive,
+    ).use { it.find(0, limit) }
+
+    private fun loadLegacyCleanupBatch(afterIdExclusive: Long, limit: Long): List<EntryEntity> =
+        pendingLegacyCleanupQuery(
+            afterIdExclusive = afterIdExclusive,
+        ).use { it.find(0, limit) }
+
+    private fun pendingEmbeddingQuery(afterIdExclusive: Long = 0L): Query<EntryEntity> =
+        boxStore.boxFor<EntryEntity>().query()
+            .equal(
+                EntryEntity_.extractionStatus,
+                ExtractionStatus.COMPLETED.name,
+                QueryBuilder.StringOrder.CASE_SENSITIVE,
+            )
+            .less(
+                EntryEntity_.vectorSchemaVersion,
+                EntryEntity.CURRENT_VECTOR_SCHEMA_VERSION.toLong(),
+            )
+            .greater(EntryEntity_.id, afterIdExclusive)
+            .order(EntryEntity_.id)
+            .build()
+
+    private fun pendingLegacyCleanupQuery(afterIdExclusive: Long = 0L): Query<EntryEntity> =
+        boxStore.boxFor<EntryEntity>().query()
+            .notEqual(
+                EntryEntity_.extractionStatus,
+                ExtractionStatus.COMPLETED.name,
+                QueryBuilder.StringOrder.CASE_SENSITIVE,
+            )
+            .less(
+                EntryEntity_.vectorSchemaVersion,
+                EntryEntity.CURRENT_VECTOR_SCHEMA_VERSION.toLong(),
+            )
+            .notNull(EntryEntity_.vector)
+            .greater(EntryEntity_.id, afterIdExclusive)
+            .order(EntryEntity_.id)
+            .build()
 
     data class BackfillStats(
         val total: Int,

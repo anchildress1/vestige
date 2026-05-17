@@ -52,19 +52,26 @@ class VectorBackfillWorkerTest {
     }
 
     @Test
-    fun `hasPendingWork is true only for COMPLETED rows behind the current vector schema`() {
+    fun `pending work distinguishes embeddings from legacy cleanup`() {
         val worker = VectorBackfillWorker(boxStore) { error("embedder must not be called") }
 
         assertFalse(worker.hasPendingWork())
+        assertFalse(worker.hasPendingEmbeddings())
 
         insertEntry(status = ExtractionStatus.PENDING, vectorSchemaVersion = 0)
-        assertFalse("PENDING rows have no distilled fields yet", worker.hasPendingWork())
+        assertFalse("PENDING rows without a vector are not work yet", worker.hasPendingWork())
+        assertFalse(worker.hasPendingEmbeddings())
+
+        insertEntry(status = ExtractionStatus.FAILED, vector = FloatArray(DIMS), vectorSchemaVersion = 0)
+        assertTrue("legacy non-COMPLETED vectors must be cleared", worker.hasPendingWork())
+        assertFalse("cleanup-only work does not require embedding artifacts", worker.hasPendingEmbeddings())
 
         insertEntry(status = ExtractionStatus.COMPLETED, vectorSchemaVersion = CURRENT)
-        assertFalse("already-current rows are not stale", worker.hasPendingWork())
+        assertTrue("already-current rows do not hide the cleanup row", worker.hasPendingWork())
 
         insertEntry(status = ExtractionStatus.COMPLETED, vectorSchemaVersion = 0)
         assertTrue("COMPLETED + stale schema is pending work", worker.hasPendingWork())
+        assertTrue("COMPLETED + stale schema requires embeddings", worker.hasPendingEmbeddings())
     }
 
     @Test
@@ -110,7 +117,7 @@ class VectorBackfillWorkerTest {
     }
 
     @Test
-    fun `non-COMPLETED rows are skipped and never embedded`() = runTest {
+    fun `non-COMPLETED rows without legacy vectors remain untouched and are not counted`() = runTest {
         val nonTerminal = listOf(
             ExtractionStatus.PENDING,
             ExtractionStatus.RUNNING,
@@ -125,6 +132,26 @@ class VectorBackfillWorkerTest {
         assertEquals(0, stats.total)
         assertEquals(0, stats.processed)
         assertTrue(boxStore.boxFor<EntryEntity>().all.all { it.vector == null && it.vectorSchemaVersion == 0 })
+    }
+
+    @Test
+    fun `legacy non-COMPLETED vectors are cleared and schema-stamped without embedding`() = runTest {
+        val ids = listOf(
+            insertEntry(status = ExtractionStatus.PENDING, vector = FloatArray(DIMS) { 1f }, vectorSchemaVersion = 0),
+            insertEntry(status = ExtractionStatus.FAILED, vector = FloatArray(DIMS) { 1f }, vectorSchemaVersion = 0),
+        )
+        val worker = VectorBackfillWorker(boxStore) { error("embedder must not be called for cleanup-only rows") }
+
+        val stats = worker.backfill(batchSize = 1)
+
+        assertEquals(2, stats.total)
+        assertEquals(0, stats.processed)
+        assertEquals(2, stats.skipped)
+        val entryBox = boxStore.boxFor<EntryEntity>()
+        ids.forEach { id ->
+            assertNull(entryBox[id].vector)
+            assertEquals(CURRENT, entryBox[id].vectorSchemaVersion)
+        }
     }
 
     @Test
@@ -169,21 +196,27 @@ class VectorBackfillWorkerTest {
     }
 
     @Test
-    fun `COMPLETED row with nothing distillable is stamped, not embedded, and terminates the sweep`() = runTest {
-        val id = insertEntry(tagNames = emptyList(), observations = emptyList(), commitmentTopic = null)
-        val worker = VectorBackfillWorker(boxStore) { error("embedder must not be called for blank distillation") }
+    fun `COMPLETED row with nothing distillable clears any legacy vector, stamps schema, and terminates the sweep`() =
+        runTest {
+            val id = insertEntry(
+                tagNames = emptyList(),
+                observations = emptyList(),
+                commitmentTopic = null,
+                vector = FloatArray(DIMS) { 0.5f },
+            )
+            val worker = VectorBackfillWorker(boxStore) { error("embedder must not be called for blank distillation") }
 
-        val stats = worker.backfill()
+            val stats = worker.backfill()
 
-        assertEquals(1, stats.total)
-        assertEquals(0, stats.processed)
-        assertEquals(0, stats.failed)
-        assertEquals(1, stats.skipped)
-        val row = boxStore.boxFor<EntryEntity>()[id]
-        assertNull("no vector — null is a zero cosine contribution", row.vector)
-        assertEquals(CURRENT, row.vectorSchemaVersion)
-        assertFalse("stamped row must not be re-selected", worker.hasPendingWork())
-    }
+            assertEquals(1, stats.total)
+            assertEquals(0, stats.processed)
+            assertEquals(0, stats.failed)
+            assertEquals(1, stats.skipped)
+            val row = boxStore.boxFor<EntryEntity>()[id]
+            assertNull("no vector — null is a zero cosine contribution", row.vector)
+            assertEquals(CURRENT, row.vectorSchemaVersion)
+            assertFalse("stamped row must not be re-selected", worker.hasPendingWork())
+        }
 
     @Test
     fun `embedder failure leaves the row stale so the next pass retries it`() = runTest {
@@ -222,22 +255,28 @@ class VectorBackfillWorkerTest {
     }
 
     @Test
-    fun `all entries are processed across multiple batches`() = runTest {
-        val ids = (0 until 5).map { insertEntry(tagNames = listOf("entry-$it")) }
-        val seen = mutableListOf<String>()
-        val worker = VectorBackfillWorker(boxStore) { text ->
-            seen.add(text)
-            FloatArray(DIMS)
+    fun `all entries are processed across multiple paged batches without skipping rows that mutate out of the query`() =
+        runTest {
+            val cleanupId =
+                insertEntry(status = ExtractionStatus.FAILED, vector = FloatArray(DIMS) { 2f }, vectorSchemaVersion = 0)
+            val ids = listOf(cleanupId) + (0 until 5).map { insertEntry(tagNames = listOf("entry-$it")) }
+            val seen = mutableListOf<String>()
+            val worker = VectorBackfillWorker(boxStore) { text ->
+                seen.add(text)
+                FloatArray(DIMS)
+            }
+
+            val stats = worker.backfill(batchSize = 2)
+
+            assertEquals(6, stats.total)
+            assertEquals(5, stats.processed)
+            assertEquals(1, stats.skipped)
+            assertEquals((0 until 5).map { "entry-$it" }.toSet(), seen.toSet())
+            val entryBox = boxStore.boxFor<EntryEntity>()
+            assertNull(entryBox[cleanupId].vector)
+            assertEquals(CURRENT, entryBox[cleanupId].vectorSchemaVersion)
+            assertTrue(ids.drop(1).all { entryBox[it].vector != null && entryBox[it].vectorSchemaVersion == CURRENT })
         }
-
-        val stats = worker.backfill(batchSize = 2)
-
-        assertEquals(5, stats.total)
-        assertEquals(5, stats.processed)
-        assertEquals((0 until 5).map { "entry-$it" }.toSet(), seen.toSet())
-        val entryBox = boxStore.boxFor<EntryEntity>()
-        assertTrue(ids.all { entryBox[it].vector != null && entryBox[it].vectorSchemaVersion == CURRENT })
-    }
 
     @Test
     fun `non-positive backfill batch size is rejected`() {

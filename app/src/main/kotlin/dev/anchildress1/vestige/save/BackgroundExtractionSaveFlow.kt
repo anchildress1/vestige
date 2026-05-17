@@ -195,7 +195,7 @@ class BackgroundExtractionSaveFlow(
         // Runs after the terminal commit so a callout failure can't unwind the resolved
         // entry. Best-effort — failures are swallowed in runPatternOrchestration.
         runPatternOrchestration(entryId, persona)
-        lifecycleCallbacks.onEntryFinalized(entryId)
+        runEntryFinalization(entryId)
     }
 
     private suspend fun runPatternOrchestration(entryId: Long, persona: Persona): EntryObservation? {
@@ -249,6 +249,21 @@ class BackgroundExtractionSaveFlow(
         } catch (@Suppress("TooGenericExceptionCaught") error: Exception) {
             orchestrator.settleReservedCallout(entry, fired = false)
             throw error
+        }
+    }
+
+    private fun runEntryFinalization(entryId: Long) {
+        try {
+            lifecycleCallbacks.onEntryFinalized(entryId)
+        } catch (cancellation: CancellationException) {
+            throw cancellation
+        } catch (@Suppress("TooGenericExceptionCaught") error: Exception) {
+            // Post-save follow-ons must never rewrite a persisted COMPLETED entry into a
+            // failure. Log and move on; the next save / cold start can retrigger downstream work.
+            Log.w(
+                TAG,
+                "onEntryFinalized failed for entryId=$entryId: ${error.javaClass.simpleName} ${error.message}",
+            )
         }
     }
 

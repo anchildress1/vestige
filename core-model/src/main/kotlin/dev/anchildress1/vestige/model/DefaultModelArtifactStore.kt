@@ -1,5 +1,6 @@
 package dev.anchildress1.vestige.model
 
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.currentCoroutineContext
@@ -87,11 +88,11 @@ class DefaultModelArtifactStore(
         var lastFailure: Throwable? = null
         while (attempt < ModelArtifactStore.MAX_DOWNLOAD_ATTEMPTS) {
             attempt++
-            val outcome = runCatching { downloadOnce(onProgress) }
-            outcome.onSuccess { result ->
-                return@withContext result
-            }
-            outcome.onFailure { error ->
+            try {
+                return@withContext downloadOnce(onProgress)
+            } catch (cancellation: CancellationException) {
+                throw cancellation
+            } catch (@Suppress("TooGenericExceptionCaught") error: Exception) {
                 lastFailure = error
                 if (attempt >= ModelArtifactStore.MAX_DOWNLOAD_ATTEMPTS) {
                     throw IOException("Model download failed after $attempt attempts", error)

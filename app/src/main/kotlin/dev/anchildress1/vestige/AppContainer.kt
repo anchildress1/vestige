@@ -778,13 +778,15 @@ class AppContainer(
             // most cold starts and steady-state save completions have nothing to backfill.
             if (!worker.hasPendingWork()) return@withLock VectorBackfillOutcome.IDLE
 
-            val modelState = embeddingModelArtifactStore.currentState()
-            val tokenizerState = embeddingTokenizerArtifactStore.currentState()
-            if (modelState !is ModelArtifactState.Complete ||
-                tokenizerState !is ModelArtifactState.Complete
-            ) {
-                Log.i(TAG, "Vector backfill delayed — embedding artifacts not yet complete")
-                return@withLock VectorBackfillOutcome.RETRY_LATER
+            if (worker.hasPendingEmbeddings()) {
+                val modelState = embeddingModelArtifactStore.currentState()
+                val tokenizerState = embeddingTokenizerArtifactStore.currentState()
+                if (modelState !is ModelArtifactState.Complete ||
+                    tokenizerState !is ModelArtifactState.Complete
+                ) {
+                    Log.i(TAG, "Vector backfill delayed — embedding artifacts not yet complete")
+                    return@withLock VectorBackfillOutcome.RETRY_LATER
+                }
             }
             val stats = worker.backfill()
             if (stats.failed > 0) {

@@ -122,6 +122,15 @@ class EmbeddingTextTest {
     }
 
     @Test
+    fun `commitment sentinel variants are omitted case-insensitively`() {
+        val none = persist(commitmentJson = commitment(topic = "NONE"))
+        val undefined = persist(commitmentJson = commitment(topic = " undefined "))
+
+        assertEquals("", buildEmbeddingText(none))
+        assertEquals("", buildEmbeddingText(undefined))
+    }
+
+    @Test
     fun `commitment missing the topic key is omitted`() {
         val entry = persist(tagNames = listOf("tag"), commitmentJson = JSONObject().put("text", "c").toString())
         assertEquals("tag", buildEmbeddingText(entry))

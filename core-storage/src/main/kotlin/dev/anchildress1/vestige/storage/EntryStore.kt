@@ -243,7 +243,14 @@ class EntryStore(private val boxStore: BoxStore, private val markdownStore: Mark
 
     private fun commitmentJson(resolved: ResolvedExtraction): String? {
         val map = resolved.fields[KEY_COMMITMENT]?.value as? Map<*, *>
-        return map?.let { JSONObject(it.mapKeys { entry -> entry.key.toString() }).toString() }
+        return map?.let {
+            JSONObject(it.mapKeys { entry -> entry.key.toString() }).apply {
+                if (has(KEY_TOPIC_OR_PERSON)) {
+                    val normalized = normalizeCommitmentTopic(optString(KEY_TOPIC_OR_PERSON))
+                    put(KEY_TOPIC_OR_PERSON, normalized ?: JSONObject.NULL)
+                }
+            }.toString()
+        }
     }
 
     private fun confidenceJson(resolved: ResolvedExtraction): String {
@@ -257,6 +264,7 @@ class EntryStore(private val boxStore: BoxStore, private val markdownStore: Mark
         private const val KEY_ENERGY = "energy_descriptor"
         private const val KEY_RECURRENCE = "recurrence_link"
         private const val KEY_COMMITMENT = "stated_commitment"
+        private const val KEY_TOPIC_OR_PERSON = "topic_or_person"
         private val NON_TERMINAL_STATUS_NAMES: Array<String> = arrayOf(
             ExtractionStatus.PENDING.name,
             ExtractionStatus.RUNNING.name,

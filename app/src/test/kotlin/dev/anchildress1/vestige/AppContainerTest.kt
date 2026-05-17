@@ -990,6 +990,7 @@ class AppContainerTest {
             ModelArtifactState.Complete,
         )
         every { worker.hasPendingWork() } returnsMany listOf(true, true)
+        every { worker.hasPendingEmbeddings() } returnsMany listOf(true, true)
         coEvery { worker.backfill() } returns VectorBackfillWorker.BackfillStats(1, 1, 0, 1)
         val container = AppContainer(
             applicationContext = context,
@@ -1067,6 +1068,39 @@ class AppContainerTest {
     }
 
     @Test
+    fun `launchVectorBackfillIfReady runs cleanup-only work without probing artifact state`() = runTest {
+        val modelStore = mockk<ModelArtifactStore>()
+        val tokenizerStore = mockk<ModelArtifactStore>()
+        val worker = mockk<VectorBackfillWorker>()
+        val context = mockk<Context>(relaxed = true) {
+            every { filesDir } returns java.io.File("/tmp/app-files-stub")
+        }
+        every { worker.hasPendingWork() } returns true
+        every { worker.hasPendingEmbeddings() } returns false
+        coEvery { worker.backfill() } returns VectorBackfillWorker.BackfillStats(1, 0, 0, 1, skipped = 1)
+        val container = AppContainer(
+            applicationContext = context,
+            boxStoreFactory = { mockk(relaxed = true) },
+            markdownStoreFactory = { mockk<MarkdownEntryStore>(relaxed = true) },
+            embeddingArtifactManifestLoader = { EmbeddingArtifactManifest.loadDefault() },
+            embeddingModelArtifactStoreFactory = { _, _, _ -> modelStore },
+            embeddingTokenizerArtifactStoreFactory = { _, _, _ -> tokenizerStore },
+            vectorBackfillWorkerFactory = { _, _ -> worker },
+            recoveredEntryIdsLoader = { emptyList() },
+            foregroundServiceIntentFactory = { Intent("dev.anchildress1.vestige.TEST_START") },
+            foregroundServiceStarter = {},
+            scope = this,
+        )
+
+        container.launchVectorBackfillIfReady()
+        advanceUntilIdle()
+
+        coVerify(exactly = 1) { worker.backfill() }
+        coVerify(exactly = 0) { modelStore.currentState() }
+        coVerify(exactly = 0) { tokenizerStore.currentState() }
+    }
+
+    @Test
     fun `launchVectorBackfillIfReady drains a second trigger that lands during an active pass`() = runTest {
         val modelStore = mockk<ModelArtifactStore>()
         val tokenizerStore = mockk<ModelArtifactStore>()
@@ -1079,6 +1113,7 @@ class AppContainerTest {
         coEvery { modelStore.currentState() } returns ModelArtifactState.Complete
         coEvery { tokenizerStore.currentState() } returns ModelArtifactState.Complete
         every { worker.hasPendingWork() } returnsMany listOf(true, true)
+        every { worker.hasPendingEmbeddings() } returnsMany listOf(true, true)
         coEvery { worker.backfill() } coAnswers {
             if (backfillCalls++ == 0) {
                 container.launchVectorBackfillIfReady()
@@ -1116,6 +1151,7 @@ class AppContainerTest {
         coEvery { modelStore.currentState() } returns ModelArtifactState.Partial(1L, 2L)
         coEvery { tokenizerStore.currentState() } returns ModelArtifactState.Partial(1L, 2L)
         every { worker.hasPendingWork() } returns true
+        every { worker.hasPendingEmbeddings() } returns true
         val container = AppContainer(
             applicationContext = context,
             boxStoreFactory = { mockk(relaxed = true) },

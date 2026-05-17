@@ -184,6 +184,8 @@ make ci         # full local check (lint + test + build)
 make clean
 ```
 
+`make setup` is the hook/bootstrap target. `make install` is now device-only and requires `adb`; it does not install lefthook anymore.
+
 ### Run on a device
 
 Reference device: Galaxy S24 Ultra. External devices are best-effort; submission promise is Android 14+, 8 GB RAM, 6 GB free storage.

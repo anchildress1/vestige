@@ -853,6 +853,38 @@ class BackgroundExtractionSaveFlowTest {
     }
 
     @Test
+    fun `onEntryFinalized failure is swallowed after the entry is already persisted`() = runTest {
+        val resolved = canonicalSample()
+        val flowWithCallback = BackgroundExtractionSaveFlow(
+            entryStore = entryStore,
+            worker = worker,
+            observationGenerator = observationGenerator,
+            lifecycleCallbacks = BackgroundExtractionLifecycleCallbacks(
+                listenerFactory = listenerFactory,
+                onEntryFinalized = { throw IllegalStateException("scheduler boom") },
+            ),
+            scope = flowScope,
+        )
+        every { entryStore.createPendingEntry(any(), any(), any()) } returns ENTRY_ID
+        coEvery { worker.extract(any(), any()) } returns BackgroundExtractionResult.Success(
+            totalElapsedMs = 25_000L,
+            lensResults = emptyList(),
+            modelCallCount = 3,
+            resolved = resolved,
+            templateLabel = TemplateLabel.AFTERMATH,
+        )
+        coEvery { observationGenerator.generate(any(), any(), any()) } returns emptyList()
+
+        flowWithCallback.saveAndExtract(SAMPLE_TEXT, SAMPLE_TIMESTAMP)
+
+        coVerify(exactly = 1) {
+            entryStore.completeEntry(ENTRY_ID, resolved, TemplateLabel.AFTERMATH, emptyList())
+        }
+        coVerify(exactly = 0) { entryStore.failEntry(any(), any(), any()) }
+        assertTrue(listenerEvents.contains(ExtractionStatus.COMPLETED))
+    }
+
+    @Test
     fun `recoverEntry runs the detached pipeline against the existing entry id without creating a new row`() = runTest {
         val resolved = canonicalSample()
         coEvery { worker.extract(any(), any()) } returns BackgroundExtractionResult.Success(

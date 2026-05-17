@@ -18,8 +18,8 @@ import kotlinx.coroutines.yield
  * [EntryEntity.vectorSchemaVersion] is behind [EntryEntity.CURRENT_VECTOR_SCHEMA_VERSION] —
  * which covers both never-embedded rows (default 0) and rows embedded against the old raw
  * `entryText` source before Story 3.11. Legacy non-COMPLETED rows that still carry a vector
- * are cleaned in the same sweep: their old raw-transcript signal is cleared and the schema is
- * stamped current so retrieval stops ranking data the extraction never actually finished.
+ * are cleaned in the same sweep: their old raw-transcript signal is cleared immediately, but
+ * their stale schema is preserved so a later COMPLETED transition still gets re-embedded.
  *
  * The embedding target is [buildEmbeddingText] (tags + observation texts + commitment topic),
  * not the verbatim transcription. Cooperative with cancellation — if the parent scope is
@@ -99,7 +99,7 @@ class VectorBackfillWorker(private val boxStore: BoxStore, private val embedder:
     ): BackfillProgress {
         batch.forEach { entry ->
             currentCoroutineContext().ensureActive()
-            clearLegacyVector(entryBox, entry)
+            clearVector(entryBox, entry)
         }
         return BackfillProgress(processed = 0, failed = 0, skipped = batch.size)
     }
@@ -117,7 +117,7 @@ class VectorBackfillWorker(private val boxStore: BoxStore, private val embedder:
         val text = buildEmbeddingText(entry)
         if (text.isBlank()) {
             Log.d(TAG, "Skipped embedding for entry ${entry.id} — no embeddable text after distillation")
-            clearLegacyVector(entryBox, entry)
+            clearVectorAndMarkCurrent(entryBox, entry)
             BackfillProgress(processed = 0, failed = 0, skipped = 1)
         } else {
             embedAndPersist(entryBox, entry, text)
@@ -132,11 +132,18 @@ class VectorBackfillWorker(private val boxStore: BoxStore, private val embedder:
         BackfillProgress(processed = 0, failed = 1, skipped = 0)
     }
 
-    private fun clearLegacyVector(entryBox: Box<EntryEntity>, entry: EntryEntity) {
-        // A stale row with no valid distilled target must contribute zero cosine signal. Clear
-        // any legacy vector before stamping the current schema so retrieval cannot keep ranking
-        // raw-transcript leftovers forever.
+    private fun clearVector(entryBox: Box<EntryEntity>, entry: EntryEntity) {
+        // Non-COMPLETED rows may still resolve later, so clear the stale cosine signal now but
+        // leave the stale schema in place. When extraction finally lands, the COMPLETED row will
+        // still qualify for the distilled re-embed pass.
         entry.vector = null
+        entryBox.put(entry)
+    }
+
+    private fun clearVectorAndMarkCurrent(entryBox: Box<EntryEntity>, entry: EntryEntity) {
+        // A COMPLETED row with no valid distilled target must contribute zero cosine signal and
+        // stop re-queuing forever. Clear the vector, then mark the row current.
+        clearVector(entryBox, entry)
         entry.vectorSchemaVersion = EntryEntity.CURRENT_VECTOR_SCHEMA_VERSION
         entryBox.put(entry)
     }

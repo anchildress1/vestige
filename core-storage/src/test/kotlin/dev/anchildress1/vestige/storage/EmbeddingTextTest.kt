@@ -1,5 +1,6 @@
 package dev.anchildress1.vestige.storage
 
+import dev.anchildress1.vestige.model.ObservationEvidence
 import dev.anchildress1.vestige.testing.newInMemoryObjectBoxDirectory
 import dev.anchildress1.vestige.testing.openInMemoryBoxStore
 import io.objectbox.BoxStore
@@ -97,6 +98,21 @@ class EmbeddingTextTest {
     }
 
     @Test
+    fun `pattern callout observations are excluded from embedding text`() {
+        val raw = JSONArray().apply {
+            put(JSONObject().put("text", "kept").put("evidence", "theme-noticing").put("fields", JSONArray()))
+            put(
+                JSONObject()
+                    .put("text", "leak me and retrieval eats its own exhaust")
+                    .put("evidence", "pattern-callout")
+                    .put("fields", JSONArray()),
+            )
+        }.toString()
+        val entry = persist(rawObservationsJson = raw)
+        assertEquals("kept", buildEmbeddingText(entry))
+    }
+
+    @Test
     fun `blank and whitespace tag names are filtered`() {
         val entry = persist(tagNames = listOf("kept", "   ", ""))
         assertEquals("kept", buildEmbeddingText(entry))
@@ -156,7 +172,12 @@ class EmbeddingTextTest {
         val tagEntities = tagNames.map { name -> TagEntity(name = name, entryCount = 1).also { tagBox.put(it) } }
         val observationsJson = rawObservationsJson ?: JSONArray().apply {
             observations.forEach {
-                put(JSONObject().put("text", it).put("evidence", "theme-noticing").put("fields", JSONArray()))
+                put(
+                    JSONObject()
+                        .put("text", it)
+                        .put("evidence", ObservationEvidence.THEME_NOTICING.serial)
+                        .put("fields", JSONArray()),
+                )
             }
         }.toString()
         val entry = EntryEntity(

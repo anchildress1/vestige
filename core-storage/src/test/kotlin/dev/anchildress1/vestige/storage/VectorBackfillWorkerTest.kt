@@ -135,7 +135,7 @@ class VectorBackfillWorkerTest {
     }
 
     @Test
-    fun `legacy non-COMPLETED vectors are cleared and schema-stamped without embedding`() = runTest {
+    fun `legacy non-COMPLETED vectors are cleared without burning the later re-embed`() = runTest {
         val ids = listOf(
             insertEntry(status = ExtractionStatus.PENDING, vector = FloatArray(DIMS) { 1f }, vectorSchemaVersion = 0),
             insertEntry(status = ExtractionStatus.FAILED, vector = FloatArray(DIMS) { 1f }, vectorSchemaVersion = 0),
@@ -150,8 +150,44 @@ class VectorBackfillWorkerTest {
         val entryBox = boxStore.boxFor<EntryEntity>()
         ids.forEach { id ->
             assertNull(entryBox[id].vector)
-            assertEquals(CURRENT, entryBox[id].vectorSchemaVersion)
+            assertEquals(0, entryBox[id].vectorSchemaVersion)
         }
+    }
+
+    @Test
+    fun `legacy vector cleanup still allows a later completed transition to embed`() = runTest {
+        val id = insertEntry(
+            status = ExtractionStatus.PENDING,
+            vector = FloatArray(DIMS) { 1f },
+            vectorSchemaVersion = 0,
+            tagNames = listOf("recovered"),
+        )
+        val cleanupOnlyWorker = VectorBackfillWorker(boxStore) { error("cleanup pass must not embed pending rows") }
+
+        val cleanupStats = cleanupOnlyWorker.backfill()
+
+        assertEquals(1, cleanupStats.total)
+        val entryBox = boxStore.boxFor<EntryEntity>()
+        val pendingRow = entryBox[id]
+        assertNull(pendingRow.vector)
+        assertEquals(0, pendingRow.vectorSchemaVersion)
+
+        pendingRow.extractionStatus = ExtractionStatus.COMPLETED
+        entryBox.put(pendingRow)
+
+        val callTexts = mutableListOf<String>()
+        val embeddingWorker = VectorBackfillWorker(boxStore) { text ->
+            callTexts += text
+            FloatArray(DIMS) { 3f }
+        }
+
+        val embedStats = embeddingWorker.backfill()
+
+        assertEquals(1, embedStats.total)
+        assertEquals(listOf("recovered"), callTexts)
+        val completedRow = entryBox[id]
+        assertNotNull(completedRow.vector)
+        assertEquals(CURRENT, completedRow.vectorSchemaVersion)
     }
 
     @Test
@@ -274,7 +310,7 @@ class VectorBackfillWorkerTest {
             assertEquals((0 until 5).map { "entry-$it" }.toSet(), seen.toSet())
             val entryBox = boxStore.boxFor<EntryEntity>()
             assertNull(entryBox[cleanupId].vector)
-            assertEquals(CURRENT, entryBox[cleanupId].vectorSchemaVersion)
+            assertEquals(0, entryBox[cleanupId].vectorSchemaVersion)
             assertTrue(ids.drop(1).all { entryBox[it].vector != null && entryBox[it].vectorSchemaVersion == CURRENT })
         }
 

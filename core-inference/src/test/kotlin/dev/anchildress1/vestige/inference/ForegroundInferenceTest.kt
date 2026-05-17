@@ -515,15 +515,8 @@ class ForegroundInferenceTest {
         }
         val inference = ForegroundInference(engine, cacheDir, clock = fixedClock)
 
-        val witnessSession = CaptureSession(defaultPersona = Persona.WITNESS)
-        witnessSession.startRecording()
-        witnessSession.submitForInference()
-        inference.runForegroundCall(audioChunk(), witnessSession.activePersona).terminal()
-
-        val editorSession = CaptureSession(defaultPersona = Persona.EDITOR)
-        editorSession.startRecording()
-        editorSession.submitForInference()
-        inference.runForegroundCall(audioChunk(), editorSession.activePersona).terminal()
+        inference.runForegroundCall(audioChunk(), Persona.WITNESS).terminal()
+        inference.runForegroundCall(audioChunk(), Persona.EDITOR).terminal()
 
         assertEquals(2, captured.size)
         val firstPrompt = captured[0]

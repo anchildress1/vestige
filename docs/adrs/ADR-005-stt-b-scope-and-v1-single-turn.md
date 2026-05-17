@@ -176,6 +176,12 @@ time.
   note above clarifies the *current* product framing; it does not foreclose the SDK-stateful
   path returning later.
 
+### Addendum (2026-05-17) — CaptureSession / Transcript retired (implementation moved, decision stands)
+
+`CaptureSession` and `Transcript`/`Turn`/`Speaker` have been **deleted**. They were proven dead: zero production code constructed or drove them — the only callers were `CaptureSessionTest`, `TranscriptTest`, and two test helpers (`ForegroundInferenceTest`, `PerCapturePersonaSmokeTest`) that span up a session purely to pass a `Persona` straight through to `ForegroundInference`. Story 2.16 streaming made the live capture lifecycle `CaptureViewModel.CaptureUiState` (Idle / Recording / Inferring / Reviewing) over the `ForegroundStreamEvent` stream, with persistence via `saveAndExtract` / `EntryStore`; the `CaptureSession` state machine became an orphaned duplicate.
+
+This is an implementation removal, **not** a decision reversal. ADR-005's decision — v1 is single-turn-per-capture, one USER + one MODEL turn, non-recoverable discard (ADR-001 §Q8) — still holds; it is now realized by `CaptureViewModel` rather than `CaptureSession`. Prior decision/record sections above (incl. §"v1-scope decision executed", the `CaptureSession` rows) are unchanged per ADR discipline — they remain the historical record of how the decision shipped. The deleted-test/dead-code provenance lives in the commit, not here.
+
 ---
 
 ## Action Items

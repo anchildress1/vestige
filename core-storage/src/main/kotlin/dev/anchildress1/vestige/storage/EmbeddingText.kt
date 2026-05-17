@@ -1,5 +1,6 @@
 package dev.anchildress1.vestige.storage
 
+import android.util.Log
 import org.json.JSONObject
 
 /**
@@ -33,8 +34,11 @@ private fun commitmentTopic(json: String?): String {
     // catches the model emitting the *string* "null" as a topic — a known LLM failure mode we
     // must not embed as semantic content.
     return runCatching { JSONObject(raw).optString("topic_or_person") }
+        .onFailure { Log.w(TAG, "Malformed statedCommitmentJson (${it.javaClass.simpleName}); topic excluded") }
         .getOrNull()
         ?.trim()
         ?.takeUnless { it.isEmpty() || it == "null" }
         ?: ""
 }
+
+private const val TAG = "VestigeEmbedText"

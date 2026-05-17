@@ -61,7 +61,7 @@ class BackgroundExtractionSaveFlowTest {
         entryStore = entryStore,
         worker = worker,
         observationGenerator = observationGenerator,
-        listenerFactory = listenerFactory,
+        lifecycleCallbacks = BackgroundExtractionLifecycleCallbacks(listenerFactory),
         scope = flowScope,
     )
 
@@ -98,7 +98,7 @@ class BackgroundExtractionSaveFlowTest {
             entryStore = entryStore,
             worker = worker,
             observationGenerator = observationGenerator,
-            listenerFactory = listenerFactory,
+            lifecycleCallbacks = BackgroundExtractionLifecycleCallbacks(listenerFactory),
             scope = flowScope,
             patternOrchestrator = orchestrator,
         )
@@ -146,14 +146,18 @@ class BackgroundExtractionSaveFlowTest {
     }
 
     @Test
-    fun `pattern orchestration completion bumps visible data after the append path settles`() = runTest {
+    fun `pattern orchestration keeps UI completion early and finalizes only after the append path settles`() = runTest {
         val orchestrator = mockk<dev.anchildress1.vestige.patterns.PatternDetectionOrchestrator>()
         val downstream: ExtractionStatusListener = mockk(relaxed = true)
+        val lifecycleEvents = mutableListOf<String>()
         val flowWithOrch = BackgroundExtractionSaveFlow(
             entryStore = entryStore,
             worker = worker,
             observationGenerator = observationGenerator,
-            listenerFactory = { downstream },
+            lifecycleCallbacks = BackgroundExtractionLifecycleCallbacks(
+                listenerFactory = { downstream },
+                onEntryFinalized = { lifecycleEvents += "finalized:$it" },
+            ),
             scope = flowScope,
             patternOrchestrator = orchestrator,
         )
@@ -179,23 +183,29 @@ class BackgroundExtractionSaveFlowTest {
         coEvery { observationGenerator.generate(any(), any(), any()) } returns emptyList()
         coEvery {
             orchestrator.onEntryCommitted(storedEntry, dev.anchildress1.vestige.model.Persona.WITNESS)
-        } returns callout
-        every { orchestrator.settleReservedCallout(storedEntry, fired = true) } returns Unit
+        } answers {
+            lifecycleEvents += "orchestrate"
+            callout
+        }
+        coEvery { downstream.onUpdate(ExtractionStatus.COMPLETED, 0, null) } answers {
+            lifecycleEvents += "completed"
+        }
+        every { orchestrator.settleReservedCallout(storedEntry, fired = true) } answers {
+            lifecycleEvents += "settle"
+        }
         every { entryStore.appendObservation(ENTRY_ID, callout, any()) } answers {
+            lifecycleEvents += "append"
             @Suppress("UNCHECKED_CAST")
             (args[2] as () -> Unit).invoke()
         }
 
         flowWithOrch.saveAndExtract(SAMPLE_TEXT, SAMPLE_TIMESTAMP)
 
-        coVerifyOrder {
-            entryStore.completeEntry(ENTRY_ID, resolved, TemplateLabel.AFTERMATH, emptyList())
-            downstream.onUpdate(ExtractionStatus.COMPLETED, 0, null)
-            orchestrator.onEntryCommitted(storedEntry, dev.anchildress1.vestige.model.Persona.WITNESS)
-            entryStore.appendObservation(ENTRY_ID, callout, any())
-            orchestrator.settleReservedCallout(storedEntry, fired = true)
-            downstream.onUpdate(ExtractionStatus.COMPLETED, 0, null)
-        }
+        coVerify(exactly = 1) { downstream.onUpdate(ExtractionStatus.COMPLETED, 0, null) }
+        assertEquals(
+            listOf("completed", "orchestrate", "append", "settle", "finalized:$ENTRY_ID"),
+            lifecycleEvents,
+        )
     }
 
     @Test
@@ -205,7 +215,7 @@ class BackgroundExtractionSaveFlowTest {
             entryStore = entryStore,
             worker = worker,
             observationGenerator = observationGenerator,
-            listenerFactory = listenerFactory,
+            lifecycleCallbacks = BackgroundExtractionLifecycleCallbacks(listenerFactory),
             scope = flowScope,
             patternOrchestrator = orchestrator,
         )
@@ -251,7 +261,7 @@ class BackgroundExtractionSaveFlowTest {
             entryStore = entryStore,
             worker = worker,
             observationGenerator = observationGenerator,
-            listenerFactory = listenerFactory,
+            lifecycleCallbacks = BackgroundExtractionLifecycleCallbacks(listenerFactory),
             scope = flowScope,
             patternOrchestrator = orchestrator,
         )
@@ -377,7 +387,13 @@ class BackgroundExtractionSaveFlowTest {
             ExtractionStatusListener { _, _, _ -> }
         }
         val flowWithCapture =
-            BackgroundExtractionSaveFlow(entryStore, worker, observationGenerator, capturingFactory, flowScope)
+            BackgroundExtractionSaveFlow(
+                entryStore,
+                worker,
+                observationGenerator,
+                BackgroundExtractionLifecycleCallbacks(capturingFactory),
+                flowScope,
+            )
         every { entryStore.createPendingEntry(any(), any(), any()) } returns ENTRY_ID
         coEvery { worker.extract(any(), any()) } returns BackgroundExtractionResult.Success(
             totalElapsedMs = 10L,
@@ -398,9 +414,13 @@ class BackgroundExtractionSaveFlowTest {
     fun `terminal completion reaches the lifecycle listener only after completeEntry succeeds`() = runTest {
         val downstream: ExtractionStatusListener = mockk(relaxed = true)
         val flowWithMockListener =
-            BackgroundExtractionSaveFlow(entryStore, worker, observationGenerator, listenerFactory = {
-                downstream
-            }, scope = flowScope)
+            BackgroundExtractionSaveFlow(
+                entryStore,
+                worker,
+                observationGenerator,
+                lifecycleCallbacks = BackgroundExtractionLifecycleCallbacks(listenerFactory = { downstream }),
+                scope = flowScope,
+            )
         every { entryStore.createPendingEntry(any(), any(), any()) } returns ENTRY_ID
         coEvery {
             worker.extract(any(), capture(capturedListener))
@@ -432,9 +452,13 @@ class BackgroundExtractionSaveFlowTest {
     fun `persistence failure after worker success emits FAILED instead of leaking worker COMPLETED`() = runTest {
         val downstream: ExtractionStatusListener = mockk(relaxed = true)
         val flowWithMockListener =
-            BackgroundExtractionSaveFlow(entryStore, worker, observationGenerator, listenerFactory = {
-                downstream
-            }, scope = flowScope)
+            BackgroundExtractionSaveFlow(
+                entryStore,
+                worker,
+                observationGenerator,
+                lifecycleCallbacks = BackgroundExtractionLifecycleCallbacks(listenerFactory = { downstream }),
+                scope = flowScope,
+            )
         val resolved = canonicalSample()
         every { entryStore.createPendingEntry(any(), any(), any()) } returns ENTRY_ID
         coEvery {
@@ -476,9 +500,13 @@ class BackgroundExtractionSaveFlowTest {
     fun `failed result reaches lifecycle listener only after failEntry succeeds`() = runTest {
         val downstream: ExtractionStatusListener = mockk(relaxed = true)
         val flowWithMockListener =
-            BackgroundExtractionSaveFlow(entryStore, worker, observationGenerator, listenerFactory = {
-                downstream
-            }, scope = flowScope)
+            BackgroundExtractionSaveFlow(
+                entryStore,
+                worker,
+                observationGenerator,
+                lifecycleCallbacks = BackgroundExtractionLifecycleCallbacks(listenerFactory = { downstream }),
+                scope = flowScope,
+            )
         val failEntryReturned = CompletableDeferred<Unit>()
         every { entryStore.createPendingEntry(any(), any(), any()) } returns ENTRY_ID
         coEvery {
@@ -520,9 +548,13 @@ class BackgroundExtractionSaveFlowTest {
     fun `timed out result reaches lifecycle listener only after failEntry succeeds`() = runTest {
         val downstream: ExtractionStatusListener = mockk(relaxed = true)
         val flowWithMockListener =
-            BackgroundExtractionSaveFlow(entryStore, worker, observationGenerator, listenerFactory = {
-                downstream
-            }, scope = flowScope)
+            BackgroundExtractionSaveFlow(
+                entryStore,
+                worker,
+                observationGenerator,
+                lifecycleCallbacks = BackgroundExtractionLifecycleCallbacks(listenerFactory = { downstream }),
+                scope = flowScope,
+            )
         val failEntryReturned = CompletableDeferred<Unit>()
         every { entryStore.createPendingEntry(any(), any(), any()) } returns ENTRY_ID
         coEvery {
@@ -564,9 +596,13 @@ class BackgroundExtractionSaveFlowTest {
     fun `persistence failure on Failed path routes through compensation`() = runTest {
         val downstream: ExtractionStatusListener = mockk(relaxed = true)
         val flowWithMockListener =
-            BackgroundExtractionSaveFlow(entryStore, worker, observationGenerator, listenerFactory = {
-                downstream
-            }, scope = flowScope)
+            BackgroundExtractionSaveFlow(
+                entryStore,
+                worker,
+                observationGenerator,
+                lifecycleCallbacks = BackgroundExtractionLifecycleCallbacks(listenerFactory = { downstream }),
+                scope = flowScope,
+            )
         every { entryStore.createPendingEntry(any(), any(), any()) } returns ENTRY_ID
         coEvery { worker.extract(any(), any()) } returns BackgroundExtractionResult.Failed(
             totalElapsedMs = 12_000L,
@@ -602,9 +638,13 @@ class BackgroundExtractionSaveFlowTest {
     fun `persistence failure on TimedOut path routes through compensation`() = runTest {
         val downstream: ExtractionStatusListener = mockk(relaxed = true)
         val flowWithMockListener =
-            BackgroundExtractionSaveFlow(entryStore, worker, observationGenerator, listenerFactory = {
-                downstream
-            }, scope = flowScope)
+            BackgroundExtractionSaveFlow(
+                entryStore,
+                worker,
+                observationGenerator,
+                lifecycleCallbacks = BackgroundExtractionLifecycleCallbacks(listenerFactory = { downstream }),
+                scope = flowScope,
+            )
         every { entryStore.createPendingEntry(any(), any(), any()) } returns ENTRY_ID
         coEvery { worker.extract(any(), any()) } returns BackgroundExtractionResult.TimedOut(
             totalElapsedMs = 90_000L,
@@ -637,9 +677,13 @@ class BackgroundExtractionSaveFlowTest {
     fun `compensation that itself throws is swallowed so the original error escapes`() = runTest {
         val downstream: ExtractionStatusListener = mockk(relaxed = true)
         val flowWithMockListener =
-            BackgroundExtractionSaveFlow(entryStore, worker, observationGenerator, listenerFactory = {
-                downstream
-            }, scope = flowScope)
+            BackgroundExtractionSaveFlow(
+                entryStore,
+                worker,
+                observationGenerator,
+                lifecycleCallbacks = BackgroundExtractionLifecycleCallbacks(listenerFactory = { downstream }),
+                scope = flowScope,
+            )
         val resolved = canonicalSample()
         every { entryStore.createPendingEntry(any(), any(), any()) } returns ENTRY_ID
         coEvery { worker.extract(any(), any()) } returns BackgroundExtractionResult.Success(
@@ -723,6 +767,90 @@ class BackgroundExtractionSaveFlowTest {
             "energy_descriptor" to ResolvedField("crashed", ConfidenceVerdict.CANONICAL),
         ),
     )
+
+    @Test
+    fun `failure result does not fire onEntryFinalized`() = runTest {
+        var finalizedCount = 0
+        val flowWithCallback = BackgroundExtractionSaveFlow(
+            entryStore = entryStore,
+            worker = worker,
+            observationGenerator = observationGenerator,
+            lifecycleCallbacks = BackgroundExtractionLifecycleCallbacks(
+                listenerFactory = listenerFactory,
+                onEntryFinalized = { finalizedCount++ },
+            ),
+            scope = flowScope,
+        )
+        every { entryStore.createPendingEntry(any(), any(), any()) } returns ENTRY_ID
+        coEvery { worker.extract(any(), any()) } returns BackgroundExtractionResult.Failed(
+            totalElapsedMs = 12_000L,
+            lensResults = emptyList(),
+            modelCallCount = 6,
+            lastError = "all-lenses-parse-fail",
+        )
+
+        flowWithCallback.saveAndExtract(SAMPLE_TEXT, SAMPLE_TIMESTAMP)
+
+        assertEquals("Failed extraction must not trigger vector backfill", 0, finalizedCount)
+    }
+
+    @Test
+    fun `timeout result does not fire onEntryFinalized`() = runTest {
+        var finalizedCount = 0
+        val flowWithCallback = BackgroundExtractionSaveFlow(
+            entryStore = entryStore,
+            worker = worker,
+            observationGenerator = observationGenerator,
+            lifecycleCallbacks = BackgroundExtractionLifecycleCallbacks(
+                listenerFactory = listenerFactory,
+                onEntryFinalized = { finalizedCount++ },
+            ),
+            scope = flowScope,
+        )
+        every { entryStore.createPendingEntry(any(), any(), any()) } returns ENTRY_ID
+        coEvery { worker.extract(any(), any()) } returns BackgroundExtractionResult.TimedOut(
+            totalElapsedMs = 90_000L,
+            lensResults = emptyList(),
+            modelCallCount = 2,
+            timeoutMs = 90_000L,
+        )
+
+        flowWithCallback.saveAndExtract(SAMPLE_TEXT, SAMPLE_TIMESTAMP)
+
+        assertEquals("TimedOut extraction must not trigger vector backfill", 0, finalizedCount)
+    }
+
+    @Test
+    fun `persistence failure in success path does not fire onEntryFinalized`() = runTest {
+        var finalizedCount = 0
+        val flowWithCallback = BackgroundExtractionSaveFlow(
+            entryStore = entryStore,
+            worker = worker,
+            observationGenerator = observationGenerator,
+            lifecycleCallbacks = BackgroundExtractionLifecycleCallbacks(
+                listenerFactory = listenerFactory,
+                onEntryFinalized = { finalizedCount++ },
+            ),
+            scope = flowScope,
+        )
+        val resolved = canonicalSample()
+        every { entryStore.createPendingEntry(any(), any(), any()) } returns ENTRY_ID
+        coEvery { worker.extract(any(), any()) } returns BackgroundExtractionResult.Success(
+            totalElapsedMs = 25_000L,
+            lensResults = emptyList(),
+            modelCallCount = 3,
+            resolved = resolved,
+            templateLabel = TemplateLabel.AFTERMATH,
+        )
+        coEvery { observationGenerator.generate(any(), any(), any()) } returns emptyList()
+        every {
+            entryStore.completeEntry(ENTRY_ID, resolved, TemplateLabel.AFTERMATH, emptyList())
+        } throws IllegalStateException("disk blew up")
+
+        flowWithCallback.saveAndExtract(SAMPLE_TEXT, SAMPLE_TIMESTAMP)
+
+        assertEquals("Persistence failure in success path must not trigger vector backfill", 0, finalizedCount)
+    }
 
     @Test
     fun `recoverEntry runs the detached pipeline against the existing entry id without creating a new row`() = runTest {

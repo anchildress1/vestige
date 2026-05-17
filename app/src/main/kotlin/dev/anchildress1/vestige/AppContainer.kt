@@ -30,6 +30,7 @@ import dev.anchildress1.vestige.model.ModelManifest
 import dev.anchildress1.vestige.model.NetworkGate
 import dev.anchildress1.vestige.model.Persona
 import dev.anchildress1.vestige.patterns.PatternDetectionOrchestrator
+import dev.anchildress1.vestige.save.BackgroundExtractionLifecycleCallbacks
 import dev.anchildress1.vestige.save.BackgroundExtractionSaveFlow
 import dev.anchildress1.vestige.save.SaveOutcome
 import dev.anchildress1.vestige.storage.CalloutCooldownEntity
@@ -148,7 +149,7 @@ class AppContainer(
         EntryStore,
         BackgroundExtractionWorker,
         ObservationGenerator,
-        (Long) -> ExtractionStatusListener,
+        BackgroundExtractionLifecycleCallbacks,
         CoroutineScope,
         PatternDetectionOrchestrator?,
     ) -> BackgroundExtractionSaveFlow =
@@ -156,7 +157,7 @@ class AppContainer(
                 entryStore,
                 worker,
                 observationGenerator,
-                listenerFactory,
+                lifecycleCallbacks,
                 extractionScope,
                 orchestrator,
             ->
@@ -164,7 +165,7 @@ class AppContainer(
                 entryStore = entryStore,
                 worker = worker,
                 observationGenerator = observationGenerator,
-                listenerFactory = listenerFactory,
+                lifecycleCallbacks = lifecycleCallbacks,
                 scope = extractionScope,
                 patternOrchestrator = orchestrator,
             )
@@ -316,7 +317,10 @@ class AppContainer(
             entryStore,
             backgroundExtractionWorker,
             observationGenerator,
-            ::extractionStatusListener,
+            BackgroundExtractionLifecycleCallbacks(
+                listenerFactory = ::extractionStatusListener,
+                onEntryFinalized = { launchVectorBackfillIfReady() },
+            ),
             scope,
             patternDetectionOrchestrator,
         )
@@ -388,12 +392,6 @@ class AppContainer(
         reportExtractionStatus(entryId, status)
         if (status.isTerminal()) {
             _dataRevision.value += 1
-        }
-        if (status == ExtractionStatus.COMPLETED) {
-            // The save-time sweep skipped this row while it was still PENDING. Its distilled
-            // fields (tags / observations / commitment) now exist, so re-trigger backfill to
-            // embed it — otherwise its vector wouldn't land until the next save or cold start.
-            launchVectorBackfillIfReady()
         }
     }
 
@@ -788,7 +786,10 @@ class AppContainer(
                 Log.i(TAG, "Vector backfill delayed — embedding artifacts not yet complete")
                 return@withLock VectorBackfillOutcome.RETRY_LATER
             }
-            worker.backfill()
+            val stats = worker.backfill()
+            if (stats.failed > 0) {
+                Log.e(TAG, "Vector backfill: ${stats.failed}/${stats.total} failures; will retry on next trigger")
+            }
             VectorBackfillOutcome.COMPLETE
         }
     }

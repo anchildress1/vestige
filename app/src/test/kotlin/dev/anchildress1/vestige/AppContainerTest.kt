@@ -176,7 +176,7 @@ class AppContainerTest {
     }
 
     @Test
-    fun `extractionStatusListener schedules vector backfill when extraction completes`() = runTest {
+    fun `extractionStatusListener never schedules vector backfill directly`() = runTest {
         var scheduled = 0
         val container = AppContainer(
             applicationContext = mockk<Context>(relaxed = true),
@@ -189,31 +189,13 @@ class AppContainerTest {
             scope = backgroundScope,
         )
 
-        container.extractionStatusListener(entryId = 7L)
-            .onUpdate(ExtractionStatus.COMPLETED, entryAttemptCount = 0, lastError = null)
-
-        assertEquals(1, scheduled, "COMPLETED must re-trigger the skipped-while-PENDING row's embed")
-    }
-
-    @Test
-    fun `extractionStatusListener does not schedule backfill on a non-COMPLETED terminal status`() = runTest {
-        var scheduled = 0
-        val container = AppContainer(
-            applicationContext = mockk<Context>(relaxed = true),
-            boxStoreFactory = { mockk(relaxed = true) },
-            markdownStoreFactory = { mockk<MarkdownEntryStore>(relaxed = true) },
-            recoveredEntryIdsLoader = { emptyList() },
-            foregroundServiceIntentFactory = { Intent("dev.anchildress1.vestige.TEST_START") },
-            foregroundServiceStarter = {},
-            vectorBackfillScheduleListener = { scheduled += 1 },
-            scope = backgroundScope,
-        )
         val listener = container.extractionStatusListener(entryId = 7L)
 
+        listener.onUpdate(ExtractionStatus.COMPLETED, entryAttemptCount = 0, lastError = null)
         listener.onUpdate(ExtractionStatus.FAILED, entryAttemptCount = 1, lastError = "boom")
         listener.onUpdate(ExtractionStatus.TIMED_OUT, entryAttemptCount = 2, lastError = "slow")
 
-        assertEquals(0, scheduled, "FAILED / TIMED_OUT have no distilled fields to embed")
+        assertEquals(0, scheduled, "save-flow finalization owns backfill scheduling now")
     }
 
     @Test
@@ -230,6 +212,35 @@ class AppContainerTest {
         )
 
         assertNotNull(container.backgroundExtractionSaveFlow)
+    }
+
+    @Test
+    fun `backgroundExtractionSaveFlow finalization callback schedules vector backfill`() {
+        val saveFlow = mockk<BackgroundExtractionSaveFlow>(relaxed = true)
+        var scheduled = 0
+        var lifecycleCallbacks: dev.anchildress1.vestige.save.BackgroundExtractionLifecycleCallbacks? = null
+        val container = AppContainer(
+            applicationContext = mockk<Context>(relaxed = true),
+            boxStoreFactory = { mockk<BoxStore>(relaxed = true) },
+            markdownStoreFactory = { mockk<MarkdownEntryStore>(relaxed = true) },
+            modelPathLoader = { "/tmp/fake-model.litertlm" },
+            backgroundEngineFactory = { _, _ -> mockk<LiteRtLmEngine>(relaxed = true) },
+            backgroundExtractionSaveFlowFactory = { _, _, _, callbacks, _, _ ->
+                lifecycleCallbacks = callbacks
+                saveFlow
+            },
+            recoveredEntryIdsLoader = { emptyList() },
+            foregroundServiceIntentFactory = { Intent("dev.anchildress1.vestige.TEST_START") },
+            foregroundServiceStarter = {},
+            vectorBackfillScheduleListener = { scheduled += 1 },
+        )
+
+        container.backgroundExtractionSaveFlow
+        assertNotNull(lifecycleCallbacks)
+
+        lifecycleCallbacks!!.onEntryFinalized(7L)
+
+        assertEquals(1, scheduled)
     }
 
     @Test

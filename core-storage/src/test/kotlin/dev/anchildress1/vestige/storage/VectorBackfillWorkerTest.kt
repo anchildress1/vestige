@@ -7,6 +7,7 @@ import io.objectbox.BoxStore
 import io.objectbox.kotlin.boxFor
 import io.objectbox.query.QueryBuilder
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -177,6 +178,7 @@ class VectorBackfillWorkerTest {
         assertEquals(1, stats.total)
         assertEquals(0, stats.processed)
         assertEquals(0, stats.failed)
+        assertEquals(1, stats.skipped)
         val row = boxStore.boxFor<EntryEntity>()[id]
         assertNull("no vector — null is a zero cosine contribution", row.vector)
         assertEquals(CURRENT, row.vectorSchemaVersion)
@@ -252,17 +254,22 @@ class VectorBackfillWorkerTest {
     fun `cancellation mid-pass stops cleanly without losing prior progress`() = runBlocking {
         val ids = (0 until 5).map { insertEntry(tagNames = listOf("entry-$it")) }
         val processedCount = AtomicInteger(0)
+        val blocked = CompletableDeferred<Unit>()
+        // Gate: let exactly 2 embeddings complete, then block the 3rd indefinitely so the
+        // cancel arrives at a deterministic point rather than racing a timer.
         val worker = VectorBackfillWorker(boxStore) {
-            // Yield first so the cancel below can land between embeddings.
-            delay(20)
+            if (processedCount.get() >= 2) {
+                blocked.complete(Unit)
+                delay(Long.MAX_VALUE)
+            }
             processedCount.incrementAndGet()
             FloatArray(DIMS)
         }
         val parent = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
         val job = parent.async { worker.backfill() }
-        delay(50) // let the worker process a couple of entries
-        parent.coroutineContext[kotlinx.coroutines.Job]!!.cancel()
+        blocked.await() // wait until the worker is parked inside the 3rd embedding
+        job.cancel()
         assertThrows(CancellationException::class.java) {
             runBlocking { job.await() }
         }
@@ -270,11 +277,11 @@ class VectorBackfillWorkerTest {
         val entryBox = boxStore.boxFor<EntryEntity>()
         val embedded = ids.count { entryBox[it].vector != null }
         assertEquals(
-            "Embedded entries must match processed count — partial progress is durable.",
+            "Exactly 2 entries must be durable after cancel",
             processedCount.get(),
             embedded,
         )
-        assertTrue("Cancellation must arrive before all 5 entries finish", embedded < 5)
+        assertEquals("Exactly 2 entries processed before gate", 2, embedded)
         assertTrue(
             "Every embedded row is stamped to the current schema",
             ids.all { entryBox[it].vector == null || entryBox[it].vectorSchemaVersion == CURRENT },

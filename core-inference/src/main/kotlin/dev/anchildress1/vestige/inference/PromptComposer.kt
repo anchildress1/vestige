@@ -6,8 +6,12 @@ import dev.anchildress1.vestige.model.Lens
 /** One retrieved history chunk for the recurrence surface. Caller passes the top three. */
 data class HistoryChunk(val patternId: String?, val text: String)
 
-/** Composed background-lens prompt. [tokenEstimate] uses a rough 4-chars-per-token rule. */
-data class ComposedPrompt(val lens: Lens, val text: String, val tokenEstimate: Int)
+/**
+ * Composed background-lens prompt. [systemInstruction] is the role/lens/surface/schema/history
+ * context (the SDK's instruction channel); [userText] is the entry being analyzed (the message).
+ * [tokenEstimate] uses a rough 4-chars-per-token rule over both halves.
+ */
+data class ComposedPrompt(val lens: Lens, val systemInstruction: String, val userText: String, val tokenEstimate: Int)
 
 /**
  * Builds one background lens prompt by stacking the lens framing on top of all five surface
@@ -34,7 +38,7 @@ object PromptComposer {
         require(entryText.isNotBlank()) { "PromptComposer.compose requires a non-blank entryText" }
         val capped = retrievedHistory.take(MAX_HISTORY_CHUNKS).map { it.copy(text = budgetText(it.text)) }
 
-        val text = buildString {
+        val systemInstruction = buildString {
             append(SYSTEM_HEADER)
             append("\n\n")
             append(loadLens(lens))
@@ -46,25 +50,30 @@ object PromptComposer {
             append(loadResource("/lenses/output-schema.txt"))
             append("\n\n")
             append(renderHistory(capped))
-            append("\n\n")
-            append("## ENTRY")
-            append('\n')
-            append(entryText.trimEnd())
-            append('\n')
         }
+        val userText = entryText.trimEnd()
 
-        val tokenEstimate = estimateTokens(text)
-        Log.d(TAG, "compose lens=$lens chars=${text.length} tokens~=$tokenEstimate history=${capped.size}")
-        logComposedBody(lens, text)
-        return ComposedPrompt(lens = lens, text = text, tokenEstimate = tokenEstimate)
+        val tokenEstimate = estimateTokens(systemInstruction) + estimateTokens(userText)
+        Log.d(
+            TAG,
+            "compose lens=$lens systemChars=${systemInstruction.length} " +
+                "entryChars=${userText.length} tokens~=$tokenEstimate history=${capped.size}",
+        )
+        logComposedBody(lens, systemInstruction, userText)
+        return ComposedPrompt(
+            lens = lens,
+            systemInstruction = systemInstruction,
+            userText = userText,
+            tokenEstimate = tokenEstimate,
+        )
     }
 
     // Verbose-only so release builds stay quiet; opt in with
     // `adb shell setprop log.tag.VestigePromptComposer VERBOSE`. Chunked at <4 kB to dodge
     // logcat's per-line ceiling.
-    private fun logComposedBody(lens: Lens, text: String) {
+    private fun logComposedBody(lens: Lens, systemInstruction: String, userText: String) {
         if (!Log.isLoggable(TAG, Log.VERBOSE)) return
-        val chunks = text.chunked(LOG_CHUNK_SIZE)
+        val chunks = "$systemInstruction\n\n## ENTRY\n$userText".chunked(LOG_CHUNK_SIZE)
         chunks.forEachIndexed { index, chunk ->
             Log.v(TAG, "compose lens=$lens body[${index + 1}/${chunks.size}]=$chunk")
         }

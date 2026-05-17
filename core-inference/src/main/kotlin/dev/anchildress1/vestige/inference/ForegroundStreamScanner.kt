@@ -2,14 +2,8 @@ package dev.anchildress1.vestige.inference
 
 /**
  * Incremental tag scanner for the streamed `<transcription>…</transcription><follow_up>…</follow_up>`
- * envelope. Each [accept] call appends a chunk to a cumulative buffer and scans the whole buffer,
- * so a tag split across two chunks (`</transcr` + `iption>`) resolves once both halves land.
- *
- * Scope: progressive UI surfacing only. The authoritative verdict — ordering, duplicate blocks,
- * empty bodies — stays with [ForegroundResponseParser] run on the final buffer. The scanner never
- * emits a partial close tag as body text: when `</follow_up>` is not yet seen it withholds the
- * trailing bytes that could be its prefix, and any withheld tail is corrected by the terminal
- * parse. Not thread-safe — one scanner per stream, driven from a single collector.
+ * envelope — progressive UI surfacing only; [ForegroundResponseParser] on the final buffer owns
+ * the authoritative verdict. Not thread-safe — one scanner per stream, one collector.
  */
 internal class ForegroundStreamScanner {
 

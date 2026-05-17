@@ -7,9 +7,10 @@ import com.google.ai.edge.litertlm.ExperimentalFlags
 import io.mockk.mockk
 import io.mockk.verify
 import kotlinx.coroutines.CompletableDeferred
-import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Assertions.assertSame
 import org.junit.jupiter.api.Assertions.assertThrows
 import org.junit.jupiter.api.Assertions.assertTrue
@@ -29,7 +30,7 @@ class LiteRtLmEngineTest {
     fun `generateText before initialize throws IllegalStateException`() {
         val engine = LiteRtLmEngine(modelPath = NOT_USED_PATH)
         val error = assertThrows(IllegalStateException::class.java) {
-            runTest { engine.generateText("hello") }
+            runTest { engine.generateText("sys", "hello") }
         }
         assertEquals(
             "LiteRtLmEngine.generateText called before initialize() (or after close()).",
@@ -41,7 +42,7 @@ class LiteRtLmEngineTest {
     fun `sendMessageContents before initialize throws IllegalStateException`() {
         val engine = LiteRtLmEngine(modelPath = NOT_USED_PATH)
         val error = assertThrows(IllegalStateException::class.java) {
-            runTest { engine.sendMessageContents(listOf(mockk<Content>())) }
+            runTest { engine.sendMessageContents("sys", listOf(mockk<Content>())) }
         }
         assertEquals(
             "LiteRtLmEngine.sendMessageContents called before initialize() (or after close()).",
@@ -50,22 +51,10 @@ class LiteRtLmEngineTest {
     }
 
     @Test
-    fun `streamText before initialize throws the contract message on first collect`() {
+    fun `streamMessageContents before initialize throws on collection`() {
         val engine = LiteRtLmEngine(modelPath = NOT_USED_PATH)
         val error = assertThrows(IllegalStateException::class.java) {
-            runTest { engine.streamText("hello").collect { } }
-        }
-        assertEquals(
-            "LiteRtLmEngine.streamText called before initialize() (or after close()).",
-            error.message,
-        )
-    }
-
-    @Test
-    fun `streamMessageContents before initialize throws the contract message on first collect`() {
-        val engine = LiteRtLmEngine(modelPath = NOT_USED_PATH)
-        val error = assertThrows(IllegalStateException::class.java) {
-            runTest { engine.streamMessageContents(listOf(mockk<Content>())).collect { } }
+            runTest { engine.streamMessageContents("sys", listOf(mockk<Content>())).toList() }
         }
         assertEquals(
             "LiteRtLmEngine.streamMessageContents called before initialize() (or after close()).",
@@ -73,32 +62,11 @@ class LiteRtLmEngineTest {
         )
     }
 
-    @OptIn(ExperimentalApi::class)
-    @Test
-    fun `initialize turns on MTP speculative decoding before engine construction`() {
-        ExperimentalFlags.enableSpeculativeDecoding = false
-        val engine = LiteRtLmEngine(modelPath = NOT_USED_PATH)
-        // initialize() flips the flag as its first statement, then crosses the native
-        // Engine/Log boundary the JVM can't satisfy without the 3.66 GB model. The catch
-        // scopes this test to exactly the pre-native flag-set, matching the file's
-        // JVM-vs-on-device split documented above.
-        runCatching { runTest { engine.initialize() } }
-        assertEquals(true, ExperimentalFlags.enableSpeculativeDecoding)
-        engine.close()
-    }
-
-    @Test
-    fun `close before initialize is a no-op`() {
-        val engine = LiteRtLmEngine(modelPath = NOT_USED_PATH)
-        engine.close() // must not throw
-        engine.close() // idempotent — must not throw on second call either
-    }
-
     // Concurrency regression: two close() calls racing the drain branch must share ONE token and
     // both return; the native engine must close exactly once. Determinism (no wall-clock
     // poll deadlines, which false-fail under CI load): each closer is sequenced by waiting until
-    // its thread is genuinely parked in `pending.await()` (Thread.State WAITING/TIMED_WAITING),
-    // which means it has already executed the `lifecycleLock` drain branch — so `drained` is
+    // its thread is genuinely parked in `gate.await()` (Thread.State WAITING/TIMED_WAITING),
+    // which means it has already executed the `stateMutex` drain branch — so `drainGate` is
     // observed only after the second closer's reuse-or-overwrite decision, making a regressed
     // (overwrite) impl fail deterministically rather than flakily. @Timeout is the only time
     // bound: a true hang regression fails cleanly instead of wedging the suite.
@@ -108,7 +76,7 @@ class LiteRtLmEngineTest {
         val engine = LiteRtLmEngine(modelPath = NOT_USED_PATH)
         val nativeEngine = mockk<Engine>(relaxed = true)
         setField(engine, "engine", nativeEngine)
-        setIntField(engine, "activeCalls", 1)
+        setIntField(engine, "inFlight", 1)
 
         val firstClose = Thread { engine.close() }
         firstClose.start()
@@ -133,13 +101,50 @@ class LiteRtLmEngineTest {
     }
 
     @Test
-    fun `default backends only set the primary engine backend`() {
-        // Constructor-default contract: Phase 1 lives on CPU until STT-A picks an accelerator,
-        // and audio/vision backends stay null unless the caller opts in.
+    fun `call after close is rejected by the closing gate`() {
+        // Exercises the drain-on-close gate: close() flips `closing`, so a later call fails its
+        // acquireEngine check rather than dereferencing a freed handle. JVM-safe — the rejection
+        // fires before any native crossing. (Concurrent in-flight drain is on-device only.)
         val engine = LiteRtLmEngine(modelPath = NOT_USED_PATH)
-        // Indirect assertion: constructing without explicit backends must not throw.
         engine.close()
-        assertTrue(true)
+        val error = assertThrows(IllegalStateException::class.java) {
+            runTest { engine.generateText("sys", "hello") }
+        }
+        assertEquals(
+            "LiteRtLmEngine.generateText called before initialize() (or after close()).",
+            error.message,
+        )
+    }
+
+    @OptIn(ExperimentalApi::class)
+    @Test
+    fun `initialize turns on MTP speculative decoding before engine construction`() {
+        // ExperimentalFlags is a process-global object — save and restore so this test
+        // can't leak the flipped flag into other tests sharing the JVM fork.
+        val original = ExperimentalFlags.enableSpeculativeDecoding
+        try {
+            ExperimentalFlags.enableSpeculativeDecoding = false
+            val engine = LiteRtLmEngine(modelPath = NOT_USED_PATH)
+            // initialize() flips the flag as its first statement, then crosses the native
+            // Engine/Log boundary the JVM can't satisfy without the 3.66 GB model. The catch
+            // scopes this test to exactly the pre-native flag-set, matching the file's
+            // JVM-vs-on-device split documented above.
+            runCatching { runTest { engine.initialize() } }
+            assertEquals(true, ExperimentalFlags.enableSpeculativeDecoding)
+            engine.close()
+        } finally {
+            ExperimentalFlags.enableSpeculativeDecoding = original
+        }
+    }
+
+    @Test
+    fun `close before initialize does not leave the wrapper permanently closing`() {
+        val engine = LiteRtLmEngine(modelPath = NOT_USED_PATH)
+        engine.close() // must not throw
+        engine.close() // idempotent — must not throw on second call either
+
+        assertEquals(false, engine.readBoolean("closing"))
+        assertNull(engine.readNullable("drainGate"))
     }
 
     @Test
@@ -183,22 +188,34 @@ class LiteRtLmEngineTest {
         field.setInt(target, value)
     }
 
-    // Blocks until [thread] is parked (the closer reached `pending.await()`, i.e. already ran the
-    // lifecycleLock drain branch). No wall-clock bound — the method @Timeout backstops a true hang.
+    // Blocks until [thread] is parked (the closer reached `gate.await()`, i.e. already ran the
+    // stateMutex drain branch). No wall-clock bound — the method @Timeout backstops a true hang.
     private fun awaitParked(thread: Thread) {
         while (thread.state != Thread.State.WAITING && thread.state != Thread.State.TIMED_WAITING) {
             Thread.sleep(POLL_SLEEP_MS)
         }
     }
 
-    // Reads the engine's private `drained` token. Only called after [awaitParked], so the closer
+    // Reads the engine's private `drainGate` token. Only called after [awaitParked], so the closer
     // has passed the branch that assigns it — the field is guaranteed non-null here.
     @Suppress("UNCHECKED_CAST")
     private fun drainToken(engine: LiteRtLmEngine): CompletableDeferred<Unit> {
-        val field = engine.javaClass.getDeclaredField("drained")
+        val field = engine.javaClass.getDeclaredField("drainGate")
         field.isAccessible = true
         return checkNotNull(field.get(engine) as CompletableDeferred<Unit>?) {
-            "drained must be set once a close() thread is parked in await()"
+            "drainGate must be set once a close() thread is parked in await()"
         }
     }
+}
+
+private fun LiteRtLmEngine.readBoolean(name: String): Boolean {
+    val field = LiteRtLmEngine::class.java.getDeclaredField(name)
+    field.isAccessible = true
+    return field.getBoolean(this)
+}
+
+private fun LiteRtLmEngine.readNullable(name: String): Any? {
+    val field = LiteRtLmEngine::class.java.getDeclaredField(name)
+    field.isAccessible = true
+    return field.get(this)
 }

@@ -123,19 +123,24 @@ class CaptureViewModel(
         }
     }
 
+    /**
+     * Done tap. No-op while [CaptureUiState.Reviewing.streaming] — the entry is not yet persisted
+     * (save fires only on the terminal event), so acknowledging mid-stream would drop it on the
+     * subsequent `onCleared()` cancel. The UI also withholds Done until streaming ends; this guard
+     * is the state-machine backstop.
+     */
     fun acknowledgeReview() {
         _state.update { current ->
             when (current) {
-                is CaptureUiState.Reviewing ->
-                    if (current.review.isTerminal) {
-                        CaptureUiState.Idle(
-                            persona = current.persona,
-                            modelReadiness = current.modelReadiness,
-                            lastReview = current.review,
-                        )
-                    } else {
-                        current
-                    }
+                is CaptureUiState.Reviewing -> if (current.streaming) {
+                    current
+                } else {
+                    CaptureUiState.Idle(
+                        persona = current.persona,
+                        modelReadiness = current.modelReadiness,
+                        lastReview = current.review,
+                    )
+                }
 
                 else -> current
             }
@@ -319,7 +324,7 @@ class CaptureViewModel(
         durationMs: Long,
         retrievedHistory: List<HistoryChunk>,
         transcriptionOverride: String?,
-        call: suspend () -> Flow<ForegroundStreamEvent>,
+        call: () -> Flow<ForegroundStreamEvent>,
     ) {
         var transcription = transcriptionOverride.orEmpty()
         val followUp = StringBuilder()
@@ -328,43 +333,138 @@ class CaptureViewModel(
                 when (event) {
                     is ForegroundStreamEvent.Transcription -> {
                         transcription = transcriptionOverride ?: event.text
-                        showReviewing(transcription, followUp.toString(), elapsedMs = 0L, isTerminal = false)
+                        showReviewing(transcription, followUp.toString(), elapsedMs = 0L, streaming = true)
                     }
 
                     is ForegroundStreamEvent.FollowUpDelta -> {
                         followUp.append(event.text)
-                        showReviewing(transcription, followUp.toString(), elapsedMs = 0L, isTerminal = false)
+                        showReviewing(transcription, followUp.toString(), elapsedMs = 0L, streaming = true)
                     }
 
-                    is ForegroundStreamEvent.Terminal -> when (val result = event.result) {
-                        is ForegroundResult.Success -> {
-                            val saved = transcriptionOverride ?: result.transcription
-                            saveAndExtract(
-                                saved,
-                                ZonedDateTime.now(clock.withZone(zoneId)),
-                                persona,
-                                durationMs,
-                                result.followUp,
-                                retrievedHistory,
-                            )
-                            showReviewing(saved, result.followUp, result.elapsedMs, isTerminal = true)
-                        }
-
-                        is ForegroundResult.ParseFailure -> emitInferenceError(
-                            CaptureError.InferenceFailed.Reason.PARSE_FAILED,
-                        )
-                    }
+                    is ForegroundStreamEvent.Terminal -> handleTerminalResult(
+                        result = event.result,
+                        persona = persona,
+                        durationMs = durationMs,
+                        retrievedHistory = retrievedHistory,
+                        transcriptionOverride = transcriptionOverride,
+                    )
                 }
             }
         } catch (timeout: TimeoutCancellationException) {
             Log.w(TAG, "Foreground inference timed out", timeout)
-            emitInferenceError(CaptureError.InferenceFailed.Reason.TIMED_OUT)
+            recoverOrEmitInferenceError(
+                reason = CaptureError.InferenceFailed.Reason.TIMED_OUT,
+                transcriptionOverride = transcriptionOverride,
+                persona = persona,
+                durationMs = durationMs,
+                retrievedHistory = retrievedHistory,
+            )
         } catch (cancel: CancellationException) {
             throw cancel
         } catch (@Suppress("TooGenericExceptionCaught") error: Exception) {
             Log.e(TAG, "Foreground inference failed", error)
-            emitInferenceError(CaptureError.InferenceFailed.Reason.ENGINE_FAILED)
+            recoverOrEmitInferenceError(
+                reason = CaptureError.InferenceFailed.Reason.ENGINE_FAILED,
+                transcriptionOverride = transcriptionOverride,
+                persona = persona,
+                durationMs = durationMs,
+                retrievedHistory = retrievedHistory,
+            )
         }
+    }
+
+    private suspend fun handleTerminalResult(
+        result: ForegroundResult,
+        persona: Persona,
+        durationMs: Long,
+        retrievedHistory: List<HistoryChunk>,
+        transcriptionOverride: String?,
+    ) {
+        when (result) {
+            is ForegroundResult.Success -> {
+                val saved = transcriptionOverride ?: result.transcription
+                persistReview(
+                    text = saved,
+                    persona = persona,
+                    durationMs = durationMs,
+                    followUpText = result.followUp,
+                    retrievedHistory = retrievedHistory,
+                )
+                showReviewing(saved, result.followUp, result.elapsedMs, streaming = false)
+            }
+
+            is ForegroundResult.ParseFailure -> {
+                val saved = transcriptionOverride ?: result.recoveredTranscription
+                if (saved.isNullOrBlank()) {
+                    emitInferenceError(CaptureError.InferenceFailed.Reason.PARSE_FAILED)
+                    return
+                }
+                // Only follow_up failed to parse; the user's words came back clean. Save them —
+                // losing the entry is the worse failure.
+                persistReview(
+                    text = saved,
+                    persona = persona,
+                    durationMs = durationMs,
+                    followUpText = null,
+                    retrievedHistory = retrievedHistory,
+                )
+                showReviewing(saved, "", result.elapsedMs, streaming = false)
+            }
+        }
+    }
+
+    private suspend fun recoverOrEmitInferenceError(
+        reason: CaptureError.InferenceFailed.Reason,
+        transcriptionOverride: String?,
+        persona: Persona,
+        durationMs: Long,
+        retrievedHistory: List<HistoryChunk>,
+    ) {
+        if (finalizeAuthoritativeVoiceFallback(
+                transcriptionOverride = transcriptionOverride,
+                persona = persona,
+                durationMs = durationMs,
+                retrievedHistory = retrievedHistory,
+            )
+        ) {
+            return
+        }
+        emitInferenceError(reason)
+    }
+
+    private suspend fun persistReview(
+        text: String,
+        persona: Persona,
+        durationMs: Long,
+        followUpText: String?,
+        retrievedHistory: List<HistoryChunk>,
+    ) {
+        saveAndExtract(
+            text,
+            ZonedDateTime.now(clock.withZone(zoneId)),
+            persona,
+            durationMs,
+            followUpText,
+            retrievedHistory,
+        )
+    }
+
+    private suspend fun finalizeAuthoritativeVoiceFallback(
+        transcriptionOverride: String?,
+        persona: Persona,
+        durationMs: Long,
+        retrievedHistory: List<HistoryChunk>,
+    ): Boolean {
+        val saved = transcriptionOverride?.takeUnless(String::isBlank) ?: return false
+        persistReview(
+            text = saved,
+            persona = persona,
+            durationMs = durationMs,
+            followUpText = null,
+            retrievedHistory = retrievedHistory,
+        )
+        showReviewing(saved, followUp = "", elapsedMs = 0L, streaming = false)
+        return true
     }
 
     /**
@@ -384,7 +484,7 @@ class CaptureViewModel(
                 emitInferenceError(CaptureError.InferenceFailed.Reason.PARSE_FAILED)
                 return
             }
-            showReviewing(transcription, followUp = "", elapsedMs = 0L, isTerminal = false)
+            showReviewing(transcription, followUp = "", elapsedMs = 0L, streaming = true)
             val history = retrieveHistorySafely(transcription)
             runForeground(persona, audio.durationMs, history, transcriptionOverride = transcription) {
                 foregroundTextInference(transcription, persona, history)
@@ -412,7 +512,7 @@ class CaptureViewModel(
         emptyList()
     }
 
-    private fun showReviewing(transcription: String, followUp: String, elapsedMs: Long, isTerminal: Boolean) {
+    private fun showReviewing(transcription: String, followUp: String, elapsedMs: Long, streaming: Boolean) {
         _state.update { c ->
             CaptureUiState.Reviewing(
                 persona = c.persona,
@@ -422,8 +522,9 @@ class CaptureViewModel(
                     followUp = followUp,
                     persona = c.persona,
                     elapsedMs = elapsedMs,
-                    isTerminal = isTerminal,
+                    isTerminal = !streaming,
                 ),
+                streaming = streaming,
             )
         }
     }
@@ -465,7 +566,7 @@ fun interface VoiceCapture {
 
 /** Streams one foreground (single-turn) call against the local model for a voice entry. */
 fun interface ForegroundInferenceCall {
-    suspend operator fun invoke(audio: AudioChunk, persona: Persona): Flow<ForegroundStreamEvent>
+    operator fun invoke(audio: AudioChunk, persona: Persona): Flow<ForegroundStreamEvent>
 }
 
 /**
@@ -475,7 +576,7 @@ fun interface ForegroundInferenceCall {
  * `ForegroundInference`.
  */
 fun interface ForegroundTextInferenceCall {
-    suspend operator fun invoke(
+    operator fun invoke(
         text: String,
         persona: Persona,
         retrievedHistory: List<HistoryChunk>,

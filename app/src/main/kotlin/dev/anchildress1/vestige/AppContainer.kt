@@ -60,6 +60,8 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.emitAll
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.joinAll
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
@@ -190,6 +192,7 @@ class AppContainer(
     private val vectorBackfillMaxRetries: Int = VECTOR_BACKFILL_MAX_RETRIES,
     private val vectorBackfillScheduleListener: (() -> Unit)? = null,
     private val scope: CoroutineScope = defaultScope(),
+    private val computeDispatcher: CoroutineDispatcher = Dispatchers.Default,
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) {
 
@@ -261,11 +264,9 @@ class AppContainer(
     }
 
     /**
-     * Single-turn foreground inference path consumed by the capture screen. Shares the engine
-     * handle with background extraction — LiteRT-LM is single-threaded, so v1 sequences the
-     * foreground call ahead of any background pass against the same engine. A second recording
-     * launched while a prior `saveAndExtract` background job is still running will block until
-     * the engine handle frees up; that's the documented v1 trade-off per ADR-002.
+     * Single-turn foreground inference path consumed by the capture screen. Shares the same
+     * process Engine as background extraction, but each call opens its own independent SDK
+     * conversation, so foreground no longer blocks on a shared Kotlin call mutex.
      */
     val foregroundInference: ForegroundInference by lazy {
         ForegroundInference(
@@ -274,27 +275,20 @@ class AppContainer(
         )
     }
 
-    /**
-     * Two-tier-aware adapter for the capture screen's voice path. Ensures the engine is
-     * initialized before the call so the screen doesn't have to thread an init step into its
-     * recording lifecycle.
-     */
-    suspend fun runForegroundCall(audio: AudioChunk, persona: Persona): Flow<ForegroundStreamEvent> {
+    /** Voice-path adapter: initializes the shared Engine before delegating to the stream. */
+    fun runForegroundCall(audio: AudioChunk, persona: Persona): Flow<ForegroundStreamEvent> = flow {
         ensureBackgroundEngineInitialized()
-        return foregroundInference.runForegroundCall(audio, persona)
+        emitAll(foregroundInference.runForegroundCall(audio, persona))
     }
 
-    /**
-     * Typed-entry foreground call — same engine + parser as the voice path so a typed entry
-     * reviews identically. The model is required; the capture screen gates on readiness.
-     */
-    suspend fun runForegroundTextCall(
+    /** Typed-entry foreground call — same engine + parser as voice, same init guard. */
+    fun runForegroundTextCall(
         text: String,
         persona: Persona,
         retrievedHistory: List<HistoryChunk> = emptyList(),
-    ): Flow<ForegroundStreamEvent> {
+    ): Flow<ForegroundStreamEvent> = flow {
         ensureBackgroundEngineInitialized()
-        return foregroundInference.runForegroundTextCall(text, persona, retrievedHistory)
+        emitAll(foregroundInference.runForegroundTextCall(text, persona, retrievedHistory))
     }
 
     private val retrievalRepo: RetrievalRepo by lazy {
@@ -307,7 +301,7 @@ class AppContainer(
      * retrieval can never block a capture. Maps the top entries to context-only [HistoryChunk]s —
      * no `patternId`, since the follow-up needs textual context, not recurrence-surface linkage.
      */
-    suspend fun retrieveHistory(query: String): List<HistoryChunk> = withContext(Dispatchers.Default) {
+    suspend fun retrieveHistory(query: String): List<HistoryChunk> = withContext(computeDispatcher) {
         try {
             retrievalRepo.query(query, topN = FOREGROUND_HISTORY_TOP_N)
                 .map { HistoryChunk(patternId = null, text = it.entryText) }
@@ -466,7 +460,7 @@ class AppContainer(
         scope.launch {
             // Serialize probe→compare→set so concurrent callers (lifecycle resume + a model
             // action) can't interleave and let an older probe overwrite a newer readiness.
-            // Each caller queues and re-probes after the prior completes (Codex review #4).
+            // Each caller queues and re-probes after the prior completes.
             readinessRefreshMutex.withLock {
                 val previous = _modelReadinessFlow.value
                 val current = probeModelReadiness(previous)
@@ -524,7 +518,7 @@ class AppContainer(
                 _modelReadinessFlow.value = ModelReadiness.Downloading(0)
                 networkGate.openForDownload(reason = "Model Status — user-requested re-download")
                 val result = runDownload(store)
-                // Honor the terminal result (Codex review #1/#3). The size-only probe would read
+                // Honor the terminal result. The size-only probe would read
                 // a checksum-corrupt full-size file as Complete → false Ready, so discard it.
                 // Anything other than Complete must not stay Downloading — Model Status actions
                 // are disabled in that state — so drop to a non-Downloading readiness and let the

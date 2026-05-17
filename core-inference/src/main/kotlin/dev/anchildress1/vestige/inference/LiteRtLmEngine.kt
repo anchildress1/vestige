@@ -31,8 +31,9 @@ sealed interface BackendChoice {
 
 /**
  * Lifecycle wrapper around LiteRT-LM's [Engine]. [initialize] once, then [generateText] /
- * [sendMessageContents] per call. Each call opens and closes a fresh conversation — the SDK's
- * stateful KV-cache Conversation handle is not exposed in v1.
+ * [sendMessageContents] per call. Each call opens its own independent conversation and closes
+ * it when done; calls run concurrently on the shared engine. [close] flips a closing gate and
+ * waits for in-flight calls to drain before freeing the native handle.
  */
 @Suppress("LongParameterList") // Mirrors the SDK's EngineConfig + ConversationConfig surfaces.
 class LiteRtLmEngine(
@@ -49,49 +50,32 @@ class LiteRtLmEngine(
     @Volatile
     private var engine: Engine? = null
 
-    // Readers/writer lifecycle (ADR-008 §Correction 2026-05-16): calls are concurrent "readers"
-    // — each opens its own independent SDK conversation off one Engine, so foreground and the
-    // three background lenses no longer serialize on a shared Kotlin mutex. close() is the
-    // exclusive "writer": it stops admitting calls and drains in-flight ones before freeing the
-    // native handle. The single GPU still serializes at its command queue (no literal speedup);
-    // the win is non-blocking preemption. lifecycleLock guards only the tiny ref/counter
-    // critical sections — never the slow inference call itself.
-    private val lifecycleLock = Mutex()
-    private var activeCalls = 0
-    private var closing = false
-    private var drained: CompletableDeferred<Unit>? = null
+    // Concurrency model: independent Conversation contexts run in parallel on the shared
+    // Engine. [stateMutex] is held only microscopically — to read the engine pointer and
+    // adjust the in-flight count — never across an inference. [close] flips [closing], then
+    // drains in-flight calls before freeing the native handle.
+    private val stateMutex = Mutex()
 
-    /**
-     * Acquire the live [Engine] under [lifecycleLock], run [block] concurrently with other calls
-     * (the lock is released for the slow inference), then release. Rejects calls before
-     * `initialize()`, after `close()`, and once a `close()` drain is in progress — all with the
-     * one documented contract message so existing call sites and tests stay valid.
-     */
-    private suspend fun <T> withEngine(caller: String, block: suspend (Engine) -> T): T {
-        val active = lifecycleLock.withLock {
-            val current = engine
-            check(current != null && !closing) {
-                "LiteRtLmEngine.$caller called before initialize() (or after close())."
-            }
-            activeCalls += 1
-            current
-        }
-        try {
-            return block(active)
-        } finally {
-            lifecycleLock.withLock {
-                activeCalls -= 1
-                if (activeCalls == 0) drained?.complete(Unit)
-            }
-        }
+    @Volatile
+    private var closing = false
+    private var inFlight = 0
+    private var drainGate: CompletableDeferred<Unit>? = null
+
+    private suspend fun acquireEngine(unavailableMessage: String): Engine = stateMutex.withLock {
+        check(!closing) { unavailableMessage }
+        val active = checkNotNull(engine) { unavailableMessage }
+        inFlight++
+        active
+    }
+
+    private suspend fun releaseEngine() = stateMutex.withLock {
+        if (--inFlight == 0) drainGate?.complete(Unit)
     }
 
     @OptIn(ExperimentalApi::class)
     suspend fun initialize() = withContext(ioDispatcher) {
         check(engine == null) { "LiteRtLmEngine already initialized; close() before re-init." }
-        // MTP single-position speculative decoding — process-global SDK flag, must be set before
-        // any Engine is constructed. Idempotent across re-init. Decode-path only: prompt, sampler,
-        // and output format are unaffected, so it stays on for CPU and GPU alike.
+        // Process-global SDK flag — must be set before any Engine is constructed.
         ExperimentalFlags.enableSpeculativeDecoding = true
         Log.d(
             TAG,
@@ -118,24 +102,30 @@ class LiteRtLmEngine(
     }
 
     /**
-     * Pinned `ConversationConfig` for every `createConversation()` — empty system instruction
-     * (callers stack system text into the message body for now), no initial history, no tools,
-     * and the engine's deterministic sampler. Without the pinned sampler the SDK defaults pick
-     * a stochastic path that produces different output across CPU vs GPU on the same prompt.
+     * Pinned `ConversationConfig` for every `createConversation()` — [systemInstruction] is the
+     * SDK's instruction channel (the prompt's role/schema/context, no longer stuffed into the
+     * message body), no initial history, no tools, and the engine's deterministic sampler.
+     * Without the pinned sampler the SDK defaults pick a stochastic path that produces different
+     * output across CPU vs GPU on the same prompt.
      */
-    private fun conversationConfig(): ConversationConfig = ConversationConfig(
-        Contents.of(""),
+    private fun conversationConfig(systemInstruction: String): ConversationConfig = ConversationConfig(
+        Contents.of(systemInstruction),
         emptyList(),
         emptyList(),
         samplerConfig,
     )
 
-    suspend fun generateText(prompt: String): String = withContext(ioDispatcher) {
+    suspend fun generateText(systemInstruction: String, prompt: String): String = withContext(ioDispatcher) {
         val started = System.nanoTime()
-        val response = withEngine("generateText") { active ->
-            active.createConversation(conversationConfig()).use { conversation ->
+        val active = acquireEngine(
+            "LiteRtLmEngine.generateText called before initialize() (or after close()).",
+        )
+        val response = try {
+            active.createConversation(conversationConfig(systemInstruction)).use { conversation ->
                 conversation.sendMessage(prompt).toString()
             }
+        } finally {
+            releaseEngine()
         }
         val elapsedMs = (System.nanoTime() - started) / NANOS_PER_MILLI
         Log.d(
@@ -146,9 +136,12 @@ class LiteRtLmEngine(
     }
 
     /** Streaming counterpart to [generateText]. Closes the conversation on flow completion. */
-    fun streamText(prompt: String): Flow<String> = flow {
-        withEngine("streamText") { active ->
-            val conversation = active.createConversation(conversationConfig())
+    fun streamText(systemInstruction: String, prompt: String): Flow<String> = flow {
+        val active = acquireEngine(
+            "LiteRtLmEngine.streamText called before initialize() (or after close()).",
+        )
+        try {
+            val conversation = active.createConversation(conversationConfig(systemInstruction))
             val started = System.nanoTime()
             var charsEmitted = 0
             try {
@@ -177,22 +170,24 @@ class LiteRtLmEngine(
                 runCatching { conversation.close() }
                     .onFailure { Log.w(TAG, "conversation.close() after streamText failed: ${it.message}") }
             }
+        } finally {
+            releaseEngine()
         }
     }.flowOn(ioDispatcher)
 
     /**
-     * Streaming counterpart to [sendMessageContents] — the multimodal `AudioFile + Text`
-     * foreground path. Mirrors [streamText]: one conversation per call, closed on flow
-     * completion or cancellation. Each emitted chunk is one SDK [com.google.ai.edge.litertlm.Message]
-     * rendered to text.
+     * Streaming counterpart to [sendMessageContents] for the multimodal `AudioFile + Text`
+     * foreground path. One conversation per call, closed on flow completion or cancellation.
      */
-    fun streamMessageContents(parts: List<Content>): Flow<String> = flow {
+    fun streamMessageContents(systemInstruction: String, parts: List<Content>): Flow<String> = flow {
         require(parts.isNotEmpty()) { "streamMessageContents requires at least one Content part." }
 
-        @Suppress("SpreadOperator") // Contents.of is a vararg factory; no List-accepting overload.
-        val contents = Contents.of(*parts.toTypedArray())
-        withEngine("streamMessageContents") { active ->
-            val conversation = active.createConversation(conversationConfig())
+        val contents = Contents.of(parts)
+        val active = acquireEngine(
+            "LiteRtLmEngine.streamMessageContents called before initialize() (or after close()).",
+        )
+        try {
+            val conversation = active.createConversation(conversationConfig(systemInstruction))
             val started = System.nanoTime()
             var charsEmitted = 0
             try {
@@ -223,6 +218,8 @@ class LiteRtLmEngine(
                         Log.w(TAG, "conversation.close() after streamMessageContents failed: ${it.message}")
                     }
             }
+        } finally {
+            releaseEngine()
         }
     }.flowOn(ioDispatcher)
 
@@ -230,54 +227,53 @@ class LiteRtLmEngine(
      * Multimodal one-shot for `Content.AudioBytes` / `Content.AudioFile` alongside a text prompt.
      * Opens and closes a conversation per call.
      */
-    suspend fun sendMessageContents(parts: List<Content>): String = withContext(ioDispatcher) {
-        require(parts.isNotEmpty()) { "sendMessageContents requires at least one Content part." }
-        val started = System.nanoTime()
+    suspend fun sendMessageContents(systemInstruction: String, parts: List<Content>): String =
+        withContext(ioDispatcher) {
+            require(parts.isNotEmpty()) { "sendMessageContents requires at least one Content part." }
+            val started = System.nanoTime()
+            val active = acquireEngine(
+                "LiteRtLmEngine.sendMessageContents called before initialize() (or after close()).",
+            )
 
-        @Suppress("SpreadOperator") // Contents.of is a vararg factory; no List-accepting overload.
-        val response = withEngine("sendMessageContents") { active ->
-            active.createConversation(conversationConfig()).use { conversation ->
-                conversation.sendMessage(Contents.of(*parts.toTypedArray())).toString()
+            val response = try {
+                active.createConversation(conversationConfig(systemInstruction)).use { conversation ->
+                    conversation.sendMessage(Contents.of(parts)).toString()
+                }
+            } finally {
+                releaseEngine()
             }
+            val elapsedMs = (System.nanoTime() - started) / NANOS_PER_MILLI
+            Log.d(
+                TAG,
+                "sendMessageContents completed in ${elapsedMs}ms (parts=${parts.size}, reply=${response.length}c)",
+            )
+            response
         }
-        val elapsedMs = (System.nanoTime() - started) / NANOS_PER_MILLI
-        Log.d(
-            TAG,
-            "sendMessageContents completed in ${elapsedMs}ms (parts=${parts.size}, reply=${response.length}c)",
-        )
-        response
-    }
 
     override fun close() {
-        // Writer side of the readers/writer lifecycle: stop admitting calls, drain any in-flight
-        // ones, then free the native handle. Without the drain a concurrent call could deref a
-        // freed engine through `active.createConversation(...)`. Idempotent — a second close()
-        // sees a null engine and no-ops.
+        // Flip `closing` (new calls fail their acquireEngine check), then wait for in-flight
+        // calls to drain before freeing the native handle — so a concurrent caller can never
+        // dereference a closed engine. Calls themselves run unlocked; only teardown is
+        // exclusive. runBlocking: AutoCloseable.close() is non-suspend.
         runBlocking {
-            val pending: CompletableDeferred<Unit>? = lifecycleLock.withLock {
-                when {
-                    engine == null -> null
-
-                    activeCalls == 0 -> {
-                        engine?.close()
-                        engine = null
-                        drained = null
-                        closing = false
-                        null
-                    }
-
-                    else -> {
-                        closing = true
-                        drained ?: CompletableDeferred<Unit>().also { drained = it }
-                    }
-                }
-            }
-            if (pending != null) {
-                pending.await()
-                lifecycleLock.withLock {
+            val gate = stateMutex.withLock {
+                closing = true
+                if (inFlight == 0) {
                     engine?.close()
                     engine = null
-                    drained = null
+                    drainGate = null
+                    closing = false
+                    null
+                } else {
+                    CompletableDeferred<Unit>().also { drainGate = it }
+                }
+            }
+            if (gate != null) {
+                gate.await()
+                stateMutex.withLock {
+                    engine?.close()
+                    engine = null
+                    drainGate = null
                     closing = false
                 }
             }

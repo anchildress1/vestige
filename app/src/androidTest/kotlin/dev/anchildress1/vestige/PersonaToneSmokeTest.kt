@@ -55,8 +55,7 @@ class PersonaToneSmokeTest {
 
             val responses = Persona.entries.associateWith { persona ->
                 val systemPrompt = PersonaPromptComposer.compose(persona)
-                val prompt = "$systemPrompt\n\nUser entry: $input"
-                it.generateText(prompt)
+                it.generateText(systemPrompt, "User entry: $input")
             }
 
             responses.forEach { (persona, response) ->

@@ -1,31 +1,35 @@
 # State Diagrams
 
-The finite-state machines in the system, as written. Source: ADR-001 (CaptureSession,
-extraction_status), ADR-003 + 2026-05-13/13b addenda (pattern lifecycle), ADR-004 + ADR-007
-(foreground service), `ux-copy.md` (ModelReadiness, onboarding download phases).
+The finite-state machines in the system, as written. Source: `CaptureViewModel.CaptureUiState`
+(capture; ADR-001 §Q8 + ADR-005 §Addendum 2026-05-17), ADR-001 (extraction_status), ADR-003 +
+2026-05-13/13b addenda (pattern lifecycle), ADR-004 + ADR-007 (foreground service),
+`ux-copy.md` (ModelReadiness, onboarding download phases).
 
 ---
 
-## 1. CaptureSession
+## 1. Capture (`CaptureViewModel.CaptureUiState`)
 
-Single-use per capture. Under v1 single-turn (ADR-005) it carries exactly one USER turn and one
-MODEL turn. `DISCARDED` is user-initiated cancel during `RECORDING` — synchronous teardown, no
-Gemma call, no entry, no rehydration.
+The live single-capture FSM, owned by `CaptureViewModel` over the `ForegroundStreamEvent`
+stream (it superseded the retired `CaptureSession`; ADR-005 §Addendum 2026-05-17). v1
+single-turn (ADR-005): one USER turn + one MODEL follow-up. Discard during `Recording` is a
+synchronous return to `Idle` — no Gemma call, no entry, no rehydration (ADR-001 §Q8). Errors
+surface as a `CaptureError` on `Idle`, not a terminal state. `Idle` is the only resting state;
+`Reviewing` self-transitions when the terminal stream event clears the streaming gate, after
+which Done (acknowledge) is allowed.
 
 ```mermaid
 stateDiagram-v2
-    accTitle: CaptureSession state machine
-    accDescr: IDLE transitions to RECORDING on tap record. From RECORDING, DISCARD ends silently back to IDLE with no entry, or STOP files it and the foreground call runs, ending in terminal RESPONDED or ERROR. RESPONDED, ERROR, and DISCARDED are terminal for the single-use session.
+    accTitle: Capture UI state machine (CaptureViewModel.CaptureUiState)
+    accDescr: Idle transitions to Recording on tap Record when the model is Ready. From Recording, discard or no captured audio returns to Idle with no entry; captured audio moves to Inferring. Inferring moves to Reviewing on the first stream event (streaming gate open), or back to Idle with a CaptureError if inference fails. Reviewing self-transitions when the terminal event clears the streaming gate, enabling Done, which acknowledges and returns to Idle. Idle is the only resting state; there are no terminal states.
 
-    [*] --> IDLE
-    IDLE --> RECORDING: tap Record
-    RECORDING --> DISCARDED: DISCARD · NO SAVE (silent)
-    RECORDING --> InFlight: STOP · FILE IT
-    InFlight --> RESPONDED: foreground call ok
-    InFlight --> ERROR: foreground call failed
-    RESPONDED --> [*]
-    ERROR --> [*]
-    DISCARDED --> [*]
+    [*] --> Idle
+    Idle --> Recording: tap Record (model Ready)
+    Recording --> Idle: discard / no audio
+    Recording --> Inferring: audio captured
+    Inferring --> Reviewing: first stream event (streaming)
+    Inferring --> Idle: inference error (CaptureError)
+    Reviewing --> Reviewing: terminal event clears streaming gate
+    Reviewing --> Idle: Done (acknowledge; only after terminal)
 ```
 
 ---

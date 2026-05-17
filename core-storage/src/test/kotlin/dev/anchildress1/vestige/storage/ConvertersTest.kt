@@ -1,6 +1,5 @@
 package dev.anchildress1.vestige.storage
 
-import dev.anchildress1.vestige.model.ConfidenceVerdict
 import dev.anchildress1.vestige.model.ExtractionStatus
 import dev.anchildress1.vestige.model.PatternState
 import dev.anchildress1.vestige.model.TemplateLabel
@@ -48,23 +47,6 @@ class ConvertersTest {
         // PENDING is the safe default — an entry that lost its status row needs to be re-extracted.
         assertEquals(ExtractionStatus.PENDING, converter.convertToEntityProperty(null))
         assertEquals(ExtractionStatus.PENDING, converter.convertToEntityProperty("DEPRECATED"))
-    }
-
-    @Test
-    fun `ConfidenceVerdict converter round-trips every entry`() {
-        val converter = ConfidenceVerdictConverter()
-        ConfidenceVerdict.entries.forEach { verdict ->
-            val db = converter.convertToDatabaseValue(verdict)
-            assertEquals(verdict, converter.convertToEntityProperty(db))
-        }
-    }
-
-    @Test
-    fun `ConfidenceVerdict converter maps null both directions`() {
-        val converter = ConfidenceVerdictConverter()
-        assertNull(converter.convertToDatabaseValue(null))
-        assertNull(converter.convertToEntityProperty(null))
-        assertNull(converter.convertToEntityProperty("UNKNOWN"))
     }
 
     @Test

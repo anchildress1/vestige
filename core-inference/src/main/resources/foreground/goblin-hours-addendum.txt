@@ -1,8 +1,0 @@
-## Time-of-day context
-
-The user is recording between midnight and 5am local time. Apply this for the follow-up only — extraction logic and the transcription block are unaffected.
-
-- Keep the follow-up short. One question, one sentence.
-- Ask fewer probes than usual; favor the single most load-bearing question.
-- Stay even-toned. No "go to bed" advice, no time-of-day commentary, no concern framing.
-- Do not name the hour or the late timing — the user knows when they are.

@@ -194,6 +194,17 @@ tasks.register<Delete>("clean") {
     delete(rootProject.layout.buildDirectory)
 }
 
+subprojects {
+    tasks.withType<org.gradle.api.tasks.testing.Test>().configureEach {
+        // JDK 24+/25 warns when class-path-based JNI loaders (ObjectBox, Robolectric native
+        // runtime) call System.load without an explicit native-access opt-in.
+        jvmArgs("--enable-native-access=ALL-UNNAMED")
+        // Robolectric appends to the bootstrap classpath; disable CDS for forked test JVMs so
+        // they stop printing the "Sharing is only supported for boot loader classes" warning.
+        jvmArgs("-Xshare:off")
+    }
+}
+
 // Aggregator that delegates to :app:verifyNoTelemetry. The actual classpath resolution lives
 // inside :app's build script because Gradle 9 forbids cross-project configuration resolution.
 tasks.register("verifyNoTelemetry") {

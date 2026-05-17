@@ -53,9 +53,9 @@ Expected evidence:
 
 Set fixture timestamps manually in the harness. Preserve local hour and weekday when listed.
 
-### Scenario A — Tuesday Meeting Aftermath
+### Scenario A — Tuesday Meeting Crashed
 
-Purpose: tag consistency, recurring aftermath pattern, STT-D divergence, STT-E vocabulary drift.
+Purpose: tag consistency, recurring Crashed pattern, STT-D divergence, STT-E vocabulary drift.
 
 A1. Tuesday 11:15 — "Standup ran long again. I was fine before it, then completely flattened by 11. Opened the doc and just stared at it."
 
@@ -73,9 +73,9 @@ Expected evidence:
 - Related event terms: `standup`, `meeting`, `roadmap call`, `sync`, `client review`, `planning call`
 - Energy/attention drop after a group work event
 - Vocabulary drift: `flattened`, `concrete`, `corpse routine`, `battery got yanked`, `hollow`, `static`
-- Likely labels: Aftermath for A1-A6 unless the model has a better sourced reason
+- Likely labels: Crashed for A1-A6 unless the model has a better sourced reason
 
-### Scenario B — Invoice Concrete Shoes
+### Scenario B — Invoice Busy Stalling
 
 Purpose: task paralysis label, commitment tracking, STT-D literal vs inferential split.
 
@@ -88,10 +88,10 @@ B3. "Invoice again. No mystery. I know what to do. The cursor just sits there li
 Expected evidence:
 - Stuck task: `invoice email`
 - Repeated commitment around sending invoice, especially B2
-- Likely label: Concrete shoes
+- Likely label: Busy Stalling
 - Forbidden output: avoidance diagnosis, moralizing, mood score
 
-### Scenario C — Decision Spiral
+### Scenario C — Nonstop Spiral
 
 Purpose: loop detection without motivation interpretation.
 
@@ -103,7 +103,7 @@ C3. "Made another comparison table. It did not become a decision through exposur
 
 Expected evidence:
 - Repeated comparison language: `criteria`, `spreadsheet`, `weights`, `comparison table`
-- Likely label: Decision spiral
+- Likely label: Nonstop Spiral
 - Observation can mention loop mechanics; it must not explain the user's psychology
 
 ### Scenario D — Goblin Hours
@@ -119,7 +119,7 @@ D3. 04:07 — "4:07am. I found a naming convention problem in the archive and tr
 Expected evidence:
 - Local time between midnight and 5am
 - Admin/reorganization loop
-- Likely label: Goblin hours
+- Likely label: Goblin Hours
 - Follow-up should be shorter and concrete; no sleep hygiene lecture
 
 ### Scenario X — Literal Keyword Distractors
@@ -152,8 +152,8 @@ Expected pressure points:
 - A4: `Not tired exactly` vs `battery got yanked` should pressure `energy_descriptor`; Skeptical should avoid saving `tired` as canonical without a conflict marker.
 - B1: Literal sees invoice/email/opened/closed; Inferential may identify task paralysis; Skeptical should note no explicit commitment yet.
 - B2: Commitment should be stronger than B1 because `Said I would send` is explicit.
-- C2: Inferential can label Decision spiral; Skeptical should note the actual options are missing.
-- D1: Literal has 3:12am and notes app; Inferential can label Goblin hours; Skeptical should not invent a sleep-cause explanation.
+- C2: Inferential can label Nonstop Spiral; Skeptical should note the actual options are missing.
+- D1: Literal has 3:12am and notes app; Inferential can label Goblin Hours; Skeptical should not invent a sleep-cause explanation.
 
 Pass condition:
 - At least 2 of these 6 entries show meaningful divergence.

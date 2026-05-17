@@ -29,8 +29,8 @@ Wrap the app in a coherent, dark, atmospheric UX that meets the 10-second judge 
 - [x] Top three error states polished: download fail/stall, inference timeout/fail, mic permission denied/unavailable. _(Story 4.11 — incl. new system-level mic-blocked + "Use typed entry instead"; download fail/stall via 4.3.)_
 - [ ] Notification permission flow ships in onboarding as the optional Wiring switch; notification tap target lands on the entry detail of the most-recent-in-flight extraction. Lifecycle fallback evaluation per ADR-004 §"Fallback Trigger" recorded by end of Phase 4 day 1 if invoked.
 - [ ] P1 stories shipped or explicitly punted to v1.5 with a recorded reason (scope held / didn't hold).
-- [ ] Demo-gate UI polish pass (Story 4.15) complete — every post-onboarding surface consumes `AppTop` + the Scoreboard primitives shipped in 4.1.5, no Material `TopAppBar` / `Button` / `OutlinedButton` / `TextButton` left in `:app/src/main/kotlin/dev/anchildress1/vestige/ui/**` for in-app affordances, and the primitive-reuse grep audit lands in the PR description.
-- [ ] Vestiges unified viewing surface (Story 4.17) ships — `PatternDetailScreen.kt` and `EntryDetailScreen.kt` deleted, `HistoryScreen.kt` either deleted or downgraded to forwarder, all nav routes repointed, notification deep-link updated per ADR-004 amendment, `ux-copy.md` + `design-guidelines.md` + `ADR-011` addendum land in the same commit.
+- [ ] Demo-gate UI polish pass (Story 4.15) complete — every post-onboarding surface consumes `AppTop` (now including a Settings gear icon top-right) + the Scoreboard primitives shipped in 4.1.5, no Material `TopAppBar` / `Button` / `OutlinedButton` / `TextButton` left in `:app/src/main/kotlin/dev/anchildress1/vestige/ui/**` for in-app affordances, and the primitive-reuse grep audit lands in the PR description.
+- [ ] Two-view + tab-toggle structure live (Stories 4.6 + 4.8) — `PatternDetailScreen.kt` and `EntryDetailScreen.kt` deleted, Patterns and History each render inline-expanding rows for their respective deep content (no detail screens), `PATTERNS | HISTORY` segmented control ships as a shared primitive consumed by both views, pattern source rows cross-link to History scrolled + auto-expanded by `entryId`. ADR-004 notification deep-link contract amended to target History tab + scroll + auto-expand.
 
 ---
 
@@ -186,42 +186,47 @@ Checked bullets above are the historical record that the Mist tokens shipped to 
 
 ### Story 4.6 — History list
 
-**As** the user, **I need** a history list that lets me browse my saved entries by reverse-chronological order with each row showing template label, date, and a snippet, **so that** I can see what I've captured and tap to read a past entry.
+**As** the user, **I need** a history view that lets me browse my saved entries by reverse-chronological order, with each row expanding inline to reveal full transcript + persona turn + observation + tags, **so that** I can see what I've captured AND read any past entry without navigating to a separate detail screen. History and Patterns are the two top-level viewing destinations; each has one job, no overlap. History does not show pattern grouping — that's Patterns' job.
 
 **Done when:**
 - [x] History list reachable from the Capture screen footer per Story 4.5 and from the app shell. (`HistoryFooter` in `IdleLayout` + `HistoryLink` in `ReviewingPane`; `HistoryHost` wired in `MainActivity`.)
 - [x] Each row shows: timestamp (relative for recent, absolute for older), template label (the agent-emitted one), and a one-line snippet from `entry_text`. (`HistoryRow` via `HistorySummary.from`; date via `HistoryDateFormatter`; template label as `Pill`; snippet capped at 80 chars.) _(**Template-label `Pill` superseded — Story 4.16.** The label is structurally always `AUDIT`; the row drops the Pill and leads with the date. See §Story 4.16 + `backlog.md` §`archetype-template-labeling`.)_
 - [x] Rows are sorted reverse-chronologically by `timestamp`. (`EntryStore.listCompleted` uses `orderDesc(timestampEpochMs)`.)
-- [ ] Tapping a row opens the Entry Detail screen (Story 4.7). (Stub no-op — pending Story 4.7.)
+- [ ] Tapping a row expands the entry inline (single-level expansion) within the History list. The expanded row renders the content block from Story 4.7 (transcript + persona turn + observation + tags). No navigation event. `EntryDetailScreen.kt` is deleted; `HistoryScreen.kt` owns the expansion state. Expansion state survives config change via `rememberSaveable` hoisted to `HistoryViewModel`. One row expanded at a time — tapping a new row auto-collapses the previously expanded one.
+- [ ] History and Patterns share a top-of-screen segmented control (`PATTERNS  |  HISTORY`) — the primitive ships in Story 4.8; History consumes it. Tap to switch tabs; swipe-paginate is the secondary gesture. The current tab persists across Capture round-trips so coming back from Capture lands on the tab the user was last on.
 - [x] Empty state: per `ux-copy.md` §"Capture history (no entries yet)" — eyebrow `HISTORY`, header `No entries yet.`, body `First one takes 30 seconds.` (`HistoryEmptyState`; locked copy asserted in `HistoryScreenTest`.)
 - [x] No filter / search affordance in v1. Filter chips are P2 / v1.5 (`backlog.md` candidate, not yet logged — add only if user explicitly asks). (Absence asserted in `HistoryScreenTest`.)
-- [ ] Performance: list renders smoothly on the reference device with at least 100 entries (smoke test with seeded data). (Requires on-device verification.)
+- [ ] Performance: list renders smoothly on the reference device with at least 100 entries (smoke test with seeded data). `LazyColumn` + `AnimatedVisibility` on expansion is the rendering path; the bounded dataset (≤ ~200 entries in a typical 30-day window) handles natively. Requires on-device verification.
+- [ ] Cross-view inbound nav: when Patterns' expanded pattern card's source row → is tapped, the app switches to the History tab, scrolls to the matched entry by `entryId`, and auto-expands that row. `HistoryScreen` accepts an `initialScrollTo: Long?` + `initialExpand: Long?` argument for this path. If the entry isn't in the current view (out-of-window), History scrolls to it anyway and the row auto-expands once visible.
+- [ ] Notification deep-link retarget per ADR-004 §"Notification Contract": tapping the `Reading the entry.` system-shade notification opens the History tab scrolled to the just-completed entry, auto-expanded. (Was: opens Entry Detail screen.) Same-commit ADR-004 amendment.
 
-**Notes / risks:** The history list is the third-most-touched screen after Capture and Patterns. Don't bloat it with metadata chips or relative-time animations. Plain rows, restrained typography, fast scroll.
+**Notes / risks:** History is the third-most-touched destination after Capture and Patterns. Don't bloat it with metadata chips, relative-time animations, or pattern-membership badges (that's Patterns' job — see "responsibility without overlap" rule). Plain rows, restrained typography, fast scroll, one expansion per tap.
 
 ---
 
-### Story 4.7 — Entry Detail screen
+### Story 4.7 — Entry content block (inline in History expanded rows)
 
-**As** the user, **I need** an entry detail screen that shows my full transcript, the extracted tags, and the per-entry observation per `design-guidelines.md` §"Entry detail" (and where defined, `ux-copy.md`), **so that** I can review what I said and what the model heard from a single entry without leaving History. _(Template label removed from this screen per §Story 4.16 — header leads with the date.)_
+**As** the user, **I need** a content block that renders inside an expanded History row showing my full transcript, the model's follow-up, the per-entry observation, and the tags, **so that** I can read any past entry without navigating to a separate detail screen — the content lives where the entry lives, in History. _(`EntryDetailScreen.kt` is deleted per the two-view + tab-toggle design recorded in Story 4.6. The composables that already shipped for the transcript body are reused inside the History expanded-row block. The "Entry detail" naming is retained in `design-guidelines.md` / `ux-copy.md` as the conceptual section name; it refers to the expanded-row content, not a screen.)_
 
 **Done when:**
-- [ ] Header shows: timestamp. _(Was "timestamp + template label" — label removed per §Story 4.16; the date is the display title, no Pill.)_
-- [x] Body shows: the entry transcript (one USER turn + one MODEL turn per the v1 single-turn lifecycle, user transcription muted, model follow-up primary, same treatment as Story 4.5).
-- [ ] A "Tags" row below the transcript shows the model-extracted tags as quiet chips.
-- [ ] A "Observation" section shows the 1-2 per-entry observations (from Story 2.13) with their evidence references.
-- [ ] Reading / Re-eval section is **deferred to Story 4.13** as P1 contingent.
+- [x] Body shows: the entry transcript (one USER turn + one MODEL turn per the v1 single-turn lifecycle, user transcription muted, model follow-up primary, same treatment as Story 4.5). _(Composable already shipped; reused inside the History expanded-row block instead of inside a `EntryDetailScreen`.)_
+- [x] Source-link integration: tapping a pattern source from Story 3.10's pattern detail navigates here and the entry is highlighted briefly. _(Source-link wiring shipped against the pre-rewrite Entry Detail screen.)_
+- [x] Notification tap target deep-links here per ADR-004 §"Notification Contract": tapping the system-shade `Reading the entry.` notification opens this screen scrolled to the most recent entry whose `extraction_status` is non-terminal. _(Wiring shipped against the pre-rewrite Entry Detail screen.)_
+- [ ] Expanded-row header line: `EyebrowE` mono `{MMM D · HH:MM}` (e.g. `MAY 16 · 22:04`). No display title (the row's collapsed-state snippet IS the title-by-content). _(Was: "Header shows: timestamp" against the separate screen. Date is now an eyebrow inside the expanded row, not a `DisplayBig` title.)_
+- [ ] Tags row at the bottom of the expanded block renders model-extracted tags as quiet chips. Interim treatment uses `Pill` outlined-`dim`; replace with the `Chip` primitive if `tag-chip-primitive-split` (backlog v1.5) ships first.
+- [ ] Observation block renders the 1-2 per-entry observations from Story 2.13 with their evidence references. **Block is omitted entirely if the observation field is null / empty** — no placeholder string, no "no observation" copy (Story 4.10 empty-state rule). Currently the on-device build's `WITNESS · READING` card renders the literal transcript as the "observation" — that bug is fixed here by binding to the actual observation field instead.
+- [ ] Reading / Re-eval section is **deferred to Story 4.13** as P1 contingent. _(Was already deferred; reaffirmed in the rewrite — the section, if it ships, expands inside the History row, not in a separate screen.)_
 - [ ] Vocabulary chip cloud below the observation is **deferred to Story 4.13** if it ships at all (it ships only if STT-E passed; otherwise the observation copy carries the vocabulary observation in plain text).
-- [x] Source-link integration: tapping a pattern source from Story 3.10's pattern detail navigates here and the entry is highlighted briefly.
-- [x] Notification tap target deep-links here per ADR-004 §"Notification Contract": tapping the system-shade `Reading the entry.` notification opens this screen scrolled to the most recent entry whose `extraction_status` is non-terminal. Falls back to History if no in-flight entry exists at tap time (e.g., the user tapped the notification right as the keep-alive expired).
+- [ ] Source-link nav retargeted: pattern source rows on Patterns expanded cards (Story 4.8) navigate to the History tab + scroll-to-entry + auto-expand-row, instead of pushing the (now-deleted) Entry Detail screen. The brief-highlight on the receiving entry is preserved.
+- [ ] Notification tap target retargeted: ADR-004 §"Notification Contract" amended in the same commit — tap target is the History tab scrolled to the matched entry + auto-expanded. Fallback (no in-flight entry) is top of History.
 
-**Notes / risks:** Don't show audio waveform or play-back controls — audio doesn't persist. The entry detail is the *text* view. Per `design-guidelines.md` §"Entry transcript", the user's transcribed words show but never as a waveform.
+**Notes / risks:** Don't show audio waveform or play-back controls — audio doesn't persist. The entry content block is the *text* view. Per `design-guidelines.md` §"Entry transcript", the user's transcribed words show but never as a waveform. Composables stay in `:app/src/main/kotlin/dev/anchildress1/vestige/ui/history/` (rename `EntryDetailScreen.kt` → `EntryContentBlock.kt` if it survives the screen-deletion at all; otherwise the relevant composables move into `HistoryScreen.kt` directly).
 
 ---
 
-### Story 4.8 — Polished Pattern List + Pattern Detail
+### Story 4.8 — Patterns view (with inline-expanding pattern cards)
 
-**As** the user, **I need** the pattern list and pattern detail screens from Phase 3 (Stories 3.9 / 3.10) polished to spec — filter chips, persona-flavored empty states, action affordance microcopy, the "Roast me" anchor button per `ux-copy.md` §"Pattern List" — **so that** the demo's pattern moment is visually clean and the persona voice carries through into a surface that's not the capture screen.
+**As** the user, **I need** a Patterns view that shows pattern cards I can tap to expand inline — revealing the full callout, intensity strip, source-entry previews (each tappable to navigate to the matching entry in History), and the Skip/Drop/Restart actions — **so that** I can see the model's clustered findings AND drill into any source without navigating to a separate Pattern Detail screen. Patterns and History are the two top-level viewing destinations; each has one job, no overlap. Patterns does not render full transcript text — that's History's job. _(`PatternDetailScreen.kt` is deleted per the two-view + tab-toggle design recorded in Story 4.6.)_
 
 **Done when:**
 - [ ] Pattern list header includes the `Roast me` button per `ux-copy.md` §"Pattern List / Action button" (the Roast bottom sheet itself is Story 4.14, P1 contingent — the button can land here as a no-op or hidden state if Story 4.14 doesn't ship). _(Punted — Story 4.14 has not shipped. Per `AGENTS.md` "don't ship dead UI" the button is omitted, not stubbed. Lands when 4.14 lands.)_
@@ -237,11 +242,23 @@ Checked bullets above are the historical record that the Mist tokens shipped to 
 - [x] Snackbars: `Skipped.` / `Dropped.` / `Pattern is back.` with `Undo` (~4s) per `ux-copy.md` §"System Messages". Model-detected `Closed` is silent — no snackbar (visible on next list load) per spec §P0.6. (`SnackbarDuration.Short`; CLOSED emits no `PatternActionEvent` so it is structurally silent.)
 - [x] Pattern lifecycle states: `PatternState` enum is `ACTIVE` / `SNOOZED` / `CLOSED` / `DROPPED` (renamed from `RESOLVED` / `DISMISSED`). `CLOSED` state is reserved for v1.5 (`backlog.md` §`pattern-auto-close`) and unreachable from user actions in v1. `snoozedUntil` added to `PatternEntity` per spec §"Data Model". (Per ADR-003 Addendum 2026-05-13 the persisted state name stays `SNOOZED` with field `snoozedUntil`; the user-facing label is "Skip". `BELOW_THRESHOLD` retained — internal detector state, out of scope.)
 - [x] Snooze wake-up: on app start / resume, patterns whose `snoozedUntil` has elapsed transition `SNOOZED → ACTIVE` automatically (cold-start sweep, not WorkManager — per spec §P0.4). (`PatternStore.promoteExpiredSkips` invoked from `AppContainer.init` (before any Pattern surface composes, spec Open Q2) and `MainActivity` `ON_RESUME`.)
-- [ ] Pattern detail screen polished per `design-guidelines.md` §"Pattern Detail":
-  - [x] Source list rows clickable to entry detail (Story 4.7). (Pre-existing via `PatternsHost`; preserved.)
-  - [x] Action row at the bottom uses the same action contract as the list: `Skip` / `Drop` on ACTIVE, `Restart` otherwise (spec §P0.1 / P0.3).
-  - Vocabulary chips below the observation **only if STT-E passed** (Story 3.4 ran). If STT-E failed, no chip cloud. _(STT-E passed (2026-05-12) so this is eligible, but `ux-copy.md` §"Pattern Detail" marks it "P1 conditional. Do not implement before the normal Pattern List and Pattern Detail are working with sourced evidence." Punted to a follow-up — no `EntryEntity`-vocabulary → detail plumbing exists yet and P0 is the shippable unit. Tracked for the post-P0 follow-up branch.)_
-  - [x] Dropped patterns surface `Dropped {date}.` Closed patterns (v1.5) surface `Closed {date}. No new entries matched in {N} days.` and hide the action row entirely. (`terminalLabelFor`; detail action row gated `state != CLOSED`; banner carries status-band a11y. CLOSED unreachable in v1 — covered by seeded tests for v1.5 readiness.)
+- [ ] Pattern card expanded-state shows the content the (now-deleted) Pattern Detail screen was supposed to show, inline within the Patterns list:
+  - [x] Source list rows clickable to entry detail (Story 4.7). (Pre-existing via `PatternsHost`; preserved.) _(Wiring shipped against the pre-rewrite Pattern Detail screen — see new bullet below for retargeting.)_
+  - [x] Action row at the bottom uses the same action contract as the list: `Skip` / `Drop` on ACTIVE, `Restart` otherwise (spec §P0.1 / P0.3). _(Composable reused at the bottom of the expanded card instead of at the bottom of a separate screen.)_
+  - [x] Dropped patterns surface `Dropped {date}.` Closed patterns (v1.5) surface `Closed {date}. No new entries matched in {N} days.` and hide the action row entirely. (`terminalLabelFor`; detail action row gated `state != CLOSED`; banner carries status-band a11y. CLOSED unreachable in v1 — covered by seeded tests for v1.5 readiness.) _(Banner now renders inside the expanded card; same a11y contract.)_
+  - [ ] Tapping a pattern card expands it inline (single-level expansion). The expanded state renders: full callout (multi-line allowed) + full-width `TraceBarE` + `SEEN IN · {N} ENT` mono eyebrow + source rows + action row. One card expanded at a time per Patterns view — tapping a new card auto-collapses the previously expanded one. Expansion state survives config change via `rememberSaveable` hoisted to `PatternsListViewModel`.
+  - [ ] Source rows inside the expanded card show: `EyebrowE` `{MMM D · HH:MM}` + one-line snippet (first ~60 chars of `entry_text`, ellipsized) + a trailing `→` affordance. Source rows do **not** expand inline and do **not** render the full transcript — that's History's job. Tap target: whole row.
+  - [ ] Source-row tap navigates to the History tab (Story 4.6), scrolls to the matched entry by `entryId`, and auto-expands that row. The tab toggle's `PATTERNS  |  HISTORY` segmented control updates to reflect the new tab. Predictive-back returns to Patterns with the previously expanded card still expanded.
+  - [ ] Vocabulary chips below the observation **only if STT-E passed** (Story 3.4 ran). If STT-E failed, no chip cloud. _(STT-E passed (2026-05-12) so this is eligible, but `ux-copy.md` §"Pattern Detail" marks it "P1 conditional." Punted to a follow-up — no `EntryEntity`-vocabulary → expanded-card plumbing exists yet and P0 is the shippable unit. Tracked for the post-P0 follow-up branch.)_
+
+- [ ] Tab toggle primitive shipped here and consumed by both Patterns and History (Story 4.6):
+  - Segmented control at the top of the viewing surface: `PATTERNS  |  HISTORY`, lime fill on the active tab, dim outline on the inactive tab. Per ADR-011 `Pill` accent system.
+  - Tap to switch tabs; horizontal swipe is the secondary gesture (Compose `HorizontalPager` underneath).
+  - Active tab persists across Capture round-trips so the user lands on the last-viewed tab.
+  - Primitive lives in `:app/src/main/kotlin/dev/anchildress1/vestige/ui/components/` so both views consume the same composable.
+  - Per `ux-copy.md` (same-commit update): tab labels are `PATTERNS` / `HISTORY` literal.
+
+- [ ] `PatternDetailScreen.kt` deleted. `PatternsHost` repointed: all nav routes that went to Pattern Detail now drive the expanded-card state on the Patterns view. Pattern source-row clicks repoint to the cross-view nav to History (above).
 
 **Notes / risks:** `Roast me` button visibility is gated on Story 4.14 shipping. If 4.14 doesn't ship in v1, hide the button rather than showing a button that does nothing. (Per `AGENTS.md` and the scope rule, don't ship dead UI.)
 
@@ -374,7 +391,7 @@ Checked bullets above are the historical record that the Mist tokens shipped to 
 
 **Done when:**
 
-- [ ] **Shared chrome on every post-onboarding surface.** `AppTop` (Scoreboard pill + persona dropdown) renders at the top of `PatternsListScreen`, `PatternDetailScreen`, `SettingsScreen`, `ModelStatusScreen` — currently `PatternsListScreen` uses Material's `TopAppBar` with a plain `R.string.patterns_title` text title (`PatternsListScreen.kt:64`), the others ship without any shell chrome at all. After this bullet: Capture / Live / Reviewing / History / Entry Detail / Patterns List / Pattern Detail / Settings / Model Status all open with the same `GEMMA 4 · LOCAL ONLY` pill + persona pill in the same position. Status mapping per `appTopStatusFor(ModelReadiness)` (Story 4.4); persona pill is non-interactive outside Capture. No screen invents its own top bar. Material `TopAppBar` imports deleted from these files.
+- [ ] **Shared chrome on every post-onboarding surface.** `AppTop` (Scoreboard pill + persona dropdown + Settings gear icon) renders at the top of `PatternsListScreen`, `SettingsScreen`, `ModelStatusScreen` — currently `PatternsListScreen` uses Material's `TopAppBar` with a plain `R.string.patterns_title` text title (`PatternsListScreen.kt:64`), the others ship without any shell chrome at all. (`PatternDetailScreen` and `EntryDetailScreen` are deleted per Story 4.6 / 4.8 rewrites — not in this list.) After this bullet: Capture / Live / Reviewing / History / Patterns / Settings / Model Status all open with the same `GEMMA 4 · LOCAL ONLY` pill (left) + persona pill (right) + Settings gear icon (far right, opens Settings from any surface) in the same position. Status mapping per `appTopStatusFor(ModelReadiness)` (Story 4.4); persona pill is non-interactive outside Capture; Settings icon is always interactive and replaces the bottom-text `Settings` link on Capture. No screen invents its own top bar. Material `TopAppBar` imports deleted from these files.
 
 - [ ] **Patterns List body uses Scoreboard primitives end-to-end** per `poc/screenshots/patterns.png` + `poc/screens-patterns.jsx`:
   - Header: `EyebrowE` `TRACKING · LAST 30D` + `DisplayBig` (Anton) `PATTERNS` title. Not Material `headlineMedium`.
@@ -382,21 +399,14 @@ Checked bullets above are the historical record that the Mist tokens shipped to 
   - Pattern card title renders the pattern's **own display name** in `DisplayBig` (Anton, ~32 sp) — current build uses `headlineSmall` sans bold ("Audit Template" reads like a Material card). _(**Changed per §Story 4.16** — was "renders the pattern's template label"; the label is structurally always `AUDIT` so every card would read the same. Title is the pattern name; no template label, no `#01 AFTERMATH` eyebrow — pattern numbering remains out of scope.)_
   - `TraceBarE` renders the 30-day intensity sparkbar on every card with `state ∈ {ACTIVE, SNOOZED, CLOSED, DROPPED}` per `cardSectionToneFor` (already wired). The current build's audit-template card shows a dotted hairline instead of bars — verify the bars actually render on a card with ≥1 hit; if `TraceBarE` is being passed an empty series, fix the data plumbing in `PatternsListViewModel` so the call site gets the same shape `IdleLayout` consumes.
 
-- [ ] **Pattern Detail body re-skinned** per `poc/screenshots/pattern-detail.png` + `poc/screens-patterns.jsx`:
-  - Header: `EyebrowE` `← PATTERNS` (left) + `SHEET · 01 OF {N}` (right). The current build's bare `←` back arrow with no breadcrumb is replaced.
-  - Title block: `EyebrowE` `● ACTIVE` + `DisplayBig` rendering the pattern's display name (Anton, two-line allowed, lime accent on the trailing punctuation per `heroAnnotated` pattern from `CaptureScreen`). _(**Per §Story 4.16** — the template-label segment of the eyebrow is dropped; the dot + state word stands alone.)_
-  - State-transition line below title: gated on `EnergyDescriptor` being present (Story 2.13 wiring); if `null`, the line is omitted (don't ship a placeholder string).
-  - `Seen in: {N} ENT` section uses the existing source-row primitive; rows already navigate to Entry Detail per Story 4.7 wiring.
-  - Action row at bottom uses `Pill` primitive for `Drop` (coral rule) / `Skip` (lime rule on ACTIVE → flip to teal on SNOOZED) / `Restart` (lime fill on non-ACTIVE) per ADR-011 accent system. The current dropdown-menu fallback (three-dot overflow with bare-text `Drop` / `Skip`) is replaced by the inline action row — keep the overflow menu reachable for parity but the row is the primary affordance.
-  - Words-You-Used vocabulary chips stay punted per Story 4.8 (STT-E gated, P1).
+- _Pattern Detail body re-skinned — **removed.** `PatternDetailScreen.kt` is deleted per Story 4.8's rewrite; pattern detail content lives inside the expanded pattern card on the Patterns view. Visual polish of the expanded-card layout (header, title block, state-transition line, source rows, action row, vocabulary chips) lives in Story 4.8._
 
 - [ ] **Capture idle screen tightened** per `poc/screenshots/capture-ready.png` + `poc/screens-capture.jsx`:
   - `StatRibbon` cells' label color lifts from `faint` (currently barely legible — `KEPT` / `HITS/MO` / `CLOUD` are illegible against `s1` in `Screenshot_20260516_220452_Vestige.png`) to `dim` to clear WCAG AA on `s1`. Token swap only; no per-surface override. If the contrast fix breaks any other primitive consumer, fix the token, not the call site (AGENTS.md §"UI discipline").
   - REC button outer ring shrinks from the current ~38% vertical occupancy to POC's ~26% (the hero question must sit above the ring with comfortable breathing room, not pushed against it).
   - Bottom-nav row (`PATTERNS →` / `Settings` / `History`) reduces to one shared `NavLink` primitive — current build ships three different visual treatments (Patterns with arrow eyebrow, Settings as bare dim text, History as outlined box). Pick the POC's bare-text-with-arrow treatment; one composable, three call sites. `OR TYPE` adopts the same `NavLink` treatment, dropping its outlined box.
 
-- [ ] **Entry Detail header re-skinned** per `poc/screenshots/details.png`:
-  - Display title renders the entry's **date** in `DisplayBig` (`MAY 16.`), not the sequential `ENTRY #{N}` placeholder currently rendered. _(**Changed per §Story 4.16** — was "renders the entry's template label, date fallback if unresolved"; the label is structurally always `AUDIT`, so the date fallback is now the only path. The label is never rendered.)_ Document the date-as-title rule in `ux-copy.md` §"Entry detail" as the same-commit doc update.
+- _Entry Detail header re-skinned — **removed.** `EntryDetailScreen.kt` is deleted per Story 4.6 / 4.7 rewrites; entry content renders inside the expanded row on the History view. Visual polish of the expanded-row block (header eyebrow, transcript, observation, tags) lives in Story 4.7. The `AUDIT` pill removal and `WITNESS · READING` cleanup still apply but now inside the expanded-row block — see Story 4.7._
   - `AUDIT` pill in the header (currently a coral outline) is removed — it's an ad-hoc affordance with no `ux-copy.md` anchor and no spec home. If a "re-read" affordance is wanted, it belongs in Story 4.13 (P1 Reading/Re-eval) and ships with that story's microcopy + confirm flow, not as a one-off button here.
   - `WITNESS · READING` callout card keeps its lime left-rule but loses the current full-card lime tint creep — apply `limeLeftRuleForActive` cleanly, no body-fill bleed.
   - `FILED · {HH:MM}` + `{AUDIO}` / `{WORDS}` stat ribbon stays.
@@ -415,30 +425,25 @@ Checked bullets above are the historical record that the Mist tokens shipped to 
 - [ ] **Button alignment + vertical rhythm fixes** (called out separately because the current build's affordances are placed by feel, not grid):
   - **Capture idle bottom stack** (`Screenshot_20260516_220452_Vestige.png`): `REC` (centered) → `OR TYPE` → `PATTERNS →` → `Settings` → `History` currently render at five different vertical rhythms (uneven gaps) and three different horizontal weights (mono eyebrow + arrow, bare dim text, outlined box). After: one shared `NavLink` primitive call site × 3, equal vertical spacing token (`spacing.l` between nav items, `spacing.xl` between `OR TYPE` and the first nav row), all centered on the same x-axis. `OR TYPE` and `REC` keep their own vertical rhythm; the three-nav cluster is one rhythm group.
   - **Capture Reviewing pane bottom** (`Screenshot_20260516_220436_Vestige.png` post-stop state): `DONE · NEW ENTRY` (centered, full-width cream rectangle, sans bold black ink) and `History` (smaller centered outlined dim box below) currently render as two different primitives at two different widths and two different ink weights — same disease as the Idle bottom stack but a different state. After: `DONE · NEW ENTRY` becomes `Pill` filled-lime (primary action) and `History` becomes the shared `NavLink` primitive used by the Idle cluster — same x-axis, `spacing.l` between them, same baseline grid.
-  - **Entry Detail footer rail** (`Screenshot_20260516_220853_Vestige.png`): back arrow currently top-left, `● NEW ENTRY` bottom-right — asymmetric, no shared baseline. After: both actions live on the same bottom rail (`← BACK` left-aligned, `● NEW ENTRY` right-aligned, same y, same `EyebrowE` weight). The top-of-screen back arrow is removed (predictive-back per AGENTS.md handles the gesture).
   - **Patterns list card overflow menu** (`Screenshot_20260516_221058_Vestige.png`): the `Drop` / `Skip` dropdown currently floats free-form over the card body with no anchored relationship — it crops "Worth noting." mid-glyph and clips the `TraceBarE` strip. After: the menu anchors to the three-dot affordance with `DropdownMenu` placement `BelowAnchor` (or `AboveAnchor` when card is in the bottom 30% of the viewport), never overlapping the card's stat row or trace strip. Items use the shared `Pill` action treatment, not bare Material `DropdownMenuItem` text.
-  - **Pattern Detail action row** (`Screenshot_20260516_221041_Vestige.png`): `Drop` / `Skip` currently render as two equal-width pills; POC's third slot is `Resolved` / `Restart` per the action contract from Story 4.8. After: three-pill row at equal width on ACTIVE (`Drop` / `Skip` / `Resolved`), two-pill row on non-ACTIVE (`Drop` / `Restart`) — never a one-pill or asymmetric two-pill row. Pills baseline-align to the same y.
+  - **Pattern card expanded action row** (`Screenshot_20260516_221041_Vestige.png` shows the pre-rewrite Pattern Detail's bottom row; after Story 4.8 rewrite the same actions render inside the expanded pattern card on the Patterns view): `Drop` / `Skip` currently render as two equal-width pills; the action contract from Story 4.8 adds a third slot (`Resolved` on ACTIVE, `Restart` on non-ACTIVE). After: three-pill row at equal width on ACTIVE (`Drop` / `Skip` / `Resolved`), two-pill row on non-ACTIVE (`Drop` / `Restart`) — never a one-pill or asymmetric two-pill row. Pills baseline-align to the same y inside the card.
+  - _Entry Detail footer rail bullet — **removed.** `EntryDetailScreen.kt` is deleted per Story 4.6 / 4.7 rewrites; entry content renders inside the expanded row on History, which has no footer rail (the row's expansion state IS the affordance). Tapping the expanded row again collapses it — predictive-back stays in the History list._
   - **Model Status footer** (`Screenshot_20260516_220505_Vestige.png`): `Re-download model` floats in upper-bottom dead space; `Delete model` jams the screen edge. After: both actions anchored to a single bottom rail with `spacing.m` between them, `Re-download` (lime outline `Pill`) above `Delete model` (coral outline `Pill`), both full-width, both flush to the safe-area inset — no floating buttons in the middle of the body.
   - **Settings section rhythm** (`Screenshot_20260516_220500_Vestige.png`): persona rows are packed tight, data rows have wide vertical gaps, no section divider rule. After: every section uses the same row-height token, sections separated by a single `hair` divider (1px) + `spacing.l` above/below. No per-section override.
   - Grid invariant for the whole pass: actions belonging to the same conceptual row share a baseline; actions in a vertical stack share a column. No eyeballed offsets. If a primitive doesn't expose the spacing token it needs, fix the primitive (Story 4.1.5 addendum), don't pad at the call site.
 
 - [ ] **Duplicate / redundant content elimination** (per screen-by-screen audit of `Downloads/Photos-3-001/Screenshot_20260516_22*.png`):
-  - **Entry Detail `WITNESS · READING` card duplicates `YOU · TRANSCRIPT`** (`Screenshot_20260516_220613_Vestige.png`, `Screenshot_20260516_220853_Vestige.png`): both cards render the literal same string (`not tired exactly, more like the battery got yanked after that last meeting` appears in BOTH cards back-to-back, only differentiated by a lime left-rule on the second). The READING slot is supposed to surface the model's per-entry observation (Story 2.13 wiring) — currently it's a copy-paste of the user's transcript with no added information. **Fix:** the READING card binds to `EnergyDescriptor` / observation output; if the observation field is null / empty, the entire READING card is omitted (early-return, no "no reading available" placeholder string). Story 4.10's empty-state rule applies — never ship a card that says nothing.
-  - **Pattern Detail header card duplicates the Patterns list card** (`Screenshot_20260516_220859_Vestige.png` vs `Screenshot_20260516_221033_Vestige.png`): tapping a pattern card opens a detail screen whose top card IS the card you just tapped, re-rendered at the same size with the same `Audit Template / audit / 3 Audit entries logged. Worth noting. / 3 of 3 entries · Last seen May 16` composition. The user navigates and sees… the same card. **Fix:** Pattern Detail header is replaced by the Pattern Detail-specific composition called out in the bullet above (display title from the pattern's own name per §Story 4.16 + state-shift line + `StatRibbon` + `TraceBarE`). The list-card composition is **only** rendered on the list — Pattern Detail never renders it.
+  - **History expanded-row READING block duplicates the transcript** (`Screenshot_20260516_220613_Vestige.png`, `Screenshot_20260516_220853_Vestige.png` show the bug in the pre-rewrite Entry Detail screen — same bug carries into Story 4.7's expanded-row block if the binding isn't fixed): both the `YOU · TRANSCRIPT` block and the `WITNESS · READING` block render the literal same string (`not tired exactly, more like the battery got yanked after that last meeting` appears twice back-to-back, only differentiated by a lime left-rule on the second). The READING slot is supposed to surface the model's per-entry observation (Story 2.13 wiring) — currently it's a copy-paste of the user's transcript with no added information. **Fix:** the READING block in Story 4.7's expanded-row content binds to the observation field; if null / empty, the entire block is omitted (early-return, no placeholder string). Story 4.10 empty-state rule applies.
+  - _Pattern Detail header card duplicates the Patterns list card — **removed.** `PatternDetailScreen.kt` is deleted per Story 4.8 rewrite; you can't duplicate a card you don't navigate into. The pre-rewrite duplication was the tell that the screen wasn't earning its keep._
   - **Reviewing pane has duplicate History nav** (`Screenshot_20260516_220436_Vestige.png`): `History` link upper-right (mono dim, in the chrome) AND `History` link bottom-center (outlined box). Pick one. Per the footer-rail rule, the bottom rail wins — top-right `History` is removed; bottom rail carries `DONE · NEW ENTRY` (primary) + `History` (secondary nav), both consuming the shared primitives called out above.
   - **Reading the entry placeholder is rendered twice in the screenshot set** (`Screenshot_20260516_220428_Vestige.png` and `Screenshot_20260516_220557_Vestige.png` are byte-identical-looking captures of the same surface) — not a code bug, but the placeholder being so static that two captures 2 minutes apart look frame-identical IS a UX bug. Covered separately under screen-transition affordances below.
 
-- [ ] **Pattern surface vs Entry surface visual disambiguation** (`Screenshot_20260516_220613_Vestige.png` Entry Detail vs `Screenshot_20260516_220859_Vestige.png` Pattern Detail): currently the two surfaces are visually indistinguishable — same chrome (lone back arrow upper-left, no AppTop on either), same rounded `s1` card composition, same stacked source/transcript rows, same two-pill bottom rail. A user landing on either after one second of glance cannot tell which one they're on. After:
-  - Both surfaces consume `AppTop` (covered by the chrome bullet) — that alone re-anchors them.
-  - **Entry Detail** display title is the entry's date in `DisplayBig` (`MAY 16.`) per §Story 4.16 — singular, one moment. Body is one transcript turn + one model turn + (optionally) one observation card. No "Seen in" multi-source section. Bottom rail = `← BACK` + `● NEW ENTRY`.
-  - **Pattern Detail** display title is the pattern's name (e.g. `TUESDAY MEETINGS.`) with `EyebrowE` `● ACTIVE` above per §Story 4.16 (template-label segment dropped) — explicitly cued as a set, not a singleton. Body is the `StatRibbon` + `TraceBarE` (which Entry Detail never shows) + `Seen in: {N} ENT` source list. Bottom rail = three pills (`Drop` / `Skip` / `Resolved|Restart`), not two.
-  - The 3-second-glance test: any screenshot of either surface, shown out of context, must answer "pattern or entry?" from the chrome + body composition alone. `StatRibbon` + `TraceBarE` + multi-source list = pattern. Single transcript + single observation = entry. No exceptions.
-  - This is the **primary navigation fuckery** the audit surfaced — it's a composition problem, not a copy problem. ux-copy.md is unchanged; what changes is which primitives each detail surface composes.
+- _Pattern surface vs Entry surface visual disambiguation — **removed.** Both Pattern Detail and Entry Detail screens are deleted per Story 4.8 / 4.7 rewrites. Patterns and History are the two top-level destinations now, with a `PATTERNS | HISTORY` tab toggle (Story 4.8 ships the primitive). Disambiguation is structural — each view has one job, no overlap. No 3-second-glance test needed because the two views have entirely different responsibilities (patterns view = clustered evidence, history view = chronological entries) and a top-of-screen tab toggle naming which one is active._
 
 - [ ] **Screen-transition affordances** (loading / sheet / chrome transitions that currently look broken):
   - **Reading the entry placeholder needs visible progress** (`Screenshot_20260516_220428_Vestige.png`): currently flat dim text `Reading the entry.` for the 24–33 s inference window (per Story 2.3 device record). No shimmer, no spinner, no `StatusDot` pulse. The user has no indication the app isn't frozen. After: `READING · GEMMA 4` mono eyebrow above the placeholder with `StatusDot(blink = true)` lime pulse using the `sbPulse` keyframe shipped in 4.1.5 — the same motion that animates the AppTop pill. No spinner widget, no progress bar (inference duration is non-deterministic) — the pulse alone says "alive, working."
   - **Typed entry sheet doesn't scrim the REC button beneath** (`Screenshot_20260516_220533_Vestige.png`): the sheet half-overlays the REC button with no backdrop dim, so the coral REC ring bleeds through the sheet's `s1` surface creating a broken transparency stack. After: `ModalBottomSheet` `scrimColor` set to `colors.floor.copy(alpha = 0.6f)` — same scrim every modal sheet in the app uses (centralize on the primitive). The REC button beneath fades to invisible behind the scrim.
-  - **Entry Detail has TWO back arrows of different kinds** (`Screenshot_20260516_220853_Vestige.png`): top-left `←` arrow above the title AND bottom-left implicit-via-predictive-back. After: top arrow is deleted (per the footer-rail bullet in the alignment group above); bottom rail carries the single `← BACK` link. One back affordance per screen, always on the bottom rail.
+  - _Entry Detail two-back-arrow bullet — **removed.** `EntryDetailScreen.kt` is deleted per Story 4.6 / 4.7 rewrites; the expanded-row pattern in History has no back arrow (tap row to collapse, or predictive-back to leave History entirely)._
 
 - [ ] **Primitive-reuse gate.** Grep audit recorded as evidence in the PR description:
   - `Material3.TopAppBar` usages in `:app/src/main/kotlin/dev/anchildress1/vestige/ui/**` drops to **0** (every screen consumes `AppTop`).
@@ -485,119 +490,6 @@ Checked bullets above are the historical record that the Mist tokens shipped to 
 
 ---
 
-### Story 4.17 — Vestiges: unified viewing surface (supersedes Pattern Detail + Entry Detail + History as separate screens)
-
-**Status:** Not started. Written 2026-05-17 after a screen-by-screen audit (`Downloads/Photos-3-001/Screenshot_20260516_22*.png`) confirmed the on-device build ships four separate viewing surfaces (Patterns list, Pattern Detail, Entry Detail, History) that show the same data with different chrome — and that the user can't distinguish a Pattern Detail from an Entry Detail at glance. The fix is structural: kill the detail screens, fold their content into inline expansion on a single viewing surface.
-
-**Supersedes:** Story 4.7 (Entry Detail screen) — Entry Detail ceases to exist as a screen; its content becomes inline-expanded source rows on Vestiges. Story 4.8 (Pattern List + Pattern Detail polished) — Pattern Detail ceases to exist; its content becomes inline-expanded pattern cards on Vestiges; Pattern List polish folds into Vestiges. Story 4.6 (History list) — History as a separate destination ceases; chronological browsing is a sort mode on Vestiges (loose entries section). Story 4.15 bullets that referenced Pattern Detail / Entry Detail / History chrome are moot once this lands (audit and strike them in the same commit). Story 4.16 (template-label yank) is unchanged — template label was already absent from this design.
-
-**References:** `Downloads/Photos-3-001/Screenshot_20260516_22*.png` (current build, the four screens being collapsed), `poc/screenshots/{patterns,pattern-detail,details,history}.png` (POC visual sources for the existing four screens — Vestiges composes from their primitives), `ux-copy.md` (text authority for every label), `adrs/ADR-011-design-language-scoreboard-pivot.md` (visual system), `AGENTS.md` §"Demo gate" (the merge passes the gate because it improves both pitch and walkthrough by reducing nav friction and surface count).
-
-**As** an ADHD-flavored adult using Vestige, **I need** one viewing surface that shows me both the patterns the model has found AND the individual entries those patterns came from — with no screen-to-screen navigation to drill in — **so that** seeing what's happening with me is one tap from Capture and zero taps from there to see the evidence, instead of `tap → screen → tap → screen → tap → screen` for every piece of context.
-
-**Why this exists:** the on-device audit found four viewing surfaces (Patterns / Pattern Detail / Entry Detail / History) that share ~80% of their composition (rounded `s1` cards, mono eyebrows, lone back arrow chrome, two-pill bottom rails). The visual disambiguation work in Story 4.15 was treating the symptom; the disease is too many surfaces. Collapsing them removes the navigation problem entirely, removes the duplicate-card problem on Pattern Detail (you can't duplicate a card you don't navigate into), removes the duplicate-back-arrow problem on Entry Detail, removes the History-vs-Patterns redundancy, and removes the deep-link target ambiguity for ADR-004 notifications.
-
-**The design:**
-
-**Top-level destinations reduce to three:**
-- **Capture** — the doing surface (record, type, get reading). Unchanged.
-- **Vestiges** — the viewing surface (this story). Replaces Patterns / Pattern Detail / Entry Detail / History.
-- **Settings** — settings. Unchanged. Reaches Model Status as a sub-destination.
-
-**Vestiges page composition (top to bottom):**
-
-```
-┌─────────────────────────────────────────┐
-│ ● GEMMA 4 · LOCAL ONLY    WITNESS ▾    │  AppTop chrome (shared)
-├─────────────────────────────────────────┤
-│ TRACKING · {N} VESTIGES · 30 DAYS       │  EyebrowE
-│                                         │
-│ VESTIGES                                │  DisplayBig (Anton)
-│                                         │
-│ ─── hair divider ───                    │
-│                                         │
-│ ● ACTIVE                                │  Section eyebrow
-│   [Pattern card collapsed]              │  one per pattern
-│   [Pattern card collapsed]              │
-│   [Pattern card EXPANDED]               │  selected pattern, see below
-│                                         │
-│ ─── hair divider ───                    │
-│                                         │
-│ ● LOOSE ENTRIES                         │  Section eyebrow (entries not in a pattern)
-│   [Entry row collapsed]                 │
-│   [Entry row EXPANDED]                  │  selected entry, see below
-│                                         │
-│ ─── hair divider ───                    │
-│                                         │
-│ ● SETTLED                               │  Snoozed / dropped patterns, dim ink
-│   [Pattern card collapsed]              │
-│                                         │
-│                              [Capture →]│  bottom-rail back-to-Capture
-└─────────────────────────────────────────┘
-```
-
-**Pattern card — collapsed state (what you see by default):**
-- Title (`DisplayBig` Anton ~24sp): pattern's display name from `PatternEntity.title`.
-- Body (`P` 15sp `dim`): pattern's callout from `PatternEntity.callout`, one line, ellipsized.
-- `TraceBarE` 30-day strip.
-- Metadata row (`EyebrowE` mono): `{N} ENT · LAST {MMM D}`.
-- Lime left-rule on ACTIVE, ember on SNOOZED, teal on CLOSED / DROPPED.
-- Tap target: whole card.
-
-**Pattern card — expanded state (after tap):**
-- Same title + callout (callout grows from one line to full body if multi-sentence).
-- Same `TraceBarE` but full-width.
-- `SEEN IN · {N} ENT` mono eyebrow.
-- Source rows below (each is the same `EntryRow` primitive used in Loose Entries section — collapsed by default, tap to expand).
-- Action row at bottom of card (inside the card, not floating): `Pill` `Skip 7d` (lime outline on ACTIVE / teal on SNOOZED) + `Pill` `Drop` (coral outline) + `Pill` `Restart` (lime outline, only on non-ACTIVE) per ADR-011 accents. Three pills on ACTIVE, two on non-ACTIVE.
-- Tap title again (or scroll out): collapses back to default.
-
-**Entry row — collapsed state:**
-- Date + time (`EyebrowE` mono): `MAY 16 · 22:04`.
-- Snippet (`P` 15sp `dim`): first ~80 chars of `entry_text`, ellipsized.
-- Tap target: whole row.
-
-**Entry row — expanded state:**
-- Same date + time eyebrow at top of expanded block.
-- `YOU` mono label + transcript (`P` `dim`).
-- `WITNESS` (or active persona name) mono label + model follow-up (`P` `ink`).
-- `OBSERVATION` mono label + the per-entry observation (`P` `ink`) **only if `EnergyDescriptor` / observation field is non-null** — otherwise the whole observation block is omitted (no "no observation" placeholder string; Story 4.10 rule).
-- Tag chips below (small mono, `dim` ink on `s2` fill — uses the `Chip` primitive backlogged in `tag-chip-primitive-split`; if that primitive doesn't ship, use `Pill` outlined-dim as the interim).
-- Tap row again (or scroll out): collapses back.
-
-**Sort order:** active patterns first (by most-recent hit), then loose entries (reverse chronological), then settled patterns (snoozed/dropped, by snoozed-until or dropped date). Per `PatternStore.listAll()` filtered + the `EntryStore.listCompleted()` minus pattern-source entries.
-
-**Empty state (no entries):** `EyebrowE` `VESTIGES · 0 ENTRIES · 30 DAYS` + `DisplayBig` `Nothing yet.` + `P` `First one takes 30 seconds.` — same locked copy as the current History empty state in `ux-copy.md` §"Empty States · Capture history" (reuses the string, retargeted to Vestiges).
-
-**Empty state (entries but no patterns):** `Loose Entries` section renders normally; `Active` and `Settled` sections render with `Patterns surface after 10 entries. Keep recording.` per current Patterns empty copy.
-
-**Notification deep-link (ADR-004 §"Notification Contract"):** tapping the system-shade `Reading the entry.` notification opens Vestiges, scrolls to the just-completed entry (always a loose entry on first surface; promoted to a pattern source on later passes), and auto-expands that entry's row. Falls back to top of Vestiges if no in-flight entry exists at tap time.
-
-**Done when:**
-- [ ] `PatternDetailScreen.kt` is deleted. All call sites that navigated to it (`PatternsHost`, `MainActivity`, any `NavController` route) are repointed to the Vestiges expanded-pattern state.
-- [ ] `EntryDetailScreen.kt` is deleted. All call sites that navigated to it (notification handler, History row tap, pattern source-row tap) are repointed to the Vestiges expanded-entry state.
-- [ ] `HistoryScreen.kt` is either deleted (preferred) or downgraded to a thin wrapper that forwards to Vestiges. Bottom-nav from Capture goes to Vestiges, not History.
-- [ ] `VestigesScreen.kt` + `VestigesViewModel.kt` exist under `:app/src/main/kotlin/dev/anchildress1/vestige/ui/vestiges/`. View model exposes one flow combining `PatternStore.listAll()` + `EntryStore.listCompleted()` into a single sorted list of `VestigeItem.Pattern` | `VestigeItem.LooseEntry`.
-- [ ] Expansion state is `rememberSaveable` per item — surviving config change + process death. One item expanded at a time per section (tapping a new card auto-collapses the previous one) — keeps the screen scannable.
-- [ ] AppTop ships on the surface per Story 4.15's chrome bullet (Vestiges is post-onboarding, gets the same pill + persona).
-- [ ] All Story 4.15 alignment + duplicate-content + screen-transition bullets that referenced Pattern Detail / Entry Detail / History are struck through with `superseded by Story 4.17` notes in the same commit.
-- [ ] `ux-copy.md` same-commit: new §"Vestiges" section with all locked strings (eyebrow, display title, section eyebrows, empty states, action labels). The old §"Pattern List", §"Pattern Detail", §"Entry detail", §"History" sections are deleted (their copy lives in §Vestiges).
-- [ ] `design-guidelines.md` same-commit: §"Screen list" reduces from 9 surfaces to 6 (Capture, Vestiges, Settings, Model Status, Onboarding, Roast bottom-sheet). §"Pattern Detail" / §"Entry detail" sections deleted (folded into §Vestiges).
-- [ ] `ADR-011` gets an addendum recording the surface collapse (one-paragraph addendum, not a new ADR — visual language is unchanged, only navigation model).
-- [ ] `ADR-004` notification deep-link contract updated: tap target is Vestiges with scroll + auto-expand, not Entry Detail.
-- [ ] Coverage shape: `VestigesScreen` ships with `LazyColumn` scroll + expansion state assertions, pattern-card / entry-row a11y assertions (`role`, `contentDescription`, expansion-state announcement on tap), and one integration test per supersession (notification tap → Vestiges with right entry expanded; pattern-card tap → callout + sources rendered inline; source-row tap → transcript + observation rendered inline).
-
-**Notes / risks:**
-- This is **the** architectural redesign for the Phase 4 viewing surfaces. It is bigger than a polish story. It pays for itself by deleting two `*Screen.kt` files + their view models + their nav routes + their host wrappers + their tests, and by removing all the Story 4.15 work that was about disambiguating now-deleted screens.
-- The `LazyColumn` with nested expandable items needs careful state hoisting — expansion state lives in the view model, not in the composable, so config change + process death survive cleanly. Recompose discipline matters here.
-- The `OBSERVATION` block on expanded entry rows currently has no data source on most entries (Story 2.13 wiring is partial). The block omits when null per the design — no placeholder. If observations never land for v1, the block is structurally dead but the design still works (entry row just shows transcript + WITNESS turn).
-- The bottom-rail "Capture →" link is the only navigation off Vestiges. Predictive-back gesture also returns to Capture. One way in, one way out.
-- If implementation surfaces a `LazyColumn` perf problem at the 100+ entry mark (Story 4.6's perf bullet), measure before optimizing — the dataset is bounded by 30-day window + active patterns, so realistic count is ~30 patterns + ~200 entries max. Compose `LazyColumn` handles that natively.
-- This story does **not** invent new ux-copy. Every string is either reused from existing `ux-copy.md` sections (retargeted to Vestiges) or pulled from POC source files. If a slot needs new copy, stop and add it to `ux-copy.md` first.
-- The "Roast me" affordance (Story 4.14, P1) lives on Vestiges as a top-right action button in the header chrome if it ships at all.
-
----
-
 ## What is explicitly NOT in Phase 4
 
 - No demo storyboard work — Phase 5 owns it.
@@ -618,7 +510,7 @@ If a Phase 4 story starts pulling a backlog entry or a Phase 5/6 task, stop. Ref
 
 Phase 5 starts when all the following are true:
 
-- [ ] Stories 4.1 – 4.5, 4.9 – 4.11, 4.4.5, 4.15, 4.16, 4.17 are Done. (Stories 4.6 / 4.7 / 4.8 are superseded by 4.17 — recorded as Superseded with date + reason, not Done. Stories 4.12 – 4.14 are P1; their state is recorded as Done or Punted-to-v1.5 with a reason.)
+- [ ] Stories 4.1 – 4.11 plus 4.4.5, 4.15, 4.16 are Done. (Stories 4.6, 4.7, 4.8 are rewritten in place to reflect the two-view + tab-toggle design — `PatternDetailScreen.kt` and `EntryDetailScreen.kt` are deleted, expansion-state is inline on the parent view; checked bullets remain as historical evidence of what shipped pre-rewrite. Stories 4.12 – 4.14 are P1; their state is recorded as Done or Punted-to-v1.5 with a reason.)
 - [ ] ADR-004 lifecycle decision recorded inline in the ADR (conditional state machine kept, or fallback applied with date + reason).
 - [ ] Onboarding flow runs end-to-end on a fresh install on the reference S24 Ultra.
 - [ ] Capture screen, History list, Entry Detail, Pattern List, Pattern Detail, Local Model Status, and Settings all load and navigate correctly.

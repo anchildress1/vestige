@@ -8,9 +8,13 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.TimeoutCancellationException
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
 import java.time.ZonedDateTime
+import java.util.concurrent.CopyOnWriteArrayList
 
 /**
  * `capturedAt` carries the user's local zone at recording time. Pass a [ZonedDateTime] (not an
@@ -26,9 +30,13 @@ data class BackgroundExtractionRequest(
 )
 
 /**
- * Runs the three lenses sequentially against an already-persisted entry, retries each lens up to
- * [maxAttemptsPerLens] times, and reduces the parsed lens outputs through [resolver]. A lens
- * that exhausts its budget contributes a null extraction (convergence treats that as "no opinion").
+ * Runs the three lenses **concurrently** (ADR-008 §Correction 2026-05-16 — one Engine, three
+ * independent SDK contexts; the single GPU still serializes at its command queue, so this is
+ * non-blocking structure, not a literal 3× speedup) against an already-persisted entry, retries
+ * each lens up to [maxAttemptsPerLens] times, and reduces the parsed lens outputs through
+ * [resolver]. A lens that exhausts its budget contributes a null extraction (convergence treats
+ * that as "no opinion"). `RUNNING` is emitted once at fan-out; the per-lens retry no longer
+ * emits its own status (interleaved per-lens transitions would be meaningless under fan-out).
  *
  * The caller threads the entry's persisted retry count in via `entryAttemptCount`; the worker
  * echoes it on every [ExtractionStatusListener] event. Lens-call volume is reported separately
@@ -70,31 +78,43 @@ class BackgroundExtractionWorker(
         }
 
         val started = System.nanoTime()
-        val state = RunState(request.entryAttemptCount)
+        // Lenses finish out of order under fan-out; this thread-safe accumulator lets the timeout
+        // path still report whichever lenses completed before the cap (structured-concurrency
+        // cancellation discards in-flight `async` results otherwise).
+        val completed = CopyOnWriteArrayList<LensResult>()
         listener.onUpdate(ExtractionStatus.RUNNING, request.entryAttemptCount, null)
 
         try {
             withTimeoutOrNoCap(request.timeoutMs) {
-                for (lens in LENSES) {
-                    state.results += runLens(lens, request.entryText, request.retrievedHistory, state, listener)
+                val results = coroutineScope {
+                    LENSES.map { lens ->
+                        async {
+                            runLens(lens, request.entryText, request.retrievedHistory)
+                                .also { completed += it }
+                        }
+                    }.awaitAll()
                 }
-                completeRun(state, request.capturedAt, started, listener)
+                completeRun(results, request.entryAttemptCount, request.capturedAt, started, listener)
             }
         } catch (timeout: TimeoutCancellationException) {
-            handleTimeout(state, started, request.timeoutMs ?: 0L, listener, timeout)
+            handleTimeout(
+                completed = completed.toList(),
+                entryAttemptCount = request.entryAttemptCount,
+                startedNanos = started,
+                timeoutMs = request.timeoutMs ?: 0L,
+                listener = listener,
+                cause = timeout,
+            )
         }
     }
 
     private suspend inline fun <T> withTimeoutOrNoCap(timeoutMs: Long?, crossinline block: suspend () -> T): T =
         if (timeoutMs == null) block() else withTimeout(timeoutMs) { block() }
 
-    private suspend fun runLens(
-        lens: Lens,
-        entryText: String,
-        retrievedHistory: List<HistoryChunk>,
-        state: RunState,
-        listener: ExtractionStatusListener,
-    ): LensResult {
+    // Pure per-lens runner: no shared state, no listener — three of these run concurrently, so
+    // any cross-lens mutation would race. Diagnostics (modelCallCount, lastError) are derived
+    // from the returned [LensResult]s after fan-out completes.
+    private suspend fun runLens(lens: Lens, entryText: String, retrievedHistory: List<HistoryChunk>): LensResult {
         val lensStarted = System.nanoTime()
         var attempts = 0
         var lensError: String? = null
@@ -103,23 +123,17 @@ class BackgroundExtractionWorker(
 
         while (attempts < maxAttemptsPerLens && parsed == null) {
             attempts += 1
-            state.modelCallCount += 1
             val composed = composer(lens, entryText, retrievedHistory)
             val attempt = attemptOnce(lens, composed, attempts)
             lastRaw = attempt.raw
             if (attempt.error != null) {
                 lensError = attempt.error
-                state.lastError = attempt.error
             } else {
                 parsed = parser(lens, attempt.raw)
                 if (parsed == null) {
                     lensError = "parse-fail"
-                    state.lastError = lensError
                     Log.w(TAG, "lens=$lens attempt=$attempts parse-fail")
                 }
-            }
-            if (parsed == null && attempts < maxAttemptsPerLens) {
-                listener.onUpdate(ExtractionStatus.RUNNING, state.entryAttemptCount, state.lastError)
             }
         }
 
@@ -152,16 +166,19 @@ class BackgroundExtractionWorker(
     }
 
     private suspend fun completeRun(
-        state: RunState,
+        results: List<LensResult>,
+        entryAttemptCount: Int,
         capturedAt: ZonedDateTime,
         startedNanos: Long,
         listener: ExtractionStatusListener,
     ): BackgroundExtractionResult {
-        val parsedExtractions = state.results.mapNotNull(LensResult::extraction)
+        val modelCallCount = results.sumOf { it.attemptCount }
+        val lensLastError = results.firstNotNullOfOrNull { it.lastError }
+        val parsedExtractions = results.mapNotNull(LensResult::extraction)
         val resolved = if (parsedExtractions.isEmpty()) {
             null
         } else {
-            tryResolve(parsedExtractions, state.lastError)
+            tryResolve(parsedExtractions, lensLastError)
         }
         val totalElapsedMs = (System.nanoTime() - startedNanos) / NANOS_PER_MILLI
         return when {
@@ -170,13 +187,13 @@ class BackgroundExtractionWorker(
                 Log.d(
                     TAG,
                     "extract completed: lenses=${parsedExtractions.size}/${LENSES.size} " +
-                        "model_calls=${state.modelCallCount} elapsed=${totalElapsedMs}ms",
+                        "model_calls=$modelCallCount elapsed=${totalElapsedMs}ms",
                 )
-                listener.onUpdate(ExtractionStatus.COMPLETED, state.entryAttemptCount, null)
+                listener.onUpdate(ExtractionStatus.COMPLETED, entryAttemptCount, null)
                 BackgroundExtractionResult.Success(
                     totalElapsedMs = totalElapsedMs,
-                    lensResults = state.results,
-                    modelCallCount = state.modelCallCount,
+                    lensResults = results,
+                    modelCallCount = modelCallCount,
                     resolved = resolved.value,
                     templateLabel = templateLabel,
                 )
@@ -184,18 +201,18 @@ class BackgroundExtractionWorker(
 
             else -> {
                 val terminalError = (resolved as? Resolution.Failure)?.error
-                    ?: state.lastError
+                    ?: lensLastError
                     ?: "all-lenses-failed"
                 Log.w(
                     TAG,
-                    "extract failed (model_calls=${state.modelCallCount} " +
+                    "extract failed (model_calls=$modelCallCount " +
                         "elapsed=${totalElapsedMs}ms last_error=$terminalError)",
                 )
-                listener.onUpdate(ExtractionStatus.FAILED, state.entryAttemptCount, terminalError)
+                listener.onUpdate(ExtractionStatus.FAILED, entryAttemptCount, terminalError)
                 BackgroundExtractionResult.Failed(
                     totalElapsedMs = totalElapsedMs,
-                    lensResults = state.results,
-                    modelCallCount = state.modelCallCount,
+                    lensResults = results,
+                    modelCallCount = modelCallCount,
                     lastError = terminalError,
                 )
             }
@@ -217,8 +234,10 @@ class BackgroundExtractionWorker(
         data class Failure(val error: String) : Resolution
     }
 
+    @Suppress("LongParameterList") // Timeout-path diagnostics: partial results + counters + cause.
     private suspend fun handleTimeout(
-        state: RunState,
+        completed: List<LensResult>,
+        entryAttemptCount: Int,
         startedNanos: Long,
         timeoutMs: Long,
         listener: ExtractionStatusListener,
@@ -227,19 +246,13 @@ class BackgroundExtractionWorker(
         val totalElapsedMs = (System.nanoTime() - startedNanos) / NANOS_PER_MILLI
         val terminalError = "timeout-after-${timeoutMs}ms"
         Log.w(TAG, "extract timed out (${cause.message ?: terminalError})")
-        listener.onUpdate(ExtractionStatus.TIMED_OUT, state.entryAttemptCount, terminalError)
+        listener.onUpdate(ExtractionStatus.TIMED_OUT, entryAttemptCount, terminalError)
         return BackgroundExtractionResult.TimedOut(
             totalElapsedMs = totalElapsedMs,
-            lensResults = state.results.toList(),
-            modelCallCount = state.modelCallCount,
+            lensResults = completed,
+            modelCallCount = completed.sumOf { it.attemptCount },
             timeoutMs = timeoutMs,
         )
-    }
-
-    private class RunState(val entryAttemptCount: Int) {
-        val results: MutableList<LensResult> = mutableListOf()
-        var modelCallCount: Int = 0
-        var lastError: String? = null
     }
 
     private data class AttemptOutcome(val raw: String, val error: String?)

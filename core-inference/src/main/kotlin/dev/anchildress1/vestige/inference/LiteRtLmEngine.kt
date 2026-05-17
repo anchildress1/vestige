@@ -11,6 +11,7 @@ import com.google.ai.edge.litertlm.ExperimentalApi
 import com.google.ai.edge.litertlm.ExperimentalFlags
 import com.google.ai.edge.litertlm.LogSeverity
 import com.google.ai.edge.litertlm.SamplerConfig
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
@@ -47,7 +48,43 @@ class LiteRtLmEngine(
 
     @Volatile
     private var engine: Engine? = null
-    private val callMutex = Mutex()
+
+    // Readers/writer lifecycle (ADR-008 §Correction 2026-05-16): calls are concurrent "readers"
+    // — each opens its own independent SDK conversation off one Engine, so foreground and the
+    // three background lenses no longer serialize on a shared Kotlin mutex. close() is the
+    // exclusive "writer": it stops admitting calls and drains in-flight ones before freeing the
+    // native handle. The single GPU still serializes at its command queue (no literal speedup);
+    // the win is non-blocking preemption. lifecycleLock guards only the tiny ref/counter
+    // critical sections — never the slow inference call itself.
+    private val lifecycleLock = Mutex()
+    private var activeCalls = 0
+    private var closing = false
+    private var drained: CompletableDeferred<Unit>? = null
+
+    /**
+     * Acquire the live [Engine] under [lifecycleLock], run [block] concurrently with other calls
+     * (the lock is released for the slow inference), then release. Rejects calls before
+     * `initialize()`, after `close()`, and once a `close()` drain is in progress — all with the
+     * one documented contract message so existing call sites and tests stay valid.
+     */
+    private suspend fun <T> withEngine(caller: String, block: suspend (Engine) -> T): T {
+        val active = lifecycleLock.withLock {
+            val current = engine
+            check(current != null && !closing) {
+                "LiteRtLmEngine.$caller called before initialize() (or after close())."
+            }
+            activeCalls += 1
+            current
+        }
+        try {
+            return block(active)
+        } finally {
+            lifecycleLock.withLock {
+                activeCalls -= 1
+                if (activeCalls == 0) drained?.complete(Unit)
+            }
+        }
+    }
 
     @OptIn(ExperimentalApi::class)
     suspend fun initialize() = withContext(ioDispatcher) {
@@ -95,10 +132,7 @@ class LiteRtLmEngine(
 
     suspend fun generateText(prompt: String): String = withContext(ioDispatcher) {
         val started = System.nanoTime()
-        val response = callMutex.withLock {
-            val active = checkNotNull(engine) {
-                "LiteRtLmEngine.generateText called before initialize() (or after close())."
-            }
+        val response = withEngine("generateText") { active ->
             active.createConversation(conversationConfig()).use { conversation ->
                 conversation.sendMessage(prompt).toString()
             }
@@ -113,10 +147,7 @@ class LiteRtLmEngine(
 
     /** Streaming counterpart to [generateText]. Closes the conversation on flow completion. */
     fun streamText(prompt: String): Flow<String> = flow {
-        callMutex.withLock {
-            val active = checkNotNull(engine) {
-                "LiteRtLmEngine.streamText called before initialize() (or after close())."
-            }
+        withEngine("streamText") { active ->
             val conversation = active.createConversation(conversationConfig())
             val started = System.nanoTime()
             var charsEmitted = 0
@@ -160,10 +191,7 @@ class LiteRtLmEngine(
 
         @Suppress("SpreadOperator") // Contents.of is a vararg factory; no List-accepting overload.
         val contents = Contents.of(*parts.toTypedArray())
-        callMutex.withLock {
-            val active = checkNotNull(engine) {
-                "LiteRtLmEngine.streamMessageContents called before initialize() (or after close())."
-            }
+        withEngine("streamMessageContents") { active ->
             val conversation = active.createConversation(conversationConfig())
             val started = System.nanoTime()
             var charsEmitted = 0
@@ -207,10 +235,7 @@ class LiteRtLmEngine(
         val started = System.nanoTime()
 
         @Suppress("SpreadOperator") // Contents.of is a vararg factory; no List-accepting overload.
-        val response = callMutex.withLock {
-            val active = checkNotNull(engine) {
-                "LiteRtLmEngine.sendMessageContents called before initialize() (or after close())."
-            }
+        val response = withEngine("sendMessageContents") { active ->
             active.createConversation(conversationConfig()).use { conversation ->
                 conversation.sendMessage(Contents.of(*parts.toTypedArray())).toString()
             }
@@ -224,13 +249,35 @@ class LiteRtLmEngine(
     }
 
     override fun close() {
-        // Block on the mutex so an in-flight call's `createConversation` / `sendMessage` finishes
-        // before the native engine handle is freed. Without this guard a concurrent caller could
-        // dereference a closed engine through `active.createConversation(...)`.
+        // Writer side of the readers/writer lifecycle: stop admitting calls, drain any in-flight
+        // ones, then free the native handle. Without the drain a concurrent call could deref a
+        // freed engine through `active.createConversation(...)`. Idempotent — a second close()
+        // sees a null engine and no-ops.
         runBlocking {
-            callMutex.withLock {
-                engine?.close()
-                engine = null
+            val pending: CompletableDeferred<Unit>? = lifecycleLock.withLock {
+                when {
+                    engine == null -> null
+
+                    activeCalls == 0 -> {
+                        engine?.close()
+                        engine = null
+                        null
+                    }
+
+                    else -> {
+                        closing = true
+                        CompletableDeferred<Unit>().also { drained = it }
+                    }
+                }
+            }
+            if (pending != null) {
+                pending.await()
+                lifecycleLock.withLock {
+                    engine?.close()
+                    engine = null
+                    drained = null
+                    closing = false
+                }
             }
         }
     }

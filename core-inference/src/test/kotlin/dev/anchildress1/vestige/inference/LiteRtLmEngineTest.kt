@@ -4,6 +4,7 @@ import com.google.ai.edge.litertlm.Content
 import com.google.ai.edge.litertlm.ExperimentalApi
 import com.google.ai.edge.litertlm.ExperimentalFlags
 import io.mockk.mockk
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertThrows
@@ -38,6 +39,30 @@ class LiteRtLmEngineTest {
         }
         assertEquals(
             "LiteRtLmEngine.sendMessageContents called before initialize() (or after close()).",
+            error.message,
+        )
+    }
+
+    @Test
+    fun `streamText before initialize throws the contract message on first collect`() {
+        val engine = LiteRtLmEngine(modelPath = NOT_USED_PATH)
+        val error = assertThrows(IllegalStateException::class.java) {
+            runTest { engine.streamText("hello").collect { } }
+        }
+        assertEquals(
+            "LiteRtLmEngine.streamText called before initialize() (or after close()).",
+            error.message,
+        )
+    }
+
+    @Test
+    fun `streamMessageContents before initialize throws the contract message on first collect`() {
+        val engine = LiteRtLmEngine(modelPath = NOT_USED_PATH)
+        val error = assertThrows(IllegalStateException::class.java) {
+            runTest { engine.streamMessageContents(listOf(mockk<Content>())).collect { } }
+        }
+        assertEquals(
+            "LiteRtLmEngine.streamMessageContents called before initialize() (or after close()).",
             error.message,
         )
     }

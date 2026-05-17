@@ -10,6 +10,7 @@ import dev.anchildress1.vestige.model.TemplateLabel
 import io.mockk.coEvery
 import io.mockk.mockk
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.yield
 import org.junit.jupiter.api.Assertions.assertAll
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertInstanceOf
@@ -21,6 +22,7 @@ import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import java.time.Instant
 import java.time.ZoneId
+import java.util.concurrent.atomic.AtomicInteger
 
 class BackgroundExtractionWorkerTest {
 
@@ -59,7 +61,7 @@ class BackgroundExtractionWorkerTest {
     }
 
     @Test
-    fun `runs three lenses sequentially and resolves on first-attempt success`() = runTest {
+    fun `runs three lenses concurrently and resolves on first-attempt success`() = runTest {
         val engine = mockk<LiteRtLmEngine>()
         coEvery { engine.generateText("prompt-for-LITERAL") } returns "raw-literal"
         coEvery { engine.generateText("prompt-for-INFERENTIAL") } returns "raw-inferential"
@@ -122,6 +124,34 @@ class BackgroundExtractionWorkerTest {
     }
 
     @Test
+    fun `the three lenses run concurrently, not serialized`() = runTest {
+        // Concurrency probe: each lens call records the peak number of simultaneously in-flight
+        // calls. Sequential iteration can never exceed 1; concurrent fan-out reaches 3. The
+        // yield() forces each call to pause mid-flight so the others get to enter first.
+        val engine = mockk<LiteRtLmEngine>()
+        val inFlight = AtomicInteger(0)
+        val maxInFlight = AtomicInteger(0)
+        coEvery { engine.generateText(any()) } coAnswers {
+            val now = inFlight.incrementAndGet()
+            maxInFlight.updateAndGet { prev -> if (now > prev) now else prev }
+            yield()
+            inFlight.decrementAndGet()
+            "raw"
+        }
+        val parser: (Lens, String) -> LensExtraction? = { lens, _ -> extraction(lens) }
+
+        val result = BackgroundExtractionWorker(
+            engine = engine,
+            resolver = RecordingResolver(resolved),
+            parser = parser,
+            composer = fakeComposer(),
+        ).extract(request = request, listener = RecordingListener())
+
+        assertInstanceOf(BackgroundExtractionResult.Success::class.java, result)
+        assertEquals(3, maxInFlight.get(), "all three lenses must be in-flight at once (concurrent fan-out)")
+    }
+
+    @Test
     fun `retries a lens once on parse failure and counts both attempts`() = runTest {
         val engine = mockk<LiteRtLmEngine>()
         coEvery { engine.generateText("prompt-for-LITERAL") } returnsMany listOf("garbage-1", "raw-literal")
@@ -144,13 +174,12 @@ class BackgroundExtractionWorkerTest {
         val success = assertInstanceOf(BackgroundExtractionResult.Success::class.java, result)
         assertEquals(4, success.modelCallCount, "1 retry on LITERAL + 1 each on INFERENTIAL/SKEPTICAL = 4")
         assertEquals(2, success.lensResults.first { it.lens == Lens.LITERAL }.attemptCount)
-        // Listener: initial RUNNING(0,null) → retry RUNNING(0,parse-fail) → terminal COMPLETED(0,null).
-        // The entry-level retry counter is stable for the whole run; per-lens retries are
-        // reported only through the repeated RUNNING update and lens-level diagnostics.
+        // Single RUNNING at fan-out (ADR-008 §Correction): per-lens retries no longer emit their
+        // own status — interleaved per-lens transitions are meaningless once the three lenses run
+        // concurrently. The retry is still observable on the lens result's attemptCount above.
         assertEquals(
             listOf(
                 RecordingListener.Update(ExtractionStatus.RUNNING, 0, null),
-                RecordingListener.Update(ExtractionStatus.RUNNING, 0, "parse-fail"),
                 RecordingListener.Update(ExtractionStatus.COMPLETED, 0, null),
             ),
             listener.updates,
@@ -329,7 +358,7 @@ class BackgroundExtractionWorkerTest {
     }
 
     @Test
-    fun `listener preserves caller supplied entry attempt count across lens retries`() = runTest {
+    fun `terminal listener events carry the caller-supplied entry attempt count`() = runTest {
         val engine = mockk<LiteRtLmEngine>()
         coEvery { engine.generateText("prompt-for-LITERAL") } returnsMany listOf("garbage-1", "raw-literal")
         coEvery { engine.generateText("prompt-for-INFERENTIAL") } returns "raw-inferential"
@@ -353,10 +382,11 @@ class BackgroundExtractionWorkerTest {
             listener = listener,
         )
 
+        // Even with a LITERAL retry, the caller's entryAttemptCount=2 rides every emitted event;
+        // per-lens retries no longer emit their own status under concurrent fan-out.
         assertEquals(
             listOf(
                 RecordingListener.Update(ExtractionStatus.RUNNING, 2, null),
-                RecordingListener.Update(ExtractionStatus.RUNNING, 2, "parse-fail"),
                 RecordingListener.Update(ExtractionStatus.COMPLETED, 2, null),
             ),
             listener.updates,
@@ -426,9 +456,14 @@ class BackgroundExtractionWorkerTest {
     @Test
     fun `timeout produces TimedOut with whatever lens results completed before the cap`() = runTest {
         val engine = mockk<LiteRtLmEngine>()
-        // First lens completes; second lens hangs forever; the cap fires before the third runs.
+        // Concurrent fan-out: LITERAL completes immediately; INFERENTIAL and SKEPTICAL both hang
+        // past the cap, so only LITERAL lands in the completed accumulator before the timeout.
         coEvery { engine.generateText("prompt-for-LITERAL") } returns "raw-literal"
         coEvery { engine.generateText("prompt-for-INFERENTIAL") } coAnswers {
+            kotlinx.coroutines.delay(Long.MAX_VALUE / 2)
+            "never"
+        }
+        coEvery { engine.generateText("prompt-for-SKEPTICAL") } coAnswers {
             kotlinx.coroutines.delay(Long.MAX_VALUE / 2)
             "never"
         }
@@ -449,7 +484,8 @@ class BackgroundExtractionWorkerTest {
 
         val timedOut = assertInstanceOf(BackgroundExtractionResult.TimedOut::class.java, result)
         assertEquals(50L, timedOut.timeoutMs)
-        // LITERAL completed before the cap; INFERENTIAL was in-flight, so it doesn't appear yet.
+        // LITERAL completed before the cap; INFERENTIAL + SKEPTICAL were still in-flight when the
+        // timeout cancelled the fan-out, so only LITERAL is in the accumulator.
         assertEquals(listOf(Lens.LITERAL), timedOut.lensResults.map { it.lens })
         val terminal = listener.updates.last()
         assertEquals(ExtractionStatus.TIMED_OUT, terminal.status)

@@ -750,6 +750,12 @@ the unit tier, no on-device cost.
 Implementation queued for post-Phase-4. Story file gets one entry per item above; tracking
 lives in stories, work-decision rationale lives here.
 
+### Addendum (2026-05-17) — goblin-hours addendum removed (cancels the §"personality + observation depth pass" persona-aware plan)
+
+The "**Goblin-hours addendum becomes persona-aware**" item in the 2026-05-15 addendum is **cancelled, not deferred** (operator decision). Rather than splitting `foreground/goblin-hours-addendum.txt` into per-persona variants to stop it flattening persona divergence at the demo, the addendum is **deleted entirely**: the resource, the `ForegroundInference` injection + `isGoblinHours`/`GOBLIN_HOURS_*` members, the `zoneId` constructor seam, `GoblinHoursAddendumSmokeTest`, and the `ForegroundInferenceTest` goblin cases. The follow-up no longer receives any time-of-day steering.
+
+Scope is the **addendum only**. The separate goblin-hours layers stay: `TemplateLabel.GOBLIN_HOURS` (this ADR §"template_label" closed enum), `ObservationGenerator.goblinHoursObservation`, `TemplateLabeler`, and ADR-003's `time_of_day_cluster` pattern are unaffected — they are not prompt steering and carry the user-facing Goblin Hours signal on their own. Prior decision sections above are unchanged per ADR discipline; this addendum is additive.
+
 ---
 
 ## Action Items

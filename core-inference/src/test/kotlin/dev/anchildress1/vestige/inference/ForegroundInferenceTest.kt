@@ -26,7 +26,6 @@ import org.junit.jupiter.api.io.TempDir
 import java.io.File
 import java.time.Clock
 import java.time.Instant
-import java.time.ZoneId
 import java.time.ZoneOffset
 
 class ForegroundInferenceTest {
@@ -550,118 +549,5 @@ class ForegroundInferenceTest {
         val failure = assertInstanceOf(ForegroundResult.ParseFailure::class.java, result)
         assertEquals(ForegroundResult.ParseReason.EMPTY_RESPONSE, failure.reason)
         assertEquals(null, failure.recoveredTranscription)
-    }
-
-    @Test
-    fun `zoneId parameter actually drives the addendum — same UTC instant, different zones`(@TempDir cacheDir: File) =
-        runTest {
-            // 08:00 UTC = 03:00 America/Chicago — goblin under local zone, not under UTC.
-            val utcEightAm = Instant.parse("2026-05-09T08:00:00Z")
-            val captured = mutableListOf<String>()
-            val engine = mockk<LiteRtLmEngine> {
-                every { streamMessageContents(capture(captured), any()) } returns flowOf(rawSuccess("a", "b"))
-            }
-
-            ForegroundInference(
-                engine = engine,
-                cacheDir = cacheDir,
-                clock = Clock.fixed(utcEightAm, ZoneOffset.UTC),
-                zoneId = ZoneId.of("America/Chicago"),
-            ).runForegroundCall(audioChunk(), Persona.WITNESS).terminal()
-            val localCallPrompt = captured[0]
-
-            ForegroundInference(
-                engine = engine,
-                cacheDir = cacheDir,
-                clock = Clock.fixed(utcEightAm, ZoneOffset.UTC),
-                zoneId = ZoneOffset.UTC,
-            ).runForegroundCall(audioChunk(), Persona.WITNESS).terminal()
-            val utcCallPrompt = captured[1]
-
-            assertAll(
-                {
-                    assertTrue(
-                        localCallPrompt.contains("Time-of-day context"),
-                        "local-zone call must include the addendum",
-                    )
-                },
-                {
-                    assertFalse(
-                        utcCallPrompt.contains("Time-of-day context"),
-                        "UTC-zone call must skip the addendum",
-                    )
-                },
-            )
-        }
-
-    @Test
-    fun `goblin-hours addendum is absent outside the midnight to 5am window`(@TempDir cacheDir: File) = runTest {
-        val captured = slot<String>()
-        val engine = mockk<LiteRtLmEngine> {
-            every { streamMessageContents(capture(captured), any()) } returns flowOf(rawSuccess("a", "b"))
-        }
-        val zone = ZoneId.of("America/Chicago")
-        val noonCentral = java.time.LocalDateTime.of(2026, 5, 9, 12, 0).atZone(zone).toInstant()
-
-        ForegroundInference(
-            engine = engine,
-            cacheDir = cacheDir,
-            clock = Clock.fixed(noonCentral, zone),
-            zoneId = zone,
-        ).runForegroundCall(audioChunk(), Persona.WITNESS).terminal()
-
-        val systemPrompt = captured.captured
-        assertFalse(systemPrompt.contains("Time-of-day context"))
-        assertFalse(systemPrompt.contains("midnight and 5am"))
-    }
-
-    @Test
-    fun `goblin-hours addendum is present inside the window`(@TempDir cacheDir: File) = runTest {
-        val captured = slot<String>()
-        val engine = mockk<LiteRtLmEngine> {
-            every { streamMessageContents(capture(captured), any()) } returns flowOf(rawSuccess("a", "b"))
-        }
-        val zone = ZoneId.of("America/Chicago")
-        val threeAmCentral = java.time.LocalDateTime.of(2026, 5, 9, 3, 0).atZone(zone).toInstant()
-
-        ForegroundInference(
-            engine = engine,
-            cacheDir = cacheDir,
-            clock = Clock.fixed(threeAmCentral, zone),
-            zoneId = zone,
-        ).runForegroundCall(audioChunk(), Persona.WITNESS).terminal()
-
-        val systemPrompt = captured.captured
-        assertAll(
-            { assertTrue(systemPrompt.contains("Time-of-day context")) },
-            { assertTrue(systemPrompt.contains("midnight and 5am")) },
-            // Addendum lives after the schema reminder so the schema framing is undisturbed.
-            {
-                assertTrue(
-                    systemPrompt.indexOf("Time-of-day context") > systemPrompt.indexOf("transcription tags"),
-                    "addendum must follow the output-schema reminder",
-                )
-            },
-        )
-    }
-
-    @Test
-    fun `5am local time is outside the goblin window`(@TempDir cacheDir: File) = runTest {
-        val captured = slot<String>()
-        val engine = mockk<LiteRtLmEngine> {
-            every { streamMessageContents(capture(captured), any()) } returns flowOf(rawSuccess("a", "b"))
-        }
-        val zone = ZoneId.of("America/Chicago")
-        val fiveAmCentral = java.time.LocalDateTime.of(2026, 5, 9, 5, 0).atZone(zone).toInstant()
-
-        ForegroundInference(
-            engine = engine,
-            cacheDir = cacheDir,
-            clock = Clock.fixed(fiveAmCentral, zone),
-            zoneId = zone,
-        ).runForegroundCall(audioChunk(), Persona.WITNESS).terminal()
-
-        val systemPrompt = captured.captured
-        assertFalse(systemPrompt.contains("Time-of-day context"))
     }
 }

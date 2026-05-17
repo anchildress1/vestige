@@ -5,7 +5,6 @@
       "release-type": "simple",
       "changelog-path": "CHANGELOG.md",
       "initial-version": "1.0.0",
-      "release-as": "1.0.0",
       "include-component-in-tag": false,
       "extra-files": [
         {

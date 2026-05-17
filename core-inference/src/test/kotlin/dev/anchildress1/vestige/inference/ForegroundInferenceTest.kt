@@ -242,6 +242,52 @@ class ForegroundInferenceTest {
     }
 
     @Test
+    fun `runForegroundTextCall renders the history block into the system prompt`(@TempDir cacheDir: File) = runTest {
+        val captured = slot<List<Content>>()
+        val engine = mockk<LiteRtLmEngine> {
+            every { streamMessageContents(capture(captured)) } returns flowOf(rawSuccess("a", "b"))
+        }
+
+        ForegroundInference(engine, cacheDir, clock = fixedClock)
+            .runForegroundTextCall(
+                text = "the new entry",
+                persona = Persona.WITNESS,
+                retrievedHistory = listOf(
+                    HistoryChunk(patternId = null, text = "an earlier entry about the same loop"),
+                ),
+            )
+            .terminal()
+
+        val systemPrompt = (captured.captured[0] as Content.Text).text
+        assertAll(
+            { assertTrue(systemPrompt.contains("## PRIOR ENTRIES")) },
+            { assertTrue(systemPrompt.contains("an earlier entry about the same loop")) },
+            // History sits after the schema reminder so the envelope framing stays first.
+            {
+                assertTrue(
+                    systemPrompt.indexOf("## PRIOR ENTRIES") > systemPrompt.indexOf("transcription tags"),
+                    "history block must follow the output-schema reminder",
+                )
+            },
+        )
+    }
+
+    @Test
+    fun `runForegroundTextCall with empty history emits no prior-entries block`(@TempDir cacheDir: File) = runTest {
+        val captured = slot<List<Content>>()
+        val engine = mockk<LiteRtLmEngine> {
+            every { streamMessageContents(capture(captured)) } returns flowOf(rawSuccess("a", "b"))
+        }
+
+        ForegroundInference(engine, cacheDir, clock = fixedClock)
+            .runForegroundTextCall(text = "no history here", persona = Persona.WITNESS)
+            .terminal()
+
+        val systemPrompt = (captured.captured[0] as Content.Text).text
+        assertFalse(systemPrompt.contains("## PRIOR ENTRIES"))
+    }
+
+    @Test
     fun `runForegroundTextCall rejects blank text`(@TempDir cacheDir: File) = runTest {
         val engine = mockk<LiteRtLmEngine>()
         val inference = ForegroundInference(engine, cacheDir, clock = fixedClock)

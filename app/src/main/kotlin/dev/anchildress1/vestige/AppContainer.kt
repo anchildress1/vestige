@@ -42,11 +42,13 @@ import dev.anchildress1.vestige.storage.PatternDetector
 import dev.anchildress1.vestige.storage.PatternEntity
 import dev.anchildress1.vestige.storage.PatternRepo
 import dev.anchildress1.vestige.storage.PatternStore
+import dev.anchildress1.vestige.storage.RetrievalRepo
 import dev.anchildress1.vestige.storage.TagEntity
 import dev.anchildress1.vestige.storage.VectorBackfillWorker
 import dev.anchildress1.vestige.storage.VestigeBoxStore
 import dev.anchildress1.vestige.ui.capture.ModelReadiness
 import io.objectbox.BoxStore
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
@@ -76,6 +78,7 @@ import java.util.zip.ZipOutputStream
 @Suppress(
     "LongParameterList", // Constructor-injection seams: factories + lifecycle + scope.
     "TooManyFunctions", // DI hub aggregates capture, save, lifecycle, and backfill orchestration.
+    "LargeClass", // DI root: aggregates the whole app graph; splitting would scatter wiring.
 )
 class AppContainer(
     private val applicationContext: Context,
@@ -285,9 +288,35 @@ class AppContainer(
      * Typed-entry foreground call — same engine + parser as the voice path so a typed entry
      * reviews identically. The model is required; the capture screen gates on readiness.
      */
-    suspend fun runForegroundTextCall(text: String, persona: Persona): Flow<ForegroundStreamEvent> {
+    suspend fun runForegroundTextCall(
+        text: String,
+        persona: Persona,
+        retrievedHistory: List<HistoryChunk> = emptyList(),
+    ): Flow<ForegroundStreamEvent> {
         ensureBackgroundEngineInitialized()
-        return foregroundInference.runForegroundTextCall(text, persona)
+        return foregroundInference.runForegroundTextCall(text, persona, retrievedHistory)
+    }
+
+    private val retrievalRepo: RetrievalRepo by lazy {
+        RetrievalRepo(boxStore = boxStore, embedder = { text -> requireEmbedder().embed(text) })
+    }
+
+    /**
+     * Off-thread prior-entry lookup feeding the foreground follow-up + background extraction.
+     * Degrades to empty on any failure (embeddings not backfilled yet, store error) so a bad
+     * retrieval can never block a capture. Maps the top entries to context-only [HistoryChunk]s —
+     * no `patternId`, since the follow-up needs textual context, not recurrence-surface linkage.
+     */
+    suspend fun retrieveHistory(query: String): List<HistoryChunk> = withContext(Dispatchers.Default) {
+        try {
+            retrievalRepo.query(query, topN = FOREGROUND_HISTORY_TOP_N)
+                .map { HistoryChunk(patternId = null, text = it.entryText) }
+        } catch (cancel: CancellationException) {
+            throw cancel
+        } catch (@Suppress("TooGenericExceptionCaught") error: Exception) {
+            Log.w(TAG, "retrieveHistory degraded (${error.javaClass.simpleName})")
+            emptyList()
+        }
     }
 
     val observationGenerator: ObservationGenerator by lazy {
@@ -840,6 +869,7 @@ class AppContainer(
         const val VECTOR_BACKFILL_RETRY_DELAY_MS = 5_000L
         const val VECTOR_BACKFILL_MAX_RETRIES = 12
         const val PCT_MAX = 100
+        const val FOREGROUND_HISTORY_TOP_N = 3
 
         fun defaultScope(): CoroutineScope {
             val exceptionHandler = CoroutineExceptionHandler { _, error ->

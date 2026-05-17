@@ -77,8 +77,8 @@ class CaptureScreenTest {
                 kotlinx.coroutines.suspendCancellableCoroutine { /* park */ }
             },
             foregroundInference = ForegroundInferenceCall { _, _ -> error("unreached") },
-            saveAndExtract = SaveAndExtract { _, _, _, _, _ -> },
-            foregroundTextInference = ForegroundTextInferenceCall { _, _ -> error("unused") },
+            saveAndExtract = SaveAndExtract { _, _, _, _, _, _ -> },
+            foregroundTextInference = ForegroundTextInferenceCall { _, _, _ -> error("unused") },
             clock = clock,
             zoneId = ZoneOffset.UTC,
             initialReadiness = ModelReadiness.Ready,
@@ -189,7 +189,12 @@ class CaptureScreenTest {
         return CaptureViewModel(
             initialPersona = Persona.WITNESS,
             recordVoice = VoiceCapture { _, _ -> audio },
+            // Option-C voice: call 1 yields the transcription, call 2 the follow-up.
             foregroundInference = ForegroundInferenceCall { _, _ ->
+                flowOf(ForegroundStreamEvent.Transcription("something happened"))
+            },
+            saveAndExtract = SaveAndExtract { _, _, _, _, _, _ -> },
+            foregroundTextInference = ForegroundTextInferenceCall { text, _, _ ->
                 flowOf(
                     ForegroundStreamEvent.Terminal(
                         ForegroundResult.Success(
@@ -197,14 +202,12 @@ class CaptureScreenTest {
                             rawResponse = "",
                             elapsedMs = 0L,
                             completedAt = clock.instant(),
-                            transcription = "something happened",
+                            transcription = text,
                             followUp = "sounds like a pattern",
                         ),
                     ),
                 )
             },
-            saveAndExtract = SaveAndExtract { _, _, _, _, _ -> },
-            foregroundTextInference = ForegroundTextInferenceCall { _, _ -> error("unused") },
             clock = clock,
             zoneId = ZoneOffset.UTC,
             initialReadiness = ModelReadiness.Ready,
@@ -223,8 +226,8 @@ class CaptureScreenTest {
                 // cancellation. The test only verifies that the route reaches the placeholder.
                 kotlinx.coroutines.suspendCancellableCoroutine { /* park */ }
             },
-            saveAndExtract = SaveAndExtract { _, _, _, _, _ -> },
-            foregroundTextInference = ForegroundTextInferenceCall { _, _ -> error("unused") },
+            saveAndExtract = SaveAndExtract { _, _, _, _, _, _ -> },
+            foregroundTextInference = ForegroundTextInferenceCall { _, _, _ -> error("unused") },
             clock = clock,
             zoneId = ZoneOffset.UTC,
             initialReadiness = readiness,

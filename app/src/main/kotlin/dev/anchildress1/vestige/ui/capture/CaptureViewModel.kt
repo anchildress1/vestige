@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import dev.anchildress1.vestige.inference.AudioChunk
 import dev.anchildress1.vestige.inference.ForegroundResult
 import dev.anchildress1.vestige.inference.ForegroundStreamEvent
+import dev.anchildress1.vestige.inference.HistoryChunk
 import dev.anchildress1.vestige.model.Persona
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -19,6 +20,8 @@ import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.filterIsInstance
+import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.time.Clock
@@ -43,6 +46,7 @@ class CaptureViewModel(
     private val foregroundInference: ForegroundInferenceCall,
     private val saveAndExtract: SaveAndExtract,
     private val foregroundTextInference: ForegroundTextInferenceCall,
+    private val retrieveHistory: HistoryRetrieval = HistoryRetrieval { emptyList() },
     private val clock: Clock = Clock.systemUTC(),
     private val zoneId: ZoneId = ZoneId.systemDefault(),
     private val initialReadiness: ModelReadiness = ModelReadiness.Loading,
@@ -180,9 +184,7 @@ class CaptureViewModel(
                     return@launch
                 }
                 transitionToInferring()
-                runForeground(inferencePersona, audio.durationMs) {
-                    foregroundInference(audio, inferencePersona)
-                }
+                runVoiceForeground(inferencePersona, audio)
             } catch (cancel: CancellationException) {
                 throw cancel
             } catch (@Suppress("TooGenericExceptionCaught") error: Exception) {
@@ -274,8 +276,9 @@ class CaptureViewModel(
                     c
                 }
             }
-            runForeground(inferencePersona, durationMs = 0L) {
-                foregroundTextInference(trimmed, inferencePersona)
+            val history = retrieveHistorySafely(trimmed)
+            runForeground(inferencePersona, durationMs = 0L, retrievedHistory = history, transcriptionOverride = null) {
+                foregroundTextInference(trimmed, inferencePersona, history)
             }
         }
     }
@@ -299,22 +302,27 @@ class CaptureViewModel(
         }
     }
 
-    // Shared streaming handler for the voice (audio) and typed (text) paths. The scanner-driven
+    // Shared streaming handler for the voice follow-up call and the typed path. The scanner-driven
     // deltas grow the Reviewing transcript live; the terminal event carries the authoritative
     // parsed result and is the only thing that saves. `durationMs` is the audio length for voice,
-    // 0 for typed. A collector cancellation (navigate-away) throws out the partial — no save.
+    // 0 for typed. `transcriptionOverride` carries the voice path's authoritative call-1
+    // transcription so the verbatim user words win over call-2's model echo; null for typed.
+    // `retrievedHistory` is forwarded to the background extraction so it sees the same prior-entry
+    // context the follow-up did. A collector cancellation (navigate-away) throws out the partial.
     private suspend fun runForeground(
         persona: Persona,
         durationMs: Long,
+        retrievedHistory: List<HistoryChunk>,
+        transcriptionOverride: String?,
         call: suspend () -> Flow<ForegroundStreamEvent>,
     ) {
-        var transcription = ""
+        var transcription = transcriptionOverride.orEmpty()
         val followUp = StringBuilder()
         try {
             call().collect { event ->
                 when (event) {
                     is ForegroundStreamEvent.Transcription -> {
-                        transcription = event.text
+                        transcription = transcriptionOverride ?: event.text
                         showReviewing(transcription, followUp.toString(), elapsedMs = 0L)
                     }
 
@@ -325,14 +333,16 @@ class CaptureViewModel(
 
                     is ForegroundStreamEvent.Terminal -> when (val result = event.result) {
                         is ForegroundResult.Success -> {
+                            val saved = transcriptionOverride ?: result.transcription
                             saveAndExtract(
-                                result.transcription,
+                                saved,
                                 ZonedDateTime.now(clock.withZone(zoneId)),
                                 persona,
                                 durationMs,
                                 result.followUp,
+                                retrievedHistory,
                             )
-                            showReviewing(result.transcription, result.followUp, result.elapsedMs)
+                            showReviewing(saved, result.followUp, result.elapsedMs)
                         }
 
                         is ForegroundResult.ParseFailure -> emitInferenceError(
@@ -350,6 +360,51 @@ class CaptureViewModel(
             Log.e(TAG, "Foreground inference failed", error)
             emitInferenceError(CaptureError.InferenceFailed.Reason.ENGINE_FAILED)
         }
+    }
+
+    /**
+     * Voice path (ADR retrieval-history-gap, option C): call 1 streams the transcription from the
+     * audio, cancels the moment it lands (no wasted follow-up generation, temp WAV discarded by
+     * ForegroundInference's finally); a retrieval query on that transcription then feeds call 2,
+     * whose follow-up is history-conditioned. The call-1 transcription is authoritative — call 2's
+     * model echo never overwrites the verbatim user words.
+     */
+    private suspend fun runVoiceForeground(persona: Persona, audio: AudioChunk) {
+        try {
+            val transcription = foregroundInference(audio, persona)
+                .filterIsInstance<ForegroundStreamEvent.Transcription>()
+                .firstOrNull()
+                ?.text
+            if (transcription.isNullOrBlank()) {
+                emitInferenceError(CaptureError.InferenceFailed.Reason.PARSE_FAILED)
+                return
+            }
+            showReviewing(transcription, followUp = "", elapsedMs = 0L)
+            val history = retrieveHistorySafely(transcription)
+            runForeground(persona, audio.durationMs, history, transcriptionOverride = transcription) {
+                foregroundTextInference(transcription, persona, history)
+            }
+        } catch (timeout: TimeoutCancellationException) {
+            Log.w(TAG, "Voice transcription timed out", timeout)
+            emitInferenceError(CaptureError.InferenceFailed.Reason.TIMED_OUT)
+        } catch (cancel: CancellationException) {
+            throw cancel
+        } catch (@Suppress("TooGenericExceptionCaught") error: Exception) {
+            Log.e(TAG, "Voice foreground failed", error)
+            emitInferenceError(CaptureError.InferenceFailed.Reason.ENGINE_FAILED)
+        }
+    }
+
+    // Retrieval must never block the capture: a degraded query (no embeddings yet, store error)
+    // yields an empty history and the follow-up proceeds context-free. Logs the exception class
+    // only — never the query text (AGENTS.md: no raw user content in any sink).
+    private suspend fun retrieveHistorySafely(query: String): List<HistoryChunk> = try {
+        retrieveHistory(query)
+    } catch (cancel: CancellationException) {
+        throw cancel
+    } catch (@Suppress("TooGenericExceptionCaught") error: Exception) {
+        Log.w(TAG, "Retrieval degraded, proceeding context-free (${error.javaClass.simpleName})")
+        emptyList()
     }
 
     private fun showReviewing(transcription: String, followUp: String, elapsedMs: Long) {
@@ -407,18 +462,37 @@ fun interface ForegroundInferenceCall {
     suspend operator fun invoke(audio: AudioChunk, persona: Persona): Flow<ForegroundStreamEvent>
 }
 
-/** Streams one foreground (single-turn) call for a typed entry — text in, progressive envelope out. */
+/**
+ * Streams a follow-up call given known text + retrieved prior-entry context. Used for typed
+ * entries (text = the user's typed words) and for the voice path's call 2 (text = call-1's
+ * authoritative transcription). The history is rendered into the system prompt by
+ * `ForegroundInference`.
+ */
 fun interface ForegroundTextInferenceCall {
-    suspend operator fun invoke(text: String, persona: Persona): Flow<ForegroundStreamEvent>
+    suspend operator fun invoke(
+        text: String,
+        persona: Persona,
+        retrievedHistory: List<HistoryChunk>,
+    ): Flow<ForegroundStreamEvent>
+}
+
+/**
+ * Looks up prior-entry context for a query string. Implementations run off the UI thread and
+ * MUST degrade to an empty list rather than throw — a failed retrieval can never block a capture.
+ */
+fun interface HistoryRetrieval {
+    suspend operator fun invoke(query: String): List<HistoryChunk>
 }
 
 /** Routes a transcription (voice or typed) into the two-tier save + background extraction pipeline. */
 fun interface SaveAndExtract {
+    @Suppress("LongParameterList") // Save+extract orchestration contract; a wrapper DTO would add indirection only.
     suspend operator fun invoke(
         text: String,
         capturedAt: ZonedDateTime,
         persona: Persona,
         durationMs: Long,
         followUpText: String?,
+        retrievedHistory: List<HistoryChunk>,
     )
 }

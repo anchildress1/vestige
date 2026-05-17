@@ -73,11 +73,15 @@ class ForegroundInference(
      * entry does — no temp WAV because there is no audio to hand off. The model is required (no
      * model-free typed path); the caller gates on readiness.
      */
-    fun runForegroundTextCall(text: String, persona: Persona): Flow<ForegroundStreamEvent> {
+    fun runForegroundTextCall(
+        text: String,
+        persona: Persona,
+        retrievedHistory: List<HistoryChunk> = emptyList(),
+    ): Flow<ForegroundStreamEvent> {
         require(text.isNotBlank()) { "ForegroundInference requires non-blank typed text." }
 
         return flow {
-            val systemPrompt = composeSystemPrompt(persona, clock.instant())
+            val systemPrompt = composeSystemPrompt(persona, clock.instant(), retrievedHistory)
             emitEnvelope(
                 persona = persona,
                 label = "runForegroundTextCall",
@@ -143,17 +147,47 @@ class ForegroundInference(
             }
     }
 
-    private fun composeSystemPrompt(persona: Persona, startedAt: java.time.Instant): String {
+    private fun composeSystemPrompt(
+        persona: Persona,
+        startedAt: java.time.Instant,
+        retrievedHistory: List<HistoryChunk> = emptyList(),
+    ): String {
         val personaPrompt = PersonaPromptComposer.compose(persona).trimEnd()
         return buildString {
             append(personaPrompt)
             append("\n\n")
             append(OUTPUT_SCHEMA_REMINDER)
+            if (retrievedHistory.isNotEmpty()) {
+                append("\n\n")
+                append(renderForegroundHistory(retrievedHistory))
+            }
             if (isGoblinHours(startedAt)) {
                 append("\n\n")
                 append(GOBLIN_HOURS_ADDENDUM.trimEnd())
             }
             append('\n')
+        }
+    }
+
+    // Mirrors PromptComposer's background history block (cap 3 chunks, 600 chars each) so the
+    // foreground follow-up sees the same prior-entry context the lens pass does. Empty history
+    // skips the block entirely — callers must not pass blanks expecting a sentinel.
+    private fun renderForegroundHistory(history: List<HistoryChunk>): String {
+        val capped = history.take(MAX_HISTORY_CHUNKS).map { chunk ->
+            if (chunk.text.length <= MAX_HISTORY_CHARS_PER_CHUNK) {
+                chunk.text
+            } else {
+                chunk.text.substring(0, MAX_HISTORY_CHARS_PER_CHUNK - HISTORY_ELLIPSIS.length)
+                    .trimEnd() + HISTORY_ELLIPSIS
+            }
+        }
+        return buildString {
+            append("## PRIOR ENTRIES (context only — do not transcribe or quote verbatim)")
+            capped.forEachIndexed { index, text ->
+                append('\n')
+                append("- [${index + 1}] ")
+                append(text.replace("\n", " "))
+            }
         }
     }
 
@@ -163,6 +197,12 @@ class ForegroundInference(
     companion object {
         internal const val TEMP_PREFIX = "vestige-fg-"
         internal const val TEMP_SUFFIX = ".wav"
+
+        // Match PromptComposer's background-history budget so the foreground follow-up and the
+        // lens pass reason over the same context window.
+        private const val MAX_HISTORY_CHUNKS = 3
+        private const val MAX_HISTORY_CHARS_PER_CHUNK = 600
+        private const val HISTORY_ELLIPSIS = "…"
 
         // Prose-only — naming the tag literals here would collide with the parser if the model
         // echoes the reminder back.

@@ -34,8 +34,8 @@ class CaptureRouteStateSyncTest {
             initialPersona = Persona.WITNESS,
             recordVoice = VoiceCapture { _, _ -> null },
             foregroundInference = ForegroundInferenceCall { _, _ -> parseFailure() },
-            saveAndExtract = SaveAndExtract { _, _, _, _, _ -> },
-            foregroundTextInference = ForegroundTextInferenceCall { _, _ -> parseFailure() },
+            saveAndExtract = SaveAndExtract { _, _, _, _, _, _ -> },
+            foregroundTextInference = ForegroundTextInferenceCall { _, _, _ -> parseFailure() },
             initialReadiness = ModelReadiness.Loading,
         )
         val persona = mutableStateOf(Persona.WITNESS)

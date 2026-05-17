@@ -1,9 +1,11 @@
 package dev.anchildress1.vestige.storage
 
+import dev.anchildress1.vestige.model.ExtractionStatus
 import dev.anchildress1.vestige.testing.newInMemoryObjectBoxDirectory
 import dev.anchildress1.vestige.testing.openInMemoryBoxStore
 import io.objectbox.BoxStore
 import io.objectbox.kotlin.boxFor
+import io.objectbox.query.QueryBuilder
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -12,8 +14,11 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
+import org.json.JSONArray
+import org.json.JSONObject
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertThrows
@@ -46,27 +51,28 @@ class VectorBackfillWorkerTest {
     }
 
     @Test
-    fun `hasPendingWork reports null-vector presence without touching the embedder`() {
-        val embedder: suspend (String) -> FloatArray = { error("embedder must not be called") }
-        val worker = VectorBackfillWorker(boxStore, embedder)
+    fun `hasPendingWork is true only for COMPLETED rows behind the current vector schema`() {
+        val worker = VectorBackfillWorker(boxStore) { error("embedder must not be called") }
 
-        assertTrue(!worker.hasPendingWork())
+        assertFalse(worker.hasPendingWork())
 
-        insertEntry("already done", vector = FloatArray(DIMS) { 1f })
-        assertTrue(!worker.hasPendingWork())
+        insertEntry(status = ExtractionStatus.PENDING, vectorSchemaVersion = 0)
+        assertFalse("PENDING rows have no distilled fields yet", worker.hasPendingWork())
 
-        insertEntry("needs backfill", vector = null)
-        assertTrue(worker.hasPendingWork())
+        insertEntry(status = ExtractionStatus.COMPLETED, vectorSchemaVersion = CURRENT)
+        assertFalse("already-current rows are not stale", worker.hasPendingWork())
+
+        insertEntry(status = ExtractionStatus.COMPLETED, vectorSchemaVersion = 0)
+        assertTrue("COMPLETED + stale schema is pending work", worker.hasPendingWork())
     }
 
     @Test
     fun `empty database returns empty stats without invoking embedder`() = runTest {
         var calls = 0
-        val embedder: suspend (String) -> FloatArray = {
+        val worker = VectorBackfillWorker(boxStore) {
             calls++
             FloatArray(DIMS)
         }
-        val worker = VectorBackfillWorker(boxStore, embedder)
 
         val stats = worker.backfill()
 
@@ -76,55 +82,115 @@ class VectorBackfillWorkerTest {
     }
 
     @Test
-    fun `null-vector entries get embedded and persisted`() = runTest {
-        val first = insertEntry("standup crashed", vector = null)
-        val second = insertEntry("groceries", vector = null)
+    fun `embeds the synthesized distillation, never the raw entryText`() = runTest {
+        insertEntry(
+            tagNames = listOf("standup", "flattened"),
+            observations = listOf("meeting ran long", "lead was absent"),
+            commitmentTopic = "alice",
+            entryText = "uh so like the whole thing just kind of crashed and burned today",
+        )
         val callTexts = mutableListOf<String>()
-        val embedder: suspend (String) -> FloatArray = { text ->
+        val worker = VectorBackfillWorker(boxStore) { text ->
             callTexts.add(text)
-            FloatArray(DIMS) { i -> if (text == "standup crashed") i.toFloat() else 0f }
+            FloatArray(DIMS) { 1f }
         }
-        val worker = VectorBackfillWorker(boxStore, embedder)
 
         val stats = worker.backfill()
 
-        assertEquals(2, stats.total)
-        assertEquals(2, stats.processed)
+        assertEquals(1, stats.processed)
         assertEquals(0, stats.failed)
-        val entryBox = boxStore.boxFor<EntryEntity>()
-        assertNotNull(entryBox[first].vector)
-        assertNotNull(entryBox[second].vector)
-        assertEquals(setOf("standup crashed", "groceries"), callTexts.toSet())
+        assertEquals(
+            listOf("standup flattened. meeting ran long. lead was absent. alice"),
+            callTexts,
+        )
+        val row = boxStore.boxFor<EntryEntity>().all.single()
+        assertNotNull(row.vector)
+        assertEquals(CURRENT, row.vectorSchemaVersion)
     }
 
     @Test
-    fun `entries with existing vectors are skipped`() = runTest {
-        val withVector = insertEntry("already done", vector = FloatArray(DIMS) { 1f })
-        val pending = insertEntry("needs backfill", vector = null)
+    fun `non-COMPLETED rows are skipped and never embedded`() = runTest {
+        val nonTerminal = listOf(
+            ExtractionStatus.PENDING,
+            ExtractionStatus.RUNNING,
+            ExtractionStatus.FAILED,
+            ExtractionStatus.TIMED_OUT,
+        )
+        nonTerminal.forEach { insertEntry(status = it, vectorSchemaVersion = 0) }
+        val worker = VectorBackfillWorker(boxStore) { error("embedder must not be called for non-COMPLETED rows") }
+
+        val stats = worker.backfill()
+
+        assertEquals(0, stats.total)
+        assertEquals(0, stats.processed)
+        assertTrue(boxStore.boxFor<EntryEntity>().all.all { it.vector == null && it.vectorSchemaVersion == 0 })
+    }
+
+    @Test
+    fun `rows already at the current schema are skipped on re-run`() = runTest {
+        val current = insertEntry(vectorSchemaVersion = CURRENT, vector = null)
+        val stale = insertEntry(vectorSchemaVersion = 0)
         val callTexts = mutableListOf<String>()
-        val embedder: suspend (String) -> FloatArray = { text ->
+        val worker = VectorBackfillWorker(boxStore) { text ->
             callTexts.add(text)
             FloatArray(DIMS)
         }
-        val worker = VectorBackfillWorker(boxStore, embedder)
 
-        worker.backfill()
+        val stats = worker.backfill()
 
+        assertEquals(1, stats.total)
+        assertEquals(1, stats.processed)
+        assertEquals(1, callTexts.size)
         val entryBox = boxStore.boxFor<EntryEntity>()
-        assertEquals(1f, entryBox[withVector].vector!![0])
-        assertNotNull(entryBox[pending].vector)
-        assertEquals(listOf("needs backfill"), callTexts)
+        assertNull("current-schema row left untouched", entryBox[current].vector)
+        assertNotNull(entryBox[stale].vector)
     }
 
     @Test
-    fun `embedder failure on one entry is logged and does not abort the pass`() = runTest {
-        val good = insertEntry("succeeds", vector = null)
-        val bad = insertEntry("throws", vector = null)
-        val embedder: suspend (String) -> FloatArray = { text ->
+    fun `stale previously-embedded rows are re-embedded against the new source`() = runTest {
+        val staleVector = FloatArray(DIMS) { 0.5f }
+        val id = insertEntry(
+            tagNames = listOf("rebackfill"),
+            vector = staleVector,
+            vectorSchemaVersion = 0,
+        )
+        val worker = VectorBackfillWorker(boxStore) { text ->
+            assertEquals("rebackfill", text)
+            FloatArray(DIMS) { 9f }
+        }
+
+        val stats = worker.backfill()
+
+        assertEquals(1, stats.processed)
+        val row = boxStore.boxFor<EntryEntity>()[id]
+        assertEquals(9f, row.vector!![0])
+        assertEquals(CURRENT, row.vectorSchemaVersion)
+    }
+
+    @Test
+    fun `COMPLETED row with nothing distillable is stamped, not embedded, and terminates the sweep`() = runTest {
+        val id = insertEntry(tagNames = emptyList(), observations = emptyList(), commitmentTopic = null)
+        val worker = VectorBackfillWorker(boxStore) { error("embedder must not be called for blank distillation") }
+
+        val stats = worker.backfill()
+
+        assertEquals(1, stats.total)
+        assertEquals(0, stats.processed)
+        assertEquals(0, stats.failed)
+        val row = boxStore.boxFor<EntryEntity>()[id]
+        assertNull("no vector — null is a zero cosine contribution", row.vector)
+        assertEquals(CURRENT, row.vectorSchemaVersion)
+        assertFalse("stamped row must not be re-selected", worker.hasPendingWork())
+    }
+
+    @Test
+    fun `embedder failure leaves the row stale so the next pass retries it`() = runTest {
+        val good = insertEntry(tagNames = listOf("succeeds"))
+        val bad = insertEntry(tagNames = listOf("throws"))
+        val worker = VectorBackfillWorker(boxStore) { text ->
             if (text == "throws") error("simulated embedder failure")
             FloatArray(DIMS) { 1f }
         }
-        val worker = VectorBackfillWorker(boxStore, embedder)
 
         val stats = worker.backfill()
 
@@ -133,33 +199,65 @@ class VectorBackfillWorkerTest {
         assertEquals(1, stats.failed)
         val entryBox = boxStore.boxFor<EntryEntity>()
         assertNotNull(entryBox[good].vector)
+        assertEquals(CURRENT, entryBox[good].vectorSchemaVersion)
         assertNull(entryBox[bad].vector)
+        assertEquals("failed row stays stale for retry", 0, entryBox[bad].vectorSchemaVersion)
     }
 
     @Test
-    fun `wrong-dimension embedder output is counted as failure and not persisted`() = runTest {
-        val target = insertEntry("dimension drift", vector = null)
-        val embedder: suspend (String) -> FloatArray = { FloatArray(64) { 1f } } // expected 768
+    fun `wrong-dimension embedder output is a failure and is not persisted`() = runTest {
+        val target = insertEntry(tagNames = listOf("dimension drift"))
+        val worker = VectorBackfillWorker(boxStore) { FloatArray(64) { 1f } } // expected 768
 
-        val stats = VectorBackfillWorker(boxStore, embedder).backfill()
+        val stats = worker.backfill()
 
         assertEquals(1, stats.total)
         assertEquals(0, stats.processed)
         assertEquals(1, stats.failed)
-        assertNull(boxStore.boxFor<EntryEntity>()[target].vector)
+        val row = boxStore.boxFor<EntryEntity>()[target]
+        assertNull(row.vector)
+        assertEquals(0, row.vectorSchemaVersion)
+    }
+
+    @Test
+    fun `all entries are processed across multiple batches`() = runTest {
+        val ids = (0 until 5).map { insertEntry(tagNames = listOf("entry-$it")) }
+        val seen = mutableListOf<String>()
+        val worker = VectorBackfillWorker(boxStore) { text ->
+            seen.add(text)
+            FloatArray(DIMS)
+        }
+
+        val stats = worker.backfill(batchSize = 2)
+
+        assertEquals(5, stats.total)
+        assertEquals(5, stats.processed)
+        assertEquals((0 until 5).map { "entry-$it" }.toSet(), seen.toSet())
+        val entryBox = boxStore.boxFor<EntryEntity>()
+        assertTrue(ids.all { entryBox[it].vector != null && entryBox[it].vectorSchemaVersion == CURRENT })
+    }
+
+    @Test
+    fun `non-positive backfill batch size is rejected`() {
+        val worker = VectorBackfillWorker(boxStore) { FloatArray(DIMS) }
+        assertThrows(IllegalArgumentException::class.java) {
+            runBlocking { worker.backfill(batchSize = 0) }
+        }
+        assertThrows(IllegalArgumentException::class.java) {
+            runBlocking { worker.backfill(batchSize = -1) }
+        }
     }
 
     @Test
     fun `cancellation mid-pass stops cleanly without losing prior progress`() = runBlocking {
-        repeat(5) { insertEntry("entry $it", vector = null) }
+        val ids = (0 until 5).map { insertEntry(tagNames = listOf("entry-$it")) }
         val processedCount = AtomicInteger(0)
-        val embedder: suspend (String) -> FloatArray = {
+        val worker = VectorBackfillWorker(boxStore) {
             // Yield first so the cancel below can land between embeddings.
             delay(20)
             processedCount.incrementAndGet()
             FloatArray(DIMS)
         }
-        val worker = VectorBackfillWorker(boxStore, embedder)
         val parent = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
         val job = parent.async { worker.backfill() }
@@ -170,28 +268,67 @@ class VectorBackfillWorkerTest {
         }
 
         val entryBox = boxStore.boxFor<EntryEntity>()
-        val embedded = entryBox.all.count { it.vector != null }
+        val embedded = ids.count { entryBox[it].vector != null }
         assertEquals(
             "Embedded entries must match processed count — partial progress is durable.",
             processedCount.get(),
             embedded,
         )
         assertTrue("Cancellation must arrive before all 5 entries finish", embedded < 5)
+        assertTrue(
+            "Every embedded row is stamped to the current schema",
+            ids.all { entryBox[it].vector == null || entryBox[it].vectorSchemaVersion == CURRENT },
+        )
     }
 
-    private fun insertEntry(text: String, vector: FloatArray?): Long {
+    @Suppress("LongParameterList") // Test seam mirrors the fields buildEmbeddingText reads.
+    private fun insertEntry(
+        tagNames: List<String> = listOf("default-tag"),
+        observations: List<String> = emptyList(),
+        commitmentTopic: String? = null,
+        entryText: String = "raw verbatim transcription body",
+        status: ExtractionStatus = ExtractionStatus.COMPLETED,
+        vector: FloatArray? = null,
+        vectorSchemaVersion: Int = 0,
+    ): Long {
         val entryBox = boxStore.boxFor<EntryEntity>()
-        return entryBox.put(
-            EntryEntity(
-                entryText = text,
-                timestampEpochMs = System.currentTimeMillis(),
-                markdownFilename = "test-${System.nanoTime()}.md",
-                vector = vector,
-            ),
+        val tagBox = boxStore.boxFor<TagEntity>()
+        // Reuse an existing tag row by name — `TagEntity.name` is @Unique, so two entries that
+        // share a tag must link the same row (mirrors EntryStore.attachTags).
+        val tagEntities = tagNames.map { name ->
+            tagBox.query().equal(TagEntity_.name, name, QueryBuilder.StringOrder.CASE_SENSITIVE)
+                .build()
+                .use { it.findFirst() }
+                ?: TagEntity(name = name, entryCount = 1).also { tagBox.put(it) }
+        }
+        val observationsJson = JSONArray().apply {
+            observations.forEach {
+                put(JSONObject().put("text", it).put("evidence", "theme-noticing").put("fields", JSONArray()))
+            }
+        }.toString()
+        val commitmentJson = commitmentTopic?.let {
+            JSONObject().put("text", "committed").put("topic_or_person", it).toString()
+        }
+        val entry = EntryEntity(
+            entryText = entryText,
+            timestampEpochMs = System.currentTimeMillis(),
+            markdownFilename = "test-${System.nanoTime()}.md",
+            statedCommitmentJson = commitmentJson,
+            entryObservationsJson = observationsJson,
+            extractionStatus = status,
+            vector = vector,
+            vectorSchemaVersion = vectorSchemaVersion,
         )
+        val id = entryBox.put(entry)
+        if (tagEntities.isNotEmpty()) {
+            entry.tags.addAll(tagEntities)
+            entryBox.put(entry)
+        }
+        return id
     }
 
     private companion object {
         const val DIMS = 768
+        const val CURRENT = EntryEntity.CURRENT_VECTOR_SCHEMA_VERSION
     }
 }

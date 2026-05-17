@@ -303,7 +303,9 @@ private fun parseObservationsForAppend(json: String, entryId: Long): List<EntryO
     return parsed
 }
 
-private fun decodeObservations(json: String): List<EntryObservation> {
+// `internal` so `buildEmbeddingText` reuses the one canonical `{ text, evidence, fields[] }`
+// decoder instead of duplicating the JSON shape — divergence here is a silent embedding bug.
+internal fun decodeObservations(json: String): List<EntryObservation> {
     val raw = json.takeIf { it.isNotBlank() } ?: return emptyList()
     val array = runCatching { JSONArray(raw) }.getOrNull()
     // `appendObservation` rewrites this field — if we cannot read the existing list, the next

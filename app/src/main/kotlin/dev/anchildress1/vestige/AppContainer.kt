@@ -389,6 +389,12 @@ class AppContainer(
         if (status.isTerminal()) {
             _dataRevision.value += 1
         }
+        if (status == ExtractionStatus.COMPLETED) {
+            // The save-time sweep skipped this row while it was still PENDING. Its distilled
+            // fields (tags / observations / commitment) now exist, so re-trigger backfill to
+            // embed it — otherwise its vector wouldn't land until the next save or cold start.
+            launchVectorBackfillIfReady()
+        }
     }
 
     /**

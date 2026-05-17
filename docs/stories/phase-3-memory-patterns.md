@@ -212,16 +212,16 @@ Query-side tag extraction goes beyond exact-substring match: a free-form query b
 **The bug:** `VectorBackfillWorker` calls `embedder(entry.entryText)` — the verbatim transcription. A 30s ADHD voice entry is stream-of-consciousness; its semantic centroid captures noise. Tags, observations, and commitment topics are the model's distillation of what the entry is about — none of them are in the current vector.
 
 **Done when:**
-- [ ] Add `buildEmbeddingText(entity: EntryEntity): String` in `:core-storage`. Constructs the embedding target from resolved fields:
+- [x] Add `buildEmbeddingText(entity: EntryEntity): String` in `:core-storage`. Constructs the embedding target from resolved fields:
   - Tags: join `TagEntity` labels space-separated (e.g., `"tuesday-meeting standup flattened"`)
   - Observation texts: join each `text` field from `entryObservationsJson` with `. `
   - Commitment topic: append `topic_or_person` from `statedCommitmentJson` if non-null
   - Result: `"{tags}. {observations}. {commitment topic}"` — omit any empty component and its separator
-- [ ] `VectorBackfillWorker` calls `embedder(buildEmbeddingText(entry))` instead of `embedder(entry.entryText)`. Entries where `extractionStatus != COMPLETED` are skipped and re-swept when extraction completes.
-- [ ] Existing entries with `vector != null` are treated as stale and re-backfilled. Simplest implementation: add `vectorSchemaVersion: Int` to `EntryEntity` (default `0`); current correct version is `1`; re-backfill any entry at `< 1`. After re-backfill, set to `1`.
-- [ ] `AppContainer.launchVectorBackfillIfReady()` triggers the sweep on cold start. Processes in batches to avoid main-thread contention.
-- [ ] `RetrievalRepo.query(text: String, ...)` query-side embedding unchanged — raw user query string embeds as-is.
-- [ ] Unit test: `VectorBackfillWorkerTest` verifies `embedder` is called with the synthesized string (not `entryText`) for a fixture with populated tags + observations; verifies incomplete entries are skipped; verifies already-current `vectorSchemaVersion` entries are skipped on re-run.
+- [x] `VectorBackfillWorker` calls `embedder(buildEmbeddingText(entry))` instead of `embedder(entry.entryText)`. Entries where `extractionStatus != COMPLETED` are skipped and re-swept when extraction completes.
+- [x] Existing entries with `vector != null` are treated as stale and re-backfilled. Simplest implementation: add `vectorSchemaVersion: Int` to `EntryEntity` (default `0`); current correct version is `1`; re-backfill any entry at `< 1`. After re-backfill, set to `1`.
+- [x] `AppContainer.launchVectorBackfillIfReady()` triggers the sweep on cold start. Processes in batches to avoid main-thread contention.
+- [x] `RetrievalRepo.query(text: String, ...)` query-side embedding unchanged — raw user query string embeds as-is.
+- [x] Unit test: `VectorBackfillWorkerTest` verifies `embedder` is called with the synthesized string (not `entryText`) for a fixture with populated tags + observations; verifies incomplete entries are skipped; verifies already-current `vectorSchemaVersion` entries are skipped on re-run.
 - [ ] On-device: after re-backfill, run STT-E corpus (same 4 cohort queries, same 18-entry set) against the corrected vectors and record new hybrid vs tag-only numbers in ADR-001 §"Addendum (2026-05-12)". This is the STT-E re-run required before Phase 4 starts.
 
 **Notes / risks:** `vectorSchemaVersion` is an operational field — does not appear in markdown source-of-truth. If ObjectBox is rebuilt from markdown, it defaults to `0` and the re-backfill runs, which is correct.

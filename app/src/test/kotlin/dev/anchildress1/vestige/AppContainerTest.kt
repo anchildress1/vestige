@@ -176,6 +176,47 @@ class AppContainerTest {
     }
 
     @Test
+    fun `extractionStatusListener schedules vector backfill when extraction completes`() = runTest {
+        var scheduled = 0
+        val container = AppContainer(
+            applicationContext = mockk<Context>(relaxed = true),
+            boxStoreFactory = { mockk(relaxed = true) },
+            markdownStoreFactory = { mockk<MarkdownEntryStore>(relaxed = true) },
+            recoveredEntryIdsLoader = { emptyList() },
+            foregroundServiceIntentFactory = { Intent("dev.anchildress1.vestige.TEST_START") },
+            foregroundServiceStarter = {},
+            vectorBackfillScheduleListener = { scheduled += 1 },
+            scope = backgroundScope,
+        )
+
+        container.extractionStatusListener(entryId = 7L)
+            .onUpdate(ExtractionStatus.COMPLETED, entryAttemptCount = 0, lastError = null)
+
+        assertEquals(1, scheduled, "COMPLETED must re-trigger the skipped-while-PENDING row's embed")
+    }
+
+    @Test
+    fun `extractionStatusListener does not schedule backfill on a non-COMPLETED terminal status`() = runTest {
+        var scheduled = 0
+        val container = AppContainer(
+            applicationContext = mockk<Context>(relaxed = true),
+            boxStoreFactory = { mockk(relaxed = true) },
+            markdownStoreFactory = { mockk<MarkdownEntryStore>(relaxed = true) },
+            recoveredEntryIdsLoader = { emptyList() },
+            foregroundServiceIntentFactory = { Intent("dev.anchildress1.vestige.TEST_START") },
+            foregroundServiceStarter = {},
+            vectorBackfillScheduleListener = { scheduled += 1 },
+            scope = backgroundScope,
+        )
+        val listener = container.extractionStatusListener(entryId = 7L)
+
+        listener.onUpdate(ExtractionStatus.FAILED, entryAttemptCount = 1, lastError = "boom")
+        listener.onUpdate(ExtractionStatus.TIMED_OUT, entryAttemptCount = 2, lastError = "slow")
+
+        assertEquals(0, scheduled, "FAILED / TIMED_OUT have no distilled fields to embed")
+    }
+
+    @Test
     fun `backgroundExtractionSaveFlow is exposed from the production container wiring`() {
         val container = AppContainer(
             applicationContext = mockk<Context>(relaxed = true),

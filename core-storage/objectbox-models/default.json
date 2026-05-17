@@ -5,7 +5,7 @@
   "entities": [
     {
       "id": "1:8495295597095795304",
-      "lastPropertyId": "17:8812289933283392122",
+      "lastPropertyId": "18:2320472029631766667",
       "name": "EntryEntity",
       "properties": [
         {
@@ -99,6 +99,11 @@
           "id": "17:8812289933283392122",
           "name": "persona",
           "type": 9
+        },
+        {
+          "id": "18:2320472029631766667",
+          "name": "vectorSchemaVersion",
+          "type": 5
         }
       ],
       "relations": [

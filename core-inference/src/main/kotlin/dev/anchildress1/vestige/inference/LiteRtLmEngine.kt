@@ -52,9 +52,7 @@ class LiteRtLmEngine(
     @OptIn(ExperimentalApi::class)
     suspend fun initialize() = withContext(ioDispatcher) {
         check(engine == null) { "LiteRtLmEngine already initialized; close() before re-init." }
-        // MTP single-position speculative decoding — process-global SDK flag, must be set before
-        // any Engine is constructed. Idempotent across re-init. Decode-path only: prompt, sampler,
-        // and output format are unaffected, so it stays on for CPU and GPU alike.
+        // Process-global SDK flag — must be set before any Engine is constructed.
         ExperimentalFlags.enableSpeculativeDecoding = true
         Log.d(
             TAG,
@@ -150,10 +148,8 @@ class LiteRtLmEngine(
     }.flowOn(ioDispatcher)
 
     /**
-     * Streaming counterpart to [sendMessageContents] — the multimodal `AudioFile + Text`
-     * foreground path. Mirrors [streamText]: one conversation per call, closed on flow
-     * completion or cancellation. Each emitted chunk is one SDK [com.google.ai.edge.litertlm.Message]
-     * rendered to text.
+     * Streaming counterpart to [sendMessageContents] for the multimodal `AudioFile + Text`
+     * foreground path. One conversation per call, closed on flow completion or cancellation.
      */
     fun streamMessageContents(parts: List<Content>): Flow<String> = flow {
         require(parts.isNotEmpty()) { "streamMessageContents requires at least one Content part." }

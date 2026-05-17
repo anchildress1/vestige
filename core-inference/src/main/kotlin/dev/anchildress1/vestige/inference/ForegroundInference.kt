@@ -16,11 +16,9 @@ import java.time.ZoneId
 import java.util.concurrent.ConcurrentHashMap
 
 /**
- * Single-turn foreground call: persona prompt + audio (voice) or typed text → the same
- * `{transcription, follow_up}` envelope, so voice and typed entries review identically. Audio is
- * handed off as a temp PCM_S16LE WAV (the only handoff that works on LiteRT-LM 0.11.0); the file
- * is always deleted before this call returns, even on cancellation. Pure with respect to
- * [CaptureSession] — the caller advances session state from the parsed result.
+ * Single-turn foreground call — persona prompt + audio or typed text → the same streaming
+ * `{transcription, follow_up}` envelope. The temp WAV is always deleted before the flow ends,
+ * even on cancellation.
  */
 class ForegroundInference(
     private val engine: LiteRtLmEngine,
@@ -31,12 +29,8 @@ class ForegroundInference(
 ) {
 
     /**
-     * Streaming voice path: persona prompt + audio → progressive [ForegroundStreamEvent]s. The
-     * transcription surfaces once its close tag lands, follow-up text streams per chunk, and a
-     * final [ForegroundStreamEvent.Terminal] carries the authoritative parsed result. The temp
-     * WAV is discarded in `finally` — on normal completion, parse failure, or collector
-     * cancellation alike. Engine handle is single-threaded; do not collect concurrently against
-     * the same engine.
+     * Voice path → progressive [ForegroundStreamEvent]s. Engine handle is single-threaded; do not
+     * collect concurrently against the same engine.
      */
     fun runForegroundCall(audio: AudioChunk, persona: Persona): Flow<ForegroundStreamEvent> {
         require(audio.samples.isNotEmpty()) { "ForegroundInference requires non-empty audio samples." }
@@ -67,12 +61,7 @@ class ForegroundInference(
         }.flowOn(ioDispatcher)
     }
 
-    /**
-     * Typed-entry counterpart of [runForegroundCall]. Same persona system prompt + same streaming
-     * envelope, so a typed entry produces the identical progressive Reviewing surface a voice
-     * entry does — no temp WAV because there is no audio to hand off. The model is required (no
-     * model-free typed path); the caller gates on readiness.
-     */
+    /** Typed-entry counterpart of [runForegroundCall] — no temp WAV; model required. */
     fun runForegroundTextCall(text: String, persona: Persona): Flow<ForegroundStreamEvent> {
         require(text.isNotBlank()) { "ForegroundInference requires non-blank typed text." }
 
@@ -86,9 +75,7 @@ class ForegroundInference(
         }.flowOn(ioDispatcher)
     }
 
-    // Streams the engine envelope, surfacing the transcription + follow-up deltas through the
-    // scanner, then parsing the complete buffer for the authoritative terminal verdict. Shared
-    // by the voice and typed paths so scan/parse logic exists once.
+    // Shared by the voice and typed paths so scan/parse logic exists once.
     private suspend fun FlowCollector<ForegroundStreamEvent>.emitEnvelope(
         persona: Persona,
         label: String,

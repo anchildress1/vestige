@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.Intent
 import android.util.Log
 import dev.anchildress1.vestige.VestigeApplication
+import dev.anchildress1.vestige.ui.onboarding.OnboardingPrefs
 
 /**
  * ADB-triggered fixture seeder for local dev iteration.
@@ -30,6 +31,7 @@ class DebugSeedReceiver : BroadcastReceiver() {
             boxStore = container.boxStore,
             patternStore = container.patternStore,
         )
+        OnboardingPrefs.from(context).markComplete()
         Log.d(TAG, "seed complete")
     }
 

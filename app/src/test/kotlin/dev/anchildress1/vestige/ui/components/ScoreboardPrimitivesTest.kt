@@ -37,33 +37,6 @@ class ScoreboardPrimitivesTest {
     @get:Rule
     val composeRule = createComposeRule()
 
-    // ─── BigStat ────────────────────────────────────────────────────────────
-
-    @Test
-    fun `BigStat renders value (pos)`() {
-        composeRule.setContent { BigStat(value = "42", label = "ENTRIES") }
-        composeRule.onNodeWithText("42").assertIsDisplayed()
-        composeRule.onNodeWithText("ENTRIES").assertIsDisplayed()
-    }
-
-    @Test
-    fun `BigStat omits label slot when null (neg)`() {
-        composeRule.setContent { BigStat(value = "7") }
-        composeRule.onNodeWithText("7").assertIsDisplayed()
-        composeRule.onAllNodesWithText("ENTRIES").assertCountEquals(0)
-    }
-
-    @Test(expected = IllegalArgumentException::class)
-    fun `BigStat rejects non-positive size (err)`() {
-        composeRule.setContent { BigStat(value = "1", size = 0) }
-    }
-
-    @Test
-    fun `BigStat accepts very small size (edge — 1sp)`() {
-        composeRule.setContent { BigStat(value = "tiny", size = 1) }
-        composeRule.onNodeWithText("tiny").assertIsDisplayed()
-    }
-
     // ─── EyebrowE ───────────────────────────────────────────────────────────
 
     @Test
@@ -131,60 +104,6 @@ class ScoreboardPrimitivesTest {
         composeRule.setContent {
             Box(modifier = Modifier.size(80.dp)) { Pill(text = "") }
         }
-    }
-
-    // ─── Delta ──────────────────────────────────────────────────────────────
-
-    @Test
-    fun `Delta positive renders up-arrow glyph and announces up direction (pos + a11y)`() {
-        composeRule.setContent { Delta(value = 4, label = "this week") }
-        composeRule.onNodeWithText("▲4").assertIsDisplayed()
-        composeRule.onNodeWithContentDescription("up 4 this week").assertIsDisplayed()
-    }
-
-    @Test
-    fun `Delta negative renders down-arrow glyph and announces down direction (neg + a11y)`() {
-        composeRule.setContent { Delta(value = -2, label = "this week") }
-        composeRule.onNodeWithText("▼2").assertIsDisplayed()
-        composeRule.onNodeWithContentDescription("down 2 this week").assertIsDisplayed()
-    }
-
-    @Test
-    fun `Delta zero renders em-dash and announces no change (edge — zero)`() {
-        composeRule.setContent { Delta(value = 0) }
-        composeRule.onNodeWithText("—").assertIsDisplayed()
-        composeRule.onNodeWithContentDescription("no change").assertIsDisplayed()
-    }
-
-    @Test
-    fun `Delta announces value without label when omitted (a11y)`() {
-        composeRule.setContent { Delta(value = 1) }
-        composeRule.onNodeWithContentDescription("up 1").assertIsDisplayed()
-    }
-
-    @Test
-    fun `Delta negative without label announces direction-only (a11y — label-null branch)`() {
-        composeRule.setContent { Delta(value = -3) }
-        composeRule.onNodeWithContentDescription("down 3").assertIsDisplayed()
-    }
-
-    @Test
-    fun `Delta zero with label announces no-change with label suffix (a11y — zero plus label)`() {
-        composeRule.setContent { Delta(value = 0, label = "vs last week") }
-        composeRule.onNodeWithContentDescription("no change, vs last week").assertIsDisplayed()
-    }
-
-    @Test
-    fun `Delta accepts max-int (edge — upper bound)`() {
-        composeRule.setContent { Delta(value = Int.MAX_VALUE) }
-        composeRule.onNodeWithText("▲${Int.MAX_VALUE}").assertIsDisplayed()
-    }
-
-    @Test
-    fun `Delta accepts min-int safely (edge — lower bound, handles overflow gracefully)`() {
-        // -Int.MIN_VALUE overflows; the glyph still renders, the a11y announce uses the magnitude
-        // as Kotlin computes it. We only assert the node exists and doesn't crash.
-        composeRule.setContent { Delta(value = Int.MIN_VALUE) }
     }
 
     // ─── StatRibbon ─────────────────────────────────────────────────────────

@@ -12,11 +12,8 @@ import java.io.File
 import java.security.MessageDigest
 
 /**
- * Debug-only fixture seeder. Lets the dev surface verify the Stories 3.9 / 3.10 pattern UI with
- * real cards on a device before Phase 4's capture UI ships. Idempotent — re-running clears the
- * box first so the dev gets a fresh, well-formed corpus every time.
- *
- * Not wired into any release path; the call site in `PhaseOneShell` is `FLAG_DEBUGGABLE`-gated.
+ * Debug-only fixture seeder. Lets the dev verify the pattern UI with real cards on a device.
+ * Idempotent — re-running clears the box first so the dev gets a fresh, well-formed corpus.
  */
 object DebugPatternSeeder {
 
@@ -62,8 +59,10 @@ object DebugPatternSeeder {
                     durationMs = seed.durationMs,
                     extractionStatus = ExtractionStatus.COMPLETED,
                 ).also {
-                    markdownStore.write(it)
+                    // put first so ObjectBox initializes the lateinit ToMany<TagEntity> field
+                    // before MarkdownEntryStore.write() iterates entry.tags
                     boxStore.boxFor(EntryEntity::class.java).put(it)
+                    markdownStore.write(it)
                 }
             }
 

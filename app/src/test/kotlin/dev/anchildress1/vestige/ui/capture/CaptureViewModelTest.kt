@@ -21,6 +21,7 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -135,26 +136,23 @@ class CaptureViewModelTest {
         // P1+P2 regression: a partial event puts the UI in Reviewing, but the entry isn't
         // persisted until Terminal. Acknowledging mid-stream would drop it on onCleared()'s
         // collector cancel, and re-applying later deltas after a premature Done would resurrect
-        // the review. The streaming flag gates both.
-        val audio = AudioChunk(FloatArray(16), 16_000, isFinal = true)
-        val voice = FakeVoiceCapture(result = audio)
+        // the review. The streaming flag gates both. Uses the typed path (single call) so
+        // option-C two-call voice splitting doesn't interfere with the gate under test.
         val gate = CompletableDeferred<Unit>()
         val save = RecordingSaveAndExtract()
         val vm = newViewModel(
-            voice = voice,
-            inference = ForegroundInferenceCall { _, _ ->
+            save = save,
+            textInference = ForegroundTextInferenceCall { _, _, _ ->
                 flow {
                     emit(ForegroundStreamEvent.Transcription("half a thought"))
                     gate.await()
                     emit(ForegroundStreamEvent.Terminal(successResult("half a thought", "and the rest")))
                 }
             },
-            save = save,
             initialReadiness = ModelReadiness.Ready,
         )
 
-        vm.startRecording()
-        voice.completeWithResult()
+        vm.submitTyped("half a thought typed out")
         advanceUntilIdle()
 
         val streaming = vm.state.value as CaptureUiState.Reviewing
@@ -225,27 +223,15 @@ class CaptureViewModelTest {
     @Test
     fun `ParseFailure with a recovered transcription saves the words instead of discarding them`() =
         runTest(dispatcher) {
-            val audio = AudioChunk(FloatArray(16), 16_000, isFinal = true)
-            val voice = FakeVoiceCapture(result = audio)
-            val inference = FakeForegroundInference(
-                ForegroundResult.ParseFailure(
-                    persona = Persona.WITNESS,
-                    rawResponse = "<transcription>i kept reopening it</transcription>",
-                    elapsedMs = 100,
-                    completedAt = clock.instant(),
-                    reason = ForegroundResult.ParseReason.MISSING_FOLLOW_UP,
-                    recoveredTranscription = "i kept reopening it",
-                ),
-            )
             val save = RecordingSaveAndExtract()
             val vm = newViewModel(
-                voice = voice,
-                inference = inference,
+                textInference = ForegroundTextInferenceCall { _, _, _ ->
+                    terminal(parseFailure("i kept reopening it"))
+                },
                 save = save,
                 initialReadiness = ModelReadiness.Ready,
             )
-            vm.startRecording()
-            voice.completeWithResult()
+            vm.submitTyped("i kept reopening it")
             advanceUntilIdle()
 
             val terminal = vm.state.value
@@ -554,6 +540,64 @@ class CaptureViewModelTest {
         assertTrue("capture must complete despite a failed lookup", vm.state.value is CaptureUiState.Reviewing)
         assertEquals(1, save.invocations.get())
         assertTrue(save.lastHistory.isEmpty())
+    }
+
+    @Test
+    fun `voice path parse failure on call 2 keeps call-1 transcription authoritative`() = runTest(dispatcher) {
+        val voice = FakeVoiceCapture(result = AudioChunk(FloatArray(16), 16_000, isFinal = true))
+        val save = RecordingSaveAndExtract()
+        val vm = newViewModel(
+            voice = voice,
+            inference = ForegroundInferenceCall { _, _ ->
+                flowOf(ForegroundStreamEvent.Transcription("the exact spoken words"))
+            },
+            textInference = ForegroundTextInferenceCall { _, _, _ ->
+                flowOf(ForegroundStreamEvent.Terminal(parseFailure("normalized echo from call 2")))
+            },
+            save = save,
+            initialReadiness = ModelReadiness.Ready,
+        )
+
+        vm.startRecording()
+        voice.completeWithResult()
+        advanceUntilIdle()
+
+        val reviewing = vm.state.value as CaptureUiState.Reviewing
+        assertEquals("the exact spoken words", reviewing.review.transcription)
+        assertEquals("", reviewing.review.followUp)
+        assertEquals("the exact spoken words", save.lastText)
+        assertEquals(null, save.lastFollowUpText)
+    }
+
+    @Test
+    fun `voice path timeout on call 2 still saves the transcription without follow-up`() = runTest(dispatcher) {
+        val voice = FakeVoiceCapture(result = AudioChunk(FloatArray(16), 16_000, isFinal = true))
+        val save = RecordingSaveAndExtract()
+        val vm = newViewModel(
+            voice = voice,
+            inference = ForegroundInferenceCall { _, _ ->
+                flowOf(ForegroundStreamEvent.Transcription("keep the user's words"))
+            },
+            textInference = ForegroundTextInferenceCall { _, _, _ ->
+                flow {
+                    kotlinx.coroutines.withTimeout(1) { kotlinx.coroutines.awaitCancellation() }
+                }
+            },
+            save = save,
+            initialReadiness = ModelReadiness.Ready,
+        )
+
+        vm.startRecording()
+        voice.completeWithResult()
+        advanceUntilIdle()
+
+        val reviewing = vm.state.value as CaptureUiState.Reviewing
+        assertEquals("keep the user's words", reviewing.review.transcription)
+        assertEquals("", reviewing.review.followUp)
+        assertFalse(reviewing.streaming)
+        assertEquals("keep the user's words", save.lastText)
+        assertEquals(null, save.lastFollowUpText)
+        assertEquals(1, save.invocations.get())
     }
 
     @Test
@@ -877,13 +921,15 @@ class CaptureViewModelTest {
             followUp = followUp,
         )
 
-    private fun parseFailure(): ForegroundResult.ParseFailure = ForegroundResult.ParseFailure(
-        persona = Persona.WITNESS,
-        rawResponse = "",
-        elapsedMs = 0,
-        completedAt = clock.instant(),
-        reason = ForegroundResult.ParseReason.EMPTY_RESPONSE,
-    )
+    private fun parseFailure(recoveredTranscription: String? = null): ForegroundResult.ParseFailure =
+        ForegroundResult.ParseFailure(
+            persona = Persona.WITNESS,
+            rawResponse = "",
+            elapsedMs = 0,
+            completedAt = clock.instant(),
+            reason = ForegroundResult.ParseReason.EMPTY_RESPONSE,
+            recoveredTranscription = recoveredTranscription,
+        )
 
     // Wraps a final ForegroundResult as a single-Terminal stream — the streaming surface's
     // collapsed shape for tests that only care about the terminal verdict, not live deltas.

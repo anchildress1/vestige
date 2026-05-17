@@ -192,6 +192,7 @@ class AppContainer(
     private val vectorBackfillMaxRetries: Int = VECTOR_BACKFILL_MAX_RETRIES,
     private val vectorBackfillScheduleListener: (() -> Unit)? = null,
     private val scope: CoroutineScope = defaultScope(),
+    private val computeDispatcher: CoroutineDispatcher = Dispatchers.Default,
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) {
 
@@ -309,7 +310,7 @@ class AppContainer(
      * retrieval can never block a capture. Maps the top entries to context-only [HistoryChunk]s —
      * no `patternId`, since the follow-up needs textual context, not recurrence-surface linkage.
      */
-    suspend fun retrieveHistory(query: String): List<HistoryChunk> = withContext(Dispatchers.Default) {
+    suspend fun retrieveHistory(query: String): List<HistoryChunk> = withContext(computeDispatcher) {
         try {
             retrievalRepo.query(query, topN = FOREGROUND_HISTORY_TOP_N)
                 .map { HistoryChunk(patternId = null, text = it.entryText) }

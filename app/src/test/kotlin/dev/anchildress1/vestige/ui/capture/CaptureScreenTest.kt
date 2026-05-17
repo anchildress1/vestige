@@ -230,7 +230,7 @@ class CaptureScreenTest {
             foregroundInference = ForegroundInferenceCall { _, _ ->
                 flow {
                     emit(ForegroundStreamEvent.Transcription("still talking"))
-                    kotlinx.coroutines.suspendCancellableCoroutine { /* park before Terminal */ }
+                    kotlinx.coroutines.awaitCancellation() // park before Terminal
                 }
             },
             saveAndExtract = SaveAndExtract { _, _, _, _, _ -> },
@@ -249,9 +249,9 @@ class CaptureScreenTest {
             // case which is reached only via a real engine path on-device.
             recordVoice = VoiceCapture { _, _ -> if (startInInferringPhase) audio else null },
             foregroundInference = ForegroundInferenceCall { _, _ ->
-                // Suspend forever for the Inferring-phase test — VM stays in Inferring until
-                // cancellation. The test only verifies that the route reaches the placeholder.
-                kotlinx.coroutines.suspendCancellableCoroutine { /* park */ }
+                // Cold flow that never emits — VM stays in Inferring until cancellation. The
+                // suspension lives inside the flow so the SAM stays non-suspend (S6309).
+                flow { kotlinx.coroutines.awaitCancellation() }
             },
             saveAndExtract = SaveAndExtract { _, _, _, _, _ -> },
             foregroundTextInference = ForegroundTextInferenceCall { _, _ -> error("unused") },

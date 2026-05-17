@@ -150,6 +150,15 @@ class CaptureScreenTest {
     }
 
     @Test
+    fun `reviewing state withholds History link while streaming`() {
+        val vm = streamingReviewingViewModel()
+        composeRule.setContent {
+            VestigeTheme { captureScreen(vm, chrome = IdleChromeCallbacks(onHistoryTap = {})) }
+        }
+        composeRule.onAllNodesWithContentDescription(CaptureCopy.HISTORY_LINK_A11Y).assertCountEquals(0)
+    }
+
+    @Test
     fun `reviewing state history link present when onOpenHistory provided`() {
         val vm = newReviewingViewModel()
         composeRule.setContent {

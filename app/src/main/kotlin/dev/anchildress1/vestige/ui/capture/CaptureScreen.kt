@@ -178,18 +178,19 @@ private fun ReviewingPane(
         }
         Spacer(modifier = Modifier.weight(1f))
         // Withheld until the terminal event lands (state.streaming == false): the entry is not
-        // persisted until then, so an early Done would be lost to onCleared()'s collector cancel.
+        // persisted until then, so any navigation away from Capture would be lost to
+        // onCleared()'s collector cancel.
         if (!state.streaming) {
             DoneButton(onClick = onAcknowledge)
-        }
-        if (onOpenHistory != null) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 18.dp, vertical = 8.dp),
-                contentAlignment = Alignment.Center,
-            ) {
-                HistoryLink(onClick = onOpenHistory)
+            if (onOpenHistory != null) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 18.dp, vertical = 8.dp),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    HistoryLink(onClick = onOpenHistory)
+                }
             }
         }
         Spacer(Modifier.windowInsetsBottomHeight(WindowInsets.navigationBars))

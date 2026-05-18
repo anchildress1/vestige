@@ -54,18 +54,7 @@ fun HistoryRow(summary: HistorySummary, durationLabel: String, onClick: (() -> U
                 .padding(horizontal = 14.dp, vertical = 12.dp),
             verticalAlignment = Alignment.Top,
         ) {
-            // Left column — time-of-day + duration
-            Column(
-                modifier = Modifier.width(52.dp),
-                verticalArrangement = Arrangement.spacedBy(4.dp),
-            ) {
-                Text(
-                    text = summary.timeLabel,
-                    style = VestigeTheme.typography.eyebrow.copy(fontSize = 13.sp, letterSpacing = 0.08.sp),
-                    color = colors.ink,
-                )
-                EyebrowE(text = durationLabel)
-            }
+            HistoryRowTimeRail(timeLabel = summary.timeLabel, durationLabel = durationLabel)
 
             Spacer(modifier = Modifier.width(12.dp))
 
@@ -84,5 +73,34 @@ fun HistoryRow(summary: HistorySummary, durationLabel: String, onClick: (() -> U
                 )
             }
         }
+    }
+}
+
+/**
+ * Fixed-width left rail (time-of-day + duration). The fixed width keeps the snippet column
+ * aligned across rows; single-line + no soft-wrap stops longer durations ("12m 30s") from
+ * dropping their last glyph onto a second line.
+ */
+@Composable
+private fun HistoryRowTimeRail(timeLabel: String, durationLabel: String) {
+    val colors = VestigeTheme.colors
+    Column(
+        modifier = Modifier.width(64.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        Text(
+            text = timeLabel,
+            style = VestigeTheme.typography.eyebrow.copy(fontSize = 13.sp, letterSpacing = 0.08.sp),
+            color = colors.ink,
+            maxLines = 1,
+            softWrap = false,
+        )
+        Text(
+            text = durationLabel,
+            style = VestigeTheme.typography.eyebrow,
+            color = colors.dim,
+            maxLines = 1,
+            softWrap = false,
+        )
     }
 }

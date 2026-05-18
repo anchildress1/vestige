@@ -266,9 +266,8 @@ private val HamburgerGlyphSize = 24.sp
 
 /**
  * App shell top — status pill on the left (lime idle `GEMMA 4 · LOCAL ONLY`, coral recording
- * `GEMMA 4 · LISTENING`), hamburger menu on the right. The menu (persona + settings) lives on
- * every screen, including recording. [rightContent] is a rarely-used override escape; default
- * is the hamburger calling [onMenuTap].
+ * `GEMMA 4 · LISTENING`), hamburger menu on the right by default. Recording overrides
+ * [rightContent] with an empty slot so capture remains modal while the mic is active.
  */
 @Composable
 @Suppress("LongParameterList") // primitive

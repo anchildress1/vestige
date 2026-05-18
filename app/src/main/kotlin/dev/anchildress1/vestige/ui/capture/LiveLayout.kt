@@ -24,9 +24,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.anchildress1.vestige.ui.components.AppTop
 import dev.anchildress1.vestige.ui.components.AppTopStatuses
-import dev.anchildress1.vestige.ui.components.BottomTab
 import dev.anchildress1.vestige.ui.components.EyebrowE
-import dev.anchildress1.vestige.ui.components.VestigeBottomNav
 import dev.anchildress1.vestige.ui.theme.VestigeTheme
 
 /**
@@ -34,13 +32,10 @@ import dev.anchildress1.vestige.ui.theme.VestigeTheme
  * passes the full `CaptureUiState.Recording` snapshot — this composable is pure-render.
  */
 @Composable
-@Suppress("LongParameterList") // Pure-render recording layout; chrome + actions co-located.
 fun LiveLayout(
     state: CaptureUiState.Recording,
     onStopTap: () -> Unit,
     onDiscardTap: () -> Unit,
-    onMenuTap: () -> Unit,
-    onNavSelect: (BottomTab) -> Unit,
     modifier: Modifier = Modifier,
     maxDurationMs: Long = CaptureViewModel.MAX_DURATION_MS,
 ) {
@@ -57,7 +52,7 @@ fun LiveLayout(
         AppTop(
             persona = state.persona.name,
             status = AppTopStatuses.Recording,
-            onMenuTap = onMenuTap,
+            rightContent = {},
         )
         TimerHeader(timerLabel = timerLabel, remainSec = remainSec)
         Box(modifier = Modifier.padding(horizontal = 18.dp, vertical = 14.dp)) {
@@ -82,7 +77,6 @@ fun LiveLayout(
             DiscardButton(onClick = onDiscardTap)
             StopButton(onClick = onStopTap)
         }
-        VestigeBottomNav(active = BottomTab.CAPTURE, onSelect = onNavSelect)
     }
 }
 

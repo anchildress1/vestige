@@ -5,12 +5,12 @@ import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertHasClickAction
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performSemanticsAction
 import dev.anchildress1.vestige.model.Persona
-import dev.anchildress1.vestige.ui.components.BottomTab
 import dev.anchildress1.vestige.ui.theme.VestigeTheme
 import org.junit.Assert.assertEquals
 import org.junit.Rule
@@ -81,16 +81,24 @@ class LiveLayoutTest {
         composeRule.runOnIdle { assertEquals(1, discards) }
     }
 
+    @Test
+    fun `recording layout omits route-changing chrome`() {
+        composeRule.setContent { VestigeTheme { liveLayout() } }
+
+        composeRule.onAllNodesWithContentDescription(label = "Menu", substring = true)
+            .assertCountEquals(0)
+        composeRule.onAllNodesWithText("CAPTURE").assertCountEquals(0)
+        composeRule.onAllNodesWithText("PATTERNS").assertCountEquals(0)
+        composeRule.onAllNodesWithText("HISTORY").assertCountEquals(0)
+    }
+
     @androidx.compose.runtime.Composable
-    @Suppress("LongParameterList") // Test fixture mirrors the LiveLayout seam.
     private fun liveLayout(
         elapsedMs: Long = 0L,
         persona: Persona = Persona.WITNESS,
         readiness: ModelReadiness = ModelReadiness.Ready,
         onStopTap: () -> Unit = {},
         onDiscardTap: () -> Unit = {},
-        onMenuTap: () -> Unit = {},
-        onNavSelect: (BottomTab) -> Unit = {},
     ) {
         LiveLayout(
             state = CaptureUiState.Recording(
@@ -101,8 +109,6 @@ class LiveLayoutTest {
             ),
             onStopTap = onStopTap,
             onDiscardTap = onDiscardTap,
-            onMenuTap = onMenuTap,
-            onNavSelect = onNavSelect,
         )
     }
 }

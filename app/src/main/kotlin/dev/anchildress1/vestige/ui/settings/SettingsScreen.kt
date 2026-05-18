@@ -86,6 +86,7 @@ fun SettingsScreen(
     info: SettingsInfo,
     actions: SettingsActions,
     onNavSelect: (BottomTab) -> Unit = {},
+    onMenuTap: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
     BackHandler(onBack = actions.onExit)
@@ -108,7 +109,7 @@ fun SettingsScreen(
 
     Box(modifier = modifier.fillMaxSize().background(colors.floor)) {
         Column(modifier = Modifier.fillMaxSize()) {
-            AppTop(persona = persona.name, status = AppTopStatuses.Ready)
+            AppTop(persona = persona.name, status = AppTopStatuses.Ready, onMenuTap = onMenuTap)
             Box(
                 modifier = Modifier
                     .clickable(role = Role.Button, onClick = actions.onExit)

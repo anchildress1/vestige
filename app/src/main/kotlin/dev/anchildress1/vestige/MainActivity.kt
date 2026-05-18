@@ -181,6 +181,7 @@ private fun MainPostOnboardingContent(
 ) {
     var screen by rememberSaveable { mutableStateOf(PostOnboardingScreen.Capture) }
     var modelStatusOrigin by rememberSaveable { mutableStateOf(PostOnboardingScreen.Capture) }
+    var settingsOrigin by rememberSaveable { mutableStateOf(PostOnboardingScreen.Capture) }
     var historyOpenRequest by remember { mutableStateOf<EntryDetailOpenRequest?>(null) }
     var openEntryToken by remember { mutableStateOf(0L) }
     PostOnboardingResumeEffects(container)
@@ -202,11 +203,16 @@ private fun MainPostOnboardingContent(
         onPersonaChange = onPersonaChange,
         onResetToOnboarding = onResetToOnboarding,
         modelStatusOrigin = modelStatusOrigin,
+        settingsOrigin = settingsOrigin,
         historyOpenRequest = historyOpenRequest,
         onNavigate = { screen = it },
         onOpenModelStatusFrom = { origin ->
             modelStatusOrigin = origin
             screen = PostOnboardingScreen.ModelStatus
+        },
+        onOpenSettingsFrom = { origin ->
+            settingsOrigin = origin
+            screen = PostOnboardingScreen.Settings
         },
         onHistoryOpenRequestConsumed = { historyOpenRequest = null },
         onOpenEntryInHistory = { entryId ->
@@ -233,9 +239,11 @@ private fun PostOnboardingScreenHost(
     onPersonaChange: (Persona) -> Unit,
     onResetToOnboarding: (ResetOnboardingState) -> Unit,
     modelStatusOrigin: PostOnboardingScreen,
+    settingsOrigin: PostOnboardingScreen,
     historyOpenRequest: EntryDetailOpenRequest?,
     onNavigate: (PostOnboardingScreen) -> Unit,
     onOpenModelStatusFrom: (PostOnboardingScreen) -> Unit,
+    onOpenSettingsFrom: (PostOnboardingScreen) -> Unit,
     onHistoryOpenRequestConsumed: () -> Unit,
     onOpenEntryInHistory: (Long) -> Unit,
 ) {
@@ -248,7 +256,7 @@ private fun PostOnboardingScreenHost(
             onOpenPatterns = { onNavigate(PostOnboardingScreen.Patterns) },
             onOpenHistory = { onNavigate(PostOnboardingScreen.History) },
             onOpenModelStatus = { onOpenModelStatusFrom(PostOnboardingScreen.Capture) },
-            onOpenSettings = { onNavigate(PostOnboardingScreen.Settings) },
+            onOpenSettings = { onOpenSettingsFrom(PostOnboardingScreen.Capture) },
             onOpenEntryDetail = onOpenEntryInHistory,
         )
 
@@ -261,7 +269,7 @@ private fun PostOnboardingScreenHost(
             persona = persona,
             onExit = { onNavigate(PostOnboardingScreen.Capture) },
             onNavigateTab = { onNavigate(it.toPostOnboardingScreen()) },
-            onOpenSettings = { onNavigate(PostOnboardingScreen.Settings) },
+            onOpenSettings = { onOpenSettingsFrom(PostOnboardingScreen.Patterns) },
             modifier = Modifier.fillMaxSize(),
         )
 
@@ -274,7 +282,7 @@ private fun PostOnboardingScreenHost(
             openRequest = historyOpenRequest,
             onOpenRequestConsumed = onHistoryOpenRequestConsumed,
             onNavigateTab = { onNavigate(it.toPostOnboardingScreen()) },
-            onOpenSettings = { onNavigate(PostOnboardingScreen.Settings) },
+            onOpenSettings = { onOpenSettingsFrom(PostOnboardingScreen.History) },
             modifier = Modifier.fillMaxSize(),
         )
 
@@ -290,7 +298,8 @@ private fun PostOnboardingScreenHost(
             onPersonaChange = onPersonaChange,
             onResetToOnboarding = onResetToOnboarding,
             onOpenModelStatus = { onOpenModelStatusFrom(PostOnboardingScreen.Settings) },
-            onExit = { onNavigate(PostOnboardingScreen.Capture) },
+            // Back / tapping the menu again closes Settings to wherever it was opened from.
+            onExit = { onNavigate(settingsOrigin) },
             onNavigateTab = { onNavigate(it.toPostOnboardingScreen()) },
         )
     }
@@ -357,6 +366,7 @@ private fun SettingsRoute(
             onExit = onExit,
         ),
         onNavSelect = onNavigateTab,
+        onMenuTap = onExit,
         modifier = Modifier.fillMaxSize(),
     )
 }

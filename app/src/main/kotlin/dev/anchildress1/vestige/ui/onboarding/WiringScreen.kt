@@ -1,11 +1,13 @@
 package dev.anchildress1.vestige.ui.onboarding
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
@@ -14,33 +16,35 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import dev.anchildress1.vestige.R
 import dev.anchildress1.vestige.ui.components.EyebrowE
-import dev.anchildress1.vestige.ui.components.Pill
-import dev.anchildress1.vestige.ui.components.VestigeListCard
-import dev.anchildress1.vestige.ui.components.VestigeListCardInteraction
-import dev.anchildress1.vestige.ui.components.limeLeftRuleForActive
+import dev.anchildress1.vestige.ui.components.StatusDot
+import dev.anchildress1.vestige.ui.components.VestigeGroupedList
 import dev.anchildress1.vestige.ui.theme.VestigeTheme
 
 /**
- * State of one wiring switch.
- * - [Granted]: ready, green.
- * - [Pending]: not yet acted on (e.g. permission untouched, model still downloading).
+ * State of one wiring row.
+ * - [Granted]: ready, lime dot.
+ * - [Pending]: not yet acted on (permission untouched, model still downloading).
  * - [Blocked]: actively prevented — denied permission, Wi-Fi unavailable, corrupt artifact.
  */
 internal enum class WiringSwitchState { Granted, Pending, Blocked }
 
 @Immutable
 internal data class WiringSwitch(
-    val number: String,
+    /** Left mono column — PERSONA / LOCAL / MIC / NOTIFY. */
+    val label: String,
+    /** Sentence-case identity / call-to-action line. */
     val title: String,
     val description: String,
     val state: WiringSwitchState,
     val pendingHint: String? = null,
     val onTap: (() -> Unit)? = null,
-    // Navigation rows (persona swap, model drill-in) read as "button" to screen readers;
-    // toggles (mic, notify) keep Role.Switch because tapping them flips a binary permission.
+    // Nav rows (persona swap, model drill-in) read as "button"; permission rows keep
+    // Role.Switch because the tap flips a binary permission.
     val role: Role = Role.Switch,
 )
 
@@ -50,68 +54,70 @@ internal fun WiringScreen(switches: List<WiringSwitch>, modifier: Modifier = Mod
         modifier = modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        EyebrowE(text = stringResource(id = R.string.onboarding_wiring_eyebrow))
         OnboardingHeadline(text = stringResource(id = R.string.onboarding_wiring_header))
-        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            switches.forEach { switch -> WiringSwitchCard(switch = switch) }
+        BodyParagraph(text = stringResource(id = R.string.onboarding_wiring_subhead), dim = true)
+        VestigeGroupedList(itemCount = switches.size) { index ->
+            WiringRow(switch = switches[index])
         }
     }
 }
 
-private data class SwitchVisuals(
-    val pillText: String,
-    val pillColor: Color,
-    val showDot: Boolean,
-    val showAccent: Boolean,
-)
+@Immutable
+private data class RowVisuals(val dot: Color, val filled: Boolean, val blink: Boolean, val stateWord: String)
 
-private fun WiringSwitch.toCardInteraction(): VestigeListCardInteraction = when (role) {
-    Role.Switch -> VestigeListCardInteraction.Toggleable(
-        checked = state == WiringSwitchState.Granted,
-        onToggle = onTap,
-        role = role,
-    )
-
-    else -> if (onTap != null) {
-        VestigeListCardInteraction.Click(onClick = onTap, role = role)
-    } else {
-        VestigeListCardInteraction.Static
+@Composable
+private fun rowVisuals(state: WiringSwitchState): RowVisuals {
+    val colors = VestigeTheme.colors
+    return when (state) {
+        WiringSwitchState.Granted -> RowVisuals(colors.lime, filled = true, blink = false, stateWord = "On")
+        WiringSwitchState.Pending -> RowVisuals(colors.dim, filled = true, blink = false, stateWord = "Off")
+        WiringSwitchState.Blocked -> RowVisuals(colors.coral, filled = true, blink = true, stateWord = "Blocked")
     }
 }
 
 @Composable
-private fun WiringSwitchCard(switch: WiringSwitch) {
+private fun WiringRow(switch: WiringSwitch) {
     val colors = VestigeTheme.colors
-    val visuals = when (switch.state) {
-        WiringSwitchState.Granted -> SwitchVisuals("ON", colors.lime, showDot = true, showAccent = true)
-        WiringSwitchState.Pending -> SwitchVisuals("OFF", colors.dim, showDot = false, showAccent = false)
-        WiringSwitchState.Blocked -> SwitchVisuals("BLOCKED", colors.coral, showDot = true, showAccent = false)
-    }
-    VestigeListCard(
-        modifier = Modifier.fillMaxWidth(),
-        interaction = switch.toCardInteraction(),
-        accentModifier = if (visuals.showAccent) Modifier.limeLeftRuleForActive() else Modifier,
-        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 14.dp),
-    ) {
-        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween,
-            ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    EyebrowE(text = switch.number)
-                    Text(text = "  " + switch.title, style = VestigeTheme.typography.title)
-                }
-                Pill(
-                    text = visuals.pillText,
-                    color = visuals.pillColor,
-                    fill = switch.state == WiringSwitchState.Granted,
-                    dot = visuals.showDot,
-                    blink = switch.state == WiringSwitchState.Blocked,
+    val visuals = rowVisuals(switch.state)
+    // Dot is decorative (StatusDot clears its own semantics); the row description carries the
+    // state word so the indicator is never color-only — AGENTS.md band a11y rule.
+    val a11y = "${switch.label}. ${switch.title}. ${visuals.stateWord}."
+    val onTap = switch.onTap
+    val interactionModifier = when {
+        onTap == null -> Modifier.semantics(mergeDescendants = true) { contentDescription = a11y }
+
+        switch.role == Role.Switch ->
+            Modifier
+                .semantics(mergeDescendants = true) { contentDescription = a11y }
+                .toggleable(
+                    value = switch.state == WiringSwitchState.Granted,
+                    role = Role.Switch,
+                    onValueChange = { onTap() },
                 )
-            }
-            Text(text = switch.description, style = VestigeTheme.typography.p, color = colors.ink)
+
+        else ->
+            Modifier
+                .semantics(mergeDescendants = true) { contentDescription = a11y }
+                .clickable(role = switch.role, onClick = onTap)
+    }
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .then(interactionModifier)
+            .padding(horizontal = 16.dp, vertical = 16.dp),
+        verticalAlignment = Alignment.Top,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        // Fixed column tuned to the longest label (PERSONA) so every title shares one left
+        // edge. Tighter than the original 84dp — alignment without the dead gap.
+        EyebrowE(
+            text = switch.label,
+            modifier = Modifier.width(WiringLabelWidth).padding(top = 4.dp),
+            color = colors.dim,
+        )
+        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text(text = switch.title, style = VestigeTheme.typography.h2)
+            Text(text = switch.description, style = VestigeTheme.typography.p, color = colors.dim)
             if (switch.state != WiringSwitchState.Granted && switch.pendingHint != null) {
                 Text(
                     text = switch.pendingHint,
@@ -121,5 +127,15 @@ private fun WiringSwitchCard(switch: WiringSwitch) {
                 )
             }
         }
+        StatusDot(
+            color = visuals.dot,
+            filled = visuals.filled,
+            blink = visuals.blink,
+            modifier = Modifier.padding(top = 6.dp),
+        )
     }
 }
+
+// Wide enough for the longest label ("PERSONA") at the mono eyebrow size; shared by every row
+// so the titles form one vertical edge.
+private val WiringLabelWidth = 68.dp

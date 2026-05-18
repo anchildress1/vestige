@@ -4,12 +4,15 @@ import android.content.Context
 import android.content.SharedPreferences
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
+import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
@@ -75,14 +78,14 @@ class OnboardingHostTest {
         startHost()
         composeRule.onNode(hasText("HARDASS") and hasClickAction()).performScrollTo().performClick()
         composeRule.waitForIdle()
-        tapPrimary("CONTINUE")
+        tapPrimary("SELECT")
         assertEquals(Persona.HARDASS, prefs.defaultPersona)
     }
 
     @Test
     fun `persona Continue advances to the Wiring hub`() {
         startHost()
-        tapPrimary("CONTINUE")
+        tapPrimary("SELECT")
         composeRule.onNodeWithText("WIRING", substring = true).assertIsDisplayed()
     }
 
@@ -92,7 +95,7 @@ class OnboardingHostTest {
         startHost(modelAvailability = fakeModelAvailability(ModelArtifactState.Complete))
         // Mic + notification are optional in the hub flow. Once the local model is ready,
         // onboarding can proceed even if those permissions are still pending.
-        composeRule.onNodeWithText("OPEN VESTIGE").assertIsEnabled()
+        composeRule.onNodeWithText("LET'S GO").assertIsEnabled()
     }
 
     @Test
@@ -100,13 +103,13 @@ class OnboardingHostTest {
         prefs.setCurrentStep(OnboardingStep.Wiring)
         startHost(modelAvailability = fakeModelAvailability(ModelArtifactState.Absent))
 
-        composeRule.onNodeWithText("OPEN VESTIGE").assertIsNotEnabled()
+        composeRule.onNodeWithText("LET'S GO").assertIsNotEnabled()
     }
 
     @Test
     fun `current onboarding step survives host recreation`() {
         startHost()
-        tapPrimary("CONTINUE")
+        tapPrimary("SELECT")
         startHost()
         composeRule.onNodeWithText("WIRING", substring = true).assertIsDisplayed()
     }
@@ -114,7 +117,7 @@ class OnboardingHostTest {
     @Test
     fun `system back from Wiring returns to PersonaPick`() {
         startHost()
-        tapPrimary("CONTINUE")
+        tapPrimary("SELECT")
         composeRule.onNodeWithText("WIRING", substring = true).assertIsDisplayed()
         Espresso.pressBack()
         composeRule.waitForIdle()
@@ -122,15 +125,15 @@ class OnboardingHostTest {
     }
 
     @Test
-    fun `download screen keeps Continue disabled while model is Absent`() {
+    fun `download screen stays put with no primary while model is Absent`() {
         prefs.setCurrentStep(OnboardingStep.ModelDownload)
         startHost(
             wifiAvailability = { true },
             modelAvailability = fakeModelAvailability(ModelArtifactState.Absent),
         )
 
-        composeRule.onNodeWithText("DOWNLOADING").assertIsDisplayed()
-        composeRule.onNodeWithText("CONTINUE").assertIsNotEnabled()
+        composeRule.onNodeWithText("DOWNLOAD MODEL", substring = true).assertIsDisplayed()
+        composeRule.onAllNodesWithText("CONTINUE").assertCountEquals(0)
         assertFalse(prefs.isComplete)
     }
 
@@ -153,7 +156,7 @@ class OnboardingHostTest {
         )
 
         composeRule.onNodeWithText("WIRING", substring = true).assertIsDisplayed()
-        composeRule.onNodeWithText("OPEN VESTIGE").assertIsNotEnabled()
+        composeRule.onNodeWithText("LET'S GO").assertIsNotEnabled()
         assertEquals(0, downloadCalls)
     }
 
@@ -161,9 +164,9 @@ class OnboardingHostTest {
     fun `tapping the persona card on Wiring returns to PersonaPick`() {
         prefs.setCurrentStep(OnboardingStep.Wiring)
         startHost(modelAvailability = fakeModelAvailability(ModelArtifactState.Absent))
-        // The persona switch sits at the top of the Wiring switch list; its title carries
-        // the selected persona's name in uppercase. Tapping the card re-opens PersonaPick.
-        composeRule.onNodeWithText("PERSONA · WITNESS", substring = true).performClick()
+        // The persona row sits at the top of the Wiring table; its merged a11y description is
+        // "<LABEL>. <title>. <state>." Tapping the row re-opens PersonaPick.
+        composeRule.onNodeWithContentDescription("PERSONA. Witness. On.").performClick()
         composeRule.waitForIdle()
         composeRule.onNodeWithText("PERSONA", substring = true).assertIsDisplayed()
         composeRule.onNodeWithText("WITNESS").assertIsDisplayed()
@@ -180,7 +183,7 @@ class OnboardingHostTest {
         // Complete on the ModelDownload screen, the host hops back to Wiring without a tap.
         composeRule.waitForIdle()
         composeRule.onNodeWithText("WIRING", substring = true).assertIsDisplayed()
-        composeRule.onNodeWithText("OPEN VESTIGE").assertIsEnabled()
+        composeRule.onNodeWithText("LET'S GO").assertIsEnabled()
     }
 
     @Test
@@ -227,14 +230,14 @@ class OnboardingHostTest {
         }
         startHost(wifiAvailability = { true }, modelAvailability = availability)
         composeRule.waitForIdle()
-        // The screen stays on ModelDownload's DOWNLOADING pill because the terminal state is
-        // not Complete; the sampler branches above all fired during the suspending body.
-        composeRule.onNodeWithText("DOWNLOADING").assertIsDisplayed()
+        // The screen stays on ModelDownload because the terminal state is not Complete; the
+        // sampler branches above all fired during the suspending body.
+        composeRule.onNodeWithText("DOWNLOAD MODEL", substring = true).assertIsDisplayed()
         assertEquals(3, ticks.size)
     }
 
     @Test
-    fun `download failure logs and leaves the Continue button disabled`() {
+    fun `download failure logs and stays on the download screen`() {
         prefs.setCurrentStep(OnboardingStep.ModelDownload)
         // Generic Exception path: runDownloadIfNeeded catches and logs without bubbling.
         val availability = object : ModelAvailability {
@@ -245,7 +248,7 @@ class OnboardingHostTest {
         }
         startHost(wifiAvailability = { true }, modelAvailability = availability)
         composeRule.waitForIdle()
-        composeRule.onNodeWithText("CONTINUE").assertIsNotEnabled()
+        composeRule.onNodeWithText("DOWNLOAD MODEL", substring = true).assertIsDisplayed()
         assertFalse(prefs.isComplete)
     }
 
@@ -348,7 +351,7 @@ class OnboardingHostTest {
         composeRule.waitForIdle()
         val baseline = statusCalls
 
-        tapPrimary("OPEN VESTIGE")
+        tapPrimary("LET'S GO")
 
         assertTrue(completed)
         assertTrue(prefs.isComplete)
@@ -367,7 +370,7 @@ class OnboardingHostTest {
             onComplete = { completedPersona = it },
             modelAvailability = fakeModelAvailability(ModelArtifactState.Complete),
         )
-        tapPrimary("OPEN VESTIGE")
+        tapPrimary("LET'S GO")
 
         assertEquals(Persona.HARDASS, completedPersona)
     }
@@ -386,7 +389,7 @@ class OnboardingHostTest {
             onComplete = { completed = true },
             modelAvailability = fakeModelAvailability(ModelArtifactState.Complete),
         )
-        tapPrimary("OPEN VESTIGE")
+        tapPrimary("LET'S GO")
 
         assertFalse(completed)
         composeRule.onNodeWithText("WIRING", substring = true).assertIsDisplayed()

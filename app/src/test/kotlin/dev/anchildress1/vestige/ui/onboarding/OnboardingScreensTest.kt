@@ -9,7 +9,6 @@ import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertHasClickAction
 import androidx.compose.ui.test.assertIsDisplayed
-import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertIsNotSelected
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
@@ -35,17 +34,22 @@ class OnboardingScreensTest {
     @get:Rule
     val composeRule = createAndroidComposeRule<ComponentActivity>()
 
+    private val partial = ModelArtifactState.Partial(
+        currentBytes = 1_500_000_000L,
+        expectedBytes = 3_928_000_000L,
+    )
+
     // region Persona Pick
 
     @Test
-    fun `persona pick renders headline + three persona cards with descriptions`() {
+    fun `persona pick renders headline + three persona cards with short descriptions`() {
         composeRule.activity.setContent {
             VestigeTheme {
                 PersonaPickScreen(selected = Persona.WITNESS, onSelect = {}, onContinue = {})
             }
         }
-        composeRule.onNodeWithText("PERSONA", substring = true).assertIsDisplayed()
-        composeRule.onNodeWithText("Observes. Names the pattern. Keeps quiet otherwise.").assertIsDisplayed()
+        composeRule.onNodeWithText("PICK A PERSONA", substring = true).assertIsDisplayed()
+        composeRule.onNodeWithText("Observes. Names the pattern.").assertIsDisplayed()
         composeRule.onNodeWithText("Sharper. Less padding. More action.").performScrollTo().assertIsDisplayed()
         composeRule.onNodeWithText("Cuts vague words until they confess.").performScrollTo().assertIsDisplayed()
     }
@@ -57,9 +61,19 @@ class OnboardingScreensTest {
                 PersonaPickScreen(selected = Persona.HARDASS, onSelect = {}, onContinue = {})
             }
         }
-        composeRule.onNodeWithText("HARDASS").assertIsSelected()
-        composeRule.onNodeWithText("WITNESS").assertIsNotSelected()
-        composeRule.onNodeWithText("EDITOR").assertIsNotSelected()
+        composeRule.onNodeWithText("Sharper. Less padding. More action.").assertIsSelected()
+        composeRule.onNodeWithText("Observes. Names the pattern.").assertIsNotSelected()
+        composeRule.onNodeWithText("Cuts vague words until they confess.").assertIsNotSelected()
+    }
+
+    @Test
+    fun `persona pick shows the SELECTED tag only on the chosen card`() {
+        composeRule.activity.setContent {
+            VestigeTheme {
+                PersonaPickScreen(selected = Persona.WITNESS, onSelect = {}, onContinue = {})
+            }
+        }
+        composeRule.onAllNodesWithText("SELECTED").assertCountEquals(1)
     }
 
     @Test
@@ -70,18 +84,20 @@ class OnboardingScreensTest {
                 PersonaPickScreen(selected = Persona.WITNESS, onSelect = { captured = it }, onContinue = {})
             }
         }
-        composeRule.onNodeWithText("EDITOR").performScrollTo().performClick()
+        composeRule.onNodeWithText("Cuts vague words until they confess.").performScrollTo().performClick()
         assertEquals(Persona.EDITOR, captured)
     }
 
     @Test
-    fun `persona pick Continue carries the selected persona into the bar label`() {
+    fun `persona pick primary reads SELECT and fires onContinue`() {
+        var advanced = false
         composeRule.activity.setContent {
             VestigeTheme {
-                PersonaPickScreen(selected = Persona.HARDASS, onSelect = {}, onContinue = {})
+                PersonaPickScreen(selected = Persona.HARDASS, onSelect = {}, onContinue = { advanced = true })
             }
         }
-        composeRule.onNodeWithText("CONTINUE").assertIsDisplayed()
+        composeRule.onNodeWithText("SELECT").assertIsDisplayed().assertHasClickAction().performClick()
+        assertEquals(true, advanced)
     }
 
     // endregion
@@ -89,69 +105,58 @@ class OnboardingScreensTest {
     // region Download
 
     @Test
-    fun `model download placeholder disables Continue until the model is present`() {
+    fun `download screen has no primary — completion auto-unwinds`() {
         composeRule.activity.setContent {
             VestigeTheme {
-                ModelDownloadPlaceholderScreen(modelState = ModelArtifactState.Absent, onContinue = {})
+                ModelDownloadPlaceholderScreen(modelState = partial)
             }
         }
-        composeRule.onNodeWithText("CONTINUE").assertIsNotEnabled()
+        composeRule.onNodeWithText("DOWNLOAD MODEL", substring = true).assertIsDisplayed()
+        composeRule.onAllNodesWithText("CONTINUE").assertCountEquals(0)
     }
 
     @Test
-    fun `model download placeholder renders huge percent number + percent sign on Partial state`() {
+    fun `download card renders percent, total, and a Pause affordance on active Partial`() {
         composeRule.activity.setContent {
             VestigeTheme {
                 ModelDownloadPlaceholderScreen(
-                    modelState = ModelArtifactState.Partial(currentBytes = 470L, expectedBytes = 1_000L),
-                    onContinue = {},
+                    modelState = partial,
+                    downloadMbps = 6.4f,
+                    downloadStatus = DownloadStatus(phase = DownloadPhase.Active, etaSeconds = 258L),
                 )
             }
         }
-        composeRule.onNodeWithText("47").assertIsDisplayed()
+        composeRule.onNodeWithText("38").assertIsDisplayed()
         composeRule.onNodeWithText("%").assertIsDisplayed()
-        composeRule.onNodeWithText("DOWNLOADING").assertIsDisplayed()
+        composeRule.onNodeWithText("OF 3.66 GB").assertIsDisplayed()
+        composeRule.onNodeWithText("04:18").assertIsDisplayed()
+        // Speed line is the card's last row — below the Robolectric fold; existence is the
+        // contract (it's plain status text, not interactive).
+        composeRule.onNodeWithText("~6.4 MB/S · WI-FI").assertExists()
+        composeRule.onNodeWithText("PAUSE").assertIsDisplayed().assertHasClickAction()
     }
 
     @Test
-    fun `model download placeholder shows em dash placeholders when Partial total is unknown`() {
+    fun `download card shows em dash percent when total is unknown`() {
         composeRule.activity.setContent {
             VestigeTheme {
                 ModelDownloadPlaceholderScreen(
                     modelState = ModelArtifactState.Partial(currentBytes = 10L, expectedBytes = 0L),
-                    onContinue = {},
                 )
             }
         }
-        // Hero number, the MB/s stat, and the ETA slot all fall back to "—" with no known
-        // total; all three must render so the UI doesn't blank out.
-        composeRule.onAllNodesWithText("—").assertCountEquals(3)
+        composeRule.onNodeWithText("—").assertIsDisplayed()
+        composeRule.onNodeWithText("--:--").assertIsDisplayed()
     }
 
     @Test
-    fun `model download placeholder swaps to ready pill once the artifact lands`() {
+    fun `download screen swaps to ready pill once the artifact lands`() {
         composeRule.activity.setContent {
             VestigeTheme {
-                ModelDownloadPlaceholderScreen(modelState = ModelArtifactState.Complete, onContinue = {})
+                ModelDownloadPlaceholderScreen(modelState = ModelArtifactState.Complete)
             }
         }
         composeRule.onNodeWithText("GEMMA READY").assertIsDisplayed()
-    }
-
-    @Test
-    fun `active download shows the ETA label and a Pause affordance`() {
-        composeRule.activity.setContent {
-            VestigeTheme {
-                ModelDownloadPlaceholderScreen(
-                    modelState = ModelArtifactState.Partial(currentBytes = 100L, expectedBytes = 1_000L),
-                    downloadStatus = DownloadStatus(phase = DownloadPhase.Active, etaSeconds = 125L),
-                    onContinue = {},
-                )
-            }
-        }
-        composeRule.onNodeWithText("~2 min").performScrollTo().assertIsDisplayed()
-        // Pause lives in the fixed bottom bar (no scrollable parent) — assert in place.
-        composeRule.onNodeWithText("Pause").assertIsDisplayed().assertHasClickAction()
     }
 
     @Test
@@ -160,21 +165,20 @@ class OnboardingScreensTest {
         composeRule.activity.setContent {
             VestigeTheme {
                 ModelDownloadPlaceholderScreen(
-                    modelState = ModelArtifactState.Partial(currentBytes = 400L, expectedBytes = 1_000L),
+                    modelState = partial,
                     downloadStatus = DownloadStatus(phase = DownloadPhase.Stalled),
-                    onContinue = {},
                     onRetry = { retried = true },
                 )
             }
         }
-        // Band a11y: polite live region, no click action — recovery is the Retry button's job.
+        // Band sits below the download card in the scroll region — existence + semantics is
+        // the contract (the polite live region announces it regardless of scroll position).
         val band = composeRule.onNodeWithContentDescription("Download stalled.")
-        band.assertIsDisplayed()
+        band.assertExists()
         band.assert(SemanticsMatcher.keyIsDefined(SemanticsProperties.LiveRegion))
         band.assert(SemanticsMatcher.keyNotDefined(SemanticsActions.OnClick))
 
-        // Retry lives in the fixed bottom bar (no scrollable parent) — act in place.
-        composeRule.onNodeWithText("Retry").assertHasClickAction().performClick()
+        composeRule.onNodeWithText("RETRY").assertHasClickAction().performClick()
         assertEquals(true, retried)
     }
 
@@ -183,18 +187,17 @@ class OnboardingScreensTest {
         composeRule.activity.setContent {
             VestigeTheme {
                 ModelDownloadPlaceholderScreen(
-                    modelState = ModelArtifactState.Partial(currentBytes = 400L, expectedBytes = 1_000L),
+                    modelState = partial,
                     downloadStatus = DownloadStatus(phase = DownloadPhase.Failed),
-                    onContinue = {},
                     onRetry = {},
                 )
             }
         }
         val band = composeRule.onNodeWithContentDescription("Network choked.")
-        band.assertIsDisplayed()
+        band.assertExists()
         band.assert(SemanticsMatcher.keyIsDefined(SemanticsProperties.LiveRegion))
         band.assert(SemanticsMatcher.keyNotDefined(SemanticsActions.OnClick))
-        composeRule.onNodeWithText("Try again").assertHasClickAction()
+        composeRule.onNodeWithText("TRY AGAIN").assertHasClickAction()
     }
 
     @Test
@@ -202,20 +205,18 @@ class OnboardingScreensTest {
         composeRule.activity.setContent {
             VestigeTheme {
                 ModelDownloadPlaceholderScreen(
-                    modelState = ModelArtifactState.Partial(currentBytes = 0L, expectedBytes = 1_000L),
+                    modelState = ModelArtifactState.Partial(currentBytes = 0L, expectedBytes = 3_928_000_000L),
                     downloadStatus = DownloadStatus(phase = DownloadPhase.Reacquiring),
-                    onContinue = {},
                 )
             }
         }
         val band = composeRule.onNodeWithContentDescription("Model file unreadable. Re-downloading.")
-        band.assertIsDisplayed()
+        band.assertExists()
         band.assert(SemanticsMatcher.keyIsDefined(SemanticsProperties.LiveRegion))
         band.assert(SemanticsMatcher.keyNotDefined(SemanticsActions.OnClick))
-        // Automatic clean re-pull in flight — no Retry / Try again / Pause while it runs.
-        composeRule.onAllNodesWithText("Retry").assertCountEquals(0)
-        composeRule.onAllNodesWithText("Try again").assertCountEquals(0)
-        composeRule.onAllNodesWithText("Pause").assertCountEquals(0)
+        composeRule.onAllNodesWithText("RETRY").assertCountEquals(0)
+        composeRule.onAllNodesWithText("TRY AGAIN").assertCountEquals(0)
+        composeRule.onAllNodesWithText("PAUSE").assertCountEquals(0)
     }
 
     // endregion

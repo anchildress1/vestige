@@ -1,11 +1,11 @@
 package dev.anchildress1.vestige.ui.onboarding
 
 /**
- * 3-screen flow. Wiring is the hub: it shows 5 switches (Persona, Local, Mic, Notify, Type).
- * Next is gated only on the model being downloaded — mic + notify are optional. Tapping Local
- * navigates forward to [ModelDownload]; the download screen auto-returns to Wiring when the
- * artifact verifies. There is no separate "Ready" screen — Wiring's Next is the open-the-app
- * action once the model is on disk.
+ * 3-screen flow. Wiring is the hub: it shows 4 rows (Persona, Local, Mic, Notify). Next is
+ * gated only on the model being downloaded — mic + notify are optional. Tapping Local navigates
+ * forward to [ModelDownload]; the download screen auto-returns to Wiring when the artifact
+ * verifies. There is no separate "Ready" screen — Wiring's Next is the open-the-app action once
+ * the model is on disk. (Typed entry stays always-available per ADR-013; it is not a wiring row.)
  */
 enum class OnboardingStep {
     PersonaPick,
@@ -17,4 +17,4 @@ enum class OnboardingStep {
     fun previous(): OnboardingStep? = entries.getOrNull(ordinal - 1)
 }
 
-internal const val TOTAL_WIRING_SWITCHES = 5
+internal const val TOTAL_WIRING_SWITCHES = 4

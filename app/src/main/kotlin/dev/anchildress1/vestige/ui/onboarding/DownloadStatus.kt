@@ -39,12 +39,9 @@ internal fun downloadChromeOnStepEntry(
 }
 
 private const val SECONDS_PER_MINUTE = 60L
-private const val SECONDS_PER_HOUR = 3_600L
 
-/** ETA label for the `{ETA}` slot in `ux-copy.md` §Onboarding Screen 3. Unknown ⇒ `—`. */
-internal fun formatEta(seconds: Long?): String = when {
-    seconds == null || seconds < 0L -> "—"
-    seconds < SECONDS_PER_MINUTE -> "~${seconds}s"
-    seconds < SECONDS_PER_HOUR -> "~${seconds / SECONDS_PER_MINUTE} min"
-    else -> "~${seconds / SECONDS_PER_HOUR}h ${(seconds % SECONDS_PER_HOUR) / SECONDS_PER_MINUTE}m"
+/** mm:ss clock for the download-card ETA slot (`ux-copy.md` §Onboarding Screen 3). Unknown ⇒ `--:--`. */
+internal fun etaClock(seconds: Long?): String {
+    if (seconds == null || seconds < 0L) return "--:--"
+    return "%02d:%02d".format(seconds / SECONDS_PER_MINUTE, seconds % SECONDS_PER_MINUTE)
 }

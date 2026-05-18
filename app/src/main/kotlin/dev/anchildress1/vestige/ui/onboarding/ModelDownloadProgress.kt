@@ -3,6 +3,7 @@ package dev.anchildress1.vestige.ui.onboarding
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -27,6 +28,7 @@ import dev.anchildress1.vestige.R
 import dev.anchildress1.vestige.model.ModelArtifactState
 import dev.anchildress1.vestige.ui.components.EyebrowE
 import dev.anchildress1.vestige.ui.components.Pill
+import dev.anchildress1.vestige.ui.components.VestigeSurface
 import dev.anchildress1.vestige.ui.theme.VestigeFonts
 import dev.anchildress1.vestige.ui.theme.VestigeTheme
 import kotlin.math.roundToInt
@@ -34,17 +36,32 @@ import kotlin.math.roundToInt
 private const val PERCENT_SCALE = 100
 private const val BYTES_PER_GB = 1_073_741_824.0 // 1024^3
 private const val PROGRESS_BAR_HEIGHT_DP = 10
-private const val DOWNLOADING_NUM_SP = 128
-private const val DOWNLOADING_PCT_SP = 72
+
+// Big percent (number + sign), small ETA — the percent is the hero; the clock is secondary.
+// maxLines=1/softWrap=false + the percent column yielding first keep "100%" from clipping.
+private const val PCT_NUM_SP = 88
+private const val PCT_SIGN_SP = 72
+private const val ETA_SP = 32
 private const val BAND_RULE_WIDTH_DP = 3
 private const val BAND_PAD_DP = 12
 
 @Composable
-internal fun ModelReadinessBanner(modelState: ModelArtifactState, downloadStatus: DownloadStatus) {
+internal fun ModelReadinessBanner(
+    modelState: ModelArtifactState,
+    downloadMbps: Float?,
+    downloadStatus: DownloadStatus,
+    wifiConnected: Boolean,
+) {
     if (modelState.isReady) {
         ModelReadyBanner()
     } else {
-        DownloadingHero(modelState = modelState, downloadStatus = downloadStatus)
+        DownloadCard(
+            modelState = modelState,
+            downloadMbps = downloadMbps,
+            downloadStatus = downloadStatus,
+            wifiConnected = wifiConnected,
+        )
+        DownloadPhaseBand(phase = downloadStatus.phase)
     }
 }
 
@@ -61,53 +78,80 @@ private fun ModelReadyBanner() {
 }
 
 @Composable
-private fun DownloadingHero(modelState: ModelArtifactState, downloadStatus: DownloadStatus) {
+private fun DownloadCard(
+    modelState: ModelArtifactState,
+    downloadMbps: Float?,
+    downloadStatus: DownloadStatus,
+    wifiConnected: Boolean,
+) {
     val colors = VestigeTheme.colors
     val fraction = modelState.downloadFraction
     val percent = if (fraction != null) (fraction * PERCENT_SCALE).roundToInt() else null
-    Column(
-        modifier = Modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
-        EyebrowE(text = stringResource(id = R.string.onboarding_download_loading_pill))
-        Row(verticalAlignment = Alignment.Bottom) {
-            Text(
-                text = percent?.toString() ?: "—",
-                style = TextStyle(
-                    fontFamily = VestigeFonts.Display,
-                    fontSize = DOWNLOADING_NUM_SP.sp,
-                    lineHeight = DOWNLOADING_NUM_SP.sp,
-                    letterSpacing = (-0.02).em,
-                    fontFeatureSettings = "tnum",
-                ),
-                color = colors.ink,
-            )
-            Text(
-                text = "%",
-                style = TextStyle(
-                    fontFamily = VestigeFonts.Display,
-                    fontSize = DOWNLOADING_PCT_SP.sp,
-                    lineHeight = DOWNLOADING_PCT_SP.sp,
-                    letterSpacing = 0.em,
-                ),
-                color = colors.lime,
-            )
+    val partial = modelState as? ModelArtifactState.Partial
+    val totalGb = partial?.let { "%.2f GB".format(it.expectedBytes / BYTES_PER_GB) } ?: "—"
+    VestigeSurface(contentPadding = PaddingValues(20.dp)) {
+        Column(
+            modifier = Modifier.fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(14.dp),
+        ) {
+            // Bottom-aligned: the ETA clock sits on the same baseline-ish bottom as the big
+            // percent; the "ETA" label rides above it, within the number's height.
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.Bottom,
+            ) {
+                Row(
+                    modifier = Modifier.weight(1f, fill = false),
+                    verticalAlignment = Alignment.Bottom,
+                ) {
+                    Text(
+                        text = percent?.toString() ?: "—",
+                        style = numberStyle(PCT_NUM_SP),
+                        color = colors.lime,
+                        maxLines = 1,
+                        softWrap = false,
+                    )
+                    Text(
+                        text = "%",
+                        style = numberStyle(PCT_SIGN_SP),
+                        color = colors.lime,
+                        maxLines = 1,
+                        softWrap = false,
+                    )
+                }
+                Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    EyebrowE(text = stringResource(id = R.string.onboarding_download_eta_label))
+                    Text(
+                        text = etaClock(downloadStatus.etaSeconds),
+                        style = numberStyle(ETA_SP),
+                        color = colors.ink,
+                        maxLines = 1,
+                        softWrap = false,
+                    )
+                }
+            }
+            EyebrowE(text = stringResource(id = R.string.onboarding_download_of_total, totalGb))
+            DownloadProgressBar(fraction = fraction)
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                EyebrowE(text = bytesLabel(partial))
+                EyebrowE(text = speedLabel(modelState, downloadMbps, wifiConnected))
+            }
         }
-        DownloadProgressBar(modelState = modelState)
-        BytesLine(modelState = modelState, etaSeconds = downloadStatus.etaSeconds)
-        DownloadPhaseBand(phase = downloadStatus.phase)
-        // ux-copy.md §Onboarding Screen 3 body line 2 — verbatim, no editorializing.
-        BodyParagraph(
-            text = stringResource(id = R.string.onboarding_download_body),
-            dim = true,
-        )
     }
 }
 
+private fun numberStyle(sizeSp: Int): TextStyle = TextStyle(
+    fontFamily = VestigeFonts.Display,
+    fontSize = sizeSp.sp,
+    lineHeight = sizeSp.sp,
+    letterSpacing = (-0.02).em,
+    fontFeatureSettings = "tnum",
+)
+
 @Composable
-private fun DownloadProgressBar(modelState: ModelArtifactState) {
+private fun DownloadProgressBar(fraction: Float?) {
     val colors = VestigeTheme.colors
-    val fraction = modelState.downloadFraction
     val barModifier = Modifier
         .fillMaxWidth()
         .height(PROGRESS_BAR_HEIGHT_DP.dp)
@@ -132,17 +176,24 @@ private fun DownloadProgressBar(modelState: ModelArtifactState) {
     }
 }
 
-@Composable
-private fun BytesLine(modelState: ModelArtifactState, etaSeconds: Long?) {
-    val partial = modelState as? ModelArtifactState.Partial ?: return
+private fun bytesLabel(partial: ModelArtifactState.Partial?): String {
+    if (partial == null) return "—"
     val current = partial.currentBytes / BYTES_PER_GB
     val total = partial.expectedBytes / BYTES_PER_GB
-    // ux-copy.md §Onboarding Screen 3 body line 1: `{bytes downloaded} / {total} · {ETA}`.
-    val progressLabel = "%.2f / %.2f GB".format(current, total)
-    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-        EyebrowE(text = progressLabel)
-        EyebrowE(text = formatEta(etaSeconds))
+    return "%.2f / %.2f GB".format(current, total)
+}
+
+private fun speedLabel(modelState: ModelArtifactState, downloadMbps: Float?, wifiConnected: Boolean): String {
+    val partial = modelState is ModelArtifactState.Partial
+    val value = when {
+        !partial -> "—"
+        downloadMbps == null -> "—"
+        downloadMbps < 0.1f -> "0"
+        downloadMbps < 10f -> "%.1f".format(downloadMbps)
+        else -> downloadMbps.toInt().toString()
     }
+    val net = if (wifiConnected) "WI-FI" else "NO WI-FI"
+    return "~$value MB/S · $net"
 }
 
 /**

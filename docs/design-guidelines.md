@@ -307,7 +307,7 @@ Forbidden across all personas: "thank you for sharing," "how does that make you 
 Three screens total. The flow is a hub, not a queue.
 
 1. Choose persona (default Witness highlighted, brief one-line descriptions)
-2. Wiring hub with five rows: Persona, Local, Mic, Notify, Type
+2. Wiring hub with four rows: Persona, Local, Mic, Notify
 3. Local model download screen (active/resumable only; blocked Wi-Fi routes back to Wiring)
 
 Rules:
@@ -317,6 +317,19 @@ Rules:
 - The download screen exists only for active/resumable transfers and auto-returns to Wiring once complete.
 
 Tone: plain, short, no emotional hand-holding. No "Welcome to your journey."
+
+#### Addendum (2026-05-17) — final-polish reconciliation
+
+- **Wiring is four rows, not five.** The `Type · Fallback` row was dropped from the Wiring
+  hub. Typed entry stays always-available per ADR-013 — it is product behavior, not a wiring
+  switch, and the mockup carries no row for it. Chrome switch count tracks four accordingly.
+- **Coral headline accent — sanctioned exception.** The poster headline's terminal square
+  (`PICK A PERSONA■` / `WIRING■` / `DOWNLOAD MODEL■`) renders in `coral`. This is the one
+  approved coral-on-chrome use; it does not loosen the "AppTop pill stays lime / coral =
+  REC heat + destructive" rule above. The square is a typographic accent on a static poster
+  title, not a status or action surface, so it cannot read as alarm.
+- **Chrome is unchanged.** The shipped `SETUP · NN OF 0N` eyebrow + tick rule + right-status
+  is retained; the mockup's `STEP n OF 3` line was a comp annotation, not adopted.
 
 ### Local Model Status
 

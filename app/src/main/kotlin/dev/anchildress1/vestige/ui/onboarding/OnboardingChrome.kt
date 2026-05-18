@@ -26,11 +26,7 @@ import dev.anchildress1.vestige.ui.theme.VestigeTheme
  * wiring switches, not a screen ordinal; `ALL SET` simply means all five switches read ready.
  */
 @Composable
-internal fun OnboardingChrome(
-    enabledCount: Int,
-    totalCount: Int = TOTAL_WIRING_SWITCHES,
-    rightStatus: String? = null,
-) {
+internal fun OnboardingChrome(enabledCount: Int, totalCount: Int = TOTAL_WIRING_SWITCHES) {
     val colors = VestigeTheme.colors
     val allEnabled = enabledCount >= totalCount
     val leftEyebrow = if (allEnabled) {
@@ -42,24 +38,9 @@ internal fun OnboardingChrome(
         modifier = Modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween,
-        ) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                StatusDot(color = colors.lime, blink = !allEnabled)
-                EyebrowE(text = leftEyebrow)
-            }
-            if (rightStatus != null) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    StatusDot(color = colors.lime, blink = false)
-                    EyebrowE(text = rightStatus)
-                }
-            }
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            StatusDot(color = colors.lime, blink = !allEnabled)
+            EyebrowE(text = leftEyebrow)
         }
         val marks = (0 until enabledCount.coerceIn(0, totalCount)).toSet()
         TickRule(count = totalCount * TICK_DENSITY, marks = marks.expandTo(TICK_DENSITY))
@@ -89,7 +70,9 @@ internal fun OnboardingHeadline(text: String, modifier: Modifier = Modifier, acc
         if (replacePeriod) {
             withStyle(
                 SpanStyle(
-                    color = VestigeTheme.colors.lime,
+                    // Coral, not lime: the poster headline's terminal square is the one sanctioned
+                    // coral-on-chrome use (design-guidelines.md §First-Run Onboarding addendum).
+                    color = VestigeTheme.colors.coral,
                     fontSize = ACCENT_GLYPH_SP.sp,
                     letterSpacing = (-0.04).em,
                 ),

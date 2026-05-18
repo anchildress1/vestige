@@ -23,13 +23,23 @@ Keep these consistent. Don't mix.
 
 ## Onboarding (3 screens, hub flow)
 
+> _Final-polish reconciliation (2026-05-17):_ the onboarding screens were brought to pixel
+> parity with `poc/onboarding-{persona,wiring,download}-final.png`. Net copy/structure changes,
+> all reflected below: Screen 1 subhead gains "later"; each Wiring row gains a sentence-case
+> **title line** above its description and a status dot replaces the ON/OFF/BLOCKED pill;
+> Wiring gains a subhead; the Type row was never a Wiring row (typed entry is ADR-013 product
+> behavior); Screen 3's single status line is rendered as a card (`{pct}%`, `OF {total}`,
+> `ETA {mm:ss}`, `{done} / {total}`, `~{mbps} MB/S · WI-FI`). The headline terminal square is
+> coral (see `design-guidelines.md` §First-Run Onboarding addendum). Chrome (`SETUP · NN OF
+> 0N` + tick rule) is unchanged — the comps' `STEP n OF 3` line was not adopted.
+
 ### Screen 1 — Pick a persona
 
 Header:
 > **Pick a persona.**
 
 Subhead:
-> Three voices. Same product. Pick the one that fits today. You can switch.
+> Three voices. Same product. Pick the one that fits today. You can switch later.
 
 Persona cards (default Witness highlighted):
 - **Witness** — Observes. Names the pattern.
@@ -49,11 +59,15 @@ Footer link:
 Header:
 > **Wiring.**
 
-Rows:
-- **Persona** — `Voice picked on the previous screen. Change it later in Settings if {persona} doesn't fit.`
-- **Local** — `No cloud. No servers. No telemetry. Voice never leaves the device.`
-- **Mic** — `Records dumps. Audio is read locally, then discarded. Transcription stays as text.`
-- **Notify** — `One line, posted while the model reads an entry. Disappears when work is done.`
+Subhead:
+> The Local row is the only one that gates entry. Mic and Notify are optional.
+
+Rows (mono left-label · sentence-case title line · description · trailing status dot —
+lime = ready, dim = pending, coral = blocked):
+- **PERSONA** — title `{persona name}` · `Set on the previous screen. Change it in Settings.`
+- **LOCAL** — title `Download Gemma` · `No cloud. No servers. Stays on the device.`
+- **MIC** — title `Grant mic` · `Read locally, then discarded. Text stays.`
+- **NOTIFY** — title `Grant process` · `One status line while the model reads. Gone after.`
 
 Local row helper states:
 - Absent on Wi-Fi: `Tap Local to start download`

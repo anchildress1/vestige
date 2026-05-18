@@ -191,7 +191,7 @@ Spinner icon.
 
 ### Capture Screen — Discard
 
-Recording-state secondary affordance — sits below `STOP · FILE IT` per `design-guidelines.md` §"Capture Screen / Discard."
+Recording-state secondary affordance — a coral-outlined button that sits *above* `STOP · FILE IT` per `design-guidelines.md` §"Capture Screen / Discard" (final-polish 2026-05-18; was muted text below STOP).
 
 Button label:
 > DISCARD · DON'T SAVE

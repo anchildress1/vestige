@@ -69,7 +69,7 @@ class LiveLayoutTest {
     }
 
     @Test
-    fun `DISCARD NO SAVE link fires onDiscardTap`() {
+    fun `DISCARD button fires onDiscardTap`() {
         var discards = 0
         composeRule.setContent {
             VestigeTheme { liveLayout(onDiscardTap = { discards += 1 }) }

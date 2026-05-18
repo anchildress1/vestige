@@ -24,7 +24,7 @@ object CaptureCopy {
     const val LIVE_WORD_COUNT_LABEL: String = "WORD COUNT · EST"
 
     const val LIVE_STOP_PRIMARY: String = "STOP · FILE IT"
-    const val LIVE_DISCARD_SECONDARY: String = "DISCARD · NO SAVE"
+    const val LIVE_DISCARD_SECONDARY: String = "DISCARD · DON'T SAVE"
 
     const val STAT_KEPT: String = "KEPT"
     const val STAT_ACTIVE: String = "ACTIVE"

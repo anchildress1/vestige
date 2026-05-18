@@ -82,8 +82,8 @@ fun LiveLayout(
             modifier = Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 18.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
+            DiscardButton(onClick = onDiscardTap)
             StopButton(onClick = onStopTap)
-            DiscardLink(onClick = onDiscardTap)
         }
         Spacer(Modifier.windowInsetsBottomHeight(WindowInsets.navigationBars))
     }
@@ -169,23 +169,24 @@ private fun StopButton(onClick: () -> Unit) {
 }
 
 @Composable
-private fun DiscardLink(onClick: () -> Unit) {
+private fun DiscardButton(onClick: () -> Unit) {
     val colors = VestigeTheme.colors
     Box(
         modifier = Modifier
             .fillMaxWidth()
+            .border(width = 1.dp, color = colors.coral)
             .clickable(onClick = onClick)
             .semantics(mergeDescendants = true) {
                 role = Role.Button
                 contentDescription = CaptureCopy.LIVE_DISCARD_SECONDARY
             }
-            .padding(vertical = 8.dp),
+            .padding(vertical = 16.dp),
         contentAlignment = Alignment.Center,
     ) {
         Text(
             text = CaptureCopy.LIVE_DISCARD_SECONDARY,
-            style = VestigeTheme.typography.personaLabel,
-            color = colors.faint,
+            style = VestigeTheme.typography.displayBig.copy(fontSize = 18.sp, lineHeight = 18.sp),
+            color = colors.coral,
         )
     }
 }

@@ -8,13 +8,9 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.TimeoutCancellationException
-import kotlinx.coroutines.async
-import kotlinx.coroutines.awaitAll
-import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
 import java.time.ZonedDateTime
-import java.util.concurrent.CopyOnWriteArrayList
 
 /**
  * `capturedAt` carries the user's local zone at recording time. Pass a [ZonedDateTime] (not an
@@ -78,21 +74,17 @@ class BackgroundExtractionWorker(
         }
 
         val started = System.nanoTime()
-        // Lenses finish out of order under fan-out; this thread-safe accumulator lets the timeout
-        // path still report whichever lenses completed before the cap (structured-concurrency
-        // cancellation discards in-flight `async` results otherwise).
-        val completed = CopyOnWriteArrayList<LensResult>()
+        // The SDK is single-session: lenses run one at a time on the shared engine. This
+        // accumulator lets the timeout path still report whichever lenses finished before
+        // the cap (the in-progress lens is cancelled and discarded).
+        val completed = mutableListOf<LensResult>()
         listener.onUpdate(ExtractionStatus.RUNNING, request.entryAttemptCount, null)
 
         try {
             withTimeoutOrNoCap(request.timeoutMs) {
-                val results = coroutineScope {
-                    LENSES.map { lens ->
-                        async {
-                            runLens(lens, request.entryText, request.retrievedHistory)
-                                .also { completed += it }
-                        }
-                    }.awaitAll()
+                val results = LENSES.map { lens ->
+                    runLens(lens, request.entryText, request.retrievedHistory)
+                        .also { completed += it }
                 }
                 completeRun(results, request.entryAttemptCount, request.capturedAt, started, listener)
             }
@@ -111,9 +103,9 @@ class BackgroundExtractionWorker(
     private suspend inline fun <T> withTimeoutOrNoCap(timeoutMs: Long?, crossinline block: suspend () -> T): T =
         if (timeoutMs == null) block() else withTimeout(timeoutMs) { block() }
 
-    // Pure per-lens runner: no shared state, no listener — three of these run concurrently, so
-    // any cross-lens mutation would race. Diagnostics (modelCallCount, lastError) are derived
-    // from the returned [LensResult]s after fan-out completes.
+    // Pure per-lens runner: no shared state, no listener. Lenses run sequentially (the SDK
+    // permits one live session at a time); diagnostics (modelCallCount, lastError) are
+    // derived from the returned [LensResult]s after all lenses finish.
     private suspend fun runLens(lens: Lens, entryText: String, retrievedHistory: List<HistoryChunk>): LensResult {
         val lensStarted = System.nanoTime()
         var attempts = 0

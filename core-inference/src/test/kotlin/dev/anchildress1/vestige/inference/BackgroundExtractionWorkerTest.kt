@@ -162,11 +162,13 @@ class BackgroundExtractionWorkerTest {
     }
 
     @Test
-    fun `the three lenses run concurrently, not serialized`() = runTest {
+    fun `lenses run sequentially, never concurrently — SDK is single-session`() = runTest {
         val engine = mockk<LiteRtLmEngine>()
         val inFlight = AtomicInteger(0)
         var maxInFlight = 0
+        val callOrder = mutableListOf<String>()
         coEvery { engine.generateText(any(), any()) } coAnswers {
+            callOrder += firstArg<String>()
             inFlight.incrementAndGet().also { if (it > maxInFlight) maxInFlight = it }
             delay(10)
             inFlight.decrementAndGet()
@@ -182,7 +184,16 @@ class BackgroundExtractionWorkerTest {
             request = BackgroundExtractionRequest(entryText = "user words", capturedAt = capturedAt),
         )
 
-        assertEquals(3, maxInFlight, "expected all 3 lenses in-flight concurrently but max was $maxInFlight")
+        assertAll(
+            { assertEquals(1, maxInFlight, "single-session SDK: at most one lens call in-flight at a time") },
+            {
+                assertEquals(
+                    listOf("prompt-for-LITERAL", "prompt-for-INFERENTIAL", "prompt-for-SKEPTICAL"),
+                    callOrder,
+                    "lenses must run one at a time in LENSES order",
+                )
+            },
+        )
     }
 
     @Test

@@ -17,9 +17,10 @@ import java.io.File
 import java.time.ZonedDateTime
 
 /**
- * On-device RAM + wall-clock probe for the concurrent-context engine design (ADR-008 §Addendum
- * 2026-05-17). Measures PSS before/after a 3-lens concurrent extraction and logs the realized
- * wall-clock. Numbers feed the ADR-008 record; there are no hard pass/fail thresholds.
+ * On-device RAM + wall-clock probe for the sequential single-session 3-lens worker (ADR-008
+ * §Addendum 2026-05-17; STT-F). Measures PSS before/after one full extraction and logs the
+ * realized wall-clock. Numbers feed the STT-F record; there are no hard pass/fail thresholds.
+ * Post-fix this must show 3/3 lenses parsed (the concurrent run showed 1/3 — single-session SDK).
  *
  * Run (each line is one shell token — never let the class arg wrap mid-name):
  *   adb logcat -c

@@ -1,5 +1,20 @@
 # STT evidence archive
 
+## STT-F — concurrent-inference viability
+
+One-off feasibility capture of `RamWallClockProbeTest` against the on-device Engine. Answered
+whether `litertlm-android:0.11.0` supports concurrent independent conversations on one Engine
+(the Story 2.6.6 / 2.19 Path C premise). Verdict: **no — single-session enforced**; v1 ships
+sequential. See `stt-f-2026-05-17.md`. Not a recurring corpus run — re-capture only if the SDK
+is bumped past 0.11.0.
+
+### Log tag
+
+`VestigeLiteRtLm` + `VestigeBackgroundExtraction` — RAM/wall-clock probe line plus the per-lens
+`FAILED_PRECONDITION` evidence.
+
+---
+
 ## STT-E — embedding retrieval comparison
 
 Captures of `SttEEmbeddingComparisonTest` runs against the 18-entry corpus from

@@ -129,7 +129,11 @@ private fun NavIcon(tab: BottomTab, tint: Color) {
         // blank on device. A near-full circular stroke + a chevron arrowhead reads as "history".
         BottomTab.HISTORY -> Canvas(modifier = deco.size(ICON_BOX)) {
             val stroke = size.minDimension * HISTORY_STROKE_FRAC
-            val inset = stroke
+            // Inset enough that the round-capped stroke AND the arrowhead stay fully inside the
+            // box — the head used to be anchored at y=inset and drew above the top edge (clipped).
+            val a = size.minDimension * HISTORY_HEAD_FRAC
+            val notch = a * HISTORY_HEAD_NOTCH
+            val inset = stroke + notch
             drawArc(
                 color = tint,
                 startAngle = HISTORY_ARC_START,
@@ -139,10 +143,9 @@ private fun NavIcon(tab: BottomTab, tint: Color) {
                 size = Size(size.width - inset * 2f, size.height - inset * 2f),
                 style = Stroke(width = stroke, cap = StrokeCap.Round),
             )
-            // Arrowhead at the arc's open (top) end.
-            val tip = Offset(size.width / 2f, inset)
-            val a = size.minDimension * HISTORY_HEAD_FRAC
-            val notch = a * HISTORY_HEAD_NOTCH
+            // Arrowhead at the arc's open (top) end — tip lowered by `notch` so the upper barb
+            // (tip.y - notch) lands at `inset`, never past the canvas top.
+            val tip = Offset(size.width / 2f, inset + notch)
             drawPath(
                 path = Path().apply {
                     moveTo(tip.x, tip.y)
@@ -166,12 +169,12 @@ private fun BottomTab.label(): String = when (this) {
     BottomTab.HISTORY -> "HISTORY"
 }
 
-private val MIN_TAP_TARGET: Dp = 48.dp
+private val MIN_TAP_TARGET: Dp = 56.dp
 private val ACTIVE_SEGMENT_H: Dp = 2.dp
-private val ICON_BOX: Dp = 14.dp
-private val DOT: Dp = 9.dp
-private val BAR_W: Dp = 3.dp
-private val BAR_GAP: Dp = 3.dp
+private val ICON_BOX: Dp = 20.dp
+private val DOT: Dp = 12.dp
+private val BAR_W: Dp = 4.dp
+private val BAR_GAP: Dp = 4.dp
 private const val HISTORY_STROKE_FRAC: Float = 0.12f
 private const val HISTORY_HEAD_FRAC: Float = 0.34f
 private const val HISTORY_HEAD_NOTCH: Float = 0.4f

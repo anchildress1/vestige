@@ -47,14 +47,7 @@ object CaptureCopy {
     const val BAND_LABEL_MODEL_PAUSED: String = "MODEL · PAUSED"
     const val BAND_LABEL_MODEL_DOWNLOADING_FMT: String = "MODEL · %d%%"
 
-    const val READING_PLACEHOLDER: String = "Reading the entry."
-
-    const val YOU_LABEL: String = "YOU"
-
     const val PATTERNS_LINK: String = "PATTERNS →"
-
-    const val HISTORY_LINK: String = "History"
-    const val HISTORY_LINK_A11Y: String = "Open history"
 
     const val SETTINGS_LINK: String = "Settings"
     const val HISTORY_FOOTER_SEPARATOR: String = " · "

@@ -15,6 +15,7 @@ import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.channels.BufferOverflow
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -22,6 +23,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.filterIsInstance
 import kotlinx.coroutines.flow.firstOrNull
+import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.time.Clock
@@ -33,11 +35,17 @@ import java.time.ZonedDateTime
  * and the foreground-call lifecycle for one voice or typed entry. Collaborators are injected as
  * fun-interfaces so the JVM unit suite drives the full state machine without Android dependencies.
  *
+ * Post-submit there is no in-Capture review surface: the entry persists on the call-1
+ * transcription, the host is told to open it in History detail via [openEntryEvents], and
+ * Capture resets to [CaptureUiState.Idle]. Call-2's persona follow-up is generated in the
+ * background and patched onto the entry — the VM is Activity-scoped so that work survives the
+ * navigation away from Capture.
+ *
  * Audio bytes never enter this VM — only RMS levels (0..1) and the final `AudioChunk` that the
  * foreground call consumes once.
  */
 @Suppress(
-    "LongParameterList", // Constructor seams: 3 collaborators + clock + zone + readiness + windows.
+    "LongParameterList", // Constructor seams: collaborators + clock + zone + readiness + windows.
     "TooManyFunctions", // Host events split across mic / model / persona / record / type lifecycles.
 )
 class CaptureViewModel(
@@ -47,6 +55,7 @@ class CaptureViewModel(
     private val saveAndExtract: SaveAndExtract,
     private val foregroundTextInference: ForegroundTextInferenceCall,
     private val retrieveHistory: HistoryRetrieval = HistoryRetrieval { emptyList() },
+    private val attachFollowUp: AttachFollowUp = AttachFollowUp { _, _ -> },
     private val clock: Clock = Clock.systemUTC(),
     private val zoneId: ZoneId = ZoneId.systemDefault(),
     private val initialReadiness: ModelReadiness = ModelReadiness.Loading,
@@ -60,6 +69,11 @@ class CaptureViewModel(
         CaptureUiState.Idle(persona = initialPersona, modelReadiness = initialReadiness),
     )
     val state: StateFlow<CaptureUiState> = _state.asStateFlow()
+
+    // One-shot: "open this entry's detail in History". Buffered so a fast emit isn't lost if the
+    // collector is mid-recomposition; consumed once by CaptureScreen.
+    private val _openEntryEvents = Channel<Long>(Channel.BUFFERED)
+    val openEntryEvents: Flow<Long> = _openEntryEvents.receiveAsFlow()
 
     // replay=1 + DROP_OLDEST: a STOP/DISCARD tap fired before `RealVoiceCapture` subscribes to
     // `stopFlow.first()` is buffered and delivered on subscribe. Without the replay slot, fast
@@ -90,8 +104,7 @@ class CaptureViewModel(
             when (current) {
                 is CaptureUiState.Idle -> current.copy(modelReadiness = readiness)
                 is CaptureUiState.Recording -> current.copy(modelReadiness = readiness)
-                is CaptureUiState.Inferring -> current.copy(modelReadiness = readiness)
-                is CaptureUiState.Reviewing -> current.copy(modelReadiness = readiness)
+                is CaptureUiState.Submitting -> current.copy(modelReadiness = readiness)
             }
         }
     }
@@ -101,8 +114,7 @@ class CaptureViewModel(
             when (current) {
                 is CaptureUiState.Idle -> current.copy(persona = persona)
                 is CaptureUiState.Recording -> current.copy(persona = persona)
-                is CaptureUiState.Inferring -> current.copy(persona = persona)
-                is CaptureUiState.Reviewing -> current.copy(persona = persona)
+                is CaptureUiState.Submitting -> current.copy(persona = persona)
             }
         }
     }
@@ -124,30 +136,6 @@ class CaptureViewModel(
         _state.update { current ->
             when (current) {
                 is CaptureUiState.Idle -> current.copy(error = null)
-                else -> current
-            }
-        }
-    }
-
-    /**
-     * Done tap. No-op while [CaptureUiState.Reviewing.streaming] — the entry is not yet persisted
-     * (save fires only on the terminal event), so acknowledging mid-stream would drop it on the
-     * subsequent `onCleared()` cancel. The UI also withholds Done until streaming ends; this guard
-     * is the state-machine backstop.
-     */
-    fun acknowledgeReview() {
-        _state.update { current ->
-            when (current) {
-                is CaptureUiState.Reviewing -> if (current.streaming) {
-                    current
-                } else {
-                    CaptureUiState.Idle(
-                        persona = current.persona,
-                        modelReadiness = current.modelReadiness,
-                        lastReview = current.review,
-                    )
-                }
-
                 else -> current
             }
         }
@@ -194,7 +182,7 @@ class CaptureViewModel(
                 returnToIdleFromRecording()
                 return@launch
             }
-            transitionToInferring()
+            transitionToSubmitting()
             runVoiceForeground(inferencePersona, audio)
         } catch (cancel: CancellationException) {
             throw cancel
@@ -219,14 +207,10 @@ class CaptureViewModel(
         }
     }
 
-    private fun transitionToInferring() {
+    private fun transitionToSubmitting() {
         _state.update { current ->
             if (current is CaptureUiState.Recording) {
-                CaptureUiState.Inferring(
-                    persona = current.persona,
-                    modelReadiness = current.modelReadiness,
-                    startedAtEpochMs = clock.millis(),
-                )
+                CaptureUiState.Submitting(persona = current.persona, modelReadiness = current.modelReadiness)
             } else {
                 current
             }
@@ -266,9 +250,9 @@ class CaptureViewModel(
     }
 
     /**
-     * Typed-entry path: runs the same foreground model call voice does, so a typed entry produces
-     * the identical Reviewing surface (persona follow-up included). The model is required — when it
-     * isn't Ready this is a silent no-op, exactly like a disabled REC button.
+     * Typed-entry path. The text is known immediately, so it persists straight away and the host
+     * opens the entry; call-2 then generates the persona follow-up in the background. Silent
+     * no-op when the model isn't Ready, exactly like a disabled REC button.
      */
     fun submitTyped(text: String) {
         val trimmed = text.trim()
@@ -278,18 +262,24 @@ class CaptureViewModel(
         viewModelScope.launch {
             _state.update { c ->
                 if (c is CaptureUiState.Idle) {
-                    CaptureUiState.Inferring(
-                        persona = c.persona,
-                        modelReadiness = c.modelReadiness,
-                        startedAtEpochMs = clock.millis(),
-                    )
+                    CaptureUiState.Submitting(persona = c.persona, modelReadiness = c.modelReadiness)
                 } else {
                     c
                 }
             }
-            val history = retrieveHistorySafely(trimmed)
-            runForeground(inferencePersona, durationMs = 0L, retrievedHistory = history, transcriptionOverride = null) {
-                foregroundTextInference(trimmed, inferencePersona, history)
+            try {
+                val history = retrieveHistorySafely(trimmed)
+                val entryId = persistPending(trimmed, inferencePersona, durationMs = 0L, history = history)
+                openEntry(entryId)
+                launchFollowUp(entryId, trimmed, inferencePersona, history)
+            } catch (timeout: TimeoutCancellationException) {
+                Log.w(TAG, "Typed submit timed out", timeout)
+                emitInferenceError(CaptureError.InferenceFailed.Reason.TIMED_OUT)
+            } catch (cancel: CancellationException) {
+                throw cancel
+            } catch (@Suppress("TooGenericExceptionCaught") error: Exception) {
+                Log.e(TAG, "Typed submit failed", error)
+                emitInferenceError(CaptureError.InferenceFailed.Reason.ENGINE_FAILED)
             }
         }
     }
@@ -315,191 +305,82 @@ class CaptureViewModel(
         }
     }
 
-    // Shared streaming handler for the voice follow-up call and the typed path. The scanner-driven
-    // deltas grow the Reviewing transcript live; the terminal event carries the authoritative
-    // parsed result and is the only thing that saves. `durationMs` is the audio length for voice,
-    // 0 for typed. `transcriptionOverride` carries the voice path's authoritative call-1
-    // transcription so the verbatim user words win over call-2's model echo; null for typed.
-    // `retrievedHistory` is forwarded to the background extraction so it sees the same prior-entry
-    // context the follow-up did. A collector cancellation (navigate-away) throws out the partial.
-    private suspend fun runForeground(
-        persona: Persona,
-        durationMs: Long,
-        retrievedHistory: List<HistoryChunk>,
-        transcriptionOverride: String?,
-        call: () -> Flow<ForegroundStreamEvent>,
-    ) {
-        var transcription = transcriptionOverride.orEmpty()
-        val followUp = StringBuilder()
-        try {
-            call().collect { event ->
-                when (event) {
-                    is ForegroundStreamEvent.Transcription -> {
-                        transcription = transcriptionOverride ?: event.text
-                        showReviewing(transcription, followUp.toString(), elapsedMs = 0L, streaming = true)
-                    }
-
-                    is ForegroundStreamEvent.FollowUpDelta -> {
-                        followUp.append(event.text)
-                        showReviewing(transcription, followUp.toString(), elapsedMs = 0L, streaming = true)
-                    }
-
-                    is ForegroundStreamEvent.Terminal -> handleTerminalResult(
-                        result = event.result,
-                        persona = persona,
-                        durationMs = durationMs,
-                        retrievedHistory = retrievedHistory,
-                        transcriptionOverride = transcriptionOverride,
-                    )
-                }
-            }
-        } catch (timeout: TimeoutCancellationException) {
-            Log.w(TAG, "Foreground inference timed out", timeout)
-            recoverOrEmitInferenceError(
-                reason = CaptureError.InferenceFailed.Reason.TIMED_OUT,
-                transcriptionOverride = transcriptionOverride,
-                persona = persona,
-                durationMs = durationMs,
-                retrievedHistory = retrievedHistory,
-            )
-        } catch (cancel: CancellationException) {
-            throw cancel
-        } catch (@Suppress("TooGenericExceptionCaught") error: Exception) {
-            Log.e(TAG, "Foreground inference failed", error)
-            recoverOrEmitInferenceError(
-                reason = CaptureError.InferenceFailed.Reason.ENGINE_FAILED,
-                transcriptionOverride = transcriptionOverride,
-                persona = persona,
-                durationMs = durationMs,
-                retrievedHistory = retrievedHistory,
-            )
-        }
-    }
-
-    private suspend fun handleTerminalResult(
-        result: ForegroundResult,
-        persona: Persona,
-        durationMs: Long,
-        retrievedHistory: List<HistoryChunk>,
-        transcriptionOverride: String?,
-    ) {
-        when (result) {
-            is ForegroundResult.Success -> {
-                val saved = transcriptionOverride ?: result.transcription
-                persistReview(
-                    text = saved,
-                    persona = persona,
-                    durationMs = durationMs,
-                    followUpText = result.followUp,
-                    retrievedHistory = retrievedHistory,
-                )
-                showReviewing(saved, result.followUp, result.elapsedMs, streaming = false)
-            }
-
-            is ForegroundResult.ParseFailure -> {
-                val saved = transcriptionOverride ?: result.recoveredTranscription
-                if (saved.isNullOrBlank()) {
-                    emitInferenceError(CaptureError.InferenceFailed.Reason.PARSE_FAILED)
-                    return
-                }
-                // Only follow_up failed to parse; the user's words came back clean. Save them —
-                // losing the entry is the worse failure.
-                persistReview(
-                    text = saved,
-                    persona = persona,
-                    durationMs = durationMs,
-                    followUpText = null,
-                    retrievedHistory = retrievedHistory,
-                )
-                showReviewing(saved, "", result.elapsedMs, streaming = false)
-            }
-        }
-    }
-
-    private suspend fun recoverOrEmitInferenceError(
-        reason: CaptureError.InferenceFailed.Reason,
-        transcriptionOverride: String?,
-        persona: Persona,
-        durationMs: Long,
-        retrievedHistory: List<HistoryChunk>,
-    ) {
-        if (finalizeAuthoritativeVoiceFallback(
-                transcriptionOverride = transcriptionOverride,
-                persona = persona,
-                durationMs = durationMs,
-                retrievedHistory = retrievedHistory,
-            )
-        ) {
+    /**
+     * Voice path (ADR retrieval-history-gap, option C): call 1 streams the transcription from the
+     * audio; the moment it lands the entry is persisted and the host opens it. A retrieval query
+     * on that transcription then feeds call 2 (background) whose history-conditioned follow-up is
+     * patched onto the entry. The call-1 transcription is authoritative and verbatim.
+     */
+    private suspend fun runVoiceForeground(persona: Persona, audio: AudioChunk) {
+        // null ⇒ the call threw and the matching error was already surfaced; "" ⇒ the call
+        // returned no transcription event (mapped to PARSE_FAILED here). Keeping both signals
+        // in one nullable String holds runVoiceForeground to a single happy path.
+        val transcription = call1Transcription(audio, persona) ?: return
+        if (transcription.isBlank()) {
+            emitInferenceError(CaptureError.InferenceFailed.Reason.PARSE_FAILED)
             return
         }
-        emitInferenceError(reason)
+        val history = retrieveHistorySafely(transcription)
+        val entryId = persistPending(transcription, persona, audio.durationMs, history)
+        openEntry(entryId)
+        launchFollowUp(entryId, transcription, persona, history)
     }
 
-    private suspend fun persistReview(
+    private suspend fun call1Transcription(audio: AudioChunk, persona: Persona): String? = try {
+        foregroundInference(audio, persona)
+            .filterIsInstance<ForegroundStreamEvent.Transcription>()
+            .firstOrNull()
+            ?.text
+            .orEmpty()
+    } catch (timeout: TimeoutCancellationException) {
+        Log.w(TAG, "Voice transcription timed out", timeout)
+        emitInferenceError(CaptureError.InferenceFailed.Reason.TIMED_OUT)
+        null
+    } catch (cancel: CancellationException) {
+        throw cancel
+    } catch (@Suppress("TooGenericExceptionCaught") error: Exception) {
+        Log.e(TAG, "Voice transcription failed", error)
+        emitInferenceError(CaptureError.InferenceFailed.Reason.ENGINE_FAILED)
+        null
+    }
+
+    private suspend fun persistPending(
         text: String,
         persona: Persona,
         durationMs: Long,
-        followUpText: String?,
-        retrievedHistory: List<HistoryChunk>,
-    ) {
-        saveAndExtract(
-            text,
-            ZonedDateTime.now(clock.withZone(zoneId)),
-            persona,
-            durationMs,
-            followUpText,
-            retrievedHistory,
-        )
+        history: List<HistoryChunk>,
+    ): Long = saveAndExtract(text, ZonedDateTime.now(clock.withZone(zoneId)), persona, durationMs, null, history)
+
+    // Entry is persisted + background extraction kicked. Tell the host to open it in History
+    // detail, then reset Capture to Idle so the CAPTURE tab is always a fresh capture surface.
+    private fun openEntry(entryId: Long) {
+        _openEntryEvents.trySend(entryId)
+        _state.update { c -> CaptureUiState.Idle(persona = c.persona, modelReadiness = c.modelReadiness) }
     }
 
-    private suspend fun finalizeAuthoritativeVoiceFallback(
-        transcriptionOverride: String?,
-        persona: Persona,
-        durationMs: Long,
-        retrievedHistory: List<HistoryChunk>,
-    ): Boolean {
-        val saved = transcriptionOverride?.takeUnless(String::isBlank) ?: return false
-        persistReview(
-            text = saved,
-            persona = persona,
-            durationMs = durationMs,
-            followUpText = null,
-            retrievedHistory = retrievedHistory,
-        )
-        showReviewing(saved, followUp = "", elapsedMs = 0L, streaming = false)
-        return true
-    }
-
-    /**
-     * Voice path (ADR retrieval-history-gap, option C): call 1 streams the transcription from the
-     * audio, cancels the moment it lands (no wasted follow-up generation, temp WAV discarded by
-     * ForegroundInference's finally); a retrieval query on that transcription then feeds call 2,
-     * whose follow-up is history-conditioned. The call-1 transcription is authoritative — call 2's
-     * model echo never overwrites the verbatim user words.
-     */
-    private suspend fun runVoiceForeground(persona: Persona, audio: AudioChunk) {
-        try {
-            val transcription = foregroundInference(audio, persona)
-                .filterIsInstance<ForegroundStreamEvent.Transcription>()
-                .firstOrNull()
-                ?.text
-            if (transcription.isNullOrBlank()) {
-                emitInferenceError(CaptureError.InferenceFailed.Reason.PARSE_FAILED)
-                return
+    // Call 2 runs after the user has navigated to the entry — kept on viewModelScope (the VM is
+    // Activity-scoped, so it survives leaving Capture). The persona follow-up is patched onto the
+    // already-persisted entry; any failure just leaves the entry follow-up-less (the worse
+    // outcome — losing the entry — can't happen, it's already saved).
+    private fun launchFollowUp(entryId: Long, text: String, persona: Persona, history: List<HistoryChunk>) {
+        viewModelScope.launch {
+            try {
+                foregroundTextInference(text, persona, history)
+                    .filterIsInstance<ForegroundStreamEvent.Terminal>()
+                    .firstOrNull()
+                    ?.let { terminal ->
+                        val result = terminal.result
+                        if (result is ForegroundResult.Success && result.followUp.isNotBlank()) {
+                            attachFollowUp(entryId, result.followUp)
+                        }
+                    }
+            } catch (timeout: TimeoutCancellationException) {
+                Log.w(TAG, "Follow-up generation timed out for entry $entryId", timeout)
+            } catch (cancel: CancellationException) {
+                throw cancel
+            } catch (@Suppress("TooGenericExceptionCaught") error: Exception) {
+                Log.w(TAG, "Follow-up generation failed for entry $entryId (${error.javaClass.simpleName})")
             }
-            showReviewing(transcription, followUp = "", elapsedMs = 0L, streaming = true)
-            val history = retrieveHistorySafely(transcription)
-            runForeground(persona, audio.durationMs, history, transcriptionOverride = transcription) {
-                foregroundTextInference(transcription, persona, history)
-            }
-        } catch (timeout: TimeoutCancellationException) {
-            Log.w(TAG, "Voice transcription timed out", timeout)
-            emitInferenceError(CaptureError.InferenceFailed.Reason.TIMED_OUT)
-        } catch (cancel: CancellationException) {
-            throw cancel
-        } catch (@Suppress("TooGenericExceptionCaught") error: Exception) {
-            Log.e(TAG, "Voice foreground failed", error)
-            emitInferenceError(CaptureError.InferenceFailed.Reason.ENGINE_FAILED)
         }
     }
 
@@ -513,23 +394,6 @@ class CaptureViewModel(
     } catch (@Suppress("TooGenericExceptionCaught") error: Exception) {
         Log.w(TAG, "Retrieval degraded, proceeding context-free (${error.javaClass.simpleName})")
         emptyList()
-    }
-
-    private fun showReviewing(transcription: String, followUp: String, elapsedMs: Long, streaming: Boolean) {
-        _state.update { c ->
-            CaptureUiState.Reviewing(
-                persona = c.persona,
-                modelReadiness = c.modelReadiness,
-                review = ReviewState(
-                    transcription = transcription,
-                    followUp = followUp,
-                    persona = c.persona,
-                    elapsedMs = elapsedMs,
-                    isTerminal = !streaming,
-                ),
-                streaming = streaming,
-            )
-        }
     }
 
     private fun emitInferenceError(reason: CaptureError.InferenceFailed.Reason) {
@@ -594,7 +458,10 @@ fun interface HistoryRetrieval {
     suspend operator fun invoke(query: String): List<HistoryChunk>
 }
 
-/** Routes a transcription (voice or typed) into the two-tier save + background extraction pipeline. */
+/**
+ * Persists the transcription as a pending entry + kicks the background 3-lens extraction.
+ * Returns the new entry id so the host can open it immediately.
+ */
 fun interface SaveAndExtract {
     @Suppress("LongParameterList") // Save+extract orchestration contract; a wrapper DTO would add indirection only.
     suspend operator fun invoke(
@@ -604,5 +471,10 @@ fun interface SaveAndExtract {
         durationMs: Long,
         followUpText: String?,
         retrievedHistory: List<HistoryChunk>,
-    )
+    ): Long
+}
+
+/** Lands call-2's persona follow-up onto an already-persisted in-flight entry. */
+fun interface AttachFollowUp {
+    suspend operator fun invoke(entryId: Long, followUpText: String)
 }

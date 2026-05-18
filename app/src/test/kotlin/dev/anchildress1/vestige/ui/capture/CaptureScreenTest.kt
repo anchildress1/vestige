@@ -4,19 +4,13 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertHasClickAction
-import androidx.compose.ui.test.assertHeightIsAtLeast
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.v2.createComposeRule
-import androidx.compose.ui.test.onAllNodesWithContentDescription
-import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
-import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performSemanticsAction
-import androidx.compose.ui.unit.dp
 import dev.anchildress1.vestige.inference.AudioChunk
-import dev.anchildress1.vestige.inference.ForegroundResult
 import dev.anchildress1.vestige.inference.ForegroundStreamEvent
 import dev.anchildress1.vestige.model.Persona
 import dev.anchildress1.vestige.ui.theme.VestigeTheme
@@ -40,9 +34,9 @@ import java.time.Instant
 import java.time.ZoneOffset
 
 /**
- * Route-level tests for CaptureScreen — verifies it picks the right layout for each CaptureUiState
- * variant and exposes the canonical content descriptions. State transitions themselves are covered
- * in CaptureViewModelTest; this suite checks the View-to-State binding.
+ * Route-level tests for CaptureScreen — verifies it picks the right layout for each
+ * CaptureUiState variant and forwards the VM's open-entry event to the host. State
+ * transitions themselves are covered in CaptureViewModelTest.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 @RunWith(RobolectricTestRunner::class)
@@ -67,7 +61,7 @@ class CaptureScreenTest {
 
     @Test
     fun `idle state renders IdleLayout content`() {
-        val vm = newViewModel(readiness = ModelReadiness.Ready)
+        val vm = idleViewModel(ModelReadiness.Ready)
         composeRule.setContent { VestigeTheme { captureScreen(vm) } }
         composeRule.onNodeWithContentDescription(CaptureCopy.REC_LABEL_IDLE).assertIsDisplayed()
         composeRule.onNodeWithText("WHAT HAPPENED?", substring = true).assertIsDisplayed()
@@ -75,37 +69,29 @@ class CaptureScreenTest {
 
     @Test
     fun `recording state renders LiveLayout chrome`() {
-        // VoiceCapture suspends forever — state stays in Recording for the duration of the test.
-        val vm = CaptureViewModel(
-            initialPersona = Persona.WITNESS,
-            recordVoice = VoiceCapture { _, _ ->
-                kotlinx.coroutines.suspendCancellableCoroutine { /* park */ }
-            },
-            foregroundInference = ForegroundInferenceCall { _, _ -> error("unreached") },
-            saveAndExtract = SaveAndExtract { _, _, _, _, _, _ -> },
-            foregroundTextInference = ForegroundTextInferenceCall { _, _, _ -> error("unused") },
-            clock = clock,
-            zoneId = ZoneOffset.UTC,
-            initialReadiness = ModelReadiness.Ready,
-        )
+        val vm = parkedRecordingViewModel()
         vm.startRecording()
         composeRule.setContent { VestigeTheme { captureScreen(vm) } }
         composeRule.onNodeWithText(CaptureCopy.LIVE_RECORDING_EYEBROW).assertIsDisplayed()
     }
 
     @Test
-    fun `inferring state renders the Reading the entry placeholder`() {
-        val vm = newViewModel(readiness = ModelReadiness.Ready, startInInferringPhase = true)
+    fun `submitting state shows a spinner, not the old reading page`() {
+        val vm = submittingViewModel()
+        vm.startRecording()
         composeRule.setContent { VestigeTheme { captureScreen(vm) } }
-        composeRule.onNodeWithText(CaptureCopy.READING_PLACEHOLDER).assertIsDisplayed()
+        // Chrome is present, but neither the idle hero nor the recording eyebrow — and the old
+        // "Reading the entry." review page is gone for good.
+        composeRule.onNodeWithContentDescription("Gemma 4 local model. Local only.").assertIsDisplayed()
+        composeRule.onAllNodesWithText("WHAT HAPPENED?", substring = true).assertCountEquals(0)
+        composeRule.onAllNodesWithText(CaptureCopy.LIVE_RECORDING_EYEBROW).assertCountEquals(0)
+        composeRule.onAllNodesWithText("Reading the entry.").assertCountEquals(0)
     }
-
-    // --- Bottom nav tests ---
 
     @Test
     fun `bottom nav HISTORY tab fires onHistoryTap`() {
         var historyTaps = 0
-        val vm = newViewModel(readiness = ModelReadiness.Ready)
+        val vm = idleViewModel(ModelReadiness.Ready)
         composeRule.setContent {
             VestigeTheme {
                 captureScreen(vm, chrome = IdleChromeCallbacks(onHistoryTap = { historyTaps += 1 }))
@@ -118,138 +104,73 @@ class CaptureScreenTest {
         composeRule.runOnIdle { assertEquals(1, historyTaps) }
     }
 
-    // --- Reviewing state tests ---
-
     @Test
-    fun `reviewing state renders DONE button`() {
-        val vm = newReviewingViewModel()
-        composeRule.setContent { VestigeTheme { captureScreen(vm) } }
-        composeRule.onNodeWithContentDescription("Done").assertIsDisplayed()
-    }
-
-    @Test
-    fun `reviewing state withholds DONE while streaming`() {
-        val vm = streamingReviewingViewModel()
-        composeRule.setContent { VestigeTheme { captureScreen(vm) } }
-        composeRule.onAllNodesWithContentDescription("Done").assertCountEquals(0)
-    }
-
-    @Test
-    fun `reviewing state withholds History link while streaming`() {
-        val vm = streamingReviewingViewModel()
+    fun `a finished capture forwards the new entry id to the host`() {
+        var openedEntryId: Long? = null
+        val vm = voiceViewModel(entryId = 99L)
         composeRule.setContent {
-            VestigeTheme { captureScreen(vm, chrome = IdleChromeCallbacks(onHistoryTap = {})) }
+            VestigeTheme {
+                captureScreen(vm, chrome = IdleChromeCallbacks(onOpenEntryDetail = { openedEntryId = it }))
+            }
         }
-        composeRule.onAllNodesWithContentDescription(CaptureCopy.HISTORY_LINK_A11Y).assertCountEquals(0)
-    }
-
-    @Test
-    fun `reviewing state history link present when onOpenHistory provided`() {
-        val vm = newReviewingViewModel()
-        composeRule.setContent {
-            VestigeTheme { captureScreen(vm, chrome = IdleChromeCallbacks(onHistoryTap = {})) }
-        }
-        composeRule.onNodeWithContentDescription(CaptureCopy.HISTORY_LINK_A11Y).assertHasClickAction()
-    }
-
-    @Test
-    fun `reviewing state history link absent when onOpenHistory is null`() {
-        val vm = newReviewingViewModel()
-        composeRule.setContent { VestigeTheme { captureScreen(vm) } }
-        composeRule.onAllNodesWithText(CaptureCopy.HISTORY_LINK).assertCountEquals(0)
-    }
-
-    @Test
-    fun `progressive review hides Done and History actions until the terminal follow-up lands`() {
-        val vm = streamingReviewingViewModel()
-        composeRule.setContent {
-            VestigeTheme { captureScreen(vm, chrome = IdleChromeCallbacks(onHistoryTap = {})) }
-        }
-        composeRule.onAllNodesWithText("DONE · NEW ENTRY").assertCountEquals(0)
-        composeRule.onAllNodesWithText(CaptureCopy.HISTORY_LINK).assertCountEquals(0)
+        vm.startRecording()
+        composeRule.waitForIdle()
+        composeRule.runOnIdle { assertEquals(99L, openedEntryId) }
     }
 
     @Composable
     private fun captureScreen(vm: CaptureViewModel, chrome: IdleChromeCallbacks = IdleChromeCallbacks()) {
-        CaptureScreen(
-            viewModel = vm,
-            chrome = chrome,
-        )
+        CaptureScreen(viewModel = vm, chrome = chrome)
     }
 
-    private fun newReviewingViewModel(): CaptureViewModel {
-        val audio = AudioChunk(FloatArray(16), sampleRateHz = 16_000, isFinal = true)
-        return CaptureViewModel(
-            initialPersona = Persona.WITNESS,
-            recordVoice = VoiceCapture { _, _ -> audio },
-            // Option-C voice: call 1 yields the transcription, call 2 the follow-up.
-            foregroundInference = ForegroundInferenceCall { _, _ ->
-                flowOf(ForegroundStreamEvent.Transcription("something happened"))
-            },
-            saveAndExtract = SaveAndExtract { _, _, _, _, _, _ -> },
-            foregroundTextInference = ForegroundTextInferenceCall { text, _, _ ->
-                flowOf(
-                    ForegroundStreamEvent.Terminal(
-                        ForegroundResult.Success(
-                            persona = Persona.WITNESS,
-                            rawResponse = "",
-                            elapsedMs = 0L,
-                            completedAt = clock.instant(),
-                            transcription = text,
-                            followUp = "sounds like a pattern",
-                        ),
-                    ),
-                )
-            },
-            clock = clock,
-            zoneId = ZoneOffset.UTC,
-            initialReadiness = ModelReadiness.Ready,
-        ).also { it.startRecording() }
-    }
+    private fun idleViewModel(readiness: ModelReadiness): CaptureViewModel = CaptureViewModel(
+        initialPersona = Persona.WITNESS,
+        recordVoice = VoiceCapture { _, _ -> null },
+        foregroundInference = ForegroundInferenceCall { _, _ -> error("unreached") },
+        saveAndExtract = SaveAndExtract { _, _, _, _, _, _ -> 1L },
+        foregroundTextInference = ForegroundTextInferenceCall { _, _, _ -> error("unused") },
+        clock = clock,
+        zoneId = ZoneOffset.UTC,
+        initialReadiness = readiness,
+    )
 
-    // Emits a partial Transcription then parks before Terminal — the VM stays in
-    // Reviewing(streaming = true), the state the DONE-withhold gate targets.
-    private fun streamingReviewingViewModel(): CaptureViewModel {
-        val audio = AudioChunk(FloatArray(16), sampleRateHz = 16_000, isFinal = true)
-        return CaptureViewModel(
-            initialPersona = Persona.WITNESS,
-            recordVoice = VoiceCapture { _, _ -> audio },
-            // Option-C voice: call 1 yields the transcription immediately.
-            foregroundInference = ForegroundInferenceCall { _, _ ->
-                flowOf(ForegroundStreamEvent.Transcription("still talking"))
-            },
-            saveAndExtract = SaveAndExtract { _, _, _, _, _, _ -> },
-            // Call 2 starts the history-conditioned follow-up, emits a partial delta, then
-            // parks before Terminal so the VM stays in Reviewing(streaming = true).
-            foregroundTextInference = ForegroundTextInferenceCall { _, _, _ ->
-                flow {
-                    emit(ForegroundStreamEvent.FollowUpDelta("thinking..."))
-                    kotlinx.coroutines.awaitCancellation()
-                }
-            },
-            clock = clock,
-            zoneId = ZoneOffset.UTC,
-            initialReadiness = ModelReadiness.Ready,
-        ).also { it.startRecording() }
-    }
+    private fun parkedRecordingViewModel(): CaptureViewModel = CaptureViewModel(
+        initialPersona = Persona.WITNESS,
+        recordVoice = VoiceCapture { _, _ -> kotlinx.coroutines.suspendCancellableCoroutine { } },
+        foregroundInference = ForegroundInferenceCall { _, _ -> error("unreached") },
+        saveAndExtract = SaveAndExtract { _, _, _, _, _, _ -> 1L },
+        foregroundTextInference = ForegroundTextInferenceCall { _, _, _ -> error("unused") },
+        clock = clock,
+        zoneId = ZoneOffset.UTC,
+        initialReadiness = ModelReadiness.Ready,
+    )
 
-    private fun newViewModel(readiness: ModelReadiness, startInInferringPhase: Boolean = false): CaptureViewModel {
-        val audio = AudioChunk(FloatArray(16), sampleRateHz = 16_000, isFinal = true)
-        return CaptureViewModel(
-            initialPersona = Persona.WITNESS,
-            // Recording driver completes immediately when triggered; not used for the Inferring
-            // case which is reached only via a real engine path on-device.
-            recordVoice = VoiceCapture { _, _ -> if (startInInferringPhase) audio else null },
-            foregroundInference = ForegroundInferenceCall { _, _ ->
-                // Cold flow that never emits — VM stays in Inferring until cancellation. The
-                // suspension lives inside the flow so the SAM stays non-suspend (S6309).
-                flow { kotlinx.coroutines.awaitCancellation() }
-            },
-            saveAndExtract = SaveAndExtract { _, _, _, _, _, _ -> },
-            foregroundTextInference = ForegroundTextInferenceCall { _, _, _ -> error("unused") },
-            clock = clock,
-            zoneId = ZoneOffset.UTC,
-            initialReadiness = readiness,
-        ).also { if (startInInferringPhase) it.startRecording() }
-    }
+    // Audio lands, but call-1 parks before emitting a transcription — the VM stays in Submitting.
+    private fun submittingViewModel(): CaptureViewModel = CaptureViewModel(
+        initialPersona = Persona.WITNESS,
+        recordVoice = VoiceCapture { _, _ -> AudioChunk(FloatArray(16), 16_000, isFinal = true) },
+        foregroundInference = ForegroundInferenceCall { _, _ ->
+            flow { kotlinx.coroutines.awaitCancellation() }
+        },
+        saveAndExtract = SaveAndExtract { _, _, _, _, _, _ -> 1L },
+        foregroundTextInference = ForegroundTextInferenceCall { _, _, _ -> error("unused") },
+        clock = clock,
+        zoneId = ZoneOffset.UTC,
+        initialReadiness = ModelReadiness.Ready,
+    )
+
+    private fun voiceViewModel(entryId: Long): CaptureViewModel = CaptureViewModel(
+        initialPersona = Persona.WITNESS,
+        recordVoice = VoiceCapture { _, _ -> AudioChunk(FloatArray(16), 16_000, isFinal = true) },
+        foregroundInference = ForegroundInferenceCall { _, _ ->
+            flowOf(ForegroundStreamEvent.Transcription("something happened"))
+        },
+        saveAndExtract = SaveAndExtract { _, _, _, _, _, _ -> entryId },
+        foregroundTextInference = ForegroundTextInferenceCall { _, _, _ ->
+            flowOf(ForegroundStreamEvent.Transcription("something happened"))
+        },
+        clock = clock,
+        zoneId = ZoneOffset.UTC,
+        initialReadiness = ModelReadiness.Ready,
+    )
 }

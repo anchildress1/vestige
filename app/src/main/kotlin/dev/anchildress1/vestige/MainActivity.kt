@@ -31,6 +31,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import dev.anchildress1.vestige.model.Persona
 import dev.anchildress1.vestige.storage.EntryStore
+import dev.anchildress1.vestige.ui.capture.AttachFollowUp
 import dev.anchildress1.vestige.ui.capture.CaptureScreen
 import dev.anchildress1.vestige.ui.capture.CaptureViewModel
 import dev.anchildress1.vestige.ui.capture.ForegroundInferenceCall
@@ -57,7 +58,9 @@ import dev.anchildress1.vestige.ui.settings.SettingsInfo
 import dev.anchildress1.vestige.ui.settings.SettingsScreen
 import dev.anchildress1.vestige.ui.theme.VestigeTheme
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.time.Clock
 import java.time.ZoneId
 
@@ -181,6 +184,7 @@ private fun MainPostOnboardingContent(
     var screen by rememberSaveable { mutableStateOf(PostOnboardingScreen.Capture) }
     var modelStatusOrigin by rememberSaveable { mutableStateOf(PostOnboardingScreen.Capture) }
     var historyOpenRequest by remember { mutableStateOf<EntryDetailOpenRequest?>(null) }
+    var openEntryToken by remember { mutableStateOf(0L) }
     PostOnboardingResumeEffects(container)
     ConsumeLaunchTarget(
         screen = screen,
@@ -207,6 +211,15 @@ private fun MainPostOnboardingContent(
             screen = PostOnboardingScreen.ModelStatus
         },
         onHistoryOpenRequestConsumed = { historyOpenRequest = null },
+        onOpenEntryInHistory = { entryId ->
+            openEntryToken += 1
+            historyOpenRequest = EntryDetailOpenRequest(
+                entryId = entryId,
+                highlightOnOpen = false,
+                token = openEntryToken,
+            )
+            screen = PostOnboardingScreen.History
+        },
     )
 }
 
@@ -226,6 +239,7 @@ private fun PostOnboardingScreenHost(
     onNavigate: (PostOnboardingScreen) -> Unit,
     onOpenModelStatusFrom: (PostOnboardingScreen) -> Unit,
     onHistoryOpenRequestConsumed: () -> Unit,
+    onOpenEntryInHistory: (Long) -> Unit,
 ) {
     when (screen) {
         PostOnboardingScreen.Capture -> CaptureRoute(
@@ -237,6 +251,7 @@ private fun PostOnboardingScreenHost(
             onOpenHistory = { onNavigate(PostOnboardingScreen.History) },
             onOpenModelStatus = { onOpenModelStatusFrom(PostOnboardingScreen.Capture) },
             onOpenSettings = { onNavigate(PostOnboardingScreen.Settings) },
+            onOpenEntryDetail = onOpenEntryInHistory,
         )
 
         PostOnboardingScreen.Patterns -> PatternsHost(
@@ -450,6 +465,7 @@ private fun CaptureRoute(
     onOpenHistory: () -> Unit,
     onOpenModelStatus: () -> Unit,
     onOpenSettings: () -> Unit,
+    onOpenEntryDetail: (Long) -> Unit,
 ) {
     val limitWarningCue = remember { ToneGeneratorLimitWarningCue() }
     DisposableEffect(limitWarningCue) {
@@ -472,12 +488,15 @@ private fun CaptureRoute(
                     persona = personaSel,
                     durationMs = durationMs,
                     followUpText = followUpText,
-                )
+                ).entryId
             },
             foregroundTextInference = ForegroundTextInferenceCall { text, personaSel, history ->
                 container.runForegroundTextCall(text = text, persona = personaSel, retrievedHistory = history)
             },
             retrieveHistory = HistoryRetrieval { query -> container.retrieveHistory(query) },
+            attachFollowUp = AttachFollowUp { entryId, followUpText ->
+                withContext(Dispatchers.IO) { container.entryStore.attachFollowUp(entryId, followUpText) }
+            },
             clock = clock,
             zoneId = zoneId,
             initialReadiness = container.modelReadinessFlow.value,
@@ -503,6 +522,7 @@ private fun CaptureRoute(
             onPatternsTap = onOpenPatterns,
             onHistoryTap = onOpenHistory,
             onSettingsTap = onOpenSettings,
+            onOpenEntryDetail = onOpenEntryDetail,
             lastEntryFooter = lastEntryFooter,
             patternsPeek = patternsPeek,
         ),
@@ -526,6 +546,7 @@ private class CaptureViewModelFactory(
     private val saveAndExtract: SaveAndExtract,
     private val foregroundTextInference: ForegroundTextInferenceCall,
     private val retrieveHistory: HistoryRetrieval,
+    private val attachFollowUp: AttachFollowUp,
     private val clock: Clock,
     private val zoneId: ZoneId,
     private val initialReadiness: ModelReadiness,
@@ -543,6 +564,7 @@ private class CaptureViewModelFactory(
             saveAndExtract = saveAndExtract,
             foregroundTextInference = foregroundTextInference,
             retrieveHistory = retrieveHistory,
+            attachFollowUp = attachFollowUp,
             clock = clock,
             zoneId = zoneId,
             initialReadiness = initialReadiness,

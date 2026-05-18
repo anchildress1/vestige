@@ -81,14 +81,6 @@ class LiveLayoutTest {
         composeRule.runOnIdle { assertEquals(1, discards) }
     }
 
-    @Test
-    fun `WORD COUNT card renders`() {
-        composeRule.setContent { VestigeTheme { liveLayout(elapsedMs = 10_000L) } }
-        composeRule.onNodeWithText(CaptureCopy.LIVE_WORD_COUNT_LABEL).assertIsDisplayed()
-        // 10 s * 2.3 words/sec = 23 words.
-        composeRule.onNodeWithText("23").assertIsDisplayed()
-    }
-
     @androidx.compose.runtime.Composable
     @Suppress("LongParameterList") // Test fixture mirrors the LiveLayout seam.
     private fun liveLayout(

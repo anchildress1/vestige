@@ -52,7 +52,6 @@ fun LiveLayout(
     val ss = (elapsedSec % SEC_PER_MIN).toString().padStart(2, '0')
     val timerLabel = "$mm:$ss"
     val progress = elapsedSec.toFloat() / totalSec.toFloat()
-    val wordCount = estimatedWords(elapsedSec)
 
     Column(modifier = modifier.fillMaxSize().background(colors.floor)) {
         AppTop(
@@ -64,7 +63,6 @@ fun LiveLayout(
         Box(modifier = Modifier.padding(horizontal = 18.dp, vertical = 14.dp)) {
             ChunkProgressBar(progress = progress, chunkDurationSec = totalSec)
         }
-        Spacer(modifier = Modifier.weight(1f))
         Column(
             modifier = Modifier.padding(horizontal = 18.dp, vertical = 8.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp),
@@ -75,7 +73,6 @@ fun LiveLayout(
                 color = colors.lime,
             )
             LiveLevelBars(levels = state.recentLevels)
-            WordCountCard(wordCount = wordCount)
         }
         Spacer(modifier = Modifier.weight(1f))
         Column(
@@ -118,27 +115,6 @@ private fun TimerHeader(timerLabel: String, remainSec: Int) {
             )
             EyebrowE(text = CaptureCopy.LIVE_SECONDS_LABEL)
         }
-    }
-}
-
-@Composable
-private fun WordCountCard(wordCount: Int) {
-    val colors = VestigeTheme.colors
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(colors.s1)
-            .border(width = 1.dp, color = colors.hair)
-            .padding(horizontal = 12.dp, vertical = 10.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        EyebrowE(text = CaptureCopy.LIVE_WORD_COUNT_LABEL)
-        Text(
-            text = wordCount.toString(),
-            style = VestigeTheme.typography.displayBig.copy(fontSize = 26.sp, lineHeight = 24.sp),
-            color = colors.ink,
-        )
     }
 }
 
@@ -191,12 +167,5 @@ private fun DiscardButton(onClick: () -> Unit) {
     }
 }
 
-private fun estimatedWords(elapsedSec: Int): Int = elapsedSec * WORDS_PER_SEC_TIMES_TEN / WORDS_DENOMINATOR
-
 private const val MS_PER_SEC: Long = 1_000L
 private const val SEC_PER_MIN: Int = 60
-
-// 2.3 words/sec is the human-conversation average — multiplied by 10 + integer-divided to avoid
-// dragging a Float through the path that recomposes 25 Hz.
-private const val WORDS_PER_SEC_TIMES_TEN: Int = 23
-private const val WORDS_DENOMINATOR: Int = 10

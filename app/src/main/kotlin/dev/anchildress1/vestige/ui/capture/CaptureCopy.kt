@@ -21,7 +21,6 @@ object CaptureCopy {
     const val LIVE_LEVEL_EYEBROW: String = "● LEVEL · LIVE"
     const val LIVE_REMAIN_LABEL: String = "REMAIN"
     const val LIVE_SECONDS_LABEL: String = "SECONDS"
-    const val LIVE_WORD_COUNT_LABEL: String = "WORD COUNT · EST"
 
     const val LIVE_STOP_PRIMARY: String = "STOP · FILE IT"
     const val LIVE_DISCARD_SECONDARY: String = "DISCARD · DON'T SAVE"

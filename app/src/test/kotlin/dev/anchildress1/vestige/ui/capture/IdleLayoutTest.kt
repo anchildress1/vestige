@@ -4,8 +4,8 @@ import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertHasClickAction
 import androidx.compose.ui.test.assertIsDisplayed
-import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
@@ -68,14 +68,14 @@ class IdleLayoutTest {
     }
 
     @Test
-    fun `REC button is disabled when model is not ready`() {
+    fun `REC button is replaced by a spinner when model is not ready`() {
         composeRule.setContent {
             VestigeTheme {
                 idleLayout(readiness = ModelReadiness.Loading)
             }
         }
-        composeRule.onNodeWithContentDescription(CaptureCopy.REC_LABEL_IDLE)
-            .assertIsNotEnabled()
+        // No REC button (and no diagnostic banner) — a spinner stands in its place.
+        composeRule.onAllNodesWithContentDescription(CaptureCopy.REC_LABEL_IDLE).assertCountEquals(0)
     }
 
     @Test
@@ -103,17 +103,8 @@ class IdleLayoutTest {
     }
 
     @Test
-    fun `error band renders informational state when readiness is Loading`() {
-        composeRule.setContent {
-            VestigeTheme { idleLayout(readiness = ModelReadiness.Loading) }
-        }
-        composeRule.onNodeWithText(CaptureCopy.MODEL_LOADING_LINE).assertIsDisplayed()
-    }
-
-    @Test
     fun `error band is absent when Ready and no error`() {
         composeRule.setContent { VestigeTheme { idleLayout() } }
-        composeRule.onAllNodesWithText(CaptureCopy.MODEL_LOADING_LINE).assertCountEquals(0)
         composeRule.onAllNodesWithText(CaptureCopy.MIC_DENIED_LINE).assertCountEquals(0)
     }
 

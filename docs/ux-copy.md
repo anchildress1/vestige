@@ -163,12 +163,18 @@ the old card-title/body):
 If no active patterns (the peek is replaced by a single dim line):
 > `NO ENTRIES YET · FIRST ONE TAKES 30 SECONDS`
 
-If model still downloading (record + typed both disabled — ADR-013):
-> Model loading. Hang tight.
+If the model isn't ready (deleted / loading / downloading / Wi-Fi-paused — record + typed
+both disabled, ADR-013): _no banner_. A spinner stands in for the REC button; the AppTop
+status pill still carries the state.
 
 Status pill during download: `DOWNLOADING · {N}%`
 Status pill if paused (no Wi-Fi): `DOWNLOAD PAUSED`
-Below button if paused: `Reconnect to Wi-Fi to resume.`
+
+> _Final-polish note (2026-05-18):_ the in-content model banner (`Model loading. Hang tight.`
+> / `Reconnect to Wi-Fi to resume.` / `Downloading model · {N}%` and the `MODEL · WARMING` /
+> `MODEL · PAUSED` band labels) no longer fits the redesign and was removed — the REC button
+> is replaced by a spinner while the model is not ready. The diagnostic band is now mic /
+> inference only.
 
 ### Center — record action
 

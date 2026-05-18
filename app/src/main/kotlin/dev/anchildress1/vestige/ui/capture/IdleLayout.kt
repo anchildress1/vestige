@@ -29,6 +29,7 @@ import androidx.compose.ui.unit.sp
 import dev.anchildress1.vestige.ui.components.AppTop
 import dev.anchildress1.vestige.ui.components.BottomTab
 import dev.anchildress1.vestige.ui.components.VestigeBottomNav
+import dev.anchildress1.vestige.ui.components.VestigeSpinner
 import dev.anchildress1.vestige.ui.theme.VestigeTheme
 
 /**
@@ -55,7 +56,6 @@ fun IdleLayout(
         )
         CaptureErrorBand(
             error = state.error,
-            readiness = state.modelReadiness,
             modifier = Modifier.padding(horizontal = 18.dp),
             onUseTyped = onTypeTap,
         )
@@ -65,12 +65,18 @@ fun IdleLayout(
             modifier = Modifier.fillMaxWidth().padding(horizontal = 18.dp),
             contentAlignment = Alignment.Center,
         ) {
-            val recEnabled = state.modelReadiness is ModelReadiness.Ready
-            RecButton(
-                onClick = onRecTap,
-                enabled = recEnabled,
-                contentDescription = CaptureCopy.REC_LABEL_IDLE,
-            )
+            // Model deleted / still warming up / downloading / Wi-Fi-paused: a spinner stands in
+            // for REC (no more diagnostic banner). The AppTop status pill still reflects the
+            // model state for anyone who looks.
+            if (state.modelReadiness is ModelReadiness.Ready) {
+                RecButton(
+                    onClick = onRecTap,
+                    enabled = true,
+                    contentDescription = CaptureCopy.REC_LABEL_IDLE,
+                )
+            } else {
+                VestigeSpinner()
+            }
         }
         Spacer(modifier = Modifier.height(18.dp))
         Box(

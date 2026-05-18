@@ -31,13 +31,8 @@ import dev.anchildress1.vestige.ui.theme.VestigeTheme
  * the band. `resolveBandKind` enumerates the rendered conditions.
  */
 @Composable
-fun CaptureErrorBand(
-    error: CaptureError?,
-    readiness: ModelReadiness,
-    modifier: Modifier = Modifier,
-    onUseTyped: (() -> Unit)? = null,
-) {
-    val kind = resolveBandKind(error = error, readiness = readiness) ?: return
+fun CaptureErrorBand(error: CaptureError?, modifier: Modifier = Modifier, onUseTyped: (() -> Unit)? = null) {
+    val kind = resolveBandKind(error = error) ?: return
     val colors = VestigeTheme.colors
     val accent = if (kind.isError) colors.coral else colors.dim
     Column(modifier = modifier) {
@@ -140,50 +135,14 @@ internal sealed interface BandKind {
         override val isError = true
         override val contentDescription: String = "Last reading failed. $body"
     }
-
-    object ModelLoading : BandKind {
-        override val eyebrow = CaptureCopy.BAND_LABEL_MODEL_LOADING
-        override val body = CaptureCopy.MODEL_LOADING_LINE
-        override val isError = false
-        override val contentDescription = "Model warming up. $body"
-    }
-
-    object ModelPaused : BandKind {
-        override val eyebrow = CaptureCopy.BAND_LABEL_MODEL_PAUSED
-        override val body = CaptureCopy.MODEL_PAUSED_LINE
-        override val isError = false
-        override val contentDescription = "Model paused. $body"
-    }
-
-    data class ModelDownloading(val percent: Int) : BandKind {
-        init {
-            require(percent in PERCENT_RANGE) { "Downloading percent must be in 0..100 (got $percent)" }
-        }
-
-        override val eyebrow: String = CaptureCopy.BAND_LABEL_MODEL_DOWNLOADING_FMT.format(percent)
-        override val body: String = CaptureCopy.MODEL_DOWNLOADING_LINE_FMT.format(percent)
-        override val isError = false
-        override val contentDescription: String = "Model downloading $percent percent."
-
-        private companion object {
-            val PERCENT_RANGE = 0..100
-        }
-    }
 }
 
-internal fun resolveBandKind(error: CaptureError?, readiness: ModelReadiness): BandKind? {
-    if (error != null) {
-        return when (error) {
-            CaptureError.MicDenied -> BandKind.MicDenied
-            CaptureError.MicBlocked -> BandKind.MicBlocked
-            CaptureError.MicUnavailable -> BandKind.MicUnavailable
-            is CaptureError.InferenceFailed -> BandKind.Inference(error.reason)
-        }
-    }
-    return when (readiness) {
-        ModelReadiness.Loading -> BandKind.ModelLoading
-        ModelReadiness.Paused -> BandKind.ModelPaused
-        is ModelReadiness.Downloading -> BandKind.ModelDownloading(readiness.percent)
-        ModelReadiness.Ready -> null
-    }
+// Model not-ready (deleted / loading / downloading / paused) no longer renders a banner — a
+// spinner stands in for the REC button instead (IdleLayout). The band is mic/inference only.
+internal fun resolveBandKind(error: CaptureError?): BandKind? = when (error) {
+    null -> null
+    CaptureError.MicDenied -> BandKind.MicDenied
+    CaptureError.MicBlocked -> BandKind.MicBlocked
+    CaptureError.MicUnavailable -> BandKind.MicUnavailable
+    is CaptureError.InferenceFailed -> BandKind.Inference(error.reason)
 }

@@ -29,9 +29,6 @@ object CaptureCopy {
     const val PATTERNS_PEEK_EYEBROW_FMT: String = "● %d ACTIVE PATTERNS"
     const val PATTERNS_PEEK_SEPARATOR: String = "  ·  "
 
-    const val MODEL_LOADING_LINE: String = "Model loading. Hang tight."
-    const val MODEL_PAUSED_LINE: String = "Reconnect to Wi-Fi to resume."
-    const val MODEL_DOWNLOADING_LINE_FMT: String = "Downloading model · %d%%"
     const val MIC_DENIED_LINE: String = "Mic permission required to record. Settings → Permissions."
     const val MIC_UNAVAILABLE_LINE: String = "Mic unavailable. Try typing."
     const val MIC_BLOCKED_LINE: String = "Mic blocked at the system level."
@@ -43,9 +40,6 @@ object CaptureCopy {
 
     const val BAND_LABEL_MIC: String = "MIC"
     const val BAND_LABEL_MODEL: String = "MODEL"
-    const val BAND_LABEL_MODEL_LOADING: String = "MODEL · WARMING"
-    const val BAND_LABEL_MODEL_PAUSED: String = "MODEL · PAUSED"
-    const val BAND_LABEL_MODEL_DOWNLOADING_FMT: String = "MODEL · %d%%"
 
     const val PATTERNS_LINK: String = "PATTERNS →"
 

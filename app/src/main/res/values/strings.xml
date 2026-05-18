@@ -120,8 +120,21 @@
     <!-- Local Model Status (standalone screen). Copy: ux-copy.md §"Local Model Status" +
          §"Destructive Confirmations" (canonical confirm wording). -->
     <string name="model_status_eyebrow">MODEL STATUS</string>
+    <string name="model_status_back_eyebrow">← SETTINGS · MODEL STATUS</string>
+    <string name="model_status_band_ready">● MODEL READY · RUNNING LOCALLY</string>
+    <string name="model_status_band_pending">● MODEL · NOT READY</string>
+    <string name="model_status_stack_eyebrow">● ON-DEVICE STACK</string>
+    <string name="model_status_stack_main_name">Gemma 4 E4B</string>
+    <string name="model_status_stack_main_role">TRANSCRIBE + EXTRACT</string>
+    <string name="model_status_stack_embed_name">EmbeddingGemma 300M</string>
+    <string name="model_status_stack_embed_role">VECTOR · HYBRID</string>
+    <string name="model_status_stack_embed_size">210 MB</string>
+    <string name="model_status_stack_runtime_name">LiteRT-LM 0.11.0</string>
+    <string name="model_status_stack_runtime_role">RUNTIME</string>
+    <string name="model_status_stack_runtime_size">NATIVE</string>
+    <string name="model_status_gate_eyebrow">● NETWORK GATE · SEALED</string>
+    <string name="model_status_gate_body">Allowlist: model artifact host only.</string>
     <string name="model_status_header">Model status.</string>
-    <string name="model_status_ready">Model ready. Running locally.</string>
     <string name="model_status_loading">Loading model.</string>
     <string name="model_status_downloading">Downloading model. Wi-Fi only.</string>
     <string name="model_status_paused">Download stalled.</string>

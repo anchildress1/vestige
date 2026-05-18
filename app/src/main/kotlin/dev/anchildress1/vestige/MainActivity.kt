@@ -289,6 +289,7 @@ private fun PostOnboardingScreenHost(
         PostOnboardingScreen.ModelStatus -> ModelStatusRoute(
             container = container,
             onExit = { onNavigate(modelStatusBackTarget(modelStatusOrigin)) },
+            onNavigateTab = { onNavigate(it.toPostOnboardingScreen()) },
         )
 
         PostOnboardingScreen.Settings -> SettingsRoute(
@@ -372,7 +373,7 @@ private fun SettingsRoute(
 }
 
 @androidx.compose.runtime.Composable
-private fun ModelStatusRoute(container: AppContainer, onExit: () -> Unit) {
+private fun ModelStatusRoute(container: AppContainer, onExit: () -> Unit, onNavigateTab: (BottomTab) -> Unit) {
     val modelReadiness by container.modelReadinessFlow.collectAsStateWithLifecycle()
     val context = LocalContext.current
     // buildConfig isn't enabled for this module — read the version off the installed package
@@ -391,6 +392,7 @@ private fun ModelStatusRoute(container: AppContainer, onExit: () -> Unit) {
         onReDownload = container::redownloadMainModel,
         onDelete = container::deleteMainModel,
         onExit = onExit,
+        onNavSelect = onNavigateTab,
         modifier = Modifier.fillMaxSize(),
     )
 }

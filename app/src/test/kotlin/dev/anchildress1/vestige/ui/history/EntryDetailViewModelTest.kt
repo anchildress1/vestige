@@ -23,6 +23,7 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -261,6 +262,7 @@ class EntryDetailViewModelTest {
         vm.state.test {
             val initial = awaitItem() as EntryDetailUiState.Loaded
             assertNull(initial.model.templateLabel)
+            assertFalse("pending entry must read as extraction-incomplete", initial.model.extractionComplete)
 
             entryStore.completeEntry(
                 id,
@@ -271,6 +273,7 @@ class EntryDetailViewModelTest {
 
             val reloaded = awaitItem() as EntryDetailUiState.Loaded
             assertEquals("AFTERMATH", reloaded.model.templateLabel)
+            assertTrue("completed entry must read as extraction-complete", reloaded.model.extractionComplete)
         }
     }
 

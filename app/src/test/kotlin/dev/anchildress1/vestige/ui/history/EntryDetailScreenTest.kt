@@ -116,6 +116,15 @@ class EntryDetailScreenTest {
     }
 
     @Test
+    fun `pending entry shows the extracting branch, not the resolved read`() {
+        val id = entryStore.createPendingEntry("still extracting", FIXTURE_INSTANT)
+        setDetail(id)
+        composeRule.onNodeWithTag("entry_extracting").assertExists()
+        composeRule.onAllNodesWithTag("entry_three_lens").assertCountEquals(0)
+        composeRule.onAllNodesWithTag("entry_field_grid").assertCountEquals(0)
+    }
+
+    @Test
     fun `blank transcription shows dash placeholder`() {
         val id = createCompleted("initial text")
         val box = boxStore.boxFor(EntryEntity::class.java)

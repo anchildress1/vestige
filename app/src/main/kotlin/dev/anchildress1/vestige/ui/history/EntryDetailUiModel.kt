@@ -1,6 +1,7 @@
 package dev.anchildress1.vestige.ui.history
 
 import android.util.Log
+import dev.anchildress1.vestige.model.ExtractionStatus
 import dev.anchildress1.vestige.storage.EntryEntity
 import org.json.JSONArray
 import java.time.ZoneId
@@ -40,6 +41,7 @@ data class EntryDetailUiModel(
             energyDescriptor = entity.energyDescriptor,
             observations = parseObservations(entity.entryObservationsJson),
             tags = entity.tags.map { it.name }.sorted(),
+            extractionComplete = entity.extractionStatus == ExtractionStatus.COMPLETED,
         )
 
         private fun parseObservations(json: String): List<ObservationLine> {

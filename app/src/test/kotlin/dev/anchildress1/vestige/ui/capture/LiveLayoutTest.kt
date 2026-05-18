@@ -33,10 +33,11 @@ class LiveLayoutTest {
     }
 
     @Test
-    fun `timer renders mm colon ss in both the AppTop badge and the hero`() {
+    fun `timer renders mm colon ss once in the hero`() {
         composeRule.setContent { VestigeTheme { liveLayout(elapsedMs = 15_000L) } }
-        // Timer appears in the AppTop coral pill and in the hero display — exactly 2 sources.
-        composeRule.onAllNodesWithText("00:15").assertCountEquals(2)
+        // The duplicate AppTop timer pill was removed (design-guidelines.md §AppTop pill / the
+        // recording comp) — the hero display is the single timer source.
+        composeRule.onAllNodesWithText("00:15").assertCountEquals(1)
     }
 
     @Test
@@ -88,12 +89,14 @@ class LiveLayoutTest {
     }
 
     @androidx.compose.runtime.Composable
+    @Suppress("LongParameterList") // Test fixture mirrors the LiveLayout seam.
     private fun liveLayout(
         elapsedMs: Long = 0L,
         persona: Persona = Persona.WITNESS,
         readiness: ModelReadiness = ModelReadiness.Ready,
         onStopTap: () -> Unit = {},
         onDiscardTap: () -> Unit = {},
+        onMenuTap: () -> Unit = {},
     ) {
         LiveLayout(
             state = CaptureUiState.Recording(
@@ -104,6 +107,7 @@ class LiveLayoutTest {
             ),
             onStopTap = onStopTap,
             onDiscardTap = onDiscardTap,
+            onMenuTap = onMenuTap,
         )
     }
 }

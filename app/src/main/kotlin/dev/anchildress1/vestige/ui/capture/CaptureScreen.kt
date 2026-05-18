@@ -99,6 +99,7 @@ fun CaptureScreen(
         }
     }
     var showTypeSheet by rememberSaveable { mutableStateOf(false) }
+    val onMenuTap = remember(chrome) { chrome.onSettingsTap ?: {} }
 
     when (val current = state) {
         is CaptureUiState.Idle -> IdleLayout(
@@ -115,6 +116,7 @@ fun CaptureScreen(
             state = current,
             onStopTap = viewModel::stopRecording,
             onDiscardTap = viewModel::discard,
+            onMenuTap = onMenuTap,
             modifier = modifier,
         )
 

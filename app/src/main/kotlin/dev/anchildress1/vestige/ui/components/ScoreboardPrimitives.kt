@@ -252,10 +252,10 @@ private const val TICK_RAIL_HEIGHT: Float = 0.40f
 private val MinTapTarget: Dp = 48.dp
 
 /**
- * App shell top — GEMMA 4 · LOCAL ONLY status pill (or GEMMA 4 · LISTENING LIVE while recording)
- * on the left, persona switcher chrome on the right. Pill stays lime in both states; coral is
- * reserved for REC button heat + destructive flows. Used by Capture and any screen that wants
- * the chrome.
+ * App shell top — status pill on the left (lime idle `GEMMA 4 · LOCAL ONLY`, coral recording
+ * `GEMMA 4 · LISTENING`), hamburger menu on the right. The menu (persona + settings) lives on
+ * every screen, including recording. [rightContent] is a rarely-used override escape; default
+ * is the hamburger calling [onMenuTap].
  */
 @Composable
 @Suppress("LongParameterList") // primitive
@@ -263,7 +263,7 @@ fun AppTop(
     persona: String,
     modifier: Modifier = Modifier,
     status: AppTopStatus = AppTopStatuses.Ready,
-    onPersonaTap: (() -> Unit)? = null,
+    onMenuTap: (() -> Unit)? = null,
     onStatusTap: (() -> Unit)? = null,
     rightContent: (@Composable () -> Unit)? = null,
 ) {
@@ -295,17 +295,12 @@ fun AppTop(
         if (rightContent != null) {
             rightContent()
         } else {
-            val personaA11yLabel = if (onPersonaTap != null) {
-                "Active persona $persona. Change persona."
-            } else {
-                "Active persona $persona."
-            }
             ChromePill(
-                onClick = onPersonaTap,
+                onClick = onMenuTap,
                 alignment = Alignment.CenterEnd,
-                a11yLabel = personaA11yLabel,
+                a11yLabel = "Menu. Active persona $persona.",
             ) {
-                Pill(text = "$persona ▾", color = VestigeTheme.colors.ink, fill = false)
+                Pill(text = "☰", color = VestigeTheme.colors.ink, fill = false)
             }
         }
     }

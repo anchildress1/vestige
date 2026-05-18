@@ -60,7 +60,7 @@ fun IdleLayout(
         AppTop(
             persona = state.persona.name,
             status = appTopStatusFor(state.modelReadiness),
-            onPersonaTap = chrome.onPersonaTap,
+            onMenuTap = chrome.onSettingsTap,
             onStatusTap = chrome.onStatusTap,
         )
         DateStrip(meta = meta)

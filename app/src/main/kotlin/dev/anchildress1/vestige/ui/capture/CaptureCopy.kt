@@ -17,7 +17,7 @@ object CaptureCopy {
     const val REC_LABEL_IDLE: String = "Record"
     const val REC_LABEL_RECORDING: String = "Stop"
 
-    const val LIVE_RECORDING_EYEBROW: String = "● RECORDING · CHUNK 1/1"
+    const val LIVE_RECORDING_EYEBROW: String = "RECORDING"
     const val LIVE_LEVEL_EYEBROW: String = "● LEVEL · LIVE"
     const val LIVE_REMAIN_LABEL: String = "REMAIN"
     const val LIVE_SECONDS_LABEL: String = "SECONDS"

@@ -221,11 +221,11 @@ class ScoreboardPrimitivesTest {
     }
 
     @Test
-    fun `AppTop persona pill fires onPersonaTap when tapped (pos)`() {
-        var personaTapped = 0
-        composeRule.setContent { AppTop(persona = "WITNESS", onPersonaTap = { personaTapped++ }) }
-        composeRule.onNodeWithContentDescription(label = "WITNESS", substring = true).performClick()
-        assert(personaTapped == 1) { "onPersonaTap should fire exactly once (was $personaTapped)" }
+    fun `AppTop hamburger fires onMenuTap when tapped (pos)`() {
+        var menuTapped = 0
+        composeRule.setContent { AppTop(persona = "WITNESS", onMenuTap = { menuTapped++ }) }
+        composeRule.onNodeWithContentDescription(label = "Menu", substring = true).performClick()
+        assert(menuTapped == 1) { "onMenuTap should fire exactly once (was $menuTapped)" }
     }
 
     @Test
@@ -234,12 +234,12 @@ class ScoreboardPrimitivesTest {
             AppTop(
                 persona = "WITNESS",
                 onStatusTap = {},
-                onPersonaTap = {},
+                onMenuTap = {},
             )
         }
         composeRule.onNodeWithContentDescription("Gemma 4 local model. Local only.")
             .assertHeightIsAtLeast(48.dp)
-        composeRule.onNodeWithContentDescription(label = "WITNESS", substring = true)
+        composeRule.onNodeWithContentDescription(label = "Menu", substring = true)
             .assertHeightIsAtLeast(48.dp)
     }
 
@@ -258,9 +258,9 @@ class ScoreboardPrimitivesTest {
     }
 
     @Test
-    fun `AppTop persona pill label includes a11y change affordance (a11y)`() {
-        composeRule.setContent { AppTop(persona = "HARDASS", onPersonaTap = {}) }
-        composeRule.onNodeWithContentDescription(label = "Change persona", substring = true)
+    fun `AppTop hamburger a11y names the menu and active persona (a11y)`() {
+        composeRule.setContent { AppTop(persona = "HARDASS", onMenuTap = {}) }
+        composeRule.onNodeWithContentDescription(label = "Menu. Active persona HARDASS.", substring = true)
             .assertIsDisplayed()
     }
 

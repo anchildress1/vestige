@@ -28,7 +28,6 @@ import androidx.compose.ui.unit.sp
 import dev.anchildress1.vestige.ui.components.AppTop
 import dev.anchildress1.vestige.ui.components.AppTopStatuses
 import dev.anchildress1.vestige.ui.components.EyebrowE
-import dev.anchildress1.vestige.ui.components.Pill
 import dev.anchildress1.vestige.ui.theme.VestigeTheme
 
 /**
@@ -36,10 +35,12 @@ import dev.anchildress1.vestige.ui.theme.VestigeTheme
  * passes the full `CaptureUiState.Recording` snapshot — this composable is pure-render.
  */
 @Composable
+@Suppress("LongParameterList") // Pure-render recording layout; chrome + actions co-located.
 fun LiveLayout(
     state: CaptureUiState.Recording,
     onStopTap: () -> Unit,
     onDiscardTap: () -> Unit,
+    onMenuTap: () -> Unit,
     modifier: Modifier = Modifier,
     maxDurationMs: Long = CaptureViewModel.MAX_DURATION_MS,
 ) {
@@ -57,7 +58,7 @@ fun LiveLayout(
         AppTop(
             persona = state.persona.name,
             status = AppTopStatuses.Recording,
-            rightContent = { Pill(text = timerLabel, color = colors.coral, fill = true) },
+            onMenuTap = onMenuTap,
         )
         TimerHeader(timerLabel = timerLabel, remainSec = remainSec)
         Box(modifier = Modifier.padding(horizontal = 18.dp, vertical = 14.dp)) {
@@ -71,7 +72,7 @@ fun LiveLayout(
             Text(
                 text = CaptureCopy.LIVE_LEVEL_EYEBROW,
                 style = VestigeTheme.typography.eyebrow,
-                color = colors.coral,
+                color = colors.lime,
             )
             LiveLevelBars(levels = state.recentLevels)
             WordCountCard(wordCount = wordCount)
@@ -100,7 +101,7 @@ private fun TimerHeader(timerLabel: String, remainSec: Int) {
             Text(
                 text = CaptureCopy.LIVE_RECORDING_EYEBROW,
                 style = VestigeTheme.typography.eyebrow,
-                color = colors.coral,
+                color = colors.dim,
             )
             Text(
                 text = timerLabel,

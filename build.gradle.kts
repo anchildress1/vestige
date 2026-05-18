@@ -214,21 +214,11 @@ subprojects {
     }
 }
 
-private data class TelemetryModuleScan(
-    val path: String,
-    val configuration: String,
-    val coordinates: List<String>,
-)
+private data class TelemetryModuleScan(val path: String, val configuration: String, val coordinates: List<String>)
 
-private data class ManifestComponentScan(
-    val file: String,
-    val components: List<String>,
-)
+private data class ManifestComponentScan(val file: String, val components: List<String>)
 
-private data class ApkHostScan(
-    val file: String,
-    val matchedHosts: List<String>,
-)
+private data class ApkHostScan(val file: String, val matchedHosts: List<String>)
 
 private object TelemetryRules {
     val forbiddenCoordinates = setOf(
@@ -426,7 +416,10 @@ private fun scanApkForHosts(apk: File, allowedHosts: Set<String>): List<String> 
                 .filterNot { it.isDirectory }
                 .filter { entry ->
                     entry.name == "AndroidManifest.xml" ||
-                        entry.name.startsWith("classes") && entry.name.endsWith(".dex") ||
+                        (
+                            entry.name.startsWith("classes") &&
+                                entry.name.endsWith(".dex")
+                            ) ||
                         entry.name.startsWith("assets/") ||
                         entry.name.startsWith("META-INF/")
                 }
@@ -478,7 +471,9 @@ val verifyNoTelemetry = tasks.register("verifyNoTelemetry") {
                 if (configuration == null) return@forEach
                 val coordinates = receiptLines.drop(1).filter(String::isNotBlank)
                 if (coordinates.isEmpty()) {
-                    violations += "${module.path} resolved zero external coordinates from $configuration; treat this as misconfigured, not clean."
+                    violations +=
+                        "${module.path} resolved zero external coordinates from $configuration; " +
+                        "treat this as misconfigured, not clean."
                 }
 
                 scans += TelemetryModuleScan(
@@ -510,7 +505,9 @@ val verifyNoTelemetry = tasks.register("verifyNoTelemetry") {
                         val relativePath = manifest.relativeTo(project.rootDir).path
                         val denied = components.filter { it in TelemetryRules.forbiddenManifestComponents }
                         denied.forEach { component ->
-                            violations += "${module.path} merged manifest includes forbidden component $component ($relativePath)"
+                            violations +=
+                                "${module.path} merged manifest includes forbidden component " +
+                                "$component ($relativePath)"
                         }
                         ManifestComponentScan(
                             file = relativePath,

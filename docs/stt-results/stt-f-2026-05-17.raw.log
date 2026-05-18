@@ -42,3 +42,25 @@
 05-17 20:03:44.014 22535 22558 I VestigeLiteRtLm: lens=INFERENTIAL elapsed_ms=8946 attempts=1 parsed=true
 05-17 20:03:44.014 22535 22558 I VestigeLiteRtLm: lens=SKEPTICAL elapsed_ms=13326 attempts=1 parsed=true
 05-17 20:03:44.014 22535 22558 I VestigeLiteRtLm: outcome=SUCCESS template=AUDIT
+
+--- POST-FIX RE-PROBE RUN B (sequential, code cebfb561, sample 2) ---
+--------- beginning of main
+05-17 20:07:01.930 24273 24324 I VestigeLiteRtLm: backend=dev.anchildress1.vestige.inference.BackendChoice$Gpu@f43dcee model=/data/local/tmp/gemma-4-E4B-it.litertlm
+05-17 20:07:01.932 24273 24331 D VestigeLiteRtLm: Loading /data/local/tmp/gemma-4-E4B-it.litertlm backend=GPU audio=off vision=off maxTokens=4096 speculativeDecoding=on sampler=topK=1,topP=1.0,temp=0.0,seed=42
+05-17 20:07:19.869 24273 24331 D VestigeLiteRtLm: Engine initialized in 17925ms
+05-17 20:07:19.874 24273 24324 I VestigeLiteRtLm: engine initialized
+05-17 20:07:19.960 24273 24324 I VestigeLiteRtLm: pss_before_kb=4859401
+05-17 20:07:28.934 24273 24331 D VestigeLiteRtLm: generateText completed in 8940ms (prompt=175c, reply=317c)
+05-17 20:07:28.935 24273 24331 D VestigeBackgroundExtraction: lens=LITERAL done parsed=true attempts=1 elapsed=8958ms
+05-17 20:07:38.328 24273 24331 D VestigeLiteRtLm: generateText completed in 9390ms (prompt=175c, reply=327c)
+05-17 20:07:38.334 24273 24331 D VestigeBackgroundExtraction: lens=INFERENTIAL done parsed=true attempts=1 elapsed=9398ms
+05-17 20:07:52.272 24273 24331 D VestigeLiteRtLm: generateText completed in 13936ms (prompt=175c, reply=540c)
+05-17 20:07:52.273 24273 24331 D VestigeBackgroundExtraction: lens=SKEPTICAL done parsed=true attempts=1 elapsed=13938ms
+05-17 20:07:52.275 24273 24331 D VestigeBackgroundExtraction: extract completed: lenses=3/3 model_calls=3 elapsed=32297ms
+05-17 20:07:52.368 24273 24324 I VestigeLiteRtLm: wall_clock_ms=32315
+05-17 20:07:52.368 24273 24324 I VestigeLiteRtLm: pss_after_kb=5147341 pss_delta_kb=287940
+05-17 20:07:52.368 24273 24324 I VestigeLiteRtLm: model_calls=3 parsed=3/3
+05-17 20:07:52.368 24273 24324 I VestigeLiteRtLm: lens=LITERAL elapsed_ms=8958 attempts=1 parsed=true
+05-17 20:07:52.368 24273 24324 I VestigeLiteRtLm: lens=INFERENTIAL elapsed_ms=9398 attempts=1 parsed=true
+05-17 20:07:52.368 24273 24324 I VestigeLiteRtLm: lens=SKEPTICAL elapsed_ms=13938 attempts=1 parsed=true
+05-17 20:07:52.368 24273 24324 I VestigeLiteRtLm: outcome=SUCCESS template=AUDIT

@@ -63,7 +63,9 @@ fun IdleLayout(
             onUseTyped = onTypeTap,
         )
         HeroBlock()
-        Spacer(modifier = Modifier.height(8.dp))
+        // Equal weighted spacers above and below the REC + OR-TYPE cluster center it vertically
+        // between the hero and the footer/nav (it used to sit jammed under the hero).
+        Spacer(modifier = Modifier.weight(1f))
         Box(
             modifier = Modifier.fillMaxWidth().padding(horizontal = 18.dp),
             contentAlignment = Alignment.Center,

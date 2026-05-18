@@ -166,6 +166,14 @@ jobs:
       - name: Verify no telemetry SDKs on release classpath
         run: ./gradlew verifyNoTelemetry
 
+      - name: Upload privacy receipt
+        uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: privacy-receipts
+          path: build/reports/privacy/privacy-receipts.txt
+          retention-days: 14
+
       - name: Upload debug APK
         uses: actions/upload-artifact@v7
         if: always()

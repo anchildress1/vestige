@@ -79,6 +79,12 @@ class CaptureViewModel(
     private var recordingJob: Job? = null
     private var limitWarningFired: Boolean = false
 
+    // Elapsed is anchored to the FIRST captured sample, not the REC tap. AudioRecord cold-start
+    // (mic HAL warmup) elapses with zero onLevel callbacks; anchoring to the tap left the meter
+    // and timer frozen during warmup, then jumping forward to "catch up" the instant the first
+    // sample landed. Null until the first level of the session arrives.
+    private var captureAnchorMs: Long? = null
+
     fun setModelReadiness(readiness: ModelReadiness) {
         _state.update { current ->
             when (current) {
@@ -154,13 +160,8 @@ class CaptureViewModel(
     fun startRecording() {
         val current = readyIdleState() ?: return
         val meter = AudioLevelMeter(windowSize = levelWindowSize)
-        val startedAtMs = clock.millis()
         beginRecording(meter)
-        recordingJob = launchRecordingJob(
-            meter = meter,
-            startedAtMs = startedAtMs,
-            inferencePersona = current.persona,
-        )
+        recordingJob = launchRecordingJob(meter = meter, inferencePersona = current.persona)
     }
 
     private fun readyIdleState(): CaptureUiState.Idle? {
@@ -183,28 +184,28 @@ class CaptureViewModel(
             }
         }
         limitWarningFired = false
+        captureAnchorMs = null
     }
 
-    private fun launchRecordingJob(meter: AudioLevelMeter, startedAtMs: Long, inferencePersona: Persona): Job =
-        viewModelScope.launch {
-            try {
-                val audio = captureAudio(meter, startedAtMs)
-                if (audio == null) {
-                    returnToIdleFromRecording()
-                    return@launch
-                }
-                transitionToInferring()
-                runVoiceForeground(inferencePersona, audio)
-            } catch (cancel: CancellationException) {
-                throw cancel
-            } catch (@Suppress("TooGenericExceptionCaught") error: Exception) {
-                Log.e(TAG, "Recording job failed", error)
-                emitInferenceError(CaptureError.InferenceFailed.Reason.ENGINE_FAILED)
+    private fun launchRecordingJob(meter: AudioLevelMeter, inferencePersona: Persona): Job = viewModelScope.launch {
+        try {
+            val audio = captureAudio(meter)
+            if (audio == null) {
+                returnToIdleFromRecording()
+                return@launch
             }
+            transitionToInferring()
+            runVoiceForeground(inferencePersona, audio)
+        } catch (cancel: CancellationException) {
+            throw cancel
+        } catch (@Suppress("TooGenericExceptionCaught") error: Exception) {
+            Log.e(TAG, "Recording job failed", error)
+            emitInferenceError(CaptureError.InferenceFailed.Reason.ENGINE_FAILED)
         }
+    }
 
-    private suspend fun captureAudio(meter: AudioLevelMeter, startedAtMs: Long): AudioChunk? = recordVoice(
-        onLevel = { level -> onRecordingLevel(meter, level, startedAtMs) },
+    private suspend fun captureAudio(meter: AudioLevelMeter): AudioChunk? = recordVoice(
+        onLevel = { level -> onRecordingLevel(meter, level) },
         stopFlow = stopSignal,
     )
 
@@ -293,12 +294,14 @@ class CaptureViewModel(
         }
     }
 
-    private fun onRecordingLevel(meter: AudioLevelMeter, level: Float, startedAtMs: Long) {
+    private fun onRecordingLevel(meter: AudioLevelMeter, level: Float) {
         // VoiceCapture surfaces 0..1 RMS values directly — meter ring-buffer turns them into a
         // chronological window for the live bar strip. Clamp defensively in case a fake driver
         // overshoots in tests.
+        val now = clock.millis()
+        val anchor = captureAnchorMs ?: now.also { captureAnchorMs = it }
         meter.pushLevel(level)
-        val elapsed = clock.millis() - startedAtMs
+        val elapsed = now - anchor
         if (!limitWarningFired && elapsed >= limitWarningThresholdMs) {
             limitWarningFired = true
             limitWarningCue.fire()

@@ -818,15 +818,17 @@ class CaptureViewModelTest {
         voice.queueLevels(0.1f, 0.2f, 0.3f)
 
         vm.startRecording()
+        // First level anchors elapsed (mic warmup before this is not recorded time).
         advancing.offsetMs = 5_000L
         voice.emitNextLevel()
-        assertEquals("no cue before threshold", 0, cue.fireCount.get())
+        assertEquals("anchor sample is t=0, no cue", 0, cue.fireCount.get())
 
-        advancing.offsetMs = 28_001L
+        // 28s of *recorded audio* = anchor (5_000) + 28_001.
+        advancing.offsetMs = 33_001L
         voice.emitNextLevel()
         assertEquals("first cross of the 28s line fires the cue", 1, cue.fireCount.get())
 
-        advancing.offsetMs = 29_500L
+        advancing.offsetMs = 34_500L
         voice.emitNextLevel()
         assertEquals("subsequent level updates past the threshold do not re-fire", 1, cue.fireCount.get())
     }
@@ -870,9 +872,11 @@ class CaptureViewModelTest {
             limitWarningCue = cue,
         )
 
-        voiceA.queueLevels(0.1f)
+        voiceA.queueLevels(0.1f, 0.1f)
         vm.startRecording()
-        advancing.offsetMs = 28_500L
+        advancing.offsetMs = 100L
+        voiceA.emitNextLevel() // anchors session A elapsed at t=0
+        advancing.offsetMs = 28_600L // 28.5s of recorded audio past the anchor
         voiceA.emitNextLevel()
         assertEquals(1, cue.fireCount.get())
 
@@ -881,10 +885,12 @@ class CaptureViewModelTest {
         vm.acknowledgeReview()
 
         active = voiceB
-        voiceB.queueLevels(0.1f)
+        voiceB.queueLevels(0.1f, 0.1f)
         advancing.offsetMs = 50_000L
         vm.startRecording()
-        advancing.offsetMs = 78_500L
+        advancing.offsetMs = 50_100L
+        voiceB.emitNextLevel() // re-armed: beginRecording cleared the anchor; this re-anchors
+        advancing.offsetMs = 78_600L // 28.5s past session B's own anchor
         voiceB.emitNextLevel()
         assertEquals("second recording must re-arm and fire again past its own threshold", 2, cue.fireCount.get())
     }

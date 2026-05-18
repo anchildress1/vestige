@@ -5,14 +5,14 @@ package dev.anchildress1.vestige.ui.capture
  * here, never invent inline. Tests assert verbatim so doc drift is loud.
  */
 object CaptureCopy {
-    const val HERO_QUESTION: String = "WHAT JUST HAPPENED?"
+    const val HERO_QUESTION: String = "WHAT HAPPENED?"
     const val HERO_HIGHLIGHT_FROM_END: String = "HAPPENED?"
 
     const val OR_TYPE: String = "OR TYPE →"
 
     const val TYPE_FIELD_LABEL: String = "Typed entry text"
-    const val TYPE_PLACEHOLDER: String = "What just happened."
-    const val TYPE_SUBMIT: String = "Log entry"
+    const val TYPE_PLACEHOLDER: String = "What happened."
+    const val TYPE_SUBMIT: String = "Save entry"
 
     const val REC_LABEL_IDLE: String = "Record"
     const val REC_LABEL_RECORDING: String = "Stop"

@@ -67,7 +67,7 @@ class CaptureScreenTest {
         val vm = newViewModel(readiness = ModelReadiness.Ready)
         composeRule.setContent { VestigeTheme { captureScreen(vm) } }
         composeRule.onNodeWithContentDescription(CaptureCopy.REC_LABEL_IDLE).assertIsDisplayed()
-        composeRule.onNodeWithText("WHAT JUST HAPPENED?", substring = true).assertIsDisplayed()
+        composeRule.onNodeWithText("WHAT HAPPENED?", substring = true).assertIsDisplayed()
     }
 
     @Test

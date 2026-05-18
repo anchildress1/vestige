@@ -47,7 +47,7 @@ class IdleLayoutTest {
     @Test
     fun `renders hero question text`() {
         composeRule.setContent { VestigeTheme { idleLayout() } }
-        composeRule.onNodeWithText("WHAT JUST HAPPENED?", substring = true).assertIsDisplayed()
+        composeRule.onNodeWithText("WHAT HAPPENED?", substring = true).assertIsDisplayed()
     }
 
     @Test

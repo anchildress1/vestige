@@ -245,7 +245,10 @@ private fun PostOnboardingScreenHost(
             entryStore = container.entryStore,
             zoneId = zoneId,
             dataRevision = container.dataRevision,
+            persona = persona,
             onExit = { onNavigate(PostOnboardingScreen.Capture) },
+            onNavigateTab = { onNavigate(it.toPostOnboardingScreen()) },
+            onOpenSettings = { onNavigate(PostOnboardingScreen.Settings) },
             modifier = Modifier.fillMaxSize(),
         )
 

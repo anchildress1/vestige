@@ -152,17 +152,15 @@ class PatternFormattingTest {
     // region emptyCopyFor
 
     @Test
-    fun `emptyCopyFor NO_ENTRIES returns the Day-1 eyebrow header and body resources`() {
+    fun `emptyCopyFor NO_ENTRIES returns the Day-1 header and body resources`() {
         val copy = emptyCopyFor(PatternsListUiState.EmptyReason.NO_ENTRIES)
-        assertEquals(dev.anchildress1.vestige.R.string.patterns_empty_day1_eyebrow, copy.eyebrowRes)
         assertEquals(dev.anchildress1.vestige.R.string.patterns_empty_day1_header, copy.headerRes)
         assertEquals(dev.anchildress1.vestige.R.string.patterns_empty_day1_body, copy.bodyRes)
     }
 
     @Test
-    fun `emptyCopyFor NO_PATTERNS returns a null eyebrow with the none header and body`() {
+    fun `emptyCopyFor NO_PATTERNS returns the none header and body`() {
         val copy = emptyCopyFor(PatternsListUiState.EmptyReason.NO_PATTERNS)
-        assertNull(copy.eyebrowRes)
         assertEquals(dev.anchildress1.vestige.R.string.patterns_empty_none_header, copy.headerRes)
         assertEquals(dev.anchildress1.vestige.R.string.patterns_empty_none_body, copy.bodyRes)
     }

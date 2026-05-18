@@ -6,7 +6,6 @@ import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertHasClickAction
-import androidx.compose.ui.test.assertHasNoClickAction
 import androidx.compose.ui.test.assertHeightIsAtLeast
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.v2.createComposeRule
@@ -15,6 +14,7 @@ import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performClick
 import androidx.compose.ui.unit.dp
 import dev.anchildress1.vestige.model.Persona
 import dev.anchildress1.vestige.model.ResolvedExtraction
@@ -79,8 +79,9 @@ class HistoryScreenTest {
     @Test
     fun `HISTORY hero heading is always present`() {
         composeRule.setContent { HistoryScreen(viewModel = newViewModel(), persona = Persona.WITNESS) }
-        // "HISTORY" appears exactly once — the hero display heading (always visible, empty + loaded states)
-        composeRule.onAllNodesWithText("HISTORY").assertCountEquals(1)
+        // The hero heading is the only node carrying the coral-dot "HISTORY." string (the bottom
+        // nav's "HISTORY" tab is a separate, period-less label). Always visible, empty + loaded.
+        composeRule.onAllNodesWithText("HISTORY.").assertCountEquals(1)
     }
 
     @Test
@@ -175,51 +176,20 @@ class HistoryScreenTest {
 
     // a11y — back navigation is via system BackHandler; no UI back button in this screen
 
-    @Test
-    fun `hero eyebrow TAIL ALL TIME is visible`() {
-        composeRule.setContent { HistoryScreen(viewModel = newViewModel(), persona = Persona.WITNESS) }
-        composeRule.onNodeWithContentDescription("TAIL · ALL TIME", substring = true).assertIsDisplayed()
-    }
-
-    // a11y — DensityBar: contentDescription present, not interactive
+    // shared bottom nav (HISTORY active) replaces the old stat ribbon / density bar
 
     @Test
-    fun `density bar has contentDescription summarising entry count`() {
-        val now = System.currentTimeMillis()
-        seedCompleted("entry one", now - 3_600_000L)
-        seedCompleted("entry two", now - 7_200_000L)
-
-        composeRule.setContent { HistoryScreen(viewModel = newViewModel(), persona = Persona.WITNESS) }
-        composeRule.onNodeWithContentDescription("2 entries in the last 30 days", substring = true).assertIsDisplayed()
-    }
-
-    @Test
-    fun `density bar has no click action`() {
-        val now = System.currentTimeMillis()
-        seedCompleted("entry one", now - 3_600_000L)
-
-        composeRule.setContent { HistoryScreen(viewModel = newViewModel(), persona = Persona.WITNESS) }
-        composeRule.onNodeWithContentDescription("in the last 30 days", substring = true)
-            .assertHasNoClickAction()
-    }
-
-    // a11y — StatRibbon: contentDescription present, not interactive
-
-    @Test
-    fun `stat ribbon has contentDescription summarising stats`() {
-        seedCompleted("entry one", 1_000_000L)
-        seedCompleted("entry two", 2_000_000L)
-
-        composeRule.setContent { HistoryScreen(viewModel = newViewModel(), persona = Persona.WITNESS) }
-        composeRule.onNodeWithContentDescription("2 entries", substring = true).assertIsDisplayed()
-    }
-
-    @Test
-    fun `stat ribbon has no click action`() {
-        seedCompleted("entry one", 1_000_000L)
-
-        composeRule.setContent { HistoryScreen(viewModel = newViewModel(), persona = Persona.WITNESS) }
-        composeRule.onNodeWithContentDescription("1 entry", substring = true).assertHasNoClickAction()
+    fun `bottom nav reports the selected tab`() {
+        var picked: dev.anchildress1.vestige.ui.components.BottomTab? = null
+        composeRule.setContent {
+            HistoryScreen(
+                viewModel = newViewModel(),
+                persona = Persona.WITNESS,
+                onNavSelect = { picked = it },
+            )
+        }
+        composeRule.onNodeWithText("PATTERNS").performClick()
+        assert(picked == dev.anchildress1.vestige.ui.components.BottomTab.PATTERNS)
     }
 
     private fun newViewModel() = HistoryViewModel(entryStore, zoneId = ZoneOffset.UTC, ioDispatcher = testDispatcher)

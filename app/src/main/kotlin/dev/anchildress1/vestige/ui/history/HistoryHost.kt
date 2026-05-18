@@ -57,6 +57,10 @@ fun HistoryHost( // NOSONAR kotlin:S107
                     openEntryId = it
                     highlightOnOpen = false
                 },
+                onNavSelect = { tab ->
+                    // HISTORY tab is the current screen — only CAPTURE / PATTERNS route away.
+                    if (tab != BottomTab.HISTORY) onNavigateTab(tab)
+                },
                 onMenuTap = onOpenSettings,
                 modifier = modifier,
             )

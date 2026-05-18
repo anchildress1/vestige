@@ -60,6 +60,10 @@ object HistoryDateFormatter {
     fun formatFullDate(timestampEpochMs: Long, zoneId: ZoneId): String =
         Instant.ofEpochMilli(timestampEpochMs).atZone(zoneId).format(FULL_DATE_FORMATTER).uppercase(Locale.US)
 
+    /** Uppercase month + day for the history-row date rail, e.g. `MAY 16`. */
+    fun formatMonthDay(timestampEpochMs: Long, zoneId: ZoneId): String =
+        Instant.ofEpochMilli(timestampEpochMs).atZone(zoneId).format(SECTION_DATE_FORMATTER).uppercase(Locale.US)
+
     private const val WITHIN_WEEK_DAYS = 6L
     private val TIME_FORMATTER: DateTimeFormatter = DateTimeFormatter.ofPattern("h:mm a", Locale.US)
     private val DATE_FORMATTER: DateTimeFormatter = DateTimeFormatter.ofPattern("MMM d", Locale.US)

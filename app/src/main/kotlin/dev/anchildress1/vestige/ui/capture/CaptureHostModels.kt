@@ -3,7 +3,9 @@ package dev.anchildress1.vestige.ui.capture
 import android.util.Log
 import dev.anchildress1.vestige.AppContainer
 import dev.anchildress1.vestige.model.ModelArtifactState
+import dev.anchildress1.vestige.model.PatternState
 import dev.anchildress1.vestige.ui.history.HistoryDurationFormatter
+import dev.anchildress1.vestige.ui.patterns.traceBarHitsFromEntries
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.TextStyle
@@ -28,6 +30,26 @@ internal fun deriveModelReadiness(state: ModelArtifactState): ModelReadiness = w
     is ModelArtifactState.Corrupt -> ModelReadiness.Loading
     is ModelArtifactState.Partial -> ModelReadiness.Paused
 }
+
+/**
+ * Idle patterns-peek payload. Null ⇒ no active patterns, so the idle screen shows the
+ * empty-state line instead. [traceHits] is the union 30-day glyph across the active patterns.
+ */
+data class CapturePatternsPeek(val activeCount: Int, val names: List<String>, val traceHits: Set<Int>)
+
+internal fun derivePatternsPeek(container: AppContainer): CapturePatternsPeek? {
+    val active = container.patternStore.findVisibleSortedByLastSeen()
+        .filter { it.state == PatternState.ACTIVE }
+    if (active.isEmpty()) return null
+    val supporting = active.flatMap { it.supportingEntries.toList() }
+    return CapturePatternsPeek(
+        activeCount = active.size,
+        names = active.take(PEEK_NAME_LIMIT).map { it.title },
+        traceHits = traceBarHitsFromEntries(supporting, System.currentTimeMillis()),
+    )
+}
+
+private const val PEEK_NAME_LIMIT = 3
 
 /** Derived metadata for the Capture footer's "Last entry" strip. Null hides the footer. */
 data class LastEntryFooter(val monthLabel: String, val dayLabel: String, val durationLabel: String)

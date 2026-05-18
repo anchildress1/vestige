@@ -26,6 +26,8 @@ object CaptureCopy {
     const val LIVE_DISCARD_SECONDARY: String = "DISCARD · DON'T SAVE"
 
     const val NO_ENTRIES_YET: String = "NO ENTRIES YET · FIRST ONE TAKES 30 SECONDS"
+    const val PATTERNS_PEEK_EYEBROW_FMT: String = "● %d ACTIVE PATTERNS"
+    const val PATTERNS_PEEK_SEPARATOR: String = "  ·  "
 
     const val MODEL_LOADING_LINE: String = "Model loading. Hang tight."
     const val MODEL_PAUSED_LINE: String = "Reconnect to Wi-Fi to resume."

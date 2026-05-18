@@ -7,4 +7,5 @@ data class IdleChromeCallbacks(
     val onHistoryTap: (() -> Unit)? = null,
     val onSettingsTap: (() -> Unit)? = null,
     val lastEntryFooter: LastEntryFooter? = null,
+    val patternsPeek: CapturePatternsPeek? = null,
 )

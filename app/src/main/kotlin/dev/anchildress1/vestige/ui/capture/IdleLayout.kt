@@ -80,15 +80,23 @@ fun IdleLayout(
             OrTypeButton(onClick = onTypeTap)
         }
         Spacer(modifier = Modifier.weight(1f))
-        Box(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 12.dp),
-            contentAlignment = Alignment.Center,
-        ) {
-            Text(
-                text = CaptureCopy.NO_ENTRIES_YET,
-                style = VestigeTheme.typography.eyebrow,
-                color = colors.dim,
+        val peek = chrome.patternsPeek
+        if (peek != null) {
+            PatternsPeekCard(
+                peek = peek,
+                modifier = Modifier.padding(horizontal = 18.dp, vertical = 12.dp),
             )
+        } else {
+            Box(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 12.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    text = CaptureCopy.NO_ENTRIES_YET,
+                    style = VestigeTheme.typography.eyebrow,
+                    color = colors.dim,
+                )
+            }
         }
         VestigeBottomNav(
             active = BottomTab.CAPTURE,

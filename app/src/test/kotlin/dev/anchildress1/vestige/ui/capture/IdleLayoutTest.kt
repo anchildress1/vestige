@@ -28,9 +28,24 @@ class IdleLayoutTest {
     val composeRule = createComposeRule()
 
     @Test
-    fun `renders the empty-state line`() {
+    fun `renders the empty-state line when there is no peek`() {
         composeRule.setContent { VestigeTheme { idleLayout() } }
         composeRule.onNodeWithText(CaptureCopy.NO_ENTRIES_YET).assertExists()
+    }
+
+    @Test
+    fun `renders the patterns peek instead of the empty line when active`() {
+        composeRule.setContent {
+            VestigeTheme {
+                idleLayout(
+                    chrome = IdleChromeCallbacks(
+                        patternsPeek = CapturePatternsPeek(2, listOf("Tuesday Meetings", "The Email"), emptySet()),
+                    ),
+                )
+            }
+        }
+        composeRule.onNodeWithText("● 2 ACTIVE PATTERNS").assertExists()
+        composeRule.onAllNodesWithText(CaptureCopy.NO_ENTRIES_YET).assertCountEquals(0)
     }
 
     @Test

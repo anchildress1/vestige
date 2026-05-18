@@ -42,6 +42,7 @@ import dev.anchildress1.vestige.ui.capture.RealVoiceCapture
 import dev.anchildress1.vestige.ui.capture.SaveAndExtract
 import dev.anchildress1.vestige.ui.capture.ToneGeneratorLimitWarningCue
 import dev.anchildress1.vestige.ui.capture.deriveLastEntryFooter
+import dev.anchildress1.vestige.ui.capture.derivePatternsPeek
 import dev.anchildress1.vestige.ui.history.EntryDetailOpenRequest
 import dev.anchildress1.vestige.ui.history.HistoryHost
 import dev.anchildress1.vestige.ui.modelstatus.ModelStatusInfo
@@ -481,6 +482,7 @@ private fun CaptureRoute(
     // it (entry write / pattern write / recovery sweep). Cheap — entryStore.countCompleted +
     // patternStore.findVisibleSortedByLastSeen are indexed reads.
     val lastEntryFooter = remember(container, dataRevision) { deriveLastEntryFooter(container, zoneId) }
+    val patternsPeek = remember(container, dataRevision) { derivePatternsPeek(container) }
     CaptureScreen(
         viewModel = viewModel,
         modifier = Modifier.fillMaxSize(),
@@ -490,6 +492,7 @@ private fun CaptureRoute(
             onHistoryTap = onOpenHistory,
             onSettingsTap = onOpenSettings,
             lastEntryFooter = lastEntryFooter,
+            patternsPeek = patternsPeek,
         ),
     )
 }

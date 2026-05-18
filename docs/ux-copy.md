@@ -154,11 +154,14 @@ sheet is open the modal scrim dims it. Source of truth for `CaptureCopy.HERO_QUE
 
 ### Patterns peek (below status)
 
-Card title:
-> **{N} active patterns**
+Peek (above the bottom nav; informational, not tappable — final-polish 2026-05-18, replaces
+the old card-title/body):
+> Eyebrow: `● {N} ACTIVE PATTERNS` (lime)
+> Teaser: `{pattern_name_1}  ·  {pattern_name_2}  ·  {pattern_name_3}` (up to 3, cream)
+> Union 30-day TraceBar (lime)
 
-Card body (one-line teaser):
-> {pattern_name_1} · {pattern_name_2} · {pattern_name_3}
+If no active patterns (the peek is replaced by a single dim line):
+> `NO ENTRIES YET · FIRST ONE TAKES 30 SECONDS`
 
 If model still downloading (record + typed both disabled — ADR-013):
 > Model loading. Hang tight.
@@ -166,9 +169,6 @@ If model still downloading (record + typed both disabled — ADR-013):
 Status pill during download: `DOWNLOADING · {N}%`
 Status pill if paused (no Wi-Fi): `DOWNLOAD PAUSED`
 Below button if paused: `Reconnect to Wi-Fi to resume.`
-
-If no active patterns:
-> Nothing repeating yet.
 
 ### Center — record action
 

@@ -211,7 +211,7 @@ private fun SettingsSection(label: String, content: @Composable () -> Unit) {
 private fun SectionHeader(label: String) {
     val colors = VestigeTheme.colors
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        Box(modifier = Modifier.size(6.dp).clip(VestigeTheme.shapes.pill).background(colors.lime))
+        Box(modifier = Modifier.size(6.dp).clip(VestigeTheme.shapes.pill).background(colors.dim))
         EyebrowE(text = label)
     }
 }

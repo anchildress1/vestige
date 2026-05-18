@@ -96,23 +96,28 @@ fun ModelStatusScreen(
                     .padding(horizontal = 18.dp, vertical = 16.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {
+                val stackLive = info.readiness is ModelReadiness.Ready
+                val stackAccent = if (stackLive) colors.lime else colors.coral
                 StatusBand(info)
                 ModelStatRibbon(sizeLabel = info.sizeLabel)
-                EyebrowE(text = stringResource(id = R.string.model_status_stack_eyebrow), color = colors.lime)
+                EyebrowE(text = stringResource(id = R.string.model_status_stack_eyebrow), color = stackAccent)
                 StackRow(
                     name = stringResource(id = R.string.model_status_stack_main_name),
                     role = stringResource(id = R.string.model_status_stack_main_role),
                     size = info.sizeLabel,
+                    dotColor = stackAccent,
                 )
                 StackRow(
                     name = stringResource(id = R.string.model_status_stack_embed_name),
                     role = stringResource(id = R.string.model_status_stack_embed_role),
                     size = stringResource(id = R.string.model_status_stack_embed_size),
+                    dotColor = stackAccent,
                 )
                 StackRow(
                     name = stringResource(id = R.string.model_status_stack_runtime_name),
                     role = stringResource(id = R.string.model_status_stack_runtime_role),
                     size = stringResource(id = R.string.model_status_stack_runtime_size),
+                    dotColor = stackAccent,
                 )
                 NetworkGateBand()
                 Row(
@@ -229,7 +234,7 @@ private fun ModelStatRibbon(sizeLabel: String) {
 }
 
 @Composable
-private fun StackRow(name: String, role: String, size: String) {
+private fun StackRow(name: String, role: String, size: String, dotColor: Color) {
     val colors = VestigeTheme.colors
     Row(
         modifier = Modifier
@@ -246,7 +251,7 @@ private fun StackRow(name: String, role: String, size: String) {
             EyebrowE(text = role)
         }
         EyebrowE(text = size, maxLines = 1, softWrap = false)
-        Box(modifier = Modifier.size(7.dp).clip(VestigeTheme.shapes.pill).background(colors.lime))
+        Box(modifier = Modifier.size(7.dp).clip(VestigeTheme.shapes.pill).background(dotColor))
     }
 }
 

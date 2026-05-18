@@ -1,5 +1,6 @@
 package dev.anchildress1.vestige.ui.components
 
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -20,7 +21,12 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.unit.Dp
@@ -116,12 +122,35 @@ private fun NavIcon(tab: BottomTab, tint: Color) {
             Box(modifier = Modifier.size(width = BAR_W, height = ICON_BOX).background(tint))
         }
 
-        BottomTab.HISTORY -> Text(
-            text = "↺",
-            style = VestigeTheme.typography.title,
-            color = tint,
-            modifier = deco,
-        )
+        // Drawn, not a glyph — the U+21BA history char isn't in the system font and rendered
+        // blank on device. A near-full circular stroke + a chevron arrowhead reads as "history".
+        BottomTab.HISTORY -> Canvas(modifier = deco.size(ICON_BOX)) {
+            val stroke = size.minDimension * HISTORY_STROKE_FRAC
+            val inset = stroke
+            drawArc(
+                color = tint,
+                startAngle = HISTORY_ARC_START,
+                sweepAngle = HISTORY_ARC_SWEEP,
+                useCenter = false,
+                topLeft = Offset(inset, inset),
+                size = Size(size.width - inset * 2f, size.height - inset * 2f),
+                style = Stroke(width = stroke, cap = StrokeCap.Round),
+            )
+            // Arrowhead at the arc's open (top) end.
+            val tip = Offset(size.width / 2f, inset)
+            val a = size.minDimension * HISTORY_HEAD_FRAC
+            val notch = a * HISTORY_HEAD_NOTCH
+            drawPath(
+                path = Path().apply {
+                    moveTo(tip.x, tip.y)
+                    lineTo(tip.x - a, tip.y - notch)
+                    moveTo(tip.x, tip.y)
+                    lineTo(tip.x - notch, tip.y + a)
+                },
+                color = tint,
+                style = Stroke(width = stroke, cap = StrokeCap.Round),
+            )
+        }
     }
 }
 
@@ -140,3 +169,8 @@ private val ICON_BOX: Dp = 14.dp
 private val DOT: Dp = 9.dp
 private val BAR_W: Dp = 3.dp
 private val BAR_GAP: Dp = 3.dp
+private const val HISTORY_STROKE_FRAC: Float = 0.12f
+private const val HISTORY_HEAD_FRAC: Float = 0.34f
+private const val HISTORY_HEAD_NOTCH: Float = 0.4f
+private const val HISTORY_ARC_START: Float = 70f
+private const val HISTORY_ARC_SWEEP: Float = 280f

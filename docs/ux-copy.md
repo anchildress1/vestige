@@ -290,12 +290,18 @@ Section headers (uppercase, mono eyebrow — one per non-empty section per `poc/
 Filter chips (small, secondary text — Phase 4 polish on top of the section structure):
 > All · Active · Skipped · Closed · Dropped
 
-Pattern card structure:
+Pattern card structure (top → bottom):
 
+> {AGENT-EMITTED LABEL — uppercase mono eyebrow, section-tone colored: lime active / ember skipped / teal closed-dropped}
 > **{Pattern name}**
-> {Agent-emitted label — Crashed / Deep Space / Busy Stalling / Nonstop Spiral / Goblin Hours / Brain Dump}
 > {One-line observation}
+> {30-day TraceBar}
 > {N} of {M} entries · Last seen {date}
+
+> _Final-polish reconciliation (2026-05-18):_ the category label moved **above** the name and
+> renders as an uppercase tone-colored eyebrow per `poc/pattern-lifecycle-final.png`. Tone is
+> the section tone (the comp's per-card colors are sample variety, not a per-category palette).
+> The card is one shared `PatternCard` component so every surface stays identical.
 
 Card actions (per card, in overflow menu):
 - **Skip**

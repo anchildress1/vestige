@@ -367,8 +367,8 @@ Cards present pattern observations on dark surfaces. Restrained, atmospheric, so
 **Status sections.** Patterns group into four sections per `ux-copy.md` §"Pattern List / Section headers" + `spec-pattern-action-buttons.md` §P0.3 — Active / Skipped · on hold / Closed · done (model-detected, v1.5) / Dropped. Each section header appears only when that section has cards. `CLOSED · DONE` is empty in v1 (model-detected; see `backlog.md` §`pattern-auto-close`). Filter chips that scope which sections render are Phase 4 polish on top of this base.
 
 **Card structure:**
+- Category (agent-emitted label) — uppercase mono eyebrow, **above** the name, colored by the section tone (lime active / ember skipped / teal closed-dropped)
 - Short title (the pattern name, e.g., `Tuesday Meetings`)
-- Category (agent-emitted label: `Aftermath`, `Tunnel exit`, `Concrete shoes`, `Decision spiral`, `Goblin hours`, `Audit`)
 - Observation (one short sentence)
 - **TraceBar — 30-day recurrence glyph** per `poc/tokens.jsx` §TraceBar. 30 thin columns; days the pattern landed render full-height in the glow purple (`#A855F7`); empty days render at 34% height in the muted hair tone. Newest day on the right. The bar is the visual answer to "how often does this come back."
 - Source count (e.g., `4 of 12 entries`)

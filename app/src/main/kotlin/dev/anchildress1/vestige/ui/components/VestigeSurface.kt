@@ -1,15 +1,18 @@
 package dev.anchildress1.vestige.ui.components
 
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.toggleable
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -180,20 +183,56 @@ fun VestigeListCard(
                 )
         }
     }
+    val isSelectedCard = (interaction as? VestigeListCardInteraction.Selectable)?.selected == true
     Surface(
         modifier = rootModifier,
         shape = VestigeTheme.shapes.xl,
         color = if (interaction.isInteractive) colors.s2 else colors.s1,
         contentColor = colors.ink,
-        border = BorderStroke(SurfaceHairline, colors.hair),
+        // Selected radio-card wears the lime border + lime wash; the border, not a loud fill,
+        // carries the selection signal. Owned by the primitive so no call site overrides it.
+        border = BorderStroke(SurfaceHairline, if (isSelectedCard) colors.lime else colors.hair),
     ) {
         Box(
             modifier = Modifier
+                .then(if (isSelectedCard) Modifier.background(colors.limeWash) else Modifier)
                 .tapeGrain()
                 .then(accentModifier)
                 .padding(contentPadding),
         ) {
             content()
+        }
+    }
+}
+
+/**
+ * Grouped list — one bordered [VestigeSurface]-grade container with the tape-grain backdrop,
+ * its rows split by full-width hairlines and no inter-row gaps (the Wiring table register).
+ * Each row owns its own click + semantics; the container is purely structural.
+ */
+@Composable
+fun VestigeGroupedList(
+    itemCount: Int,
+    modifier: Modifier = Modifier,
+    shape: Shape = VestigeTheme.shapes.xl,
+    item: @Composable (index: Int) -> Unit,
+) {
+    require(itemCount > 0) { "VestigeGroupedList itemCount must be > 0 (got $itemCount)" }
+    val colors = VestigeTheme.colors
+    Surface(
+        modifier = modifier,
+        shape = shape,
+        color = colors.s1,
+        contentColor = colors.ink,
+        border = BorderStroke(SurfaceHairline, colors.hair),
+    ) {
+        Column(modifier = Modifier.tapeGrain().fillMaxWidth()) {
+            repeat(itemCount) { index ->
+                item(index)
+                if (index < itemCount - 1) {
+                    HorizontalDivider(thickness = SurfaceHairline, color = colors.hair)
+                }
+            }
         }
     }
 }

@@ -59,12 +59,17 @@ fun EyebrowE(text: String, modifier: Modifier = Modifier, color: Color = Color.U
     )
 }
 
-/** Status dot, optionally blinking. Default lime; coral when recording. */
+/**
+ * Status dot, optionally blinking. Default lime; coral when recording. [filled] `false` draws a
+ * hollow ring with no glow — the "not chosen / not live" register (unselected persona card).
+ */
 @Composable
+@Suppress("LongParameterList") // primitive
 fun StatusDot(
     modifier: Modifier = Modifier,
     color: Color = VestigeTheme.colors.lime,
     blink: Boolean = false,
+    filled: Boolean = true,
     size: Dp = DefaultStatusDotSize,
 ) {
     val alpha = if (blink) rememberSbBlink(periodMs = VestigeMotion.BLINK_MS).value else 1f
@@ -76,17 +81,24 @@ fun StatusDot(
             .size(size)
             .alpha(alpha)
             .drawBehind {
-                drawRect(
-                    brush = Brush.radialGradient(
-                        colors = listOf(color.copy(alpha = STATUS_DOT_GLOW_ALPHA), Color.Transparent),
-                        center = Offset(this.size.width / 2f, this.size.height / 2f),
-                        radius = maxOf(this.size.width, this.size.height),
-                    ),
-                )
-                drawCircle(color = color, radius = this.size.minDimension / 2f)
+                val r = this.size.minDimension / 2f
+                if (filled) {
+                    drawRect(
+                        brush = Brush.radialGradient(
+                            colors = listOf(color.copy(alpha = STATUS_DOT_GLOW_ALPHA), Color.Transparent),
+                            center = Offset(this.size.width / 2f, this.size.height / 2f),
+                            radius = maxOf(this.size.width, this.size.height),
+                        ),
+                    )
+                    drawCircle(color = color, radius = r)
+                } else {
+                    drawCircle(color = color, radius = r, style = Stroke(width = STATUS_DOT_RING_PX))
+                }
             },
     )
 }
+
+private const val STATUS_DOT_RING_PX: Float = 2.5f
 
 internal val DefaultStatusDotSize: Dp = 7.dp
 private const val STATUS_DOT_GLOW_ALPHA: Float = 0.55f

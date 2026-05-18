@@ -8,6 +8,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.test.assertHasClickAction
 import androidx.compose.ui.test.assertHasNoClickAction
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsNotSelected
+import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
@@ -15,6 +17,7 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.unit.dp
 import dev.anchildress1.vestige.ui.theme.Ink
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -259,5 +262,54 @@ class VestigePrimitivesTest {
             }
         }
         composeRule.onNodeWithText("tape").assertIsDisplayed()
+    }
+
+    @Test
+    fun `VestigeListCard Selectable selected exposes selected semantics (a11y, pos)`() {
+        composeRule.setContent {
+            VestigeListCard(
+                modifier = Modifier.size(160.dp, 60.dp),
+                interaction = VestigeListCardInteraction.Selectable(selected = true, onClick = {}),
+            ) {
+                Text(text = "sel-card")
+            }
+        }
+        composeRule.onNodeWithText("sel-card").assertIsSelected()
+    }
+
+    @Test
+    fun `VestigeListCard Selectable unselected is not selected (a11y, neg)`() {
+        composeRule.setContent {
+            VestigeListCard(
+                modifier = Modifier.size(160.dp, 60.dp),
+                interaction = VestigeListCardInteraction.Selectable(selected = false, onClick = {}),
+            ) {
+                Text(text = "unsel-card")
+            }
+        }
+        composeRule.onNodeWithText("unsel-card").assertIsNotSelected()
+    }
+
+    @Test
+    fun `VestigeGroupedList renders every row (pos)`() {
+        composeRule.setContent {
+            VestigeGroupedList(itemCount = 3) { index -> Text(text = "grouped-$index") }
+        }
+        composeRule.onNodeWithText("grouped-0").assertIsDisplayed()
+        composeRule.onNodeWithText("grouped-1").assertIsDisplayed()
+        composeRule.onNodeWithText("grouped-2").assertIsDisplayed()
+    }
+
+    @Test
+    fun `VestigeGroupedList rejects a non-positive item count (err)`() {
+        val failure = runCatching {
+            composeRule.setContent {
+                VestigeGroupedList(itemCount = 0) { Text(text = "never") }
+            }
+        }.exceptionOrNull()
+        assertTrue(
+            "expected an IllegalArgumentException, got $failure",
+            generateSequence(failure) { it.cause }.any { it is IllegalArgumentException },
+        )
     }
 }

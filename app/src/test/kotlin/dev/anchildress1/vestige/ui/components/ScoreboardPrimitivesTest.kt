@@ -79,6 +79,12 @@ class ScoreboardPrimitivesTest {
         composeRule.setContent { StatusDot(size = 64.dp) }
     }
 
+    @Test
+    fun `StatusDot filled=false composes the hollow ring (edge — unselected)`() {
+        composeRule.setContent { StatusDot(filled = false) }
+        composeRule.onAllNodesWithText("").assertCountEquals(0)
+    }
+
     // ─── Pill ───────────────────────────────────────────────────────────────
 
     @Test

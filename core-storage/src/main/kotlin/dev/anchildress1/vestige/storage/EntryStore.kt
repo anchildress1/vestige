@@ -196,6 +196,33 @@ class EntryStore(private val boxStore: BoxStore, private val markdownStore: Mark
         }
     }
 
+    /**
+     * Land the persona follow-up on a still-in-flight entry. The voice path persists the entry on
+     * the call-1 transcription — before call-2 has produced the follow-up — so the follow-up
+     * arrives separately and is written here once call-2 terminal lands. Blank input is a no-op.
+     *
+     * Bounded by design: only `PENDING`/`RUNNING` rows are patched. A follow-up arriving after the
+     * row already reached a terminal status is dropped — extraction beat call-2, the user has
+     * moved on, and rewriting a `COMPLETED` row's markdown would race [completeEntry]. Dropping a
+     * late best-effort follow-up is the correct outcome, not a silent failure.
+     */
+    fun attachFollowUp(entryId: Long, followUpText: String) {
+        val trimmed = followUpText.trimEnd().takeIf(String::isNotBlank) ?: return
+        boxStore.runInTx {
+            val box = boxStore.boxFor<EntryEntity>()
+            val entry = box.get(entryId)
+                ?: throw EntryPersistenceException("No entry row id=$entryId to attach follow-up")
+            if (entry.extractionStatus !in NON_TERMINAL_STATUSES) return@runInTx
+            entry.followUpText = trimmed
+            try {
+                markdownStore.write(entry)
+            } catch (@Suppress("TooGenericExceptionCaught") writeFail: Exception) {
+                throw EntryPersistenceException("Markdown rewrite failed attaching follow-up to id=$entryId", writeFail)
+            }
+            box.put(entry)
+        }
+    }
+
     private fun applyResolved(entry: EntryEntity, resolved: ResolvedExtraction, templateLabel: TemplateLabel?) {
         entry.templateLabel = templateLabel
         entry.energyDescriptor = stringField(resolved, KEY_ENERGY)
@@ -265,10 +292,9 @@ class EntryStore(private val boxStore: BoxStore, private val markdownStore: Mark
         private const val KEY_RECURRENCE = "recurrence_link"
         private const val KEY_COMMITMENT = "stated_commitment"
         private const val KEY_TOPIC_OR_PERSON = "topic_or_person"
-        private val NON_TERMINAL_STATUS_NAMES: Array<String> = arrayOf(
-            ExtractionStatus.PENDING.name,
-            ExtractionStatus.RUNNING.name,
-        )
+        private val NON_TERMINAL_STATUSES = setOf(ExtractionStatus.PENDING, ExtractionStatus.RUNNING)
+        private val NON_TERMINAL_STATUS_NAMES: Array<String> =
+            NON_TERMINAL_STATUSES.map(ExtractionStatus::name).toTypedArray()
         private val PROMOTABLE_VERDICTS = setOf(
             ConfidenceVerdict.CANONICAL,
             ConfidenceVerdict.CANONICAL_WITH_CONFLICT,

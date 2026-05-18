@@ -197,6 +197,45 @@ class EntryStoreTest {
     }
 
     @Test
+    fun `attachFollowUp lands follow-up on a pending row and rewrites markdown`() {
+        val id = entryStore.createPendingEntry(SAMPLE_TEXT, SAMPLE_INSTANT)
+
+        entryStore.attachFollowUp(id, "What did you do right after?")
+
+        val row = boxStore.boxFor<EntryEntity>().get(id)
+        assertEquals("What did you do right after?", row.followUpText)
+        assertEquals(ExtractionStatus.PENDING, row.extractionStatus)
+        val mdFile = File(File(markdownDir, "entries"), row.markdownFilename)
+        assertTrue(mdFile.readText().contains("follow_up: What did you do right after?"))
+    }
+
+    @Test
+    fun `attachFollowUp is a no-op for blank input`() {
+        val id = entryStore.createPendingEntry(SAMPLE_TEXT, SAMPLE_INSTANT)
+
+        entryStore.attachFollowUp(id, "   ")
+
+        assertNull(boxStore.boxFor<EntryEntity>().get(id).followUpText)
+    }
+
+    @Test
+    fun `attachFollowUp drops a late follow-up once the row is terminal`() {
+        val id = entryStore.createPendingEntry(SAMPLE_TEXT, SAMPLE_INSTANT)
+        entryStore.completeEntry(id, resolvedSample(), TemplateLabel.AFTERMATH)
+
+        entryStore.attachFollowUp(id, "too late")
+
+        assertNull(boxStore.boxFor<EntryEntity>().get(id).followUpText)
+    }
+
+    @Test
+    fun `attachFollowUp rejects when entry row does not exist`() {
+        assertThrows(EntryPersistenceException::class.java) {
+            entryStore.attachFollowUp(9_999L, "orphan follow-up")
+        }
+    }
+
+    @Test
     fun `mostRecentNonTerminalEntryId returns newest pending or running row`() {
         val first = entryStore.createPendingEntry("first", SAMPLE_INSTANT)
         val second = entryStore.createPendingEntry("second", SAMPLE_INSTANT.plusSeconds(60))

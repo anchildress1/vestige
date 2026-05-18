@@ -3,6 +3,7 @@
 package dev.anchildress1.vestige.ui.history
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -23,6 +24,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.Role
@@ -36,7 +38,6 @@ import dev.anchildress1.vestige.ui.components.AppTop
 import dev.anchildress1.vestige.ui.components.AppTopStatuses
 import dev.anchildress1.vestige.ui.components.BottomTab
 import dev.anchildress1.vestige.ui.components.EyebrowE
-import dev.anchildress1.vestige.ui.components.Pill
 import dev.anchildress1.vestige.ui.components.VestigeBottomNav
 import dev.anchildress1.vestige.ui.components.VestigeSpinner
 import dev.anchildress1.vestige.ui.components.limeLeftRuleForActive
@@ -134,12 +135,13 @@ private fun EntryDetailContent(model: EntryDetailUiModel, onBack: () -> Unit, mo
             FieldSkeletonGrid()
         }
 
+        EntryTagsRow(tags = model.tags)
+        // Transcript sits at the very bottom of the scroll, after the tags.
         TranscriptBlock(
             eyebrow = EntryDetailCopy.YOU_LABEL,
             body = model.transcription,
             testTag = "entry_transcription",
         )
-        EntryTagsRow(tags = model.tags)
         Spacer(Modifier.height(8.dp))
     }
 }
@@ -171,8 +173,8 @@ private fun ThreeLensRead() {
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-            EyebrowE(text = EntryDetailSeed.THREE_LENS_EYEBROW, color = colors.lime)
-            EyebrowE(text = EntryDetailSeed.THREE_LENS_STATUS, color = colors.coral)
+            EyebrowE(text = EntryDetailSeed.THREE_LENS_EYEBROW, color = colors.lime, maxLines = 1, softWrap = false)
+            EyebrowE(text = EntryDetailSeed.THREE_LENS_STATUS, color = colors.coral, maxLines = 1, softWrap = false)
         }
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -183,7 +185,7 @@ private fun ThreeLensRead() {
                     modifier = Modifier.weight(1f),
                     verticalArrangement = Arrangement.spacedBy(4.dp),
                 ) {
-                    EyebrowE(text = lens.label)
+                    EyebrowE(text = lens.label, maxLines = 1, softWrap = false)
                     Text(text = lens.value, style = VestigeTheme.typography.pCompact, color = lens.tone.color())
                 }
             }
@@ -207,14 +209,19 @@ private fun FieldGrid() {
                 horizontalArrangement = Arrangement.spacedBy(10.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                EyebrowE(text = field.label, modifier = Modifier.weight(FIELD_LABEL_WEIGHT))
+                EyebrowE(
+                    text = field.label,
+                    modifier = Modifier.weight(FIELD_LABEL_WEIGHT),
+                    maxLines = 1,
+                    softWrap = false,
+                )
                 Text(
                     text = field.value,
                     style = VestigeTheme.typography.p,
                     color = colors.ink,
                     modifier = Modifier.weight(FIELD_VALUE_WEIGHT),
                 )
-                EyebrowE(text = field.tone.name, color = field.tone.color())
+                EyebrowE(text = field.tone.name, color = field.tone.color(), maxLines = 1, softWrap = false)
             }
         }
     }
@@ -317,14 +324,20 @@ private fun EntryTagsRow(tags: List<String>) {
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalArrangement = Arrangement.spacedBy(6.dp),
         ) {
-            tags.forEach { tag ->
-                Pill(
-                    text = tag,
-                    color = colors.faint,
-                    modifier = Modifier.semantics { contentDescription = "tag: $tag" },
-                )
-            }
+            tags.forEach { tag -> TagChip(tag = tag, color = colors.faint) }
         }
+    }
+}
+
+@Composable
+private fun TagChip(tag: String, color: Color) {
+    Box(
+        modifier = Modifier
+            .border(width = 1.dp, color = color, shape = RectangleShape)
+            .semantics { contentDescription = "tag: $tag" }
+            .padding(horizontal = 10.dp, vertical = 4.dp),
+    ) {
+        Text(text = tag, style = VestigeTheme.typography.eyebrow, color = color)
     }
 }
 

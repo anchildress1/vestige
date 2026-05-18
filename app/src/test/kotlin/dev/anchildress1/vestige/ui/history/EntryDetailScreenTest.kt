@@ -76,8 +76,9 @@ class EntryDetailScreenTest {
         val id = createCompleted("standup was brutal today")
         setDetail(id)
         composeRule.onNodeWithTag("entry_time").assertIsDisplayed()
-        composeRule.onNodeWithTag("entry_transcription").assertIsDisplayed()
-        composeRule.onNodeWithText("standup was brutal today").assertIsDisplayed()
+        // Transcript is the very-bottom block now — it exists in the scroll, below the fold.
+        composeRule.onNodeWithTag("entry_transcription").assertExists()
+        composeRule.onNodeWithText("standup was brutal today").assertExists()
     }
 
     @Test
@@ -132,11 +133,11 @@ class EntryDetailScreenTest {
         entity.entryText = ""
         box.put(entity)
         setDetail(id)
-        composeRule.onNodeWithTag("entry_transcription").assertIsDisplayed()
+        composeRule.onNodeWithTag("entry_transcription").assertExists()
         composeRule.onNodeWithContentDescription(
             "${EntryDetailCopy.YOU_LABEL}:",
             substring = true,
-        ).assertIsDisplayed()
+        ).assertExists()
     }
 
     @Test

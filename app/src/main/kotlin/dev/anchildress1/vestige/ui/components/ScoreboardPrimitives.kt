@@ -47,15 +47,26 @@ import dev.anchildress1.vestige.ui.theme.VestigeTheme
 
 /**
  * Mono uppercase eyebrow row — defaults to the `dim` slot. Accepts an optional [color] override
- * for accent sites; omit to let the theme drive secondary-text foreground.
+ * for accent sites; omit to let the theme drive secondary-text foreground. [softWrap] `false`
+ * (with [maxLines] `1`) keeps a constrained eyebrow on one line — the mono font + wide letter
+ * spacing otherwise orphans the final glyph onto a second line in tight columns.
  */
 @Composable
-fun EyebrowE(text: String, modifier: Modifier = Modifier, color: Color = Color.Unspecified) {
+@Suppress("LongParameterList") // primitive
+fun EyebrowE(
+    text: String,
+    modifier: Modifier = Modifier,
+    color: Color = Color.Unspecified,
+    maxLines: Int = Int.MAX_VALUE,
+    softWrap: Boolean = true,
+) {
     Text(
         text = text,
         modifier = modifier,
         style = VestigeTheme.typography.eyebrow,
         color = if (color == Color.Unspecified) VestigeTheme.colors.dim else color,
+        maxLines = maxLines,
+        softWrap = softWrap,
     )
 }
 

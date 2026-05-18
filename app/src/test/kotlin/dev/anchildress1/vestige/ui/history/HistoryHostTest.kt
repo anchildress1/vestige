@@ -81,7 +81,7 @@ class HistoryHostTest {
 
         composeRule.onNodeWithTag("history_row").performClick()
         composeRule.waitForIdle()
-        composeRule.onNodeWithText("● NEW ENTRY").assertIsDisplayed()
+        composeRule.onNodeWithTag("entry_time").assertIsDisplayed()
 
         composeRule.activity.runOnUiThread {
             composeRule.activity.onBackPressedDispatcher.onBackPressed()
@@ -111,34 +111,6 @@ class HistoryHostTest {
     }
 
     @Test
-    fun `new entry from detail clears stale detail nav and exits`() {
-        seedCompleted("standup crashed me again", 1_000_000L)
-        var exited = false
-
-        composeRule.activity.setContent {
-            HistoryHost(
-                entryStore = entryStore,
-                persona = Persona.WITNESS,
-                onExit = { exited = true },
-                zoneId = ZoneOffset.UTC,
-                dataRevision = MutableStateFlow(0L),
-            )
-        }
-
-        composeRule.onNodeWithTag("history_row").performClick()
-        composeRule.waitForIdle()
-        composeRule.onNodeWithText("● NEW ENTRY").assertIsDisplayed()
-
-        composeRule.onNodeWithContentDescription(EntryDetailCopy.NEW_ENTRY_CD).performClick()
-        composeRule.waitForIdle()
-
-        assertTrue("onNewEntry must call onExit", exited)
-        // Regression guard: openEntryId is rememberSaveable; without the explicit reset the host
-        // would still render the stale detail. After the fix it falls back to the list.
-        composeRule.onNodeWithText("standup crashed me again", substring = true).assertIsDisplayed()
-    }
-
-    @Test
     fun `openRequest routes directly to entry detail and consumes the one-shot request`() {
         val entryId = seedCompleted("opened from notification", 1_000_000L)
         var consumed = false
@@ -156,7 +128,7 @@ class HistoryHostTest {
         }
 
         composeRule.waitForIdle()
-        composeRule.onNodeWithText("● NEW ENTRY").assertIsDisplayed()
+        composeRule.onNodeWithTag("entry_time").assertIsDisplayed()
         assertTrue("openRequest should be consumed after routing", consumed)
     }
 

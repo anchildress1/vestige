@@ -3,18 +3,14 @@ package dev.anchildress1.vestige.ui.history
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertHasClickAction
 import androidx.compose.ui.test.assertIsDisplayed
-import androidx.compose.ui.test.assertIsNotDisplayed
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
-import dev.anchildress1.vestige.model.EntryObservation
-import dev.anchildress1.vestige.model.ObservationEvidence
 import dev.anchildress1.vestige.model.Persona
 import dev.anchildress1.vestige.model.ResolvedExtraction
-import dev.anchildress1.vestige.model.TemplateLabel
 import dev.anchildress1.vestige.storage.EntryEntity
 import dev.anchildress1.vestige.storage.EntryStore
 import dev.anchildress1.vestige.storage.MarkdownEntryStore
@@ -22,6 +18,7 @@ import dev.anchildress1.vestige.testing.cleanupObjectBoxTempRoot
 import dev.anchildress1.vestige.testing.newInMemoryObjectBoxDirectory
 import dev.anchildress1.vestige.testing.newModuleTempRoot
 import dev.anchildress1.vestige.testing.openInMemoryBoxStore
+import dev.anchildress1.vestige.ui.theme.VestigeTheme
 import io.objectbox.BoxStore
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -74,38 +71,48 @@ class EntryDetailScreenTest {
         cleanupObjectBoxTempRoot(tempRoot, dataDir)
     }
 
-    // --- content display ---
-
     @Test
-    fun `entry number heading is displayed`() {
-        val id = createCompleted("crash and burn")
-        setDetail(id)
-
-        composeRule.onNodeWithTag("entry_number").assertIsDisplayed()
-    }
-
-    @Test
-    fun `transcription text is displayed`() {
+    fun `time hero and transcription are displayed`() {
         val id = createCompleted("standup was brutal today")
         setDetail(id)
-
+        composeRule.onNodeWithTag("entry_time").assertIsDisplayed()
         composeRule.onNodeWithTag("entry_transcription").assertIsDisplayed()
         composeRule.onNodeWithText("standup was brutal today").assertIsDisplayed()
     }
 
     @Test
-    fun `follow-up text is displayed as the saved model turn`() {
+    fun `follow-up card is shown with persona eyebrow and a11y`() {
         val id = createCompleted(
             text = "standup was brutal today",
             followUpText = "What did you do right after it ended?",
             persona = Persona.HARDASS,
         )
         setDetail(id)
-
         composeRule.onNodeWithTag("entry_follow_up").assertIsDisplayed()
         composeRule.onNodeWithText("What did you do right after it ended?").assertIsDisplayed()
-        composeRule.onNodeWithContentDescription("HARDASS: What did you do right after it ended?")
-            .assertIsDisplayed()
+        composeRule.onNodeWithContentDescription(
+            "HARDASS · FOLLOW-UP: What did you do right after it ended?",
+        ).assertIsDisplayed()
+    }
+
+    @Test
+    fun `follow-up card absent when no follow-up saved`() {
+        val id = createCompleted("no follow up here")
+        setDetail(id)
+        composeRule.onAllNodesWithTag("entry_follow_up").assertCountEquals(0)
+    }
+
+    @Test
+    fun `resolved view shows the three-lens read and field grid (seed)`() {
+        val id = createCompleted("battery got yanked")
+        setDetail(id)
+        composeRule.onNodeWithTag("entry_three_lens").assertIsDisplayed()
+        composeRule.onNodeWithTag("entry_field_grid").assertIsDisplayed()
+        composeRule.onNodeWithText(EntryDetailSeed.THREE_LENS_EYEBROW).assertIsDisplayed()
+        composeRule.onNodeWithText("battery yanked").assertIsDisplayed()
+        composeRule.onNodeWithText("crashed").assertIsDisplayed()
+        // The extracting/skeleton branch is not the resolved view.
+        composeRule.onAllNodesWithTag("entry_extracting").assertCountEquals(0)
     }
 
     @Test
@@ -116,9 +123,7 @@ class EntryDetailScreenTest {
         entity.entryText = ""
         box.put(entity)
         setDetail(id)
-
         composeRule.onNodeWithTag("entry_transcription").assertIsDisplayed()
-        // Blank body maps to "—" in display; content description captures the raw body.
         composeRule.onNodeWithContentDescription(
             "${EntryDetailCopy.YOU_LABEL}:",
             substring = true,
@@ -126,238 +131,54 @@ class EntryDetailScreenTest {
     }
 
     @Test
-    fun `energy descriptor is displayed in reading card`() {
-        val id = createCompleted("cruisy and crashed")
-        completeWithEnergy(id, "cruisy in, crashed out")
-        setDetail(id)
-
-        composeRule.onNodeWithTag("entry_reading_card").assertIsDisplayed()
-        // descriptor is uppercased in the composable
-        composeRule.onNodeWithText("CRUISY IN, CRASHED OUT").assertIsDisplayed()
-    }
-
-    @Test
-    fun `template label pill shown when label present`() {
-        val id = createCompleted("aftermath entry")
-        entryStore.completeEntry(id, ResolvedExtraction(emptyMap()), TemplateLabel.AFTERMATH)
-        setDetail(id)
-
-        composeRule.onNodeWithTag("entry_template_label").assertIsDisplayed()
-    }
-
-    @Test
-    fun `tags are displayed as pills`() {
+    fun `tags are displayed under the TAGS eyebrow`() {
         val id = createCompleted("got tags")
-        entryStore.completeEntry(
-            id,
-            resolved("tired", "monday"),
-            null,
-        )
+        entryStore.completeEntry(id, resolved("tired", "monday"), null)
         setDetail(id)
-
-        composeRule.onNodeWithTag("entry_tags").assertIsDisplayed()
-        composeRule.onNodeWithContentDescription("tag: monday").assertIsDisplayed()
+        // Tags sit at the bottom of the scroll region — existence is the contract.
+        composeRule.onNodeWithTag("entry_tags").assertExists()
+        composeRule.onNodeWithContentDescription("tag: monday").assertExists()
     }
-
-    @Test
-    fun `observations are shown inside reading card`() {
-        val id = createCompleted("observation entry")
-        val obs = listOf(
-            EntryObservation("You said fine twice.", ObservationEvidence.VOCABULARY_CONTRADICTION, emptyList()),
-        )
-        entryStore.completeEntry(id, ResolvedExtraction(emptyMap()), null, obs)
-        setDetail(id)
-
-        composeRule.onNodeWithText("You said fine twice.").assertIsDisplayed()
-    }
-
-    // --- not found ---
 
     @Test
     fun `not-found copy shown for unknown entry id`() {
         composeRule.setContent {
-            dev.anchildress1.vestige.ui.theme.VestigeTheme {
-                EntryDetailScreen(
-                    viewModel = buildVm(99_999L),
-                    onBack = {},
-                    onNewEntry = {},
-                )
-            }
+            VestigeTheme { EntryDetailScreen(viewModel = buildVm(99_999L), onBack = {}) }
         }
         composeRule.onNodeWithText(EntryDetailCopy.NOT_FOUND).assertIsDisplayed()
     }
 
-    // --- bottom bar a11y ---
-
     @Test
-    fun `back button has click action`() {
-        val id = createCompleted("back test")
-        setDetail(id)
-
-        composeRule.onNodeWithContentDescription(EntryDetailCopy.BACK_CD).assertHasClickAction()
-    }
-
-    @Test
-    fun `new entry button has click action`() {
-        val id = createCompleted("new entry test")
-        setDetail(id)
-
-        composeRule.onNodeWithContentDescription(EntryDetailCopy.NEW_ENTRY_CD).assertHasClickAction()
-    }
-
-    @Test
-    fun `back callback fires on back tap`() {
+    fun `back affordance has a click action and fires onBack`() {
         val id = createCompleted("back fires")
         var backFired = false
         composeRule.setContent {
-            dev.anchildress1.vestige.ui.theme.VestigeTheme {
-                EntryDetailScreen(
-                    viewModel = buildVm(id),
-                    onBack = { backFired = true },
-                    onNewEntry = {},
-                )
-            }
+            VestigeTheme { EntryDetailScreen(viewModel = buildVm(id), onBack = { backFired = true }) }
         }
-        composeRule.onNodeWithContentDescription(EntryDetailCopy.BACK_CD).performClick()
+        composeRule.onNodeWithContentDescription(EntryDetailCopy.BACK_CD)
+            .assertHasClickAction()
+            .performClick()
         assertTrue(backFired)
     }
 
     @Test
-    fun `new entry callback fires on new entry tap`() {
-        val id = createCompleted("new entry fires")
-        var newEntryFired = false
+    fun `bottom nav reports the selected tab`() {
+        val id = createCompleted("nav test")
+        var picked: dev.anchildress1.vestige.ui.components.BottomTab? = null
         composeRule.setContent {
-            dev.anchildress1.vestige.ui.theme.VestigeTheme {
-                EntryDetailScreen(
-                    viewModel = buildVm(id),
-                    onBack = {},
-                    onNewEntry = { newEntryFired = true },
-                )
+            VestigeTheme {
+                EntryDetailScreen(viewModel = buildVm(id), onBack = {}, onNavSelect = { picked = it })
             }
         }
-        composeRule.onNodeWithContentDescription(EntryDetailCopy.NEW_ENTRY_CD).performClick()
-        assertTrue(newEntryFired)
-    }
-
-    @Test
-    fun `source-link highlight cue appears when requested`() {
-        val id = createCompleted("pattern source entry")
-        composeRule.setContent {
-            dev.anchildress1.vestige.ui.theme.VestigeTheme {
-                EntryDetailScreen(
-                    viewModel = buildVm(id),
-                    onBack = {},
-                    onNewEntry = {},
-                    highlightOnOpen = true,
-                )
-            }
-        }
-
-        composeRule.onNodeWithTag("entry_source_highlight").assertIsDisplayed()
-    }
-
-    // --- a11y: stat ribbon ---
-
-    @Test
-    fun `stat ribbon has merged content description`() {
-        val id = createCompleted("four words here test")
-        setDetail(id)
-        // The StatRibbon merges descendants; its a11y content covers audio + words
-        composeRule.onNodeWithContentDescription(
-            "— audio, 4 words",
-            substring = true,
-        ).assertIsDisplayed()
-    }
-
-    // --- a11y: reading card content description ---
-
-    @Test
-    fun `reading card content description includes observation text when energy is absent`() {
-        val id = createCompleted("observation only")
-        val obs = listOf(
-            EntryObservation("You said fine twice.", ObservationEvidence.VOCABULARY_CONTRADICTION, emptyList()),
-        )
-        entryStore.completeEntry(id, ResolvedExtraction(emptyMap()), null, obs)
-        setDetail(id)
-
-        // Regression guard: a manual mergeDescendants contentDescription replaces descendant
-        // text, so observation lines must be folded into it — not left unspoken.
-        composeRule.onNodeWithContentDescription(
-            "READING: You said fine twice.",
-            substring = true,
-        ).assertIsDisplayed()
-    }
-
-    @Test
-    fun `reading card content description spans energy and observations`() {
-        val id = createCompleted("energy and observation")
-        val resolved = ResolvedExtraction(
-            mapOf(
-                "energy_descriptor" to dev.anchildress1.vestige.model.ResolvedField(
-                    "cruisy in, crashed out",
-                    dev.anchildress1.vestige.model.ConfidenceVerdict.CANONICAL,
-                ),
-            ),
-        )
-        val obs = listOf(
-            EntryObservation("You said fine twice.", ObservationEvidence.VOCABULARY_CONTRADICTION, emptyList()),
-        )
-        entryStore.completeEntry(id, resolved, null, obs)
-        setDetail(id)
-
-        composeRule.onNodeWithContentDescription(
-            "READING: cruisy in, crashed out. You said fine twice.",
-            substring = true,
-        ).assertIsDisplayed()
-    }
-
-    @Test
-    fun `reading card is absent when there is no energy or observation`() {
-        val id = createCompleted("plain entry")
-        setDetail(id)
-
-        composeRule.onAllNodesWithTag("entry_reading_card").assertCountEquals(0)
-    }
-
-    @Test
-    fun `follow-up block is absent when no follow-up was saved`() {
-        val id = createCompleted("no follow up here")
-        setDetail(id)
-
-        composeRule.onAllNodesWithTag("entry_follow_up").assertCountEquals(0)
-    }
-
-    // --- not-found keeps navigation ---
-
-    @Test
-    fun `not-found state still exposes back and new entry controls`() {
-        composeRule.setContent {
-            dev.anchildress1.vestige.ui.theme.VestigeTheme {
-                EntryDetailScreen(
-                    viewModel = buildVm(99_999L),
-                    onBack = {},
-                    onNewEntry = {},
-                )
-            }
-        }
-
-        // Regression guard: NotFound must not consume the whole column and push the bar off.
-        composeRule.onNodeWithText(EntryDetailCopy.NOT_FOUND).assertIsDisplayed()
-        composeRule.onNodeWithContentDescription(EntryDetailCopy.BACK_CD).assertHasClickAction()
-        composeRule.onNodeWithContentDescription(EntryDetailCopy.NEW_ENTRY_CD).assertHasClickAction()
+        composeRule.onNodeWithText("PATTERNS").performClick()
+        assertTrue(picked == dev.anchildress1.vestige.ui.components.BottomTab.PATTERNS)
     }
 
     // --- helpers ---
 
     private fun setDetail(id: Long) {
         composeRule.setContent {
-            dev.anchildress1.vestige.ui.theme.VestigeTheme {
-                EntryDetailScreen(
-                    viewModel = buildVm(id),
-                    onBack = {},
-                    onNewEntry = {},
-                )
-            }
+            VestigeTheme { EntryDetailScreen(viewModel = buildVm(id), onBack = {}) }
         }
     }
 
@@ -377,18 +198,6 @@ class EntryDetailScreenTest {
         )
         entryStore.completeEntry(id, ResolvedExtraction(emptyMap()), null)
         return id
-    }
-
-    private fun completeWithEnergy(id: Long, energy: String) {
-        val resolved = ResolvedExtraction(
-            mapOf(
-                "energy_descriptor" to dev.anchildress1.vestige.model.ResolvedField(
-                    energy,
-                    dev.anchildress1.vestige.model.ConfidenceVerdict.CANONICAL,
-                ),
-            ),
-        )
-        entryStore.completeEntry(id, resolved, null)
     }
 
     private fun resolved(vararg tags: String): ResolvedExtraction = ResolvedExtraction(

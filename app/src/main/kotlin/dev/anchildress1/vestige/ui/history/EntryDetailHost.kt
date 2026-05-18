@@ -8,8 +8,16 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import java.time.ZoneId
 
-/** Wires [EntryDetailViewModel] to [EntryDetailScreen]. */
-@Suppress("LongParameterList") // Route-level host; dataRevision + modifier are structural, not business.
+/**
+ * Wires [EntryDetailViewModel] to [EntryDetailScreen].
+ *
+ * `onNewEntry` / `highlightOnOpen` are retained on the host signature so the nav graph
+ * (PatternsHost / HistoryHost / EntryDetailOpenRequest) is untouched, but the redesigned
+ * detail screen (`poc/entry-full-final.png`) dropped the +NEW-ENTRY action and the
+ * source-highlight, so they are no longer forwarded. Bottom-nav routes are stubbed pending
+ * the nav-layer pass.
+ */
+@Suppress("LongParameterList", "UNUSED_PARAMETER") // Route host; signature kept to avoid a nav-graph ripple.
 @Composable
 fun EntryDetailHost( // NOSONAR kotlin:S107
     entryId: Long,
@@ -32,8 +40,6 @@ fun EntryDetailHost( // NOSONAR kotlin:S107
     EntryDetailScreen(
         viewModel = viewModel,
         onBack = onBack,
-        onNewEntry = onNewEntry,
-        highlightOnOpen = highlightOnOpen,
         modifier = modifier,
     )
 }

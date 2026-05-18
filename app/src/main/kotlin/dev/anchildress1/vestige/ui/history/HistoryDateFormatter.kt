@@ -52,9 +52,18 @@ object HistoryDateFormatter {
     fun formatTimeOnly(timestampEpochMs: Long, zoneId: ZoneId): String =
         Instant.ofEpochMilli(timestampEpochMs).atZone(zoneId).format(TIME_ONLY_FORMATTER)
 
+    /** 12-hour clock for the entry-detail hero, e.g. `10:04 PM`. */
+    fun formatClock12(timestampEpochMs: Long, zoneId: ZoneId): String =
+        Instant.ofEpochMilli(timestampEpochMs).atZone(zoneId).format(TIME_FORMATTER)
+
+    /** Uppercase long date for the entry-detail eyebrow, e.g. `SAT MAY 17 2026`. */
+    fun formatFullDate(timestampEpochMs: Long, zoneId: ZoneId): String =
+        Instant.ofEpochMilli(timestampEpochMs).atZone(zoneId).format(FULL_DATE_FORMATTER).uppercase(Locale.US)
+
     private const val WITHIN_WEEK_DAYS = 6L
     private val TIME_FORMATTER: DateTimeFormatter = DateTimeFormatter.ofPattern("h:mm a", Locale.US)
     private val DATE_FORMATTER: DateTimeFormatter = DateTimeFormatter.ofPattern("MMM d", Locale.US)
     private val SECTION_DATE_FORMATTER: DateTimeFormatter = DateTimeFormatter.ofPattern("MMM d", Locale.US)
     private val TIME_ONLY_FORMATTER: DateTimeFormatter = DateTimeFormatter.ofPattern("HH:mm", Locale.US)
+    private val FULL_DATE_FORMATTER: DateTimeFormatter = DateTimeFormatter.ofPattern("EEE MMM d yyyy", Locale.US)
 }

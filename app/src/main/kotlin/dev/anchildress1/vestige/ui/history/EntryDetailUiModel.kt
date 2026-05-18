@@ -8,6 +8,8 @@ import java.time.ZoneId
 /** Immutable UI projection for a single entry detail. */
 data class EntryDetailUiModel(
     val id: Long,
+    val timeOfDayLabel: String,
+    val dateLabel: String,
     val filedTimeLabel: String,
     val entryNumberLabel: String,
     val templateLabel: String?,
@@ -19,10 +21,14 @@ data class EntryDetailUiModel(
     val energyDescriptor: String?,
     val observations: List<ObservationLine>,
     val tags: List<String>,
+    /** Until the 3-lens extraction resolves the screen shows the spinner/skeleton state. */
+    val extractionComplete: Boolean = true,
 ) {
     companion object {
         fun from(entity: EntryEntity, zoneId: ZoneId): EntryDetailUiModel = EntryDetailUiModel(
             id = entity.id,
+            timeOfDayLabel = HistoryDateFormatter.formatClock12(entity.timestampEpochMs, zoneId),
+            dateLabel = HistoryDateFormatter.formatFullDate(entity.timestampEpochMs, zoneId),
             filedTimeLabel = HistoryDateFormatter.formatTimeOnly(entity.timestampEpochMs, zoneId),
             entryNumberLabel = "${EntryDetailCopy.ENTRY_NUMBER_PREFIX}${entity.id}",
             templateLabel = entity.templateLabel?.serial?.uppercase(),

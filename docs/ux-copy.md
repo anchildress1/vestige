@@ -216,6 +216,31 @@ Send action:
 
 ---
 
+## Entry detail
+
+Single-exchange view (`poc/entry-full-final.png` resolved, `entry-loading-final.png`
+extracting). Top → bottom: AppTop pill + hamburger; `← BACK`; the filed **time of day**
+(hero, e.g. `10:04 PM`); `{DATE} · {DURATION} · {N} WORDS` eyebrow; the
+`{PERSONA} · FOLLOW-UP` card (lime left-rule); then —
+
+- **Resolved:** `● THREE-LENS READ` + status, the LITERAL / INFERENTIAL / SKEPTICAL columns,
+  and the BEHAVIOR / STATE / VOCABULARY / COMMITMENT / RECURRENCE field grid with tone tags
+  (`CANONICAL` lime · `CONFLICT` coral · `AMBIGUOUS` ember · `CANDIDATE` teal).
+- **Extracting:** `● EXTRACTING · 3 LENSES` with an animated spinner +
+  "Convergence resolves in the background. Open the entry later for the full read.", and the
+  lens/field areas render as skeletons.
+
+Then `YOU · TRANSCRIPT` (dim user transcription), `▸ TAGS` chips, and the shared bottom nav
+(HISTORY active). No +NEW-ENTRY action (Capture tab covers it); no stat ribbon; no reading
+card.
+
+> _Final-polish note (2026-05-18):_ the 3-lens read + field grid + the extracting state have
+> no model backing yet. Their content is a temporary user-approved UI seed in
+> `EntryDetailSeed.kt` (overrides the AGENTS.md no-fiction guardrail for this screen only),
+> isolated so it's obvious and trivial to delete on real extraction wiring.
+
+---
+
 ## Local Model Status (standalone screen)
 
 Reachable from settings or status indicator chevron in app shell.

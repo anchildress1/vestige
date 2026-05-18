@@ -32,12 +32,12 @@ Subhead:
 > Three voices. Same product. Pick the one that fits today. You can switch.
 
 Persona cards (default Witness highlighted):
-- **Witness** — Observes. Names the pattern. Keeps quiet otherwise.
+- **Witness** — Observes. Names the pattern.
 - **Hardass** — Sharper. Less padding. More action.
 - **Editor** — Cuts vague words until they confess.
 
 Primary action:
-> **Continue**
+> **Select**
 
 Footer link:
 > Change later in settings.
@@ -54,7 +54,6 @@ Rows:
 - **Local** — `No cloud. No servers. No telemetry. Voice never leaves the device.`
 - **Mic** — `Records dumps. Audio is read locally, then discarded. Transcription stays as text.`
 - **Notify** — `One line, posted while the model reads an entry. Disappears when work is done.`
-- **Type** — `Voice is the default. Typing works the same. Same patterns. Same persona.`
 
 Local row helper states:
 - Absent on Wi-Fi: `Tap Local to start download`
@@ -70,10 +69,11 @@ Notify row helper state:
 - Pending: `Single-status only · nothing else, ever`
 
 Primary action:
-> **Open Vestige**
+> **Let's Go**
 
 Gate:
 > Enabled only when the Local row is green.
+> Shows green background when all rows are green.
 
 Notification text when posted (per `adrs/ADR-004-app-backgrounding-and-model-handle-lifecycle.md` §"Notification Contract"):
 > Reading the entry.
@@ -85,13 +85,13 @@ This string is the same one used for mid-capture inference loading copy (see §"
 ### Screen 3 — Model download
 
 Header:
-> **Downloading model.**
+> **Download model.**
 
 Body line 1 (active):
 > {bytes downloaded} / {total} · {ETA}
 
 Body line 2 (status):
-> Quiet for a minute. This takes a while.
+> Quiet for a minute. This could take a while.
 
 Cancel:
 > **Pause**
@@ -127,7 +127,7 @@ Behavior:
 
 ### Status row (top)
 
-- Local model status indicator: `GEMMA 4 · LOCAL ONLY` (when idle, model loaded) / `GEMMA 4 · LISTENING LIVE` (when recording) / `GEMMA 4 · LOADING` (engine warming) / `DOWNLOADING · {N}%` (active download) / `MODEL PAUSED` (Wi-Fi dropped mid-download) — pill color stays lime in every state; coral is reserved for the REC button heat + destructive flows (see `design-guidelines.md` §"Capture Screen / AppTop status pill"). _(Story 4.4: `GEMMA 4 · LOADING` is the reconciled label — the doc previously named only the idle/recording strings; the pill now reflects all four `ModelReadiness` states and is tappable post-onboarding to open the Model Status screen.)_
+- Local model status indicator: `GEMMA 4 · LOCAL ONLY` (when idle, model loaded) / `GEMMA 4 · LISTENING` (when recording) / `GEMMA 4 · LOADING` (engine warming) / `DOWNLOADING · {N}%` (active download) / `DOWNLOAD PAUSED` (Wi-Fi dropped mid-download) — pill color stays lime in every state except LISTENING; coral is reserved for the REC button heat + destructive flows (see `design-guidelines.md` §"Capture Screen / AppTop status pill"). _(Story 4.4: `GEMMA 4 · LOADING` is the reconciled label — the doc previously named only the idle/recording strings; the pill now reflects all four `ModelReadiness` states and is tappable post-onboarding to open the Model Status screen.)_
 - Persona dropdown label: `WITNESS ▾` (or active persona)
 
 ### Patterns peek (below status)
@@ -142,7 +142,7 @@ If model still downloading (record + typed both disabled — ADR-013):
 > Model loading. Hang tight.
 
 Status pill during download: `DOWNLOADING · {N}%`
-Status pill if paused (no Wi-Fi): `MODEL PAUSED`
+Status pill if paused (no Wi-Fi): `DOWNLOAD PAUSED`
 Below button if paused: `Reconnect to Wi-Fi to resume.`
 
 If no active patterns:
@@ -150,12 +150,10 @@ If no active patterns:
 
 ### Center — record action
 
-Persona name above record button: *(removed — see design-guidelines.md, the centered persona label was forbidden)*
-
-Record button label (when idle, screen-reader content description):
+Record button label (when idle green dot, screen-reader content description):
 > Record
 
-Record button label (when recording):
+Record button label (when recording red dot):
 > Stop
 
 Hint text under button (idle, optional, very subtle):
@@ -165,14 +163,16 @@ Approaching chunk boundary (~25s):
 > *(visual cue only, no copy)*
 
 After tap-stop, while transcribing (1-5 sec target per ADR-002 §"Latency budget" — measurement-driven, not a contractual promise):
+Spinner icon.
 > Reading the entry.
+
 
 ### Capture Screen — Discard
 
 Recording-state secondary affordance — sits below `STOP · FILE IT` per `design-guidelines.md` §"Capture Screen / Discard."
 
 Button label:
-> DISCARD · NO SAVE
+> DISCARD · DON'T SAVE
 
 Behavior (per `adrs/ADR-001-stack-and-build-infra.md` §Q8):
 - Single tap. No confirmation dialog, no long-press, no two-tap arming.
@@ -187,14 +187,10 @@ Button:
 > Type
 
 When expanded into text input, placeholder:
-> What just happened.
+> What happened.
 
 Send action:
-> Log entry
-
-### Footer metadata (small text)
-
-> Last entry · May 7 · 4m 02s · **History**
+> Save entry
 
 ---
 

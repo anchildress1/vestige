@@ -25,10 +25,7 @@ class ForegroundInference(
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) {
 
-    /**
-     * Voice path → progressive [ForegroundStreamEvent]s. Engine handle is single-threaded; do not
-     * collect concurrently against the same engine.
-     */
+    /** Voice path → progressive [ForegroundStreamEvent]s. Safe to collect concurrently. */
     fun runForegroundCall(audio: AudioChunk, persona: Persona): Flow<ForegroundStreamEvent> {
         require(audio.samples.isNotEmpty()) { "ForegroundInference requires non-empty audio samples." }
         require(audio.isFinal) {

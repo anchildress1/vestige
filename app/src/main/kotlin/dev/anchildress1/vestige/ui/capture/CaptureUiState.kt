@@ -85,4 +85,10 @@ sealed interface CaptureError {
 }
 
 /** Single transcript pair from one foreground call. */
-data class ReviewState(val transcription: String, val followUp: String, val persona: Persona, val elapsedMs: Long)
+data class ReviewState(
+    val transcription: String,
+    val followUp: String,
+    val persona: Persona,
+    val elapsedMs: Long,
+    val isTerminal: Boolean,
+)

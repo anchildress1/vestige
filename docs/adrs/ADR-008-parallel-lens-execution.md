@@ -1,10 +1,10 @@
 # ADR-008 — Parallel 3-Lens Execution via LiteRT-LM Engine/Session Pattern
 
-**Status:** Accepted. Corrected 2026-05-16 — see [§Correction](#correction-2026-05-16--mechanism-and-performance-premise). The decision (concurrent multi-context 3-lens on one Engine) stands; the mechanism is `Engine.createSession()` / `createConversation()`, **not** `Session.clone()` + CoW prefix-fork.
+**Status:** **REVERSED 2026-05-17 by [§Addendum (2026-05-17)](#addendum-2026-05-17--reversed-sdk-is-single-session-stt-f).** The core decision (concurrent multi-context 3-lens on one Engine) is **disproven on-device**: `litertlm-android:0.11.0` enforces one live session per Engine (`FAILED_PRECONDITION` on a second concurrent conversation — STT-F, `stt-results/stt-f-2026-05-17.md`). v1 ships **sequential** 3-lens on one serialized session; ADR-002's sequential rule is **restored**. The §Correction (2026-05-16) and original body are retained below as the (wrong) historical reasoning trail — read everything through §Addendum (2026-05-17). The product-shape consequence (foreground = only user-blocking call; analytics + periodic pattern analysis async) is locked by [ADR-014](ADR-014-foreground-background-split-and-periodic-pattern-analysis.md), which supersedes this ADR's §Correction premise.
 **Date:** 2026-05-10
 **Deciders:** Ashley (sole owner). AI implementors read this as authoritative.
-**Depends on:** `adrs/ADR-002-multi-lens-extraction-pattern.md` (supersedes the "sequential" sequencing rule)
-**Supersedes:** ADR-002 §"Background pass (3 lens calls, sequential)" — that rule assumed one model handle forced serialization. LiteRT-LM's Engine → multi-Session API invalidates that assumption.
+**Depends on:** `adrs/ADR-002-multi-lens-extraction-pattern.md` (sequential sequencing rule **restored** — see §Addendum 2026-05-17)
+**Supersedes:** ~~ADR-002 §"Background pass (3 lens calls, sequential)"~~ — **no longer supersedes.** The assumption "one model handle forced serialization" was correct after all: 0.11.0's Engine permits only one live session, so serialization is SDK-enforced. ADR-002 §"Background pass" stands.
 
 > **Correction note (2026-05-16).** A prior ADR (ADR-009, since **deleted as a mistake**) claimed `litertlm-android:0.11.0` could not do this because it lacks `Session.clone()`. That probe was mis-scoped: it searched for a method literally named `clone()`. A direct AAR bytecode probe of the pinned `0.11.0` artifact found `Engine.createSession(SessionConfig)` and `Engine.createConversation(ConversationConfig)` — one Engine drives many **independent** contexts. The capability this ADR depends on shipped in 0.11.0 the whole time. The original `Session.clone()` + Copy-on-Write **shared-prefix** mechanism below was never the SDK shape and is corrected in [§Correction](#correction-2026-05-16--mechanism-and-performance-premise); read the body's clone/CoW/wall-clock specifics through that section.
 
@@ -159,6 +159,37 @@ Per-entry extraction drops from ~15–21s to ~7–9s. Queue concern dissolves. T
 - A future model artifact requires more than one Engine (e.g., EmbeddingGemma loaded alongside Gemma 4 if STT-E passes) — that's a separate AppContainer addition, not a change here.
 
 ---
+
+## Addendum (2026-05-17) — REVERSED: SDK is single-session (STT-F)
+
+**This addendum supersedes the §Correction (2026-05-16) and the core decision of this ADR.** It is the authoritative section; everything above is the historical (incorrect) reasoning trail.
+
+**What happened.** The §Correction (2026-05-16) inferred "one Engine → many independent concurrent contexts" from an AAR bytecode probe that found `Engine.createSession` / `Engine.createConversation` *exist*. **Method presence is not runtime permission.** An interim build briefly implemented concurrent fan-out on that inference. On-device measurement on 2026-05-17 (`RamWallClockProbeTest`, Galaxy S24 Ultra, GPU, pinned `litertlm-android:0.11.0` — full evidence in [`stt-results/stt-f-2026-05-17.md`](../stt-results/stt-f-2026-05-17.md)) disproved it: a second concurrent `createConversation` throws
+
+> `FAILED_PRECONDITION: A session already exists. Only one session is supported at a time.`
+
+In the concurrent run only the lens that won the session race completed (1/3 parsed); the 2-of-3 resolver fallback masked it as `outcome=SUCCESS`. Action Item 6's STOP branch fired; this addendum is the recorded supersede (handled in place per the project's ADR-mistake convention — the §Correction and this Addendum are same-branch, never on `main`).
+
+**Decision (reversed).** Concurrent multi-context 3-lens on one Engine is **not possible on 0.11.0** and is **withdrawn** (not deferred — SDK-gated). v1 ships:
+
+- `LiteRtLmEngine.callMutex` — one exclusive lock held for the whole `createConversation`→`close` lifetime of every call. At most one live session, ever. (`stateMutex`/`closing`/`drainGate` close-drain machinery is unchanged and orthogonal.)
+- `BackgroundExtractionWorker` — sequential `LENSES.map { runLens(...) }`; no `coroutineScope`/`async`/`awaitAll`; plain `mutableListOf` accumulator. 2-of-3 fallback, per-lens retry, `RUNNING`-once unchanged.
+- Story 2.19 (foreground non-blocking on background) is **withdrawn** — SDK-impossible. Foreground serializes behind an in-flight background lens (≤ ~15 s on E4B GPU); accepted for v1.
+
+**Performance.** Sequential 3-lens ≈ 3 × single-lens ≈ ~44 s/entry on E4B GPU (single-lens measured 14.7 s in STT-F) — within the documented 25–55 s band. ADR-002's sequential sequencing is restored; this ADR no longer supersedes it. Re-open only if a future SDK lifts single-session — and then verify **on-device**, never from bytecode-method-presence.
+
+---
+
+## Action Items
+
+_Items 1–5 below were written for the concurrent design that §Addendum (2026-05-17) reversed. They are obsolete; the live state is sequential per §Addendum._
+
+1. [x] ~~Story 2.6 rewrite for multi-context fan-out~~ — moot; Story 2.6.6 / 2.19 marked WITHDRAWN, sequential is the shipped shape.
+2. [x] `architecture-brief.md` §"AppContainer Ownership" `InferenceCoordinator` row — reflects single serialized session (sequential 3-lens).
+3. [x] ~~ADR-002 §"Background pass" superseded-by-ADR-008 note~~ — reversed; ADR-002 sequential rule is restored, ADR-008 no longer supersedes it.
+4. [x] ~~ADR-002 independence footer for parallelism~~ — moot; sequencing is sequential.
+5. [ ] README + PRD §"Authoritative documents" — ADR-008 entry (still valid; it documents the reversal trail).
+6. [x] **Fired.** Concurrent multi-context broke on-device (STT-F, 2026-05-17). STOP was honored: §Addendum (2026-05-17) is the superseding record; no silent revert — the reversal is documented with device evidence.
 
 ---
 

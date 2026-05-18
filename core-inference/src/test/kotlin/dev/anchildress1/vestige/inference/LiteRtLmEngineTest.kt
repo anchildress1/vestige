@@ -1,17 +1,23 @@
 package dev.anchildress1.vestige.inference
 
 import com.google.ai.edge.litertlm.Content
+import com.google.ai.edge.litertlm.Engine
 import com.google.ai.edge.litertlm.ExperimentalApi
 import com.google.ai.edge.litertlm.ExperimentalFlags
 import io.mockk.mockk
+import io.mockk.verify
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNull
+import org.junit.jupiter.api.Assertions.assertSame
 import org.junit.jupiter.api.Assertions.assertThrows
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.Timeout
 import org.junit.jupiter.api.assertDoesNotThrow
+import java.util.concurrent.TimeUnit
 
 /**
  * Lifecycle-invariant tests for [LiteRtLmEngine]. The pre-state checks fail before any SDK call,
@@ -54,6 +60,44 @@ class LiteRtLmEngineTest {
             "LiteRtLmEngine.streamMessageContents called before initialize() (or after close()).",
             error.message,
         )
+    }
+
+    // Concurrency regression: two close() calls racing the drain branch must share ONE token and
+    // both return; the native engine must close exactly once. Determinism (no wall-clock
+    // poll deadlines, which false-fail under CI load): each closer is sequenced by waiting until
+    // its thread is genuinely parked in `gate.await()` (Thread.State WAITING/TIMED_WAITING),
+    // which means it has already executed the `stateMutex` drain branch — so `drainGate` is
+    // observed only after the second closer's reuse-or-overwrite decision, making a regressed
+    // (overwrite) impl fail deterministically rather than flakily. @Timeout is the only time
+    // bound: a true hang regression fails cleanly instead of wedging the suite.
+    @Test
+    @Timeout(value = 30, unit = TimeUnit.SECONDS)
+    fun `concurrent close calls reuse one drain and both return after the final reader exits`() {
+        val engine = LiteRtLmEngine(modelPath = NOT_USED_PATH)
+        val nativeEngine = mockk<Engine>(relaxed = true)
+        setField(engine, "engine", nativeEngine)
+        setIntField(engine, "inFlight", 1)
+
+        val firstClose = Thread { engine.close() }
+        firstClose.start()
+        awaitParked(firstClose)
+        val firstDrain = drainToken(engine)
+
+        val secondClose = Thread { engine.close() }
+        secondClose.start()
+        awaitParked(secondClose)
+        val currentDrain = drainToken(engine)
+
+        // Asserted before completing the token: on a regressed (overwrite) impl currentDrain is a
+        // different object, so this fails deterministically — not on a timing fluke.
+        assertSame(firstDrain, currentDrain, "every close() waiter must share the same drain token")
+
+        firstDrain.complete(Unit)
+        if (currentDrain !== firstDrain) currentDrain.complete(Unit) // unblock a regressed impl too
+        firstClose.join()
+        secondClose.join()
+
+        verify(exactly = 1) { nativeEngine.close() }
     }
 
     @Test
@@ -129,6 +173,38 @@ class LiteRtLmEngineTest {
     private companion object {
         // Path is never actually opened — the tests assert pre-state checks fire first.
         const val NOT_USED_PATH = "/tmp/never-loaded.litertlm"
+        const val POLL_SLEEP_MS = 5L
+    }
+
+    private fun setField(target: Any, name: String, value: Any?) {
+        val field = target.javaClass.getDeclaredField(name)
+        field.isAccessible = true
+        field.set(target, value)
+    }
+
+    private fun setIntField(target: Any, name: String, value: Int) {
+        val field = target.javaClass.getDeclaredField(name)
+        field.isAccessible = true
+        field.setInt(target, value)
+    }
+
+    // Blocks until [thread] is parked (the closer reached `gate.await()`, i.e. already ran the
+    // stateMutex drain branch). No wall-clock bound — the method @Timeout backstops a true hang.
+    private fun awaitParked(thread: Thread) {
+        while (thread.state != Thread.State.WAITING && thread.state != Thread.State.TIMED_WAITING) {
+            Thread.sleep(POLL_SLEEP_MS)
+        }
+    }
+
+    // Reads the engine's private `drainGate` token. Only called after [awaitParked], so the closer
+    // has passed the branch that assigns it — the field is guaranteed non-null here.
+    @Suppress("UNCHECKED_CAST")
+    private fun drainToken(engine: LiteRtLmEngine): CompletableDeferred<Unit> {
+        val field = engine.javaClass.getDeclaredField("drainGate")
+        field.isAccessible = true
+        return checkNotNull(field.get(engine) as CompletableDeferred<Unit>?) {
+            "drainGate must be set once a close() thread is parked in await()"
+        }
     }
 }
 

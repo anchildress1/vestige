@@ -458,6 +458,44 @@ class CaptureViewModelTest {
         vm.acknowledgeReview()
         val idle = vm.state.value as CaptureUiState.Idle
         assertEquals("hello", idle.lastReview?.transcription)
+        assertTrue(idle.lastReview?.isTerminal == true)
+    }
+
+    @Test
+    fun `acknowledgeReview ignores progressive voice review until terminal follow-up lands`() = runTest(dispatcher) {
+        val voice = FakeVoiceCapture(result = AudioChunk(FloatArray(16), 16_000, isFinal = true))
+        val releaseTerminal = CompletableDeferred<Unit>()
+        val vm = newViewModel(
+            voice = voice,
+            inference = ForegroundInferenceCall { _, _ ->
+                flowOf(ForegroundStreamEvent.Transcription("i kept reopening it"))
+            },
+            textInference = ForegroundTextInferenceCall { text, _, _ ->
+                flow {
+                    releaseTerminal.await()
+                    emit(ForegroundStreamEvent.Terminal(successResult(text, "what were you checking for")))
+                }
+            },
+            save = RecordingSaveAndExtract(),
+            initialReadiness = ModelReadiness.Ready,
+        )
+
+        vm.startRecording()
+        voice.completeWithResult()
+        advanceUntilIdle()
+
+        val progressive = vm.state.value as CaptureUiState.Reviewing
+        assertTrue(!progressive.review.isTerminal)
+        vm.acknowledgeReview()
+        assertEquals(progressive, vm.state.value)
+
+        releaseTerminal.complete(Unit)
+        advanceUntilIdle()
+
+        val terminal = vm.state.value as CaptureUiState.Reviewing
+        assertTrue(terminal.review.isTerminal)
+        vm.acknowledgeReview()
+        assertTrue(vm.state.value is CaptureUiState.Idle)
     }
 
     @Test
@@ -634,6 +672,7 @@ class CaptureViewModelTest {
         val reviewing = vm.state.value as CaptureUiState.Reviewing
         assertEquals("just got off the call again", reviewing.review.transcription)
         assertEquals("and then what", reviewing.review.followUp)
+        assertTrue(reviewing.review.isTerminal)
     }
 
     @Test

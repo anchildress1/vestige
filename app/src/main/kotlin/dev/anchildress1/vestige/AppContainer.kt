@@ -264,11 +264,9 @@ class AppContainer(
     }
 
     /**
-     * Single-turn foreground inference path consumed by the capture screen. Shares the engine
-     * handle with background extraction — LiteRT-LM is single-threaded, so v1 sequences the
-     * foreground call ahead of any background pass against the same engine. A second recording
-     * launched while a prior `saveAndExtract` background job is still running will block until
-     * the engine handle frees up; that's the documented v1 trade-off per ADR-002.
+     * Single-turn foreground inference path consumed by the capture screen. Shares the same
+     * process Engine as background extraction, but each call opens its own independent SDK
+     * conversation, so foreground no longer blocks on a shared Kotlin call mutex.
      */
     val foregroundInference: ForegroundInference by lazy {
         ForegroundInference(
@@ -277,20 +275,13 @@ class AppContainer(
         )
     }
 
-    /**
-     * Two-tier-aware adapter for the capture screen's voice path. Ensures the engine is
-     * initialized before the call so the screen doesn't have to thread an init step into its
-     * recording lifecycle.
-     */
+    /** Voice-path adapter: initializes the shared Engine before delegating to the stream. */
     fun runForegroundCall(audio: AudioChunk, persona: Persona): Flow<ForegroundStreamEvent> = flow {
         ensureBackgroundEngineInitialized()
         emitAll(foregroundInference.runForegroundCall(audio, persona))
     }
 
-    /**
-     * Typed-entry foreground call — same engine + parser as the voice path so a typed entry
-     * reviews identically. The model is required; the capture screen gates on readiness.
-     */
+    /** Typed-entry foreground call — same engine + parser as voice, same init guard. */
     fun runForegroundTextCall(
         text: String,
         persona: Persona,

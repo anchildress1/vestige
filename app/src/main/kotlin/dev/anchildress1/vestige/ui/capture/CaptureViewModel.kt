@@ -522,6 +522,7 @@ class CaptureViewModel(
                     followUp = followUp,
                     persona = c.persona,
                     elapsedMs = elapsedMs,
+                    isTerminal = !streaming,
                 ),
                 streaming = streaming,
             )

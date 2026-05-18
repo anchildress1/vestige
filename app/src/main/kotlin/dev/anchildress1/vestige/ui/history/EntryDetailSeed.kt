@@ -29,8 +29,8 @@ object EntryDetailSeed {
     val fields: List<FieldRow> = listOf(
         FieldRow("BEHAVIOR", "post-meeting drop", LensTone.CANONICAL),
         FieldRow("STATE", "crashed", LensTone.CONFLICT),
-        FieldRow("VOCABULARY", "battery, yanked", LensTone.CANONICAL),
-        FieldRow("COMMITMENT", "—", LensTone.AMBIGUOUS),
-        FieldRow("RECURRENCE", "matches Tue-Meetings (4/12)", LensTone.CANDIDATE),
+        FieldRow("VOCAB", "battery, yanked", LensTone.CANONICAL),
+        FieldRow("PROMISES", "—", LensTone.AMBIGUOUS),
+        FieldRow("REPEAT", "matches Tue-Meetings (4/12)", LensTone.CANDIDATE),
     )
 }

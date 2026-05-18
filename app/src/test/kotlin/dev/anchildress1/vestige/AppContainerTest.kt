@@ -752,6 +752,48 @@ class AppContainerTest {
     }
 
     @Test
+    fun `refreshModelReadiness holds Loading until the engine warms, then flips Ready`(@TempDir tempRoot: File) =
+        runTest {
+            val modelFile = File(tempRoot, "main-model.litertlm").apply { writeText("xx") }
+            val artifactStore = fakeArtifactStore(artifactFile = modelFile, expectedByteSize = 2L)
+            val context = mockk<Context>(relaxed = true) {
+                every { filesDir } returns tempRoot
+                every { cacheDir } returns File(tempRoot, "cache").apply { mkdirs() }
+            }
+            val warmGate = CompletableDeferred<Unit>()
+            val engine = mockk<LiteRtLmEngine>(relaxed = true)
+            // initialize()'s expression body yields Android Log.d's Int; suspend on the gate
+            // then return any Int so the warming window is observable under the test scheduler.
+            coEvery { engine.initialize() } coAnswers {
+                warmGate.await()
+                0
+            }
+            val container = AppContainer(
+                applicationContext = context,
+                boxStoreFactory = { mockk<BoxStore>(relaxed = true) },
+                markdownStoreFactory = { mockk<MarkdownEntryStore>(relaxed = true) },
+                modelPathLoader = { modelFile.absolutePath },
+                backgroundEngineFactory = { _, _ -> engine },
+                mainModelArtifactStoreFactory = { _, _, _ -> artifactStore },
+                recoveredEntryIdsLoader = { emptyList() },
+                foregroundServiceIntentFactory = { Intent("dev.anchildress1.vestige.TEST_START") },
+                foregroundServiceStarter = {},
+                scope = this,
+            )
+
+            container.refreshModelReadiness()
+            advanceUntilIdle()
+            // Artifact is full-size on disk, but the engine is still inside initialize() —
+            // readiness must report the honest warming state, not a premature Ready.
+            assertEquals(ModelReadiness.Loading, container.modelReadinessFlow.value)
+
+            warmGate.complete(Unit)
+            advanceUntilIdle()
+            assertEquals(ModelReadiness.Ready, container.modelReadinessFlow.value)
+            coVerify(exactly = 1) { engine.initialize() }
+        }
+
+    @Test
     fun `refreshModelReadiness leaves a checksum-corrupt full-size artifact Loading`(@TempDir tempRoot: File) =
         runTest {
             val modelFile = File(tempRoot, "main-model.litertlm").apply { writeText("xx") }

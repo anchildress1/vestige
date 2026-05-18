@@ -58,9 +58,7 @@ import dev.anchildress1.vestige.ui.settings.SettingsInfo
 import dev.anchildress1.vestige.ui.settings.SettingsScreen
 import dev.anchildress1.vestige.ui.theme.VestigeTheme
 import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import java.time.Clock
 import java.time.ZoneId
 
@@ -502,7 +500,7 @@ private fun CaptureRoute(
             },
             retrieveHistory = HistoryRetrieval { query -> container.retrieveHistory(query) },
             attachFollowUp = AttachFollowUp { entryId, followUpText ->
-                withContext(Dispatchers.IO) { container.entryStore.attachFollowUp(entryId, followUpText) }
+                container.attachFollowUp(entryId, followUpText)
             },
             clock = clock,
             zoneId = zoneId,

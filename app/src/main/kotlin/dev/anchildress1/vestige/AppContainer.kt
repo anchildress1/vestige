@@ -403,6 +403,17 @@ class AppContainer(
             .onFailure { Log.w(TAG, "Skip wake-up sweep failed", it) }
     }
 
+    /**
+     * Land call-2's persona follow-up on the still-in-flight entry and nudge [dataRevision] so an
+     * open detail screen reloads now — not later when background extraction terminal happens to
+     * bump it. Without the nudge the follow-up sits on disk, invisible, until convergence
+     * finishes (~15 s+); the user expects it moments after the transcript.
+     */
+    suspend fun attachFollowUp(entryId: Long, followUpText: String) {
+        withContext(Dispatchers.IO) { entryStore.attachFollowUp(entryId, followUpText) }
+        _dataRevision.value += 1
+    }
+
     fun reportExtractionStatus(entryId: Long, status: ExtractionStatus) {
         if (!status.isTerminal() && entryStore.readEntry(entryId) == null) {
             Log.w(TAG, "Ignoring stale in-flight extraction status for missing entryId=$entryId")

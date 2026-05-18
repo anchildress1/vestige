@@ -172,9 +172,22 @@ private fun ThreeLensRead() {
         modifier = Modifier.fillMaxWidth().testTag("entry_three_lens"),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-            EyebrowE(text = EntryDetailSeed.THREE_LENS_EYEBROW, color = colors.lime, maxLines = 1, softWrap = false)
-            EyebrowE(text = EntryDetailSeed.THREE_LENS_STATUS, color = colors.coral, maxLines = 1, softWrap = false)
+        // The eyebrow label is weighted so it yields/clips first; the CANONICAL_WITH_CONFLICT
+        // status is unweighted, so the Row measures it at full intrinsic width — it is never
+        // cut off, on any device width.
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            EyebrowE(
+                text = EntryDetailSeed.THREE_LENS_EYEBROW,
+                modifier = Modifier.weight(1f),
+                color = colors.lime,
+                maxLines = 1,
+                softWrap = false,
+            )
+            EyebrowE(text = EntryDetailSeed.THREE_LENS_STATUS, color = colors.coral, maxLines = 1)
         }
         Row(
             modifier = Modifier.fillMaxWidth(),

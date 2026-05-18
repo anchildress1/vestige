@@ -99,9 +99,10 @@ class SettingsScreenTest {
         var wiped = 0
         screen(onWipe = { wiped++ })
         composeRule.onNodeWithTag("settings_row_delete").performScrollTo().performClick()
-        composeRule.onNodeWithText("This deletes everything.").assertIsDisplayed()
+        // The scoreboard confirm card uppercases the headline.
+        composeRule.onNodeWithText("THIS DELETES EVERYTHING.").assertIsDisplayed()
 
-        val confirm = composeRule.onNodeWithText("Wipe everything. No backup.")
+        val confirm = composeRule.onNodeWithContentDescription("Wipe everything. No backup.")
         confirm.assertIsNotEnabled()
         composeRule.onNodeWithTag(WIPE_FIELD_TAG).performTextInput("DELETE")
         confirm.assertIsEnabled()
@@ -114,8 +115,8 @@ class SettingsScreenTest {
         var wiped = 0
         screen(onWipe = { wiped++ })
         composeRule.onNodeWithTag("settings_row_delete").performScrollTo().performClick()
-        composeRule.onNodeWithText("Cancel").performClick()
+        composeRule.onNodeWithContentDescription("Cancel").performClick()
         assertEquals(0, wiped)
-        composeRule.onAllNodesWithText("This deletes everything.").assertCountEquals(0)
+        composeRule.onAllNodesWithText("THIS DELETES EVERYTHING.").assertCountEquals(0)
     }
 }

@@ -21,12 +21,10 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -55,6 +53,7 @@ import dev.anchildress1.vestige.ui.components.AppTopStatuses
 import dev.anchildress1.vestige.ui.components.BottomTab
 import dev.anchildress1.vestige.ui.components.EyebrowE
 import dev.anchildress1.vestige.ui.components.VestigeBottomNav
+import dev.anchildress1.vestige.ui.components.VestigeConfirmCard
 import dev.anchildress1.vestige.ui.theme.VestigeTheme
 import kotlinx.coroutines.launch
 
@@ -374,36 +373,24 @@ private fun DeleteAllDialog(onConfirm: () -> Unit, onDismiss: () -> Unit) {
     val colors = VestigeTheme.colors
     var typed by remember { mutableStateOf("") }
     val armed = typed == DELETE_TOKEN
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        containerColor = colors.deep,
-        titleContentColor = colors.ink,
-        textContentColor = colors.dim,
-        title = { Text(text = stringResource(id = R.string.settings_wipe_title)) },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Text(text = stringResource(id = R.string.settings_wipe_body))
-                OutlinedTextField(
-                    value = typed,
-                    onValueChange = { typed = it },
-                    singleLine = true,
-                    label = { Text(text = stringResource(id = R.string.settings_wipe_placeholder)) },
-                    modifier = Modifier.testTag(WIPE_FIELD_TAG),
-                )
-            }
-        },
-        confirmButton = {
-            TextButton(onClick = onConfirm, enabled = armed) {
-                Text(
-                    text = stringResource(id = R.string.settings_wipe_confirm),
-                    color = if (armed) colors.coral else colors.dim,
-                )
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text(text = stringResource(id = R.string.settings_cancel), color = colors.dim)
-            }
+    // Same scoreboard confirm card as the model-delete, but this wipe is irreversible so it
+    // keeps the typed-DELETE gate as the card's extra slot.
+    VestigeConfirmCard(
+        title = stringResource(id = R.string.settings_wipe_title),
+        body = stringResource(id = R.string.settings_wipe_body),
+        confirmLabel = stringResource(id = R.string.settings_wipe_confirm),
+        onConfirm = onConfirm,
+        onDismiss = onDismiss,
+        confirmEnabled = armed,
+        cancelLabel = stringResource(id = R.string.settings_cancel),
+        extra = {
+            OutlinedTextField(
+                value = typed,
+                onValueChange = { typed = it },
+                singleLine = true,
+                label = { Text(text = stringResource(id = R.string.settings_wipe_placeholder)) },
+                modifier = Modifier.fillMaxWidth().testTag(WIPE_FIELD_TAG),
+            )
         },
     )
 }

@@ -28,6 +28,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.anchildress1.vestige.ui.components.AppTop
 import dev.anchildress1.vestige.ui.components.AppTopStatuses
 import dev.anchildress1.vestige.ui.components.BottomTab
+import dev.anchildress1.vestige.ui.components.PageSpinnerDiameter
 import dev.anchildress1.vestige.ui.components.VestigeSpinner
 import dev.anchildress1.vestige.ui.theme.VestigeTheme
 
@@ -135,7 +136,7 @@ private fun SubmittingPane(persona: String, modifier: Modifier = Modifier) {
     Column(modifier = modifier.fillMaxSize().background(colors.floor)) {
         AppTop(persona = persona, status = AppTopStatuses.Ready)
         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            VestigeSpinner()
+            VestigeSpinner(diameter = PageSpinnerDiameter)
         }
     }
 }

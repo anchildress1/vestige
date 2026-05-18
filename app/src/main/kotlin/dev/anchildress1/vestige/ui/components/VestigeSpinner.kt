@@ -54,6 +54,9 @@ fun VestigeSpinner(modifier: Modifier = Modifier, diameter: Dp = DEFAULT_DIAMETE
 }
 
 private val DEFAULT_DIAMETER: Dp = 16.dp
+
+/** Size for a spinner that stands alone in the middle of a page (Submitting, model-not-ready). */
+val PageSpinnerDiameter: Dp = 64.dp
 private const val FULL_TURN: Float = 360f
 private const val SWEEP: Float = 270f
 private const val PERIOD_MS: Int = 900

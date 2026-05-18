@@ -16,8 +16,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.AnnotatedString
@@ -28,6 +30,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.anchildress1.vestige.ui.components.AppTop
 import dev.anchildress1.vestige.ui.components.BottomTab
+import dev.anchildress1.vestige.ui.components.PageSpinnerDiameter
 import dev.anchildress1.vestige.ui.components.VestigeBottomNav
 import dev.anchildress1.vestige.ui.components.VestigeSpinner
 import dev.anchildress1.vestige.ui.theme.VestigeTheme
@@ -65,9 +68,9 @@ fun IdleLayout(
             modifier = Modifier.fillMaxWidth().padding(horizontal = 18.dp),
             contentAlignment = Alignment.Center,
         ) {
-            // Model deleted / still warming up / downloading / Wi-Fi-paused: a spinner stands in
-            // for REC (no more diagnostic banner). The AppTop status pill still reflects the
-            // model state for anyone who looks.
+            // Model deleted / still warming up / downloading / Wi-Fi-paused: a spinner + a line
+            // telling the user what they're waiting on stands in for REC (no diagnostic banner).
+            // The AppTop status pill still reflects the model state too.
             if (state.modelReadiness is ModelReadiness.Ready) {
                 RecButton(
                     onClick = onRecTap,
@@ -75,7 +78,7 @@ fun IdleLayout(
                     contentDescription = CaptureCopy.REC_LABEL_IDLE,
                 )
             } else {
-                VestigeSpinner()
+                ModelWaiting(readiness = state.modelReadiness)
             }
         }
         Spacer(modifier = Modifier.height(18.dp))
@@ -143,6 +146,34 @@ private fun heroAnnotated(full: String, highlightSuffix: String, inkColor: Color
             withStyle(SpanStyle(color = inkColor)) { append(full.substring(0, split)) }
         }
         withStyle(SpanStyle(color = accentColor)) { append(highlightSuffix) }
+    }
+}
+
+@Composable
+private fun ModelWaiting(readiness: ModelReadiness) {
+    val colors = VestigeTheme.colors
+    val message = when (readiness) {
+        ModelReadiness.Loading -> CaptureCopy.MODEL_LOADING_LINE
+        ModelReadiness.Paused -> CaptureCopy.MODEL_PAUSED_LINE
+        is ModelReadiness.Downloading -> CaptureCopy.MODEL_DOWNLOADING_LINE_FMT.format(readiness.percent)
+        ModelReadiness.Ready -> ""
+    }
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .semantics(mergeDescendants = true) {
+                liveRegion = LiveRegionMode.Polite
+                contentDescription = message
+            },
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(16.dp),
+    ) {
+        VestigeSpinner(diameter = PageSpinnerDiameter)
+        Text(
+            text = message,
+            style = VestigeTheme.typography.p,
+            color = colors.dim,
+        )
     }
 }
 

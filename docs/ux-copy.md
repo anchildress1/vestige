@@ -164,17 +164,21 @@ If no active patterns (the peek is replaced by a single dim line):
 > `NO ENTRIES YET · FIRST ONE TAKES 30 SECONDS`
 
 If the model isn't ready (deleted / loading / downloading / Wi-Fi-paused — record + typed
-both disabled, ADR-013): _no banner_. A spinner stands in for the REC button; the AppTop
-status pill still carries the state.
+both disabled, ADR-013): a large centered spinner stands in for the REC button, with a line
+under it saying what's pending:
+> Loading: `Loading the model. One moment.`
+> Downloading: `Downloading the model. {N}%.`
+> Paused: `Wi-Fi dropped. Reconnect to finish the model download.`
+
+The AppTop status pill still carries the state too.
 
 Status pill during download: `DOWNLOADING · {N}%`
 Status pill if paused (no Wi-Fi): `DOWNLOAD PAUSED`
 
-> _Final-polish note (2026-05-18):_ the in-content model banner (`Model loading. Hang tight.`
-> / `Reconnect to Wi-Fi to resume.` / `Downloading model · {N}%` and the `MODEL · WARMING` /
-> `MODEL · PAUSED` band labels) no longer fits the redesign and was removed — the REC button
-> is replaced by a spinner while the model is not ready. The diagnostic band is now mic /
-> inference only.
+> _Final-polish note (2026-05-18):_ the old in-content model **banner** (`Model loading.
+> Hang tight.` and the `MODEL · WARMING` / `MODEL · PAUSED` band labels) no longer fit the
+> redesign and were removed. The model-not-ready state is now a big page spinner + the line
+> above; the diagnostic band is mic / inference only.
 
 ### Center — record action
 
@@ -230,7 +234,7 @@ extracting). Top → bottom: AppTop pill + hamburger; `← BACK`; the filed **ti
 `{PERSONA} · FOLLOW-UP` card (lime left-rule); then —
 
 - **Resolved:** `● THREE-LENS READ` + status, the LITERAL / INFERENTIAL / SKEPTICAL columns,
-  and the BEHAVIOR / STATE / VOCABULARY / COMMITMENT / RECURRENCE field grid with tone tags
+  and the BEHAVIOR / STATE / VOCAB / PROMISES / REPEAT field grid with tone tags
   (`CANONICAL` lime · `CONFLICT` coral · `AMBIGUOUS` ember · `CANDIDATE` teal).
 - **Extracting:** `● EXTRACTING · 3 LENSES` with an animated spinner +
   "Convergence resolves in the background. Open the entry later for the full read.", and the

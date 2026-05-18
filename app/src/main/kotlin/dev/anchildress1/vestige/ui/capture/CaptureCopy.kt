@@ -29,6 +29,12 @@ object CaptureCopy {
     const val PATTERNS_PEEK_EYEBROW_FMT: String = "● %d ACTIVE PATTERNS"
     const val PATTERNS_PEEK_SEPARATOR: String = "  ·  "
 
+    // Shown under the model-not-ready spinner (REC button stand-in) — tells the user what
+    // they're waiting on. Sourced from docs/ux-copy.md §"Capture — model not ready".
+    const val MODEL_LOADING_LINE: String = "Loading the model. One moment."
+    const val MODEL_PAUSED_LINE: String = "Wi-Fi dropped. Reconnect to finish the model download."
+    const val MODEL_DOWNLOADING_LINE_FMT: String = "Downloading the model. %d%%."
+
     const val MIC_DENIED_LINE: String = "Mic permission required to record. Settings → Permissions."
     const val MIC_UNAVAILABLE_LINE: String = "Mic unavailable. Try typing."
     const val MIC_BLOCKED_LINE: String = "Mic blocked at the system level."

@@ -68,14 +68,25 @@ class IdleLayoutTest {
     }
 
     @Test
-    fun `REC button is replaced by a spinner when model is not ready`() {
+    fun `REC is replaced by a spinner and a what-you're-waiting-on line when not ready`() {
         composeRule.setContent {
             VestigeTheme {
                 idleLayout(readiness = ModelReadiness.Loading)
             }
         }
-        // No REC button (and no diagnostic banner) — a spinner stands in its place.
+        // No REC button (and no diagnostic banner) — a spinner + status line stand in.
         composeRule.onAllNodesWithContentDescription(CaptureCopy.REC_LABEL_IDLE).assertCountEquals(0)
+        composeRule.onNodeWithText(CaptureCopy.MODEL_LOADING_LINE).assertIsDisplayed()
+    }
+
+    @Test
+    fun `download progress is threaded into the model-waiting line`() {
+        composeRule.setContent {
+            VestigeTheme {
+                idleLayout(readiness = ModelReadiness.Downloading(percent = 42))
+            }
+        }
+        composeRule.onNodeWithText(CaptureCopy.MODEL_DOWNLOADING_LINE_FMT.format(42)).assertIsDisplayed()
     }
 
     @Test

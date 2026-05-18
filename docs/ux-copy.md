@@ -139,9 +139,17 @@ Behavior:
 
 ## Capture Screen
 
+### Hero
+
+> **WHAT HAPPENED?**
+
+Poster headline, same treatment as onboarding headlines but the trailing `HAPPENED?`
+renders in lime (not a coral period-square). Idle shows it full-bright; when the type
+sheet is open the modal scrim dims it. Source of truth for `CaptureCopy.HERO_QUESTION`.
+
 ### Status row (top)
 
-- Local model status indicator: `GEMMA 4 · LOCAL ONLY` (when idle, model loaded) / `GEMMA 4 · LISTENING` (when recording) / `GEMMA 4 · LOADING` (engine warming) / `DOWNLOADING · {N}%` (active download) / `DOWNLOAD PAUSED` (Wi-Fi dropped mid-download) — pill color stays lime in every state except LISTENING; coral is reserved for the REC button heat + destructive flows (see `design-guidelines.md` §"Capture Screen / AppTop status pill"). _(Story 4.4: `GEMMA 4 · LOADING` is the reconciled label — the doc previously named only the idle/recording strings; the pill now reflects all four `ModelReadiness` states and is tappable post-onboarding to open the Model Status screen.)_
+- Local model status indicator: `GEMMA 4 · LOCAL ONLY` (when idle, model loaded) / `GEMMA 4 · LISTENING` (when recording) / `GEMMA 4 · LOADING` (engine warming) / `DOWNLOADING · {N}%` (active download) / `DOWNLOAD PAUSED` (Wi-Fi dropped mid-download) — the pill is lime in every state except LISTENING, which renders coral; coral is otherwise reserved for the REC button heat + destructive flows (see `design-guidelines.md` §"Capture Screen / AppTop status pill"). _(Story 4.4: `GEMMA 4 · LOADING` is the reconciled label — the doc previously named only the idle/recording strings; the pill now reflects all four `ModelReadiness` states and is tappable post-onboarding to open the Model Status screen.)_
 - Persona dropdown label: `WITNESS ▾` (or active persona)
 
 ### Patterns peek (below status)

@@ -179,9 +179,9 @@ class ScoreboardPrimitivesTest {
     }
 
     @Test
-    fun `AppTop recording status pill announces listening live (a11y, pos)`() {
+    fun `AppTop recording status pill announces listening (a11y, pos)`() {
         composeRule.setContent { AppTop(persona = "HARDASS", status = AppTopStatuses.Recording) }
-        composeRule.onNodeWithContentDescription("Gemma 4 local model. Listening live.")
+        composeRule.onNodeWithContentDescription("Gemma 4 local model. Listening.")
             .assertIsDisplayed()
             .assertHasNoClickAction()
     }
@@ -246,7 +246,7 @@ class ScoreboardPrimitivesTest {
     @Test
     fun `AppTop a11y descriptions swap on recording toggle (edge — state-dependent label)`() {
         composeRule.setContent { AppTop(persona = "WITNESS", status = AppTopStatuses.Recording) }
-        composeRule.onNodeWithContentDescription("Gemma 4 local model. Listening live.").assertIsDisplayed()
+        composeRule.onNodeWithContentDescription("Gemma 4 local model. Listening.").assertIsDisplayed()
         composeRule.onAllNodesWithText("GEMMA 4 · LOCAL ONLY").assertCountEquals(0)
     }
 

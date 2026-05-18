@@ -121,11 +121,13 @@ object AppTopStatuses {
             blink = true,
         )
 
+    // Recording is the one sanctioned coral-on-pill state (design-guidelines.md §"AppTop status
+    // pill" addendum + ux-copy.md §Capture). Idle stays lime; coral here = the machine is hot.
     val Recording: AppTopStatus
         @Composable get() = AppTopStatus(
-            text = "GEMMA 4 · LISTENING LIVE",
-            contentDescription = "Gemma 4 local model. Listening live.",
-            color = VestigeTheme.colors.lime,
+            text = "GEMMA 4 · LISTENING",
+            contentDescription = "Gemma 4 local model. Listening.",
+            color = VestigeTheme.colors.coral,
             dot = true,
             blink = true,
         )

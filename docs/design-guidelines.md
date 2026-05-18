@@ -283,7 +283,9 @@ Forbidden across all personas: "thank you for sharing," "how does that make you 
 7. **Footer metadata strip**
    - Small dim text — last entry timestamp + duration + `PATTERNS` link. Strings per `ux-copy.md` §"Footer metadata."
 
-**AppTop status pill (idle + recording).** Both states render lime — `GEMMA 4 · LOCAL ONLY` (idle) and `GEMMA 4 · LISTENING LIVE` (recording). Coral never appears on the pill. Coral is reserved for REC button heat (idle outline → recording fill), REC button halo, destructive fills (`Wipe everything`, `Delete model`), and the `errorRed` token. The "pill stays lime" rule decouples chrome operability ("the system is up") from action heat ("the machine is hot"), which the earlier coral-during-recording pill collapsed and read as alarm.
+**AppTop status pill (idle + recording).** Idle renders lime — `GEMMA 4 · LOCAL ONLY`. Recording renders **coral** — `GEMMA 4 · LISTENING`. Coral is otherwise reserved for REC button heat (idle outline → recording fill), REC button halo, destructive fills (`Wipe everything`, `Delete model`), and the `errorRed` token.
+
+> _Addendum (2026-05-18) — capture final-polish reconciliation._ This section previously read *"Both states render lime — coral never appears on the pill."* That contradicted `ux-copy.md` §Capture ("pill stays lime in every state except LISTENING") and the final capture comp (`poc/capture-recording-final.png`), which shows a coral `LISTENING` pill. The comp + ux-copy win: the recording pill is coral. The coral here reads as "the machine is hot / it is listening" — an intentional, single sanctioned coral-on-pill state, not the scattered coral the old rule guarded against.
 
 **Recording-state changes to the stack:**
 - The AppTop right slot is empty during recording — no persona switcher mid-take, no duplicate timer pill. The persona is fixed for the duration of a recording; switching mid-recording is forbidden. The canonical recording timer is the in-content 96sp display + remaining-seconds countdown, not a chrome pill.

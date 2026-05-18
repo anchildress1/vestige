@@ -36,10 +36,11 @@ import dev.anchildress1.vestige.ui.theme.VestigeTheme
 /**
  * Shared bottom navigation — three tabs, the active one lit lime with a lime top-segment over
  * it. State-driven and reused on every primary screen (Capture / Patterns / History) so the
- * chrome is identical everywhere. The owning navigation layer maps [onSelect] to routes.
+ * chrome is identical everywhere. [active] `null` lights none — used on menu destinations like
+ * Settings that aren't one of the three tabs. The owning nav layer maps [onSelect] to routes.
  */
 @Composable
-fun VestigeBottomNav(active: BottomTab, onSelect: (BottomTab) -> Unit, modifier: Modifier = Modifier) {
+fun VestigeBottomNav(active: BottomTab?, onSelect: (BottomTab) -> Unit, modifier: Modifier = Modifier) {
     val colors = VestigeTheme.colors
     Column(modifier = modifier.fillMaxWidth()) {
         Box(modifier = Modifier.fillMaxWidth().height(ACTIVE_SEGMENT_H)) {
@@ -50,19 +51,21 @@ fun VestigeBottomNav(active: BottomTab, onSelect: (BottomTab) -> Unit, modifier:
                     .align(Alignment.TopCenter)
                     .background(colors.hair),
             )
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth(1f / BottomTab.entries.size)
-                    .height(ACTIVE_SEGMENT_H)
-                    .align(
-                        when (active) {
-                            BottomTab.CAPTURE -> Alignment.TopStart
-                            BottomTab.PATTERNS -> Alignment.TopCenter
-                            BottomTab.HISTORY -> Alignment.TopEnd
-                        },
-                    )
-                    .background(colors.lime),
-            )
+            if (active != null) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth(1f / BottomTab.entries.size)
+                        .height(ACTIVE_SEGMENT_H)
+                        .align(
+                            when (active) {
+                                BottomTab.CAPTURE -> Alignment.TopStart
+                                BottomTab.PATTERNS -> Alignment.TopCenter
+                                BottomTab.HISTORY -> Alignment.TopEnd
+                            },
+                        )
+                        .background(colors.lime),
+                )
+            }
         }
         Row(
             modifier = Modifier

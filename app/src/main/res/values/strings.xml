@@ -138,23 +138,23 @@
     <string name="model_status_delete_confirm">Delete model</string>
 
     <!-- Settings (P0). Copy: ux-copy.md §Settings + §"Destructive Confirmations / Delete all data". -->
-    <string name="settings_eyebrow">SETTINGS</string>
-    <string name="settings_header">Settings.</string>
+    <string name="settings_back_eyebrow">← BACK · SETTINGS</string>
+    <string name="settings_default_tag">DEFAULT</string>
     <string name="settings_section_persona">PERSONA</string>
     <string name="settings_section_data">DATA</string>
     <string name="settings_section_model">MODEL</string>
     <string name="settings_section_about">ABOUT</string>
-    <string name="settings_persona_witness">Witness</string>
-    <string name="settings_persona_hardass">Hardass</string>
-    <string name="settings_persona_editor">Editor</string>
     <string name="settings_export">Export all entries</string>
+    <string name="settings_export_desc">Zip of per-entry markdown</string>
     <!-- SAF picks the destination, so the copy stays location-agnostic per docs/ux-copy.md
          §System Messages. Failure is surfaced honestly — a silently-broken export is the bug. -->
     <string name="settings_export_success">Entries exported.</string>
     <string name="settings_export_failed">Export failed. Nothing was written.</string>
     <string name="settings_delete_all">Delete all data</string>
+    <string name="settings_delete_all_desc">Wipes entries, patterns, tags, and prefs.</string>
     <string name="settings_model_status">Model status</string>
-    <string name="settings_source">Source code</string>
+    <string name="settings_model_status_desc">Gemma 4 E4B · On-device</string>
+    <string name="settings_version_label">Version</string>
     <string name="settings_license">Polyform Shield 1.0.0</string>
     <string name="settings_version">v%1$s</string>
     <string name="settings_cancel">Cancel</string>

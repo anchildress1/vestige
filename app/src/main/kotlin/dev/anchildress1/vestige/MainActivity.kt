@@ -293,6 +293,7 @@ private fun PostOnboardingScreenHost(
             onResetToOnboarding = onResetToOnboarding,
             onOpenModelStatus = { onOpenModelStatusFrom(PostOnboardingScreen.Settings) },
             onExit = { onNavigate(PostOnboardingScreen.Capture) },
+            onNavigateTab = { onNavigate(it.toPostOnboardingScreen()) },
         )
     }
 }
@@ -310,6 +311,7 @@ private fun SettingsRoute(
     onResetToOnboarding: (ResetOnboardingState) -> Unit,
     onOpenModelStatus: () -> Unit,
     onExit: () -> Unit,
+    onNavigateTab: (BottomTab) -> Unit,
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -320,7 +322,11 @@ private fun SettingsRoute(
     }
     SettingsScreen(
         persona = persona,
-        info = SettingsInfo(versionLabel = versionName, sourceUrl = VESTIGE_SOURCE_URL),
+        info = SettingsInfo(
+            versionLabel = versionName,
+            sourceUrl = VESTIGE_SOURCE_URL,
+            defaultPersona = onboardingPrefs.defaultPersona,
+        ),
         actions = SettingsActions(
             onSelectPersona = { picked ->
                 onPersonaChange(picked)
@@ -356,6 +362,7 @@ private fun SettingsRoute(
             },
             onExit = onExit,
         ),
+        onNavSelect = onNavigateTab,
         modifier = Modifier.fillMaxSize(),
     )
 }

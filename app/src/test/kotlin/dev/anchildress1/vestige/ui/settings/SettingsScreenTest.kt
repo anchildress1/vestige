@@ -39,7 +39,11 @@ class SettingsScreenTest {
             VestigeTheme {
                 SettingsScreen(
                     persona = persona,
-                    info = SettingsInfo(versionLabel = "1.0.0", sourceUrl = "https://example.test"),
+                    info = SettingsInfo(
+                        versionLabel = "1.0.0",
+                        sourceUrl = "https://example.test",
+                        defaultPersona = Persona.WITNESS,
+                    ),
                     actions = SettingsActions(
                         onSelectPersona = onSelectPersona,
                         onExportToUri = { true },
@@ -54,24 +58,33 @@ class SettingsScreenTest {
     }
 
     @Test
-    fun `renders the four sections and about details`() {
+    fun `renders the headline, sections and rows`() {
         screen()
-        // The screen is a single verticalScroll column; Robolectric's short window means
-        // lower rows must be scrolled into view before they count as displayed.
-        composeRule.onNodeWithText("Settings.").assertIsDisplayed()
+        composeRule.onNodeWithText("SETTINGS.").assertIsDisplayed()
         composeRule.onNodeWithText("PERSONA").performScrollTo().assertIsDisplayed()
-        composeRule.onNodeWithText("Export all entries").performScrollTo().assertIsDisplayed()
-        composeRule.onNodeWithText("Delete all data").performScrollTo().assertIsDisplayed()
-        composeRule.onNodeWithText("Model status").performScrollTo().assertIsDisplayed()
-        composeRule.onNodeWithText("v1.0.0").performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithText("DATA").performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithText("MODEL").performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithText("ABOUT").performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithTag("settings_row_export").performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithTag("settings_row_delete").performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithTag("settings_row_model").performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithTag("settings_row_version").performScrollTo().assertIsDisplayed()
         composeRule.onNodeWithText("Polyform Shield 1.0.0").performScrollTo().assertIsDisplayed()
+    }
+
+    @Test
+    fun `the default persona carries the DEFAULT tag`() {
+        screen(persona = Persona.HARDASS)
+        // Selection is HARDASS but the default is WITNESS — DEFAULT marks the default, not the
+        // current selection.
+        composeRule.onNodeWithText("DEFAULT").performScrollTo().assertIsDisplayed()
     }
 
     @Test
     fun `tapping a persona reports the selection`() {
         var picked: Persona? = null
         screen(onSelectPersona = { picked = it })
-        composeRule.onNodeWithText("Editor").performClick()
+        composeRule.onNodeWithTag("persona_EDITOR").performScrollTo().performClick()
         assertEquals(Persona.EDITOR, picked)
     }
 
@@ -79,7 +92,7 @@ class SettingsScreenTest {
     fun `model status row navigates`() {
         var opened = false
         screen(onOpenModelStatus = { opened = true })
-        composeRule.onNodeWithText("Model status").performScrollTo().performClick()
+        composeRule.onNodeWithTag("settings_row_model").performScrollTo().performClick()
         assertEquals(true, opened)
     }
 
@@ -87,7 +100,7 @@ class SettingsScreenTest {
     fun `delete-all confirm is armed only after typing DELETE`() {
         var wiped = 0
         screen(onWipe = { wiped++ })
-        composeRule.onNodeWithText("Delete all data").performScrollTo().performClick()
+        composeRule.onNodeWithTag("settings_row_delete").performScrollTo().performClick()
         composeRule.onNodeWithText("This deletes everything.").assertIsDisplayed()
 
         val confirm = composeRule.onNodeWithText("Wipe everything. No backup.")
@@ -102,7 +115,7 @@ class SettingsScreenTest {
     fun `delete-all cancel dismisses without wiping`() {
         var wiped = 0
         screen(onWipe = { wiped++ })
-        composeRule.onNodeWithText("Delete all data").performScrollTo().performClick()
+        composeRule.onNodeWithTag("settings_row_delete").performScrollTo().performClick()
         composeRule.onNodeWithText("Cancel").performClick()
         assertEquals(0, wiped)
         composeRule.onAllNodesWithText("This deletes everything.").assertCountEquals(0)

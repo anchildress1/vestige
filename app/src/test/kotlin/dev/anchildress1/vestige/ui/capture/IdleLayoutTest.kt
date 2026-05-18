@@ -28,20 +28,9 @@ class IdleLayoutTest {
     val composeRule = createComposeRule()
 
     @Test
-    fun `renders date strip headline content`() {
+    fun `renders the empty-state line`() {
         composeRule.setContent { VestigeTheme { idleLayout() } }
-        composeRule.onNodeWithText("NOW · THU MAY 8").assertIsDisplayed()
-        composeRule.onNodeWithText("12", substring = true).assertIsDisplayed()
-        composeRule.onNodeWithText("STREAK").assertIsDisplayed()
-    }
-
-    @Test
-    fun `renders the four stat labels`() {
-        composeRule.setContent { VestigeTheme { idleLayout() } }
-        composeRule.onNodeWithText("KEPT").assertIsDisplayed()
-        composeRule.onNodeWithText("ACTIVE").assertIsDisplayed()
-        composeRule.onNodeWithText("HITS/MO").assertIsDisplayed()
-        composeRule.onNodeWithText("CLOUD").assertIsDisplayed()
+        composeRule.onNodeWithText(CaptureCopy.NO_ENTRIES_YET).assertExists()
     }
 
     @Test
@@ -148,14 +137,6 @@ class IdleLayoutTest {
     ) {
         IdleLayout(
             state = CaptureUiState.Idle(persona = persona, modelReadiness = readiness, error = error),
-            stats = CaptureStats(kept = 31, active = 3, hitsThisMonth = 47, cloud = 0),
-            meta = CaptureMeta(
-                weekdayLabel = "THU",
-                monthDayLabel = "MAY 8",
-                timeLabel = "09:41",
-                dayNumber = 134,
-                streakDays = 12,
-            ),
             onRecTap = onRecTap,
             onTypeTap = onTypeTap,
             chrome = chrome,

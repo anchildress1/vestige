@@ -42,8 +42,6 @@ import dev.anchildress1.vestige.ui.capture.RealVoiceCapture
 import dev.anchildress1.vestige.ui.capture.SaveAndExtract
 import dev.anchildress1.vestige.ui.capture.ToneGeneratorLimitWarningCue
 import dev.anchildress1.vestige.ui.capture.deriveLastEntryFooter
-import dev.anchildress1.vestige.ui.capture.deriveMeta
-import dev.anchildress1.vestige.ui.capture.deriveStats
 import dev.anchildress1.vestige.ui.history.EntryDetailOpenRequest
 import dev.anchildress1.vestige.ui.history.HistoryHost
 import dev.anchildress1.vestige.ui.modelstatus.ModelStatusInfo
@@ -482,13 +480,9 @@ private fun CaptureRoute(
     // `dataRevision` as a remember key forces re-derivation whenever AppContainer increments
     // it (entry write / pattern write / recovery sweep). Cheap — entryStore.countCompleted +
     // patternStore.findVisibleSortedByLastSeen are indexed reads.
-    val stats = remember(container, dataRevision) { deriveStats(container) }
-    val meta = remember(clock, zoneId) { deriveMeta(clock, zoneId) }
     val lastEntryFooter = remember(container, dataRevision) { deriveLastEntryFooter(container, zoneId) }
     CaptureScreen(
         viewModel = viewModel,
-        stats = stats,
-        meta = meta,
         modifier = Modifier.fillMaxSize(),
         chrome = IdleChromeCallbacks(
             onStatusTap = onOpenModelStatus,

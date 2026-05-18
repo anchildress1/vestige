@@ -25,13 +25,7 @@ object CaptureCopy {
     const val LIVE_STOP_PRIMARY: String = "STOP · FILE IT"
     const val LIVE_DISCARD_SECONDARY: String = "DISCARD · DON'T SAVE"
 
-    const val STAT_KEPT: String = "KEPT"
-    const val STAT_ACTIVE: String = "ACTIVE"
-    const val STAT_HITS_MONTH: String = "HITS/MO"
-    const val STAT_CLOUD: String = "CLOUD"
-
-    const val STREAK_LABEL: String = "STREAK"
-    const val DAY_PREFIX: String = "DAY"
+    const val NO_ENTRIES_YET: String = "NO ENTRIES YET · FIRST ONE TAKES 30 SECONDS"
 
     const val MODEL_LOADING_LINE: String = "Model loading. Hang tight."
     const val MODEL_PAUSED_LINE: String = "Reconnect to Wi-Fi to resume."
@@ -64,15 +58,3 @@ object CaptureCopy {
     const val HISTORY_FOOTER_SEPARATOR: String = " · "
     const val HISTORY_FOOTER_PREFIX: String = "Last entry"
 }
-
-/** Demo / on-device summary stats consumed by the date strip + StatRibbon. */
-data class CaptureStats(val kept: Int, val active: Int, val hitsThisMonth: Int, val cloud: Int)
-
-/** Date-strip metadata. `dayNumber` is the install-day counter; `streakDays` is the streak length. */
-data class CaptureMeta(
-    val weekdayLabel: String,
-    val monthDayLabel: String,
-    val timeLabel: String,
-    val dayNumber: Int,
-    val streakDays: Int,
-)

@@ -173,14 +173,6 @@ class CaptureScreenTest {
     private fun captureScreen(vm: CaptureViewModel, chrome: IdleChromeCallbacks = IdleChromeCallbacks()) {
         CaptureScreen(
             viewModel = vm,
-            stats = CaptureStats(kept = 0, active = 0, hitsThisMonth = 0, cloud = 0),
-            meta = CaptureMeta(
-                weekdayLabel = "THU",
-                monthDayLabel = "MAY 14",
-                timeLabel = "09:41",
-                dayNumber = 1,
-                streakDays = 0,
-            ),
             chrome = chrome,
         )
     }

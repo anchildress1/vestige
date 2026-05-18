@@ -68,17 +68,12 @@ private fun Context.isMicPermanentlyBlocked(): Boolean {
  * Route composable for the capture surface. Owns the mic permission launcher and dispatches
  * across [CaptureUiState] variants. Stateless wrt audio I/O — the [viewModel] holds the
  * recording job + foreground-call lifecycle.
- *
- * Stats and meta are caller-supplied so tests + previews can pin them; production wires them
- * from `AppContainer.entryStore.countCompleted()` + similar reads.
  */
 @Composable
 @OptIn(ExperimentalMaterial3Api::class)
 @Suppress("LongMethod") // Route dispatcher — per-state branch + sheet/menu wiring co-located.
 fun CaptureScreen(
     viewModel: CaptureViewModel,
-    stats: CaptureStats,
-    meta: CaptureMeta,
     modifier: Modifier = Modifier,
     chrome: IdleChromeCallbacks = IdleChromeCallbacks(),
 ) {
@@ -107,8 +102,6 @@ fun CaptureScreen(
     when (val current = state) {
         is CaptureUiState.Idle -> IdleLayout(
             state = current,
-            stats = stats,
-            meta = meta,
             onRecTap = onRecTap,
             onTypeTap = { showTypeSheet = true },
             modifier = modifier,

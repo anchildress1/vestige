@@ -42,13 +42,14 @@ fun HistoryScreen(
     viewModel: HistoryViewModel,
     persona: Persona,
     onEntryClick: (Long) -> Unit = {},
+    onMenuTap: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
     val uiState by viewModel.state.collectAsStateWithLifecycle()
     val colors = VestigeTheme.colors
 
     Column(modifier = modifier.fillMaxSize().background(colors.floor)) {
-        AppTop(persona = persona.name, status = AppTopStatuses.Ready)
+        AppTop(persona = persona.name, status = AppTopStatuses.Ready, onMenuTap = onMenuTap)
 
         Row(
             modifier = Modifier

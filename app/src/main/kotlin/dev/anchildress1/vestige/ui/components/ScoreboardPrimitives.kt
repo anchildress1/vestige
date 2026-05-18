@@ -251,6 +251,8 @@ private const val TICK_RAIL_HEIGHT: Float = 0.40f
 /** Minimum touch target per Material accessibility guideline (Android 48dp guidance). */
 private val MinTapTarget: Dp = 48.dp
 
+private val HamburgerGlyphSize = 24.sp
+
 /**
  * App shell top — status pill on the left (lime idle `GEMMA 4 · LOCAL ONLY`, coral recording
  * `GEMMA 4 · LISTENING`), hamburger menu on the right. The menu (persona + settings) lives on
@@ -300,7 +302,16 @@ fun AppTop(
                 alignment = Alignment.CenterEnd,
                 a11yLabel = "Menu. Active persona $persona.",
             ) {
-                Pill(text = "☰", color = VestigeTheme.colors.ink, fill = false)
+                Text(
+                    text = "☰",
+                    style = VestigeTheme.typography.displayBig.copy(
+                        fontSize = HamburgerGlyphSize,
+                        lineHeight = HamburgerGlyphSize,
+                        fontWeight = FontWeight.Bold,
+                    ),
+                    color = VestigeTheme.colors.ink,
+                    modifier = Modifier.padding(horizontal = 6.dp),
+                )
             }
         }
     }

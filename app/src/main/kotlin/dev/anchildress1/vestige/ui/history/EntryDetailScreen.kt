@@ -58,6 +58,7 @@ fun EntryDetailScreen(
     viewModel: EntryDetailViewModel,
     onBack: () -> Unit,
     onNavSelect: (BottomTab) -> Unit = {},
+    onMenuTap: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -67,6 +68,7 @@ fun EntryDetailScreen(
         AppTop(
             persona = (state as? EntryDetailUiState.Loaded)?.model?.personaName ?: "",
             status = AppTopStatuses.Ready,
+            onMenuTap = onMenuTap,
         )
         when (val s = state) {
             EntryDetailUiState.Loading -> Spacer(Modifier.weight(1f))

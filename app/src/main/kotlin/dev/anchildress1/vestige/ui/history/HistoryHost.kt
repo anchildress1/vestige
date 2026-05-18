@@ -13,6 +13,7 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewmodel.compose.viewModel
 import dev.anchildress1.vestige.model.Persona
 import dev.anchildress1.vestige.storage.EntryStore
+import dev.anchildress1.vestige.ui.components.BottomTab
 import kotlinx.coroutines.flow.StateFlow
 import java.time.ZoneId
 
@@ -26,6 +27,8 @@ fun HistoryHost( // NOSONAR kotlin:S107
     dataRevision: StateFlow<Long>,
     openRequest: EntryDetailOpenRequest? = null,
     onOpenRequestConsumed: () -> Unit = {},
+    onNavigateTab: (BottomTab) -> Unit = {},
+    onOpenSettings: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     var openEntryId by rememberSaveable { mutableStateOf<Long?>(null) }
@@ -54,34 +57,62 @@ fun HistoryHost( // NOSONAR kotlin:S107
                     openEntryId = it
                     highlightOnOpen = false
                 },
+                onMenuTap = onOpenSettings,
                 modifier = modifier,
             )
         }
 
-        else -> {
-            BackHandler {
+        else -> HistoryDetailRoute(
+            entryId = openEntryId!!,
+            entryStore = entryStore,
+            zoneId = zoneId,
+            dataRevision = dataRevision,
+            highlightOnOpen = highlightOnOpen,
+            // Clear detail nav before leaving — openEntryId is rememberSaveable, so without
+            // this a later return to History would re-open the stale detail, not the list.
+            onClearDetail = {
                 openEntryId = null
                 highlightOnOpen = false
-            }
-            EntryDetailHost(
-                entryId = openEntryId!!,
-                entryStore = entryStore,
-                zoneId = zoneId,
-                dataRevision = dataRevision,
-                onBack = {
-                    openEntryId = null
-                    highlightOnOpen = false
-                },
-                // Clear detail nav before leaving — openEntryId is rememberSaveable, so without
-                // this a later return to History would re-open the stale detail instead of the list.
-                onNewEntry = {
-                    openEntryId = null
-                    highlightOnOpen = false
-                    onExit()
-                },
-                highlightOnOpen = highlightOnOpen,
-                modifier = modifier,
-            )
-        }
+            },
+            onExit = onExit,
+            onNavigateTab = onNavigateTab,
+            onOpenSettings = onOpenSettings,
+            modifier = modifier,
+        )
     }
+}
+
+@Suppress("LongParameterList") // Route seam: ids + store + zone + nav callbacks + modifier.
+@Composable
+private fun HistoryDetailRoute( // NOSONAR kotlin:S107
+    entryId: Long,
+    entryStore: EntryStore,
+    zoneId: ZoneId,
+    dataRevision: StateFlow<Long>,
+    highlightOnOpen: Boolean,
+    onClearDetail: () -> Unit,
+    onExit: () -> Unit,
+    onNavigateTab: (BottomTab) -> Unit,
+    onOpenSettings: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    BackHandler(onBack = onClearDetail)
+    EntryDetailHost(
+        entryId = entryId,
+        entryStore = entryStore,
+        zoneId = zoneId,
+        dataRevision = dataRevision,
+        onBack = onClearDetail,
+        onNewEntry = {
+            onClearDetail()
+            onExit()
+        },
+        onNavSelect = { tab ->
+            // HISTORY from a detail page = pop back to the list, not a re-entry.
+            if (tab == BottomTab.HISTORY) onClearDetail() else onNavigateTab(tab)
+        },
+        onMenuTap = onOpenSettings,
+        highlightOnOpen = highlightOnOpen,
+        modifier = modifier,
+    )
 }

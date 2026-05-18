@@ -43,6 +43,7 @@ import dev.anchildress1.vestige.ui.capture.SaveAndExtract
 import dev.anchildress1.vestige.ui.capture.ToneGeneratorLimitWarningCue
 import dev.anchildress1.vestige.ui.capture.deriveLastEntryFooter
 import dev.anchildress1.vestige.ui.capture.derivePatternsPeek
+import dev.anchildress1.vestige.ui.components.BottomTab
 import dev.anchildress1.vestige.ui.history.EntryDetailOpenRequest
 import dev.anchildress1.vestige.ui.history.HistoryHost
 import dev.anchildress1.vestige.ui.modelstatus.ModelStatusInfo
@@ -95,6 +96,12 @@ class MainActivity : ComponentActivity() {
 }
 
 internal enum class PostOnboardingScreen { Capture, Patterns, History, ModelStatus, Settings }
+
+private fun BottomTab.toPostOnboardingScreen(): PostOnboardingScreen = when (this) {
+    BottomTab.CAPTURE -> PostOnboardingScreen.Capture
+    BottomTab.PATTERNS -> PostOnboardingScreen.Patterns
+    BottomTab.HISTORY -> PostOnboardingScreen.History
+}
 
 private data class LaunchTargetController(val target: PostOnboardingLaunchTarget, val onConsumed: () -> Unit)
 
@@ -250,6 +257,8 @@ private fun PostOnboardingScreenHost(
             dataRevision = container.dataRevision,
             openRequest = historyOpenRequest,
             onOpenRequestConsumed = onHistoryOpenRequestConsumed,
+            onNavigateTab = { onNavigate(it.toPostOnboardingScreen()) },
+            onOpenSettings = { onNavigate(PostOnboardingScreen.Settings) },
             modifier = Modifier.fillMaxSize(),
         )
 

@@ -8,13 +8,10 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.windowInsetsBottomHeight
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -27,7 +24,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.anchildress1.vestige.ui.components.AppTop
 import dev.anchildress1.vestige.ui.components.AppTopStatuses
+import dev.anchildress1.vestige.ui.components.BottomTab
 import dev.anchildress1.vestige.ui.components.EyebrowE
+import dev.anchildress1.vestige.ui.components.VestigeBottomNav
 import dev.anchildress1.vestige.ui.theme.VestigeTheme
 
 /**
@@ -41,6 +40,7 @@ fun LiveLayout(
     onStopTap: () -> Unit,
     onDiscardTap: () -> Unit,
     onMenuTap: () -> Unit,
+    onNavSelect: (BottomTab) -> Unit,
     modifier: Modifier = Modifier,
     maxDurationMs: Long = CaptureViewModel.MAX_DURATION_MS,
 ) {
@@ -85,7 +85,7 @@ fun LiveLayout(
             DiscardButton(onClick = onDiscardTap)
             StopButton(onClick = onStopTap)
         }
-        Spacer(Modifier.windowInsetsBottomHeight(WindowInsets.navigationBars))
+        VestigeBottomNav(active = BottomTab.CAPTURE, onSelect = onNavSelect)
     }
 }
 

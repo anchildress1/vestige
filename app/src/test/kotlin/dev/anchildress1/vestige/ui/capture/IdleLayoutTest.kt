@@ -114,23 +114,22 @@ class IdleLayoutTest {
     }
 
     @Test
-    fun `patterns link is hidden when no callback is provided (neg)`() {
+    fun `bottom nav patterns tab is always present`() {
         composeRule.setContent { VestigeTheme { idleLayout() } }
-        composeRule.onAllNodesWithText(CaptureCopy.PATTERNS_LINK).assertCountEquals(0)
+        composeRule.onNodeWithText("PATTERNS").assertExists()
     }
 
     @Test
-    fun `patterns link is announced and fires onPatternsTap when wired (pos)`() {
+    fun `bottom nav PATTERNS tab fires onPatternsTap`() {
         var patternsTaps = 0
         composeRule.setContent {
             VestigeTheme {
                 idleLayout(chrome = IdleChromeCallbacks(onPatternsTap = { patternsTaps += 1 }))
             }
         }
-        // assertExists (not assertIsDisplayed) — the link sits past a Spacer(weight=1f) in the
-        // Column, and Robolectric's headless viewport can clip it off-screen even though the
-        // node is composed.
-        composeRule.onNodeWithContentDescription(CaptureCopy.PATTERNS_LINK)
+        // The tab sits past a Spacer(weight=1f); assertExists + semantics-action click avoids
+        // Robolectric's headless-viewport clipping.
+        composeRule.onNodeWithText("PATTERNS")
             .assertExists()
             .assertHasClickAction()
             .performSemanticsAction(SemanticsActions.OnClick)

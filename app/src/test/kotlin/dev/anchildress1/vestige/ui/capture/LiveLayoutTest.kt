@@ -10,6 +10,7 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performSemanticsAction
 import dev.anchildress1.vestige.model.Persona
+import dev.anchildress1.vestige.ui.components.BottomTab
 import dev.anchildress1.vestige.ui.theme.VestigeTheme
 import org.junit.Assert.assertEquals
 import org.junit.Rule
@@ -97,6 +98,7 @@ class LiveLayoutTest {
         onStopTap: () -> Unit = {},
         onDiscardTap: () -> Unit = {},
         onMenuTap: () -> Unit = {},
+        onNavSelect: (BottomTab) -> Unit = {},
     ) {
         LiveLayout(
             state = CaptureUiState.Recording(
@@ -108,6 +110,7 @@ class LiveLayoutTest {
             onStopTap = onStopTap,
             onDiscardTap = onDiscardTap,
             onMenuTap = onMenuTap,
+            onNavSelect = onNavSelect,
         )
     }
 }

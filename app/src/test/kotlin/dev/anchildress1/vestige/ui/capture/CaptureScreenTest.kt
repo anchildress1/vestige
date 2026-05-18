@@ -1,6 +1,7 @@
 package dev.anchildress1.vestige.ui.capture
 
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertHasClickAction
 import androidx.compose.ui.test.assertHeightIsAtLeast
@@ -12,6 +13,7 @@ import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.unit.dp
 import dev.anchildress1.vestige.inference.AudioChunk
 import dev.anchildress1.vestige.inference.ForegroundResult
@@ -26,6 +28,7 @@ import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.setMain
 import org.junit.After
+import org.junit.Assert.assertEquals
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
@@ -97,40 +100,22 @@ class CaptureScreenTest {
         composeRule.onNodeWithText(CaptureCopy.READING_PLACEHOLDER).assertIsDisplayed()
     }
 
-    // --- Capture footer tests ---
+    // --- Bottom nav tests ---
 
     @Test
-    fun `footer is hidden when lastEntryFooter is null`() {
+    fun `bottom nav HISTORY tab fires onHistoryTap`() {
+        var historyTaps = 0
         val vm = newViewModel(readiness = ModelReadiness.Ready)
-        composeRule.setContent { VestigeTheme { captureScreen(vm) } }
-        composeRule.onAllNodesWithText(CaptureCopy.HISTORY_FOOTER_PREFIX).assertCountEquals(0)
-        composeRule.onAllNodesWithTag("history_footer_link").assertCountEquals(0)
-    }
-
-    @Test
-    fun `footer renders prefix date and duration when lastEntryFooter is present`() {
-        val vm = newViewModel(readiness = ModelReadiness.Ready)
-        val footer = LastEntryFooter(monthLabel = "JAN", dayLabel = "27", durationLabel = "4m 02s")
-        composeRule.setContent {
-            VestigeTheme { captureScreen(vm, chrome = IdleChromeCallbacks(lastEntryFooter = footer)) }
-        }
-        // Use count checks: footer is in composition but may be below viewport in test.
-        composeRule.onAllNodesWithText(CaptureCopy.HISTORY_FOOTER_PREFIX, substring = true).assertCountEquals(1)
-        composeRule.onAllNodesWithText("JAN", substring = true).assertCountEquals(1)
-        composeRule.onAllNodesWithText("27", substring = true).assertCountEquals(1)
-        composeRule.onAllNodesWithText("4m 02s", substring = true).assertCountEquals(1)
-    }
-
-    @Test
-    fun `History link is clickable with correct contentDescription`() {
-        val vm = newViewModel(readiness = ModelReadiness.Ready)
-        val footer = LastEntryFooter(monthLabel = "JAN", dayLabel = "27", durationLabel = "4m 02s")
         composeRule.setContent {
             VestigeTheme {
-                captureScreen(vm, chrome = IdleChromeCallbacks(lastEntryFooter = footer, onHistoryTap = {}))
+                captureScreen(vm, chrome = IdleChromeCallbacks(onHistoryTap = { historyTaps += 1 }))
             }
         }
-        composeRule.onNodeWithContentDescription(CaptureCopy.HISTORY_LINK_A11Y).assertHasClickAction()
+        composeRule.onNodeWithText("HISTORY")
+            .assertExists()
+            .assertHasClickAction()
+            .performSemanticsAction(SemanticsActions.OnClick)
+        composeRule.runOnIdle { assertEquals(1, historyTaps) }
     }
 
     // --- Reviewing state tests ---
@@ -182,18 +167,6 @@ class CaptureScreenTest {
         }
         composeRule.onAllNodesWithText("DONE · NEW ENTRY").assertCountEquals(0)
         composeRule.onAllNodesWithText(CaptureCopy.HISTORY_LINK).assertCountEquals(0)
-    }
-
-    @Test
-    fun `History link tap target is at least 48 dp tall`() {
-        val vm = newViewModel(readiness = ModelReadiness.Ready)
-        val footer = LastEntryFooter(monthLabel = "JAN", dayLabel = "27", durationLabel = "4m 02s")
-        composeRule.setContent {
-            VestigeTheme {
-                captureScreen(vm, chrome = IdleChromeCallbacks(lastEntryFooter = footer, onHistoryTap = {}))
-            }
-        }
-        composeRule.onNodeWithTag("history_footer_link").assertHeightIsAtLeast(48.dp)
     }
 
     @Composable

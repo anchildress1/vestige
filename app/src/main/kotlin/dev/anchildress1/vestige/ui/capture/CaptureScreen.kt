@@ -47,6 +47,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.anchildress1.vestige.model.Persona
 import dev.anchildress1.vestige.ui.components.AppTop
 import dev.anchildress1.vestige.ui.components.AppTopStatuses
+import dev.anchildress1.vestige.ui.components.BottomTab
 import dev.anchildress1.vestige.ui.components.EyebrowE
 import dev.anchildress1.vestige.ui.theme.VestigeTheme
 
@@ -73,6 +74,7 @@ private fun Context.isMicPermanentlyBlocked(): Boolean {
  */
 @Composable
 @OptIn(ExperimentalMaterial3Api::class)
+@Suppress("LongMethod") // Route dispatcher — per-state branch + sheet/menu wiring co-located.
 fun CaptureScreen(
     viewModel: CaptureViewModel,
     stats: CaptureStats,
@@ -100,6 +102,7 @@ fun CaptureScreen(
     }
     var showTypeSheet by rememberSaveable { mutableStateOf(false) }
     val onMenuTap = remember(chrome) { chrome.onSettingsTap ?: {} }
+    val onNavSelect: (BottomTab) -> Unit = remember(chrome) { { tab -> captureNavRoute(tab, chrome) } }
 
     when (val current = state) {
         is CaptureUiState.Idle -> IdleLayout(
@@ -117,6 +120,7 @@ fun CaptureScreen(
             onStopTap = viewModel::stopRecording,
             onDiscardTap = viewModel::discard,
             onMenuTap = onMenuTap,
+            onNavSelect = onNavSelect,
             modifier = modifier,
         )
 
@@ -141,6 +145,14 @@ fun CaptureScreen(
                 showTypeSheet = false
             },
         )
+    }
+}
+
+private fun captureNavRoute(tab: BottomTab, chrome: IdleChromeCallbacks) {
+    when (tab) {
+        BottomTab.CAPTURE -> Unit
+        BottomTab.PATTERNS -> chrome.onPatternsTap?.invoke()
+        BottomTab.HISTORY -> chrome.onHistoryTap?.invoke()
     }
 }
 

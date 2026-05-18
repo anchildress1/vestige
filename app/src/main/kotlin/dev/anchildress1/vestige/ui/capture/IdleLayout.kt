@@ -35,9 +35,11 @@ import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.anchildress1.vestige.ui.components.AppTop
+import dev.anchildress1.vestige.ui.components.BottomTab
 import dev.anchildress1.vestige.ui.components.EyebrowE
 import dev.anchildress1.vestige.ui.components.StatItem
 import dev.anchildress1.vestige.ui.components.StatRibbon
+import dev.anchildress1.vestige.ui.components.VestigeBottomNav
 import dev.anchildress1.vestige.ui.theme.VestigeTheme
 
 /**
@@ -94,90 +96,15 @@ fun IdleLayout(
             OrTypeButton(onClick = onTypeTap)
         }
         Spacer(modifier = Modifier.weight(1f))
-        chrome.onPatternsTap?.let { onTap ->
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 18.dp, vertical = 4.dp),
-                contentAlignment = Alignment.Center,
-            ) {
-                PatternsLink(onClick = onTap)
-            }
-        }
-        chrome.onSettingsTap?.let { onTap ->
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 18.dp, vertical = 4.dp),
-                contentAlignment = Alignment.Center,
-            ) {
-                SettingsLink(onClick = onTap)
-            }
-        }
-        if (chrome.lastEntryFooter != null) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 18.dp, vertical = 12.dp),
-                contentAlignment = Alignment.Center,
-            ) {
-                HistoryFooter(
-                    footer = chrome.lastEntryFooter,
-                    onHistoryTap = chrome.onHistoryTap,
-                )
-            }
-        } else {
-            chrome.onHistoryTap?.let { onTap ->
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 18.dp, vertical = 12.dp),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    HistoryLink(onClick = onTap)
+        VestigeBottomNav(
+            active = BottomTab.CAPTURE,
+            onSelect = { tab ->
+                when (tab) {
+                    BottomTab.CAPTURE -> Unit
+                    BottomTab.PATTERNS -> chrome.onPatternsTap?.invoke()
+                    BottomTab.HISTORY -> chrome.onHistoryTap?.invoke()
                 }
-            }
-        }
-        Spacer(Modifier.windowInsetsBottomHeight(WindowInsets.navigationBars))
-    }
-}
-
-@Composable
-private fun PatternsLink(onClick: () -> Unit) {
-    val colors = VestigeTheme.colors
-    Box(
-        modifier = Modifier
-            .clickable(onClick = onClick)
-            .semantics(mergeDescendants = true) {
-                role = Role.Button
-                contentDescription = CaptureCopy.PATTERNS_LINK
-            }
-            .padding(horizontal = 12.dp, vertical = 8.dp),
-    ) {
-        Text(
-            text = CaptureCopy.PATTERNS_LINK,
-            style = VestigeTheme.typography.personaLabel,
-            color = colors.dim,
-        )
-    }
-}
-
-@Composable
-private fun SettingsLink(onClick: () -> Unit) {
-    val colors = VestigeTheme.colors
-    Box(
-        modifier = Modifier
-            .clickable(onClick = onClick)
-            .semantics(mergeDescendants = true) {
-                role = Role.Button
-                contentDescription = CaptureCopy.SETTINGS_LINK
-            }
-            .padding(horizontal = 12.dp, vertical = 8.dp),
-    ) {
-        Text(
-            text = CaptureCopy.SETTINGS_LINK,
-            style = VestigeTheme.typography.personaLabel,
-            color = colors.dim,
+            },
         )
     }
 }
@@ -264,50 +191,6 @@ private fun heroAnnotated(full: String, highlightSuffix: String, inkColor: Color
             withStyle(SpanStyle(color = inkColor)) { append(full.substring(0, split)) }
         }
         withStyle(SpanStyle(color = accentColor)) { append(highlightSuffix) }
-    }
-}
-
-@Composable
-private fun HistoryFooter(footer: LastEntryFooter, onHistoryTap: (() -> Unit)?) {
-    val colors = VestigeTheme.colors
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        // Left group: prefix + stacked date + duration
-        Row(
-            modifier = Modifier.weight(1f),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            EyebrowE(text = CaptureCopy.HISTORY_FOOTER_PREFIX)
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                EyebrowE(text = footer.monthLabel, color = colors.faint)
-                Text(
-                    text = footer.dayLabel,
-                    style = VestigeTheme.typography.eyebrow.copy(fontSize = 16.sp),
-                    color = colors.ink,
-                )
-            }
-            Text(
-                text = footer.durationLabel,
-                style = VestigeTheme.typography.eyebrow,
-                color = colors.dim,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.weight(1f),
-            )
-        }
-        if (onHistoryTap != null) {
-            HistoryLink(onClick = onHistoryTap, testTag = "history_footer_link")
-        } else {
-            Text(
-                text = CaptureCopy.HISTORY_LINK,
-                style = VestigeTheme.typography.personaLabel,
-                color = colors.dim,
-            )
-        }
     }
 }
 

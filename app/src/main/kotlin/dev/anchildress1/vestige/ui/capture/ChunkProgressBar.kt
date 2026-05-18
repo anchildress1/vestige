@@ -19,7 +19,7 @@ import androidx.compose.ui.unit.sp
 import dev.anchildress1.vestige.ui.theme.VestigeTheme
 
 /**
- * Capture chunk progress — 6 dp coral fill with hairline ticks at every [tickIntervalSec], plus
+ * Capture chunk progress — 6 dp lime fill with hairline ticks at every [tickIntervalSec], plus
  * the `0s · 10s · 20s · 30s` label row beneath. Decorative; the live timer above carries the
  * a11y announcement. Caller passes `elapsedMs / maxMs` as [progress] (clamped to `[0, 1]`).
  */
@@ -47,7 +47,7 @@ fun ChunkProgressBar(
         ) {
             drawRect(color = colors.s2, topLeft = Offset.Zero, size = size)
             drawRect(
-                color = colors.coral,
+                color = colors.lime,
                 topLeft = Offset.Zero,
                 size = Size(size.width * clamped, size.height),
             )

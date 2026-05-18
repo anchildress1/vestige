@@ -360,15 +360,18 @@ private fun Project.resolveTelemetryCoordinates(module: Project, configurationNa
         .sorted()
 }
 
+private fun File.invariantPath(): String = path.replace(File.separatorChar, '/')
+
 private fun findMergedReleaseManifests(module: Project): List<File> = module.layout.buildDirectory.asFile.get()
     .resolve("intermediates")
     .takeIf(File::exists)
     ?.walkTopDown()
     ?.filter { file ->
+        val normalizedPath = file.invariantPath()
         file.isFile &&
             file.name == "AndroidManifest.xml" &&
-            file.path.contains("/merged_manifest/") &&
-            file.path.contains("/release/")
+            normalizedPath.contains("/merged_manifest/") &&
+            normalizedPath.contains("/release/")
     }
     ?.toList()
     .orEmpty()
@@ -526,7 +529,7 @@ val verifyNoTelemetry = tasks.register("verifyNoTelemetry") {
                         val matchedHosts = scanApkForHosts(apk, allowedHosts)
                         val relativePath = apk.relativeTo(project.rootDir).path
                         matchedHosts
-                            .filter { it !in allowedHosts }
+                            .filter { it in TelemetryRules.forbiddenHostLiterals }
                             .forEach { host ->
                                 violations += "${module.path} APK contains forbidden host literal $host ($relativePath)"
                             }
@@ -616,6 +619,7 @@ subprojects {
         description = "Resolve this module's runtime coordinates for the root telemetry audit."
         val receiptFile = telemetryCoordinateReceiptFile()
         outputs.file(receiptFile)
+        outputs.upToDateWhen { false }
 
         doLast {
             receiptFile.parentFile.mkdirs()

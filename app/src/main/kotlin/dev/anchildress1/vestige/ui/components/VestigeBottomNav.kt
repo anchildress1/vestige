@@ -22,11 +22,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.scale
+import androidx.compose.ui.graphics.vector.PathParser
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.unit.Dp
@@ -110,51 +111,35 @@ private fun NavItem(tab: BottomTab, selected: Boolean, onClick: () -> Unit, modi
     }
 }
 
+// Lucide geometry, drawn (no icon-font dependency): coords are the verbatim 24-unit viewBox
+// `d` data from lucide.dev (`history`, `chart-no-axes-column-increasing`) scaled into the box
+// at Lucide's 2-unit round stroke. Capture stays a filled record dot.
+private const val LUCIDE_VIEWBOX: Float = 24f
+private const val LUCIDE_STROKE: Float = 2f
+private const val LUCIDE_PATTERNS_PATH: String = "M5 21v-6 M12 21V9 M19 21V3"
+private const val LUCIDE_HISTORY_PATH: String =
+    "M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8 M3 3v5h5 M12 7v5l4 2"
+
 @Composable
 private fun NavIcon(tab: BottomTab, tint: Color) {
     // Decorative — the tab's label + selected semantics carry the announcement.
     val deco = Modifier.clearAndSetSemantics { }
     when (tab) {
         BottomTab.CAPTURE -> Box(modifier = deco.size(DOT).clip(CircleShape).background(tint))
+        BottomTab.PATTERNS -> LucideGlyph(LUCIDE_PATTERNS_PATH, tint, deco)
+        BottomTab.HISTORY -> LucideGlyph(LUCIDE_HISTORY_PATH, tint, deco)
+    }
+}
 
-        BottomTab.PATTERNS -> Row(
-            modifier = deco,
-            horizontalArrangement = Arrangement.spacedBy(BAR_GAP),
-        ) {
-            Box(modifier = Modifier.size(width = BAR_W, height = ICON_BOX).background(tint))
-            Box(modifier = Modifier.size(width = BAR_W, height = ICON_BOX).background(tint))
-        }
-
-        // Drawn, not a glyph — the U+21BA history char isn't in the system font and rendered
-        // blank on device. A near-full circular stroke + a chevron arrowhead reads as "history".
-        BottomTab.HISTORY -> Canvas(modifier = deco.size(ICON_BOX)) {
-            val stroke = size.minDimension * HISTORY_STROKE_FRAC
-            // Inset enough that the round-capped stroke AND the arrowhead stay fully inside the
-            // box — the head used to be anchored at y=inset and drew above the top edge (clipped).
-            val a = size.minDimension * HISTORY_HEAD_FRAC
-            val notch = a * HISTORY_HEAD_NOTCH
-            val inset = stroke + notch
-            drawArc(
-                color = tint,
-                startAngle = HISTORY_ARC_START,
-                sweepAngle = HISTORY_ARC_SWEEP,
-                useCenter = false,
-                topLeft = Offset(inset, inset),
-                size = Size(size.width - inset * 2f, size.height - inset * 2f),
-                style = Stroke(width = stroke, cap = StrokeCap.Round),
-            )
-            // Arrowhead at the arc's open (top) end — tip lowered by `notch` so the upper barb
-            // (tip.y - notch) lands at `inset`, never past the canvas top.
-            val tip = Offset(size.width / 2f, inset + notch)
+@Composable
+private fun LucideGlyph(pathData: String, tint: Color, modifier: Modifier) {
+    Canvas(modifier = modifier.size(ICON_BOX)) {
+        val path = PathParser().parsePathString(pathData).toPath()
+        scale(size.minDimension / LUCIDE_VIEWBOX, pivot = Offset.Zero) {
             drawPath(
-                path = Path().apply {
-                    moveTo(tip.x, tip.y)
-                    lineTo(tip.x - a, tip.y - notch)
-                    moveTo(tip.x, tip.y)
-                    lineTo(tip.x - notch, tip.y + a)
-                },
+                path = path,
                 color = tint,
-                style = Stroke(width = stroke, cap = StrokeCap.Round),
+                style = Stroke(width = LUCIDE_STROKE, cap = StrokeCap.Round, join = StrokeJoin.Round),
             )
         }
     }
@@ -173,10 +158,3 @@ private val MIN_TAP_TARGET: Dp = 56.dp
 private val ACTIVE_SEGMENT_H: Dp = 2.dp
 private val ICON_BOX: Dp = 20.dp
 private val DOT: Dp = 12.dp
-private val BAR_W: Dp = 4.dp
-private val BAR_GAP: Dp = 4.dp
-private const val HISTORY_STROKE_FRAC: Float = 0.12f
-private const val HISTORY_HEAD_FRAC: Float = 0.34f
-private const val HISTORY_HEAD_NOTCH: Float = 0.4f
-private const val HISTORY_ARC_START: Float = 70f
-private const val HISTORY_ARC_SWEEP: Float = 280f

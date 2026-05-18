@@ -76,7 +76,7 @@ class HistoryHostTest {
             )
         }
 
-        // The list row is timestamp-only now — identify the list by its row tag, not entry text.
+        // Identify the list by its row tag — robust to row-content formatting changes.
         composeRule.onNodeWithTag("history_row").assertIsDisplayed()
 
         composeRule.onNodeWithTag("history_row").performClick()

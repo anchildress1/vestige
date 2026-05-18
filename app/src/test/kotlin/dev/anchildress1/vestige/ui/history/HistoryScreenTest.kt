@@ -139,14 +139,15 @@ class HistoryScreenTest {
     }
 
     @Test
-    fun `row shows the entry timestamp, not its content`() {
-        // 1_000_000 ms past epoch, UTC → 12:16 AM · JAN 1. The entry text is never surfaced.
+    fun `row shows timestamp, snippet and record-secs word-count meta`() {
+        // 1_000_000 ms past epoch, UTC → 12:16 AM · JAN 1; seeded duration 0s, 4 words.
         seedCompleted("standup crashed me again", 1_000_000L)
 
         composeRule.setContent { HistoryScreen(viewModel = newViewModel(), persona = Persona.WITNESS) }
         composeRule.onNodeWithText("12:16 AM").assertIsDisplayed()
         composeRule.onNodeWithText("JAN 1").assertIsDisplayed()
-        composeRule.onAllNodesWithText("standup crashed me again", substring = true).assertCountEquals(0)
+        composeRule.onNodeWithText("standup crashed me again", substring = true).assertIsDisplayed()
+        composeRule.onNodeWithText("0 · 4 WORDS").assertIsDisplayed()
     }
 
     // a11y — tap target ≥ 48 dp
@@ -170,13 +171,13 @@ class HistoryScreenTest {
     }
 
     @Test
-    fun `history row contentDescription is the timestamp only`() {
+    fun `history row contentDescription carries timestamp, snippet and meta`() {
         seedCompleted("something happened today", 1_000_000L)
 
         composeRule.setContent { HistoryScreen(viewModel = newViewModel(), persona = Persona.WITNESS) }
-        composeRule.onNodeWithContentDescription("12:16 AM, JAN 1").assertIsDisplayed()
-        composeRule.onNodeWithContentDescription("something happened today", substring = true)
-            .assertDoesNotExist()
+        composeRule.onNodeWithContentDescription(
+            "12:16 AM JAN 1 · something happened today · 0 seconds · 3 words",
+        ).assertIsDisplayed()
     }
 
     // a11y — back navigation is via system BackHandler; no UI back button in this screen

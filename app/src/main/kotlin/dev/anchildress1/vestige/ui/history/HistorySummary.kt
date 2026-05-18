@@ -14,6 +14,7 @@ data class HistorySummary(
     val templateLabel: String?,
     val snippet: String,
     val durationMs: Long,
+    val wordCount: Int,
 ) {
     companion object {
         fun from(entity: EntryEntity, zoneId: ZoneId): HistorySummary = HistorySummary(
@@ -24,6 +25,7 @@ data class HistorySummary(
             templateLabel = entity.templateLabel?.serial,
             snippet = entity.entryText.replace('\n', ' ').replace('\r', ' ').trim().take(SNIPPET_MAX),
             durationMs = entity.durationMs,
+            wordCount = entity.entryText.trim().split("\\s+".toRegex()).count { it.isNotEmpty() },
         )
     }
 }

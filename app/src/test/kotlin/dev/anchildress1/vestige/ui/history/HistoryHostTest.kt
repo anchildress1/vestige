@@ -6,7 +6,6 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
-import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import dev.anchildress1.vestige.model.Persona
 import dev.anchildress1.vestige.model.ResolvedExtraction
@@ -77,7 +76,8 @@ class HistoryHostTest {
             )
         }
 
-        composeRule.onNodeWithText("standup crashed me again", substring = true).assertIsDisplayed()
+        // The list row is timestamp-only now — identify the list by its row tag, not entry text.
+        composeRule.onNodeWithTag("history_row").assertIsDisplayed()
 
         composeRule.onNodeWithTag("history_row").performClick()
         composeRule.waitForIdle()
@@ -87,7 +87,7 @@ class HistoryHostTest {
             composeRule.activity.onBackPressedDispatcher.onBackPressed()
         }
         composeRule.waitForIdle()
-        composeRule.onNodeWithText("standup crashed me again", substring = true).assertIsDisplayed()
+        composeRule.onNodeWithTag("history_row").assertIsDisplayed()
     }
 
     @Test

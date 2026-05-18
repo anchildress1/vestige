@@ -139,11 +139,14 @@ class HistoryScreenTest {
     }
 
     @Test
-    fun `row snippet text is visible`() {
+    fun `row shows the entry timestamp, not its content`() {
+        // 1_000_000 ms past epoch, UTC → 12:16 AM · JAN 1. The entry text is never surfaced.
         seedCompleted("standup crashed me again", 1_000_000L)
 
         composeRule.setContent { HistoryScreen(viewModel = newViewModel(), persona = Persona.WITNESS) }
-        composeRule.onNodeWithText("standup crashed me again", substring = true).assertIsDisplayed()
+        composeRule.onNodeWithText("12:16 AM").assertIsDisplayed()
+        composeRule.onNodeWithText("JAN 1").assertIsDisplayed()
+        composeRule.onAllNodesWithText("standup crashed me again", substring = true).assertCountEquals(0)
     }
 
     // a11y — tap target ≥ 48 dp
@@ -167,11 +170,13 @@ class HistoryScreenTest {
     }
 
     @Test
-    fun `history row has non-empty contentDescription`() {
+    fun `history row contentDescription is the timestamp only`() {
         seedCompleted("something happened today", 1_000_000L)
 
         composeRule.setContent { HistoryScreen(viewModel = newViewModel(), persona = Persona.WITNESS) }
-        composeRule.onNodeWithContentDescription("something happened today", substring = true).assertIsDisplayed()
+        composeRule.onNodeWithContentDescription("12:16 AM, JAN 1").assertIsDisplayed()
+        composeRule.onNodeWithContentDescription("something happened today", substring = true)
+            .assertDoesNotExist()
     }
 
     // a11y — back navigation is via system BackHandler; no UI back button in this screen

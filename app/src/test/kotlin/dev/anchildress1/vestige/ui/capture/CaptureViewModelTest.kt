@@ -565,7 +565,7 @@ class CaptureViewModelTest {
     // 30s cap audio cue (pre-warn at 28s, single fire)
 
     @Test
-    fun `limit warning cue fires once when elapsed crosses 28s (pos)`() = runTest(dispatcher) {
+    fun `limit warning cue fires once when recorded audio crosses 27s (pos)`() = runTest(dispatcher) {
         val voice = FakeVoiceCapture(result = AudioChunk(FloatArray(16), 16_000, isFinal = true))
         val cue = CountingLimitWarningCue()
         val advancing = AdvancingClock()
@@ -575,16 +575,21 @@ class CaptureViewModelTest {
             clockOverride = advancing,
             limitWarningCue = cue,
         )
-        voice.queueLevels(0.1f, 0.2f, 0.3f)
+        voice.queueLevels(0.1f, 0.2f, 0.3f, 0.4f)
 
         vm.startRecording()
+        // First level anchors elapsed at 0; 26.999s of audio is still under the 27s line.
         advancing.offsetMs = 5_000L
         voice.emitNextLevel()
         assertEquals("anchor sample is t=0, no cue", 0, cue.fireCount.get())
 
-        advancing.offsetMs = 33_001L
+        advancing.offsetMs = 31_999L
         voice.emitNextLevel()
-        assertEquals("first cross of the 28s line fires the cue", 1, cue.fireCount.get())
+        assertEquals("26.999s of audio — still under the line", 0, cue.fireCount.get())
+
+        advancing.offsetMs = 32_001L
+        voice.emitNextLevel()
+        assertEquals("crossing 27s of recorded audio fires the cue", 1, cue.fireCount.get())
 
         advancing.offsetMs = 34_500L
         voice.emitNextLevel()
@@ -592,7 +597,7 @@ class CaptureViewModelTest {
     }
 
     @Test
-    fun `limit warning cue does not fire when recording stops before 28s (neg)`() = runTest(dispatcher) {
+    fun `limit warning cue does not fire when recording stops before the 27s line (neg)`() = runTest(dispatcher) {
         val voice = FakeVoiceCapture(result = AudioChunk(FloatArray(16), 16_000, isFinal = true))
         val cue = CountingLimitWarningCue()
         val advancing = AdvancingClock()

@@ -415,7 +415,10 @@ class CaptureViewModel(
     companion object {
         const val MAX_DURATION_MS: Long = 30_000L
         const val LEVEL_WINDOW_SIZE: Int = 42
-        const val LIMIT_WARNING_THRESHOLD_MS: Long = 28_000L
+
+        // Elapsed is real recorded-audio time (anchored to the first sample). The 30s hard cap
+        // is also audio-time, so warn at 27s for a ~3s lead — 28s left only ~2s before the cap.
+        const val LIMIT_WARNING_THRESHOLD_MS: Long = 27_000L
         private const val MIN_TYPED_LENGTH: Int = 3
         private const val TAG = "CaptureVM"
     }

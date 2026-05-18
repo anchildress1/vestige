@@ -139,7 +139,7 @@
 
     <!-- Settings (P0). Copy: ux-copy.md §Settings + §"Destructive Confirmations / Delete all data". -->
     <string name="settings_back_eyebrow">← BACK · SETTINGS</string>
-    <string name="settings_default_tag">DEFAULT</string>
+    <string name="settings_selected_tag">SELECTED</string>
     <string name="settings_section_persona">PERSONA</string>
     <string name="settings_section_data">DATA</string>
     <string name="settings_section_model">MODEL</string>

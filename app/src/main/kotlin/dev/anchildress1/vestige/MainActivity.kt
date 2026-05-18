@@ -320,11 +320,7 @@ private fun SettingsRoute(
     }
     SettingsScreen(
         persona = persona,
-        info = SettingsInfo(
-            versionLabel = versionName,
-            sourceUrl = VESTIGE_SOURCE_URL,
-            defaultPersona = onboardingPrefs.defaultPersona,
-        ),
+        info = SettingsInfo(versionLabel = versionName, sourceUrl = VESTIGE_SOURCE_URL),
         actions = SettingsActions(
             onSelectPersona = { picked ->
                 onPersonaChange(picked)

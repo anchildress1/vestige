@@ -59,7 +59,7 @@ import dev.anchildress1.vestige.ui.theme.VestigeTheme
 import kotlinx.coroutines.launch
 
 /** Static facts for the Settings surface, bundled to keep arity low. */
-data class SettingsInfo(val versionLabel: String, val sourceUrl: String, val defaultPersona: Persona)
+data class SettingsInfo(val versionLabel: String, val sourceUrl: String)
 
 /** Settings actions, grouped so the screen stays a small-arity surface. */
 data class SettingsActions(
@@ -173,17 +173,13 @@ private fun SettingsBody(
             .padding(horizontal = 18.dp, vertical = 16.dp),
         verticalArrangement = Arrangement.spacedBy(20.dp),
     ) {
-        PersonaSection(
-            selected = persona,
-            default = info.defaultPersona,
-            onSelect = actions.onSelectPersona,
-        )
+        PersonaSection(selected = persona, onSelect = actions.onSelectPersona)
         DataSection(onExport = onExport, onDeleteAll = onDeleteAll)
         SettingsSection(stringResource(id = R.string.settings_section_model)) {
             SettingsBoxRow(
                 title = stringResource(id = R.string.settings_model_status),
                 desc = stringResource(id = R.string.settings_model_status_desc),
-                trailing = "▸",
+                trailing = "→",
                 titleColor = colors.ink,
                 testTag = "settings_row_model",
                 onClick = actions.onOpenModelStatus,
@@ -197,8 +193,8 @@ private fun SettingsBody(
                 titleColor = colors.ink,
                 testTag = "settings_row_version",
                 onClick = actions.onOpenSource,
+                desc2 = stringResource(id = R.string.settings_license),
             )
-            EyebrowE(text = stringResource(id = R.string.settings_license))
         }
     }
 }
@@ -221,7 +217,7 @@ private fun SectionHeader(label: String) {
 }
 
 @Composable
-private fun PersonaSection(selected: Persona, default: Persona, onSelect: (Persona) -> Unit) {
+private fun PersonaSection(selected: Persona, onSelect: (Persona) -> Unit) {
     val colors = VestigeTheme.colors
     SettingsSection(stringResource(id = R.string.settings_section_persona)) {
         Column(
@@ -237,7 +233,6 @@ private fun PersonaSection(selected: Persona, default: Persona, onSelect: (Perso
                 PersonaRow(
                     persona = persona,
                     isSelected = persona == selected,
-                    isDefault = persona == default,
                     onSelect = { onSelect(persona) },
                 )
             }
@@ -246,7 +241,7 @@ private fun PersonaSection(selected: Persona, default: Persona, onSelect: (Perso
 }
 
 @Composable
-private fun PersonaRow(persona: Persona, isSelected: Boolean, isDefault: Boolean, onSelect: () -> Unit) {
+private fun PersonaRow(persona: Persona, isSelected: Boolean, onSelect: () -> Unit) {
     val colors = VestigeTheme.colors
     val name = stringResource(id = personaNameRes(persona))
     val desc = stringResource(id = personaDescRes(persona))
@@ -270,9 +265,9 @@ private fun PersonaRow(persona: Persona, isSelected: Boolean, isDefault: Boolean
                     color = if (isSelected) colors.lime else colors.ink,
                     modifier = Modifier.weight(1f),
                 )
-                if (isDefault) {
+                if (isSelected) {
                     EyebrowE(
-                        text = stringResource(id = R.string.settings_default_tag),
+                        text = stringResource(id = R.string.settings_selected_tag),
                         color = colors.lime,
                         maxLines = 1,
                         softWrap = false,
@@ -325,7 +320,7 @@ private fun DataSection(onExport: () -> Unit, onDeleteAll: () -> Unit) {
 }
 
 @Composable
-@Suppress("LongParameterList") // Box-row primitive: title + desc + trailing glyph + color + tag + click.
+@Suppress("LongParameterList") // Box-row primitive: title + desc(+desc2) + glyph + color + tag + click.
 private fun SettingsBoxRow(
     title: String,
     desc: String,
@@ -333,6 +328,7 @@ private fun SettingsBoxRow(
     titleColor: Color,
     testTag: String,
     onClick: () -> Unit,
+    desc2: String? = null,
 ) {
     val colors = VestigeTheme.colors
     Row(
@@ -341,7 +337,9 @@ private fun SettingsBoxRow(
             .clip(VestigeTheme.shapes.m)
             .border(width = 1.dp, color = colors.hair, shape = VestigeTheme.shapes.m)
             .clickable(role = Role.Button, onClick = onClick)
-            .semantics(mergeDescendants = true) { contentDescription = "$title. $desc" }
+            .semantics(mergeDescendants = true) {
+                contentDescription = listOfNotNull(title, desc, desc2).joinToString(". ")
+            }
             .testTag(testTag)
             .padding(horizontal = 16.dp, vertical = 14.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -350,6 +348,9 @@ private fun SettingsBoxRow(
         Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Text(text = title, style = VestigeTheme.typography.title, color = titleColor)
             Text(text = desc, style = VestigeTheme.typography.pCompact, color = colors.dim)
+            if (desc2 != null) {
+                Text(text = desc2, style = VestigeTheme.typography.eyebrow, color = colors.dim)
+            }
         }
         Text(text = trailing, style = VestigeTheme.typography.title, color = titleColor)
     }

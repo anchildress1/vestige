@@ -8,6 +8,7 @@ import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -39,11 +40,7 @@ class SettingsScreenTest {
             VestigeTheme {
                 SettingsScreen(
                     persona = persona,
-                    info = SettingsInfo(
-                        versionLabel = "1.0.0",
-                        sourceUrl = "https://example.test",
-                        defaultPersona = Persona.WITNESS,
-                    ),
+                    info = SettingsInfo(versionLabel = "1.0.0", sourceUrl = "https://example.test"),
                     actions = SettingsActions(
                         onSelectPersona = onSelectPersona,
                         onExportToUri = { true },
@@ -69,15 +66,16 @@ class SettingsScreenTest {
         composeRule.onNodeWithTag("settings_row_delete").performScrollTo().assertIsDisplayed()
         composeRule.onNodeWithTag("settings_row_model").performScrollTo().assertIsDisplayed()
         composeRule.onNodeWithTag("settings_row_version").performScrollTo().assertIsDisplayed()
-        composeRule.onNodeWithText("Polyform Shield 1.0.0").performScrollTo().assertIsDisplayed()
+        // License is folded into the Version box (merged a11y node), under the version line.
+        composeRule.onNodeWithContentDescription("Polyform Shield 1.0.0", substring = true).assertExists()
     }
 
     @Test
-    fun `the default persona carries the DEFAULT tag`() {
+    fun `the selected persona carries the SELECTED tag`() {
         screen(persona = Persona.HARDASS)
-        // Selection is HARDASS but the default is WITNESS — DEFAULT marks the default, not the
-        // current selection.
-        composeRule.onNodeWithText("DEFAULT").performScrollTo().assertIsDisplayed()
+        // The tag marks the currently-selected persona.
+        composeRule.onNodeWithTag("persona_HARDASS").performScrollTo()
+        composeRule.onNodeWithText("SELECTED").assertIsDisplayed()
     }
 
     @Test

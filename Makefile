@@ -1,4 +1,4 @@
-.PHONY: setup install bootstrap-wrapper doctor build assemble reinstall _reinstall_base push-model seed-entries logcat test test-full lint format ktlint-format ktlint-check detekt android-lint secret-scan commitlint verify-no-telemetry verify ci clean
+.PHONY: setup install bootstrap-wrapper doctor build assemble reinstall reinstall-prod _reinstall_base push-model seed-entries logcat test test-full lint format ktlint-format ktlint-check detekt android-lint secret-scan commitlint verify-no-telemetry verify ci clean
 
 GRADLE := ./gradlew
 KTLINT := $(or $(shell command -v ktlint 2>/dev/null), $(HOME)/.local/bin/ktlint)
@@ -65,6 +65,12 @@ DEV_SETUP_STEPS_prod :=
 DEV_SETUP_STEPS := $(DEV_SETUP_STEPS_$(ENV))
 
 reinstall: _reinstall_base $(DEV_SETUP_STEPS) logcat
+
+# Production first-run: uninstall wipes all app data + the downloaded model; nothing is pushed
+# or seeded, so the device walks the real onboarding and performs the 3.66 GB download itself
+# (persona → wiring → download). Make target names can't contain ':' — this is `reinstall:prod`.
+reinstall-prod:
+	@$(MAKE) reinstall ENV=prod
 
 _reinstall_base:
 	@if [ "$(ENV)" != "dev" ] && [ "$(ENV)" != "prod" ]; then \

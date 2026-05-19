@@ -794,6 +794,165 @@ class AppContainerTest {
         }
 
     @Test
+    fun `a failed engine warmup re-arms so the next refresh retries to Ready`(@TempDir tempRoot: File) = runTest {
+        val modelFile = File(tempRoot, "main-model.litertlm").apply { writeText("xx") }
+        val artifactStore = fakeArtifactStore(artifactFile = modelFile, expectedByteSize = 2L)
+        val context = mockk<Context>(relaxed = true) {
+            every { filesDir } returns tempRoot
+            every { cacheDir } returns File(tempRoot, "cache").apply { mkdirs() }
+        }
+        var attempts = 0
+        val engine = mockk<LiteRtLmEngine>(relaxed = true)
+        coEvery { engine.initialize() } coAnswers {
+            if (attempts++ == 0) error("warm boom")
+            0
+        }
+        val container = AppContainer(
+            applicationContext = context,
+            boxStoreFactory = { mockk<BoxStore>(relaxed = true) },
+            markdownStoreFactory = { mockk<MarkdownEntryStore>(relaxed = true) },
+            modelPathLoader = { modelFile.absolutePath },
+            backgroundEngineFactory = { _, _ -> engine },
+            mainModelArtifactStoreFactory = { _, _, _ -> artifactStore },
+            recoveredEntryIdsLoader = { emptyList() },
+            foregroundServiceIntentFactory = { Intent("dev.anchildress1.vestige.TEST_START") },
+            foregroundServiceStarter = {},
+            scope = this,
+        )
+
+        container.refreshModelReadiness()
+        advanceUntilIdle()
+        // initialize() threw — readiness must NOT advance to Ready and must not wedge.
+        assertEquals(ModelReadiness.Loading, container.modelReadinessFlow.value)
+
+        container.refreshModelReadiness()
+        advanceUntilIdle()
+        assertEquals(ModelReadiness.Ready, container.modelReadinessFlow.value)
+        coVerify(exactly = 2) { engine.initialize() }
+    }
+
+    @Test
+    fun `repeated refresh while warming kicks the engine exactly once`(@TempDir tempRoot: File) = runTest {
+        val modelFile = File(tempRoot, "main-model.litertlm").apply { writeText("xx") }
+        val artifactStore = fakeArtifactStore(artifactFile = modelFile, expectedByteSize = 2L)
+        val context = mockk<Context>(relaxed = true) {
+            every { filesDir } returns tempRoot
+            every { cacheDir } returns File(tempRoot, "cache").apply { mkdirs() }
+        }
+        val warmGate = CompletableDeferred<Unit>()
+        val engine = mockk<LiteRtLmEngine>(relaxed = true)
+        coEvery { engine.initialize() } coAnswers {
+            warmGate.await()
+            0
+        }
+        val container = AppContainer(
+            applicationContext = context,
+            boxStoreFactory = { mockk<BoxStore>(relaxed = true) },
+            markdownStoreFactory = { mockk<MarkdownEntryStore>(relaxed = true) },
+            modelPathLoader = { modelFile.absolutePath },
+            backgroundEngineFactory = { _, _ -> engine },
+            mainModelArtifactStoreFactory = { _, _, _ -> artifactStore },
+            recoveredEntryIdsLoader = { emptyList() },
+            foregroundServiceIntentFactory = { Intent("dev.anchildress1.vestige.TEST_START") },
+            foregroundServiceStarter = {},
+            scope = this,
+        )
+
+        repeat(3) { container.refreshModelReadiness() }
+        advanceUntilIdle()
+        assertEquals(ModelReadiness.Loading, container.modelReadinessFlow.value)
+        coVerify(exactly = 1) { engine.initialize() }
+
+        warmGate.complete(Unit)
+        advanceUntilIdle()
+        assertEquals(ModelReadiness.Ready, container.modelReadinessFlow.value)
+        coVerify(exactly = 1) { engine.initialize() }
+    }
+
+    @Test
+    fun `refresh goes straight to Ready when the engine is already initialized`(@TempDir tempRoot: File) = runTest {
+        val modelFile = File(tempRoot, "main-model.litertlm").apply { writeText("xx") }
+        val artifactStore = fakeArtifactStore(artifactFile = modelFile, expectedByteSize = 2L)
+        val context = mockk<Context>(relaxed = true) {
+            every { filesDir } returns tempRoot
+            every { cacheDir } returns File(tempRoot, "cache").apply { mkdirs() }
+        }
+        val engine = mockk<LiteRtLmEngine>(relaxed = true)
+        val container = AppContainer(
+            applicationContext = context,
+            boxStoreFactory = { mockk<BoxStore>(relaxed = true) },
+            markdownStoreFactory = { mockk<MarkdownEntryStore>(relaxed = true) },
+            modelPathLoader = { modelFile.absolutePath },
+            backgroundEngineFactory = { _, _ -> engine },
+            mainModelArtifactStoreFactory = { _, _, _ -> artifactStore },
+            recoveredEntryIdsLoader = { emptyList() },
+            foregroundServiceIntentFactory = { Intent("dev.anchildress1.vestige.TEST_START") },
+            foregroundServiceStarter = {},
+            scope = this,
+        )
+
+        container.ensureBackgroundEngineInitialized()
+        container.refreshModelReadiness()
+        advanceUntilIdle()
+
+        // Engine already warm — no second initialize, no warming hop.
+        assertEquals(ModelReadiness.Ready, container.modelReadinessFlow.value)
+        coVerify(exactly = 1) { engine.initialize() }
+    }
+
+    @Test
+    fun `mainModelOnDiskByteSize reports the live artifact length and 0 once removed`(@TempDir tempRoot: File) =
+        runTest {
+            val modelFile = File(tempRoot, "main-model.litertlm").apply { writeText("abcde") } // 5 bytes
+            val artifactStore = fakeArtifactStore(artifactFile = modelFile, expectedByteSize = 5L)
+            val context = mockk<Context>(relaxed = true) {
+                every { filesDir } returns tempRoot
+                every { cacheDir } returns File(tempRoot, "cache").apply { mkdirs() }
+            }
+            val container = AppContainer(
+                applicationContext = context,
+                boxStoreFactory = { mockk<BoxStore>(relaxed = true) },
+                markdownStoreFactory = { mockk<MarkdownEntryStore>(relaxed = true) },
+                modelPathLoader = { modelFile.absolutePath },
+                backgroundEngineFactory = { _, _ -> mockk<LiteRtLmEngine>(relaxed = true) },
+                mainModelArtifactStoreFactory = { _, _, _ -> artifactStore },
+                recoveredEntryIdsLoader = { emptyList() },
+                foregroundServiceIntentFactory = { Intent("dev.anchildress1.vestige.TEST_START") },
+                foregroundServiceStarter = {},
+                scope = this,
+            )
+
+            assertEquals(5L, container.mainModelOnDiskByteSize)
+            assertTrue(modelFile.delete())
+            assertEquals(0L, container.mainModelOnDiskByteSize)
+        }
+
+    @Test
+    fun `mainModelOnDiskByteSize swallows a store failure and returns 0`(@TempDir tempRoot: File) = runTest {
+        val throwingStore = mockk<ModelArtifactStore> {
+            every { artifactFile } throws IllegalStateException("store boom")
+        }
+        val context = mockk<Context>(relaxed = true) {
+            every { filesDir } returns tempRoot
+            every { cacheDir } returns File(tempRoot, "cache").apply { mkdirs() }
+        }
+        val container = AppContainer(
+            applicationContext = context,
+            boxStoreFactory = { mockk<BoxStore>(relaxed = true) },
+            markdownStoreFactory = { mockk<MarkdownEntryStore>(relaxed = true) },
+            modelPathLoader = { File(tempRoot, "m").absolutePath },
+            backgroundEngineFactory = { _, _ -> mockk<LiteRtLmEngine>(relaxed = true) },
+            mainModelArtifactStoreFactory = { _, _, _ -> throwingStore },
+            recoveredEntryIdsLoader = { emptyList() },
+            foregroundServiceIntentFactory = { Intent("dev.anchildress1.vestige.TEST_START") },
+            foregroundServiceStarter = {},
+            scope = this,
+        )
+
+        assertEquals(0L, container.mainModelOnDiskByteSize)
+    }
+
+    @Test
     fun `refreshModelReadiness leaves a checksum-corrupt full-size artifact Loading`(@TempDir tempRoot: File) =
         runTest {
             val modelFile = File(tempRoot, "main-model.litertlm").apply { writeText("xx") }

@@ -259,6 +259,9 @@ extracting). Top → bottom: AppTop pill + hamburger; `← BACK`; the filed **ti
 - **Unreadable receipt:** a stored lens receipt that exists but cannot be parsed reads
   `unreadable` (coral / CONFLICT tone) instead of `not run` — a corrupt blob must not be
   misrepresented as "the lens never ran".
+- **No receipt payload:** completed debug / seeded entries with no stored lens receipts omit the
+  three-lens read and field grid entirely. The detail page must not invent static `not run` /
+  empty-field data to make the comp look populated.
 
 Then `YOU · TRANSCRIPT` (dim user transcription), `▸ TAGS` chips, and the shared bottom nav
 (HISTORY active). No +NEW-ENTRY action (Capture tab covers it); no stat ribbon; no reading

@@ -75,6 +75,32 @@ class ForegroundStreamScannerTest {
     }
 
     @Test
+    fun `colon-label transcription surfaces when follow-up label arrives`() {
+        val scanner = ForegroundStreamScanner()
+
+        val first = scanner.feed("transcription: they asked again\n")
+        val second = scanner.accept("_follow_up: what did they actually ask?")
+
+        assertTrue(first.none { it is ForegroundStreamEvent.Transcription })
+        val transcription = second.filterIsInstance<ForegroundStreamEvent.Transcription>().single()
+        assertEquals("they asked again", transcription.text)
+    }
+
+    @Test
+    fun `colon-label follow-up streams after label without close tag`() {
+        val scanner = ForegroundStreamScanner()
+
+        val events = scanner.feed(
+            "transcription: they asked again\n_follow_up: what",
+            " did they",
+            " actually ask?",
+        )
+
+        val body = events.filterIsInstance<ForegroundStreamEvent.FollowUpDelta>().joinToString("") { it.text }
+        assertEquals("what did they actually ask?", body)
+    }
+
+    @Test
     fun `a partial close tag is withheld until disambiguated`() {
         val scanner = ForegroundStreamScanner()
 

@@ -179,6 +179,32 @@ class CaptureViewModelTest {
     }
 
     @Test
+    fun `terminal foreground success persists transcription when stream scanner emitted no event`() =
+        runTest(dispatcher) {
+            val audio = AudioChunk(FloatArray(16), 16_000, isFinal = true)
+            val voice = FakeVoiceCapture(result = audio)
+            val save = RecordingSaveAndExtract()
+            val vm = newViewModel(
+                voice = voice,
+                inference = ForegroundInferenceCall { _, _ ->
+                    flowOf(ForegroundStreamEvent.Terminal(successResult("terminal-only words", "what got missed?")))
+                },
+                textInference = ForegroundTextInferenceCall { _, _, _ ->
+                    flowOf(ForegroundStreamEvent.Terminal(successResult("terminal-only words", "what got missed?")))
+                },
+                save = save,
+                initialReadiness = ModelReadiness.Ready,
+            )
+
+            vm.startRecording()
+            voice.completeWithResult()
+            advanceUntilIdle()
+
+            assertEquals("terminal-only words", save.lastText)
+            assertEquals(1, save.invocations.get())
+        }
+
+    @Test
     fun `inference engine failure on call-1 surfaces ENGINE_FAILED`() = runTest(dispatcher) {
         val audio = AudioChunk(FloatArray(16), 16_000, isFinal = true)
         val voice = FakeVoiceCapture(result = audio)

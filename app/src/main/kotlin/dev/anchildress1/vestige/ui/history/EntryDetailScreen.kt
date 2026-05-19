@@ -145,6 +145,8 @@ private fun EntryDetailContent(model: EntryDetailUiModel, onBack: () -> Unit, mo
 
             ExtractionDisplay.FAILED -> ExtractionFailedBand()
 
+            ExtractionDisplay.NO_READ -> Unit
+
             ExtractionDisplay.IN_PROGRESS -> {
                 ExtractingBand()
                 LensSkeletonRow()

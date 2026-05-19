@@ -163,6 +163,16 @@ class EntryDetailScreenTest {
     }
 
     @Test
+    fun `completed entry with no lens receipts hides the three-lens static shell`() {
+        val id = createCompleted("debug fixture without receipts")
+        setDetail(id)
+        composeRule.onAllNodesWithTag("entry_three_lens").assertCountEquals(0)
+        composeRule.onAllNodesWithTag("entry_field_grid").assertCountEquals(0)
+        composeRule.onAllNodesWithTag("entry_extracting").assertCountEquals(0)
+        composeRule.onNodeWithText("debug fixture without receipts").assertExists()
+    }
+
+    @Test
     fun `failed entry shows failure band instead of endless extracting`() {
         val id = entryStore.createPendingEntry("failed extraction", FIXTURE_INSTANT)
         entryStore.failEntry(id, ExtractionStatus.FAILED, "lens-failed")

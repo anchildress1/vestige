@@ -24,6 +24,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.filterIsInstance
 import kotlinx.coroutines.flow.firstOrNull
+import kotlinx.coroutines.flow.mapNotNull
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -329,9 +330,14 @@ class CaptureViewModel(
 
     private suspend fun call1Transcription(audio: AudioChunk, persona: Persona): String? = try {
         foregroundInference(audio, persona)
-            .filterIsInstance<ForegroundStreamEvent.Transcription>()
+            .mapNotNull { event ->
+                when (event) {
+                    is ForegroundStreamEvent.Transcription -> event.text
+                    is ForegroundStreamEvent.Terminal -> (event.result as? ForegroundResult.Success)?.transcription
+                    is ForegroundStreamEvent.FollowUpDelta -> null
+                }
+            }
             .firstOrNull()
-            ?.text
             .orEmpty()
     } catch (timeout: TimeoutCancellationException) {
         Log.w(TAG, "Voice transcription timed out", timeout)

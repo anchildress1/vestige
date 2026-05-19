@@ -9,7 +9,6 @@ object EntryDetailCopy {
     const val WORDS_STAT_LABEL = "WORDS"
 
     const val YOU_LABEL = "YOU · TRANSCRIPT"
-    const val READING_LABEL_SUFFIX = "· READING"
     const val THREE_LENS_EYEBROW = "● THREE-LENS READ"
     const val THREE_LENS_STATUS_CONFLICT = "CANONICAL · WITH CONFLICT"
     const val THREE_LENS_STATUS_CANONICAL = "CANONICAL"

@@ -197,6 +197,60 @@ class ForegroundResponseParserTest {
     }
 
     @Test
+    fun `parses Gemma colon-label envelope when XML tags are absent`() {
+        val raw = """
+            transcription: i'm not very caring, or they're kind of insensitive.
+            but for intps, clarifying data is how they show they care.
+            _follow_up: you said clarifying data is how intps show they care. What was happening?
+        """.trimIndent()
+
+        val success = assertInstanceOf(ForegroundResult.Success::class.java, parse(raw))
+        assertEquals(
+            "i'm not very caring, or they're kind of insensitive.\n" +
+                "but for intps, clarifying data is how they show they care.",
+            success.transcription,
+        )
+        assertEquals(
+            "you said clarifying data is how intps show they care. What was happening?",
+            success.followUp,
+        )
+    }
+
+    @Test
+    fun `colon-label envelope accepts follow_up without leading underscore`() {
+        val raw = """
+            transcription: they asked again
+            follow_up: what did they actually ask?
+        """.trimIndent()
+
+        val success = assertInstanceOf(ForegroundResult.Success::class.java, parse(raw))
+        assertEquals("they asked again", success.transcription)
+        assertEquals("what did they actually ask?", success.followUp)
+    }
+
+    @Test
+    fun `colon-label transcription without follow-up returns MISSING_FOLLOW_UP with recovered text`() {
+        val raw = "transcription: they asked again"
+
+        val failure = assertInstanceOf(ForegroundResult.ParseFailure::class.java, parse(raw))
+        assertEquals(ForegroundResult.ParseReason.MISSING_FOLLOW_UP, failure.reason)
+        assertEquals("they asked again", failure.recoveredTranscription)
+    }
+
+    @Test
+    fun `duplicate colon-label envelope returns AMBIGUOUS_BLOCKS`() {
+        val raw = """
+            transcription: first
+            follow_up: q1
+            transcription: second
+            follow_up: q2
+        """.trimIndent()
+
+        val failure = assertInstanceOf(ForegroundResult.ParseFailure::class.java, parse(raw))
+        assertEquals(ForegroundResult.ParseReason.AMBIGUOUS_BLOCKS, failure.reason)
+    }
+
+    @Test
     fun `unbalanced transcription tag (no closing) returns MISSING_TRANSCRIPTION`() {
         val raw = "<transcription>I started speaking but the close tag is missing.\n<follow_up>nope</follow_up>"
         val failure = assertInstanceOf(ForegroundResult.ParseFailure::class.java, parse(raw))

@@ -352,6 +352,8 @@ class ForegroundInferenceTest {
             { assertTrue(systemPrompt.contains("follow_up tags")) },
             { assertTrue(systemPrompt.contains("Do not output analysis notes")) },
             { assertTrue(systemPrompt.contains("Do not duplicate the transcription text")) },
+            { assertTrue(systemPrompt.contains("today/this time with always/ever/again")) },
+            { assertTrue(systemPrompt.contains("Do not ask the user to decide")) },
             { assertTrue(systemPrompt.contains("Transcribe audible speech even when music")) },
             { assertTrue(systemPrompt.contains("must contain spoken words only")) },
             { assertTrue(systemPrompt.contains("do not substitute labels, summaries")) },
@@ -361,6 +363,27 @@ class ForegroundInferenceTest {
             { assertFalse(systemPrompt.contains("<follow_up>")) },
         )
     }
+
+    @Test
+    fun `hardass prompt forbids action forks and includes today versus ever example`(@TempDir cacheDir: File) =
+        runTest {
+            val captured = slot<String>()
+            val engine = mockk<LiteRtLmEngine> {
+                every { streamMessageContents(capture(captured), any()) } returns flowOf(rawSuccess("a", "b"))
+            }
+
+            ForegroundInference(engine, cacheDir, clock = fixedClock)
+                .runForegroundCall(audio = audioChunk(), persona = Persona.HARDASS)
+                .terminal()
+
+            val systemPrompt = captured.captured
+            assertAll(
+                { assertTrue(systemPrompt.contains("Persona: Hardass")) },
+                { assertTrue(systemPrompt.contains("No \"decide\", \"choose\", \"log this entry\"")) },
+                { assertTrue(systemPrompt.contains("work today and the bigger loop")) },
+                { assertFalse(systemPrompt.contains("decide on the work today or log this entry and stop")) },
+            )
+        }
 
     @Test
     fun `audio handoff goes through Content_AudioFile pointing inside cacheDir`(@TempDir cacheDir: File) = runTest {

@@ -27,34 +27,45 @@ data class EntryDetailUiModel(
     val extraction: ExtractionDisplay = ExtractionDisplay.COMPLETE,
 ) {
     companion object {
-        fun from(entity: EntryEntity, zoneId: ZoneId): EntryDetailUiModel = EntryDetailUiModel(
-            id = entity.id,
-            timeOfDayLabel = HistoryDateFormatter.formatClock12(entity.timestampEpochMs, zoneId),
-            dateLabel = HistoryDateFormatter.formatFullDate(entity.timestampEpochMs, zoneId),
-            filedTimeLabel = HistoryDateFormatter.formatTimeOnly(entity.timestampEpochMs, zoneId),
-            entryNumberLabel = "${EntryDetailCopy.ENTRY_NUMBER_PREFIX}${entity.id}",
-            templateLabel = entity.templateLabel?.serial?.uppercase(),
-            audioLabel = HistoryDurationFormatter.format(entity.durationMs),
-            wordCount = entity.entryText.trim().split("\\s+".toRegex()).count { it.isNotEmpty() },
-            transcription = entity.entryText,
-            followUp = entity.followUpText?.takeIf(String::isNotBlank),
-            personaName = entity.persona.name,
-            energyDescriptor = entity.energyDescriptor,
-            lensStatus = lensStatus(entity.confidenceJson),
-            lenses = buildLensReads(entity.lensReceiptsJson),
-            fields = buildFieldRows(entity),
-            observations = parseObservations(entity.entryObservationsJson),
-            tags = entity.tags.map { it.name }.sorted(),
-            extraction = when (entity.extractionStatus) {
-                ExtractionStatus.COMPLETED -> ExtractionDisplay.COMPLETE
-                ExtractionStatus.FAILED, ExtractionStatus.TIMED_OUT -> ExtractionDisplay.FAILED
-                ExtractionStatus.PENDING, ExtractionStatus.RUNNING -> ExtractionDisplay.IN_PROGRESS
-            },
-        )
+        fun from(entity: EntryEntity, zoneId: ZoneId): EntryDetailUiModel {
+            val lensReceipts = entity.lensReceiptsJson?.trim().orEmpty()
+            val hasLensReceiptPayload = lensReceipts.isNotEmpty() && lensReceipts != "[]"
+            return EntryDetailUiModel(
+                id = entity.id,
+                timeOfDayLabel = HistoryDateFormatter.formatClock12(entity.timestampEpochMs, zoneId),
+                dateLabel = HistoryDateFormatter.formatFullDate(entity.timestampEpochMs, zoneId),
+                filedTimeLabel = HistoryDateFormatter.formatTimeOnly(entity.timestampEpochMs, zoneId),
+                entryNumberLabel = "${EntryDetailCopy.ENTRY_NUMBER_PREFIX}${entity.id}",
+                templateLabel = entity.templateLabel?.serial?.uppercase(),
+                audioLabel = HistoryDurationFormatter.format(entity.durationMs),
+                wordCount = entity.entryText.trim().split("\\s+".toRegex()).count { it.isNotEmpty() },
+                transcription = entity.entryText,
+                followUp = entity.followUpText?.takeIf(String::isNotBlank),
+                personaName = entity.persona.name,
+                energyDescriptor = entity.energyDescriptor,
+                lensStatus = lensStatus(entity.confidenceJson),
+                lenses = buildLensReads(entity.lensReceiptsJson),
+                fields = buildFieldRows(entity),
+                observations = parseObservations(entity.entryObservationsJson),
+                tags = entity.tags.map { it.name }.sorted(),
+                extraction = when (entity.extractionStatus) {
+                    ExtractionStatus.COMPLETED ->
+                        if (hasLensReceiptPayload) {
+                            ExtractionDisplay.COMPLETE
+                        } else {
+                            ExtractionDisplay.NO_READ
+                        }
+
+                    ExtractionStatus.FAILED, ExtractionStatus.TIMED_OUT -> ExtractionDisplay.FAILED
+
+                    ExtractionStatus.PENDING, ExtractionStatus.RUNNING -> ExtractionDisplay.IN_PROGRESS
+                },
+            )
+        }
     }
 }
 
-enum class ExtractionDisplay { IN_PROGRESS, COMPLETE, FAILED }
+enum class ExtractionDisplay { IN_PROGRESS, COMPLETE, FAILED, NO_READ }
 
 enum class LensTone { CANONICAL, CONFLICT, AMBIGUOUS, CANDIDATE }
 

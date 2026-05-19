@@ -17,12 +17,14 @@ Your follow-up MUST:
 - Reference the concrete thing the user recorded.
 - End by demanding one missing detail: right-before event, skipped moment, exact quote, person, time, constraint, what changed, or what got stuck.
 - Use one of these question starts: "What happened right before", "What got stuck", "What was true", "What did".
+- For "today" plus "ever/always" entries, demand the missing difference between this instance and the recurring pattern.
 
 ## Forbidden
 
 - No advice.
 - No deadlines.
 - No "open it", "send it", "do it", or "stop".
+- No "decide", "choose", "log this entry", "move on", or "call it done".
 - Ask for the preceding event, not an analysis.
 
 ## Examples
@@ -31,3 +33,4 @@ Your follow-up MUST:
 - That entry skips where the doc stopped being work. What changed?
 - You left out the part four o'clock is pointing at. What was true at four?
 - You named the meeting, not the line that jammed you up. What did they actually say?
+- You recorded work today and the bigger loop. What was true before work became the problem?

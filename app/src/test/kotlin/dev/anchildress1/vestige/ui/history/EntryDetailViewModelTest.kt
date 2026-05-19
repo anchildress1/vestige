@@ -216,6 +216,32 @@ class EntryDetailViewModelTest {
     }
 
     @Test
+    fun `completed entry with no lens receipts does not expose a faux read`() = runTest {
+        val id = createCompleted("debug fixture without model receipts")
+        val vm = buildVm(id)
+
+        vm.state.test {
+            val loaded = awaitItem() as EntryDetailUiState.Loaded
+            assertEquals(ExtractionDisplay.NO_READ, loaded.model.extraction)
+            assertTrue(loaded.model.lenses.all { it.value == EntryDetailCopy.LENS_MISSING })
+        }
+    }
+
+    @Test
+    fun `completed entry with malformed non-empty lens receipts still exposes unreadable receipt state`() = runTest {
+        val id = createCompleted("corrupt receipt")
+        val box = boxStore.boxFor(EntryEntity::class.java)
+        box.get(id).also { it.lensReceiptsJson = "{not valid json" }.let(box::put)
+        val vm = buildVm(id)
+
+        vm.state.test {
+            val loaded = awaitItem() as EntryDetailUiState.Loaded
+            assertEquals(ExtractionDisplay.COMPLETE, loaded.model.extraction)
+            assertTrue(loaded.model.lenses.all { it.value == EntryDetailCopy.LENS_UNREADABLE })
+        }
+    }
+
+    @Test
     fun `observations skip entries with blank or missing text`() = runTest {
         val id = createCompleted("mixed observations")
         val box = boxStore.boxFor(EntryEntity::class.java)
@@ -271,6 +297,13 @@ class EntryDetailViewModelTest {
                 id,
                 ResolvedExtraction(emptyMap()),
                 TemplateLabel.AFTERMATH,
+                lensReceipts = listOf(
+                    EntryLensReceipt(
+                        lens = Lens.LITERAL,
+                        extracted = true,
+                        fields = mapOf("tags" to listOf("pending-entry")),
+                    ),
+                ),
             )
             dataRevision.value = 1L
 

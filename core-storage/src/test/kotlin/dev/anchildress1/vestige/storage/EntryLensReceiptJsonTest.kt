@@ -52,4 +52,22 @@ class EntryLensReceiptJsonTest {
         assertEquals(emptyList<EntryLensReceipt>(), EntryLensReceiptJson.decodeOrNull("[]"))
         assertEquals(emptyList<EntryLensReceipt>(), EntryLensReceiptJson.decodeOrNull("  "))
     }
+
+    @Test
+    fun `decodeOrNull returns null for schema corrupt receipt rows`() {
+        val corruptRows = listOf(
+            """["not-object"]""",
+            """[{"lens":"NO_SUCH_LENS","extracted":true}]""",
+            """[{"lens":"LITERAL","attempt_count":-1}]""",
+            """[{"lens":"LITERAL","elapsed_ms":-1}]""",
+        )
+
+        corruptRows.forEach { json ->
+            assertNull("must reject corrupt receipt row: $json", EntryLensReceiptJson.decodeOrNull(json))
+            assertTrue(
+                "lenient decode must collapse corrupt receipt row: $json",
+                EntryLensReceiptJson.decode(json).isEmpty(),
+            )
+        }
+    }
 }

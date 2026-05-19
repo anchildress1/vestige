@@ -39,10 +39,9 @@ object EntryLensReceiptJson {
         if (json.isBlank() || json.trim() == "[]") return emptyList()
         return runCatching {
             val array = JSONArray(json)
-            (0 until array.length()).mapNotNull { index ->
-                val obj = array.optJSONObject(index) ?: return@mapNotNull null
-                val lens = runCatching { Lens.valueOf(obj.getString(KEY_LENS)) }.getOrNull()
-                    ?: return@mapNotNull null
+            (0 until array.length()).map { index ->
+                val obj = array.getJSONObject(index)
+                val lens = Lens.valueOf(obj.getString(KEY_LENS))
                 EntryLensReceipt(
                     lens = lens,
                     extracted = obj.optBoolean(KEY_EXTRACTED, false),

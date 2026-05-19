@@ -38,7 +38,7 @@ class PatternAnalysisGenerator(
         } catch (cancellation: CancellationException) {
             throw cancellation
         } catch (@Suppress("TooGenericExceptionCaught") error: Exception) {
-            Log.w(TAG, "pattern analysis threw ${error.javaClass.simpleName}: ${error.message}")
+            Log.w(TAG, "pattern analysis threw ${error.javaClass.simpleName}")
             return@withContext null
         }
         parse(raw)

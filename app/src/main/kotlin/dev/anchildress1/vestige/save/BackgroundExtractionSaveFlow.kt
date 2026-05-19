@@ -227,11 +227,7 @@ class BackgroundExtractionSaveFlow(
             throw cancellation
         } catch (@Suppress("TooGenericExceptionCaught") error: Exception) {
             // Best-effort layer; swallow so a pattern-detection failure doesn't fail the save.
-            Log.w(
-                TAG,
-                "Pattern orchestration failed for entryId=$entryId: " +
-                    "${error.javaClass.simpleName} ${error.message}",
-            )
+            Log.w(TAG, "Pattern orchestration failed for entryId=$entryId: ${error.javaClass.simpleName}")
         }
     }
 
@@ -280,10 +276,7 @@ class BackgroundExtractionSaveFlow(
         } catch (@Suppress("TooGenericExceptionCaught") error: Exception) {
             // Post-save follow-ons must never rewrite a persisted COMPLETED entry into a
             // failure. Log and move on; the next save / cold start can retrigger downstream work.
-            Log.w(
-                TAG,
-                "onEntryFinalized failed for entryId=$entryId: ${error.javaClass.simpleName} ${error.message}",
-            )
+            Log.w(TAG, "onEntryFinalized failed for entryId=$entryId: ${error.javaClass.simpleName}")
         }
     }
 
@@ -293,11 +286,7 @@ class BackgroundExtractionSaveFlow(
         } catch (cancellation: CancellationException) {
             throw cancellation
         } catch (@Suppress("TooGenericExceptionCaught") error: Exception) {
-            Log.w(
-                TAG,
-                "onPatternCalloutAppended failed for entryId=$entryId: " +
-                    "${error.javaClass.simpleName} ${error.message}",
-            )
+            Log.w(TAG, "onPatternCalloutAppended failed for entryId=$entryId: ${error.javaClass.simpleName}")
         }
     }
 
@@ -367,8 +356,7 @@ class BackgroundExtractionSaveFlow(
         } catch (@Suppress("TooGenericExceptionCaught") compensationError: Exception) {
             Log.e(
                 TAG,
-                "Persistence compensation failed for entryId=$entryId " +
-                    "(${compensationError.javaClass.simpleName}: ${compensationError.message})",
+                "Persistence compensation failed for entryId=$entryId (${compensationError.javaClass.simpleName})",
             )
         }
         terminalRelay.emitTerminal(

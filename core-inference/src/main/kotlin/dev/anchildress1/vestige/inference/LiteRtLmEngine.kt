@@ -175,7 +175,9 @@ class LiteRtLmEngine(
                     throw error
                 } finally {
                     runCatching { conversation.close() }
-                        .onFailure { Log.w(TAG, "conversation.close() after streamText failed: ${it.message}") }
+                        .onFailure {
+                            Log.w(TAG, "conversation.close() after streamText failed: ${it.javaClass.simpleName}")
+                        }
                 }
             } finally {
                 releaseEngine()
@@ -224,7 +226,10 @@ class LiteRtLmEngine(
                 } finally {
                     runCatching { conversation.close() }
                         .onFailure {
-                            Log.w(TAG, "conversation.close() after streamMessageContents failed: ${it.message}")
+                            Log.w(
+                                TAG,
+                                "conversation.close() after streamMessageContents failed: ${it.javaClass.simpleName}",
+                            )
                         }
                 }
             } finally {

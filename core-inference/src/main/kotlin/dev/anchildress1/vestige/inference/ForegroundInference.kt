@@ -116,7 +116,7 @@ class ForegroundInference(
         if (temp.delete()) return
         Log.w(TAG, "Initial delete failed for ${temp.absolutePath}; truncating audio payload")
         runCatching { temp.outputStream().use { } }
-            .onFailure { Log.w(TAG, "Truncate failed for ${temp.absolutePath}: ${it.message}") }
+            .onFailure { Log.w(TAG, "Truncate failed for ${temp.absolutePath}: ${it.javaClass.simpleName}") }
         if (temp.delete()) return
         Log.w(TAG, "Retry delete failed for ${temp.absolutePath}; scheduling deleteOnExit")
         temp.deleteOnExit()

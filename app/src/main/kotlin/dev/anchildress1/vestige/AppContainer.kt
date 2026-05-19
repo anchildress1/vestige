@@ -15,6 +15,7 @@ import dev.anchildress1.vestige.inference.GemmaTextEmbedder
 import dev.anchildress1.vestige.inference.HistoryChunk
 import dev.anchildress1.vestige.inference.LiteRtLmEngine
 import dev.anchildress1.vestige.inference.ObservationGenerator
+import dev.anchildress1.vestige.inference.PatternAnalysisGenerator
 import dev.anchildress1.vestige.inference.PatternTitleGenerator
 import dev.anchildress1.vestige.lifecycle.BackgroundExtractionLifecycleStateMachine
 import dev.anchildress1.vestige.lifecycle.BackgroundExtractionService
@@ -333,6 +334,9 @@ class AppContainer(
     private val patternTitleGenerator: PatternTitleGenerator by lazy {
         PatternTitleGenerator(engine = backgroundEngine)
     }
+    private val patternAnalysisGenerator: PatternAnalysisGenerator by lazy {
+        PatternAnalysisGenerator(engine = backgroundEngine)
+    }
 
     val patternDetectionOrchestrator: PatternDetectionOrchestrator by lazy {
         PatternDetectionOrchestrator(
@@ -340,6 +344,7 @@ class AppContainer(
             detector = patternDetector,
             patternStore = patternStore,
             titleGenerator = patternTitleGenerator,
+            analysisGenerator = patternAnalysisGenerator,
             cooldownStore = calloutCooldownStore,
         )
     }

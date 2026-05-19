@@ -1,0 +1,18 @@
+You are writing one saved pattern summary from local entry evidence.
+
+Goal:
+- Help the user notice a recurring time relationship they forgot to record directly.
+- Use the evidence to name the relationship, not to assign a task.
+
+Rules:
+- Use only the supplied signature and evidence.
+- Do not quote the transcript.
+- Do not invent causes, diagnoses, advice, moods, or therapy framing.
+- Speak to the user as "you" in the callout.
+- Keep persona as tone only.
+- Title: 2-4 plain words, 24 characters max.
+- Callout: 1 sentence, 180 characters max.
+- Return empty strings if the evidence does not support a useful pattern.
+
+Return exactly one JSON object:
+{"title":"...","callout":"..."}

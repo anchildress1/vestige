@@ -1,11 +1,15 @@
 package dev.anchildress1.vestige.patterns
 
 import android.util.Log
+import dev.anchildress1.vestige.inference.PatternAnalysisGenerator
+import dev.anchildress1.vestige.inference.PatternAnalysisResult
+import dev.anchildress1.vestige.inference.PatternEvidenceEntry
 import dev.anchildress1.vestige.inference.PatternTitleGenerator
 import dev.anchildress1.vestige.model.DetectedPattern
 import dev.anchildress1.vestige.model.EntryObservation
 import dev.anchildress1.vestige.model.ExtractionStatus
 import dev.anchildress1.vestige.model.ObservationEvidence
+import dev.anchildress1.vestige.model.PatternKind
 import dev.anchildress1.vestige.model.PatternState
 import dev.anchildress1.vestige.model.Persona
 import dev.anchildress1.vestige.storage.CalloutCooldownStore
@@ -42,6 +46,7 @@ class PatternDetectionOrchestrator(
     private val detector: PatternDetector,
     private val patternStore: PatternStore,
     private val titleGenerator: PatternTitleGenerator,
+    private val analysisGenerator: PatternAnalysisGenerator? = null,
     private val cooldownStore: CalloutCooldownStore,
     private val clock: Clock = Clock.systemUTC(),
     private val zoneId: ZoneId = ZoneId.systemDefault(),
@@ -95,16 +100,18 @@ class PatternDetectionOrchestrator(
             return
         }
         val current = promoteSnoozedIfExpired(existing) ?: existing
+        val analysis = analysisGenerator.generatePatternAnalysis(detected, supportingEntries, persona)
         // Wrap the read-modify-write of supportingEntries in a tx so concurrent save calls
         // can't lose-update each other's evidence sets. ObjectBox tx is read-write-isolated.
         boxStore.runInTx {
-            applySupportingAndCallout(current, detected, supportingEntries)
+            applySupportingAndCallout(current, detected, supportingEntries, analysis)
             patternStore.put(current)
         }
     }
 
     private suspend fun insertNewActive(detected: DetectedPattern, supporting: List<EntryEntity>, persona: Persona) {
-        val title = titleGenerator
+        val analysis = analysisGenerator.generatePatternAnalysis(detected, supporting, persona)
+        val title = analysis?.title ?: titleGenerator
             .runCatching { generate(persona, detected) }
             .getOrElse {
                 if (it is CancellationException) throw it
@@ -112,7 +119,7 @@ class PatternDetectionOrchestrator(
                 null
             }
             ?: deterministicFallbackTitle(detected)
-        val callout = PatternCalloutText.build(detected)
+        val callout = analysis?.calloutText ?: PatternCalloutText.build(detected)
         val now = clock.millis()
         val entity = PatternEntity(
             patternId = detected.patternId,
@@ -150,6 +157,7 @@ class PatternDetectionOrchestrator(
         pattern: PatternEntity,
         detected: DetectedPattern,
         supporting: List<EntryEntity>,
+        analysis: PatternAnalysisResult?,
     ) {
         pattern.lastSeenTimestamp = detected.lastSeenTimestamp
         pattern.supportingEntries.clear()
@@ -159,7 +167,8 @@ class PatternDetectionOrchestrator(
         // freeze the callout the user last saw — re-surfacing in v1.5 must show that string,
         // not arbitrary drift from later evidence.
         if (pattern.state == PatternState.ACTIVE) {
-            pattern.latestCalloutText = PatternCalloutText.build(detected)
+            if (analysis != null) pattern.title = analysis.title
+            pattern.latestCalloutText = analysis?.calloutText ?: PatternCalloutText.build(detected)
         }
     }
 
@@ -191,7 +200,8 @@ class PatternDetectionOrchestrator(
         val candidates = patternStore.findActive()
             .filter { PatternMatcher.matches(entry, it, zoneId) }
         return candidates.sortedWith(
-            compareByDescending<PatternEntity> { it.supportingEntries.size }
+            compareByDescending<PatternEntity> { it.kind == PatternKind.TEMPORAL_RELATIVE }
+                .thenByDescending { it.supportingEntries.size }
                 .thenByDescending { it.lastSeenTimestamp },
         ).firstOrNull()
     }
@@ -221,3 +231,26 @@ private fun deterministicFallbackTitle(detected: DetectedPattern): String {
     return source.replaceFirstChar { it.titlecase() }
         .take(PatternDetectionOrchestrator.MAX_TITLE_CHARS)
 }
+
+private suspend fun PatternAnalysisGenerator?.generatePatternAnalysis(
+    detected: DetectedPattern,
+    supporting: List<EntryEntity>,
+    persona: Persona,
+): PatternAnalysisResult? {
+    if (detected.kind != PatternKind.TEMPORAL_RELATIVE) return null
+    return this
+        ?.runCatching { generate(persona, detected, supporting.map { it.toPatternEvidence() }) }
+        ?.getOrElse {
+            if (it is CancellationException) throw it
+            Log.w("VestigePatternOrch", "pattern analysis generator threw ${it.javaClass.simpleName}: ${it.message}")
+            null
+        }
+}
+
+private fun EntryEntity.toPatternEvidence(): PatternEvidenceEntry = PatternEvidenceEntry(
+    id = id,
+    timestampEpochMs = timestampEpochMs,
+    text = entryText,
+    tags = tags.map { it.name },
+    templateLabel = templateLabel?.serial,
+)

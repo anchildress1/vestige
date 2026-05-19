@@ -7,6 +7,7 @@
 
 ---
 
+
 ## Context
 
 Vestige ships in 17 days. Most product-shape decisions are already locked in `concept-locked.md` and `PRD.md`. What is **not** recorded anywhere is the build-infrastructure spine the CLI is about to start hammering on, and a handful of plumbing decisions Phase 1 will collide with the moment a module boundary needs to be drawn.
@@ -318,6 +319,21 @@ Storage row in §"Locked Stack" now records a ships-in-v1 schema with the HNSW v
 
 The 50% gate is cleared on corrected vectors. Phase 4 is unblocked. The tie on Q_invoice is structurally expected — tag recall is already perfect at 3/3 for that cohort; cosine adds nothing on exact-match queries.
 
+### Addendum (2026-05-19) — STT-E harness corrected to production embedding source
+
+The 2026-05-16 result document claimed corrected vectors, but the instrumentation harness still seeded `EntryEntity.vector` from raw `entryText`. That was the old bug wearing a new hat. The harness now seeds vectors from `buildEmbeddingText(entry)` after tags are attached, matching `VectorBackfillWorker`.
+
+`SttEEmbeddingComparisonTest` re-ran on the reference S24 Ultra with the same 18-entry corpus. Result: hybrid won 3/4 queries; tied 1; lost 0. Verdict unchanged, but the evidence now exercises the production embedding source.
+
+| Query | Baseline relevant in top-5 | Hybrid relevant in top-5 | Novel relevant (hybrid-only) | Outcome |
+|---|---|---|---|---|
+| Q_aftermath | 2/6 | 3/6 | A4 | Win |
+| Q_invoice | 3/3 | 3/3 | — | Tie |
+| Q_decision | 1/3 | 3/3 | C2, C3 | Win |
+| Q_lateNight | 1/3 | 3/3 | D2, D3 | Win |
+
+Evidence: `docs/stt-results/stt-e-2026-05-19.md` and `docs/stt-results/stt-e-2026-05-19.raw.log`.
+
 ### Q7. Privacy / network enforcement (the P0 marketing claim has to be code, not vibes)
 
 `PRD.md` §P0 promises zero outbound network calls during normal operation. The model download is the sole network event. Enforcement mechanism beyond a code review:
@@ -480,4 +496,3 @@ The dominant trade-off is **deadline vs. correctness**. Every flag and every mod
 - Post-submission, if v1.5 adds CI → keystore strategy becomes a real ADR of its own.
 
 ---
-

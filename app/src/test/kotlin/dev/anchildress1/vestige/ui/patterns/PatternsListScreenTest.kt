@@ -108,8 +108,9 @@ class PatternsListScreenTest {
         repeat(2) { seedEntry("entry $it", ExtractionStatus.COMPLETED) }
         composeRule.setContent { PatternsListScreen(viewModel = newViewModel(), onOpenPattern = {}) }
         composeRule.onNodeWithText("NOTHING TO READ YET.").assertIsDisplayed()
-        composeRule.onAllNodesWithText("VESTIGES", substring = false).assertCountEquals(1)
-        // VESTIGES appears only as the page headline; the ribbon's "VESTIGES" label is absent.
+        // Ribbon is gated on Loaded — its merged "$n vestiges, $m entries, last $d days"
+        // description must not exist on Empty surfaces.
+        composeRule.onAllNodesWithContentDescription("0 vestiges, 2 entries, last 1 days").assertCountEquals(0)
     }
 
     @Test

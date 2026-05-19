@@ -65,20 +65,19 @@ stateDiagram-v2
 ## 3. ModelReadiness
 
 Exactly **four** runtime states. `Stalled` / `Failed` / `Updating` are display labels on the
-status screen, **not** runtime states. A failed re-download falls back to `Loading`. A
-full-size artifact on disk is **not** `Ready` on its own: `Loading` covers both "no artifact"
-and "artifact present, engine still warming" — readiness only reaches `Ready` once
-`engine.initialize()` completes, so REC/typed never unlock while a cold inference would stall.
+status screen, **not** runtime states. A failed re-download falls back to `Loading`. Readiness
+is artifact-presence based: a full-size artifact on disk is `Ready`; the engine loads lazily
+on the first inference (ADR-012 §Addendum: proactive pre-warm reverted after it regressed into
+a startup GPU-init crash).
 
 ```mermaid
 stateDiagram-v2
     accTitle: ModelReadiness runtime state machine
-    accDescr: Four runtime states. Loading transitions to Downloading when a download starts. A completed download returns to Loading (engine warming), not straight to Ready. Loading reaches Ready only when the engine finishes initialize. Downloading goes to Paused if Wi-Fi drops mid-download. Paused resumes to Downloading. Ready returns to Loading if the artifact is deleted or a re-download fails.
+    accDescr: Four runtime states. Loading transitions to Downloading when a download starts. Downloading goes to Ready when the artifact is verified complete, or Paused if Wi-Fi drops mid-download. Paused resumes to Downloading. Ready returns to Loading if the artifact is deleted or a re-download fails.
 
     [*] --> Loading
     Loading --> Downloading: download starts
-    Loading --> Ready: engine warmed (initialize complete)
-    Downloading --> Loading: artifact complete (engine warming)
+    Downloading --> Ready: verified complete
     Downloading --> Paused: Wi-Fi dropped mid-download
     Paused --> Downloading: Wi-Fi restored / resume
     Ready --> Downloading: user Re-download

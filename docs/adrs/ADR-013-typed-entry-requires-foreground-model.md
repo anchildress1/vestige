@@ -65,24 +65,3 @@ product, not a voice-only embellishment.
 | `AppContainer` | + `runForegroundTextCall`; `saveTypedEntry` removed |
 | `MainActivity` | factory wires `foregroundTextInference` instead of `saveTypedEntry` |
 | `CaptureCopy` / `CaptureUiState` KDoc / `ux-copy.md` | "Typed entries work now." removed; readiness gates both inputs |
-
----
-
-### Addendum (2026-05-18) — `Ready` means engine-warmed, not artifact-present
-
-This ADR gates REC + typed on `ModelReadiness.Ready`. The runtime was resolving
-`Ready` from a **size-only artifact probe** — a full-size file on disk flipped readiness
-to `Ready` immediately, before `engine.initialize()` (up to ~10 s) had run. The "warming
-up" indicator was therefore a sub-frame flash on cold start, and the first inference after
-a cold start absorbed the full warmup latency while the UI claimed Ready.
-
-Refinement (additive — the gate contract is unchanged, its meaning is made honest):
-
-- `AppContainer.refreshModelReadiness` holds readiness at `Loading` while the artifact is
-  complete but `backgroundEngineInitialized == false`, kicks `ensureBackgroundEngineInitialized`
-  off the readiness lock, then flips to `Ready` only after the engine actually loads. A
-  failed warmup re-arms so the next `ON_RESUME` retries instead of wedging at `Loading`.
-- `Loading` now legitimately covers two cases — *no artifact* and *artifact present, engine
-  warming*. Copy ("Loading the model. One moment.") and the gate are unchanged; the
-  `ModelReadiness` state-machine diagram in `state-diagrams.md` is updated to show
-  `Downloading → Loading → Ready` rather than `Downloading → Ready`.

@@ -115,7 +115,13 @@ class CaptureScreenTest {
         }
         vm.startRecording()
         composeRule.waitForIdle()
-        composeRule.runOnIdle { assertEquals(99L, openedEntryId) }
+        composeRule.runOnIdle {
+            assertEquals(99L, openedEntryId)
+            assertEquals(
+                CaptureUiState.Idle(persona = Persona.WITNESS, modelReadiness = ModelReadiness.Ready),
+                vm.state.value,
+            )
+        }
     }
 
     @Composable

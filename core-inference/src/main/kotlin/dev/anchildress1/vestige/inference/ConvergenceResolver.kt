@@ -27,8 +27,11 @@ fun interface ConvergenceResolver {
  * Lens parse failures are honored by the caller — a missing lens is treated as no opinion. With
  * only one surviving lens the entry is under-evidenced; every field (populated or not) resolves
  * to AMBIGUOUS rather than minting candidates from a single witness. With two surviving the
- * threshold collapses to "both must agree."
+ * threshold collapses to "both must agree." Semantic no-op values (`null`, `false`, blank text,
+ * empty lists/maps) do not count as corroborating evidence.
  */
+// One resolver helper per ResolvedField; bound by the schema, not arbitrary surface.
+@Suppress("TooManyFunctions")
 class DefaultConvergenceResolver : ConvergenceResolver {
 
     override fun resolve(extractions: List<LensExtraction>): ResolvedExtraction {
@@ -46,7 +49,8 @@ class DefaultConvergenceResolver : ConvergenceResolver {
     ): ResolvedField {
         val matchingFlags = skepticalFlags.filter { flagBelongsToField(it, key) }
         val populated: List<Pair<Lens, Any>> = Lens.entries.mapNotNull { lens ->
-            byLens[lens]?.fields?.get(key)?.let { lens to it }
+            val raw = byLens[lens]?.fields?.get(key) ?: return@mapNotNull null
+            meaningfulValue(raw)?.let { lens to raw }
         }
         return when {
             key == TAGS_KEY -> resolveTags(byLens, skepticalFlags)
@@ -60,7 +64,7 @@ class DefaultConvergenceResolver : ConvergenceResolver {
             )
 
             populated.isEmpty() ->
-                ResolvedField(value = null, verdict = ConfidenceVerdict.CANONICAL, flags = matchingFlags)
+                ResolvedField(value = null, verdict = ConfidenceVerdict.AMBIGUOUS, flags = matchingFlags)
 
             populated.size == 1 -> ResolvedField(
                 value = populated.single().second,
@@ -116,8 +120,8 @@ class DefaultConvergenceResolver : ConvergenceResolver {
         // count as the same tag.
         return when {
             populated.isEmpty() -> ResolvedField(
-                value = emptyList<String>(),
-                verdict = ConfidenceVerdict.CANONICAL,
+                value = null,
+                verdict = ConfidenceVerdict.AMBIGUOUS,
                 flags = matchingFlags,
             )
 
@@ -194,6 +198,15 @@ class DefaultConvergenceResolver : ConvergenceResolver {
     private fun canonicalize(key: String, value: Any): Any = when (key) {
         ENERGY_DESCRIPTOR_KEY -> (value as? String)?.trim()?.lowercase() ?: value
         STATED_COMMITMENT_KEY -> canonicalizeCommitment(value)
+        else -> value
+    }
+
+    private fun meaningfulValue(value: Any?): Any? = when (value) {
+        null -> null
+        is String -> value.takeIf(String::isNotBlank)
+        is Boolean -> value.takeIf { it }
+        is List<*> -> value.takeIf { values -> values.any { meaningfulValue(it) != null } }
+        is Map<*, *> -> value.takeIf { values -> values.values.any { meaningfulValue(it) != null } }
         else -> value
     }
 

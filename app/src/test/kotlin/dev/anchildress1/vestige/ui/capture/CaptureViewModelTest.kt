@@ -80,10 +80,15 @@ class CaptureViewModelTest {
 
                 voice.completeWithResult()
                 advanceUntilIdle()
-                assertTrue("capture resets to Idle", expectMostRecentItem() is CaptureUiState.Idle)
+                assertTrue(
+                    "capture stays Submitting until the UI consumes the open-entry event",
+                    expectMostRecentItem() is CaptureUiState.Submitting,
+                )
                 cancelAndIgnoreRemainingEvents()
             }
             assertEquals("host is told to open the persisted entry", 42L, awaitItem())
+            vm.onOpenEntryHandled()
+            assertTrue("capture resets only after the navigation handoff lands", vm.state.value is CaptureUiState.Idle)
             cancelAndIgnoreRemainingEvents()
         }
         assertEquals(1, save.invocations.get())
@@ -247,6 +252,11 @@ class CaptureViewModelTest {
         advanceUntilIdle()
 
         assertEquals("entry still saved", 1, save.invocations.get())
+        assertTrue(
+            "capture stays Submitting until the UI consumes the open-entry event",
+            vm.state.value is CaptureUiState.Submitting,
+        )
+        vm.onOpenEntryHandled()
         assertTrue("capture is a clean Idle, not an error", vm.state.value is CaptureUiState.Idle)
         assertNull("no error band — the entry is safe", (vm.state.value as CaptureUiState.Idle).error)
         assertNull("no follow-up attached on a failed call-2", attach.lastFollowUp)
@@ -488,6 +498,8 @@ class CaptureViewModelTest {
             vm.submitTyped("just got off the call again")
             advanceUntilIdle()
             assertEquals(5L, awaitItem())
+            assertTrue(vm.state.value is CaptureUiState.Submitting)
+            vm.onOpenEntryHandled()
             cancelAndIgnoreRemainingEvents()
         }
         assertEquals(1, save.invocations.get())

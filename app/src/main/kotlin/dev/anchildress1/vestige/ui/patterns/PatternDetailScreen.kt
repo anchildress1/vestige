@@ -3,10 +3,13 @@
 
 package dev.anchildress1.vestige.ui.patterns
 
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -26,6 +29,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.Role
@@ -143,6 +147,8 @@ private fun LoadedBody(
 
         PatternSourcesCard(sources = loaded.sources, onOpenEntry = onOpenEntry)
 
+        PatternVocabularyCard(words = loaded.vocabulary)
+
         loaded.terminalLabel?.let { terminal ->
             val text = terminal.days
                 ?.let { stringResource(terminal.prefixRes, terminal.dateLabel, it) }
@@ -163,6 +169,40 @@ private fun LoadedBody(
         if (loaded.availableActions.isNotEmpty() && loaded.state != PatternState.CLOSED) {
             ActionRow(availableActions = loaded.availableActions, actions = actions)
         }
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun PatternVocabularyCard(words: List<String>) {
+    if (words.isEmpty()) return
+    VestigeSurface(contentPadding = PaddingValues(16.dp)) {
+        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Text(
+                text = stringResource(R.string.pattern_detail_words_used),
+                style = MaterialTheme.typography.labelSmall,
+                color = VestigeTheme.colors.dim,
+            )
+            FlowRow(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                words.forEach { word -> VocabularyChip(word) }
+            }
+        }
+    }
+}
+
+@Composable
+private fun VocabularyChip(word: String) {
+    Box(
+        modifier = Modifier
+            .border(width = 1.dp, color = VestigeTheme.colors.faint, shape = RectangleShape)
+            .semantics { contentDescription = "word used: $word" }
+            .padding(horizontal = 10.dp, vertical = 4.dp),
+    ) {
+        Text(text = word, style = VestigeTheme.typography.eyebrow, color = VestigeTheme.colors.ink)
     }
 }
 

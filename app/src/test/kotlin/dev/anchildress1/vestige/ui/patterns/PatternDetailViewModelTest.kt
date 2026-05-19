@@ -10,6 +10,7 @@ import dev.anchildress1.vestige.storage.MarkdownEntryStore
 import dev.anchildress1.vestige.storage.PatternEntity
 import dev.anchildress1.vestige.storage.PatternRepo
 import dev.anchildress1.vestige.storage.PatternStore
+import dev.anchildress1.vestige.storage.TagEntity
 import dev.anchildress1.vestige.testing.cleanupObjectBoxTempRoot
 import dev.anchildress1.vestige.testing.newInMemoryObjectBoxDirectory
 import dev.anchildress1.vestige.testing.newModuleTempRoot
@@ -103,6 +104,36 @@ class PatternDetailViewModelTest {
                 setOf(PatternAction.DROP, PatternAction.SKIP),
                 loaded.availableActions,
             )
+        }
+    }
+
+    @Test
+    fun `Loaded surfaces vocabulary from supporting entries embedding source`() = runTest(testDispatcher) {
+        val entries = listOf(
+            seedEntry(
+                text = "raw transcript words should not leak",
+                timestampEpochMs = 100L,
+                tagNames = listOf("crashed", "standup"),
+                observationsJson = OBSERVATION_SLEPT_THROUGH_DINNER,
+            ),
+            seedEntry(
+                text = "another raw transcript should not leak",
+                timestampEpochMs = 200L,
+                tagNames = listOf("wired", "standup"),
+                observationsJson = OBSERVATION_REPLAYED_MEETING,
+            ),
+        )
+        seedActivePattern("p-vocab", lastSeenMs = 500L, supporting = entries)
+
+        val vm = newViewModel("p-vocab")
+
+        vm.state.test {
+            val loaded = expectMostRecentItem() as PatternDetailUiState.Loaded
+            assertEquals(
+                listOf("crashed", "standup", "slept", "through", "dinner", "wired", "replayed", "meeting"),
+                loaded.vocabulary,
+            )
+            assertFalse(loaded.vocabulary.contains("transcript"))
         }
     }
 
@@ -340,6 +371,34 @@ class PatternDetailViewModelTest {
         return rows
     }
 
+    private fun seedEntry(
+        text: String,
+        timestampEpochMs: Long,
+        tagNames: List<String> = emptyList(),
+        observationsJson: String = "[]",
+    ): EntryEntity {
+        val entity = EntryEntity(
+            entryText = text,
+            timestampEpochMs = timestampEpochMs,
+            markdownFilename = "$timestampEpochMs--entry.md",
+            extractionStatus = ExtractionStatus.COMPLETED,
+            entryObservationsJson = observationsJson,
+        )
+        val entryBox = boxStore.boxFor(EntryEntity::class.java)
+        val tagBox = boxStore.boxFor(TagEntity::class.java)
+        entryBox.put(entity)
+        if (tagNames.isNotEmpty()) {
+            entity.tags.addAll(
+                tagNames.map { name ->
+                    tagBox.all.firstOrNull { it.name == name }
+                        ?: TagEntity(name = name, entryCount = 1).also(tagBox::put)
+                },
+            )
+            entryBox.put(entity)
+        }
+        return entity
+    }
+
     private fun seedActivePattern(patternId: String, lastSeenMs: Long, supporting: List<EntryEntity>) {
         val entity = PatternEntity(
             patternId = patternId,
@@ -358,5 +417,12 @@ class PatternDetailViewModelTest {
             ?: error("pattern not persisted: $patternId")
         saved.supportingEntries.addAll(supporting)
         boxStore.boxFor(PatternEntity::class.java).put(saved)
+    }
+
+    private companion object {
+        const val OBSERVATION_SLEPT_THROUGH_DINNER =
+            """[{"text":"slept through dinner","evidence":"theme-noticing","fields":["energy_descriptor"]}]"""
+        const val OBSERVATION_REPLAYED_MEETING =
+            """[{"text":"replayed meeting","evidence":"theme-noticing","fields":["recurrence_link"]}]"""
     }
 }

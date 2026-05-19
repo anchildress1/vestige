@@ -71,6 +71,7 @@ sealed interface PatternDetailUiState {
         val totalEntryCount: Long,
         val lastSeenLabel: String,
         val sources: List<PatternSourceUi>,
+        val vocabulary: List<String>,
         val traceHits: Set<Int>,
         val state: PatternState,
         val isTerminal: Boolean,

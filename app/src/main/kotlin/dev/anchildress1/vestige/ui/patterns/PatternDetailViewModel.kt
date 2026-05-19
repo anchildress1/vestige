@@ -9,6 +9,7 @@ import dev.anchildress1.vestige.storage.EntryStore
 import dev.anchildress1.vestige.storage.PatternEntity
 import dev.anchildress1.vestige.storage.PatternRepo
 import dev.anchildress1.vestige.storage.PatternStore
+import dev.anchildress1.vestige.storage.buildEmbeddingText
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
@@ -22,6 +23,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.time.Clock
+import java.util.Locale
 
 /**
  * Drives the Pattern detail screen. Loads the pattern + its supporting entries on construction;
@@ -146,8 +148,9 @@ class PatternDetailViewModel(
         val sources = supporting
             .sortedByDescending { it.timestampEpochMs }
             .map { it.toSourceRow() }
+        val vocabulary = vocabularyFrom(supporting)
         val traceHits = traceBarHitsFromEntries(supporting, clock.millis())
-        pattern.toLoaded(totalEntries, sources, traceHits)
+        pattern.toLoaded(totalEntries, sources, vocabulary, traceHits)
     }
 
     private fun EntryEntity.toSourceRow() = PatternSourceUi(
@@ -159,6 +162,7 @@ class PatternDetailViewModel(
     private fun PatternEntity.toLoaded(
         totalEntries: Long,
         sources: List<PatternSourceUi>,
+        vocabulary: List<String>,
         traceHits: Set<Int>,
     ): PatternDetailUiState.Loaded = PatternDetailUiState.Loaded(
         patternId = patternId,
@@ -168,6 +172,7 @@ class PatternDetailViewModel(
         totalEntryCount = totalEntries,
         lastSeenLabel = formatShortDate(lastSeenTimestamp),
         sources = sources,
+        vocabulary = vocabulary,
         traceHits = traceHits,
         state = state,
         isTerminal = isTerminalState(state),
@@ -175,7 +180,33 @@ class PatternDetailViewModel(
         availableActions = availableActionsFor(state),
     )
 
+    private fun vocabularyFrom(entries: List<EntryEntity>): List<String> {
+        val words = entries.asSequence()
+            .map(::buildEmbeddingText)
+            .flatMap { WORD_SPLIT.splitToSequence(it.lowercase(Locale.ROOT)) }
+            .map(String::trim)
+            .filter { it.length >= MIN_VOCAB_LENGTH && it !in STOP_WORDS }
+        return words
+            .filter(String::isNotBlank)
+            .distinct()
+            .take(VOCABULARY_LIMIT)
+            .toList()
+    }
+
     private companion object {
         const val TAG = "PatternDetailVM"
+        const val VOCABULARY_LIMIT = 8
+        const val MIN_VOCAB_LENGTH = 4
+        val WORD_SPLIT: Regex = Regex("[^a-z0-9]+")
+        val STOP_WORDS = setOf(
+            "after",
+            "again",
+            "that",
+            "this",
+            "with",
+            "until",
+            "same",
+            "entry",
+        )
     }
 }

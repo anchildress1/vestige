@@ -248,7 +248,7 @@ Checked bullets above are the historical record that the Mist tokens shipped to 
 - [x] Dropped patterns surface `Dropped {date}.` Closed patterns (v1.5) surface `Closed {date}. No new entries matched in {N} days.` and hide the action row entirely. (`terminalLabelFor`; detail action row gated `state != CLOSED`; banner carries status-band a11y. CLOSED unreachable in v1 — covered by seeded tests for v1.5 readiness.)
 - [ ] Pattern Detail renders actual source rows: `EyebrowE` `{MMM D · HH:MM}` + one-line snippet (first ~60 chars of `entry_text`, ellipsized) + a trailing affordance. Tap target: whole row.
 - [ ] Pattern Detail source-row tap opens Entry Detail for the matched `entryId`. Predictive-back returns to Pattern Detail.
-- [ ] Vocabulary chips below the observation ship only when backed by stored vocabulary/embedding data. STT-E passed (2026-05-12), so the UI slot is eligible, but no screenshot seed vocabulary may render.
+- [x] Vocabulary chips below the observation ship only when backed by stored vocabulary/embedding data. (`PatternDetailViewModel.vocabularyFrom` tokenizes `buildEmbeddingText(entry)` across supporting rows; empty distilled embedding text omits the card, so screenshot seed vocabulary never renders.)
 
 **Notes / risks:** `Roast me` button visibility is gated on Story 4.14 shipping. If 4.14 doesn't ship in v1, hide the button rather than showing a button that does nothing. (Per `AGENTS.md` and the scope rule, don't ship dead UI.)
 

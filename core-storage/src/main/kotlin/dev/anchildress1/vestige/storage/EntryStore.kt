@@ -344,11 +344,6 @@ private fun observationsJson(observations: List<EntryObservation>): String {
     return array.toString()
 }
 
-// Cap on the malformed-payload preview included in `Log.w` lines so logcat doesn't get
-// flooded by a single corrupt row. 80 chars is enough to identify the shape (object vs
-// array, leading keys) without paying for the long tail.
-private const val LOG_PREVIEW_CHARS = 80
-
 // Used by `appendObservation` only — distinguishes legit empty from malformed-and-fell-back.
 // Throws so the malformed-existing case can't silently overwrite real persisted observations.
 private fun parseObservationsForAppend(json: String, entryId: Long): List<EntryObservation> {
@@ -372,7 +367,7 @@ internal fun decodeObservations(json: String): List<EntryObservation> {
     // empty so the rewrite path can still make progress.
     return when (array) {
         null -> {
-            android.util.Log.w("VestigeEntryStore", "malformed entryObservationsJson: ${raw.take(LOG_PREVIEW_CHARS)}")
+            android.util.Log.w("VestigeEntryStore", "malformed entryObservationsJson (len=${raw.length})")
             emptyList()
         }
 

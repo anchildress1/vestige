@@ -22,8 +22,7 @@ object PatternCalloutText {
         if (signature == null && detected.signatureJson.isNotBlank()) {
             android.util.Log.w(
                 "VestigeCalloutText",
-                "malformed signatureJson for ${detected.kind.serial}: " +
-                    detected.signatureJson.take(LOG_PREVIEW_CHARS),
+                "malformed signatureJson for ${detected.kind.serial} (len=${detected.signatureJson.length})",
             )
         }
         return when (detected.kind) {
@@ -81,6 +80,4 @@ object PatternCalloutText {
         if (isEmpty()) return ""
         return split('-').joinToString(" ") { it.replaceFirstChar { ch -> ch.titlecase(Locale.ROOT) } }
     }
-
-    private const val LOG_PREVIEW_CHARS = 80
 }

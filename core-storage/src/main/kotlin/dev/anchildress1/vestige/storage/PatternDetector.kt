@@ -193,8 +193,6 @@ class PatternDetector(
 }
 
 // Top-level helper — kept off the class to satisfy the function-count budget.
-private const val LOG_PREVIEW_CHARS = 80
-
 private fun parseCommitmentTopic(json: String?): String? {
     val text = json?.takeIf { it.isNotBlank() } ?: return null
     val obj = runCatching { JSONObject(text) }.getOrNull()
@@ -205,7 +203,7 @@ private fun parseCommitmentTopic(json: String?): String? {
         null -> {
             android.util.Log.w(
                 "VestigePatternDetector",
-                "malformed statedCommitmentJson: ${text.take(LOG_PREVIEW_CHARS)}",
+                "malformed statedCommitmentJson (len=${text.length})",
             )
             null
         }

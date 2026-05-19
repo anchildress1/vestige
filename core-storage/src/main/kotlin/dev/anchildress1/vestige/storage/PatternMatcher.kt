@@ -22,8 +22,7 @@ object PatternMatcher {
         if (signature == null) {
             android.util.Log.w(
                 "VestigePatternMatcher",
-                "malformed signatureJson for patternId=${pattern.patternId}: " +
-                    pattern.signatureJson.take(LOG_PREVIEW_CHARS),
+                "malformed signatureJson for patternId=${pattern.patternId} (len=${pattern.signatureJson.length})",
             )
             return false
         }
@@ -78,7 +77,7 @@ object PatternMatcher {
         if (raw != null && commitment == null) {
             android.util.Log.w(
                 "VestigePatternMatcher",
-                "malformed statedCommitmentJson on entry id=${entry.id}: ${raw.take(LOG_PREVIEW_CHARS)}",
+                "malformed statedCommitmentJson on entry id=${entry.id} (len=${raw.length})",
             )
         }
         val topic = commitment?.optString("topic_or_person")?.trim()?.let(TagNormalize::kebab)
@@ -117,6 +116,5 @@ object PatternMatcher {
     }
 
     private val VOCAB_SPLIT: Regex = Regex("[^a-z0-9]+")
-    private const val LOG_PREVIEW_CHARS = 80
     private const val TAG_PAIR_SIZE = 2
 }

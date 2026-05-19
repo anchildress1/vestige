@@ -34,6 +34,7 @@ class ModelStatusScreenTest {
 
     private fun screen(
         readiness: ModelReadiness = ModelReadiness.Ready,
+        onDiskLabel: String = "3.66 GB",
         onReDownload: () -> Unit = {},
         onDelete: () -> Unit = {},
         onExit: () -> Unit = {},
@@ -44,6 +45,7 @@ class ModelStatusScreenTest {
                     info = ModelStatusInfo(
                         readiness = readiness,
                         sizeLabel = "3.66 GB",
+                        onDiskLabel = onDiskLabel,
                         versionName = "1.0.0",
                     ),
                     onReDownload = onReDownload,
@@ -69,6 +71,18 @@ class ModelStatusScreenTest {
         composeRule.onNodeWithContentDescription(
             "Allowlist: model artifact host only.",
         ).assertExists()
+    }
+
+    @Test
+    fun `on-disk stat shows the artifact size, and drops to 0 once deleted`() {
+        screen(onDiskLabel = "3.66 GB")
+        composeRule.onNodeWithContentDescription("3.66 GB on disk, 0 cloud calls").assertExists()
+    }
+
+    @Test
+    fun `on-disk stat reads 0 when the model is gone`() {
+        screen(readiness = ModelReadiness.Loading, onDiskLabel = "0")
+        composeRule.onNodeWithContentDescription("0 on disk, 0 cloud calls").assertExists()
     }
 
     @Test

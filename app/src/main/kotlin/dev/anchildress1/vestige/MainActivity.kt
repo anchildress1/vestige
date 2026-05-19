@@ -383,10 +383,15 @@ private fun ModelStatusRoute(container: AppContainer, onExit: () -> Unit, onNavi
             context.packageManager.getPackageInfo(context.packageName, 0).versionName
         }.getOrNull().orEmpty()
     }
+    // Re-read on every readiness change so a delete/redownload reflects in the "ON DISK" stat.
+    val onDiskLabel = remember(modelReadiness) {
+        container.mainModelOnDiskByteSize.let { if (it <= 0L) "0" else gigabyteLabel(it) }
+    }
     ModelStatusScreen(
         info = ModelStatusInfo(
             readiness = modelReadiness,
             sizeLabel = gigabyteLabel(container.mainModelExpectedByteSize),
+            onDiskLabel = onDiskLabel,
             versionName = versionName,
         ),
         onReDownload = container::redownloadMainModel,

@@ -99,7 +99,7 @@ fun ModelStatusScreen(
                 val stackLive = info.readiness is ModelReadiness.Ready
                 val stackAccent = if (stackLive) colors.lime else colors.coral
                 StatusBand(info)
-                ModelStatRibbon(sizeLabel = info.sizeLabel)
+                ModelStatRibbon(onDiskLabel = info.onDiskLabel)
                 EyebrowE(text = stringResource(id = R.string.model_status_stack_eyebrow), color = stackAccent)
                 StackRow(
                     name = stringResource(id = R.string.model_status_stack_main_name),
@@ -218,15 +218,15 @@ private fun readinessLine(readiness: ModelReadiness): String = when (readiness) 
 }
 
 @Composable
-private fun ModelStatRibbon(sizeLabel: String) {
+private fun ModelStatRibbon(onDiskLabel: String) {
     Box(
         modifier = Modifier.semantics(mergeDescendants = true) {
-            contentDescription = "$sizeLabel on disk, 0 cloud calls"
+            contentDescription = "$onDiskLabel on disk, 0 cloud calls"
         },
     ) {
         StatRibbon(
             items = listOf(
-                StatItem(value = sizeLabel, label = "ON DISK"),
+                StatItem(value = onDiskLabel, label = "ON DISK"),
                 StatItem(value = "0", label = "CLOUD CALLS", color = VestigeTheme.colors.coral),
             ),
         )

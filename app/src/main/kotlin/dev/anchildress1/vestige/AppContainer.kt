@@ -525,6 +525,12 @@ class AppContainer(
     /** Expected on-disk size of the Gemma artifact — drives the Model Status detail line. */
     val mainModelExpectedByteSize: Long get() = mainModelManifest.expectedByteSize
 
+    /** Actual bytes of the on-disk artifact; `0` once it's deleted. Drives the "ON DISK" stat. */
+    val mainModelOnDiskByteSize: Long
+        get() = runCatching {
+            mainModelArtifactStore.artifactFile.let { if (it.exists()) it.length() else 0L }
+        }.getOrDefault(0L)
+
     /**
      * Delete the on-disk Gemma artifact (and any resumable `.part`), then re-probe readiness.
      * Entries are untouched — only the model file goes; the app falls back to `Loading` until a

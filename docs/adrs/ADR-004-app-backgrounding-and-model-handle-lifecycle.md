@@ -228,3 +228,11 @@ Cross-doc sources of truth updated alongside this addendum:
 
 ---
 
+### Addendum (2026-05-19) — Notification deep-link deferred to v2
+
+The `Reading the entry.` notification *content* and lifecycle keep-alive (§"Notification Contract", §"Fallback Trigger") remain authoritative for v1. The **tap-target deep-link** — opening Entry Detail for the most-recent-in-flight entry on system-shade tap — is **deferred to v2** on this branch. Reason: the Phase-4 scope review concluded the deep-link added integration surface (notification PendingIntent + Activity routing + predictive-back coordination) that wasn't load-bearing for the 90s pitch or 5min walkthrough. The notification still surfaces; tapping it brings the app to foreground without a specific entry route.
+
+**What does not change:** the keep-alive window, the §"Fallback Trigger" criteria, the §"Trigger recorded" requirement, `POST_NOTIFICATIONS` runtime ask in onboarding, or the `Reading the entry.` copy contract.
+
+**Re-engage when:** v2 picks up the lifecycle track, or a real-use signal shows users routinely background mid-extraction expecting a tap-to-return.
+

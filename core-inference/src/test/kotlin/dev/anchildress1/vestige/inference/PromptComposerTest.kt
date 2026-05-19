@@ -58,6 +58,19 @@ class PromptComposerTest {
         assertTrue(
             composed.systemInstruction.contains("`stated_commitment`: object `{text, topic_or_person}` or `null`."),
         )
+        assertTrue(
+            composed.systemInstruction.contains(
+                "Do not return an effectively empty read when the entry contains concrete anchors.",
+            ),
+        )
+    }
+
+    @Test
+    fun `composed prompt explicitly forbids anchorless empty reads`() {
+        val text = PromptComposer.compose(Lens.LITERAL, entry).systemInstruction
+        assertTrue(text.contains("emit at least one behavioral tag"))
+        assertTrue(text.contains("do not leave `energy_descriptor` null"))
+        assertTrue(text.contains("tag that word instead of leaving the vocabulary surface silent"))
     }
 
     @Test

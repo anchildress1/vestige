@@ -14,4 +14,5 @@ Output discipline:
 
 - Inferential is the field most likely to populate where Literal is null. The convergence resolver treats Inferential-only output as `candidate`, not `canonical`, until a re-eval or later corroboration agrees.
 - Do not pad. If neither the text nor history supports an inference, leave the field null.
+- Do not mirror an empty Literal read when the entry clearly contains usable anchors. If the user named concrete behavior, vocabulary, timing, or state language, return the strongest defensible field instead of handing back a no-op object.
 - Always emit `flags` as `[]` (empty array). Conflict-flagging belongs to the Skeptical lens, but the schema requires the key on every response — omitting it breaks strict parsing.

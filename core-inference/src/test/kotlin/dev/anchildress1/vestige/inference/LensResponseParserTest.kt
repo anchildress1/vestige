@@ -396,6 +396,103 @@ class LensResponseParserTest {
     }
 
     @Test
+    fun `repairs duplicate commas between sibling fields after trimming payload whitespace`() {
+        val raw = """
+
+            
+              {
+                "tags": ["standup", "payroll-doc"],
+                "energy_descriptor": "flat",
+                "state_shift": true,
+                ,"vocabulary_contradictions": [
+                  {
+                    "term_a": "fine",
+                    "term_b": "stuck",
+                    "snippet": "I said I was fine but felt stuck"
+                  }
+                ],
+                "stated_commitment": null,
+                "recurrence_link": null,
+                "recurrence_kind": null,
+                "flags": []
+              }
+            
+
+        """.trimIndent()
+
+        val extraction = LensResponseParser.parse(Lens.INFERENTIAL, raw)
+
+        assertNotNull(extraction)
+        assertEquals(listOf("standup", "payroll-doc"), extraction!!.fields["tags"])
+        assertEquals("flat", extraction.fields["energy_descriptor"])
+        assertEquals(true, extraction.fields["state_shift"])
+        @Suppress("UNCHECKED_CAST")
+        val contradictions = extraction.fields["vocabulary_contradictions"] as List<Map<String, Any?>>
+        assertEquals("fine", contradictions.single()["term_a"])
+    }
+
+    @Test
+    fun `repairs duplicate commas immediately after object open`() {
+        val raw = """
+            {
+              ,
+              "tags": ["work"],
+              "energy_descriptor": "flat",
+              "state_shift": false,
+              "vocabulary_contradictions": [],
+              "stated_commitment": null,
+              "recurrence_link": null,
+              "recurrence_kind": null,
+              "flags": []
+            }
+        """.trimIndent()
+
+        val extraction = LensResponseParser.parse(Lens.LITERAL, raw)
+
+        assertNotNull(extraction)
+        assertEquals(listOf("work"), extraction!!.fields["tags"])
+        assertEquals("flat", extraction.fields["energy_descriptor"])
+    }
+
+    @Test
+    fun `repairs unescaped quotes and missing closing quote in skeptical note string`() {
+        val raw = """
+            {
+              "tags": ["standup", "kitchen", "payroll-doc", "stuck", "muttering"],
+              "energy_descriptor": "flat",
+              "state_shift": true,
+              "vocabulary_contradictions": [
+                {
+                  "term_a": "fine",
+                  "term_b": "stuck",
+                  "snippet": "I said I was fine but felt stuck"
+                }
+              ],
+              "stated_commitment": null,
+              "recurrence_link": null,
+              "recurrence_kind": null,
+              "flags": [
+                {
+                  "kind": "vocabulary-contradiction",
+                  "snippet": "I said I was fine but felt stuck",
+                  "note": ""fine" and "stuck" are used to describe the same feeling state.
+            }]}
+        """.trimIndent()
+
+        val extraction = LensResponseParser.parse(Lens.SKEPTICAL, raw)
+
+        assertNotNull(extraction)
+        assertEquals(listOf("standup", "kitchen", "payroll-doc", "stuck", "muttering"), extraction!!.fields["tags"])
+        assertEquals(
+            listOf(
+                "vocabulary-contradiction:I said I was fine but felt stuck:" +
+                    "\"fine\" and \"stuck\" are used to describe the same feeling state.",
+            ),
+            extraction.flags,
+        )
+    }
+
+    @Test
     fun `repairs unquoted schema keys`() {
         val raw = """
             {

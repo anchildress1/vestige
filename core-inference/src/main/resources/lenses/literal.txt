@@ -14,4 +14,5 @@ Output discipline:
 
 - This lens is the floor. If the Literal lens populates a field, downstream convergence treats it as anchored.
 - Sparse output is correct output. Null is a real answer.
+- A completely empty object is rare. If the user explicitly named any activity, object, place, time anchor, or state word, capture at least one of those anchors in `tags` or the matching field instead of defaulting to null/empty everywhere.
 - Always emit `flags` as `[]` (empty array). Conflict-flagging belongs to the Skeptical lens, but the schema requires the key on every response — omitting it breaks strict parsing.

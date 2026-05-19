@@ -90,7 +90,7 @@ internal object LensResponseParser {
         var keepScanning = true
         while (keepScanning && found == null) {
             val open = raw.indexOf('{', cursor).takeIf { it >= 0 }
-            val close = open?.let { scanBalancedClose(raw, it) }
+            val close = open?.let { scanBalancedClose(raw, it) ?: fallbackObjectClose(raw, it) }
             if (open == null || close == null) {
                 keepScanning = false
             } else {
@@ -102,8 +102,10 @@ internal object LensResponseParser {
         return found
     }
 
+    private fun fallbackObjectClose(raw: String, openIdx: Int): Int? = raw.lastIndexOf('}').takeIf { it > openIdx }
+
     private fun parseCandidateSchemaObject(candidate: String): JSONObject? {
-        candidateVariants(candidate).forEach { variant ->
+        candidateVariants(candidate.trim()).forEach { variant ->
             parseJSONObject(variant)?.let(::selectSchemaObject)?.let { return it }
         }
         return null
@@ -112,10 +114,12 @@ internal object LensResponseParser {
     private fun candidateVariants(candidate: String): List<String> {
         val variants = linkedSetOf(candidate)
         listOf<(String) -> String?>(
+            ::repairDuplicateCommas,
             ::repairMissingObjectFieldCommas,
             ::repairTrailingCommas,
             ::repairUnquotedPayloadKeys,
             ::repairCurlyDoubleQuotes,
+            ::repairMalformedQuotedStrings,
         ).forEach { repair ->
             variants.toList().forEach { current ->
                 repair(current)?.let(variants::add)
@@ -155,6 +159,13 @@ internal object LensResponseParser {
         return repaired.takeIf { it != candidate }
     }
 
+    private fun repairDuplicateCommas(candidate: String): String? {
+        val repaired = LEADING_DUPLICATE_COMMA
+            .replace(candidate) { match -> match.groupValues[1] }
+            .let { DUPLICATE_COMMA.replace(it, ",") }
+        return repaired.takeIf { it != candidate }
+    }
+
     private fun repairTrailingCommas(candidate: String): String? {
         val repaired = TRAILING_COMMA.replace(candidate, "$1")
         return repaired.takeIf { it != candidate }
@@ -172,6 +183,101 @@ internal object LensResponseParser {
             .replace('“', '"')
             .replace('”', '"')
         return repaired.takeIf { it != candidate }
+    }
+
+    // Character-level repair scanner — the branches are the spec, splitting them up obscures
+    // the malformed-quote shapes this is documenting against real-device model output.
+    @Suppress("LongMethod", "CyclomaticComplexMethod", "ComplexCondition")
+    private fun repairMalformedQuotedStrings(candidate: String): String? {
+        val repaired = buildString(candidate.length + 8) {
+            var inString = false
+            var escape = false
+            var stringStartIndex = -1
+            var stringSawWhitespace = false
+            var insertedLeadingContentQuote = false
+            var index = 0
+            while (index < candidate.length) {
+                val c = candidate[index]
+                when {
+                    escape -> {
+                        append(c)
+                        escape = false
+                    }
+
+                    c == '\\' -> {
+                        append(c)
+                        if (inString) {
+                            escape = true
+                        }
+                    }
+
+                    c == '"' -> {
+                        if (!inString) {
+                            append(c)
+                            inString = true
+                            stringStartIndex = length
+                            stringSawWhitespace = false
+                            insertedLeadingContentQuote = false
+                        } else {
+                            val next = nextNonWhitespaceChar(candidate, index + 1)
+                            if (next == null || next in STRING_CLOSE_FOLLOWERS) {
+                                append(c)
+                                inString = false
+                                stringStartIndex = -1
+                            } else {
+                                if (!insertedLeadingContentQuote &&
+                                    !stringSawWhitespace &&
+                                    stringStartIndex >= 0 &&
+                                    next.isLetter()
+                                ) {
+                                    insert(stringStartIndex, "\\\"")
+                                    insertedLeadingContentQuote = true
+                                }
+                                append("\\\"")
+                            }
+                        }
+                    }
+
+                    (c == '\n' || c == '\r') && inString -> {
+                        val next = nextNonWhitespaceChar(candidate, index + 1)
+                        if (next != null && next in VALUE_CLOSE_FOLLOWERS) {
+                            append('"')
+                            append(c)
+                            inString = false
+                        } else {
+                            if (c == '\r' && candidate.getOrNull(index + 1) == '\n') {
+                                append("\\n")
+                                index += 1
+                            } else {
+                                append("\\n")
+                            }
+                        }
+                    }
+
+                    else -> {
+                        append(c)
+                        if (inString && c.isWhitespace()) {
+                            stringSawWhitespace = true
+                        }
+                    }
+                }
+                index += 1
+            }
+            if (inString) {
+                append('"')
+            }
+        }
+        return repaired.takeIf { it != candidate }
+    }
+
+    private fun nextNonWhitespaceChar(candidate: String, startIndex: Int): Char? {
+        var index = startIndex
+        while (index < candidate.length) {
+            val c = candidate[index]
+            if (!c.isWhitespace()) return c
+            index += 1
+        }
+        return null
     }
 
     private fun repairDanglingArrayStringItems(raw: String): String? {
@@ -231,8 +337,11 @@ internal object LensResponseParser {
         null, JSONObject.NULL -> null
         is JSONObject -> value.keys().asSequence().associateWith { key -> normalize(value.opt(key)) }
         is JSONArray -> List(value.length()) { idx -> normalize(value.opt(idx)) }
+        is String -> normalizeStringValue(value)
         else -> value
     }
+
+    private fun normalizeStringValue(value: String): String = value.trim().replace(LEADING_DOUBLE_QUOTE_RUN, "\"")
 
     // Group 1 is only the value's final char — the match span is replaced in place, so the
     // preceding bytes are untouched and a single terminator (string/number/bool/null close,
@@ -246,6 +355,14 @@ internal object LensResponseParser {
         """,\s*"\s*(?=])""",
     )
 
+    private val LEADING_DUPLICATE_COMMA = Regex(
+        """([{\[])\s*,+""",
+    )
+
+    private val DUPLICATE_COMMA = Regex(
+        """,\s*,+""",
+    )
+
     private val TRAILING_COMMA = Regex(
         """,\s*([}\]])""",
     )
@@ -253,4 +370,12 @@ internal object LensResponseParser {
     private val UNQUOTED_PAYLOAD_KEY = Regex(
         """([{\s,])(${PAYLOAD_KEYS.joinToString("|")}):""",
     )
+
+    private val LEADING_DOUBLE_QUOTE_RUN = Regex(
+        """^""+""",
+    )
+
+    private val STRING_CLOSE_FOLLOWERS = setOf(':', ',', '}', ']')
+
+    private val VALUE_CLOSE_FOLLOWERS = setOf(',', '}', ']')
 }

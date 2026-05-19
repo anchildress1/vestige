@@ -16,3 +16,4 @@ What goes in the schema:
 - Populate `state_shift` as `true` when the entry describes a transition between two distinct states; otherwise `false`. The schema requires a boolean, never null and never omitted.
 - Append state-related signals to `tags` (e.g. `crashed`, `tunnel-exit`, `decision-loop`, `late-night`).
 - Do not infer a state the user did not name. "Stressed" is not extractable unless the user said "stressed".
+- If the user named a concrete state word, do not leave `energy_descriptor` null. Use the user's own word rather than paraphrasing it away.

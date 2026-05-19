@@ -15,3 +15,4 @@ What goes in the schema:
 - Append behavioral signals to `tags` as short lowercase tokens (e.g. `standup`, `late-night`, `q3-doc`, `chair`).
 - One token per discrete signal. Multi-word activities use kebab-case.
 - Do not invent activities that the user did not name. Implicit context belongs to the lens, not this surface.
+- If the entry names any concrete activity, object, location, or time anchor, emit at least one behavioral tag. An empty behavioral read is valid only when the entry truly contains none of those anchors.

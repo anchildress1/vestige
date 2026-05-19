@@ -378,7 +378,7 @@ Action button (top right) — persona-aware:
 - Hardass: **Run the numbers.**
 - Editor: **Audit my vocabulary.**
 
-Section headers (uppercase, mono eyebrow — one per non-empty section per `poc/screens-patterns.jsx`):
+Section headers (uppercase, mono eyebrow — one per non-empty section per `poc/patterns-final.png`):
 > ACTIVE
 > SKIPPED · ON HOLD
 > CLOSED · DONE
@@ -389,15 +389,16 @@ Filter chips (small, secondary text — Phase 4 polish on top of the section str
 
 Pattern card structure (top → bottom):
 
-> {PATTERN KIND — uppercase mono eyebrow from stored `pattern.kind`, section-tone colored: lime active / ember skipped / teal closed-dropped}
+> {SEMANTIC LABEL — uppercase mono eyebrow, section-tone colored: lime active / ember skipped / teal closed-dropped}
 > **{Pattern name}**
 > {One-line observation}
 > {30-day TraceBar}
 > {N} of {M} entries · Last seen {date}
 
 > _Data-slot reconciliation (2026-05-19):_ the eyebrow slot stays because it is part of the
-> `poc/pattern-lifecycle-final.png` layout, but it binds to stored `pattern.kind`, not the
-> structurally-broken `template_label` or screenshot sample copy. Tone is the section tone.
+> `poc/pattern-lifecycle-final.png` layout. Current v1 binding is stored `pattern.kind`
+> because `template_label` is untrusted. If a redesigned, trusted `templateLabel` lands,
+> it may replace `pattern.kind` in this same slot. Never use screenshot sample copy.
 > The card is one shared `PatternCard` component so every surface stays identical.
 
 Card actions (per card, in overflow menu):
@@ -431,7 +432,7 @@ Empty states:
 Header:
 > **{Pattern name}**
 
-No agent-emitted template label or archetype eyebrow appears in the UI.
+No inaccurate agent-emitted template label or archetype eyebrow appears in the UI. A future trusted semantic label may appear only where the POC layout has a label slot.
 
 Summary observation (one line, primary text):
 > {The card's one-line observation, expanded slightly with timing}

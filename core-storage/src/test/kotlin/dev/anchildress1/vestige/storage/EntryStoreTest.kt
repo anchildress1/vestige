@@ -210,20 +210,20 @@ class EntryStoreTest {
     }
 
     @Test
+    fun `attachFollowUp lands follow-up on a completed row`() {
+        val id = entryStore.createPendingEntry(SAMPLE_TEXT, SAMPLE_INSTANT)
+        entryStore.completeEntry(id, resolvedSample(), TemplateLabel.AFTERMATH)
+
+        entryStore.attachFollowUp(id, "What got stuck?")
+
+        assertEquals("What got stuck?", boxStore.boxFor<EntryEntity>().get(id).followUpText)
+    }
+
+    @Test
     fun `attachFollowUp is a no-op for blank input`() {
         val id = entryStore.createPendingEntry(SAMPLE_TEXT, SAMPLE_INSTANT)
 
         entryStore.attachFollowUp(id, "   ")
-
-        assertNull(boxStore.boxFor<EntryEntity>().get(id).followUpText)
-    }
-
-    @Test
-    fun `attachFollowUp drops a late follow-up once the row is terminal`() {
-        val id = entryStore.createPendingEntry(SAMPLE_TEXT, SAMPLE_INSTANT)
-        entryStore.completeEntry(id, resolvedSample(), TemplateLabel.AFTERMATH)
-
-        entryStore.attachFollowUp(id, "too late")
 
         assertNull(boxStore.boxFor<EntryEntity>().get(id).followUpText)
     }

@@ -8,11 +8,14 @@ import android.content.pm.PackageManager
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -23,6 +26,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.unit.dp
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -101,6 +110,7 @@ fun CaptureScreen(
 
         is CaptureUiState.Submitting -> SubmittingPane(
             persona = current.persona.name,
+            streamedFollowUp = current.streamedFollowUp,
             modifier = modifier,
         )
     }
@@ -116,17 +126,40 @@ fun CaptureScreen(
     }
 }
 
-// Brief filing spinner between STOP / typed-submit and the entry being persisted. No copy —
-// the old "Reading the entry." review page is gone; the entry opens in History on persist.
+// Brief foreground-prompt surface between STOP / typed-submit and the entry being persisted.
 @Composable
-private fun SubmittingPane(persona: String, modifier: Modifier = Modifier) {
+private fun SubmittingPane(persona: String, streamedFollowUp: String, modifier: Modifier = Modifier) {
     val colors = VestigeTheme.colors
     Column(modifier = modifier.fillMaxSize().background(colors.floor)) {
         AppTop(persona = persona, status = AppTopStatuses.Ready)
-        // weight(1f) takes the space below AppTop so the spinner is truly vertically centered
-        // (fillMaxSize here would over-extend past the fold and skew it).
-        Box(modifier = Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
-            VestigeSpinner(diameter = PageSpinnerDiameter)
+        Box(
+            modifier = Modifier.weight(1f).fillMaxWidth().padding(horizontal = 18.dp),
+            contentAlignment = Alignment.Center,
+        ) {
+            val visibleFollowUp = streamedFollowUp.trim()
+            if (visibleFollowUp.isEmpty()) {
+                VestigeSpinner(diameter = PageSpinnerDiameter)
+            } else {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(colors.s1)
+                        .testTag("capture_streamed_follow_up")
+                        .semantics(mergeDescendants = true) {
+                            liveRegion = LiveRegionMode.Polite
+                            contentDescription = "$persona follow-up: $visibleFollowUp"
+                        }
+                        .padding(horizontal = 14.dp, vertical = 12.dp),
+                    verticalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
+                    Text(
+                        text = "$persona · FOLLOW-UP",
+                        style = VestigeTheme.typography.eyebrow,
+                        color = colors.lime,
+                    )
+                    Text(text = visibleFollowUp, style = VestigeTheme.typography.p, color = colors.ink)
+                }
+            }
         }
     }
 }

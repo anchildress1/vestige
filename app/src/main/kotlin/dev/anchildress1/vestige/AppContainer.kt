@@ -420,10 +420,8 @@ class AppContainer(
     }
 
     /**
-     * Land call-2's persona follow-up on the still-in-flight entry and nudge [dataRevision] so an
-     * open detail screen reloads now — not later when background extraction terminal happens to
-     * bump it. Without the nudge the follow-up sits on disk, invisible, until convergence
-     * finishes (~15 s+); the user expects it moments after the transcript.
+     * Land the streamed foreground follow-up and nudge [dataRevision] so an open detail screen
+     * reloads before the background extraction terminal update.
      */
     suspend fun attachFollowUp(entryId: Long, followUpText: String) {
         withContext(Dispatchers.IO) { entryStore.attachFollowUp(entryId, followUpText) }

@@ -196,23 +196,13 @@ class EntryStore(private val boxStore: BoxStore, private val markdownStore: Mark
         }
     }
 
-    /**
-     * Land the persona follow-up on a still-in-flight entry. The voice path persists the entry on
-     * the call-1 transcription — before call-2 has produced the follow-up — so the follow-up
-     * arrives separately and is written here once call-2 terminal lands. Blank input is a no-op.
-     *
-     * Bounded by design: only `PENDING`/`RUNNING` rows are patched. A follow-up arriving after the
-     * row already reached a terminal status is dropped — extraction beat call-2, the user has
-     * moved on, and rewriting a `COMPLETED` row's markdown would race [completeEntry]. Dropping a
-     * late best-effort follow-up is the correct outcome, not a silent failure.
-     */
+    /** Land the foreground follow-up after the entry has already been created. Blank input is a no-op. */
     fun attachFollowUp(entryId: Long, followUpText: String) {
         val trimmed = followUpText.trimEnd().takeIf(String::isNotBlank) ?: return
         boxStore.runInTx {
             val box = boxStore.boxFor<EntryEntity>()
             val entry = box.get(entryId)
                 ?: throw EntryPersistenceException("No entry row id=$entryId to attach follow-up")
-            if (entry.extractionStatus !in NON_TERMINAL_STATUSES) return@runInTx
             entry.followUpText = trimmed
             try {
                 markdownStore.write(entry)

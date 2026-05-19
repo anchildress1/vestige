@@ -28,11 +28,14 @@ sealed interface CaptureUiState {
     ) : CaptureUiState
 
     /**
-     * Transient spinner between STOP (or typed submit) and the entry being persisted — the
-     * window where call-1 transcription is still in flight and there is no entry to open yet.
-     * Once the entry persists the VM emits a navigation event and returns to [Idle].
+     * Transient foreground-prompt surface between STOP (or typed submit) and the entry being
+     * persisted. The follow-up streams here until the terminal result can be saved and opened.
      */
-    data class Submitting(override val persona: Persona, override val modelReadiness: ModelReadiness) : CaptureUiState
+    data class Submitting(
+        override val persona: Persona,
+        override val modelReadiness: ModelReadiness,
+        val streamedFollowUp: String = "",
+    ) : CaptureUiState
 }
 
 /** Local-model readiness drives the REC button + status-pill copy. */
@@ -60,7 +63,7 @@ sealed interface ModelReadiness {
 
 /**
  * Surfaced as a transient banner / chrome state. Mic errors come from the permission flow;
- * inference errors come from a failed call-1 transcription (no entry was persisted).
+ * inference errors come from a failed foreground prompt (no entry was persisted).
  */
 sealed interface CaptureError {
     object MicDenied : CaptureError

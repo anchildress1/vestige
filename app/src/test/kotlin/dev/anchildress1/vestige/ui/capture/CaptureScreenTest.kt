@@ -145,7 +145,7 @@ class CaptureScreenTest {
         initialReadiness = ModelReadiness.Ready,
     )
 
-    // Audio lands, but call-1 parks before emitting a transcription — the VM stays in Submitting.
+    // Audio lands, but the foreground prompt parks before terminal — the VM stays in Submitting.
     private fun submittingViewModel(): CaptureViewModel = CaptureViewModel(
         initialPersona = Persona.WITNESS,
         recordVoice = VoiceCapture { _, _ -> AudioChunk(FloatArray(16), 16_000, isFinal = true) },
@@ -163,7 +163,19 @@ class CaptureScreenTest {
         initialPersona = Persona.WITNESS,
         recordVoice = VoiceCapture { _, _ -> AudioChunk(FloatArray(16), 16_000, isFinal = true) },
         foregroundInference = ForegroundInferenceCall { _, _ ->
-            flowOf(ForegroundStreamEvent.Transcription("something happened"))
+            flowOf(
+                ForegroundStreamEvent.Transcription("something happened"),
+                ForegroundStreamEvent.Terminal(
+                    dev.anchildress1.vestige.inference.ForegroundResult.Success(
+                        persona = Persona.WITNESS,
+                        rawResponse = "",
+                        elapsedMs = 0L,
+                        completedAt = clock.instant(),
+                        transcription = "something happened",
+                        followUp = "what happened before that",
+                    ),
+                ),
+            )
         },
         saveAndExtract = SaveAndExtract { _, _, _, _, _, _ -> entryId },
         foregroundTextInference = ForegroundTextInferenceCall { _, _, _ ->

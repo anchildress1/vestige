@@ -7,17 +7,15 @@ import androidx.compose.ui.text.withStyle
 import java.util.Locale
 
 /**
- * Uppercased editorial headline with only the **trailing punctuation** accented (e.g. the
- * `.` in `NOTHING RECORDED YET.` coral) — the shared empty-state treatment so History and
- * Patterns render identically. No trailing punctuation ⇒ no accent.
+ * Uppercased editorial headline with the final whitespace-delimited token accented (e.g.
+ * `YET.` lime), matching `poc/patterns-empty-final.png`. Shared so History and Patterns
+ * render identically. Single-word headers render fully accented.
  */
 fun accentedHeadline(raw: String, inkColor: Color, accentColor: Color) = buildAnnotatedString {
     val up = raw.uppercase(Locale.US)
-    val punctStart = up.indexOfLast { it.isLetterOrDigit() } + 1
-    if (punctStart > 0) {
-        withStyle(SpanStyle(color = inkColor)) { append(up.substring(0, punctStart)) }
+    val split = up.lastIndexOf(' ')
+    if (split > 0) {
+        withStyle(SpanStyle(color = inkColor)) { append(up.substring(0, split + 1)) }
     }
-    if (punctStart < up.length) {
-        withStyle(SpanStyle(color = accentColor)) { append(up.substring(punctStart)) }
-    }
+    withStyle(SpanStyle(color = accentColor)) { append(up.substring(split + 1)) }
 }

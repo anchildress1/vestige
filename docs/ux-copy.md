@@ -148,16 +148,9 @@ Behavior:
 
 > **WHAT HAPPENED?**
 
-Poster headline, same treatment as onboarding headlines; the trailing `HAPPENED?`
-is the accented token. Idle shows it full-bright; when the type sheet is open the modal
-scrim dims it. Source of truth for `CaptureCopy.HERO_QUESTION`.
-
-> _Accent reconciliation (2026-05-18):_ only the **trailing punctuation** is the accent and
-> it is now **coral**, not lime — the hero shows `WHAT HAPPENED` in ink with just the `?`
-> coral (not the whole `HAPPENED?`). Same rule on the empty-state headlines (Capture-history
-> / Patterns): the word is ink, only the terminal `.` is coral. One unified coral
-> terminal-punctuation accent, consistent with the coral period on `MODEL STATUS.` /
-> `SETTINGS.`. The earlier "trailing `HAPPENED?` renders in lime" wording is superseded.
+Poster headline, same treatment as onboarding headlines but the trailing `HAPPENED?`
+renders in lime (not a coral period-square). Idle shows it full-bright; when the type
+sheet is open the modal scrim dims it. Source of truth for `CaptureCopy.HERO_QUESTION`.
 
 ### Status row (top)
 
@@ -508,8 +501,8 @@ Loading state (model generating):
 
 > _Reconciliation (2026-05-18):_ header was `No entries yet.`; now `Nothing recorded yet.`
 > and rendered with the **same** treatment as the Patterns empty state — shared
-> `accentedHeadline` (`displayBig`, uppercased, only the terminal `.` coral). One headline
-> component, two screens.
+> `accentedHeadline` (`displayBig`, uppercased, final token lime per
+> `poc/patterns-empty-final.png`). One headline component, two screens.
 
 ### Pattern detail — no sources
 Should not occur in normal flow (a pattern requires entries). If it renders:

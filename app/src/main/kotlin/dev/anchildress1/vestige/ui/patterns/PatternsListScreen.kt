@@ -142,7 +142,7 @@ private fun PatternsEmptyState(empty: PatternsListUiState.Empty) {
             .padding(horizontal = 18.dp),
         verticalArrangement = Arrangement.Center,
     ) {
-        Text(text = accentedHeadline(header, colors.ink, colors.coral), style = VestigeTheme.typography.displayBig)
+        Text(text = accentedHeadline(header, colors.ink, colors.lime), style = VestigeTheme.typography.displayBig)
         Text(
             text = body,
             style = VestigeTheme.typography.p,

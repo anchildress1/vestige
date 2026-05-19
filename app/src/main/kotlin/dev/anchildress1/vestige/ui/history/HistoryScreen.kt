@@ -96,7 +96,7 @@ private fun HistoryEmptyState(modifier: Modifier = Modifier) {
     ) {
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(
-                text = accentedHeadline(HistoryCopy.EMPTY_HEADER, colors.ink, colors.coral),
+                text = accentedHeadline(HistoryCopy.EMPTY_HEADER, colors.ink, colors.lime),
                 style = VestigeTheme.typography.displayBig,
             )
             Text(text = HistoryCopy.EMPTY_BODY, style = VestigeTheme.typography.p, color = colors.dim)

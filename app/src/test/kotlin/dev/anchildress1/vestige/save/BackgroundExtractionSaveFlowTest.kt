@@ -4,6 +4,7 @@ import dev.anchildress1.vestige.inference.BackgroundExtractionRequest
 import dev.anchildress1.vestige.inference.BackgroundExtractionResult
 import dev.anchildress1.vestige.inference.BackgroundExtractionWorker
 import dev.anchildress1.vestige.inference.ExtractionStatusListener
+import dev.anchildress1.vestige.inference.HistoryChunk
 import dev.anchildress1.vestige.inference.LensResult
 import dev.anchildress1.vestige.inference.ObservationGenerator
 import dev.anchildress1.vestige.model.ConfidenceVerdict
@@ -36,6 +37,7 @@ import org.junit.jupiter.api.Assertions.fail
 import org.junit.jupiter.api.Test
 import java.time.ZoneId
 import java.time.ZonedDateTime
+import java.util.concurrent.atomic.AtomicInteger
 
 /**
  * The orchestrator's routing logic. The real EntryStore + BoxStore + markdown round-trip is
@@ -462,6 +464,91 @@ class BackgroundExtractionSaveFlowTest {
 
         assertEquals(listOf(ENTRY_ID), capturedIds)
         assertEquals(ENTRY_ID, outcome.entryId)
+    }
+
+    @Test
+    fun `saveAndExtract retrieves history inside the detached path when caller provides none`() = runTest {
+        val history = listOf(HistoryChunk(patternId = null, text = "same loop last Thursday"))
+        val flowWithLookup = BackgroundExtractionSaveFlow(
+            entryStore = entryStore,
+            worker = worker,
+            observationGenerator = observationGenerator,
+            lifecycleCallbacks = BackgroundExtractionLifecycleCallbacks(listenerFactory),
+            scope = flowScope,
+            retrieveHistory = { query ->
+                assertEquals(SAMPLE_TEXT, query)
+                history
+            },
+        )
+        every { entryStore.createPendingEntry(any(), any(), any()) } returns ENTRY_ID
+        coEvery { worker.extract(capture(capturedRequest), any()) } returns BackgroundExtractionResult.Success(
+            totalElapsedMs = 10L,
+            lensResults = emptyList(),
+            modelCallCount = 3,
+            resolved = canonicalSample(),
+            templateLabel = TemplateLabel.AFTERMATH,
+        )
+        coEvery { observationGenerator.generate(any(), any(), any()) } returns emptyList()
+
+        flowWithLookup.saveAndExtract(SAMPLE_TEXT, SAMPLE_TIMESTAMP)
+
+        assertEquals(history, capturedRequest.captured.retrievedHistory)
+    }
+
+    @Test
+    fun `saveAndExtract keeps caller supplied history and skips detached lookup`() = runTest {
+        val history = listOf(HistoryChunk(patternId = null, text = "seeded already"))
+        val lookupCalls = AtomicInteger(0)
+        val flowWithLookup = BackgroundExtractionSaveFlow(
+            entryStore = entryStore,
+            worker = worker,
+            observationGenerator = observationGenerator,
+            lifecycleCallbacks = BackgroundExtractionLifecycleCallbacks(listenerFactory),
+            scope = flowScope,
+            retrieveHistory = {
+                lookupCalls.incrementAndGet()
+                emptyList()
+            },
+        )
+        every { entryStore.createPendingEntry(any(), any(), any()) } returns ENTRY_ID
+        coEvery { worker.extract(capture(capturedRequest), any()) } returns BackgroundExtractionResult.Success(
+            totalElapsedMs = 10L,
+            lensResults = emptyList(),
+            modelCallCount = 3,
+            resolved = canonicalSample(),
+            templateLabel = TemplateLabel.AFTERMATH,
+        )
+        coEvery { observationGenerator.generate(any(), any(), any()) } returns emptyList()
+
+        flowWithLookup.saveAndExtract(SAMPLE_TEXT, SAMPLE_TIMESTAMP, retrievedHistory = history)
+
+        assertEquals(history, capturedRequest.captured.retrievedHistory)
+        assertEquals(0, lookupCalls.get())
+    }
+
+    @Test
+    fun `saveAndExtract degrades to empty history when detached lookup throws`() = runTest {
+        val flowWithLookup = BackgroundExtractionSaveFlow(
+            entryStore = entryStore,
+            worker = worker,
+            observationGenerator = observationGenerator,
+            lifecycleCallbacks = BackgroundExtractionLifecycleCallbacks(listenerFactory),
+            scope = flowScope,
+            retrieveHistory = { error("vector store unavailable") },
+        )
+        every { entryStore.createPendingEntry(any(), any(), any()) } returns ENTRY_ID
+        coEvery { worker.extract(capture(capturedRequest), any()) } returns BackgroundExtractionResult.Success(
+            totalElapsedMs = 10L,
+            lensResults = emptyList(),
+            modelCallCount = 3,
+            resolved = canonicalSample(),
+            templateLabel = TemplateLabel.AFTERMATH,
+        )
+        coEvery { observationGenerator.generate(any(), any(), any()) } returns emptyList()
+
+        flowWithLookup.saveAndExtract(SAMPLE_TEXT, SAMPLE_TIMESTAMP)
+
+        assertTrue(capturedRequest.captured.retrievedHistory.isEmpty())
     }
 
     @Test

@@ -39,9 +39,9 @@ import java.time.ZonedDateTime
  *
  * Post-submit there is no in-Capture review surface: the entry persists on the call-1
  * transcription, the host is told to open it in History detail via [openEntryEvents], and
- * Capture resets to [CaptureUiState.Idle]. Call-2's persona follow-up is generated in the
- * background and patched onto the entry — the VM is Activity-scoped so that work survives the
- * navigation away from Capture.
+ * Capture resets to [CaptureUiState.Idle] only after the UI confirms it consumed that open
+ * request. Call-2's persona follow-up is generated in the background and patched onto the entry
+ * — the VM is Activity-scoped so that work survives the navigation away from Capture.
  *
  * Audio bytes never enter this VM — only RMS levels (0..1) and the final `AudioChunk` that the
  * foreground call consumes once.
@@ -270,10 +270,9 @@ class CaptureViewModel(
                 }
             }
             try {
-                val history = retrieveHistorySafely(trimmed)
-                val entryId = persistPending(trimmed, inferencePersona, durationMs = 0L, history = history)
+                val entryId = persistPending(trimmed, inferencePersona, durationMs = 0L)
                 openEntry(entryId)
-                launchFollowUp(entryId, trimmed, inferencePersona, history)
+                launchFollowUp(entryId, trimmed, inferencePersona)
             } catch (timeout: TimeoutCancellationException) {
                 Log.w(TAG, "Typed submit timed out", timeout)
                 emitInferenceError(CaptureError.InferenceFailed.Reason.TIMED_OUT)
@@ -308,10 +307,9 @@ class CaptureViewModel(
     }
 
     /**
-     * Voice path (ADR retrieval-history-gap, option C): call 1 streams the transcription from the
-     * audio; the moment it lands the entry is persisted and the host opens it. A retrieval query
-     * on that transcription then feeds call 2 (background) whose history-conditioned follow-up is
-     * patched onto the entry. The call-1 transcription is authoritative and verbatim.
+     * Voice path: call 1 streams the transcription from the audio; the moment it lands the entry
+     * is persisted and the host opens it. Retrieval and follow-up generation run only after that
+     * handoff, so the user does not wait on vector lookup before seeing the entry.
      */
     private suspend fun runVoiceForeground(persona: Persona, audio: AudioChunk) {
         // null ⇒ the call threw and the matching error was already surfaced; "" ⇒ the call
@@ -322,10 +320,9 @@ class CaptureViewModel(
             emitInferenceError(CaptureError.InferenceFailed.Reason.PARSE_FAILED)
             return
         }
-        val history = retrieveHistorySafely(transcription)
-        val entryId = persistPending(transcription, persona, audio.durationMs, history)
+        val entryId = persistPending(transcription, persona, audio.durationMs)
         openEntry(entryId)
-        launchFollowUp(entryId, transcription, persona, history)
+        launchFollowUp(entryId, transcription, persona)
     }
 
     private suspend fun call1Transcription(audio: AudioChunk, persona: Persona): String? = try {
@@ -355,13 +352,23 @@ class CaptureViewModel(
         text: String,
         persona: Persona,
         durationMs: Long,
-        history: List<HistoryChunk>,
-    ): Long = saveAndExtract(text, ZonedDateTime.now(clock.withZone(zoneId)), persona, durationMs, null, history)
+    ): Long = saveAndExtract(
+        text = text,
+        capturedAt = ZonedDateTime.now(clock.withZone(zoneId)),
+        persona = persona,
+        durationMs = durationMs,
+        followUpText = null,
+        retrievedHistory = emptyList(),
+    )
 
     // Entry is persisted + background extraction kicked. Tell the host to open it in History
-    // detail, then reset Capture to Idle so the CAPTURE tab is always a fresh capture surface.
+    // detail and keep Submitting alive until the route collector confirms it consumed the event.
+    // Resetting here created a dead frame where Capture flashed blank before History painted.
     private fun openEntry(entryId: Long) {
         _openEntryEvents.trySend(entryId)
+    }
+
+    fun onOpenEntryHandled() {
         _state.update { c -> CaptureUiState.Idle(persona = c.persona, modelReadiness = c.modelReadiness) }
     }
 
@@ -369,9 +376,10 @@ class CaptureViewModel(
     // Activity-scoped, so it survives leaving Capture). The persona follow-up is patched onto the
     // already-persisted entry; any failure just leaves the entry follow-up-less (the worse
     // outcome — losing the entry — can't happen, it's already saved).
-    private fun launchFollowUp(entryId: Long, text: String, persona: Persona, history: List<HistoryChunk>) {
+    private fun launchFollowUp(entryId: Long, text: String, persona: Persona) {
         viewModelScope.launch {
             try {
+                val history = retrieveHistorySafely(text)
                 foregroundTextInference(text, persona, history)
                     .filterIsInstance<ForegroundStreamEvent.Terminal>()
                     .firstOrNull()

@@ -159,6 +159,7 @@ class AppContainer(
         ObservationGenerator,
         BackgroundExtractionLifecycleCallbacks,
         CoroutineScope,
+        suspend (String) -> List<HistoryChunk>,
         PatternDetectionOrchestrator?,
     ) -> BackgroundExtractionSaveFlow =
         {
@@ -167,6 +168,7 @@ class AppContainer(
                 observationGenerator,
                 lifecycleCallbacks,
                 extractionScope,
+                retrieveHistory,
                 orchestrator,
             ->
             BackgroundExtractionSaveFlow(
@@ -175,6 +177,7 @@ class AppContainer(
                 observationGenerator = observationGenerator,
                 lifecycleCallbacks = lifecycleCallbacks,
                 scope = extractionScope,
+                retrieveHistory = retrieveHistory,
                 patternOrchestrator = orchestrator,
             )
         },
@@ -298,10 +301,10 @@ class AppContainer(
     }
 
     /**
-     * Off-thread prior-entry lookup feeding the foreground follow-up + background extraction.
+     * Off-thread prior-entry lookup feeding detached follow-up generation + background extraction.
      * Degrades to empty on any failure (embeddings not backfilled yet, store error) so a bad
-     * retrieval can never block a capture. Maps the top entries to context-only [HistoryChunk]s —
-     * no `patternId`, since the follow-up needs textual context, not recurrence-surface linkage.
+     * retrieval never blocks entry creation. Maps the top entries to context-only [HistoryChunk]s
+     * — no `patternId`, since follow-up generation needs textual context, not recurrence linkage.
      */
     suspend fun retrieveHistory(query: String): List<HistoryChunk> = withContext(computeDispatcher) {
         try {
@@ -353,6 +356,7 @@ class AppContainer(
                 onPatternCalloutAppended = { _dataRevision.value += 1 },
             ),
             scope,
+            ::retrieveHistory,
             patternDetectionOrchestrator,
         )
     }

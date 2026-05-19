@@ -47,13 +47,17 @@ data class BackgroundExtractionLifecycleCallbacks(
  *      follow-ons like vector backfill. Pattern callout work continues on its own coroutine and
  *      reports [onPatternCalloutAppended] when it changes entry-visible state.
  */
-@Suppress("TooManyFunctions") // Pipeline + handlers + helpers; splitting hides the linear flow.
+@Suppress(
+    "TooManyFunctions", // Pipeline + handlers + helpers; splitting hides the linear flow.
+    "LongParameterList", // Wiring object: seams are explicit and cheaper than a fake config carrier.
+)
 class BackgroundExtractionSaveFlow(
     private val entryStore: EntryStore,
     private val worker: BackgroundExtractionWorker,
     private val observationGenerator: ObservationGenerator,
     private val lifecycleCallbacks: BackgroundExtractionLifecycleCallbacks,
     private val scope: CoroutineScope,
+    private val retrieveHistory: suspend (String) -> List<HistoryChunk> = { emptyList() },
     private val patternOrchestrator: PatternDetectionOrchestrator? = null,
 ) {
 
@@ -134,12 +138,15 @@ class BackgroundExtractionSaveFlow(
         persona: Persona,
     ) {
         try {
-            when (val result = worker.extract(request, terminalRelay.workerListener)) {
+            val requestWithHistory = request.copy(
+                retrievedHistory = resolveRetrievedHistory(entryText, request.retrievedHistory),
+            )
+            when (val result = worker.extract(requestWithHistory, terminalRelay.workerListener)) {
                 is BackgroundExtractionResult.Success -> handleSuccess(
                     entryId = entryId,
                     entryText = entryText,
                     capturedAt = capturedAt,
-                    entryAttemptCount = request.entryAttemptCount,
+                    entryAttemptCount = requestWithHistory.entryAttemptCount,
                     result = result,
                     terminalRelay = terminalRelay,
                     persona = persona,
@@ -147,14 +154,14 @@ class BackgroundExtractionSaveFlow(
 
                 is BackgroundExtractionResult.Failed -> handleFailure(
                     entryId = entryId,
-                    entryAttemptCount = request.entryAttemptCount,
+                    entryAttemptCount = requestWithHistory.entryAttemptCount,
                     result = result,
                     terminalRelay = terminalRelay,
                 )
 
                 is BackgroundExtractionResult.TimedOut -> handleTimeout(
                     entryId = entryId,
-                    entryAttemptCount = request.entryAttemptCount,
+                    entryAttemptCount = requestWithHistory.entryAttemptCount,
                     result = result,
                     terminalRelay = terminalRelay,
                 )
@@ -173,6 +180,21 @@ class BackgroundExtractionSaveFlow(
             // Detached path has no caller to throw to — log + persist a terminal failure.
             Log.e(TAG, "Detached extraction failed for entryId=$entryId", error)
             compensatePersistenceFailure(entryId, request.entryAttemptCount, terminalRelay, error)
+        }
+    }
+
+    private suspend fun resolveRetrievedHistory(
+        entryText: String,
+        seededHistory: List<HistoryChunk>,
+    ): List<HistoryChunk> {
+        if (seededHistory.isNotEmpty()) return seededHistory
+        return try {
+            retrieveHistory(entryText)
+        } catch (cancellation: CancellationException) {
+            throw cancellation
+        } catch (@Suppress("TooGenericExceptionCaught") error: Exception) {
+            Log.w(TAG, "Detached retrieval degraded (${error.javaClass.simpleName})")
+            emptyList()
         }
     }
 

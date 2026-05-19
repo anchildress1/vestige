@@ -202,13 +202,13 @@ Story 2.19 carries the implementation decision and wiring once Story 2.14 confir
 
 ## Retrieval History Gap (Addendum 2026-05-16)
 
-`AppContainer.saveAndExtract` accepts `retrievedHistory: List<HistoryChunk>` but `CaptureViewModel` does not perform a `RetrievalRepo.query()` before the foreground call and therefore passes no history. Retrieved history flows only into `BackgroundExtractionWorker`'s lens prompts.
+`CaptureViewModel` now persists the entry first and leaves `retrievedHistory` empty on that foreground save. Retrieval runs only after the entry is already open to the user: detached follow-up generation queries history on the saved text, and `BackgroundExtractionSaveFlow` does the same before it calls `BackgroundExtractionWorker`.
 
-The consequence: the foreground response the user sees immediately after recording has no awareness of prior entries. The background extraction does. This means the follow-up question the user receives is context-free while the structured fields are context-aware — an inversion of where context matters most from a UX standpoint.
+The consequence is deliberate: the foreground response and entry creation are no longer stalled on query embedding + vector lookup. The user gets the transcript-backed entry first; history-conditioned follow-up and history-conditioned lens extraction land afterward.
 
-**Correct behavior:** foreground voice owns the immediate response; retrieval history feeds the detached background analysis after transcription lands. Typed entries can still use retrieval before the foreground prompt because typed text is already available.
+**Correct behavior:** foreground owns the immediate transcript / open-entry handoff; retrieval history feeds detached follow-up generation and detached background analysis after transcription lands.
 
-**Corrected 2026-05-18.** The foreground voice path is one streaming model call again: audio in, verbatim transcription + persona follow-up out. `CaptureViewModel` saves the pending entry as soon as the transcription block streams, which queues detached background analysis immediately. The same foreground stream continues rendering follow-up deltas while the user waits; terminal follow-up text is patched onto the entry when it lands. `LiteRtLmEngine` still serializes Gemma calls on the GPU, so the background job is queued behind the foreground stream rather than running in parallel. Typed entries still run `runForegroundTextCall(text, persona, history)` because the text is known before the prompt starts.
+**Corrected 2026-05-19.** Both voice and typed capture now skip retrieval on the critical path. `CaptureViewModel` saves the pending entry as soon as it has authoritative text, opens History detail immediately, and then launches follow-up retrieval/generation on `viewModelScope`. `BackgroundExtractionSaveFlow` performs its own retrieval when the caller supplied none, so structured extraction keeps prior-entry context without making the user wait. `LiteRtLmEngine` still serializes Gemma calls on the GPU, so the detached work queues behind the foreground stream rather than running in parallel.
 
 ---
 

@@ -80,7 +80,10 @@ fun CaptureScreen(
 
     val onOpenEntryDetail = chrome.onOpenEntryDetail
     LaunchedEffect(viewModel, onOpenEntryDetail) {
-        viewModel.openEntryEvents.collect { entryId -> onOpenEntryDetail?.invoke(entryId) }
+        viewModel.openEntryEvents.collect { entryId ->
+            onOpenEntryDetail?.invoke(entryId)
+            viewModel.onOpenEntryHandled()
+        }
     }
 
     when (val current = state) {

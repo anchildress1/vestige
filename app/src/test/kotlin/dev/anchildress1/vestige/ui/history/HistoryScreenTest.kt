@@ -87,7 +87,8 @@ class HistoryScreenTest {
     @Test
     fun `empty state renders locked header copy`() {
         composeRule.setContent { HistoryScreen(viewModel = newViewModel(), persona = Persona.WITNESS) }
-        composeRule.onNodeWithText("No entries yet.").assertIsDisplayed()
+        // Shared accentedHeadline uppercases the display form; "YET." is the coral accent token.
+        composeRule.onNodeWithText("NOTHING RECORDED YET.").assertIsDisplayed()
     }
 
     @Test
@@ -99,7 +100,7 @@ class HistoryScreenTest {
     @Test
     fun `empty state is a polite live region with merged copy and no click action`() {
         composeRule.setContent { HistoryScreen(viewModel = newViewModel(), persona = Persona.WITNESS) }
-        val band = composeRule.onNodeWithContentDescription("No entries yet. First one takes 30 seconds.")
+        val band = composeRule.onNodeWithContentDescription("Nothing recorded yet. First one takes 30 seconds.")
         band.assertIsDisplayed()
         band.assert(SemanticsMatcher.keyIsDefined(SemanticsProperties.LiveRegion))
         band.assert(SemanticsMatcher.keyNotDefined(SemanticsActions.OnClick))
@@ -124,7 +125,7 @@ class HistoryScreenTest {
     @Test
     fun `forbidden exclamation mark does not appear in empty state`() {
         composeRule.setContent { HistoryScreen(viewModel = newViewModel(), persona = Persona.WITNESS) }
-        composeRule.onAllNodesWithText("No entries yet!").assertCountEquals(0)
+        composeRule.onAllNodesWithText("NOTHING RECORDED YET!").assertCountEquals(0)
     }
 
     // loaded state

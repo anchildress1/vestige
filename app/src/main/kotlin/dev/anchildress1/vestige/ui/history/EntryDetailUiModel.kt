@@ -24,6 +24,7 @@ data class EntryDetailUiModel(
     val tags: List<String>,
     /** Until the 3-lens extraction resolves the screen shows the spinner/skeleton state. */
     val extractionComplete: Boolean = true,
+    val extractionFailed: Boolean = false,
 ) {
     companion object {
         fun from(entity: EntryEntity, zoneId: ZoneId): EntryDetailUiModel = EntryDetailUiModel(
@@ -42,6 +43,8 @@ data class EntryDetailUiModel(
             observations = parseObservations(entity.entryObservationsJson),
             tags = entity.tags.map { it.name }.sorted(),
             extractionComplete = entity.extractionStatus == ExtractionStatus.COMPLETED,
+            extractionFailed = entity.extractionStatus == ExtractionStatus.FAILED ||
+                entity.extractionStatus == ExtractionStatus.TIMED_OUT,
         )
 
         private fun parseObservations(json: String): List<ObservationLine> {

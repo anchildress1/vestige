@@ -58,4 +58,20 @@ class VestigeBottomNavTest {
         composeRule.onNodeWithText("PATTERNS").assertHeightIsAtLeast(48.dp)
         composeRule.onNodeWithText("HISTORY").assertHeightIsAtLeast(48.dp)
     }
+
+    @Test
+    fun `active null lights no tab (menu destinations like Settings)`() {
+        composeRule.setContent { VestigeTheme { VestigeBottomNav(active = null, onSelect = {}) } }
+        composeRule.onNodeWithText("CAPTURE").assertIsNotSelected()
+        composeRule.onNodeWithText("PATTERNS").assertIsNotSelected()
+        composeRule.onNodeWithText("HISTORY").assertIsNotSelected()
+    }
+
+    @Test
+    fun `history active selects the trailing segment`() {
+        composeRule.setContent { VestigeTheme { VestigeBottomNav(active = BottomTab.HISTORY, onSelect = {}) } }
+        composeRule.onNodeWithText("HISTORY").assertIsSelected()
+        composeRule.onNodeWithText("CAPTURE").assertIsNotSelected()
+        composeRule.onNodeWithText("PATTERNS").assertIsNotSelected()
+    }
 }

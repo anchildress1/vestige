@@ -106,6 +106,15 @@ class ModelStatusScreenTest {
     }
 
     @Test
+    fun `a deleted model surfaces the re-download error, not the loading line`() {
+        screen(readiness = ModelReadiness.Loading, onDiskLabel = "0")
+        composeRule.onNodeWithContentDescription(
+            "Model file unreadable. Re-download from settings.",
+        ).assertIsDisplayed()
+        composeRule.onAllNodesWithContentDescription("Loading model.").assertCountEquals(0)
+    }
+
+    @Test
     fun `status band renders Paused as stalled copy`() {
         screen(readiness = ModelReadiness.Paused)
         composeRule.onNodeWithContentDescription("Download stalled.").assertIsDisplayed()
@@ -187,5 +196,23 @@ class ModelStatusScreenTest {
         // The confirm is last; tapping it fires onDelete.
         composeRule.onAllNodesWithContentDescription("Delete model").onLast().performClick()
         assertEquals(1, deleted)
+    }
+
+    @Test
+    fun `downloading with no progress snapshot degrades the card and pulled ribbon`() {
+        screen(readiness = ModelReadiness.Downloading(percent = 0), downloadProgress = null)
+        // DownloadingBand announce → no percent; PulledRibbon currentBytes null → "—".
+        composeRule.onNodeWithContentDescription("Downloading model.").assertIsDisplayed()
+        composeRule.onNodeWithContentDescription("— gigabytes pulled, 0 cloud calls").assertExists()
+    }
+
+    @Test
+    fun `paused (not-ready, not-absent) renders the coral stack accent`() {
+        screen(readiness = ModelReadiness.Paused, onDiskLabel = "3.66 GB")
+        composeRule.onNodeWithContentDescription("Download stalled.").assertIsDisplayed()
+        // Not Ready and not absent → readinessLine, stack present with coral (not lime) accent.
+        composeRule.onNodeWithContentDescription(
+            "EmbeddingGemma 300M. VECTOR · HYBRID. 210 MB",
+        ).assertExists()
     }
 }

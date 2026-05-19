@@ -32,7 +32,7 @@ import dev.anchildress1.vestige.ui.theme.VestigeTheme
  */
 @Composable
 @Suppress("LongParameterList") // Modal seam: copy x3 + enabled + 2 callbacks + optional slot.
-fun VestigeConfirmCard(
+fun VestigeConfirmCard( // NOSONAR kotlin:S107
     title: String,
     body: String,
     confirmLabel: String,

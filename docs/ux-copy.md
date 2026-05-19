@@ -293,9 +293,16 @@ Status band (lime border + eyebrow when Ready, coral otherwise; polite live regi
 > Eyebrow — Ready: `● MODEL READY · RUNNING LOCALLY`
 > Eyebrow — not Ready: `● MODEL · NOT READY`
 > Body — Ready: `Gemma 4 E4B · {size} · v{version} · On-device`
-> Body — Loading: `Loading model.`
+> Body — Loading (engine warming, artifact present): `Loading model.`
+> Body — Absent (model deleted / no artifact): `Model file unreadable. Re-download from settings.`
 > Body — Downloading: `Downloading model. Wi-Fi only.` + ` {N}%`
 > Body — Paused: `Download stalled.`
+
+> _Absent reconciliation (2026-05-18):_ `Loading` overloads "engine warming" and "no model
+> on disk". A deleted model isn't loading — the band uses the canonical §"Error States"
+> catalog string `Model file unreadable. Re-download from settings.` (the only sanctioned
+> model-gone copy; deleted and corrupt present the same actionable state). Detected via the
+> route's no-bytes-on-disk signal.
 
 Stat ribbon:
 > `{on-disk size}` · `ON DISK` — the *actual* artifact size; reads `0` once the model is
@@ -324,9 +331,13 @@ Actions (outline buttons):
 > `● DOWNLOADING MODEL · WI-FI ONLY` wrapping the card (polite live region); the stat ribbon
 > becomes `{GB pulled}` · `GB PULLED` + `0` · `CLOUD CALLS`; the network-gate band switches
 > to `● NETWORK GATE · ALLOWLIST ACTIVE 1 HOST` / `Model artifact host only. Closes the
-> moment the pull completes.`; the on-device stack is hidden; the action row is a single
-> full-width **PAUSE**. PAUSE cancels the in-flight pull and keeps the `.part` so a later
-> Re-download resumes via HTTP-Range; readiness drops to `Paused`.
+> moment the pull completes.` and its border/eyebrow render **lime** while the pull is
+> active (active allowlisting reads as "this is on / working"; the sealed-at-rest gate stays
+> coral) — an intentional deviation from the comp's red gate. The on-device stack is hidden;
+> the action row is a single full-width **PAUSE** (the Re-download/Delete buttons keep their
+> gray/coral register — the download surface is not outlined green). PAUSE cancels the
+> in-flight pull and keeps the `.part` so a later Re-download resumes via HTTP-Range;
+> readiness drops to `Paused`.
 
 Both route through the shared scoreboard confirm card (`VestigeConfirmCard`) using the
 canonical §"Destructive Confirmations" wording below — not a Material dialog, not a shorter
@@ -356,7 +367,7 @@ Selected-row tag:
 ## Pattern List
 
 Header:
-> **Patterns**
+> **Vestiges.** *(screen headline only — brand word; the nav tab + section headers stay "Patterns" / `ACTIVE` etc. Function in navigation, brand in the heading. Reconciled 2026-05-18.)*
 
 Action button (top right) — persona-aware:
 - Witness: **Roast me**
@@ -485,8 +496,13 @@ Loading state (model generating):
 
 ### Capture history (no entries yet)
 > Eyebrow: `HISTORY`
-> Header: `No entries yet.`
+> Header: `Nothing recorded yet.`
 > Body: `First one takes 30 seconds.`
+
+> _Reconciliation (2026-05-18):_ header was `No entries yet.`; now `Nothing recorded yet.`
+> and rendered with the **same** treatment as the Patterns empty state — shared
+> `accentedHeadline` (`displayBig`, uppercased, final token lime per
+> `poc/patterns-empty-final.png`). One headline component, two screens.
 
 ### Pattern detail — no sources
 Should not occur in normal flow (a pattern requires entries). If it renders:

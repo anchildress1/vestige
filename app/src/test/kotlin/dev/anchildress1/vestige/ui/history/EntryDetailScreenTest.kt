@@ -9,6 +9,7 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import dev.anchildress1.vestige.model.ExtractionStatus
 import dev.anchildress1.vestige.model.Persona
 import dev.anchildress1.vestige.model.ResolvedExtraction
 import dev.anchildress1.vestige.storage.EntryEntity
@@ -123,6 +124,18 @@ class EntryDetailScreenTest {
         composeRule.onNodeWithTag("entry_extracting").assertExists()
         composeRule.onAllNodesWithTag("entry_three_lens").assertCountEquals(0)
         composeRule.onAllNodesWithTag("entry_field_grid").assertCountEquals(0)
+    }
+
+    @Test
+    fun `failed entry shows failure band instead of endless extracting`() {
+        val id = entryStore.createPendingEntry("failed extraction", FIXTURE_INSTANT)
+        entryStore.failEntry(id, ExtractionStatus.FAILED, "lens-failed")
+
+        setDetail(id)
+
+        composeRule.onNodeWithTag("entry_extracting_failed").assertExists()
+        composeRule.onAllNodesWithTag("entry_extracting").assertCountEquals(0)
+        composeRule.onAllNodesWithTag("entry_lens_skeleton").assertCountEquals(0)
     }
 
     @Test

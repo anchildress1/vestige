@@ -21,7 +21,7 @@ import java.time.ZoneId
 
 @Suppress("LongMethod", "LongParameterList")
 @Composable
-fun PatternsHost(
+fun PatternsHost( // NOSONAR kotlin:S107
     patternStore: PatternStore,
     patternRepo: PatternRepo,
     entryStore: EntryStore,
@@ -113,7 +113,7 @@ fun PatternsHost(
 
 @Suppress("LongParameterList") // Route seam: ids + store + zone + nav callbacks + modifier.
 @Composable
-private fun PatternEntryDetailRoute(
+private fun PatternEntryDetailRoute( // NOSONAR kotlin:S107
     entryId: Long,
     entryStore: EntryStore,
     zoneId: ZoneId,

@@ -141,6 +141,7 @@
     <string name="model_status_pause">PAUSE</string>
     <string name="model_status_header">Model status.</string>
     <string name="model_status_loading">Loading model.</string>
+    <string name="model_status_absent">Model file unreadable. Re-download from settings.</string>
     <string name="model_status_downloading">Downloading model. Wi-Fi only.</string>
     <string name="model_status_paused">Download stalled.</string>
     <string name="model_status_downloading_pct">%1$d%%</string>

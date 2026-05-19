@@ -58,6 +58,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -76,7 +77,6 @@ import java.time.Instant
 import java.time.ZoneId
 import java.time.ZonedDateTime
 import java.util.concurrent.atomic.AtomicBoolean
-import java.util.concurrent.atomic.AtomicLong
 import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
 
@@ -218,11 +218,6 @@ class AppContainer(
 
     @Volatile
     private var backgroundEngineInitialized = false
-
-    @Volatile
-    private var engineWarmupKicked = false
-
-    private val engineWarmupGeneration = AtomicLong(0L)
 
     @Volatile
     private var embedderInstance: Embedder? = null
@@ -425,11 +420,13 @@ class AppContainer(
     }
 
     /**
-     * Land the streamed foreground follow-up and nudge [dataRevision] so an open detail screen
-     * reloads before the background extraction terminal update.
+     * Land call-2's persona follow-up on the still-in-flight entry and nudge [dataRevision] so an
+     * open detail screen reloads now — not later when background extraction terminal happens to
+     * bump it. Without the nudge the follow-up sits on disk, invisible, until convergence
+     * finishes (~15 s+); the user expects it moments after the transcript.
      */
     suspend fun attachFollowUp(entryId: Long, followUpText: String) {
-        withContext(Dispatchers.IO) { entryStore.attachFollowUp(entryId, followUpText) }
+        withContext(ioDispatcher) { entryStore.attachFollowUp(entryId, followUpText) }
         _dataRevision.value += 1
     }
 
@@ -482,62 +479,25 @@ class AppContainer(
     /**
      * Re-probes the model artifact and emits the latest [ModelReadiness] to [modelReadinessFlow].
      * Host calls on lifecycle ON_RESUME (or when an action might have changed model state — e.g.
-     * Settings → Delete model, or a Phase-4 download-complete event). A full-size artifact alone
-     * is *not* `Ready`: the engine still has to load it. Readiness stays `Loading` until
-     * [ensureBackgroundEngineInitialized] completes, then flips to `Ready` and kicks the
-     * PENDING-extraction recovery sweep.
+     * Settings → Delete model, or a Phase-4 download-complete event). Readiness is
+     * **artifact-presence based**: a full-size artifact on disk is `Ready` — the engine is
+     * loaded lazily on the first inference, not proactively, because proactive pre-warm
+     * regressed into a startup GPU-init crash. On the Ready transition the
+     * PENDING-extraction recovery sweep still runs.
      */
     fun refreshModelReadiness() {
         scope.launch {
             // Serialize probe→compare→set so concurrent callers (lifecycle resume + a model
             // action) can't interleave and let an older probe overwrite a newer readiness.
-            // Each caller queues and re-probes after the prior completes.
             readinessRefreshMutex.withLock {
                 val previous = _modelReadinessFlow.value
-                val probed = probeModelReadiness(previous)
-                // The size-only probe reports `Ready` the moment the artifact is on disk, but
-                // `engine.initialize()` (up to ~10 s) hasn't run yet — REC/typed must not unlock
-                // while the first inference would still eat the cold-start warmup. Hold at
-                // `Loading` (the honest "warming up" state) until the engine can actually serve.
-                val artifactReady = probed is ModelReadiness.Ready
-                val current =
-                    if (artifactReady && !backgroundEngineInitialized) ModelReadiness.Loading else probed
-                if (previous != current) _modelReadinessFlow.value = current
-                when {
-                    artifactReady && !backgroundEngineInitialized -> kickEngineWarmup()
-
-                    current is ModelReadiness.Ready && previous !is ModelReadiness.Ready ->
-                        scope.launch { recoverPendingExtractions() }
+                val current = probeModelReadiness(previous)
+                if (previous == current) return@withLock
+                _modelReadinessFlow.value = current
+                if (current is ModelReadiness.Ready && previous !is ModelReadiness.Ready) {
+                    scope.launch { recoverPendingExtractions() }
                 }
             }
-        }
-    }
-
-    /**
-     * Loads the engine off the readiness lock (initialize can take ~10 s), then flips readiness
-     * to `Ready` and drains PENDING recovery. Kicked at most once per warm cycle; a failed warmup
-     * re-arms so the next ON_RESUME retries instead of wedging at `Loading` forever.
-     */
-    private fun kickEngineWarmup() {
-        if (engineWarmupKicked) return
-        engineWarmupKicked = true
-        val warmupGeneration = engineWarmupGeneration.get()
-        scope.launch {
-            val warmed = runCatching { ensureBackgroundEngineInitialized() }
-                .onFailure { Log.e(TAG, "Engine warmup failed; readiness stays Loading", it) }
-                .isSuccess && backgroundEngineInitialized
-            readinessRefreshMutex.withLock {
-                val stillCurrent = warmupGeneration == engineWarmupGeneration.get()
-                val artifactStillReady = verifiedMainModelState() is ModelArtifactState.Complete
-                if (warmed && stillCurrent && artifactStillReady) {
-                    if (_modelReadinessFlow.value is ModelReadiness.Loading) {
-                        _modelReadinessFlow.value = ModelReadiness.Ready
-                    }
-                } else {
-                    engineWarmupKicked = false
-                }
-            }
-            if (warmed) recoverPendingExtractions()
         }
     }
 
@@ -615,9 +575,14 @@ class AppContainer(
      * live instead of wedging the view in a dead progress state.
      */
     fun pauseMainModelDownload() {
-        redownloadJob?.cancel()
+        val job = redownloadJob
         redownloadJob = null
         scope.launch {
+            // cancelAndJoin (not bare cancel): the in-flight redownload holds modelMutationMutex
+            // and only releases it in its `finally` during cancellation unwind. Re-probing or a
+            // follow-up Re-download before that unwind completes would hit the still-held
+            // tryLock() and silently no-op, stranding the user on a dead Paused screen.
+            job?.cancelAndJoin()
             _downloadProgressFlow.value = null
             _modelReadinessFlow.value = ModelReadiness.Paused
             refreshModelReadiness()
@@ -836,11 +801,7 @@ class AppContainer(
     }
 
     private suspend fun resetBackgroundEngine() {
-        engineWarmupGeneration.incrementAndGet()
         backgroundEngineInitMutex.withLock {
-            // Re-arm warmup unconditionally: a delete/redownload mid-warmup must let the next
-            // refresh kick a fresh cycle, even if `initialize()` hadn't finished yet.
-            engineWarmupKicked = false
             if (!backgroundEngineInitialized) return
             // Keep the wrapper instance so every collaborator holding `backgroundEngine` sees the
             // same object; `LiteRtLmEngine.close()` clears the native handle and supports re-init.

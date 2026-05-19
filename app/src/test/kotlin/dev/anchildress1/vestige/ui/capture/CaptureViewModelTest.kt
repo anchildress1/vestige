@@ -87,28 +87,26 @@ class CaptureViewModelTest {
             cancelAndIgnoreRemainingEvents()
         }
         assertEquals(1, save.invocations.get())
-        assertEquals("save persists the foreground transcription", "they asked again", save.lastText)
-        assertNull("save queues analysis before the follow-up terminal lands", save.lastFollowUpText)
+        assertEquals("save persists the call-1 transcription", "they asked again", save.lastText)
+        assertNull("entry persists without a follow-up; it lands later", save.lastFollowUpText)
         assertEquals(42L, attach.lastEntryId)
         assertEquals("what did they actually want", attach.lastFollowUp)
     }
 
     @Test
-    fun `voice path saves first streamed transcription and attaches terminal follow-up`() = runTest(dispatcher) {
+    fun `voice path keeps call-1 transcription authoritative over call-2 echo`() = runTest(dispatcher) {
         val audio = AudioChunk(FloatArray(16), 16_000, isFinal = true)
         val voice = FakeVoiceCapture(result = audio)
         val save = RecordingSaveAndExtract(entryId = 7L)
-        val attach = RecordingAttachFollowUp()
         val vm = newViewModel(
             voice = voice,
             inference = ForegroundInferenceCall { _, _ ->
-                flowOf(
-                    ForegroundStreamEvent.Transcription("streamed early text"),
-                    ForegroundStreamEvent.Terminal(successResult("i kept reopening it", "what were you avoiding")),
-                )
+                flowOf(ForegroundStreamEvent.Transcription("i kept reopening it"))
+            },
+            textInference = ForegroundTextInferenceCall { _, _, _ ->
+                flowOf(ForegroundStreamEvent.Terminal(successResult("garbled echo", "what were you avoiding")))
             },
             save = save,
-            attachFollowUp = attach,
             initialReadiness = ModelReadiness.Ready,
         )
 
@@ -116,10 +114,7 @@ class CaptureViewModelTest {
         voice.completeWithResult()
         advanceUntilIdle()
 
-        assertEquals("save happens as soon as transcription streams", "streamed early text", save.lastText)
-        assertNull(save.lastFollowUpText)
-        assertEquals(7L, attach.lastEntryId)
-        assertEquals("what were you avoiding", attach.lastFollowUp)
+        assertEquals("save persists call-1, not call-2's echo", "i kept reopening it", save.lastText)
         assertEquals(1, save.invocations.get())
     }
 
@@ -138,7 +133,7 @@ class CaptureViewModelTest {
     }
 
     @Test
-    fun `blank foreground transcription surfaces PARSE_FAILED and never persists`() = runTest(dispatcher) {
+    fun `blank call-1 transcription surfaces PARSE_FAILED and never persists`() = runTest(dispatcher) {
         val audio = AudioChunk(FloatArray(16), 16_000, isFinal = true)
         val voice = FakeVoiceCapture(result = audio)
         val save = RecordingSaveAndExtract()
@@ -184,7 +179,7 @@ class CaptureViewModelTest {
     }
 
     @Test
-    fun `foreground engine failure surfaces ENGINE_FAILED`() = runTest(dispatcher) {
+    fun `inference engine failure on call-1 surfaces ENGINE_FAILED`() = runTest(dispatcher) {
         val audio = AudioChunk(FloatArray(16), 16_000, isFinal = true)
         val voice = FakeVoiceCapture(result = audio)
         val vm = newViewModel(
@@ -205,16 +200,19 @@ class CaptureViewModelTest {
     }
 
     @Test
-    fun `foreground terminal parse failure never persists`() = runTest(dispatcher) {
+    fun `call-2 failure still keeps the persisted entry and never errors Capture`() = runTest(dispatcher) {
         val audio = AudioChunk(FloatArray(16), 16_000, isFinal = true)
         val voice = FakeVoiceCapture(result = audio)
-        val save = RecordingSaveAndExtract()
+        val save = RecordingSaveAndExtract(entryId = 9L)
+        val attach = RecordingAttachFollowUp()
         val vm = newViewModel(
             voice = voice,
             inference = ForegroundInferenceCall { _, _ ->
-                flowOf(ForegroundStreamEvent.Terminal(parseFailure(recoveredTranscription = "the exact spoken words")))
+                flowOf(ForegroundStreamEvent.Transcription("the exact spoken words"))
             },
+            textInference = ForegroundTextInferenceCall { _, _, _ -> error("call-2 boom") },
             save = save,
+            attachFollowUp = attach,
             initialReadiness = ModelReadiness.Ready,
         )
 
@@ -222,40 +220,10 @@ class CaptureViewModelTest {
         voice.completeWithResult()
         advanceUntilIdle()
 
-        assertEquals(0, save.invocations.get())
-        assertEquals(
-            CaptureError.InferenceFailed(CaptureError.InferenceFailed.Reason.PARSE_FAILED),
-            (vm.state.value as CaptureUiState.Idle).error,
-        )
-    }
-
-    @Test
-    fun `voice stream failure after transcription still opens the saved entry`() = runTest(dispatcher) {
-        val audio = AudioChunk(FloatArray(16), 16_000, isFinal = true)
-        val voice = FakeVoiceCapture(result = audio)
-        val save = RecordingSaveAndExtract(entryId = 12L)
-        val vm = newViewModel(
-            voice = voice,
-            inference = ForegroundInferenceCall { _, _ ->
-                flow {
-                    emit(ForegroundStreamEvent.Transcription("saved before the crash"))
-                    error("follow-up crash")
-                }
-            },
-            save = save,
-            initialReadiness = ModelReadiness.Ready,
-        )
-
-        vm.openEntryEvents.test {
-            vm.startRecording()
-            voice.completeWithResult()
-            advanceUntilIdle()
-
-            assertEquals(12L, awaitItem())
-            cancelAndIgnoreRemainingEvents()
-        }
-        assertEquals("saved before the crash", save.lastText)
-        assertNull((vm.state.value as CaptureUiState.Idle).error)
+        assertEquals("entry still saved", 1, save.invocations.get())
+        assertTrue("capture is a clean Idle, not an error", vm.state.value is CaptureUiState.Idle)
+        assertNull("no error band — the entry is safe", (vm.state.value as CaptureUiState.Idle).error)
+        assertNull("no follow-up attached on a failed call-2", attach.lastFollowUp)
     }
 
     @Test
@@ -386,7 +354,7 @@ class CaptureViewModelTest {
             inference = ForegroundInferenceCall { _, _ ->
                 flow {
                     release.await()
-                    emit(ForegroundStreamEvent.Terminal(successResult("words", "what got stuck")))
+                    emit(ForegroundStreamEvent.Transcription("words"))
                 }
             },
             save = RecordingSaveAndExtract(),
@@ -405,7 +373,7 @@ class CaptureViewModelTest {
     }
 
     @Test
-    fun `voice path queries lookup with foreground transcription and threads history to save`() = runTest(dispatcher) {
+    fun `voice path queries lookup with call-1 transcription and threads history to save`() = runTest(dispatcher) {
         val voice = FakeVoiceCapture(result = AudioChunk(FloatArray(16), 16_000, isFinal = true))
         val history = listOf(HistoryChunk(patternId = null, text = "a prior entry about the same loop"))
         val lookup = RecordingHistoryLookup(history)
@@ -413,12 +381,11 @@ class CaptureViewModelTest {
         val vm = newViewModel(
             voice = voice,
             inference = ForegroundInferenceCall { _, _ ->
-                flowOf(
-                    ForegroundStreamEvent.Transcription("i keep reopening the same ticket"),
-                    ForegroundStreamEvent.Terminal(
-                        successResult("i keep reopening the same ticket", "what pulls you back"),
-                    ),
-                )
+                flowOf(ForegroundStreamEvent.Transcription("i keep reopening the same ticket"))
+            },
+            textInference = ForegroundTextInferenceCall { _, _, h ->
+                assertEquals(history, h)
+                flowOf(ForegroundStreamEvent.Terminal(successResult("echo", "what pulls you back")))
             },
             save = save,
             lookupHistory = lookup,
@@ -441,10 +408,11 @@ class CaptureViewModelTest {
         val vm = newViewModel(
             voice = voice,
             inference = ForegroundInferenceCall { _, _ ->
-                flowOf(
-                    ForegroundStreamEvent.Transcription("words the lookup will choke on"),
-                    ForegroundStreamEvent.Terminal(successResult("words the lookup will choke on", "still asks")),
-                )
+                flowOf(ForegroundStreamEvent.Transcription("words the lookup will choke on"))
+            },
+            textInference = ForegroundTextInferenceCall { _, _, h ->
+                assertTrue("a degraded lookup must pass empty history", h.isEmpty())
+                flowOf(ForegroundStreamEvent.Terminal(successResult("echo", "still asks")))
             },
             save = save,
             lookupHistory = HistoryRetrieval { error("history store unavailable") },
@@ -460,34 +428,6 @@ class CaptureViewModelTest {
     }
 
     @Test
-    fun `foreground follow-up deltas stream into Submitting`() = runTest(dispatcher) {
-        val voice = FakeVoiceCapture(result = AudioChunk(FloatArray(16), 16_000, isFinal = true))
-        val release = CompletableDeferred<Unit>()
-        val vm = newViewModel(
-            voice = voice,
-            inference = ForegroundInferenceCall { _, _ ->
-                flow {
-                    emit(ForegroundStreamEvent.FollowUpDelta("what got "))
-                    emit(ForegroundStreamEvent.FollowUpDelta("stuck"))
-                    release.await()
-                    emit(ForegroundStreamEvent.Terminal(successResult("words", "what got stuck")))
-                }
-            },
-            save = RecordingSaveAndExtract(),
-            initialReadiness = ModelReadiness.Ready,
-        )
-
-        vm.startRecording()
-        voice.completeWithResult()
-        advanceUntilIdle()
-
-        val submitting = vm.state.value as CaptureUiState.Submitting
-        assertEquals("what got stuck", submitting.streamedFollowUp)
-        release.complete(Unit)
-        advanceUntilIdle()
-    }
-
-    @Test
     fun `submitTyped below minimum length is ignored`() {
         val vm = newViewModel(initialReadiness = ModelReadiness.Ready)
         vm.submitTyped("hi")
@@ -497,11 +437,12 @@ class CaptureViewModelTest {
     @Test
     fun `submitTyped persists, opens the entry and attaches the follow-up`() = runTest(dispatcher) {
         val save = RecordingSaveAndExtract(entryId = 5L)
+        val attach = RecordingAttachFollowUp()
         val vm = newViewModel(
             save = save,
+            attachFollowUp = attach,
             textInference = ForegroundTextInferenceCall { text, persona, _ ->
                 flowOf(
-                    ForegroundStreamEvent.FollowUpDelta("and then what"),
                     ForegroundStreamEvent.Terminal(
                         ForegroundResult.Success(
                             persona = persona,
@@ -525,8 +466,9 @@ class CaptureViewModelTest {
         }
         assertEquals(1, save.invocations.get())
         assertEquals("just got off the call again", save.lastText)
-        assertEquals("and then what", save.lastFollowUpText)
         assertTrue(vm.state.value is CaptureUiState.Idle)
+        assertEquals(5L, attach.lastEntryId)
+        assertEquals("and then what", attach.lastFollowUp)
     }
 
     @Test
@@ -551,7 +493,7 @@ class CaptureViewModelTest {
     }
 
     @Test
-    fun `submitTyped threads looked-up history to save and the foreground prompt`() = runTest(dispatcher) {
+    fun `submitTyped threads looked-up history to save and call-2`() = runTest(dispatcher) {
         val history = listOf(HistoryChunk(patternId = null, text = "earlier note"))
         val lookup = RecordingHistoryLookup(history)
         val save = RecordingSaveAndExtract()
@@ -597,7 +539,7 @@ class CaptureViewModelTest {
             inference = ForegroundInferenceCall { _, _ ->
                 flow {
                     release.await()
-                    emit(ForegroundStreamEvent.Terminal(successResult("x", "y")))
+                    emit(ForegroundStreamEvent.Transcription("x"))
                 }
             },
             save = RecordingSaveAndExtract(),
@@ -715,12 +657,9 @@ class CaptureViewModelTest {
         attachFollowUp: AttachFollowUp = AttachFollowUp { _, _ -> },
     ): CaptureViewModel = newViewModel(
         voice = voice,
-        inference = ForegroundInferenceCall { _, _ ->
-            flowOf(
-                ForegroundStreamEvent.Transcription(transcription),
-                ForegroundStreamEvent.FollowUpDelta(followUp),
-                ForegroundStreamEvent.Terminal(successResult(transcription, followUp)),
-            )
+        inference = ForegroundInferenceCall { _, _ -> flowOf(ForegroundStreamEvent.Transcription(transcription)) },
+        textInference = ForegroundTextInferenceCall { t, _, _ ->
+            flowOf(ForegroundStreamEvent.Terminal(successResult(t, followUp)))
         },
         save = save,
         attachFollowUp = attachFollowUp,

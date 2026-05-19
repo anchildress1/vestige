@@ -8,6 +8,7 @@ import dev.anchildress1.vestige.inference.ForegroundResult
 import dev.anchildress1.vestige.inference.ForegroundStreamEvent
 import dev.anchildress1.vestige.inference.HistoryChunk
 import dev.anchildress1.vestige.model.Persona
+import dev.anchildress1.vestige.storage.EntryPersistenceException
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
@@ -21,6 +22,8 @@ import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.filterIsInstance
+import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -33,8 +36,11 @@ import java.time.ZonedDateTime
  * and the foreground-call lifecycle for one voice or typed entry. Collaborators are injected as
  * fun-interfaces so the JVM unit suite drives the full state machine without Android dependencies.
  *
- * Post-submit the foreground prompt streams first. Voice entries save as soon as transcription
- * lands so background analysis is queued while the same stream finishes the follow-up.
+ * Post-submit there is no in-Capture review surface: the entry persists on the call-1
+ * transcription, the host is told to open it in History detail via [openEntryEvents], and
+ * Capture resets to [CaptureUiState.Idle]. Call-2's persona follow-up is generated in the
+ * background and patched onto the entry — the VM is Activity-scoped so that work survives the
+ * navigation away from Capture.
  *
  * Audio bytes never enter this VM — only RMS levels (0..1) and the final `AudioChunk` that the
  * foreground call consumes once.
@@ -245,9 +251,9 @@ class CaptureViewModel(
     }
 
     /**
-     * Typed-entry path. The text is known immediately, but the persona prompt still runs first so
-     * the user sees the same foreground response shape as voice. Silent no-op when the model isn't
-     * Ready, exactly like a disabled REC button.
+     * Typed-entry path. The text is known immediately, so it persists straight away and the host
+     * opens the entry; call-2 then generates the persona follow-up in the background. Silent
+     * no-op when the model isn't Ready, exactly like a disabled REC button.
      */
     fun submitTyped(text: String) {
         val trimmed = text.trim()
@@ -264,15 +270,9 @@ class CaptureViewModel(
             }
             try {
                 val history = retrieveHistorySafely(trimmed)
-                val foreground = callForegroundText(trimmed, inferencePersona, history) ?: return@launch
-                val entryId = persistPending(
-                    text = foreground.transcription,
-                    persona = inferencePersona,
-                    durationMs = 0L,
-                    followUp = foreground.followUp,
-                    history = history,
-                )
+                val entryId = persistPending(trimmed, inferencePersona, durationMs = 0L, history = history)
                 openEntry(entryId)
+                launchFollowUp(entryId, trimmed, inferencePersona, history)
             } catch (timeout: TimeoutCancellationException) {
                 Log.w(TAG, "Typed submit timed out", timeout)
                 emitInferenceError(CaptureError.InferenceFailed.Reason.TIMED_OUT)
@@ -307,127 +307,50 @@ class CaptureViewModel(
     }
 
     /**
-     * Voice path: save + queue background analysis on the first streamed transcription, then keep
-     * collecting the same foreground stream for the follow-up. The GPU work is serialized by
-     * `LiteRtLmEngine`; queuing here is about lifecycle ordering, not parallel Gemma calls.
+     * Voice path (ADR retrieval-history-gap, option C): call 1 streams the transcription from the
+     * audio; the moment it lands the entry is persisted and the host opens it. A retrieval query
+     * on that transcription then feeds call 2 (background) whose history-conditioned follow-up is
+     * patched onto the entry. The call-1 transcription is authoritative and verbatim.
      */
     private suspend fun runVoiceForeground(persona: Persona, audio: AudioChunk) {
-        val outcome = callForegroundAudio(audio, persona) ?: return
-        val entryId = outcome.entryId ?: persistFromTerminal(outcome.terminal, persona, audio.durationMs) ?: return
-        val terminal = outcome.terminal
-        if (terminal is ForegroundResult.Success && terminal.followUp.isNotBlank()) {
-            attachFollowUp(entryId, terminal.followUp)
-        }
-        openEntry(entryId)
-    }
-
-    private suspend fun callForegroundAudio(audio: AudioChunk, persona: Persona): VoiceForegroundOutcome? {
-        var entryId: Long? = null
-        var terminal: ForegroundResult? = null
-        val outcome = try {
-            foregroundInference(audio, persona).collect { event ->
-                when (event) {
-                    is ForegroundStreamEvent.Transcription -> {
-                        if (entryId == null && event.text.isNotBlank()) {
-                            val history = retrieveHistorySafely(event.text)
-                            entryId = persistPending(
-                                text = event.text,
-                                persona = persona,
-                                durationMs = audio.durationMs,
-                                followUp = null,
-                                history = history,
-                            )
-                        }
-                    }
-
-                    is ForegroundStreamEvent.FollowUpDelta -> appendStreamedFollowUp(event.text)
-
-                    is ForegroundStreamEvent.Terminal -> terminal = event.result
-                }
-            }
-            VoiceForegroundOutcome(entryId = entryId, terminal = terminal)
-        } catch (timeout: TimeoutCancellationException) {
-            Log.w(TAG, "Voice foreground prompt timed out", timeout)
-            handlePartialVoiceFailure(entryId, CaptureError.InferenceFailed.Reason.TIMED_OUT)
-        } catch (cancel: CancellationException) {
-            throw cancel
-        } catch (@Suppress("TooGenericExceptionCaught") error: Exception) {
-            Log.e(TAG, "Voice foreground prompt failed", error)
-            handlePartialVoiceFailure(entryId, CaptureError.InferenceFailed.Reason.ENGINE_FAILED)
-        }
-        return outcome
-    }
-
-    private fun handlePartialVoiceFailure(
-        entryId: Long?,
-        reason: CaptureError.InferenceFailed.Reason,
-    ): VoiceForegroundOutcome? = if (entryId != null) {
-        VoiceForegroundOutcome(entryId = entryId, terminal = null)
-    } else {
-        emitInferenceError(reason)
-        null
-    }
-
-    private suspend fun persistFromTerminal(terminal: ForegroundResult?, persona: Persona, durationMs: Long): Long? {
-        val success = terminal as? ForegroundResult.Success
-        if (success == null || success.transcription.isBlank()) {
+        // null ⇒ the call threw and the matching error was already surfaced; "" ⇒ the call
+        // returned no transcription event (mapped to PARSE_FAILED here). Keeping both signals
+        // in one nullable String holds runVoiceForeground to a single happy path.
+        val transcription = call1Transcription(audio, persona) ?: return
+        if (transcription.isBlank()) {
             emitInferenceError(CaptureError.InferenceFailed.Reason.PARSE_FAILED)
-            return null
+            return
         }
-        val history = retrieveHistorySafely(success.transcription)
-        return persistPending(
-            text = success.transcription,
-            persona = persona,
-            durationMs = durationMs,
-            followUp = success.followUp,
-            history = history,
-        )
+        val history = retrieveHistorySafely(transcription)
+        val entryId = persistPending(transcription, persona, audio.durationMs, history)
+        openEntry(entryId)
+        launchFollowUp(entryId, transcription, persona, history)
     }
 
-    private suspend fun callForegroundText(
-        text: String,
-        persona: Persona,
-        history: List<HistoryChunk>,
-    ): ForegroundResult.Success? = try {
-        foregroundTextInference(text, persona, history).collectForegroundSuccess()
+    private suspend fun call1Transcription(audio: AudioChunk, persona: Persona): String? = try {
+        foregroundInference(audio, persona)
+            .filterIsInstance<ForegroundStreamEvent.Transcription>()
+            .firstOrNull()
+            ?.text
+            .orEmpty()
     } catch (timeout: TimeoutCancellationException) {
-        Log.w(TAG, "Typed foreground prompt timed out", timeout)
+        Log.w(TAG, "Voice transcription timed out", timeout)
         emitInferenceError(CaptureError.InferenceFailed.Reason.TIMED_OUT)
         null
     } catch (cancel: CancellationException) {
         throw cancel
     } catch (@Suppress("TooGenericExceptionCaught") error: Exception) {
-        Log.e(TAG, "Typed foreground prompt failed", error)
+        Log.e(TAG, "Voice transcription failed", error)
         emitInferenceError(CaptureError.InferenceFailed.Reason.ENGINE_FAILED)
         null
-    }
-
-    private suspend fun Flow<ForegroundStreamEvent>.collectForegroundSuccess(): ForegroundResult.Success? {
-        var terminal: ForegroundResult? = null
-        collect { event ->
-            when (event) {
-                is ForegroundStreamEvent.FollowUpDelta -> appendStreamedFollowUp(event.text)
-                is ForegroundStreamEvent.Terminal -> terminal = event.result
-                is ForegroundStreamEvent.Transcription -> Unit
-            }
-        }
-        return when (val result = terminal) {
-            is ForegroundResult.Success -> result
-
-            else -> {
-                emitInferenceError(CaptureError.InferenceFailed.Reason.PARSE_FAILED)
-                null
-            }
-        }
     }
 
     private suspend fun persistPending(
         text: String,
         persona: Persona,
         durationMs: Long,
-        followUp: String?,
         history: List<HistoryChunk>,
-    ): Long = saveAndExtract(text, ZonedDateTime.now(clock.withZone(zoneId)), persona, durationMs, followUp, history)
+    ): Long = saveAndExtract(text, ZonedDateTime.now(clock.withZone(zoneId)), persona, durationMs, null, history)
 
     // Entry is persisted + background extraction kicked. Tell the host to open it in History
     // detail, then reset Capture to Idle so the CAPTURE tab is always a fresh capture surface.
@@ -436,12 +359,33 @@ class CaptureViewModel(
         _state.update { c -> CaptureUiState.Idle(persona = c.persona, modelReadiness = c.modelReadiness) }
     }
 
-    private fun appendStreamedFollowUp(delta: String) {
-        _state.update { current ->
-            if (current is CaptureUiState.Submitting) {
-                current.copy(streamedFollowUp = current.streamedFollowUp + delta)
-            } else {
-                current
+    // Call 2 runs after the user has navigated to the entry — kept on viewModelScope (the VM is
+    // Activity-scoped, so it survives leaving Capture). The persona follow-up is patched onto the
+    // already-persisted entry; any failure just leaves the entry follow-up-less (the worse
+    // outcome — losing the entry — can't happen, it's already saved).
+    private fun launchFollowUp(entryId: Long, text: String, persona: Persona, history: List<HistoryChunk>) {
+        viewModelScope.launch {
+            try {
+                foregroundTextInference(text, persona, history)
+                    .filterIsInstance<ForegroundStreamEvent.Terminal>()
+                    .firstOrNull()
+                    ?.let { terminal ->
+                        val result = terminal.result
+                        if (result is ForegroundResult.Success && result.followUp.isNotBlank()) {
+                            attachFollowUp(entryId, result.followUp)
+                        }
+                    }
+            } catch (timeout: TimeoutCancellationException) {
+                Log.w(TAG, "Follow-up generation timed out for entry $entryId", timeout)
+            } catch (cancel: CancellationException) {
+                throw cancel
+            } catch (persist: EntryPersistenceException) {
+                // Persistence failure (disk full, markdown dir gone) is a different class than a
+                // transient inference miss — error-tier so the lost-follow-up disk case is
+                // greppable instead of hiding under the warn-tier generic handler.
+                Log.e(TAG, "Follow-up persist failed for entry $entryId", persist)
+            } catch (@Suppress("TooGenericExceptionCaught") error: Exception) {
+                Log.w(TAG, "Follow-up generation failed for entry $entryId (${error.javaClass.simpleName})")
             }
         }
     }
@@ -502,8 +446,10 @@ fun interface ForegroundInferenceCall {
 }
 
 /**
- * Streams the foreground persona prompt for typed entries. The history is rendered into the
- * system prompt by `ForegroundInference`.
+ * Streams a follow-up call given known text + retrieved prior-entry context. Used for typed
+ * entries (text = the user's typed words) and for the voice path's call 2 (text = call-1's
+ * authoritative transcription). The history is rendered into the system prompt by
+ * `ForegroundInference`.
  */
 fun interface ForegroundTextInferenceCall {
     operator fun invoke(
@@ -537,9 +483,7 @@ fun interface SaveAndExtract {
     ): Long
 }
 
-/** Lands the foreground follow-up onto an already-persisted entry. */
+/** Lands call-2's persona follow-up onto an already-persisted in-flight entry. */
 fun interface AttachFollowUp {
     suspend operator fun invoke(entryId: Long, followUpText: String)
 }
-
-private data class VoiceForegroundOutcome(val entryId: Long?, val terminal: ForegroundResult?)

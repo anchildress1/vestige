@@ -675,10 +675,64 @@ class AppContainerTest {
         assertEquals(1, stopRequests)
         assertEquals(BackgroundExtractionLifecycleState.NORMAL, container.lifecycleStateMachine.state.value)
         verify(exactly = 1) { engineMock.close() }
-        coVerify(exactly = 2) { engineMock.initialize() }
+        // Post-revert there is no proactive pre-warm: only the explicit pre-redownload
+        // initialize() ran; the re-pull does not eagerly re-init (lazy on next inference).
+        coVerify(exactly = 1) { engineMock.initialize() }
         assertTrue(modelFile.exists(), "re-pull must land the artifact on disk")
         assertEquals(ModelReadiness.Ready, container.modelReadinessFlow.value)
     }
+
+    @Test
+    fun `pause cancels the in-flight pull, frees the mutex, and a re-download still runs`(@TempDir tempRoot: File) =
+        runTest {
+            val modelFile = File(tempRoot, "main-model.litertlm")
+            val artifactStore = fakeArtifactStore(artifactFile = modelFile, expectedByteSize = 2L)
+            val firstPullGate = CompletableDeferred<Unit>()
+            var downloadCalls = 0
+            coEvery { artifactStore.download(any()) } coAnswers {
+                if (downloadCalls++ == 0) {
+                    firstPullGate.await() // in-flight; holds modelMutationMutex until cancelled
+                    ModelArtifactState.Complete
+                } else {
+                    modelFile.writeText("xx")
+                    ModelArtifactState.Complete
+                }
+            }
+            val context = mockk<Context>(relaxed = true) {
+                every { filesDir } returns tempRoot
+                every { cacheDir } returns File(tempRoot, "cache").apply { mkdirs() }
+            }
+            val container = AppContainer(
+                applicationContext = context,
+                boxStoreFactory = { mockk<BoxStore>(relaxed = true) },
+                markdownStoreFactory = { mockk<MarkdownEntryStore>(relaxed = true) },
+                modelPathLoader = { modelFile.absolutePath },
+                backgroundEngineFactory = { _, _ -> mockk<LiteRtLmEngine>(relaxed = true) },
+                mainModelArtifactStoreFactory = { _, _, _ -> artifactStore },
+                recoveredEntryIdsLoader = { emptyList() },
+                foregroundServiceIntentFactory = { Intent("dev.anchildress1.vestige.TEST_START") },
+                foregroundServiceStarter = {},
+                scope = this,
+            )
+
+            container.redownloadMainModel()
+            advanceUntilIdle() // first pull is now suspended inside download(), holding the mutex
+
+            container.pauseMainModelDownload()
+            advanceUntilIdle()
+            // cancelAndJoin must have unwound the mutation before re-probe: progress cleared and
+            // readiness no longer Downloading (the fake store has no .part, so the re-probe resolves
+            // Absent→Loading; a real .part would resolve Paused — either is "not wedged").
+            assertEquals(null, container.downloadProgressFlow.value)
+            assertTrue(container.modelReadinessFlow.value !is ModelReadiness.Downloading)
+
+            // The regression: a follow-up re-download must NOT silently no-op on a still-held mutex.
+            container.redownloadMainModel()
+            advanceUntilIdle()
+            coVerify(exactly = 2) { artifactStore.download(any()) }
+            assertTrue(modelFile.exists(), "the second re-pull must actually run, not be dropped")
+            assertEquals(ModelReadiness.Ready, container.modelReadinessFlow.value)
+        }
 
     @Test
     fun `redownloadMainModel closes the initialized engine so the same wrapper can be reinitialized`(
@@ -752,125 +806,9 @@ class AppContainerTest {
     }
 
     @Test
-    fun `refreshModelReadiness holds Loading until the engine warms, then flips Ready`(@TempDir tempRoot: File) =
-        runTest {
-            val modelFile = File(tempRoot, "main-model.litertlm").apply { writeText("xx") }
-            val artifactStore = fakeArtifactStore(artifactFile = modelFile, expectedByteSize = 2L)
-            val context = mockk<Context>(relaxed = true) {
-                every { filesDir } returns tempRoot
-                every { cacheDir } returns File(tempRoot, "cache").apply { mkdirs() }
-            }
-            val warmGate = CompletableDeferred<Unit>()
-            val engine = mockk<LiteRtLmEngine>(relaxed = true)
-            // initialize()'s expression body yields Android Log.d's Int; suspend on the gate
-            // then return any Int so the warming window is observable under the test scheduler.
-            coEvery { engine.initialize() } coAnswers {
-                warmGate.await()
-                0
-            }
-            val container = AppContainer(
-                applicationContext = context,
-                boxStoreFactory = { mockk<BoxStore>(relaxed = true) },
-                markdownStoreFactory = { mockk<MarkdownEntryStore>(relaxed = true) },
-                modelPathLoader = { modelFile.absolutePath },
-                backgroundEngineFactory = { _, _ -> engine },
-                mainModelArtifactStoreFactory = { _, _, _ -> artifactStore },
-                recoveredEntryIdsLoader = { emptyList() },
-                foregroundServiceIntentFactory = { Intent("dev.anchildress1.vestige.TEST_START") },
-                foregroundServiceStarter = {},
-                scope = this,
-            )
-
-            container.refreshModelReadiness()
-            advanceUntilIdle()
-            // Artifact is full-size on disk, but the engine is still inside initialize() —
-            // readiness must report the honest warming state, not a premature Ready.
-            assertEquals(ModelReadiness.Loading, container.modelReadinessFlow.value)
-
-            warmGate.complete(Unit)
-            advanceUntilIdle()
-            assertEquals(ModelReadiness.Ready, container.modelReadinessFlow.value)
-            coVerify(exactly = 1) { engine.initialize() }
-        }
-
-    @Test
-    fun `a failed engine warmup re-arms so the next refresh retries to Ready`(@TempDir tempRoot: File) = runTest {
-        val modelFile = File(tempRoot, "main-model.litertlm").apply { writeText("xx") }
-        val artifactStore = fakeArtifactStore(artifactFile = modelFile, expectedByteSize = 2L)
-        val context = mockk<Context>(relaxed = true) {
-            every { filesDir } returns tempRoot
-            every { cacheDir } returns File(tempRoot, "cache").apply { mkdirs() }
-        }
-        var attempts = 0
-        val engine = mockk<LiteRtLmEngine>(relaxed = true)
-        coEvery { engine.initialize() } coAnswers {
-            if (attempts++ == 0) error("warm boom")
-            0
-        }
-        val container = AppContainer(
-            applicationContext = context,
-            boxStoreFactory = { mockk<BoxStore>(relaxed = true) },
-            markdownStoreFactory = { mockk<MarkdownEntryStore>(relaxed = true) },
-            modelPathLoader = { modelFile.absolutePath },
-            backgroundEngineFactory = { _, _ -> engine },
-            mainModelArtifactStoreFactory = { _, _, _ -> artifactStore },
-            recoveredEntryIdsLoader = { emptyList() },
-            foregroundServiceIntentFactory = { Intent("dev.anchildress1.vestige.TEST_START") },
-            foregroundServiceStarter = {},
-            scope = this,
-        )
-
-        container.refreshModelReadiness()
-        advanceUntilIdle()
-        // initialize() threw — readiness must NOT advance to Ready and must not wedge.
-        assertEquals(ModelReadiness.Loading, container.modelReadinessFlow.value)
-
-        container.refreshModelReadiness()
-        advanceUntilIdle()
-        assertEquals(ModelReadiness.Ready, container.modelReadinessFlow.value)
-        coVerify(exactly = 2) { engine.initialize() }
-    }
-
-    @Test
-    fun `repeated refresh while warming kicks the engine exactly once`(@TempDir tempRoot: File) = runTest {
-        val modelFile = File(tempRoot, "main-model.litertlm").apply { writeText("xx") }
-        val artifactStore = fakeArtifactStore(artifactFile = modelFile, expectedByteSize = 2L)
-        val context = mockk<Context>(relaxed = true) {
-            every { filesDir } returns tempRoot
-            every { cacheDir } returns File(tempRoot, "cache").apply { mkdirs() }
-        }
-        val warmGate = CompletableDeferred<Unit>()
-        val engine = mockk<LiteRtLmEngine>(relaxed = true)
-        coEvery { engine.initialize() } coAnswers {
-            warmGate.await()
-            0
-        }
-        val container = AppContainer(
-            applicationContext = context,
-            boxStoreFactory = { mockk<BoxStore>(relaxed = true) },
-            markdownStoreFactory = { mockk<MarkdownEntryStore>(relaxed = true) },
-            modelPathLoader = { modelFile.absolutePath },
-            backgroundEngineFactory = { _, _ -> engine },
-            mainModelArtifactStoreFactory = { _, _, _ -> artifactStore },
-            recoveredEntryIdsLoader = { emptyList() },
-            foregroundServiceIntentFactory = { Intent("dev.anchildress1.vestige.TEST_START") },
-            foregroundServiceStarter = {},
-            scope = this,
-        )
-
-        repeat(3) { container.refreshModelReadiness() }
-        advanceUntilIdle()
-        assertEquals(ModelReadiness.Loading, container.modelReadinessFlow.value)
-        coVerify(exactly = 1) { engine.initialize() }
-
-        warmGate.complete(Unit)
-        advanceUntilIdle()
-        assertEquals(ModelReadiness.Ready, container.modelReadinessFlow.value)
-        coVerify(exactly = 1) { engine.initialize() }
-    }
-
-    @Test
-    fun `refresh goes straight to Ready when the engine is already initialized`(@TempDir tempRoot: File) = runTest {
+    fun `refreshModelReadiness flips Ready on artifact-present without pre-warming the engine`(
+        @TempDir tempRoot: File,
+    ) = runTest {
         val modelFile = File(tempRoot, "main-model.litertlm").apply { writeText("xx") }
         val artifactStore = fakeArtifactStore(artifactFile = modelFile, expectedByteSize = 2L)
         val context = mockk<Context>(relaxed = true) {
@@ -891,13 +829,14 @@ class AppContainerTest {
             scope = this,
         )
 
-        container.ensureBackgroundEngineInitialized()
         container.refreshModelReadiness()
         advanceUntilIdle()
 
-        // Engine already warm — no second initialize, no warming hop.
+        // Artifact on disk ⇒ Ready immediately. The engine is NOT pre-warmed here — it loads
+        // lazily on first inference (ADR-012 §Addendum 2026-05-18: proactive pre-warm reverted
+        // after it regressed into a startup GPU-init crash).
         assertEquals(ModelReadiness.Ready, container.modelReadinessFlow.value)
-        coVerify(exactly = 1) { engine.initialize() }
+        coVerify(exactly = 0) { engine.initialize() }
     }
 
     @Test
@@ -1575,36 +1514,6 @@ class AppContainerTest {
             dev.anchildress1.vestige.ui.capture.ModelReadiness.Ready,
             container.modelReadinessFlow.value,
         )
-    }
-
-    @Test
-    fun `pre-warm fires immediately on Ready transition without a delay`(@TempDir tempRoot: File) = runTest {
-        val modelFile = File(tempRoot, "main-model.litertlm").apply { writeText("xx") } // 2 bytes
-        val artifactStore = fakeArtifactStore(artifactFile = modelFile, expectedByteSize = 2L)
-        val context = mockk<Context>(relaxed = true) {
-            every { filesDir } returns tempRoot
-            every { cacheDir } returns File(tempRoot, "cache").apply { mkdirs() }
-        }
-        val engineMock = mockk<LiteRtLmEngine>(relaxed = true)
-        val container = AppContainer(
-            applicationContext = context,
-            boxStoreFactory = { mockk<BoxStore>(relaxed = true) },
-            markdownStoreFactory = { mockk<MarkdownEntryStore>(relaxed = true) },
-            modelPathLoader = { modelFile.absolutePath },
-            backgroundEngineFactory = { _, _ -> engineMock },
-            mainModelArtifactStoreFactory = { _, _, _ -> artifactStore },
-            recoveredEntryIdsLoader = { emptyList() },
-            foregroundServiceIntentFactory = { Intent("dev.anchildress1.vestige.TEST_START") },
-            foregroundServiceStarter = {},
-            scope = this,
-        )
-
-        container.refreshModelReadiness()
-        advanceUntilIdle()
-
-        assertEquals(ModelReadiness.Ready, container.modelReadinessFlow.value)
-        coVerify(exactly = 1) { engineMock.initialize() }
-        assertEquals(0L, testScheduler.currentTime, "pre-warm must fire without advancing virtual time")
     }
 
     @Test

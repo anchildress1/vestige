@@ -107,6 +107,15 @@ kover {
                         "dev.anchildress1.vestige.inference.AudioCapture",
                         "dev.anchildress1.vestige.inference.AudioCapture*",
                     )
+                    // Compose UI carries no business logic — `@Composable` functions are
+                    // declarative rendering; their "branches" are overwhelmingly the compiler's
+                    // recomposition/skippability guards (`$changed`, `shouldExecute`), not
+                    // testable conditions. View logic lives in ViewModels / host-model
+                    // derivations / formatters, which are NOT `@Composable` and stay fully
+                    // measured by the LINE + BRANCH bounds. This annotation exclude supersedes
+                    // the brittle per-screen `composeScreenExclusions` list for the branch metric
+                    // (new screens no longer have to be hand-added to keep the gate honest).
+                    annotatedBy("androidx.compose.runtime.Composable")
                 }
             }
             verify {

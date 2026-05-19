@@ -196,7 +196,15 @@ class EntryStore(private val boxStore: BoxStore, private val markdownStore: Mark
         }
     }
 
-    /** Land the foreground follow-up after the entry has already been created. Blank input is a no-op. */
+    /**
+     * Land the persona follow-up on a still-in-flight entry. The voice path persists the entry on
+     * the call-1 transcription — before call-2 has produced the follow-up — so the follow-up
+     * arrives separately and is written here once call-2 terminal lands. Blank input is a no-op.
+     *
+     * This also patches terminal rows: background extraction and call-2 share the engine, so
+     * extraction can complete first and the follow-up can still be the latest valid foreground
+     * result.
+     */
     fun attachFollowUp(entryId: Long, followUpText: String) {
         val trimmed = followUpText.trimEnd().takeIf(String::isNotBlank) ?: return
         boxStore.runInTx {

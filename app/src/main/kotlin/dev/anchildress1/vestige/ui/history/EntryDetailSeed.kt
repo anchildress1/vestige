@@ -19,6 +19,8 @@ object EntryDetailSeed {
     const val EXTRACTING_EYEBROW: String = "● EXTRACTING · 3 LENSES"
     const val EXTRACTING_BODY: String =
         "Convergence resolves in the background. Open the entry later for the full read."
+    const val FAILED_EYEBROW: String = "● EXTRACTION DID NOT FINISH"
+    const val FAILED_BODY: String = "The transcript was saved, but the structured read did not resolve."
 
     val lenses: List<LensRead> = listOf(
         LensRead("LITERAL", "battery yanked", LensTone.CANONICAL),

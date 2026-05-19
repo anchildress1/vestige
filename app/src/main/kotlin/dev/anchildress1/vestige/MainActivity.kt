@@ -311,7 +311,7 @@ private const val SETTINGS_TAG = "SettingsRoute"
 
 @Suppress("LongParameterList") // Settings nav root — host seams are intentionally co-located.
 @androidx.compose.runtime.Composable
-private fun SettingsRoute(
+private fun SettingsRoute( // NOSONAR kotlin:S107
     container: AppContainer,
     onboardingPrefs: OnboardingPrefs,
     persona: Persona,

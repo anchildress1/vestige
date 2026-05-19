@@ -1,6 +1,7 @@
 package dev.anchildress1.vestige.inference
 
 import dev.anchildress1.vestige.model.Persona
+import org.junit.jupiter.api.Assertions.assertAll
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNotEquals
 import org.junit.jupiter.api.Assertions.assertTrue
@@ -47,11 +48,10 @@ class PersonaPromptComposerTest {
         assertNotEquals(witness, editor)
         assertNotEquals(hardass, editor)
 
-        // Forbidden-phrase sentinel from the shared block must show up in all three.
-        val forbidden = "Forbidden phrases:"
-        assertTrue(witness.contains(forbidden))
-        assertTrue(hardass.contains(forbidden))
-        assertTrue(editor.contains(forbidden))
+        val sharedSentinel = "The follow-up is memory completion"
+        assertTrue(witness.contains(sharedSentinel))
+        assertTrue(hardass.contains(sharedSentinel))
+        assertTrue(editor.contains(sharedSentinel))
     }
 
     @Test
@@ -62,13 +62,46 @@ class PersonaPromptComposerTest {
     }
 
     @Test
-    fun `editor prompt includes sparse-input fallback instead of requiring hallucinated contradictions`() {
+    fun `shared prompt targets missing observable facts instead of next actions`() {
+        Persona.entries.forEach { persona ->
+            val prompt = PersonaPromptComposer.compose(persona)
+            assertAll(
+                { assertTrue(prompt.contains("The primary thing the user explicitly recorded")) },
+                { assertTrue(prompt.contains("The secondary thing they also recorded")) },
+                { assertTrue(prompt.contains("The non-obvious missing detail")) },
+                { assertTrue(prompt.contains("What got blank, locked, scattered")) },
+                { assertTrue(prompt.contains("Use artifact names only when they belong to the missing detail")) },
+                { assertTrue(prompt.contains("Ask one recall question about the original moment")) },
+                { assertTrue(prompt.contains("Do not ask for a next action, deadline, plan")) },
+                { assertTrue(prompt.contains("Keep the question anchored to recall")) },
+                { assertTrue(prompt.contains("The silent checklist is identical for every persona")) },
+                { assertTrue(prompt.contains("Do not output this checklist")) },
+            )
+        }
+    }
+
+    @Test
+    fun `hardass prompt is recall focused and forbids action pressure`() {
+        val hardass = PersonaPromptComposer.compose(Persona.HARDASS)
+        assertAll(
+            { assertTrue(hardass.contains("recall-focused")) },
+            { assertTrue(hardass.contains("Push recall only. Do not push action.")) },
+            { assertTrue(hardass.contains("Open by naming what the entry failed to capture")) },
+            { assertTrue(hardass.contains("Use one of these question starts")) },
+            { assertTrue(hardass.contains("You recorded the renaming loop, not the before-moment")) },
+        )
+    }
+
+    @Test
+    fun `editor prompt recovers precise wording without collapsing into witness`() {
         val editor = PersonaPromptComposer.compose(Persona.EDITOR)
-        assertTrue(editor.contains("if the transcription has neither")) {
-            "Editor prompt must define a sparse-input fallback when no contradiction or vague noun exists"
-        }
-        assertTrue(editor.contains("quote one broad action/state word")) {
-            "Editor prompt must fall back to tightening an imprecise user word on thin inputs"
-        }
+        assertAll(
+            { assertTrue(editor.contains("linguistic bullshit")) },
+            { assertTrue(editor.contains("Do not merge two recorded facts into a new claim")) },
+            { assertTrue(editor.contains("Point at the word or phrase doing too much work")) },
+            { assertTrue(editor.contains("'Still open' names the doc, not you")) },
+            { assertTrue(editor.contains("starts with \"What word\" or \"Which word\"")) },
+            { assertTrue(editor.contains("What word belongs before it?")) },
+        )
     }
 }

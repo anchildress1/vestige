@@ -350,6 +350,13 @@ class ForegroundInferenceTest {
             { assertFalse(systemPrompt.contains("RECENT TURNS")) },
             { assertTrue(systemPrompt.contains("transcription tags")) },
             { assertTrue(systemPrompt.contains("follow_up tags")) },
+            { assertTrue(systemPrompt.contains("Do not output analysis notes")) },
+            { assertTrue(systemPrompt.contains("Do not duplicate the transcription text")) },
+            { assertTrue(systemPrompt.contains("Transcribe audible speech even when music")) },
+            { assertTrue(systemPrompt.contains("must contain spoken words only")) },
+            { assertTrue(systemPrompt.contains("do not substitute labels, summaries")) },
+            { assertTrue(systemPrompt.contains("repeated placeholder rows for speech")) },
+            { assertTrue(!systemPrompt.contains("[music]")) },
             { assertFalse(systemPrompt.contains("<transcription>")) },
             { assertFalse(systemPrompt.contains("<follow_up>")) },
         )

@@ -73,10 +73,19 @@ class PatternAnalysisGenerator(
 
     @Suppress("ReturnCount") // Model-output validation is clearer as guard clauses.
     private fun parse(raw: String): PatternAnalysisResult? {
-        val root = findFirstParseableObject(raw) ?: return null
-        val title = root.optString("title").trim().sanitizeTitle() ?: return null
-        val callout = root.optString("callout").trim().sanitizeCallout() ?: return null
-        if (forbiddenPhraseDetector(title) || forbiddenPhraseDetector(callout)) return null
+        // Distinguishes each rejection so a deterministic fallback callout is diagnosable.
+        // Length only — model output is derived from journal text, never a log sink.
+        fun rejected(reason: String): PatternAnalysisResult? {
+            Log.w(TAG, "pattern analysis rejected reason=$reason (rawLen=${raw.length})")
+            return null
+        }
+        val root = findFirstParseableObject(raw) ?: return rejected("no-json")
+        val title = root.optString("title").trim().sanitizeTitle() ?: return rejected("blank-title")
+        val callout = root.optString("callout").trim().sanitizeCallout()
+            ?: return rejected("blank-or-overlong-callout")
+        if (forbiddenPhraseDetector(title) || forbiddenPhraseDetector(callout)) {
+            return rejected("forbidden-phrase")
+        }
         return PatternAnalysisResult(title = title, calloutText = callout)
     }
 

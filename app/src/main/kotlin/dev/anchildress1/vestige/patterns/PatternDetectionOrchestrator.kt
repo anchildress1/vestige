@@ -119,6 +119,7 @@ class PatternDetectionOrchestrator(
                 null
             }
             ?: deterministicFallbackTitle(detected)
+        logDegradedIfTemporal(detected, analysis)
         val callout = analysis?.calloutText ?: PatternCalloutText.build(detected)
         val now = clock.millis()
         val entity = PatternEntity(
@@ -167,6 +168,7 @@ class PatternDetectionOrchestrator(
         // freeze the callout the user last saw — re-surfacing in v1.5 must show that string,
         // not arbitrary drift from later evidence.
         if (pattern.state == PatternState.ACTIVE) {
+            logDegradedIfTemporal(detected, analysis)
             if (analysis != null) pattern.title = analysis.title
             pattern.latestCalloutText = analysis?.calloutText ?: PatternCalloutText.build(detected)
         }
@@ -225,6 +227,15 @@ private fun completedEntryCount(boxStore: BoxStore): Long = boxStore.boxFor(Entr
     .equal(EntryEntity_.extractionStatus, ExtractionStatus.COMPLETED.name, QueryBuilder.StringOrder.CASE_SENSITIVE)
     .build()
     .use { it.count() }
+
+// A TEMPORAL_RELATIVE pattern that lands on the deterministic callout means model analysis
+// failed or was rejected (the generator already logged the specific reason). Surface the
+// degraded outcome so a canned-looking callout is traceable to a real fallback, not silence.
+private fun logDegradedIfTemporal(detected: DetectedPattern, analysis: PatternAnalysisResult?) {
+    if (detected.kind == PatternKind.TEMPORAL_RELATIVE && analysis == null) {
+        Log.w("VestigePatternOrch", "pattern ${detected.patternId} callout degraded to deterministic fallback")
+    }
+}
 
 private fun deterministicFallbackTitle(detected: DetectedPattern): String {
     val source = detected.templateLabel ?: detected.kind.serial.replace('_', ' ')

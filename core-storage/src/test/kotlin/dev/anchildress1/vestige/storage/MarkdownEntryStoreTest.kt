@@ -115,7 +115,7 @@ class MarkdownEntryStoreTest {
         assertEquals(Persona.HARDASS, readBack.persona)
         assertEquals(TemplateLabel.AFTERMATH, readBack.templateLabel)
         assertEquals("flattened", readBack.energyDescriptor)
-        assertTrue(readBack.lensReceiptsJson.contains("LITERAL"))
+        assertTrue(readBack.lensReceiptsJson.orEmpty().contains("LITERAL"))
     }
 
     @Test
@@ -283,7 +283,7 @@ class MarkdownEntryStoreTest {
             readBack.statedCommitmentJson,
         )
         assertEquals("""{"templateLabel":"CANONICAL"}""", readBack.confidenceJson)
-        assertTrue(readBack.lensReceiptsJson.contains("SKEPTICAL"))
+        assertTrue(readBack.lensReceiptsJson.orEmpty().contains("SKEPTICAL"))
         assertEquals(Instant.parse("2026-05-09T14:32:15Z").toEpochMilli(), readBack.timestampEpochMs)
     }
 

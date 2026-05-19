@@ -15,12 +15,15 @@ import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 
 /**
- * Best-effort background analysis for temporal patterns. The deterministic resolver decides what
+ * Best-effort background analysis for temporal patterns. The deterministic detector decides what
  * counts; this call decides how to say the recurring time relationship back to the user.
+ *
+ * The persona contributes voice only — the foreground follow-up prompt is a different task with a
+ * conflicting output contract, so this path takes a one-line tone descriptor, not that prompt.
  */
 class PatternAnalysisGenerator(
     private val engine: LiteRtLmEngine,
-    private val personaPromptComposer: (Persona) -> String = PersonaPromptComposer::compose,
+    private val personaPromptComposer: (Persona) -> String = ::patternAnalysisPersonaTone,
     private val templateLoader: () -> String = { loadResource("/patterns/temporal-analysis.txt") },
     private val forbiddenPhraseDetector: (String) -> Boolean = ObservationResponseParser::containsForbiddenPhrase,
     private val zoneId: ZoneId = ZoneId.systemDefault(),
@@ -172,6 +175,12 @@ class PatternAnalysisGenerator(
             return stream.bufferedReader(Charsets.UTF_8).use { it.readText() }
         }
     }
+}
+
+private fun patternAnalysisPersonaTone(persona: Persona): String = when (persona) {
+    Persona.WITNESS -> "Voice: quiet, calm, literal. State the relationship plainly. No judgment, no wordplay."
+    Persona.HARDASS -> "Voice: blunt and direct. Name the relationship without softening. No insults, no advice."
+    Persona.EDITOR -> "Voice: precise and economical. Tight phrasing. No filler, no advice."
 }
 
 data class PatternEvidenceEntry(

@@ -6,11 +6,13 @@ import dev.anchildress1.vestige.model.Persona
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.mockk
+import io.mockk.slot
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
@@ -129,6 +131,21 @@ class PatternAnalysisGeneratorTest {
                 match { it.contains("2026-05-19T13:30:00Z") && it.contains("forgot the thing") },
             )
         }
+    }
+
+    @Test
+    fun `default persona prompt is tone-only, not the follow-up prompt`() = runTest {
+        val captured = slot<String>()
+        coEvery { engine.generateText(capture(captured), any()) } returns
+            "{\"title\":\"Tuesday Drag\",\"callout\":\"You keep landing here on Tuesday afternoons.\"}"
+
+        PatternAnalysisGenerator(engine = engine, ioDispatcher = dispatcher)
+            .generate(Persona.WITNESS, temporalPattern(), evidence())
+
+        val systemInstruction = captured.captured
+        assertTrue(systemInstruction.contains("Voice:"))
+        assertFalse(systemInstruction.contains("Silent Checklist"))
+        assertFalse(systemInstruction.contains("recall question"))
     }
 
     @Test

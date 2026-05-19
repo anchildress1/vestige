@@ -1166,7 +1166,7 @@ class AppContainerTest {
         }
 
     @Test
-    fun `zipAllEntriesTo propagates read failure and preserves completed entries`(@TempDir tempRoot: File) = runTest {
+    fun `zipAllEntriesTo propagates read failure without writing a partial archive`(@TempDir tempRoot: File) = runTest {
         val boxDir = newInMemoryObjectBoxDirectory("export-fail")
         val box = openInMemoryBoxStore(boxDir)
         val good = File(tempRoot, "good.md").apply { writeText("first") }
@@ -1198,11 +1198,9 @@ class AppContainerTest {
 
             // The export is honest about failure — a failed entry read propagates, never swallowed.
             assertTrue(raised.isFailure, "a mid-archive read failure must propagate, not be swallowed")
-            // closeEntry() ran in finally, so the archive stays parseable and the entry written
-            // before the failure survives instead of being orphaned by a dangling open entry.
-            val names = unzipTextEntries(out).keys
-            assertTrue(names.contains(VestigeDataExporter.SNAPSHOT_ENTRY), "the snapshot entry must remain parseable")
-            assertTrue(names.contains("entries/good.md"), "the entry completed before the failure must remain")
+            // The archive is staged in full before any byte reaches the caller's target, so a
+            // mid-archive failure leaves no truncated zip the user could mistake for a backup.
+            assertEquals(0, out.size(), "a failed export must not write a partial archive to the target")
         } finally {
             box.close()
         }

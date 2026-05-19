@@ -208,7 +208,6 @@ private fun PatternsListPreview() {
                 PatternCardUi(
                     patternId = "abc",
                     title = "Tuesday Meetings",
-                    templateLabel = "Crashed",
                     observation = "Fourth entry mentions Tuesday meetings. State before: cruising. After: crashed.",
                     supportingCount = 4,
                     totalEntryCount = 12,

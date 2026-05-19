@@ -6,7 +6,6 @@ import dev.anchildress1.vestige.model.PatternState
 data class PatternCardUi(
     val patternId: String,
     val title: String,
-    val templateLabel: String?,
     val observation: String,
     val supportingCount: Int,
     val totalEntryCount: Long,
@@ -66,7 +65,6 @@ sealed interface PatternDetailUiState {
     data class Loaded(
         val patternId: String,
         val title: String,
-        val templateLabel: String?,
         val observation: String,
         val supportingCount: Int,
         val totalEntryCount: Long,

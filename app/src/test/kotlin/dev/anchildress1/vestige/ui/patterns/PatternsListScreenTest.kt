@@ -172,8 +172,7 @@ class PatternsListScreenTest {
         composeRule.setContent { PatternsListScreen(viewModel = newViewModel(), onOpenPattern = {}) }
 
         composeRule.onNodeWithText("Tuesday Meetings").assertIsDisplayed()
-        // Category renders as an uppercase tone-colored eyebrow above the name (comp parity).
-        composeRule.onNodeWithText("AFTERMATH").assertIsDisplayed()
+        composeRule.onAllNodesWithText("AFTERMATH").assertCountEquals(0)
         composeRule.onNodeWithText("Fourth entry mentions Tuesday meetings.").assertIsDisplayed()
         // Substring match avoids brittleness on the bullet glyph and trailing date format.
         composeRule.onNodeWithText("1 of 1 entries", substring = true).assertIsDisplayed()

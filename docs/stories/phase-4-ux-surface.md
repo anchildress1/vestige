@@ -469,7 +469,7 @@ Checked bullets above are the historical record that the Mist tokens shipped to 
 
 ### Story 4.16 — Yank template label from all UI surfaces
 
-**Status:** Not started. Written 2026-05-17 after the template-assignment root-cause trace (`backlog.md` §`archetype-template-labeling`, `docs/stories/phase-2-core-loop.md` §Story 2.10 "Structural defect").
+**Status:** Done 2026-05-19. Written 2026-05-17 after the template-assignment root-cause trace (`backlog.md` §`archetype-template-labeling`, `docs/stories/phase-2-core-loop.md` §Story 2.10 "Structural defect").
 
 **References:** `backlog.md` §`archetype-template-labeling`, `docs/stories/phase-2-core-loop.md` §Story 2.10, `core-inference/TemplateLabeler.kt`, `core-inference/ConvergenceResolver.kt`, `ux-copy.md` §"Pattern List" / §"Pattern Detail" / §"Entry detail", `AGENTS.md` §"Demo gate".
 
@@ -478,13 +478,13 @@ Checked bullets above are the historical record that the Mist tokens shipped to 
 **Why now, not in Phase 2:** The root cause is architectural (CANONICAL requires ≥2-lens agreement; archetype triggers are Inferential-only → CANDIDATE → discarded → always `AUDIT`). The redesign is a new ADR superseding the ADR-002 resolver coupling — v1.5 scope. Ripping `TemplateLabeler` + the `template_label` field mid-Phase-2 is a cross-cutting change touching storage, the extraction worker, and ~20 test files for zero demo value. The label is **inert, not removed**: it stays computed and persisted; only the UI stops showing it. This story is the UI yank only.
 
 **Done when:**
-- [ ] History rows (Story 4.6): the template-label `Pill` is removed. The row leads with the date; snippet + timestamp only. `HistoryRow` / `HistorySummary` stop reading `templateLabel`.
-- [ ] Entry Detail (Story 4.7 / 4.15): the display title is the entry's date in `DisplayBig` (`MAY 16.`). No template label, no `AUDIT` pill. The header `AUDIT` pill (already flagged for removal in 4.15) stays removed.
-- [ ] Pattern List card (Story 4.15): card title is the pattern's own display name in `DisplayBig`, never the template label. No card renders a template label or archetype eyebrow.
-- [ ] Pattern Detail (Story 4.15): the `● ACTIVE · {TEMPLATE_LABEL_UPPER}` eyebrow drops the template-label segment — `● ACTIVE` only. No archetype text anywhere on the screen.
-- [ ] Grep audit in the PR description: `templateLabel` / `TemplateLabel` usages in `:app/src/main/kotlin/dev/anchildress1/vestige/ui/**` drops to **0**. `core-inference` / `core-storage` references stay (the field is inert, not deleted).
-- [ ] `ux-copy.md` same-commit: §"Pattern List", §"Pattern Detail", §"Entry detail" lose the `{Crashed / Deep Space / Busy Stalling / Nonstop Spiral / Goblin Hours / Brain Dump}` label lines; replaced with the date / pattern-name rule. `README.md` §About loses the template parenthetical.
-- [ ] Coverage shape: each touched screen's existing suite updates to assert the template label / Pill is **absent** (neg assertion), not present. No suite keeps a stale "renders template label" test.
+- [x] History rows (Story 4.6): the template-label `Pill` is removed. The row leads with the date; snippet + timestamp only. `HistoryRow` / `HistorySummary` stop reading `templateLabel`.
+- [x] Entry Detail (Story 4.7 / 4.15): the display title is the entry's date in `DisplayBig` (`MAY 16.`). No template label, no `AUDIT` pill. The header `AUDIT` pill (already flagged for removal in 4.15) stays removed.
+- [x] Pattern List card (Story 4.15): card title is the pattern's own display name in `DisplayBig`, never the template label. No card renders a template label or archetype eyebrow.
+- [x] Pattern Detail (Story 4.15): the `● ACTIVE · {TEMPLATE_LABEL_UPPER}` eyebrow drops the template-label segment — `● ACTIVE` only. No archetype text anywhere on the screen.
+- [x] Grep audit in the PR description: `templateLabel` / `TemplateLabel` usages in `:app/src/main/kotlin/dev/anchildress1/vestige/ui/**` drops to **0**. `core-inference` / `core-storage` references stay (the field is inert, not deleted).
+- [x] `ux-copy.md` same-commit: §"Pattern List", §"Pattern Detail", §"Entry detail" lose the `{Crashed / Deep Space / Busy Stalling / Nonstop Spiral / Goblin Hours / Brain Dump}` label lines; replaced with the date / pattern-name rule. `README.md` §About loses the template parenthetical.
+- [x] Coverage shape: each touched screen's existing suite updates to assert the template label / Pill is **absent** (neg assertion), not present. No suite keeps a stale "renders template label" test.
 
 **Notes / risks:** This is a removal story — the diff is deletions plus neg-assertion test flips, not new UI. Do not redesign the label, do not accept Inferential CANDIDATE in `TemplateLabeler` "while we're here" — that is the v1.5 ADR work and is explicitly out of scope (AGENTS.md: no quick fixes, no scope creep). If a surface needs a non-label title and the date doesn't fit the composition, push the gap to `backlog.md`, do not invent a replacement label.
 

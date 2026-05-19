@@ -1,8 +1,10 @@
 package dev.anchildress1.vestige.ui.patterns
 
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertHasClickAction
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -23,13 +25,11 @@ class PatternCardTest {
 
     private fun card(
         section: PatternSection = PatternSection.ACTIVE,
-        templateLabel: String? = "Aftermath",
         actions: Set<PatternAction> = setOf(PatternAction.DROP, PatternAction.SKIP),
         backLabel: String? = null,
     ) = PatternCardUi(
         patternId = "p1",
         title = "Tuesday Meetings",
-        templateLabel = templateLabel,
         observation = "Fourth entry mentions Tuesday meetings.",
         supportingCount = 4,
         totalEntryCount = 12,
@@ -41,12 +41,12 @@ class PatternCardTest {
     )
 
     @Test
-    fun `renders name, uppercased category, and observation (pos)`() {
+    fun `renders name and observation without archetype label (pos neg)`() {
         composeRule.setContent {
             VestigeTheme { PatternCard(card(), onClick = {}, onDrop = {}, onSkip = {}, onRestart = {}) }
         }
         composeRule.onNodeWithText("Tuesday Meetings").assertIsDisplayed()
-        composeRule.onNodeWithText("AFTERMATH").assertIsDisplayed()
+        composeRule.onAllNodesWithText("AFTERMATH").assertCountEquals(0)
         composeRule.onNodeWithText("Fourth entry mentions Tuesday meetings.").assertIsDisplayed()
     }
 
@@ -71,10 +71,10 @@ class PatternCardTest {
     }
 
     @Test
-    fun `no category renders without an eyebrow (neg)`() {
+    fun `title still renders when no archetype label exists (edge)`() {
         composeRule.setContent {
             VestigeTheme {
-                PatternCard(card(templateLabel = null), onClick = {}, onDrop = {}, onSkip = {}, onRestart = {})
+                PatternCard(card(), onClick = {}, onDrop = {}, onSkip = {}, onRestart = {})
             }
         }
         composeRule.onNodeWithText("Tuesday Meetings").assertIsDisplayed()

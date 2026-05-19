@@ -171,13 +171,6 @@ private fun PatternSummaryCard(loaded: PatternDetailUiState.Loaded) {
     VestigeSurface(contentPadding = PaddingValues(16.dp)) {
         Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Text(text = loaded.title, style = MaterialTheme.typography.headlineSmall)
-            loaded.templateLabel?.let {
-                Text(
-                    text = it,
-                    style = MaterialTheme.typography.labelLarge,
-                    color = VestigeTheme.colors.dim,
-                )
-            }
             Text(text = loaded.observation, style = MaterialTheme.typography.bodyLarge)
             // Count meta renders without a label — "Seen in:" is reserved for the sources card
             // heading below.

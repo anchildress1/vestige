@@ -163,7 +163,6 @@ class PatternDetailViewModel(
     ): PatternDetailUiState.Loaded = PatternDetailUiState.Loaded(
         patternId = patternId,
         title = title,
-        templateLabel = templateLabel,
         observation = latestCalloutText,
         supportingCount = supportingEntries.size,
         totalEntryCount = totalEntries,

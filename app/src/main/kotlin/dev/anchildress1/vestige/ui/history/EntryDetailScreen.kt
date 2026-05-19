@@ -126,7 +126,7 @@ private fun EntryDetailContent(model: EntryDetailUiModel, onBack: () -> Unit, mo
             EyebrowE(text = "← BACK", modifier = Modifier.testTag("detail_back"))
         }
         Text(
-            text = model.timeOfDayLabel,
+            text = model.displayTitleLabel,
             style = VestigeTheme.typography.displayBig,
             color = colors.ink,
             modifier = Modifier.testTag("entry_time"),

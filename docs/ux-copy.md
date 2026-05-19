@@ -431,8 +431,7 @@ Empty states:
 Header:
 > **{Pattern name}**
 
-Subhead (agent-emitted template label):
-> {Crashed / Deep Space / Busy Stalling / Nonstop Spiral / Goblin Hours / Brain Dump}
+No agent-emitted template label or archetype eyebrow appears in the UI.
 
 Summary observation (one line, primary text):
 > {The card's one-line observation, expanded slightly with timing}

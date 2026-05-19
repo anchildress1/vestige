@@ -26,8 +26,8 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import dev.anchildress1.vestige.R
-import dev.anchildress1.vestige.ui.components.EyebrowE
 import dev.anchildress1.vestige.ui.components.VestigeListCard
 import dev.anchildress1.vestige.ui.components.VestigeListCardInteraction
 import dev.anchildress1.vestige.ui.components.limeLeftRuleForActive
@@ -41,8 +41,7 @@ private const val DROPPED_CARD_ALPHA = 0.6f
  * pattern-card surface, so the look stays identical everywhere). Structure mirrors
  * `poc/pattern-lifecycle-final.png`: a tone-colored uppercase category eyebrow on top, the
  * pattern name, the one-line observation, the 30-day TraceBar, then the source/last-seen meta.
- * Tone (lime / ember / teal) is the section tone — the comp's per-card colors are sample
- * variety, not a per-category palette.
+ * Tone (lime / ember / teal) is the section tone; archetype labels are not user-visible.
  */
 @Composable
 @Suppress("LongMethod", "LongParameterList") // Compose layout cluster; call-site clarity wins.
@@ -74,10 +73,10 @@ fun PatternCard(
     ) {
         Row(modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min)) {
             Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                card.templateLabel?.let {
-                    EyebrowE(text = it.uppercase(), color = tone.accent)
-                }
-                Text(text = card.title, style = MaterialTheme.typography.titleMedium)
+                Text(
+                    text = card.title,
+                    style = VestigeTheme.typography.displayBig.copy(fontSize = 32.sp, lineHeight = 34.sp),
+                )
                 Text(text = card.observation, style = MaterialTheme.typography.bodyMedium)
                 Spacer(modifier = Modifier.height(2.dp))
                 TraceBarE(hits = card.traceHits, accent = tone.accent, peak = tone.peak)

@@ -112,7 +112,7 @@ class PatternDetailScreenTest {
         }
 
         composeRule.onNodeWithText("Tuesday Meetings").assertIsDisplayed()
-        composeRule.onNodeWithText("Aftermath").assertIsDisplayed()
+        composeRule.onAllNodesWithText("Aftermath").assertCountEquals(0)
         composeRule.onNodeWithText("Fourth entry mentions Tuesday meetings.").assertIsDisplayed()
         // Action row + sources live below the new card stack; scrolling brings them into view.
         composeRule.onNodeWithText("crashed after standup").performScrollTo().assertIsDisplayed()

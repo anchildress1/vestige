@@ -9,7 +9,6 @@ import dev.anchildress1.vestige.model.ObservationEvidence
 import dev.anchildress1.vestige.model.Persona
 import dev.anchildress1.vestige.model.ResolvedExtraction
 import dev.anchildress1.vestige.model.ResolvedField
-import dev.anchildress1.vestige.model.TemplateLabel
 import dev.anchildress1.vestige.storage.EntryEntity
 import dev.anchildress1.vestige.storage.EntryStore
 import dev.anchildress1.vestige.storage.MarkdownEntryStore
@@ -127,35 +126,6 @@ class EntryDetailViewModelTest {
         vm.state.test {
             val loaded = awaitItem() as EntryDetailUiState.Loaded
             assertEquals(4, loaded.model.wordCount)
-        }
-    }
-
-    // --- template label ---
-
-    @Test
-    fun `templateLabel is uppercased serial when present`() = runTest {
-        val id = entryStore.createPendingEntry("aftermath entry", FIXTURE_INSTANT)
-        entryStore.completeEntry(
-            id,
-            ResolvedExtraction(emptyMap()),
-            dev.anchildress1.vestige.model.TemplateLabel.TUNNEL_EXIT,
-        )
-        val vm = buildVm(id)
-
-        vm.state.test {
-            val loaded = awaitItem() as EntryDetailUiState.Loaded
-            assertEquals("TUNNEL-EXIT", loaded.model.templateLabel)
-        }
-    }
-
-    @Test
-    fun `templateLabel is null when none extracted`() = runTest {
-        val id = createCompleted("no template here")
-        val vm = buildVm(id)
-
-        vm.state.test {
-            val loaded = awaitItem() as EntryDetailUiState.Loaded
-            assertNull(loaded.model.templateLabel)
         }
     }
 
@@ -290,13 +260,12 @@ class EntryDetailViewModelTest {
 
         vm.state.test {
             val initial = awaitItem() as EntryDetailUiState.Loaded
-            assertNull(initial.model.templateLabel)
             assertEquals(ExtractionDisplay.IN_PROGRESS, initial.model.extraction)
 
             entryStore.completeEntry(
                 id,
                 ResolvedExtraction(emptyMap()),
-                TemplateLabel.AFTERMATH,
+                null,
                 lensReceipts = listOf(
                     EntryLensReceipt(
                         lens = Lens.LITERAL,
@@ -308,7 +277,6 @@ class EntryDetailViewModelTest {
             dataRevision.value = 1L
 
             val reloaded = awaitItem() as EntryDetailUiState.Loaded
-            assertEquals("AFTERMATH", reloaded.model.templateLabel)
             assertEquals(ExtractionDisplay.COMPLETE, reloaded.model.extraction)
         }
     }
@@ -419,7 +387,7 @@ class EntryDetailViewModelTest {
                     ),
                 ),
             ),
-            TemplateLabel.AFTERMATH,
+            null,
             lensReceipts = listOf(
                 EntryLensReceipt(
                     lens = Lens.LITERAL,

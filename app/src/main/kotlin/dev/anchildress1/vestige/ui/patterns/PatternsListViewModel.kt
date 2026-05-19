@@ -171,7 +171,6 @@ class PatternsListViewModel(
         return PatternCardUi(
             patternId = patternId,
             title = title,
-            templateLabel = templateLabel,
             observation = latestCalloutText,
             supportingCount = supportingEntries.size,
             totalEntryCount = totalEntries,

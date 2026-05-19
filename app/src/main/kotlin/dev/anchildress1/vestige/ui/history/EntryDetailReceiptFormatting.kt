@@ -58,7 +58,7 @@ internal fun buildFieldRows(entity: EntryEntity): List<FieldRow> {
     return listOf(
         FieldRow(
             label = "BEHAVIOR",
-            value = entity.templateLabel?.serial ?: tagsText,
+            value = tagsText,
             tone = confidence[KEY_TAGS].toTone(fallback = LensTone.CANONICAL),
         ),
         FieldRow(

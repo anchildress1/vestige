@@ -77,10 +77,11 @@ class EntryDetailScreenTest {
     }
 
     @Test
-    fun `time hero and transcription are displayed`() {
+    fun `date hero and transcription are displayed`() {
         val id = createCompleted("standup was brutal today")
         setDetail(id)
         composeRule.onNodeWithTag("entry_time").assertIsDisplayed()
+        composeRule.onNodeWithText("MAY 15.").assertIsDisplayed()
         // Transcript is the very-bottom block now — it exists in the scroll, below the fold.
         composeRule.onNodeWithTag("entry_transcription").assertExists()
         composeRule.onNodeWithText("standup was brutal today").assertExists()

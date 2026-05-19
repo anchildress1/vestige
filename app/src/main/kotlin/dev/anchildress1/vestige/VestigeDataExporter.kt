@@ -12,6 +12,7 @@ import io.objectbox.BoxStore
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
+import java.io.IOException
 import java.io.OutputStream
 import java.time.Instant
 import java.util.zip.ZipEntry
@@ -26,14 +27,18 @@ internal class VestigeDataExporter(
 ) {
 
     fun writeTo(out: OutputStream) {
+        // One snapshot: markdown listing + box reads inside the same callInReadTx so a concurrent
+        // extraction can't desync the manifest from the box entries.
         val content = boxStore.callClosingThreadResources {
             boxStore.callInReadTx {
-                val markdownFiles = markdownStore.listAll()
+                val markdownFiles = markdownStore.listAll().sortedBy { it.name }
                 ExportContent(buildSnapshot(markdownFiles), markdownFiles)
             }
         }
-        // Assemble the whole archive in a temp file first: a read or file failure must not
-        // leave a truncated zip at the user's export target.
+        // Catch the common "file missing" case with a clear IOException before the zip opens.
+        // The staged-then-copy below is the broader guarantee — TOCTOU, disk-full on `out`, or
+        // any mid-archive throw still leaves no partial zip at the user's target.
+        verifyMarkdownReadable(content.markdownFiles)
         val staged = File.createTempFile("vestige-export", ".zip")
         try {
             ZipOutputStream(staged.outputStream().buffered()).use { zip ->
@@ -143,6 +148,14 @@ internal class VestigeDataExporter(
         .map { it.name }
         .sorted()
         .toJsonArray()
+
+    private fun verifyMarkdownReadable(markdownFiles: List<File>) {
+        markdownFiles.forEach { file ->
+            if (!file.isFile || !file.canRead()) {
+                throw IOException("Export markdown entry is not readable: ${file.absolutePath}")
+            }
+        }
+    }
 
     private fun ZipOutputStream.putTextEntry(name: String, value: String) {
         putNextEntry(ZipEntry(name))

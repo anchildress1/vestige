@@ -110,7 +110,11 @@ class PatternDetectionOrchestrator(
         }
     }
 
-    private suspend fun insertNewActive(detected: DetectedPattern, supporting: List<EntryEntity>, persona: Persona) {
+    private suspend fun insertNewActive(
+        detected: DetectedPattern,
+        supporting: List<SupportingEntry>,
+        persona: Persona,
+    ) {
         val analysis = analysisGenerator.generatePatternAnalysis(detected, supporting, persona)
         val title = analysis?.title ?: titleGenerator
             .runCatching { generate(persona, detected) }
@@ -141,7 +145,7 @@ class PatternDetectionOrchestrator(
             patternStore.put(entity)
             val saved = patternStore.findByPatternId(detected.patternId) ?: return@runInTx
             saved.supportingEntries.clear()
-            saved.supportingEntries.addAll(supporting)
+            saved.supportingEntries.addAll(supporting.map { it.entity })
             patternStore.put(saved)
         }
     }
@@ -158,12 +162,12 @@ class PatternDetectionOrchestrator(
     private fun applySupportingAndCallout(
         pattern: PatternEntity,
         detected: DetectedPattern,
-        supporting: List<EntryEntity>,
+        supporting: List<SupportingEntry>,
         analysis: PatternAnalysisResult?,
     ) {
         pattern.lastSeenTimestamp = detected.lastSeenTimestamp
         pattern.supportingEntries.clear()
-        pattern.supportingEntries.addAll(supporting)
+        pattern.supportingEntries.addAll(supporting.map { it.entity })
         // ADR-003 step 6: `latestCalloutText` updates on the ACTIVE branch only. The silent-update
         // branches (snoozed within window, dismissed, resolved) accumulate supporting entries but
         // freeze the callout the user last saw — re-surfacing in v1.5 must show that string,
@@ -209,11 +213,13 @@ class PatternDetectionOrchestrator(
         ).firstOrNull()
     }
 
-    private fun loadSupporting(ids: List<Long>): List<EntryEntity> {
+    private fun loadSupporting(ids: List<Long>): List<SupportingEntry> {
         if (ids.isEmpty()) return emptyList()
         return boxStore.callClosingThreadResources {
             val box = boxStore.boxFor(EntryEntity::class.java)
-            ids.mapNotNull { box.get(it) }
+            // Resolve `tags` (a lazy ToMany) here while the reader is open. A detached entity
+            // read later reopens a thread reader the enclosing close was meant to reclaim.
+            ids.mapNotNull { id -> box.get(id)?.let { SupportingEntry(it, it.toPatternEvidence()) } }
         }
     }
 
@@ -250,18 +256,20 @@ private fun deterministicFallbackTitle(detected: DetectedPattern): String {
 
 private suspend fun PatternAnalysisGenerator?.generatePatternAnalysis(
     detected: DetectedPattern,
-    supporting: List<EntryEntity>,
+    supporting: List<SupportingEntry>,
     persona: Persona,
 ): PatternAnalysisResult? {
     if (detected.kind != PatternKind.TEMPORAL_RELATIVE) return null
     return this
-        ?.runCatching { generate(persona, detected, supporting.map { it.toPatternEvidence() }) }
+        ?.runCatching { generate(persona, detected, supporting.map { it.evidence }) }
         ?.getOrElse {
             if (it is CancellationException) throw it
             Log.w("VestigePatternOrch", "pattern analysis generator threw ${it.javaClass.simpleName}")
             null
         }
 }
+
+private class SupportingEntry(val entity: EntryEntity, val evidence: PatternEvidenceEntry)
 
 private fun EntryEntity.toPatternEvidence(): PatternEvidenceEntry = PatternEvidenceEntry(
     id = id,

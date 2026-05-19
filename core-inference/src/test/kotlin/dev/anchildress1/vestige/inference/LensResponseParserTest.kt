@@ -225,6 +225,32 @@ class LensResponseParserTest {
     }
 
     @Test
+    fun `drops dangling quoted array item so the rest of the lens payload can parse`() {
+        val raw = """
+            {
+            "tags": [
+            "work",
+            "
+            ],
+            "energy_descriptor": null,
+            "state_shift": false,
+            "vocabulary_contradictions": [],
+            "stated_commitment": null,
+            "recurrence_link": null,
+            "recurrence_kind": null,
+            "flags": []
+            }
+        """.trimIndent()
+
+        val extraction = LensResponseParser.parse(Lens.SKEPTICAL, raw)
+
+        assertNotNull(extraction)
+        assertEquals(listOf("work"), extraction!!.fields["tags"])
+        assertEquals(false, extraction.fields["state_shift"])
+        assertTrue(extraction.flags.isEmpty())
+    }
+
+    @Test
     fun `returns null when the payload is a JSON array, not an object`() {
         // Schema requires an object; an array at the top level is a parse failure (the worker
         // treats this lens as "no opinion" per ADR-002 §"Convergence edge cases").

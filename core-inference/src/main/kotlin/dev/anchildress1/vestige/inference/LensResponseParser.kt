@@ -74,7 +74,17 @@ internal object LensResponseParser {
      * payload itself, not prose like `[note] {...}`.
      */
     private fun findFirstParseableObject(raw: String): JSONObject? {
-        if (raw.isBlank()) return null
+        var found: JSONObject? = null
+        if (raw.isNotBlank()) {
+            found = findFirstParseableObjectIn(raw)
+            if (found == null) {
+                found = repairDanglingArrayStringItems(raw)?.let(::findFirstParseableObjectIn)
+            }
+        }
+        return found
+    }
+
+    private fun findFirstParseableObjectIn(raw: String): JSONObject? {
         var cursor = 0
         var found: JSONObject? = null
         var keepScanning = true
@@ -114,6 +124,11 @@ internal object LensResponseParser {
             "${match.groupValues[1]},${match.groupValues[2]}"
         }
         return repaired.takeIf { it != candidate }
+    }
+
+    private fun repairDanglingArrayStringItems(raw: String): String? {
+        val repaired = DANGLING_ARRAY_STRING_ITEM.replace(raw, "")
+        return repaired.takeIf { it != raw }
     }
 
     /**
@@ -189,5 +204,9 @@ internal object LensResponseParser {
     // Over-broad matches re-parse-fail downstream, preserving the fail-closed contract.
     private val MISSING_FIELD_COMMA = Regex(
         """(["\]}\w])\s*("(?:\\.|[^"\\])+":)""",
+    )
+
+    private val DANGLING_ARRAY_STRING_ITEM = Regex(
+        """,\s*"\s*(?=])""",
     )
 }

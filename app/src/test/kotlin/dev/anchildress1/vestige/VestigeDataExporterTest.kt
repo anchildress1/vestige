@@ -204,8 +204,9 @@ class VestigeDataExporterTest {
 
     @Test
     fun `markdown manifest matches the files actually archived`() {
-        File(markdownDir, "one.md").writeText("first")
-        File(markdownDir, "two.md").writeText("second")
+        val entriesDir = File(markdownDir, "entries").apply { mkdirs() }
+        File(entriesDir, "one.md").writeText("first")
+        File(entriesDir, "two.md").writeText("second")
         val out = ByteArrayOutputStream()
 
         exporter().writeTo(out)

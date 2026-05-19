@@ -35,6 +35,11 @@ val Lime: Color = Color(0xFFD8E830) // oklch(89% 0.19 115)
 val LimeDim: Color = Lime.copy(alpha = 0.20f)
 val LimeSoft: Color = Lime.copy(alpha = 0.55f)
 
+// Selected-card wash — lime laid over a surface at low alpha reads as the warm olive tint on
+// the chosen persona card. Distinct from LimeDim (20%, used for fills/strokes): this sits just
+// above the surface so the lime border, not the fill, carries the selection signal.
+val LimeWash: Color = Lime.copy(alpha = 0.07f)
+
 // Coral: heat — REC button on-air, roast, danger / destructive. AppTop status pill stays lime.
 // The Mist `ErrorRed` collapses into coral.
 val Coral: Color = Color(0xFFFF6254) // oklch(72% 0.21 28)

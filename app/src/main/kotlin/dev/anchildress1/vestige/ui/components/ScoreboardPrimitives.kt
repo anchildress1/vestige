@@ -47,24 +47,40 @@ import dev.anchildress1.vestige.ui.theme.VestigeTheme
 
 /**
  * Mono uppercase eyebrow row — defaults to the `dim` slot. Accepts an optional [color] override
- * for accent sites; omit to let the theme drive secondary-text foreground.
+ * for accent sites; omit to let the theme drive secondary-text foreground. [softWrap] `false`
+ * (with [maxLines] `1`) keeps a constrained eyebrow on one line — the mono font + wide letter
+ * spacing otherwise orphans the final glyph onto a second line in tight columns.
  */
 @Composable
-fun EyebrowE(text: String, modifier: Modifier = Modifier, color: Color = Color.Unspecified) {
+@Suppress("LongParameterList") // primitive
+fun EyebrowE(
+    text: String,
+    modifier: Modifier = Modifier,
+    color: Color = Color.Unspecified,
+    maxLines: Int = Int.MAX_VALUE,
+    softWrap: Boolean = true,
+) {
     Text(
         text = text,
         modifier = modifier,
         style = VestigeTheme.typography.eyebrow,
         color = if (color == Color.Unspecified) VestigeTheme.colors.dim else color,
+        maxLines = maxLines,
+        softWrap = softWrap,
     )
 }
 
-/** Status dot, optionally blinking. Default lime; coral when recording. */
+/**
+ * Status dot, optionally blinking. Default lime; coral when recording. [filled] `false` draws a
+ * hollow ring with no glow — the "not chosen / not live" register (unselected persona card).
+ */
 @Composable
+@Suppress("LongParameterList") // primitive
 fun StatusDot(
     modifier: Modifier = Modifier,
     color: Color = VestigeTheme.colors.lime,
     blink: Boolean = false,
+    filled: Boolean = true,
     size: Dp = DefaultStatusDotSize,
 ) {
     val alpha = if (blink) rememberSbBlink(periodMs = VestigeMotion.BLINK_MS).value else 1f
@@ -76,17 +92,24 @@ fun StatusDot(
             .size(size)
             .alpha(alpha)
             .drawBehind {
-                drawRect(
-                    brush = Brush.radialGradient(
-                        colors = listOf(color.copy(alpha = STATUS_DOT_GLOW_ALPHA), Color.Transparent),
-                        center = Offset(this.size.width / 2f, this.size.height / 2f),
-                        radius = maxOf(this.size.width, this.size.height),
-                    ),
-                )
-                drawCircle(color = color, radius = this.size.minDimension / 2f)
+                val r = this.size.minDimension / 2f
+                if (filled) {
+                    drawRect(
+                        brush = Brush.radialGradient(
+                            colors = listOf(color.copy(alpha = STATUS_DOT_GLOW_ALPHA), Color.Transparent),
+                            center = Offset(this.size.width / 2f, this.size.height / 2f),
+                            radius = maxOf(this.size.width, this.size.height),
+                        ),
+                    )
+                    drawCircle(color = color, radius = r)
+                } else {
+                    drawCircle(color = color, radius = r, style = Stroke(width = STATUS_DOT_RING_PX))
+                }
             },
     )
 }
+
+private const val STATUS_DOT_RING_PX: Float = 2.5f
 
 internal val DefaultStatusDotSize: Dp = 7.dp
 private const val STATUS_DOT_GLOW_ALPHA: Float = 0.55f
@@ -109,11 +132,13 @@ object AppTopStatuses {
             blink = true,
         )
 
+    // Recording is the one sanctioned coral-on-pill state (design-guidelines.md §"AppTop status
+    // pill" addendum + ux-copy.md §Capture). Idle stays lime; coral here = the machine is hot.
     val Recording: AppTopStatus
         @Composable get() = AppTopStatus(
-            text = "GEMMA 4 · LISTENING LIVE",
-            contentDescription = "Gemma 4 local model. Listening live.",
-            color = VestigeTheme.colors.lime,
+            text = "GEMMA 4 · LISTENING",
+            contentDescription = "Gemma 4 local model. Listening.",
+            color = VestigeTheme.colors.coral,
             dot = true,
             blink = true,
         )
@@ -237,11 +262,12 @@ private const val TICK_RAIL_HEIGHT: Float = 0.40f
 /** Minimum touch target per Material accessibility guideline (Android 48dp guidance). */
 private val MinTapTarget: Dp = 48.dp
 
+private val HamburgerGlyphSize = 24.sp
+
 /**
- * App shell top — GEMMA 4 · LOCAL ONLY status pill (or GEMMA 4 · LISTENING LIVE while recording)
- * on the left, persona switcher chrome on the right. Pill stays lime in both states; coral is
- * reserved for REC button heat + destructive flows. Used by Capture and any screen that wants
- * the chrome.
+ * App shell top — status pill on the left (lime idle `GEMMA 4 · LOCAL ONLY`, coral recording
+ * `GEMMA 4 · LISTENING`), hamburger menu on the right by default. Recording overrides
+ * [rightContent] with an empty slot so capture remains modal while the mic is active.
  */
 @Composable
 @Suppress("LongParameterList") // primitive
@@ -249,7 +275,7 @@ fun AppTop(
     persona: String,
     modifier: Modifier = Modifier,
     status: AppTopStatus = AppTopStatuses.Ready,
-    onPersonaTap: (() -> Unit)? = null,
+    onMenuTap: (() -> Unit)? = null,
     onStatusTap: (() -> Unit)? = null,
     rightContent: (@Composable () -> Unit)? = null,
 ) {
@@ -281,17 +307,21 @@ fun AppTop(
         if (rightContent != null) {
             rightContent()
         } else {
-            val personaA11yLabel = if (onPersonaTap != null) {
-                "Active persona $persona. Change persona."
-            } else {
-                "Active persona $persona."
-            }
             ChromePill(
-                onClick = onPersonaTap,
+                onClick = onMenuTap,
                 alignment = Alignment.CenterEnd,
-                a11yLabel = personaA11yLabel,
+                a11yLabel = "Menu. Active persona $persona.",
             ) {
-                Pill(text = "$persona ▾", color = VestigeTheme.colors.ink, fill = false)
+                Text(
+                    text = "☰",
+                    style = VestigeTheme.typography.displayBig.copy(
+                        fontSize = HamburgerGlyphSize,
+                        lineHeight = HamburgerGlyphSize,
+                        fontWeight = FontWeight.Bold,
+                    ),
+                    color = VestigeTheme.colors.ink,
+                    modifier = Modifier.padding(horizontal = 6.dp),
+                )
             }
         }
     }

@@ -1,6 +1,7 @@
 package dev.anchildress1.vestige.ui.history
 
 import android.util.Log
+import dev.anchildress1.vestige.model.ExtractionStatus
 import dev.anchildress1.vestige.storage.EntryEntity
 import org.json.JSONArray
 import java.time.ZoneId
@@ -8,6 +9,8 @@ import java.time.ZoneId
 /** Immutable UI projection for a single entry detail. */
 data class EntryDetailUiModel(
     val id: Long,
+    val timeOfDayLabel: String,
+    val dateLabel: String,
     val filedTimeLabel: String,
     val entryNumberLabel: String,
     val templateLabel: String?,
@@ -19,10 +22,15 @@ data class EntryDetailUiModel(
     val energyDescriptor: String?,
     val observations: List<ObservationLine>,
     val tags: List<String>,
+    /** Until the 3-lens extraction resolves the screen shows the spinner/skeleton state. */
+    val extractionComplete: Boolean = true,
+    val extractionFailed: Boolean = false,
 ) {
     companion object {
         fun from(entity: EntryEntity, zoneId: ZoneId): EntryDetailUiModel = EntryDetailUiModel(
             id = entity.id,
+            timeOfDayLabel = HistoryDateFormatter.formatClock12(entity.timestampEpochMs, zoneId),
+            dateLabel = HistoryDateFormatter.formatFullDate(entity.timestampEpochMs, zoneId),
             filedTimeLabel = HistoryDateFormatter.formatTimeOnly(entity.timestampEpochMs, zoneId),
             entryNumberLabel = "${EntryDetailCopy.ENTRY_NUMBER_PREFIX}${entity.id}",
             templateLabel = entity.templateLabel?.serial?.uppercase(),
@@ -34,6 +42,9 @@ data class EntryDetailUiModel(
             energyDescriptor = entity.energyDescriptor,
             observations = parseObservations(entity.entryObservationsJson),
             tags = entity.tags.map { it.name }.sorted(),
+            extractionComplete = entity.extractionStatus == ExtractionStatus.COMPLETED,
+            extractionFailed = entity.extractionStatus == ExtractionStatus.FAILED ||
+                entity.extractionStatus == ExtractionStatus.TIMED_OUT,
         )
 
         private fun parseObservations(json: String): List<ObservationLine> {

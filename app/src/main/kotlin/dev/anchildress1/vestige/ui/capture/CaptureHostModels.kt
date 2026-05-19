@@ -5,10 +5,9 @@ import dev.anchildress1.vestige.AppContainer
 import dev.anchildress1.vestige.model.ModelArtifactState
 import dev.anchildress1.vestige.model.PatternState
 import dev.anchildress1.vestige.ui.history.HistoryDurationFormatter
-import java.time.Clock
+import dev.anchildress1.vestige.ui.patterns.traceBarHitsFromEntries
 import java.time.Instant
 import java.time.ZoneId
-import java.time.format.DateTimeFormatter
 import java.time.format.TextStyle
 import java.util.Locale
 
@@ -32,31 +31,25 @@ internal fun deriveModelReadiness(state: ModelArtifactState): ModelReadiness = w
     is ModelArtifactState.Partial -> ModelReadiness.Paused
 }
 
-internal fun deriveStats(container: AppContainer): CaptureStats = deriveStatsFromInputs(
-    kept = container.entryStore.countCompleted(),
-    patterns = container.patternStore.findVisibleSortedByLastSeen().map {
-        CapturePatternSummary(state = it.state, sourceCount = it.supportingEntries.size)
-    },
-)
+/**
+ * Idle patterns-peek payload. Null ⇒ no active patterns, so the idle screen shows the
+ * empty-state line instead. [traceHits] is the union 30-day glyph across the active patterns.
+ */
+data class CapturePatternsPeek(val activeCount: Int, val names: List<String>, val traceHits: Set<Int>)
 
-internal fun deriveStatsFromInputs(kept: Long, patterns: List<CapturePatternSummary>): CaptureStats {
-    val active = patterns.count { it.state == PatternState.ACTIVE }
-    val hitsThisMonth = patterns.sumOf { it.sourceCount }
-    return CaptureStats(kept = kept.toInt(), active = active, hitsThisMonth = hitsThisMonth, cloud = 0)
-}
-
-internal fun deriveMeta(clock: Clock, zoneId: ZoneId): CaptureMeta {
-    val now = clock.instant().atZone(zoneId)
-    return CaptureMeta(
-        weekdayLabel = now.dayOfWeek.getDisplayName(TextStyle.SHORT, Locale.US).uppercase(Locale.US),
-        monthDayLabel = now.format(MONTH_DAY_FORMATTER).uppercase(Locale.US),
-        timeLabel = now.format(TIME_FORMATTER),
-        dayNumber = 1,
-        streakDays = 0,
+internal fun derivePatternsPeek(container: AppContainer): CapturePatternsPeek? {
+    val active = container.patternStore.findVisibleSortedByLastSeen()
+        .filter { it.state == PatternState.ACTIVE }
+    if (active.isEmpty()) return null
+    val supporting = active.flatMap { it.supportingEntries.toList() }
+    return CapturePatternsPeek(
+        activeCount = active.size,
+        names = active.take(PEEK_NAME_LIMIT).map { it.title },
+        traceHits = traceBarHitsFromEntries(supporting, System.currentTimeMillis()),
     )
 }
 
-internal data class CapturePatternSummary(val state: PatternState, val sourceCount: Int)
+private const val PEEK_NAME_LIMIT = 3
 
 /** Derived metadata for the Capture footer's "Last entry" strip. Null hides the footer. */
 data class LastEntryFooter(val monthLabel: String, val dayLabel: String, val durationLabel: String)
@@ -72,5 +65,3 @@ internal fun deriveLastEntryFooter(container: AppContainer, zoneId: ZoneId): Las
 }
 
 private const val TAG = "VestigeCaptureHost"
-private val MONTH_DAY_FORMATTER: DateTimeFormatter = DateTimeFormatter.ofPattern("MMM d", Locale.US)
-private val TIME_FORMATTER: DateTimeFormatter = DateTimeFormatter.ofPattern("h:mm a", Locale.US)

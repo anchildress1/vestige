@@ -79,6 +79,12 @@ class ScoreboardPrimitivesTest {
         composeRule.setContent { StatusDot(size = 64.dp) }
     }
 
+    @Test
+    fun `StatusDot filled=false composes the hollow ring (edge — unselected)`() {
+        composeRule.setContent { StatusDot(filled = false) }
+        composeRule.onAllNodesWithText("").assertCountEquals(0)
+    }
+
     // ─── Pill ───────────────────────────────────────────────────────────────
 
     @Test
@@ -173,9 +179,9 @@ class ScoreboardPrimitivesTest {
     }
 
     @Test
-    fun `AppTop recording status pill announces listening live (a11y, pos)`() {
+    fun `AppTop recording status pill announces listening (a11y, pos)`() {
         composeRule.setContent { AppTop(persona = "HARDASS", status = AppTopStatuses.Recording) }
-        composeRule.onNodeWithContentDescription("Gemma 4 local model. Listening live.")
+        composeRule.onNodeWithContentDescription("Gemma 4 local model. Listening.")
             .assertIsDisplayed()
             .assertHasNoClickAction()
     }
@@ -215,11 +221,11 @@ class ScoreboardPrimitivesTest {
     }
 
     @Test
-    fun `AppTop persona pill fires onPersonaTap when tapped (pos)`() {
-        var personaTapped = 0
-        composeRule.setContent { AppTop(persona = "WITNESS", onPersonaTap = { personaTapped++ }) }
-        composeRule.onNodeWithContentDescription(label = "WITNESS", substring = true).performClick()
-        assert(personaTapped == 1) { "onPersonaTap should fire exactly once (was $personaTapped)" }
+    fun `AppTop hamburger fires onMenuTap when tapped (pos)`() {
+        var menuTapped = 0
+        composeRule.setContent { AppTop(persona = "WITNESS", onMenuTap = { menuTapped++ }) }
+        composeRule.onNodeWithContentDescription(label = "Menu", substring = true).performClick()
+        assert(menuTapped == 1) { "onMenuTap should fire exactly once (was $menuTapped)" }
     }
 
     @Test
@@ -228,19 +234,19 @@ class ScoreboardPrimitivesTest {
             AppTop(
                 persona = "WITNESS",
                 onStatusTap = {},
-                onPersonaTap = {},
+                onMenuTap = {},
             )
         }
         composeRule.onNodeWithContentDescription("Gemma 4 local model. Local only.")
             .assertHeightIsAtLeast(48.dp)
-        composeRule.onNodeWithContentDescription(label = "WITNESS", substring = true)
+        composeRule.onNodeWithContentDescription(label = "Menu", substring = true)
             .assertHeightIsAtLeast(48.dp)
     }
 
     @Test
     fun `AppTop a11y descriptions swap on recording toggle (edge — state-dependent label)`() {
         composeRule.setContent { AppTop(persona = "WITNESS", status = AppTopStatuses.Recording) }
-        composeRule.onNodeWithContentDescription("Gemma 4 local model. Listening live.").assertIsDisplayed()
+        composeRule.onNodeWithContentDescription("Gemma 4 local model. Listening.").assertIsDisplayed()
         composeRule.onAllNodesWithText("GEMMA 4 · LOCAL ONLY").assertCountEquals(0)
     }
 
@@ -252,9 +258,9 @@ class ScoreboardPrimitivesTest {
     }
 
     @Test
-    fun `AppTop persona pill label includes a11y change affordance (a11y)`() {
-        composeRule.setContent { AppTop(persona = "HARDASS", onPersonaTap = {}) }
-        composeRule.onNodeWithContentDescription(label = "Change persona", substring = true)
+    fun `AppTop hamburger a11y names the menu and active persona (a11y)`() {
+        composeRule.setContent { AppTop(persona = "HARDASS", onMenuTap = {}) }
+        composeRule.onNodeWithContentDescription(label = "Menu. Active persona HARDASS.", substring = true)
             .assertIsDisplayed()
     }
 

@@ -18,7 +18,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.compositeOver
+import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.role
@@ -33,9 +33,8 @@ import dev.anchildress1.vestige.ui.theme.VestigeTheme
 @Composable
 internal fun OnboardingScaffold(
     enabledCount: Int,
-    primary: OnboardingAction,
     modifier: Modifier = Modifier,
-    rightStatus: String? = null,
+    primary: OnboardingAction? = null,
     secondary: OnboardingAction? = null,
     footerHelper: String? = null,
     content: @Composable () -> Unit = {},
@@ -45,10 +44,12 @@ internal fun OnboardingScaffold(
             modifier = Modifier
                 .weight(1f)
                 .verticalScroll(rememberScrollState())
-                .padding(horizontal = 24.dp, vertical = 24.dp),
+                // The window-inset padding from VestigeScaffold already clears the camera
+                // cutout — only a small top breath is added here, not a second full gap.
+                .padding(PaddingValues(start = 24.dp, top = 8.dp, end = 24.dp, bottom = 24.dp)),
             verticalArrangement = Arrangement.spacedBy(20.dp),
         ) {
-            OnboardingChrome(enabledCount = enabledCount, rightStatus = rightStatus)
+            OnboardingChrome(enabledCount = enabledCount)
             content()
             Spacer(modifier = Modifier.height(16.dp))
         }
@@ -61,7 +62,7 @@ internal fun OnboardingScaffold(
 }
 
 @Composable
-private fun OnboardingPrimaryBar(primary: OnboardingAction, secondary: OnboardingAction?, footerHelper: String?) {
+private fun OnboardingPrimaryBar(primary: OnboardingAction?, secondary: OnboardingAction?, footerHelper: String?) {
     val colors = VestigeTheme.colors
     Column(
         modifier = Modifier
@@ -69,30 +70,34 @@ private fun OnboardingPrimaryBar(primary: OnboardingAction, secondary: Onboardin
             .padding(horizontal = 16.dp, vertical = 16.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        Button(
-            onClick = primary.onAction,
-            enabled = primary.enabled,
-            modifier = Modifier
-                .fillMaxWidth()
-                .semantics { role = Role.Button },
-            contentPadding = PaddingValues(vertical = 18.dp, horizontal = 20.dp),
-            colors = ButtonDefaults.buttonColors(
-                // Calibrated lime — pure `colors.lime` reads as screaming neon on device,
-                // `limeSoft` (55% alpha) reads as dark olive. 85% alpha composited over the
-                // floor sits between: clearly lime, clearly bright, no retina burn.
-                containerColor = colors.lime.copy(alpha = LIME_BAR_ALPHA).compositeOver(colors.floor),
-                contentColor = colors.deep,
-                disabledContainerColor = colors.s2,
-                disabledContentColor = colors.dim,
-            ),
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween,
+        if (primary != null) {
+            Button(
+                onClick = primary.onAction,
+                enabled = primary.enabled,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .semantics { role = Role.Button },
+                shape = RectangleShape,
+                contentPadding = PaddingValues(vertical = 18.dp, horizontal = 20.dp),
+                // Cream by default; greens once the screen's gate is fully met (Wiring "all
+                // rows green"). Dark text reads on both. Single source — no per-screen override.
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = if (primary.highlighted) colors.lime else colors.ink,
+                    contentColor = colors.deep,
+                    disabledContainerColor = colors.s2,
+                    disabledContentColor = colors.dim,
+                ),
             ) {
-                Text(text = primary.label.uppercase(), style = VestigeTheme.typography.title)
-                Text(text = "→", style = VestigeTheme.typography.title)
+                // Label + arrow travel together, centered — the M3 Button centers its content,
+                // so the inner row must wrap (not fillMaxWidth/SpaceBetween, which pinned the
+                // label left and the arrow right).
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
+                    Text(text = primary.label.uppercase(), style = VestigeTheme.typography.title)
+                    Text(text = "→", style = VestigeTheme.typography.title)
+                }
             }
         }
         if (secondary != null) {
@@ -102,9 +107,11 @@ private fun OnboardingPrimaryBar(primary: OnboardingAction, secondary: Onboardin
                 modifier = Modifier
                     .fillMaxWidth()
                     .semantics { role = Role.Button },
-                contentPadding = PaddingValues(vertical = 14.dp),
+                shape = RectangleShape,
+                contentPadding = PaddingValues(vertical = 16.dp),
             ) {
-                Text(text = secondary.label)
+                // Outlined, centered, uppercase — the download-screen Pause / Retry register.
+                Text(text = secondary.label.uppercase(), style = VestigeTheme.typography.title)
             }
         }
         if (footerHelper != null) {
@@ -128,7 +135,3 @@ internal fun OnboardingFooterLink(text: String, modifier: Modifier = Modifier) {
 
 @Composable
 internal fun onboardingDefaultBack(): String = stringResource(id = R.string.onboarding_back)
-
-// Tuned by hand on device. Pure lime (1.0) burns; limeSoft (0.55) looks olive; 0.85 reads
-// flat; 0.92 keeps most of the lime's intensity while still trimming the neon edge.
-private const val LIME_BAR_ALPHA: Float = 0.92f

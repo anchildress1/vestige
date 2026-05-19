@@ -22,6 +22,10 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 
+/**
+ * The band is mic/inference only. Model not-ready (deleted / loading / downloading / paused) is
+ * no longer a banner — IdleLayout swaps the REC button for a spinner instead.
+ */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34], manifest = Config.NONE, application = android.app.Application::class)
 class CaptureErrorBandTest {
@@ -29,92 +33,51 @@ class CaptureErrorBandTest {
     @get:Rule
     val composeRule = createComposeRule()
 
-    // ─── resolver (pos / neg / edge / err) ──────────────────────────────────
+    // ─── resolver (pos / neg / err) ─────────────────────────────────────────
 
     @Test
-    fun `resolver returns null when Ready and no error (neg)`() {
-        assertNull(resolveBandKind(error = null, readiness = ModelReadiness.Ready))
+    fun `resolver returns null when there is no error (neg)`() {
+        assertNull(resolveBandKind(error = null))
     }
 
     @Test
     fun `resolver maps MicDenied (err)`() {
-        val kind = resolveBandKind(error = CaptureError.MicDenied, readiness = ModelReadiness.Ready)
+        val kind = resolveBandKind(error = CaptureError.MicDenied)
         assertEquals(BandKind.MicDenied, kind)
         assertTrue(kind!!.isError)
     }
 
     @Test
     fun `resolver maps MicUnavailable (err)`() {
-        val kind = resolveBandKind(error = CaptureError.MicUnavailable, readiness = ModelReadiness.Ready)
-        assertEquals(BandKind.MicUnavailable, kind)
+        assertEquals(BandKind.MicUnavailable, resolveBandKind(error = CaptureError.MicUnavailable))
     }
 
     @Test
-    fun `resolver maps InferenceFailed PARSE_FAILED (err)`() {
-        val kind = resolveBandKind(
-            error = CaptureError.InferenceFailed(CaptureError.InferenceFailed.Reason.PARSE_FAILED),
-            readiness = ModelReadiness.Ready,
-        )
-        assertEquals(BandKind.Inference(CaptureError.InferenceFailed.Reason.PARSE_FAILED), kind)
+    fun `resolver maps MicBlocked (err)`() {
+        assertEquals(BandKind.MicBlocked, resolveBandKind(error = CaptureError.MicBlocked))
     }
 
     @Test
-    fun `resolver maps InferenceFailed TIMED_OUT (err)`() {
-        val kind = resolveBandKind(
-            error = CaptureError.InferenceFailed(CaptureError.InferenceFailed.Reason.TIMED_OUT),
-            readiness = ModelReadiness.Ready,
-        )
-        assertEquals(BandKind.Inference(CaptureError.InferenceFailed.Reason.TIMED_OUT), kind)
-    }
-
-    @Test
-    fun `resolver maps InferenceFailed ENGINE_FAILED (err)`() {
-        val kind = resolveBandKind(
-            error = CaptureError.InferenceFailed(CaptureError.InferenceFailed.Reason.ENGINE_FAILED),
-            readiness = ModelReadiness.Ready,
-        )
-        assertEquals(BandKind.Inference(CaptureError.InferenceFailed.Reason.ENGINE_FAILED), kind)
-    }
-
-    @Test
-    fun `resolver maps readiness states when no error (pos)`() {
-        assertEquals(BandKind.ModelLoading, resolveBandKind(error = null, readiness = ModelReadiness.Loading))
-        assertEquals(BandKind.ModelPaused, resolveBandKind(error = null, readiness = ModelReadiness.Paused))
-        assertEquals(
-            BandKind.ModelDownloading(percent = 42),
-            resolveBandKind(error = null, readiness = ModelReadiness.Downloading(percent = 42)),
-        )
-    }
-
-    @Test
-    fun `error wins over non-Ready readiness (edge — both set)`() {
-        val kind = resolveBandKind(
-            error = CaptureError.MicDenied,
-            readiness = ModelReadiness.Loading,
-        )
-        assertEquals(BandKind.MicDenied, kind)
+    fun `resolver maps every InferenceFailed reason (err)`() {
+        CaptureError.InferenceFailed.Reason.entries.forEach { reason ->
+            assertEquals(
+                BandKind.Inference(reason),
+                resolveBandKind(error = CaptureError.InferenceFailed(reason)),
+            )
+        }
     }
 
     // ─── render (pos / neg / a11y) ──────────────────────────────────────────
 
     @Test
-    fun `renders nothing when Ready and no error (neg)`() {
-        composeRule.setContent {
-            VestigeTheme {
-                CaptureErrorBand(error = null, readiness = ModelReadiness.Ready)
-            }
-        }
+    fun `renders nothing when there is no error (neg)`() {
+        composeRule.setContent { VestigeTheme { CaptureErrorBand(error = null) } }
         composeRule.onAllNodesWithText(CaptureCopy.MIC_DENIED_LINE).assertCountEquals(0)
-        composeRule.onAllNodesWithText(CaptureCopy.MODEL_LOADING_LINE).assertCountEquals(0)
     }
 
     @Test
     fun `renders MicDenied copy + a11y (pos, err)`() {
-        composeRule.setContent {
-            VestigeTheme {
-                CaptureErrorBand(error = CaptureError.MicDenied, readiness = ModelReadiness.Ready)
-            }
-        }
+        composeRule.setContent { VestigeTheme { CaptureErrorBand(error = CaptureError.MicDenied) } }
         composeRule.onNodeWithText(CaptureCopy.BAND_LABEL_MIC).assertIsDisplayed()
         composeRule.onNodeWithText(CaptureCopy.MIC_DENIED_LINE).assertIsDisplayed()
         val band = composeRule.onNodeWithContentDescription("Mic permission denied.", substring = true)
@@ -125,11 +88,7 @@ class CaptureErrorBandTest {
 
     @Test
     fun `renders MicUnavailable copy (pos, err)`() {
-        composeRule.setContent {
-            VestigeTheme {
-                CaptureErrorBand(error = CaptureError.MicUnavailable, readiness = ModelReadiness.Ready)
-            }
-        }
+        composeRule.setContent { VestigeTheme { CaptureErrorBand(error = CaptureError.MicUnavailable) } }
         composeRule.onNodeWithText(CaptureCopy.MIC_UNAVAILABLE_LINE).assertIsDisplayed()
         val band = composeRule.onNodeWithContentDescription("Mic unavailable.", substring = true)
         band.assertIsDisplayed()
@@ -143,7 +102,6 @@ class CaptureErrorBandTest {
             VestigeTheme {
                 CaptureErrorBand(
                     error = CaptureError.InferenceFailed(CaptureError.InferenceFailed.Reason.PARSE_FAILED),
-                    readiness = ModelReadiness.Ready,
                 )
             }
         }
@@ -157,7 +115,6 @@ class CaptureErrorBandTest {
             VestigeTheme {
                 CaptureErrorBand(
                     error = CaptureError.InferenceFailed(CaptureError.InferenceFailed.Reason.TIMED_OUT),
-                    readiness = ModelReadiness.Ready,
                 )
             }
         }
@@ -170,7 +127,6 @@ class CaptureErrorBandTest {
             VestigeTheme {
                 CaptureErrorBand(
                     error = CaptureError.InferenceFailed(CaptureError.InferenceFailed.Reason.ENGINE_FAILED),
-                    readiness = ModelReadiness.Ready,
                 )
             }
         }
@@ -178,78 +134,11 @@ class CaptureErrorBandTest {
     }
 
     @Test
-    fun `renders ModelLoading informational band (pos)`() {
-        composeRule.setContent {
-            VestigeTheme {
-                CaptureErrorBand(error = null, readiness = ModelReadiness.Loading)
-            }
-        }
-        composeRule.onNodeWithText(CaptureCopy.BAND_LABEL_MODEL_LOADING).assertIsDisplayed()
-        composeRule.onNodeWithText(CaptureCopy.MODEL_LOADING_LINE).assertIsDisplayed()
-        val band = composeRule.onNodeWithContentDescription("Model warming up.", substring = true)
-        band.assertIsDisplayed()
-        band.assert(SemanticsMatcher.keyIsDefined(SemanticsProperties.LiveRegion))
-        band.assert(SemanticsMatcher.keyNotDefined(SemanticsActions.OnClick))
-    }
-
-    @Test
-    fun `renders ModelPaused informational band (pos)`() {
-        composeRule.setContent {
-            VestigeTheme {
-                CaptureErrorBand(error = null, readiness = ModelReadiness.Paused)
-            }
-        }
-        composeRule.onNodeWithText(CaptureCopy.MODEL_PAUSED_LINE).assertIsDisplayed()
-        val band = composeRule.onNodeWithContentDescription("Model paused.", substring = true)
-        band.assertIsDisplayed()
-        band.assert(SemanticsMatcher.keyIsDefined(SemanticsProperties.LiveRegion))
-        band.assert(SemanticsMatcher.keyNotDefined(SemanticsActions.OnClick))
-    }
-
-    @Test
-    fun `renders ModelDownloading percent in eyebrow and body (edge — percent threading)`() {
-        composeRule.setContent {
-            VestigeTheme {
-                CaptureErrorBand(error = null, readiness = ModelReadiness.Downloading(percent = 73))
-            }
-        }
-        composeRule.onNodeWithText("MODEL · 73%").assertIsDisplayed()
-        composeRule.onNodeWithText("Downloading model · 73%").assertIsDisplayed()
-        val band = composeRule.onNodeWithContentDescription("Model downloading 73 percent.", substring = true)
-        band.assertIsDisplayed()
-        band.assert(SemanticsMatcher.keyIsDefined(SemanticsProperties.LiveRegion))
-        band.assert(SemanticsMatcher.keyNotDefined(SemanticsActions.OnClick))
-    }
-
-    @Test
-    fun `error band shadows non-Ready readiness in UI (edge — error wins)`() {
-        composeRule.setContent {
-            VestigeTheme {
-                CaptureErrorBand(error = CaptureError.MicDenied, readiness = ModelReadiness.Loading)
-            }
-        }
-        composeRule.onNodeWithText(CaptureCopy.MIC_DENIED_LINE).assertIsDisplayed()
-        composeRule.onAllNodesWithText(CaptureCopy.MODEL_LOADING_LINE).assertCountEquals(0)
-    }
-
-    @Test
-    fun `resolver maps MicBlocked (err)`() {
-        assertEquals(
-            BandKind.MicBlocked,
-            resolveBandKind(error = CaptureError.MicBlocked, readiness = ModelReadiness.Ready),
-        )
-    }
-
-    @Test
     fun `MicBlocked band is a polite no-click status region with a separate Use-typed button`() {
         var usedTyped = false
         composeRule.setContent {
             VestigeTheme {
-                CaptureErrorBand(
-                    error = CaptureError.MicBlocked,
-                    readiness = ModelReadiness.Ready,
-                    onUseTyped = { usedTyped = true },
-                )
+                CaptureErrorBand(error = CaptureError.MicBlocked, onUseTyped = { usedTyped = true })
             }
         }
         val band = composeRule.onNodeWithContentDescription(
@@ -259,7 +148,6 @@ class CaptureErrorBandTest {
         band.assert(SemanticsMatcher.keyIsDefined(SemanticsProperties.LiveRegion))
         band.assert(SemanticsMatcher.keyNotDefined(SemanticsActions.OnClick))
 
-        // The recovery affordance is a distinct, actionable node — not merged into the band.
         val useTyped = composeRule.onNodeWithContentDescription(CaptureCopy.USE_TYPED_INSTEAD)
         useTyped.assertHasClickAction()
         useTyped.performClick()
@@ -268,11 +156,7 @@ class CaptureErrorBandTest {
 
     @Test
     fun `MicBlocked omits the Use-typed affordance when no callback is wired`() {
-        composeRule.setContent {
-            VestigeTheme {
-                CaptureErrorBand(error = CaptureError.MicBlocked, readiness = ModelReadiness.Ready)
-            }
-        }
+        composeRule.setContent { VestigeTheme { CaptureErrorBand(error = CaptureError.MicBlocked) } }
         composeRule.onAllNodesWithText(CaptureCopy.USE_TYPED_INSTEAD).assertCountEquals(0)
     }
 
@@ -282,7 +166,6 @@ class CaptureErrorBandTest {
             VestigeTheme {
                 CaptureErrorBand(
                     error = CaptureError.InferenceFailed(CaptureError.InferenceFailed.Reason.ENGINE_FAILED),
-                    readiness = ModelReadiness.Ready,
                 )
             }
         }

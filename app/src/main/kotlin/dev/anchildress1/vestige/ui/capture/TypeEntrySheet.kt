@@ -123,7 +123,7 @@ private fun SubmitRow(canSubmit: Boolean, onSubmit: () -> Unit) {
         contentAlignment = Alignment.Center,
     ) {
         Text(
-            text = CaptureCopy.TYPE_SUBMIT.uppercase(),
+            text = "${CaptureCopy.TYPE_SUBMIT.uppercase()} →",
             style = VestigeTheme.typography.displayBig.copy(fontSize = 18.sp, lineHeight = 18.sp),
             color = fg,
         )

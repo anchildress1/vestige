@@ -1,7 +1,7 @@
 package dev.anchildress1.vestige
 
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.junit4.v2.createComposeRule
 import dev.anchildress1.vestige.inference.ForegroundResult
 import dev.anchildress1.vestige.inference.ForegroundStreamEvent
 import dev.anchildress1.vestige.model.Persona
@@ -34,7 +34,7 @@ class CaptureRouteStateSyncTest {
             initialPersona = Persona.WITNESS,
             recordVoice = VoiceCapture { _, _ -> null },
             foregroundInference = ForegroundInferenceCall { _, _ -> parseFailure() },
-            saveAndExtract = SaveAndExtract { _, _, _, _, _, _ -> },
+            saveAndExtract = SaveAndExtract { _, _, _, _, _, _ -> 1L },
             foregroundTextInference = ForegroundTextInferenceCall { _, _, _ -> parseFailure() },
             initialReadiness = ModelReadiness.Loading,
         )

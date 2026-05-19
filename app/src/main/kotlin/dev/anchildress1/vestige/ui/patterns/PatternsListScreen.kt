@@ -1,119 +1,187 @@
 package dev.anchildress1.vestige.ui.patterns
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
-import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.liveRegion
-import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import dev.anchildress1.vestige.R
-import dev.anchildress1.vestige.ui.components.VestigeListCard
-import dev.anchildress1.vestige.ui.components.VestigeListCardInteraction
-import dev.anchildress1.vestige.ui.components.VestigeScaffold
-import dev.anchildress1.vestige.ui.components.limeLeftRuleForActive
+import dev.anchildress1.vestige.model.Persona
+import dev.anchildress1.vestige.ui.components.AppTop
+import dev.anchildress1.vestige.ui.components.AppTopStatuses
+import dev.anchildress1.vestige.ui.components.BottomTab
+import dev.anchildress1.vestige.ui.components.StatItem
+import dev.anchildress1.vestige.ui.components.StatRibbon
+import dev.anchildress1.vestige.ui.components.VestigeBottomNav
+import dev.anchildress1.vestige.ui.components.accentedHeadline
 import dev.anchildress1.vestige.ui.theme.VestigeTheme
+import java.util.Locale
 
-// Dropped cards stay legible but de-prioritized per spec-pattern-action-buttons.md §Visual.
-private const val DROPPED_CARD_ALPHA = 0.6f
+private const val PATTERN_WINDOW_DAYS = "30"
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
+@Suppress("LongParameterList") // Screen seam: vm + open/persona/nav/menu callbacks + modifier.
 fun PatternsListScreen(
     viewModel: PatternsListViewModel,
     onOpenPattern: (String) -> Unit,
+    persona: Persona = Persona.WITNESS,
+    onNavSelect: (BottomTab) -> Unit = {},
+    onMenuTap: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val snackbarHostState = rememberPatternSnackbarHostState(viewModel.events, viewModel::undo)
+    val colors = VestigeTheme.colors
 
-    VestigeScaffold(
-        modifier = modifier,
-        topBar = { TopAppBar(title = { Text(stringResource(R.string.patterns_title)) }) },
-        snackbarHost = { PatternSnackbarHost(snackbarHostState) },
-    ) { padding ->
-        PatternsListBody(
-            state = state,
-            padding = padding,
-            onCardClick = onOpenPattern,
-            actions = PatternActionCallbacks(
-                onDrop = viewModel::drop,
-                onSkip = viewModel::skip,
-                onRestart = viewModel::restart,
+    Box(modifier = modifier.fillMaxSize().background(colors.floor)) {
+        Column(modifier = Modifier.fillMaxSize()) {
+            AppTop(persona = persona.name, status = AppTopStatuses.Ready, onMenuTap = onMenuTap)
+            Text(
+                text = buildAnnotatedString {
+                    // Screen headline carries the brand; the nav tab + section headers stay
+                    // the functional "Patterns" word (function in navigation, brand in headings).
+                    withStyle(SpanStyle(color = colors.ink)) { append("VESTIGES") }
+                    withStyle(SpanStyle(color = colors.coral)) { append(".") }
+                },
+                style = VestigeTheme.typography.displayBig,
+                modifier = Modifier.padding(horizontal = 18.dp, vertical = 12.dp),
+            )
+            PatternsStatRibbon(state)
+            Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
+                when (val s = state) {
+                    PatternsListUiState.Loading -> Unit
+
+                    is PatternsListUiState.Empty -> PatternsEmptyState(s)
+
+                    is PatternsListUiState.Loaded -> PatternsLoadedList(
+                        cards = s.cards,
+                        onCardClick = onOpenPattern,
+                        actions = PatternActionCallbacks(
+                            onDrop = viewModel::drop,
+                            onSkip = viewModel::skip,
+                            onRestart = viewModel::restart,
+                        ),
+                    )
+                }
+            }
+            VestigeBottomNav(active = BottomTab.PATTERNS, onSelect = onNavSelect)
+        }
+        Box(
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .padding(bottom = SNACKBAR_NAV_CLEARANCE),
+        ) {
+            PatternSnackbarHost(snackbarHostState)
+        }
+    }
+}
+
+private val SNACKBAR_NAV_CLEARANCE = 84.dp
+
+@Composable
+private fun PatternsStatRibbon(state: PatternsListUiState) {
+    val loaded = state as? PatternsListUiState.Loaded
+    val vestiges = loaded?.cards?.size ?: 0
+    val entries = when (state) {
+        is PatternsListUiState.Empty -> state.entryCount
+        is PatternsListUiState.Loaded -> state.cards.firstOrNull()?.totalEntryCount?.toInt() ?: 0
+        PatternsListUiState.Loading -> 0
+    }
+    Box(
+        modifier = Modifier
+            .padding(horizontal = 18.dp, vertical = 8.dp)
+            .semantics(mergeDescendants = true) {
+                contentDescription =
+                    "$vestiges vestiges, $entries entries, last $PATTERN_WINDOW_DAYS days"
+            },
+    ) {
+        StatRibbon(
+            items = listOf(
+                StatItem(value = "$vestiges", label = "VESTIGES"),
+                StatItem(value = "$entries", label = "ENTRIES"),
+                StatItem(value = PATTERN_WINDOW_DAYS, label = "DAYS"),
             ),
         )
     }
 }
 
 @Composable
-private fun PatternsListBody(
-    state: PatternsListUiState,
-    padding: PaddingValues,
+private fun PatternsEmptyState(empty: PatternsListUiState.Empty) {
+    val colors = VestigeTheme.colors
+    val copy = emptyCopyFor(empty.reason)
+    val header = stringResource(copy.headerRes)
+    val body = stringResource(copy.bodyRes)
+    // Status band per AGENTS.md: announced politely, no click action, single merged description
+    // in the spoken (sentence-case) form — the display uppercases purely visually.
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .semantics(mergeDescendants = true) {
+                liveRegion = LiveRegionMode.Polite
+                contentDescription = "$header $body"
+            }
+            .padding(horizontal = 18.dp),
+        verticalArrangement = Arrangement.Center,
+    ) {
+        Text(text = accentedHeadline(header, colors.ink, colors.lime), style = VestigeTheme.typography.displayBig)
+        Text(
+            text = body,
+            style = VestigeTheme.typography.p,
+            color = colors.dim,
+            modifier = Modifier.padding(top = 16.dp),
+        )
+    }
+}
+
+@Composable
+private fun PatternsLoadedList(
+    cards: List<PatternCardUi>,
     onCardClick: (String) -> Unit,
     actions: PatternActionCallbacks<String>,
 ) {
-    when (state) {
-        PatternsListUiState.Loading -> Unit
-
-        is PatternsListUiState.Empty -> EmptyState(state, Modifier.padding(padding))
-
-        is PatternsListUiState.Loaded -> LazyColumn(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding),
-            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            // Section order is the PatternSection declaration order per spec §P0.4:
-            // ACTIVE → SKIPPED → CLOSED → DROPPED. Empty sections render no header.
-            val grouped = state.cards.groupBy { it.section }
-            PatternSection.entries.forEach { section ->
-                val cards = grouped[section].orEmpty()
-                if (cards.isEmpty()) return@forEach
-                item(key = "header-${section.name}") {
-                    SectionHeader(section = section)
-                }
-                items(cards, key = { it.patternId }) { card ->
-                    PatternCard(
-                        card = card,
-                        onClick = { onCardClick(card.patternId) },
-                        onDrop = { actions.onDrop(card.patternId) },
-                        onSkip = { actions.onSkip(card.patternId) },
-                        onRestart = { actions.onRestart(card.patternId) },
-                    )
-                }
+    LazyColumn(
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        // Section order is the PatternSection declaration order per spec §P0.4:
+        // ACTIVE → SKIPPED → CLOSED → DROPPED. Empty sections render no header.
+        val grouped = cards.groupBy { it.section }
+        PatternSection.entries.forEach { section ->
+            val sectionCards = grouped[section].orEmpty()
+            if (sectionCards.isEmpty()) return@forEach
+            item(key = "header-${section.name}") {
+                SectionHeader(section = section)
+            }
+            items(sectionCards, key = { it.patternId }) { card ->
+                PatternCard(
+                    card = card,
+                    onClick = { onCardClick(card.patternId) },
+                    onDrop = { actions.onDrop(card.patternId) },
+                    onSkip = { actions.onSkip(card.patternId) },
+                    onRestart = { actions.onRestart(card.patternId) },
+                )
             }
         }
     }
@@ -131,199 +199,25 @@ private fun SectionHeader(section: PatternSection) {
     )
 }
 
-@Composable
-private fun EmptyState(empty: PatternsListUiState.Empty, modifier: Modifier = Modifier) {
-    val copy = emptyCopyFor(empty.reason)
-    val eyebrow = copy.eyebrowRes?.let { stringResource(it, empty.entryCount) }
-    val header = stringResource(copy.headerRes)
-    val body = stringResource(copy.bodyRes)
-    // Status band per AGENTS.md: announced politely, no click action, single merged description.
-    val description = listOfNotNull(eyebrow, header, body).joinToString(" ")
-    Box(
-        modifier = modifier
-            .fillMaxSize()
-            .semantics(mergeDescendants = true) {
-                liveRegion = LiveRegionMode.Polite
-                contentDescription = description
-            },
-        contentAlignment = Alignment.Center,
-    ) {
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            eyebrow?.let {
-                Text(
-                    text = it,
-                    style = MaterialTheme.typography.labelSmall,
-                    color = VestigeTheme.colors.dim,
-                    textAlign = TextAlign.Center,
-                )
-            }
-            Text(
-                text = header,
-                style = MaterialTheme.typography.titleMedium,
-                color = VestigeTheme.colors.ink,
-                textAlign = TextAlign.Center,
-            )
-            Text(
-                text = body,
-                style = MaterialTheme.typography.bodyMedium,
-                color = VestigeTheme.colors.dim,
-                textAlign = TextAlign.Center,
-            )
-        }
-    }
-}
-
-@Composable
-@Suppress("LongMethod", "LongParameterList") // Compose layout cluster; call-site clarity wins.
-private fun PatternCard(
-    card: PatternCardUi,
-    onClick: () -> Unit,
-    onDrop: () -> Unit,
-    onSkip: () -> Unit,
-    onRestart: () -> Unit,
-) {
-    val cardAlpha = if (card.section == PatternSection.DROPPED) DROPPED_CARD_ALPHA else 1f
-    val backDescription = card.backLabel?.let { stringResource(R.string.pattern_card_back_on, it) }
-    VestigeListCard(
-        modifier = Modifier
-            .fillMaxWidth()
-            .alpha(cardAlpha)
-            .semantics {
-                role = Role.Button
-                contentDescription = listOfNotNull(card.title, card.observation, backDescription).joinToString(". ")
-            },
-        interaction = VestigeListCardInteraction.Click(onClick = onClick),
-        accentModifier = if (card.section == PatternSection.ACTIVE) {
-            Modifier.limeLeftRuleForActive(color = VestigeTheme.colors.lime)
-        } else {
-            Modifier
-        },
-    ) {
-        Row(modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min)) {
-            Column(
-                modifier = Modifier
-                    .weight(1f),
-                verticalArrangement = Arrangement.spacedBy(4.dp),
-            ) {
-                Text(text = card.title, style = MaterialTheme.typography.titleMedium)
-                card.templateLabel?.let {
-                    Text(
-                        text = it,
-                        style = MaterialTheme.typography.labelMedium,
-                        color = VestigeTheme.colors.dim,
-                    )
-                }
-                Text(text = card.observation, style = MaterialTheme.typography.bodyMedium)
-                Spacer(modifier = Modifier.height(2.dp))
-                val traceBarStyle = cardSectionToneFor(card.section).themedStyle()
-                TraceBarE(
-                    hits = card.traceHits,
-                    accent = traceBarStyle.accent,
-                    peak = traceBarStyle.peak,
-                )
-                Spacer(modifier = Modifier.height(2.dp))
-                Text(
-                    text = stringResource(
-                        R.string.pattern_card_meta,
-                        card.supportingCount,
-                        card.totalEntryCount,
-                        card.lastSeenLabel,
-                    ),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = VestigeTheme.colors.dim,
-                )
-                card.backLabel?.let { back ->
-                    Text(
-                        text = stringResource(R.string.pattern_card_back_on, back),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = VestigeTheme.colors.dim,
-                    )
-                }
-            }
-            OverflowMenu(
-                availableActions = card.availableActions,
-                onDrop = onDrop,
-                onSkip = onSkip,
-                onRestart = onRestart,
-            )
-        }
-    }
-}
-
-@Composable
-private fun OverflowMenu(
-    availableActions: Set<PatternAction>,
-    onDrop: () -> Unit,
-    onSkip: () -> Unit,
-    onRestart: () -> Unit,
-) {
-    if (availableActions.isEmpty()) return
-    var expanded by remember { mutableStateOf(false) }
-    val overflowDescription = stringResource(R.string.pattern_actions_overflow_description)
-    Box {
-        IconButton(
-            onClick = { expanded = true },
-            modifier = Modifier.semantics { contentDescription = overflowDescription },
-        ) {
-            Text(text = stringResource(R.string.pattern_overflow_glyph), style = MaterialTheme.typography.titleLarge)
-        }
-        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
-            if (PatternAction.DROP in availableActions) {
-                DropdownMenuItem(
-                    text = { Text(stringResource(R.string.pattern_action_dismiss)) },
-                    onClick = {
-                        expanded = false
-                        onDrop()
-                    },
-                )
-            }
-            if (PatternAction.SKIP in availableActions) {
-                DropdownMenuItem(
-                    text = { Text(stringResource(R.string.pattern_action_snooze_7_days)) },
-                    onClick = {
-                        expanded = false
-                        onSkip()
-                    },
-                )
-            }
-            if (PatternAction.RESTART in availableActions) {
-                DropdownMenuItem(
-                    text = { Text(stringResource(R.string.pattern_action_restart)) },
-                    onClick = {
-                        expanded = false
-                        onRestart()
-                    },
-                )
-            }
-        }
-    }
-}
-
 @Preview
 @Composable
 private fun PatternsListPreview() {
     VestigeTheme {
-        PatternsListBody(
-            state = PatternsListUiState.Loaded(
-                listOf(
-                    PatternCardUi(
-                        patternId = "abc",
-                        title = "Tuesday Meetings",
-                        templateLabel = "Crashed",
-                        observation = "Fourth entry mentions Tuesday meetings. State before: cruising. After: crashed.",
-                        supportingCount = 4,
-                        totalEntryCount = 12,
-                        lastSeenLabel = "May 7",
-                        section = PatternSection.ACTIVE,
-                        traceHits = PREVIEW_TRACE_HITS,
-                        availableActions = setOf(PatternAction.DROP, PatternAction.SKIP),
-                    ),
+        PatternsLoadedList(
+            cards = listOf(
+                PatternCardUi(
+                    patternId = "abc",
+                    title = "Tuesday Meetings",
+                    templateLabel = "Crashed",
+                    observation = "Fourth entry mentions Tuesday meetings. State before: cruising. After: crashed.",
+                    supportingCount = 4,
+                    totalEntryCount = 12,
+                    lastSeenLabel = "May 7",
+                    section = PatternSection.ACTIVE,
+                    traceHits = PREVIEW_TRACE_HITS,
+                    availableActions = setOf(PatternAction.DROP, PatternAction.SKIP),
                 ),
             ),
-            padding = PaddingValues(0.dp),
             onCardClick = {},
             actions = PatternActionCallbacks(onDrop = {}, onSkip = {}, onRestart = {}),
         )

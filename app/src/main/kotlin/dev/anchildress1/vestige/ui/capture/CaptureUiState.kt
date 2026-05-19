@@ -3,20 +3,19 @@ package dev.anchildress1.vestige.ui.capture
 import dev.anchildress1.vestige.model.Persona
 
 /**
- * Screen-level state for `CaptureScreen`. The four phase variants drive the layout swap
- * (idle frame vs live recording vs inferring placeholder vs review). Persona and model
- * readiness are common slots — every variant carries them so the chrome (`AppTop` status
- * pill, persona dropdown) renders without phase-conditional reads.
+ * Screen-level state for `CaptureScreen`. Three phases drive the layout swap: idle frame vs
+ * live recording vs the brief submitting spinner. Post-submit the entry is persisted and the
+ * host navigates to its detail in History — Capture has no review/inferring surface of its own.
+ * Persona and model readiness are common slots so the chrome renders without phase reads.
  */
 sealed interface CaptureUiState {
     val persona: Persona
     val modelReadiness: ModelReadiness
 
-    /** Pre-recording. May carry the last `Reviewing` payload so the transcript persists across taps. */
+    /** Pre-recording resting state. */
     data class Idle(
         override val persona: Persona,
         override val modelReadiness: ModelReadiness,
-        val lastReview: ReviewState? = null,
         val error: CaptureError? = null,
     ) : CaptureUiState
 
@@ -28,24 +27,12 @@ sealed interface CaptureUiState {
         val recentLevels: List<Float>,
     ) : CaptureUiState
 
-    /** Foreground call in flight. Holds the `Reading the entry.` placeholder per ux-copy.md. */
-    data class Inferring(
-        override val persona: Persona,
-        override val modelReadiness: ModelReadiness,
-        val startedAtEpochMs: Long,
-    ) : CaptureUiState
-
     /**
-     * Single-turn transcript per STT-B v1 scope: one USER + one MODEL turn from the foreground call.
-     * [streaming] true while partial deltas are still arriving — the entry is not yet persisted, so
-     * Done is withheld until the terminal event flips this to false (gates premature acknowledge).
+     * Transient spinner between STOP (or typed submit) and the entry being persisted — the
+     * window where call-1 transcription is still in flight and there is no entry to open yet.
+     * Once the entry persists the VM emits a navigation event and returns to [Idle].
      */
-    data class Reviewing(
-        override val persona: Persona,
-        override val modelReadiness: ModelReadiness,
-        val review: ReviewState,
-        val streaming: Boolean,
-    ) : CaptureUiState
+    data class Submitting(override val persona: Persona, override val modelReadiness: ModelReadiness) : CaptureUiState
 }
 
 /** Local-model readiness drives the REC button + status-pill copy. */
@@ -73,7 +60,7 @@ sealed interface ModelReadiness {
 
 /**
  * Surfaced as a transient banner / chrome state. Mic errors come from the permission flow;
- * inference errors come from `ForegroundResult.ParseFailure` or thrown engine failures.
+ * inference errors come from a failed call-1 transcription (no entry was persisted).
  */
 sealed interface CaptureError {
     object MicDenied : CaptureError
@@ -83,12 +70,3 @@ sealed interface CaptureError {
         enum class Reason { TIMED_OUT, PARSE_FAILED, ENGINE_FAILED }
     }
 }
-
-/** Single transcript pair from one foreground call. */
-data class ReviewState(
-    val transcription: String,
-    val followUp: String,
-    val persona: Persona,
-    val elapsedMs: Long,
-    val isTerminal: Boolean,
-)

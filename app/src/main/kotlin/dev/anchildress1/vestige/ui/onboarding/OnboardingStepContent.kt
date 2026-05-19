@@ -29,7 +29,6 @@ internal data class OnboardingStepState(
             modelState is ModelArtifactState.Complete,
             micGranted,
             notifGranted,
-            true, // type fallback — always on
         ).count { it }
 }
 
@@ -81,10 +80,9 @@ internal fun OnboardingStepContent(
             downloadStatus = state.downloadStatus,
             wifiConnected = state.wifiConnected,
             enabledCount = state.enabledCount,
-            // Auto-unwinds back to Wiring once Complete; the screen is intentionally not a stop.
-            onContinue = callbacks.onDownloadReturn,
             onRetry = callbacks.onRetryDownload,
             // Pause = leave the screen; `.part` persists and HTTP-Range resumes on re-entry.
+            // Completion auto-unwinds to Wiring via the host LaunchedEffect — not a button here.
             onPause = callbacks.onDownloadReturn,
         )
     }
@@ -106,21 +104,20 @@ private fun WiringHostScreen(modifier: Modifier, state: OnboardingStepState, cal
             onAllow = callbacks.onMicAllow,
         ),
         notifSwitch(granted = state.notifGranted, onAllow = callbacks.onNotificationAllow),
-        typedFallbackSwitch(),
     )
-    val granted = switches.count { it.state == WiringSwitchState.Granted }
     val readyToAdvance = isWiringReadyToAdvance(state)
     OnboardingScaffold(
         enabledCount = state.enabledCount,
         modifier = modifier,
-        rightStatus = "$granted / ${switches.size} LIVE",
         // Wiring is the terminal hub — Next opens the app once the model is on disk. Mic +
         // Notify stay optional per the design (granted, pending, or blocked all let the user
-        // proceed; only `modelState.isReady` gates Next).
+        // proceed; only `modelState.isReady` gates Next). The button greens once every row
+        // reads ready (ux-copy.md §Onboarding Screen 2 "green background when all rows green").
         primary = OnboardingAction(
-            label = stringResource(id = R.string.onboarding_open_vestige),
+            label = stringResource(id = R.string.onboarding_wiring_lets_go),
             onAction = callbacks.onOpenApp,
             enabled = readyToAdvance,
+            highlighted = state.enabledCount >= TOTAL_WIRING_SWITCHES,
         ),
         footerHelper = if (readyToAdvance) {
             null
@@ -139,9 +136,9 @@ internal fun isWiringReadyToAdvance(state: OnboardingStepState): Boolean =
 private fun personaSwitch(persona: Persona, onTap: () -> Unit): WiringSwitch {
     val name = stringResource(id = personaNameRes(persona))
     return WiringSwitch(
-        number = stringResource(id = R.string.onboarding_wiring_persona_number),
-        title = stringResource(id = R.string.onboarding_wiring_persona_title, name.uppercase()),
-        description = stringResource(id = R.string.onboarding_wiring_persona_desc, name),
+        label = stringResource(id = R.string.onboarding_wiring_persona_label),
+        title = name,
+        description = stringResource(id = R.string.onboarding_wiring_persona_desc),
         state = WiringSwitchState.Granted,
         onTap = onTap,
         role = Role.Button, // Navigation back to persona pick — not a toggle.
@@ -183,7 +180,7 @@ private fun localSwitch(
         else -> onOpenDownload
     }
     return WiringSwitch(
-        number = stringResource(id = R.string.onboarding_wiring_local_number),
+        label = stringResource(id = R.string.onboarding_wiring_local_label),
         title = stringResource(id = R.string.onboarding_wiring_local_title),
         description = stringResource(id = R.string.onboarding_wiring_local_desc),
         state = state,
@@ -201,7 +198,7 @@ private fun micSwitch(granted: Boolean, denied: Boolean, onAllow: () -> Unit): W
         else -> WiringSwitchState.Pending
     }
     return WiringSwitch(
-        number = stringResource(id = R.string.onboarding_wiring_mic_number),
+        label = stringResource(id = R.string.onboarding_wiring_mic_label),
         title = stringResource(id = R.string.onboarding_wiring_mic_title),
         description = stringResource(id = R.string.onboarding_wiring_mic_desc),
         state = state,
@@ -218,7 +215,7 @@ private fun micSwitch(granted: Boolean, denied: Boolean, onAllow: () -> Unit): W
 private fun notifSwitch(granted: Boolean, onAllow: () -> Unit): WiringSwitch {
     val state = if (granted) WiringSwitchState.Granted else WiringSwitchState.Pending
     return WiringSwitch(
-        number = stringResource(id = R.string.onboarding_wiring_notif_number),
+        label = stringResource(id = R.string.onboarding_wiring_notif_label),
         title = stringResource(id = R.string.onboarding_wiring_notif_title),
         description = stringResource(id = R.string.onboarding_wiring_notif_desc),
         state = state,
@@ -226,11 +223,3 @@ private fun notifSwitch(granted: Boolean, onAllow: () -> Unit): WiringSwitch {
         onTap = if (granted) null else onAllow,
     )
 }
-
-@Composable
-private fun typedFallbackSwitch(): WiringSwitch = WiringSwitch(
-    number = stringResource(id = R.string.onboarding_wiring_type_number),
-    title = stringResource(id = R.string.onboarding_wiring_type_title),
-    description = stringResource(id = R.string.onboarding_wiring_type_desc),
-    state = WiringSwitchState.Granted,
-)

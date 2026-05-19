@@ -23,13 +23,23 @@ Keep these consistent. Don't mix.
 
 ## Onboarding (3 screens, hub flow)
 
+> _Final-polish reconciliation (2026-05-17):_ the onboarding screens were brought to pixel
+> parity with `poc/onboarding-{persona,wiring,download}-final.png`. Net copy/structure changes,
+> all reflected below: Screen 1 subhead gains "later"; each Wiring row gains a sentence-case
+> **title line** above its description and a status dot replaces the ON/OFF/BLOCKED pill;
+> Wiring gains a subhead; the Type row was never a Wiring row (typed entry is ADR-013 product
+> behavior); Screen 3's single status line is rendered as a card (`{pct}%`, `OF {total}`,
+> `ETA {mm:ss}`, `{done} / {total}`, `~{mbps} MB/S · WI-FI`). The headline terminal square is
+> coral (see `design-guidelines.md` §First-Run Onboarding addendum). Chrome (`SETUP · NN OF
+> 0N` + tick rule) is unchanged — the comps' `STEP n OF 3` line was not adopted.
+
 ### Screen 1 — Pick a persona
 
 Header:
 > **Pick a persona.**
 
 Subhead:
-> Three voices. Same product. Pick the one that fits today. You can switch.
+> Three voices. Same product. Pick the one that fits today. You can switch later.
 
 Persona cards (default Witness highlighted):
 - **Witness** — Observes. Names the pattern.
@@ -49,11 +59,15 @@ Footer link:
 Header:
 > **Wiring.**
 
-Rows:
-- **Persona** — `Voice picked on the previous screen. Change it later in Settings if {persona} doesn't fit.`
-- **Local** — `No cloud. No servers. No telemetry. Voice never leaves the device.`
-- **Mic** — `Records dumps. Audio is read locally, then discarded. Transcription stays as text.`
-- **Notify** — `One line, posted while the model reads an entry. Disappears when work is done.`
+Subhead:
+> The Local row is the only one that gates entry. Mic and Notify are optional.
+
+Rows (mono left-label · sentence-case title line · description · trailing status dot —
+lime = ready, dim = pending, coral = blocked):
+- **PERSONA** — title `{persona name}` · `Set on the previous screen. Change it in Settings.`
+- **LOCAL** — title `Download Gemma` · `No cloud. No servers. Stays on the device.`
+- **MIC** — title `Grant mic` · `Read locally, then discarded. Text stays.`
+- **NOTIFY** — title `Grant process` · `One status line while the model reads. Gone after.`
 
 Local row helper states:
 - Absent on Wi-Fi: `Tap Local to start download`
@@ -83,6 +97,11 @@ This string is the same one used for mid-capture inference loading copy (see §"
 ---
 
 ### Screen 3 — Model download
+
+> _Shared-card note (2026-05-18):_ the progress block here is the **same** `ModelDownloadCard`
+> the Settings → Model Status downloading state renders (one component, two hosts) — see
+> §"Local Model Status" Downloading-state reconciliation. Only the surrounding chrome differs
+> (`STEP 3 OF 3` + no bottom nav here; scoreboard + bottom nav there).
 
 Header:
 > **Download model.**
@@ -125,28 +144,53 @@ Behavior:
 
 ## Capture Screen
 
+### Hero
+
+> **WHAT HAPPENED?**
+
+Poster headline, same treatment as onboarding headlines but the trailing `HAPPENED?`
+renders in lime (not a coral period-square). Idle shows it full-bright; when the type
+sheet is open the modal scrim dims it. Source of truth for `CaptureCopy.HERO_QUESTION`.
+
 ### Status row (top)
 
-- Local model status indicator: `GEMMA 4 · LOCAL ONLY` (when idle, model loaded) / `GEMMA 4 · LISTENING` (when recording) / `GEMMA 4 · LOADING` (engine warming) / `DOWNLOADING · {N}%` (active download) / `DOWNLOAD PAUSED` (Wi-Fi dropped mid-download) — pill color stays lime in every state except LISTENING; coral is reserved for the REC button heat + destructive flows (see `design-guidelines.md` §"Capture Screen / AppTop status pill"). _(Story 4.4: `GEMMA 4 · LOADING` is the reconciled label — the doc previously named only the idle/recording strings; the pill now reflects all four `ModelReadiness` states and is tappable post-onboarding to open the Model Status screen.)_
+- Local model status indicator: `GEMMA 4 · LOCAL ONLY` (when idle, model loaded) / `GEMMA 4 · LISTENING` (when recording) / `GEMMA 4 · LOADING` (engine warming) / `DOWNLOADING · {N}%` (active download) / `DOWNLOAD PAUSED` (Wi-Fi dropped mid-download) — the pill is lime in every state except LISTENING, which renders coral; coral is otherwise reserved for the REC button heat + destructive flows (see `design-guidelines.md` §"Capture Screen / AppTop status pill"). _(Story 4.4: `GEMMA 4 · LOADING` is the reconciled label — the doc previously named only the idle/recording strings; the pill now reflects all four `ModelReadiness` states and is tappable post-onboarding to open the Model Status screen.)_
 - Persona dropdown label: `WITNESS ▾` (or active persona)
 
 ### Patterns peek (below status)
 
-Card title:
-> **{N} active patterns**
+Peek (above the bottom nav; informational, not tappable — final-polish 2026-05-18, replaces
+the old card-title/body):
+> Eyebrow: `● {N} ACTIVE PATTERNS` (lime)
+> Teaser: `{pattern_name_1}  ·  {pattern_name_2}  ·  {pattern_name_3}` (up to 3, cream)
+> Union 30-day TraceBar (lime)
 
-Card body (one-line teaser):
-> {pattern_name_1} · {pattern_name_2} · {pattern_name_3}
+If no active patterns (the peek is replaced by a single dim line):
+> `NO ENTRIES YET · FIRST ONE TAKES 30 SECONDS`
 
-If model still downloading (record + typed both disabled — ADR-013):
-> Model loading. Hang tight.
+If the model isn't ready (deleted / loading / downloading / Wi-Fi-paused — record + typed
+both disabled, ADR-013): a large centered spinner stands in for the REC button, with a line
+under it saying what's pending:
+> Loading: `Loading the model. One moment.`
+> Downloading: `Downloading the model. {N}%.`
+> Paused: `Wi-Fi dropped. Reconnect to finish the model download.`
+
+The AppTop status pill still carries the state too.
 
 Status pill during download: `DOWNLOADING · {N}%`
 Status pill if paused (no Wi-Fi): `DOWNLOAD PAUSED`
-Below button if paused: `Reconnect to Wi-Fi to resume.`
 
-If no active patterns:
-> Nothing repeating yet.
+> _Final-polish note (2026-05-18):_ the old in-content model **banner** (`Model loading.
+> Hang tight.` and the `MODEL · WARMING` / `MODEL · PAUSED` band labels) no longer fit the
+> redesign and were removed. The model-not-ready state is now a big page spinner + the line
+> above; the diagnostic band is mic / inference only.
+
+> _Readiness-meaning note (2026-05-18, ADR-013 §Addendum):_ `Loading` is now an **honest
+> engine-warm** state, not a sub-frame flash. A full-size artifact on disk is no longer
+> `Ready` on its own — readiness holds at `Loading` (showing `Loading the model. One
+> moment.`) until `engine.initialize()` actually completes, so REC/typed stay gated while a
+> cold first inference would still stall. `Loading` legitimately covers both "no artifact"
+> and "artifact present, engine warming".
 
 ### Center — record action
 
@@ -169,7 +213,7 @@ Spinner icon.
 
 ### Capture Screen — Discard
 
-Recording-state secondary affordance — sits below `STOP · FILE IT` per `design-guidelines.md` §"Capture Screen / Discard."
+Recording-state secondary affordance — a coral-outlined button that sits *above* `STOP · FILE IT` per `design-guidelines.md` §"Capture Screen / Discard" (final-polish 2026-05-18; was muted text below STOP).
 
 Button label:
 > DISCARD · DON'T SAVE
@@ -180,6 +224,11 @@ Behavior (per `adrs/ADR-001-stack-and-build-infra.md` §Q8):
 - Visible only while `CaptureUiState` is `Recording`. Hidden once the user has tapped `STOP · FILE IT` (foreground call is in flight).
 
 There is no error copy, no destructive confirmation copy, no post-discard toast. Silent dismissal is the contract.
+
+> _Recording-modal note (2026-05-18):_ while `CaptureUiState` is `Recording` the screen is
+> **modal** — the AppTop hamburger menu and the bottom navigation are both removed (the
+> AppTop right slot is empty). An active mic capture cannot be routed away from; the only
+> exits are `STOP · FILE IT` and `DISCARD · DON'T SAVE`. The menu/nav return on idle.
 
 ### Type affordance (bottom)
 
@@ -194,44 +243,115 @@ Send action:
 
 ---
 
+## Entry detail
+
+Single-exchange view (`poc/entry-full-final.png` resolved, `entry-loading-final.png`
+extracting). Top → bottom: AppTop pill + hamburger; `← BACK`; the filed **time of day**
+(hero, e.g. `10:04 PM`); `{DATE} · {DURATION} · {N} WORDS` eyebrow; the
+`{PERSONA} · FOLLOW-UP` card (lime left-rule); then —
+
+- **Resolved:** `● THREE-LENS READ` + status, the LITERAL / INFERENTIAL / SKEPTICAL columns,
+  and the BEHAVIOR / STATE / VOCAB / PROMISES / REPEAT field grid with tone tags
+  (`CANONICAL` lime · `CONFLICT` coral · `AMBIGUOUS` ember · `CANDIDATE` teal).
+- **Extracting:** `● EXTRACTING · 3 LENSES` with an animated spinner +
+  "Convergence resolves in the background. Open the entry later for the full read.", and the
+  lens/field areas render as skeletons.
+
+Then `YOU · TRANSCRIPT` (dim user transcription), `▸ TAGS` chips, and the shared bottom nav
+(HISTORY active). No +NEW-ENTRY action (Capture tab covers it); no stat ribbon; no reading
+card.
+
+> _Final-polish note (2026-05-18):_ the 3-lens read + field grid + the extracting state have
+> no model backing yet. Their content is a temporary user-approved UI seed in
+> `EntryDetailSeed.kt` (overrides the AGENTS.md no-fiction guardrail for this screen only),
+> isolated so it's obvious and trivial to delete on real extraction wiring.
+
+---
+
 ## Local Model Status (standalone screen)
 
-Reachable from settings or status indicator chevron in app shell.
+Reachable from the Settings **Model status** row or the tappable AppTop status pill.
 
-Header:
-> **Model status.**
+> _Final-polish reconciliation (2026-05-18):_ rebuilt to the scoreboard comp
+> `poc/model-detail-final.png`. The plain `Model status.` header + the bullet status-state
+> list below are superseded by the structure here. Strings are verbatim from
+> `app/src/main/res/values/strings.xml` (`model_status_*`). The earlier _Story 4.4
+> reconciliation_ note is retained immediately below as historical context for why the v1
+> runtime has only four states.
 
-Status states:
+> _Story 4.4 reconciliation (historical):_ the v1 runtime has four `ModelReadiness` states —
+> `Ready` / `Loading` / `Downloading(percent)` / `Paused`. The screen renders `Paused` as
+> **`Download stalled.`**; a user-initiated **Re-download** surfaces as **Downloading** (not a
+> distinct `Updating`); a failed re-download falls back to `Loading`. `Stalled` / `Failed` /
+> `Updating` are not separate runtime states in v1.
 
-- **Ready:** `Model ready. Running locally.`
-- **Loading:** `Loading model.`
-- **Downloading:** `Downloading model. Wi-Fi only.` + progress
-- **Stalled:** `Download stalled.` + Retry button
-- **Failed:** `Network choked.` + Retry button
-- **Updating:** `Updating model.` + progress
+Chrome:
+> Back eyebrow: `← SETTINGS · MODEL STATUS`
+> Headline: `MODEL STATUS` (ink) + `.` (coral) — annotated, same treatment as `SETTINGS.`
 
-> _Story 4.4 reconciliation:_ the v1 runtime has four `ModelReadiness` states — `Ready` / `Loading` / `Downloading(percent)` / `Paused`. The screen renders `Paused` as **`Download stalled.`**; a user-initiated **Re-download** surfaces as **Downloading** (not a distinct `Updating`); a failed re-download falls back to `Loading` (no model on disk — honest). `Stalled` / `Failed` / `Updating` are not separate runtime states in v1 and were not spun up as such (demo-gate / no new abstraction layer). The confirm dialogs use the canonical §"Destructive Confirmations" wording below, not this section's shorter summary.
+Status band (lime border + eyebrow when Ready, coral otherwise; polite live region):
+> Eyebrow — Ready: `● MODEL READY · RUNNING LOCALLY`
+> Eyebrow — not Ready: `● MODEL · NOT READY`
+> Body — Ready: `Gemma 4 E4B · {size} · v{version} · On-device`
+> Body — Loading (engine warming, artifact present): `Loading model.`
+> Body — Absent (model deleted / no artifact): `Model file unreadable. Re-download from settings.`
+> Body — Downloading: `Downloading model. Wi-Fi only.` + ` {N}%`
+> Body — Paused: `Download stalled.`
 
-Detail line (always visible when loaded):
-> Gemma 4 E4B · 3.66 GB · v{version} · On-device
+> _Absent reconciliation (2026-05-18):_ `Loading` overloads "engine warming" and "no model
+> on disk". A deleted model isn't loading — the band uses the canonical §"Error States"
+> catalog string `Model file unreadable. Re-download from settings.` (the only sanctioned
+> model-gone copy; deleted and corrupt present the same actionable state). Detected via the
+> route's no-bytes-on-disk signal.
 
-Settings actions:
+Stat ribbon:
+> `{on-disk size}` · `ON DISK` — the *actual* artifact size; reads `0` once the model is
+> deleted (not the nominal 3.66 GB).
+> `0` · `CLOUD CALLS` (coral value — it is always zero, by design)
+
+On-device stack (`● ON-DEVICE STACK` eyebrow; rows carry a trailing dot — lime when Ready,
+coral when the model is gone, matching the band):
+> `Gemma 4 E4B` · `TRANSCRIBE + EXTRACT` · `{size}`
+> `EmbeddingGemma 300M` · `VECTOR · HYBRID` · `210 MB`
+> `LiteRT-LM 0.11.0` · `RUNTIME` · `NATIVE`
+
+Network-gate band (coral border):
+> Eyebrow: `● NETWORK GATE · SEALED`
+> Body: `Allowlist: model artifact host only.`
+
+Actions (outline buttons):
 - **Re-download model**
 - **Delete model**
 
-Re-download confirm:
-> This downloads ~3.7 GB again. Wi-Fi recommended.
->
-> **Re-download** / Cancel
+> _Downloading-state reconciliation (2026-05-18, `poc/model-detail-downloading-final.png`):_
+> while `readiness` is `Downloading` the screen swaps to the **shared download card** — the
+> exact same hero-percent / ETA / progress-bar / bytes / MB·s block onboarding Screen 3 uses
+> (one `ModelDownloadCard`, two hosts; the inner card is pixel-identical across both comps).
+> Layout in this state: AppTop pill `● GEMMA 4 · DOWNLOADING · {N}%`; a lime band
+> `● DOWNLOADING MODEL · WI-FI ONLY` wrapping the card (polite live region); the stat ribbon
+> becomes `{GB pulled}` · `GB PULLED` + `0` · `CLOUD CALLS`; the network-gate band switches
+> to `● NETWORK GATE · ALLOWLIST ACTIVE 1 HOST` / `Model artifact host only. Closes the
+> moment the pull completes.` and its border/eyebrow render **lime** while the pull is
+> active (active allowlisting reads as "this is on / working"; the sealed-at-rest gate stays
+> coral) — an intentional deviation from the comp's red gate. The on-device stack is hidden;
+> the action row is a single full-width **PAUSE** (the Re-download/Delete buttons keep their
+> gray/coral register — the download surface is not outlined green). PAUSE cancels the
+> in-flight pull and keeps the `.part` so a later Re-download resumes via HTTP-Range;
+> readiness drops to `Paused`.
 
-Delete confirm:
-> Deletes the model file. The app won't work until re-downloaded.
->
-> **Delete model** / Cancel
+Both route through the shared scoreboard confirm card (`VestigeConfirmCard`) using the
+canonical §"Destructive Confirmations" wording below — not a Material dialog, not a shorter
+summary. Bottom nav is present (no tab active — Model Status is a menu destination).
 
 ---
 
 ## Persona Selector (settings)
+
+> _Final-polish reconciliation (2026-05-18):_ persona is **not** a standalone screen with a
+> Save button. It is the `PERSONA` section of the Settings screen — three name-only rows; the
+> active one carries a `SELECTED` tag and a lime treatment; tapping a row commits immediately
+> (no Save action, no descriptions — Settings is not the onboarding pitch). The header /
+> subhead / Save copy below is superseded and kept only as historical context.
 
 Header:
 > **Persona.**
@@ -239,20 +359,15 @@ Header:
 Subhead:
 > Default voice. Changes how the model talks back. You can override per capture.
 
-Persona descriptions (same as onboarding):
-- **Witness** — Observes. Names the pattern. Keeps quiet otherwise.
-- **Hardass** — Sharper. Less padding. More action.
-- **Editor** — Cuts vague words until they confess.
-
-Primary action:
-> **Save**
+Selected-row tag:
+> SELECTED
 
 ---
 
 ## Pattern List
 
 Header:
-> **Patterns**
+> **Vestiges.** *(screen headline only — brand word; the nav tab + section headers stay "Patterns" / `ACTIVE` etc. Function in navigation, brand in the heading. Reconciled 2026-05-18.)*
 
 Action button (top right) — persona-aware:
 - Witness: **Roast me**
@@ -268,12 +383,18 @@ Section headers (uppercase, mono eyebrow — one per non-empty section per `poc/
 Filter chips (small, secondary text — Phase 4 polish on top of the section structure):
 > All · Active · Skipped · Closed · Dropped
 
-Pattern card structure:
+Pattern card structure (top → bottom):
 
+> {AGENT-EMITTED LABEL — uppercase mono eyebrow, section-tone colored: lime active / ember skipped / teal closed-dropped}
 > **{Pattern name}**
-> {Agent-emitted label — Crashed / Deep Space / Busy Stalling / Nonstop Spiral / Goblin Hours / Brain Dump}
 > {One-line observation}
+> {30-day TraceBar}
 > {N} of {M} entries · Last seen {date}
+
+> _Final-polish reconciliation (2026-05-18):_ the category label moved **above** the name and
+> renders as an uppercase tone-colored eyebrow per `poc/pattern-lifecycle-final.png`. Tone is
+> the section tone (the comp's per-card colors are sample variety, not a per-category palette).
+> The card is one shared `PatternCard` component so every surface stays identical.
 
 Card actions (per card, in overflow menu):
 - **Skip**
@@ -375,8 +496,13 @@ Loading state (model generating):
 
 ### Capture history (no entries yet)
 > Eyebrow: `HISTORY`
-> Header: `No entries yet.`
+> Header: `Nothing recorded yet.`
 > Body: `First one takes 30 seconds.`
+
+> _Reconciliation (2026-05-18):_ header was `No entries yet.`; now `Nothing recorded yet.`
+> and rendered with the **same** treatment as the Patterns empty state — shared
+> `accentedHeadline` (`displayBig`, uppercased, final token lime per
+> `poc/patterns-empty-final.png`). One headline component, two screens.
 
 ### Pattern detail — no sources
 Should not occur in normal flow (a pattern requires entries). If it renders:
@@ -498,6 +624,17 @@ Section: **About**
 
 > _Story 4.9 reconciliation:_ the screen header is `Settings.` (this section named no header string — derived to match the `Model status.` screen-header pattern). The **Model** section is a single **Model status** row that opens the Story 4.4 screen; Re-download / Delete model live there with their canonical confirm dialogs, so they are reached by delegation rather than duplicated here (one destructive-confirm implementation, per KISS / no-duplicate-flows). The **Persona** section lists the three names only (no descriptions — settings is not the onboarding pitch). Export uses the Storage Access Framework `CreateDocument` picker — no `FileProvider`, no storage permission (`AGENTS.md` storage constraint). Delete-all wipes ObjectBox (entry/pattern/tag/callout) + every markdown file + onboarding prefs, then returns to the first-run flow.
 
+> _Final-polish reconciliation (2026-05-18):_ shipped specifics on top of the above —
+> back eyebrow `← BACK · SETTINGS`; section eyebrows `PERSONA` / `DATA` / `MODEL` / `ABOUT`
+> each lead with a **gray** dot (neutral section marker, not a live-status signal); every
+> row uses one uniform trailing `→` glyph (the Model status row matches the rest — no
+> special chevron). The active persona row carries a `SELECTED` tag. The **About** section
+> folds the license **under** the version line as a second dim line: `Version` / `v{version}`
+> with `Polyform Shield 1.0.0` beneath it; `Source code` opens the GitHub repo. Delete-all
+> uses the shared scoreboard `VestigeConfirmCard` (armed only when the field reads `DELETE`).
+> Tapping the AppTop menu button while Settings is open **closes** Settings and returns to
+> the screen it was opened from (Capture / Patterns / History) — the menu toggles.
+
 ### Locked v1 behavior (not configurable)
 
 - **Default input:** voice. Typed entry is an always-available alternate input but, like voice, requires the local model to be Ready (ADR-013 — it runs the same foreground call and reviews identically). Voice is the entry-point per product positioning. No setting toggle.
@@ -552,7 +689,7 @@ Forbidden tooltips:
 |---|---|
 | Initial app load (model loading from disk) | `Loading.` |
 | First-run model download | `Downloading model.` *(see Onboarding 6)* |
-| Mid-session inference (after tap-stop, awaiting transcription + response) | `Reading the entry.` |
+| Mid-session inference (after tap-stop, awaiting call-1 transcription) | *(no copy — a brief borderless spinner; see note below)* |
 | Pattern recalculation after entry | *(silent, background — no copy unless it fails)* |
 | Roast generation | `Reading the file.` |
 | Settings save | *(silent — control state changes inline)* |
@@ -591,5 +728,5 @@ A short forbidden-copy list. If any of these end up in a build, it's a regressio
 - User-facing lifecycle actions are exactly two: Skip and Drop. No third option.
 - Export format is a zip of per-entry markdown files only. Rolled-up `.md` and PDF are v1.5+.
 - No first-time mock data. Empty means empty; demo seed data is a dev/demo setup concern, not user-facing fiction.
-- Loading copy stays distinct: `Reading the entry.` for single-entry inference, `Reading the file.` for Roast generation.
+- Loading copy: `Reading the file.` for Roast generation. _(2026-05-18, ADR-014 §Addendum: single-entry capture no longer shows a `Reading the entry.` page — post-stop is a brief borderless spinner, then the app opens the entry's detail in History. The "Reading the entry." quotes in the Capture/Inference walkthroughs above are superseded.)_
 - No user name or handle in onboarding. Anonymity is on-brand and the feature didn't pass the demo-impact test. Handle system deferred to v1.5 (see `backlog.md`).

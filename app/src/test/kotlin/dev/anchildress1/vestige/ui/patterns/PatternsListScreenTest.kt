@@ -25,6 +25,7 @@ import dev.anchildress1.vestige.testing.cleanupObjectBoxTempRoot
 import dev.anchildress1.vestige.testing.newInMemoryObjectBoxDirectory
 import dev.anchildress1.vestige.testing.newModuleTempRoot
 import dev.anchildress1.vestige.testing.openInMemoryBoxStore
+import dev.anchildress1.vestige.ui.components.BottomTab
 import io.objectbox.BoxStore
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -49,7 +50,12 @@ import java.io.File
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [34], manifest = Config.NONE, application = PatternsTestApplication::class)
+@Config(
+    sdk = [34],
+    manifest = Config.NONE,
+    application = PatternsTestApplication::class,
+    qualifiers = "w360dp-h800dp",
+)
 class PatternsListScreenTest {
 
     @get:Rule
@@ -87,29 +93,27 @@ class PatternsListScreenTest {
     }
 
     @Test
-    fun `Day-1 empty state renders the eyebrow header and body text`() {
+    fun `Day-1 empty state renders the stat ribbon, accented header and body`() {
         composeRule.setContent { PatternsListScreen(viewModel = newViewModel(), onOpenPattern = {}) }
-        composeRule.onNodeWithText("VESTIGES · 0 ENTRIES · 30 DAYS").assertIsDisplayed()
-        composeRule.onNodeWithText("Nothing to read yet.").assertIsDisplayed()
+        composeRule.onNodeWithContentDescription("0 vestiges, 0 entries, last 30 days").assertIsDisplayed()
+        composeRule.onNodeWithText("NOTHING TO READ YET.").assertIsDisplayed()
         composeRule.onNodeWithText("Patterns surface after 10 entries. Keep recording.").assertIsDisplayed()
     }
 
     @Test
-    fun `Day-1 eyebrow substitutes the live entry count below the detection threshold`() {
+    fun `stat ribbon substitutes the live entry count below the detection threshold`() {
         // Nine COMPLETED entries — one below PATTERN_SURFACE_MIN_ENTRIES, so still NO_ENTRIES.
-        // Proves the %1$d substitution in patterns_empty_day1_eyebrow, not just count==0.
         repeat(9) { seedEntry("entry $it", ExtractionStatus.COMPLETED) }
         composeRule.setContent { PatternsListScreen(viewModel = newViewModel(), onOpenPattern = {}) }
-        composeRule.onNodeWithText("VESTIGES · 9 ENTRIES · 30 DAYS").assertIsDisplayed()
+        composeRule.onNodeWithContentDescription("0 vestiges, 9 entries, last 30 days").assertIsDisplayed()
     }
 
     @Test
     fun `Day-1 empty state is an announced status band with no click action (a11y)`() {
         composeRule.setContent { PatternsListScreen(viewModel = newViewModel(), onOpenPattern = {}) }
         // AGENTS.md band rule: merged contentDescription + polite liveRegion present, NO click.
-        val mergedDescription =
-            "VESTIGES · 0 ENTRIES · 30 DAYS Nothing to read yet. " +
-                "Patterns surface after 10 entries. Keep recording."
+        // The stat ribbon is a separate node — the band is header + body only.
+        val mergedDescription = "Nothing to read yet. Patterns surface after 10 entries. Keep recording."
         val band = composeRule.onNodeWithContentDescription(mergedDescription)
         band.assertIsDisplayed()
         band.assert(SemanticsMatcher.keyIsDefined(SemanticsProperties.LiveRegion))
@@ -117,12 +121,13 @@ class PatternsListScreenTest {
     }
 
     @Test
-    fun `NO_PATTERNS empty state renders header and body but no eyebrow`() {
+    fun `NO_PATTERNS empty state renders header, body and the stat ribbon`() {
         repeat(10) { seedEntry("entry $it", ExtractionStatus.COMPLETED) }
         composeRule.setContent { PatternsListScreen(viewModel = newViewModel(), onOpenPattern = {}) }
-        composeRule.onNodeWithText("No repeating pattern detected.").assertIsDisplayed()
+        composeRule.onNodeWithText("NO REPEATING PATTERN DETECTED.").assertIsDisplayed()
         composeRule.onNodeWithText("The model looked. Nothing came back twice.").assertIsDisplayed()
-        composeRule.onAllNodesWithText("VESTIGES", substring = true).assertCountEquals(0)
+        // The stat ribbon is always present now (not gated by reason).
+        composeRule.onNodeWithContentDescription("0 vestiges, 10 entries, last 30 days").assertIsDisplayed()
     }
 
     @Test
@@ -140,6 +145,20 @@ class PatternsListScreenTest {
     }
 
     @Test
+    fun `bottom nav reports the selected tab`() {
+        var picked: BottomTab? = null
+        composeRule.setContent {
+            PatternsListScreen(
+                viewModel = newViewModel(),
+                onOpenPattern = {},
+                onNavSelect = { picked = it },
+            )
+        }
+        composeRule.onNodeWithText("HISTORY").performClick()
+        assertEquals(BottomTab.HISTORY, picked)
+    }
+
+    @Test
     fun `loaded list surfaces card title observation and source count`() {
         val supporting = listOf(seedEntry("crashed", ExtractionStatus.COMPLETED))
         seedActivePattern(
@@ -153,7 +172,8 @@ class PatternsListScreenTest {
         composeRule.setContent { PatternsListScreen(viewModel = newViewModel(), onOpenPattern = {}) }
 
         composeRule.onNodeWithText("Tuesday Meetings").assertIsDisplayed()
-        composeRule.onNodeWithText("Aftermath").assertIsDisplayed()
+        // Category renders as an uppercase tone-colored eyebrow above the name (comp parity).
+        composeRule.onNodeWithText("AFTERMATH").assertIsDisplayed()
         composeRule.onNodeWithText("Fourth entry mentions Tuesday meetings.").assertIsDisplayed()
         // Substring match avoids brittleness on the bullet glyph and trailing date format.
         composeRule.onNodeWithText("1 of 1 entries", substring = true).assertIsDisplayed()

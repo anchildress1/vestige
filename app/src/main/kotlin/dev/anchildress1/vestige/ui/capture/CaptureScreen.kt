@@ -8,23 +8,13 @@ import android.content.pm.PackageManager
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.navigationBars
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.requiredHeightIn
-import androidx.compose.foundation.layout.windowInsetsBottomHeight
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -32,22 +22,14 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.role
-import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.semantics.testTag
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import dev.anchildress1.vestige.model.Persona
 import dev.anchildress1.vestige.ui.components.AppTop
 import dev.anchildress1.vestige.ui.components.AppTopStatuses
-import dev.anchildress1.vestige.ui.components.EyebrowE
+import dev.anchildress1.vestige.ui.components.PageSpinnerDiameter
+import dev.anchildress1.vestige.ui.components.VestigeSpinner
 import dev.anchildress1.vestige.ui.theme.VestigeTheme
 
 private tailrec fun Context.findActivity(): Activity? = when (this) {
@@ -64,19 +46,15 @@ private fun Context.isMicPermanentlyBlocked(): Boolean {
 }
 
 /**
- * Route composable for the capture surface. Owns the mic permission launcher and dispatches
- * across [CaptureUiState] variants. Stateless wrt audio I/O — the [viewModel] holds the
- * recording job + foreground-call lifecycle.
- *
- * Stats and meta are caller-supplied so tests + previews can pin them; production wires them
- * from `AppContainer.entryStore.countCompleted()` + similar reads.
+ * Route composable for the capture surface. Owns the mic permission launcher, dispatches across
+ * [CaptureUiState] variants, and forwards the VM's one-shot "open this entry" event to the host
+ * so a finished capture lands on the entry's detail in History.
  */
 @Composable
 @OptIn(ExperimentalMaterial3Api::class)
+@Suppress("LongMethod") // Route dispatcher — per-state branch + sheet/menu wiring co-located.
 fun CaptureScreen(
     viewModel: CaptureViewModel,
-    stats: CaptureStats,
-    meta: CaptureMeta,
     modifier: Modifier = Modifier,
     chrome: IdleChromeCallbacks = IdleChromeCallbacks(),
 ) {
@@ -100,11 +78,14 @@ fun CaptureScreen(
     }
     var showTypeSheet by rememberSaveable { mutableStateOf(false) }
 
+    val onOpenEntryDetail = chrome.onOpenEntryDetail
+    LaunchedEffect(viewModel, onOpenEntryDetail) {
+        viewModel.openEntryEvents.collect { entryId -> onOpenEntryDetail?.invoke(entryId) }
+    }
+
     when (val current = state) {
         is CaptureUiState.Idle -> IdleLayout(
             state = current,
-            stats = stats,
-            meta = meta,
             onRecTap = onRecTap,
             onTypeTap = { showTypeSheet = true },
             modifier = modifier,
@@ -118,15 +99,8 @@ fun CaptureScreen(
             modifier = modifier,
         )
 
-        is CaptureUiState.Inferring -> InferringPane(
-            persona = current.persona,
-            modifier = modifier,
-        )
-
-        is CaptureUiState.Reviewing -> ReviewingPane(
-            state = current,
-            onAcknowledge = viewModel::acknowledgeReview,
-            onOpenHistory = chrome.onHistoryTap,
+        is CaptureUiState.Submitting -> SubmittingPane(
+            persona = current.persona.name,
             modifier = modifier,
         )
     }
@@ -142,124 +116,17 @@ fun CaptureScreen(
     }
 }
 
+// Brief filing spinner between STOP / typed-submit and the entry being persisted. No copy —
+// the old "Reading the entry." review page is gone; the entry opens in History on persist.
 @Composable
-private fun InferringPane(persona: Persona, modifier: Modifier = Modifier) {
+private fun SubmittingPane(persona: String, modifier: Modifier = Modifier) {
     val colors = VestigeTheme.colors
     Column(modifier = modifier.fillMaxSize().background(colors.floor)) {
-        AppTop(persona = persona.name, status = AppTopStatuses.Ready)
-        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            Text(
-                text = CaptureCopy.READING_PLACEHOLDER,
-                style = VestigeTheme.typography.h1,
-                color = colors.dim,
-            )
+        AppTop(persona = persona, status = AppTopStatuses.Ready)
+        // weight(1f) takes the space below AppTop so the spinner is truly vertically centered
+        // (fillMaxSize here would over-extend past the fold and skew it).
+        Box(modifier = Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
+            VestigeSpinner(diameter = PageSpinnerDiameter)
         }
-    }
-}
-
-@Composable
-private fun ReviewingPane(
-    state: CaptureUiState.Reviewing,
-    onAcknowledge: () -> Unit,
-    onOpenHistory: (() -> Unit)? = null,
-    modifier: Modifier = Modifier,
-) {
-    val colors = VestigeTheme.colors
-    Column(modifier = modifier.fillMaxSize().background(colors.floor)) {
-        AppTop(persona = state.persona.name, status = AppTopStatuses.Ready)
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 18.dp, vertical = 18.dp),
-            verticalArrangement = Arrangement.spacedBy(18.dp),
-        ) {
-            TranscriptTurn(label = CaptureCopy.YOU_LABEL, body = state.review.transcription, bodyColor = colors.dim)
-            TranscriptTurn(label = state.persona.name, body = state.review.followUp, bodyColor = colors.ink)
-        }
-        Spacer(modifier = Modifier.weight(1f))
-        // Withheld until the terminal event lands (state.streaming == false): the entry is not
-        // persisted until then, so any navigation away from Capture would be lost to
-        // onCleared()'s collector cancel.
-        if (!state.streaming) {
-            DoneButton(onClick = onAcknowledge)
-            if (onOpenHistory != null) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 18.dp, vertical = 8.dp),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    HistoryLink(onClick = onOpenHistory)
-                }
-            }
-        }
-        Spacer(Modifier.windowInsetsBottomHeight(WindowInsets.navigationBars))
-    }
-}
-
-@Composable
-private fun TranscriptTurn(label: String, body: String, bodyColor: Color) {
-    val colors = VestigeTheme.colors
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(colors.s1)
-            .padding(horizontal = 12.dp, vertical = 12.dp),
-        verticalArrangement = Arrangement.spacedBy(6.dp),
-    ) {
-        EyebrowE(text = label)
-        Text(
-            text = body.ifBlank { "—" },
-            style = VestigeTheme.typography.p,
-            color = bodyColor,
-        )
-    }
-}
-
-@Composable
-internal fun HistoryLink(onClick: () -> Unit, testTag: String? = null) {
-    val colors = VestigeTheme.colors
-    Box(
-        modifier = Modifier
-            .requiredHeightIn(min = 48.dp)
-            .border(width = 1.dp, color = colors.hair)
-            .clickable(onClick = onClick)
-            .semantics(mergeDescendants = true) {
-                role = Role.Button
-                contentDescription = CaptureCopy.HISTORY_LINK_A11Y
-                if (testTag != null) this.testTag = testTag
-            }
-            .padding(horizontal = 12.dp, vertical = 8.dp),
-        contentAlignment = Alignment.Center,
-    ) {
-        Text(
-            text = CaptureCopy.HISTORY_LINK,
-            style = VestigeTheme.typography.personaLabel,
-            color = colors.dim,
-        )
-    }
-}
-
-@Composable
-private fun DoneButton(onClick: () -> Unit) {
-    val colors = VestigeTheme.colors
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 18.dp, vertical = 18.dp)
-            .background(colors.ink)
-            .clickable(onClick = onClick)
-            .semantics(mergeDescendants = true) {
-                role = Role.Button
-                contentDescription = "Done"
-            }
-            .padding(vertical = 16.dp),
-        contentAlignment = Alignment.Center,
-    ) {
-        Text(
-            text = "DONE · NEW ENTRY",
-            style = VestigeTheme.typography.displayBig.copy(fontSize = 22.sp, lineHeight = 22.sp),
-            color = colors.deep,
-        )
     }
 }

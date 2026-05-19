@@ -5,6 +5,7 @@ import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertHasClickAction
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
@@ -33,10 +34,11 @@ class LiveLayoutTest {
     }
 
     @Test
-    fun `timer renders mm colon ss in both the AppTop badge and the hero`() {
+    fun `timer renders mm colon ss once in the hero`() {
         composeRule.setContent { VestigeTheme { liveLayout(elapsedMs = 15_000L) } }
-        // Timer appears in the AppTop coral pill and in the hero display — exactly 2 sources.
-        composeRule.onAllNodesWithText("00:15").assertCountEquals(2)
+        // The duplicate AppTop timer pill was removed (design-guidelines.md §AppTop pill / the
+        // recording comp) — the hero display is the single timer source.
+        composeRule.onAllNodesWithText("00:15").assertCountEquals(1)
     }
 
     @Test
@@ -68,7 +70,7 @@ class LiveLayoutTest {
     }
 
     @Test
-    fun `DISCARD NO SAVE link fires onDiscardTap`() {
+    fun `DISCARD button fires onDiscardTap`() {
         var discards = 0
         composeRule.setContent {
             VestigeTheme { liveLayout(onDiscardTap = { discards += 1 }) }
@@ -80,11 +82,14 @@ class LiveLayoutTest {
     }
 
     @Test
-    fun `WORD COUNT card renders`() {
-        composeRule.setContent { VestigeTheme { liveLayout(elapsedMs = 10_000L) } }
-        composeRule.onNodeWithText(CaptureCopy.LIVE_WORD_COUNT_LABEL).assertIsDisplayed()
-        // 10 s * 2.3 words/sec = 23 words.
-        composeRule.onNodeWithText("23").assertIsDisplayed()
+    fun `recording layout omits route-changing chrome`() {
+        composeRule.setContent { VestigeTheme { liveLayout() } }
+
+        composeRule.onAllNodesWithContentDescription(label = "Menu", substring = true)
+            .assertCountEquals(0)
+        composeRule.onAllNodesWithText("CAPTURE").assertCountEquals(0)
+        composeRule.onAllNodesWithText("PATTERNS").assertCountEquals(0)
+        composeRule.onAllNodesWithText("HISTORY").assertCountEquals(0)
     }
 
     @androidx.compose.runtime.Composable

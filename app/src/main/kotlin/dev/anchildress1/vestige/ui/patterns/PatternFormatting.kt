@@ -41,23 +41,19 @@ fun actionSnackbarMessageRes(action: PatternAction): Int = when (action) {
 @StringRes
 fun undoLabelResFor(undo: PatternUndo?): Int? = if (undo == null) null else R.string.pattern_undo
 
-/** Structured empty-state copy per `ux-copy.md` §"Pattern List / Empty states". */
-data class PatternEmptyCopy(
-    /** Format string expecting `entryCount` as its `%1$d` argument when non-null. */
-    @field:StringRes val eyebrowRes: Int?,
-    @field:StringRes val headerRes: Int,
-    @field:StringRes val bodyRes: Int,
-)
+/**
+ * Structured empty-state copy per `ux-copy.md` §"Pattern List / Empty states". The
+ * VESTIGES/ENTRIES/DAYS counts render as the shared StatRibbon, not a copy string.
+ */
+data class PatternEmptyCopy(@field:StringRes val headerRes: Int, @field:StringRes val bodyRes: Int)
 
 fun emptyCopyFor(reason: PatternsListUiState.EmptyReason): PatternEmptyCopy = when (reason) {
     PatternsListUiState.EmptyReason.NO_ENTRIES -> PatternEmptyCopy(
-        eyebrowRes = R.string.patterns_empty_day1_eyebrow,
         headerRes = R.string.patterns_empty_day1_header,
         bodyRes = R.string.patterns_empty_day1_body,
     )
 
     PatternsListUiState.EmptyReason.NO_PATTERNS -> PatternEmptyCopy(
-        eyebrowRes = null,
         headerRes = R.string.patterns_empty_none_header,
         bodyRes = R.string.patterns_empty_none_body,
     )

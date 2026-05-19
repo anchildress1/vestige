@@ -283,15 +283,21 @@ Forbidden across all personas: "thank you for sharing," "how does that make you 
 7. **Footer metadata strip**
    - Small dim text — last entry timestamp + duration + `PATTERNS` link. Strings per `ux-copy.md` §"Footer metadata."
 
-**AppTop status pill (idle + recording).** Both states render lime — `GEMMA 4 · LOCAL ONLY` (idle) and `GEMMA 4 · LISTENING LIVE` (recording). Coral never appears on the pill. Coral is reserved for REC button heat (idle outline → recording fill), REC button halo, destructive fills (`Wipe everything`, `Delete model`), and the `errorRed` token. The "pill stays lime" rule decouples chrome operability ("the system is up") from action heat ("the machine is hot"), which the earlier coral-during-recording pill collapsed and read as alarm.
+**AppTop status pill (idle + recording).** Idle renders lime — `GEMMA 4 · LOCAL ONLY`. Recording renders **coral** — `GEMMA 4 · LISTENING`. Coral is otherwise reserved for REC button heat (idle outline → recording fill), REC button halo, destructive fills (`Wipe everything`, `Delete model`), and the `errorRed` token.
+
+> _Addendum (2026-05-18) — capture final-polish reconciliation._ This section previously read *"Both states render lime — coral never appears on the pill."* That contradicted `ux-copy.md` §Capture ("pill stays lime in every state except LISTENING") and the final capture comp (`poc/capture-recording-final.png`), which shows a coral `LISTENING` pill. The comp + ux-copy win: the recording pill is coral. The coral here reads as "the machine is hot / it is listening" — an intentional, single sanctioned coral-on-pill state, not the scattered coral the old rule guarded against.
 
 **Recording-state changes to the stack:**
-- The AppTop right slot is empty during recording — no persona switcher mid-take, no duplicate timer pill. The persona is fixed for the duration of a recording; switching mid-recording is forbidden. The canonical recording timer is the in-content 96sp display + remaining-seconds countdown, not a chrome pill.
+- The AppTop right slot carries the hamburger menu (Settings/system nav) on every screen, recording included — there is no per-state persona switcher and no duplicate timer pill. The persona is fixed for the duration of a recording; switching mid-recording is forbidden. The canonical recording timer is the in-content 96sp display + remaining-seconds countdown, not a chrome pill. _(Addendum 2026-05-18 — capture final-polish: this previously said "the right slot is empty during recording." The final comps + product direction put the menu button on all pages; only the duplicate timer pill was removed.)_ _(Addendum 2026-05-18b — **recording is modal, superseding the prior addendum**: the AppTop right slot **and** the bottom navigation are removed while `CaptureUiState` is `Recording`. An active mic capture must not be routable away from with no stop/discard control; the only exits are `STOP · FILE IT` and `DISCARD · DON'T SAVE`. Menu + bottom nav return on idle. The "menu on every screen including recording" rule holds for every screen **except** active recording.)_
 - The patterns peek card and footer metadata can dim or fade out during active recording — capture is the only surface that matters in that state. Do not collapse the layout; just lower contrast.
 - The hero title can swap to a recording-state line per `ux-copy.md`, or stay; do not invent here.
-- 30s cap pre-warn at 28s elapsed: single-fire system tone on the notification stream (not a bundled chime). Minimum-viable signal so the user knows the cap is firing — no cap-moment cue, the screen flip to Inferring carries that.
+- 30s cap pre-warn at 27s of recorded audio (elapsed is anchored to the first sample, same clock as the cap, so ~3s lead): single-fire system tone on the notification stream (not a bundled chime). Respects notification volume — silent if the device's notification volume is. Minimum-viable signal so the user knows the cap is firing — no cap-moment cue, the brief submitting spinner carries that.
 
-**Capture Screen / Discard.** During recording, a secondary `DISCARD · NO SAVE` text link sits below the primary `STOP · FILE IT` pill. Visual register: muted secondary text — *not* destructive accent — because the buffer is gone instantly on tap and a destructive treatment would over-signal the action. Per ADR-001 Q8: single-tap, no confirmation dialog, no long-press, no `Undo` snackbar; the screen returns to idle and the layout resumes. The destructive accent (`coral` under Scoreboard, per ADR-011) stays reserved for `Wipe everything` / `Delete model` confirmations. Contract: `adrs/ADR-001-stack-and-build-infra.md` §Q8 (audio byte lifecycle, state machine, no-silent-save guarantees). Copy: `ux-copy.md` §"Capture Screen — Discard."
+> _Addendum (2026-05-18) — post-submit flow (see ADR-014 §Addendum 2026-05-18):_ Capture no longer has an in-screen "Reading the entry." / Reviewing surface. After STOP the entry persists on the call-1 transcription, the app navigates straight to the entry's detail in History (extracting → resolved there), and Capture resets to Idle. The only post-stop Capture state is a brief borderless spinner while call-1 is in flight. References below to a `Reading the entry.` placeholder or a Reviewing/DONE·NEW-ENTRY pane are superseded.
+
+**Capture Screen / Discard.** During recording, a full-width coral-outlined `DISCARD · DON'T SAVE` button sits *above* the primary cream `STOP · FILE IT` button. Per ADR-001 Q8 the *behavior* is unchanged: single-tap, no confirmation dialog, no long-press, no `Undo` snackbar; the screen returns to idle and the layout resumes. Contract: `adrs/ADR-001-stack-and-build-infra.md` §Q8 (audio byte lifecycle, state machine, no-silent-save guarantees). Copy: `ux-copy.md` §"Capture Screen — Discard."
+
+> _Addendum (2026-05-18) — capture final-polish._ This previously specified *"muted secondary text — not destructive accent — because a destructive treatment would over-signal the action."* The final comp (`poc/capture-recording-final.png`) shows a coral-outlined button. The comp wins: only the *visual register* changed (coral outline, button shape, placed above STOP); the one-tap / no-confirm / silent ADR-001 Q8 contract is untouched, so the "over-signal" concern is addressed by keeping the behavior instant rather than by hiding the control.
 
 **Transcription appears after inference returns** (Phase 1/2 measures the real S24 Ultra latency; target 1-5 seconds per `adrs/ADR-002-multi-lens-extraction-pattern.md` §"Latency budget" — not a guarantee). Until it arrives, the placeholder copy from `ux-copy.md` sits in the user-turn slot. Streaming-as-you-speak transcription is v2; not in this design.
 
@@ -307,7 +313,7 @@ Forbidden across all personas: "thank you for sharing," "how does that make you 
 Three screens total. The flow is a hub, not a queue.
 
 1. Choose persona (default Witness highlighted, brief one-line descriptions)
-2. Wiring hub with five rows: Persona, Local, Mic, Notify, Type
+2. Wiring hub with four rows: Persona, Local, Mic, Notify
 3. Local model download screen (active/resumable only; blocked Wi-Fi routes back to Wiring)
 
 Rules:
@@ -317,6 +323,19 @@ Rules:
 - The download screen exists only for active/resumable transfers and auto-returns to Wiring once complete.
 
 Tone: plain, short, no emotional hand-holding. No "Welcome to your journey."
+
+#### Addendum (2026-05-17) — final-polish reconciliation
+
+- **Wiring is four rows, not five.** The `Type · Fallback` row was dropped from the Wiring
+  hub. Typed entry stays always-available per ADR-013 — it is product behavior, not a wiring
+  switch, and the mockup carries no row for it. Chrome switch count tracks four accordingly.
+- **Coral headline accent — sanctioned exception.** The poster headline's terminal square
+  (`PICK A PERSONA■` / `WIRING■` / `DOWNLOAD MODEL■`) renders in `coral`. This is the one
+  approved coral-on-chrome use; it does not loosen the "AppTop pill stays lime / coral =
+  REC heat + destructive" rule above. The square is a typographic accent on a static poster
+  title, not a status or action surface, so it cannot read as alarm.
+- **Chrome is unchanged.** The shipped `SETUP · NN OF 0N` eyebrow + tick rule + right-status
+  is retained; the mockup's `STEP n OF 3` line was a comp annotation, not adopted.
 
 ### Local Model Status
 
@@ -332,6 +351,27 @@ Shows:
 - Avoid: `Preparing your personalized AI experience`, `Hang tight`, `Almost there!`
 
 This screen is part of how a 10-second judge realizes "this is a local AI app, not a cloud chatbot." Make it visible.
+
+> _Addendum (2026-05-18) — scoreboard rebuild._ Rebuilt to `poc/model-detail-final.png`;
+> the "Shows" list above is superseded. The screen is now: annotated `MODEL STATUS.`
+> headline; a readiness status **band** (lime border/eyebrow `● MODEL READY · RUNNING
+> LOCALLY` when Ready, coral `● MODEL · NOT READY` otherwise; polite live region); a stat
+> ribbon (`ON DISK` = the **actual** artifact size, `0` once deleted — not the nominal
+> 3.66 GB — and a permanently-`0` coral `CLOUD CALLS`); an `● ON-DEVICE STACK` of three
+> bordered rows (Gemma 4 E4B / EmbeddingGemma 300M / LiteRT-LM 0.11.0) whose trailing dot
+> **and** the stack eyebrow follow readiness (lime Ready / coral gone); a coral
+> `● NETWORK GATE · SEALED` band; and Re-download / Delete outline actions that route
+> through the shared scoreboard `VestigeConfirmCard` (disabled while a download is in
+> flight). Full copy: `ux-copy.md` §"Local Model Status". The 10-second-judge intent is
+> unchanged — the honest stack + sealed-gate + zero-cloud-calls make "local AI" legible.
+
+> _Addendum (2026-05-18b) — one download card._ The `Downloading` state shares the **same**
+> `ModelDownloadCard` onboarding Screen 3 uses (`poc/onboarding-download-final.png` ==
+> `poc/model-detail-downloading-final.png` for the inner block; chrome differs only). Hero
+> percent stays the 88sp number. The state swaps the stack for the card in a lime
+> `● DOWNLOADING MODEL · WI-FI ONLY` band, the ribbon to `GB PULLED`, the gate band to its
+> `ALLOWLIST ACTIVE 1 HOST` variant, and the action row to a single **PAUSE** that cancels
+> the pull but keeps the `.part` (HTTP-Range resume) and drops readiness to `Paused`.
 
 ### Persona Selector
 
@@ -350,8 +390,8 @@ Cards present pattern observations on dark surfaces. Restrained, atmospheric, so
 **Status sections.** Patterns group into four sections per `ux-copy.md` §"Pattern List / Section headers" + `spec-pattern-action-buttons.md` §P0.3 — Active / Skipped · on hold / Closed · done (model-detected, v1.5) / Dropped. Each section header appears only when that section has cards. `CLOSED · DONE` is empty in v1 (model-detected; see `backlog.md` §`pattern-auto-close`). Filter chips that scope which sections render are Phase 4 polish on top of this base.
 
 **Card structure:**
+- Category (agent-emitted label) — uppercase mono eyebrow, **above** the name, colored by the section tone (lime active / ember skipped / teal closed-dropped)
 - Short title (the pattern name, e.g., `Tuesday Meetings`)
-- Category (agent-emitted label: `Aftermath`, `Tunnel exit`, `Concrete shoes`, `Decision spiral`, `Goblin hours`, `Audit`)
 - Observation (one short sentence)
 - **TraceBar — 30-day recurrence glyph** per `poc/tokens.jsx` §TraceBar. 30 thin columns; days the pattern landed render full-height in the glow purple (`#A855F7`); empty days render at 34% height in the muted hair tone. Newest day on the right. The bar is the visual answer to "how often does this come back."
 - Source count (e.g., `4 of 12 entries`)

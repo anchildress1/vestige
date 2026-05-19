@@ -31,6 +31,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import dev.anchildress1.vestige.model.Persona
 import dev.anchildress1.vestige.storage.EntryStore
+import dev.anchildress1.vestige.ui.capture.AttachFollowUp
 import dev.anchildress1.vestige.ui.capture.CaptureScreen
 import dev.anchildress1.vestige.ui.capture.CaptureViewModel
 import dev.anchildress1.vestige.ui.capture.ForegroundInferenceCall
@@ -42,8 +43,8 @@ import dev.anchildress1.vestige.ui.capture.RealVoiceCapture
 import dev.anchildress1.vestige.ui.capture.SaveAndExtract
 import dev.anchildress1.vestige.ui.capture.ToneGeneratorLimitWarningCue
 import dev.anchildress1.vestige.ui.capture.deriveLastEntryFooter
-import dev.anchildress1.vestige.ui.capture.deriveMeta
-import dev.anchildress1.vestige.ui.capture.deriveStats
+import dev.anchildress1.vestige.ui.capture.derivePatternsPeek
+import dev.anchildress1.vestige.ui.components.BottomTab
 import dev.anchildress1.vestige.ui.history.EntryDetailOpenRequest
 import dev.anchildress1.vestige.ui.history.HistoryHost
 import dev.anchildress1.vestige.ui.modelstatus.ModelStatusInfo
@@ -96,6 +97,12 @@ class MainActivity : ComponentActivity() {
 }
 
 internal enum class PostOnboardingScreen { Capture, Patterns, History, ModelStatus, Settings }
+
+private fun BottomTab.toPostOnboardingScreen(): PostOnboardingScreen = when (this) {
+    BottomTab.CAPTURE -> PostOnboardingScreen.Capture
+    BottomTab.PATTERNS -> PostOnboardingScreen.Patterns
+    BottomTab.HISTORY -> PostOnboardingScreen.History
+}
 
 private data class LaunchTargetController(val target: PostOnboardingLaunchTarget, val onConsumed: () -> Unit)
 
@@ -174,7 +181,9 @@ private fun MainPostOnboardingContent(
 ) {
     var screen by rememberSaveable { mutableStateOf(PostOnboardingScreen.Capture) }
     var modelStatusOrigin by rememberSaveable { mutableStateOf(PostOnboardingScreen.Capture) }
+    var settingsOrigin by rememberSaveable { mutableStateOf(PostOnboardingScreen.Capture) }
     var historyOpenRequest by remember { mutableStateOf<EntryDetailOpenRequest?>(null) }
+    var openEntryToken by remember { mutableStateOf(0L) }
     PostOnboardingResumeEffects(container)
     ConsumeLaunchTarget(
         screen = screen,
@@ -194,13 +203,27 @@ private fun MainPostOnboardingContent(
         onPersonaChange = onPersonaChange,
         onResetToOnboarding = onResetToOnboarding,
         modelStatusOrigin = modelStatusOrigin,
+        settingsOrigin = settingsOrigin,
         historyOpenRequest = historyOpenRequest,
         onNavigate = { screen = it },
         onOpenModelStatusFrom = { origin ->
             modelStatusOrigin = origin
             screen = PostOnboardingScreen.ModelStatus
         },
+        onOpenSettingsFrom = { origin ->
+            settingsOrigin = origin
+            screen = PostOnboardingScreen.Settings
+        },
         onHistoryOpenRequestConsumed = { historyOpenRequest = null },
+        onOpenEntryInHistory = { entryId ->
+            openEntryToken += 1
+            historyOpenRequest = EntryDetailOpenRequest(
+                entryId = entryId,
+                highlightOnOpen = false,
+                token = openEntryToken,
+            )
+            screen = PostOnboardingScreen.History
+        },
     )
 }
 
@@ -216,10 +239,13 @@ private fun PostOnboardingScreenHost(
     onPersonaChange: (Persona) -> Unit,
     onResetToOnboarding: (ResetOnboardingState) -> Unit,
     modelStatusOrigin: PostOnboardingScreen,
+    settingsOrigin: PostOnboardingScreen,
     historyOpenRequest: EntryDetailOpenRequest?,
     onNavigate: (PostOnboardingScreen) -> Unit,
     onOpenModelStatusFrom: (PostOnboardingScreen) -> Unit,
+    onOpenSettingsFrom: (PostOnboardingScreen) -> Unit,
     onHistoryOpenRequestConsumed: () -> Unit,
+    onOpenEntryInHistory: (Long) -> Unit,
 ) {
     when (screen) {
         PostOnboardingScreen.Capture -> CaptureRoute(
@@ -230,7 +256,8 @@ private fun PostOnboardingScreenHost(
             onOpenPatterns = { onNavigate(PostOnboardingScreen.Patterns) },
             onOpenHistory = { onNavigate(PostOnboardingScreen.History) },
             onOpenModelStatus = { onOpenModelStatusFrom(PostOnboardingScreen.Capture) },
-            onOpenSettings = { onNavigate(PostOnboardingScreen.Settings) },
+            onOpenSettings = { onOpenSettingsFrom(PostOnboardingScreen.Capture) },
+            onOpenEntryDetail = onOpenEntryInHistory,
         )
 
         PostOnboardingScreen.Patterns -> PatternsHost(
@@ -239,7 +266,10 @@ private fun PostOnboardingScreenHost(
             entryStore = container.entryStore,
             zoneId = zoneId,
             dataRevision = container.dataRevision,
+            persona = persona,
             onExit = { onNavigate(PostOnboardingScreen.Capture) },
+            onNavigateTab = { onNavigate(it.toPostOnboardingScreen()) },
+            onOpenSettings = { onOpenSettingsFrom(PostOnboardingScreen.Patterns) },
             modifier = Modifier.fillMaxSize(),
         )
 
@@ -251,12 +281,15 @@ private fun PostOnboardingScreenHost(
             dataRevision = container.dataRevision,
             openRequest = historyOpenRequest,
             onOpenRequestConsumed = onHistoryOpenRequestConsumed,
+            onNavigateTab = { onNavigate(it.toPostOnboardingScreen()) },
+            onOpenSettings = { onOpenSettingsFrom(PostOnboardingScreen.History) },
             modifier = Modifier.fillMaxSize(),
         )
 
         PostOnboardingScreen.ModelStatus -> ModelStatusRoute(
             container = container,
             onExit = { onNavigate(modelStatusBackTarget(modelStatusOrigin)) },
+            onNavigateTab = { onNavigate(it.toPostOnboardingScreen()) },
         )
 
         PostOnboardingScreen.Settings -> SettingsRoute(
@@ -266,7 +299,9 @@ private fun PostOnboardingScreenHost(
             onPersonaChange = onPersonaChange,
             onResetToOnboarding = onResetToOnboarding,
             onOpenModelStatus = { onOpenModelStatusFrom(PostOnboardingScreen.Settings) },
-            onExit = { onNavigate(PostOnboardingScreen.Capture) },
+            // Back / tapping the menu again closes Settings to wherever it was opened from.
+            onExit = { onNavigate(settingsOrigin) },
+            onNavigateTab = { onNavigate(it.toPostOnboardingScreen()) },
         )
     }
 }
@@ -276,7 +311,7 @@ private const val SETTINGS_TAG = "SettingsRoute"
 
 @Suppress("LongParameterList") // Settings nav root — host seams are intentionally co-located.
 @androidx.compose.runtime.Composable
-private fun SettingsRoute(
+private fun SettingsRoute( // NOSONAR kotlin:S107
     container: AppContainer,
     onboardingPrefs: OnboardingPrefs,
     persona: Persona,
@@ -284,6 +319,7 @@ private fun SettingsRoute(
     onResetToOnboarding: (ResetOnboardingState) -> Unit,
     onOpenModelStatus: () -> Unit,
     onExit: () -> Unit,
+    onNavigateTab: (BottomTab) -> Unit,
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -330,13 +366,16 @@ private fun SettingsRoute(
             },
             onExit = onExit,
         ),
+        onNavSelect = onNavigateTab,
+        onMenuTap = onExit,
         modifier = Modifier.fillMaxSize(),
     )
 }
 
 @androidx.compose.runtime.Composable
-private fun ModelStatusRoute(container: AppContainer, onExit: () -> Unit) {
+private fun ModelStatusRoute(container: AppContainer, onExit: () -> Unit, onNavigateTab: (BottomTab) -> Unit) {
     val modelReadiness by container.modelReadinessFlow.collectAsStateWithLifecycle()
+    val downloadProgress by container.downloadProgressFlow.collectAsStateWithLifecycle()
     val context = LocalContext.current
     // buildConfig isn't enabled for this module — read the version off the installed package
     // instead of generating BuildConfig (a build-config change is out of scope here).
@@ -345,15 +384,23 @@ private fun ModelStatusRoute(container: AppContainer, onExit: () -> Unit) {
             context.packageManager.getPackageInfo(context.packageName, 0).versionName
         }.getOrNull().orEmpty()
     }
+    // Re-read on every readiness change so a delete/redownload reflects in the "ON DISK" stat.
+    val onDiskLabel = remember(modelReadiness) {
+        container.mainModelOnDiskByteSize.let { if (it <= 0L) "0" else gigabyteLabel(it) }
+    }
     ModelStatusScreen(
         info = ModelStatusInfo(
             readiness = modelReadiness,
             sizeLabel = gigabyteLabel(container.mainModelExpectedByteSize),
+            onDiskLabel = onDiskLabel,
             versionName = versionName,
+            downloadProgress = downloadProgress,
         ),
         onReDownload = container::redownloadMainModel,
         onDelete = container::deleteMainModel,
+        onPause = container::pauseMainModelDownload,
         onExit = onExit,
+        onNavSelect = onNavigateTab,
         modifier = Modifier.fillMaxSize(),
     )
 }
@@ -439,6 +486,7 @@ private fun CaptureRoute(
     onOpenHistory: () -> Unit,
     onOpenModelStatus: () -> Unit,
     onOpenSettings: () -> Unit,
+    onOpenEntryDetail: (Long) -> Unit,
 ) {
     val limitWarningCue = remember { ToneGeneratorLimitWarningCue() }
     DisposableEffect(limitWarningCue) {
@@ -461,12 +509,15 @@ private fun CaptureRoute(
                     persona = personaSel,
                     durationMs = durationMs,
                     followUpText = followUpText,
-                )
+                ).entryId
             },
             foregroundTextInference = ForegroundTextInferenceCall { text, personaSel, history ->
                 container.runForegroundTextCall(text = text, persona = personaSel, retrievedHistory = history)
             },
             retrieveHistory = HistoryRetrieval { query -> container.retrieveHistory(query) },
+            attachFollowUp = AttachFollowUp { entryId, followUpText ->
+                container.attachFollowUp(entryId, followUpText)
+            },
             clock = clock,
             zoneId = zoneId,
             initialReadiness = container.modelReadinessFlow.value,
@@ -482,20 +533,19 @@ private fun CaptureRoute(
     // `dataRevision` as a remember key forces re-derivation whenever AppContainer increments
     // it (entry write / pattern write / recovery sweep). Cheap — entryStore.countCompleted +
     // patternStore.findVisibleSortedByLastSeen are indexed reads.
-    val stats = remember(container, dataRevision) { deriveStats(container) }
-    val meta = remember(clock, zoneId) { deriveMeta(clock, zoneId) }
     val lastEntryFooter = remember(container, dataRevision) { deriveLastEntryFooter(container, zoneId) }
+    val patternsPeek = remember(container, dataRevision) { derivePatternsPeek(container) }
     CaptureScreen(
         viewModel = viewModel,
-        stats = stats,
-        meta = meta,
         modifier = Modifier.fillMaxSize(),
         chrome = IdleChromeCallbacks(
             onStatusTap = onOpenModelStatus,
             onPatternsTap = onOpenPatterns,
             onHistoryTap = onOpenHistory,
             onSettingsTap = onOpenSettings,
+            onOpenEntryDetail = onOpenEntryDetail,
             lastEntryFooter = lastEntryFooter,
+            patternsPeek = patternsPeek,
         ),
     )
 }
@@ -517,6 +567,7 @@ private class CaptureViewModelFactory(
     private val saveAndExtract: SaveAndExtract,
     private val foregroundTextInference: ForegroundTextInferenceCall,
     private val retrieveHistory: HistoryRetrieval,
+    private val attachFollowUp: AttachFollowUp,
     private val clock: Clock,
     private val zoneId: ZoneId,
     private val initialReadiness: ModelReadiness,
@@ -534,6 +585,7 @@ private class CaptureViewModelFactory(
             saveAndExtract = saveAndExtract,
             foregroundTextInference = foregroundTextInference,
             retrieveHistory = retrieveHistory,
+            attachFollowUp = attachFollowUp,
             clock = clock,
             zoneId = zoneId,
             initialReadiness = initialReadiness,

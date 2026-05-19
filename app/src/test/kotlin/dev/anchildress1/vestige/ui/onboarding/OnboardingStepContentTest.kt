@@ -8,9 +8,9 @@ import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertIsOff
-import androidx.compose.ui.test.assertIsOn
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.test.core.app.ApplicationProvider
@@ -53,7 +53,7 @@ class OnboardingStepContentTest {
         composeRule.onAllNodesWithText("ARTIFACT CORRUPT · TAP TO RETRY").assertCountEquals(1)
         composeRule.onAllNodesWithText("DENIED · TAP AGAIN OR SETTINGS → PERMISSIONS").assertCountEquals(1)
         composeRule.onAllNodesWithText("SINGLE-STATUS ONLY · NOTHING ELSE, EVER").assertCountEquals(1)
-        composeRule.onNodeWithText("OPEN VESTIGE").assertIsNotEnabled()
+        composeRule.onNodeWithText("LET'S GO").assertIsNotEnabled()
     }
 
     @Test
@@ -74,7 +74,7 @@ class OnboardingStepContentTest {
         composeRule.onAllNodesWithText("REQUIRED FOR VOICE · OPTIONAL OTHERWISE").assertCountEquals(1)
         composeRule.onAllNodesWithText("SINGLE-STATUS ONLY · NOTHING ELSE, EVER").assertCountEquals(1)
         composeRule.onAllNodesWithText("WAITING ON MODEL · TAP LOCAL TO START").assertCountEquals(1)
-        composeRule.onNodeWithText("OPEN VESTIGE").assertIsNotEnabled()
+        composeRule.onNodeWithText("LET'S GO").assertIsNotEnabled()
     }
 
     @Test
@@ -153,12 +153,12 @@ class OnboardingStepContentTest {
             ),
         )
 
-        composeRule.onNodeWithText("GEMMA 4 · LOCAL ONLY", substring = true).performClick()
+        composeRule.onNodeWithContentDescription("LOCAL. Download Gemma. Blocked.").performClick()
         assertEquals(1, wifiSettingsOpens)
     }
 
     @Test
-    fun `wiring switch rows expose checked semantics`() {
+    fun `wiring rows carry per-row state in their a11y description and drop the Type row`() {
         renderWiring(
             OnboardingStepState(
                 step = OnboardingStep.Wiring,
@@ -171,9 +171,15 @@ class OnboardingStepContentTest {
             ),
         )
 
-        composeRule.onNodeWithText("MIC · INPUT", substring = true).assertIsOff()
-        composeRule.onNodeWithText("NOTIFY · STATUS", substring = true).assertIsOn()
-        composeRule.onNodeWithText("TYPE · FALLBACK", substring = true).assertIsOn()
+        // Persona + Local (model Complete) read On; Mic (ungranted) is an Off toggle; Notify
+        // (granted) is a static On row. The Type·Fallback row no longer exists.
+        // Rows live in a scroll region; the 4th can be below the fold. Semantics presence +
+        // toggle state is the contract, not pixel visibility.
+        composeRule.onNodeWithContentDescription("PERSONA. Witness. On.").assertExists()
+        composeRule.onNodeWithContentDescription("LOCAL. Download Gemma. On.").assertExists()
+        composeRule.onNodeWithContentDescription("MIC. Grant mic. Off.").assertIsOff()
+        composeRule.onNodeWithContentDescription("NOTIFY. Grant process. On.").assertExists()
+        composeRule.onAllNodesWithText("Voice is the default", substring = true).assertCountEquals(0)
     }
 
     @Test
@@ -193,7 +199,7 @@ class OnboardingStepContentTest {
         composeRule.onAllNodesWithText("WAITING ON MODEL · TAP LOCAL TO START").assertCountEquals(0)
         composeRule.onAllNodesWithText("DENIED · TAP AGAIN OR SETTINGS → PERMISSIONS").assertCountEquals(0)
         composeRule.onAllNodesWithText("SINGLE-STATUS ONLY · NOTHING ELSE, EVER").assertCountEquals(0)
-        composeRule.onNodeWithText("OPEN VESTIGE").assertIsEnabled()
+        composeRule.onNodeWithText("LET'S GO").assertIsEnabled()
     }
 
     private fun renderWiring(state: OnboardingStepState, callbacks: OnboardingStepCallbacks = callbacks()) {

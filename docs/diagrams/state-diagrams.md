@@ -65,12 +65,15 @@ stateDiagram-v2
 ## 3. ModelReadiness
 
 Exactly **four** runtime states. `Stalled` / `Failed` / `Updating` are display labels on the
-status screen, **not** runtime states. A failed re-download falls back to `Loading`.
+status screen, **not** runtime states. A failed re-download falls back to `Loading`. Readiness
+is artifact-presence based: a full-size artifact on disk is `Ready`; the engine loads lazily
+on the first inference (ADR-012 §Addendum: proactive pre-warm reverted after it regressed into
+a startup GPU-init crash).
 
 ```mermaid
 stateDiagram-v2
     accTitle: ModelReadiness runtime state machine
-    accDescr: Four runtime states. Loading transitions to Downloading when a download starts. Downloading goes to Ready on success, or Paused if Wi-Fi drops mid-download. Paused resumes to Downloading. Ready can return to Loading if the artifact is deleted. A failed re-download from Ready falls back to Loading.
+    accDescr: Four runtime states. Loading transitions to Downloading when a download starts. Downloading goes to Ready when the artifact is verified complete, or Paused if Wi-Fi drops mid-download. Paused resumes to Downloading. Ready returns to Loading if the artifact is deleted or a re-download fails.
 
     [*] --> Loading
     Loading --> Downloading: download starts

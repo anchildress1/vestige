@@ -9,66 +9,56 @@
     <string name="notification_channel_local_processing_description">Status notification while Vestige reads an entry locally.</string>
     <string name="notification_local_processing_text">Reading the entry.</string>
 
-    <!-- Onboarding copy — single source of truth is docs/ux-copy.md §Onboarding. Edit there first. -->
-    <string name="onboarding_continue">Continue</string>
-    <string name="onboarding_got_it">Got it</string>
+    <!-- Onboarding copy — single source of truth is docs/ux-copy.md §Onboarding. Edit there first.
+         Chrome (STEP/SETUP eyebrow + tick rule) is rendered by OnboardingChrome, not these strings. -->
     <string name="onboarding_back">Back</string>
 
     <!-- Screen 1 — Persona pick -->
-    <string name="onboarding_persona_eyebrow">VOICE · PICK ONE</string>
-    <string name="onboarding_persona_header">PERSONA.</string>
-    <string name="onboarding_persona_subhead">Three voices. Same product. Pick the one that fits today. You can switch.</string>
-    <string name="onboarding_persona_continue">Continue</string>
+    <string name="onboarding_persona_header">PICK A PERSONA.</string>
+    <string name="onboarding_persona_subhead">Three voices. Same product. Pick the one that fits today. You can switch later.</string>
+    <string name="onboarding_persona_select">Select</string>
+    <string name="onboarding_persona_selected">SELECTED</string>
     <string name="onboarding_persona_footer">Change later in settings.</string>
     <string name="onboarding_persona_witness_name">Witness</string>
-    <string name="onboarding_persona_witness_tag">DEFAULT · QUIET</string>
-    <string name="onboarding_persona_witness_desc">Observes. Names the pattern. Keeps quiet otherwise.</string>
+    <string name="onboarding_persona_witness_card">Observes. Names the pattern.</string>
     <string name="onboarding_persona_hardass_name">Hardass</string>
-    <string name="onboarding_persona_hardass_tag">LESS PADDING</string>
-    <string name="onboarding_persona_hardass_desc">Sharper. Less padding. More action.</string>
+    <string name="onboarding_persona_hardass_card">Sharper. Less padding. More action.</string>
     <string name="onboarding_persona_editor_name">Editor</string>
-    <string name="onboarding_persona_editor_tag">TIGHTENS VOCAB</string>
-    <string name="onboarding_persona_editor_desc">Cuts vague words until they confess.</string>
+    <string name="onboarding_persona_editor_card">Cuts vague words until they confess.</string>
 
-    <!-- Screen 2 — Wiring hub. Persona + Local + Mic + Notif + Type switches. -->
-    <string name="onboarding_wiring_eyebrow">PRE-FLIGHT</string>
+    <!-- Screen 2 — Wiring hub. Persona + Local + Mic + Notify rows (Type is not a row; ADR-013). -->
     <string name="onboarding_wiring_header">WIRING.</string>
-    <string name="onboarding_wiring_persona_number">#01</string>
-    <string name="onboarding_wiring_persona_title">PERSONA · %1$s</string>
-    <string name="onboarding_wiring_persona_desc">Voice picked on the previous screen. Change it later in Settings if %1$s doesn\'t fit.</string>
-    <string name="onboarding_open_vestige">Open Vestige</string>
+    <string name="onboarding_wiring_subhead">The Local row is the only one that gates entry. Mic and Notify are optional.</string>
+    <string name="onboarding_wiring_lets_go">Let\'s Go</string>
     <string name="onboarding_wiring_waiting_on_model">WAITING ON MODEL · TAP LOCAL TO START</string>
+
+    <string name="onboarding_wiring_persona_label">PERSONA</string>
+    <string name="onboarding_wiring_persona_desc">Set on the previous screen. Change it in Settings.</string>
+
+    <string name="onboarding_wiring_local_label">LOCAL</string>
+    <string name="onboarding_wiring_local_title">Download Gemma</string>
+    <string name="onboarding_wiring_local_desc">No cloud. No servers. Stays on the device.</string>
     <string name="onboarding_wiring_local_absent_hint">TAP LOCAL TO START DOWNLOAD</string>
     <string name="onboarding_wiring_local_partial_hint">DOWNLOAD STILL RUNNING · BACK UP TO RESUME</string>
     <string name="onboarding_wiring_local_corrupt_hint">ARTIFACT CORRUPT · TAP TO RETRY</string>
     <string name="onboarding_wiring_local_blocked_hint">NETWORK DOWN · TAP FOR WI-FI SETTINGS</string>
+
+    <string name="onboarding_wiring_mic_label">MIC</string>
+    <string name="onboarding_wiring_mic_title">Grant mic</string>
+    <string name="onboarding_wiring_mic_desc">Read locally, then discarded. Text stays.</string>
+    <string name="onboarding_wiring_mic_hint">REQUIRED FOR VOICE · OPTIONAL OTHERWISE</string>
     <string name="onboarding_wiring_mic_blocked_hint">DENIED · TAP AGAIN OR SETTINGS → PERMISSIONS</string>
 
-    <string name="onboarding_wiring_local_number">#02</string>
-    <string name="onboarding_wiring_local_title">GEMMA 4 · LOCAL ONLY</string>
-    <string name="onboarding_wiring_local_desc">No cloud. No servers. No telemetry. Voice never leaves the device.</string>
-
-    <string name="onboarding_wiring_mic_number">#03</string>
-    <string name="onboarding_wiring_mic_title">MIC · INPUT</string>
-    <string name="onboarding_wiring_mic_desc">Records dumps. Audio is read locally, then discarded. Transcription stays as text.</string>
-    <string name="onboarding_wiring_mic_hint">REQUIRED FOR VOICE · OPTIONAL OTHERWISE</string>
-
-    <string name="onboarding_wiring_notif_number">#04</string>
-    <string name="onboarding_wiring_notif_title">NOTIFY · STATUS</string>
-    <string name="onboarding_wiring_notif_desc">One line, posted while the model reads an entry. Disappears when work is done.</string>
+    <string name="onboarding_wiring_notif_label">NOTIFY</string>
+    <string name="onboarding_wiring_notif_title">Grant process</string>
+    <string name="onboarding_wiring_notif_desc">One status line while the model reads. Gone after.</string>
     <string name="onboarding_wiring_notif_hint">SINGLE-STATUS ONLY · NOTHING ELSE, EVER</string>
 
-    <string name="onboarding_wiring_type_number">#05</string>
-    <string name="onboarding_wiring_type_title">TYPE · FALLBACK</string>
-    <string name="onboarding_wiring_type_desc">Voice is the default. Typing works the same. Same patterns. Same persona.</string>
-
-    <string name="onboarding_mic_denied">Mic permission required to record. Settings → Permissions.</string>
-
     <!-- Screen 3 — Model download -->
-    <string name="onboarding_download_header">DOWNLOAD.</string>
-    <string name="onboarding_download_body">Quiet for a minute. This takes a while.</string>
-    <string name="onboarding_download_loading_pill">DOWNLOADING</string>
-    <string name="onboarding_download_loading_pill_percent">DOWNLOADING %1$d%%</string>
+    <string name="onboarding_download_header">DOWNLOAD MODEL.</string>
+    <string name="onboarding_download_body">Quiet for a minute. This could take a while.</string>
+    <string name="onboarding_download_of_total">OF %1$s</string>
+    <string name="onboarding_download_eta_label">ETA</string>
     <string name="onboarding_download_ready_pill">GEMMA READY</string>
     <string name="onboarding_download_stalled">Download stalled.</string>
     <string name="onboarding_download_failed">Network choked.</string>
@@ -83,9 +73,8 @@
     <string name="entry_detail_placeholder_not_found">Entry not found.</string>
 
     <!-- Patterns list + detail surface. Mirrors poc/screens-patterns.jsx + ux-copy.md §"Pattern List / Detail". -->
-    <string name="patterns_title">Patterns</string>
-    <!-- Empty states per docs/ux-copy.md §"Pattern List / Empty states". `%1$d` = live entry count. -->
-    <string name="patterns_empty_day1_eyebrow">VESTIGES · %1$d ENTRIES · 30 DAYS</string>
+    <!-- Empty states per docs/ux-copy.md §"Pattern List / Empty states". The VESTIGES/ENTRIES/
+         DAYS counts now render as the shared StatRibbon, not a copy string. -->
     <string name="patterns_empty_day1_header">Nothing to read yet.</string>
     <string name="patterns_empty_day1_body">Patterns surface after 10 entries. Keep recording.</string>
     <string name="patterns_empty_none_header">No repeating pattern detected.</string>
@@ -131,9 +120,28 @@
     <!-- Local Model Status (standalone screen). Copy: ux-copy.md §"Local Model Status" +
          §"Destructive Confirmations" (canonical confirm wording). -->
     <string name="model_status_eyebrow">MODEL STATUS</string>
+    <string name="model_status_back_eyebrow">← SETTINGS · MODEL STATUS</string>
+    <string name="model_status_band_ready">● MODEL READY · RUNNING LOCALLY</string>
+    <string name="model_status_band_pending">● MODEL · NOT READY</string>
+    <string name="model_status_stack_eyebrow">● ON-DEVICE STACK</string>
+    <string name="model_status_stack_main_name">Gemma 4 E4B</string>
+    <string name="model_status_stack_main_role">TRANSCRIBE + EXTRACT</string>
+    <string name="model_status_stack_embed_name">EmbeddingGemma 300M</string>
+    <string name="model_status_stack_embed_role">VECTOR · HYBRID</string>
+    <string name="model_status_stack_embed_size">210 MB</string>
+    <string name="model_status_stack_runtime_name">LiteRT-LM 0.11.0</string>
+    <string name="model_status_stack_runtime_role">RUNTIME</string>
+    <string name="model_status_stack_runtime_size">NATIVE</string>
+    <string name="model_status_gate_eyebrow">● NETWORK GATE · SEALED</string>
+    <string name="model_status_gate_body">Allowlist: model artifact host only.</string>
+    <string name="model_status_gate_active_eyebrow">● NETWORK GATE · ALLOWLIST ACTIVE 1 HOST</string>
+    <string name="model_status_gate_active_body">Model artifact host only. Closes the moment the pull completes.</string>
+    <string name="model_status_downloading_eyebrow">● DOWNLOADING MODEL · WI-FI ONLY</string>
+    <string name="model_status_pulled_label">GB PULLED</string>
+    <string name="model_status_pause">PAUSE</string>
     <string name="model_status_header">Model status.</string>
-    <string name="model_status_ready">Model ready. Running locally.</string>
     <string name="model_status_loading">Loading model.</string>
+    <string name="model_status_absent">Model file unreadable. Re-download from settings.</string>
     <string name="model_status_downloading">Downloading model. Wi-Fi only.</string>
     <string name="model_status_paused">Download stalled.</string>
     <string name="model_status_downloading_pct">%1$d%%</string>
@@ -149,23 +157,23 @@
     <string name="model_status_delete_confirm">Delete model</string>
 
     <!-- Settings (P0). Copy: ux-copy.md §Settings + §"Destructive Confirmations / Delete all data". -->
-    <string name="settings_eyebrow">SETTINGS</string>
-    <string name="settings_header">Settings.</string>
+    <string name="settings_back_eyebrow">← BACK · SETTINGS</string>
+    <string name="settings_selected_tag">SELECTED</string>
     <string name="settings_section_persona">PERSONA</string>
     <string name="settings_section_data">DATA</string>
     <string name="settings_section_model">MODEL</string>
     <string name="settings_section_about">ABOUT</string>
-    <string name="settings_persona_witness">Witness</string>
-    <string name="settings_persona_hardass">Hardass</string>
-    <string name="settings_persona_editor">Editor</string>
     <string name="settings_export">Export all entries</string>
+    <string name="settings_export_desc">Zip of per-entry markdown</string>
     <!-- SAF picks the destination, so the copy stays location-agnostic per docs/ux-copy.md
          §System Messages. Failure is surfaced honestly — a silently-broken export is the bug. -->
     <string name="settings_export_success">Entries exported.</string>
     <string name="settings_export_failed">Export failed. Nothing was written.</string>
     <string name="settings_delete_all">Delete all data</string>
+    <string name="settings_delete_all_desc">Wipes entries, patterns, tags, and prefs.</string>
     <string name="settings_model_status">Model status</string>
-    <string name="settings_source">Source code</string>
+    <string name="settings_model_status_desc">Gemma 4 E4B · On-device</string>
+    <string name="settings_version_label">Version</string>
     <string name="settings_license">Polyform Shield 1.0.0</string>
     <string name="settings_version">v%1$s</string>
     <string name="settings_cancel">Cancel</string>

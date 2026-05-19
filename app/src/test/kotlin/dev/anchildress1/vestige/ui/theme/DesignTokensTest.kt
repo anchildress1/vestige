@@ -59,6 +59,7 @@ class DesignTokensTest {
     fun `lime alpha rails carry the documented alphas`() {
         assertEquals(0.20f, LimeDim.alpha, ALPHA_TOLERANCE)
         assertEquals(0.55f, LimeSoft.alpha, ALPHA_TOLERANCE)
+        assertEquals(0.07f, LimeWash.alpha, ALPHA_TOLERANCE)
     }
 
     @Test

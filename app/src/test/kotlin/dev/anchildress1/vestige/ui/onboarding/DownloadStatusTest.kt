@@ -19,28 +19,28 @@ class DownloadStatusTest {
     }
 
     @Test
-    fun `formatEta returns the unknown dash for null and negative input`() {
-        assertEquals("—", formatEta(null))
-        assertEquals("—", formatEta(-1L))
+    fun `etaClock returns the unknown clock for null and negative input`() {
+        assertEquals("--:--", etaClock(null))
+        assertEquals("--:--", etaClock(-1L))
     }
 
     @Test
-    fun `formatEta renders seconds under a minute`() {
-        assertEquals("~0s", formatEta(0L))
-        assertEquals("~45s", formatEta(45L))
-        assertEquals("~59s", formatEta(59L))
+    fun `etaClock zero-pads seconds under a minute`() {
+        assertEquals("00:00", etaClock(0L))
+        assertEquals("00:05", etaClock(5L))
+        assertEquals("00:59", etaClock(59L))
     }
 
     @Test
-    fun `formatEta renders whole minutes between one minute and one hour`() {
-        assertEquals("~1 min", formatEta(60L))
-        assertEquals("~12 min", formatEta(12L * 60L + 30L))
-        assertEquals("~59 min", formatEta(59L * 60L))
+    fun `etaClock renders minutes and seconds`() {
+        assertEquals("01:00", etaClock(60L))
+        assertEquals("04:18", etaClock(4L * 60L + 18L))
+        assertEquals("59:59", etaClock(59L * 60L + 59L))
     }
 
     @Test
-    fun `formatEta renders hours and minutes at and beyond one hour`() {
-        assertEquals("~1h 0m", formatEta(3_600L))
-        assertEquals("~2h 5m", formatEta(2L * 3_600L + 5L * 60L))
+    fun `etaClock keeps counting minutes past an hour`() {
+        assertEquals("60:00", etaClock(3_600L))
+        assertEquals("125:05", etaClock(125L * 60L + 5L))
     }
 }

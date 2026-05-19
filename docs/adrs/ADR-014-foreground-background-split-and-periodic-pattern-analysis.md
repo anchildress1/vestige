@@ -95,3 +95,21 @@ The user only ever waits for step 1. Steps 2 and 3 deliver the same eventual inf
 ## Backlog Addition
 
 - `pattern-cadence-tuning` — v1.5, patterns. v1 ships ADR-014's every-5-entries default; optimal cadence is a usage-data question post-v1. Unblock: usage telemetry shows 5 is too frequent (battery cost) or too sparse (stale pattern view).
+
+---
+
+### Addendum (2026-05-18) — Persist on call-1, navigate to the entry, follow-up patched in
+
+Refines the foreground/background boundary; does not supersede it.
+
+**What changed:**
+
+- The entry now persists on the **call-1 transcription** (`EntryStore.createPendingEntry`), not the inference terminal event. The earliest a non-blank transcription exists is when call-1 lands; persisting there gives the UI a real entry id to navigate to.
+- Post-capture UI is no longer an in-Capture "Reading the entry" / Reviewing pair. The user is taken straight to the entry's detail screen, which renders its own extracting → resolved states off `extractionStatus`. The synchronous wait the user experiences is unchanged in length — it just happens on the entry surface instead of a capture-local pane.
+- ADR-002's write-once `follow_up` is **relaxed for the in-flight window only**: `EntryStore.attachFollowUp(entryId, text)` lands call-2's persona follow-up on a `PENDING`/`RUNNING` row and rewrites markdown front-matter. A follow-up arriving after the row reached a terminal status is dropped — extraction beat call-2; rewriting a `COMPLETED` row would race `completeEntry`. This is a bounded, in-flight-only mutation, not a general edit API.
+
+**What this does NOT change:**
+
+- The single synchronous touchpoint is still the foreground call; background 3-lens extraction stays invisible and unchanged.
+- `completeEntry` / `failEntry` contracts, the convergence resolver, and the pattern cadence are untouched.
+- `follow_up` remains immutable once an entry is terminal.

@@ -1,13 +1,10 @@
 package dev.anchildress1.vestige.ui.onboarding
 
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -18,9 +15,9 @@ import androidx.compose.ui.unit.dp
 import dev.anchildress1.vestige.R
 import dev.anchildress1.vestige.model.Persona
 import dev.anchildress1.vestige.ui.components.EyebrowE
+import dev.anchildress1.vestige.ui.components.StatusDot
 import dev.anchildress1.vestige.ui.components.VestigeListCard
 import dev.anchildress1.vestige.ui.components.VestigeListCardInteraction
-import dev.anchildress1.vestige.ui.components.limeLeftRuleForActive
 import dev.anchildress1.vestige.ui.theme.VestigeTheme
 
 @Composable
@@ -31,20 +28,17 @@ internal fun PersonaPickScreen(
     modifier: Modifier = Modifier,
     enabledCount: Int = 2,
 ) {
-    val selectedName = stringResource(id = personaNameRes(selected)).uppercase()
     OnboardingScaffold(
         enabledCount = enabledCount,
         modifier = modifier,
-        rightStatus = "SKIP NONE",
         primary = OnboardingAction(
-            label = stringResource(id = R.string.onboarding_persona_continue, selectedName),
+            label = stringResource(id = R.string.onboarding_persona_select),
             onAction = onContinue,
         ),
         footerHelper = stringResource(id = R.string.onboarding_persona_footer).uppercase(),
     ) {
-        EyebrowE(text = stringResource(id = R.string.onboarding_persona_eyebrow))
         OnboardingHeadline(text = stringResource(id = R.string.onboarding_persona_header))
-        BodyParagraph(text = stringResource(id = R.string.onboarding_persona_subhead))
+        BodyParagraph(text = stringResource(id = R.string.onboarding_persona_subhead), dim = true)
         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
             personaOptions().forEach { option ->
                 PersonaCard(
@@ -60,88 +54,63 @@ internal fun PersonaPickScreen(
 @Composable
 private fun PersonaCard(option: PersonaOption, isSelected: Boolean, onSelect: () -> Unit) {
     val colors = VestigeTheme.colors
+    val accent = if (isSelected) colors.lime else colors.dim
+    val name = stringResource(id = option.nameRes).uppercase()
     VestigeListCard(
         modifier = Modifier.fillMaxWidth(),
-        // `selected != null` routes through `Modifier.selectable` — the Compose primitive for
-        // radio cards. Merges descendant semantics, dispatches taps on the persona name Text
-        // to the card's onClick, and announces "radio button, selected" to TalkBack.
+        // Selectable routes through Modifier.selectable — merged semantics, RadioButton role,
+        // selected-state announce. The lime border + wash come from the primitive's selected
+        // branch, not a call-site accent override.
         interaction = VestigeListCardInteraction.Selectable(
             selected = isSelected,
             onClick = onSelect,
             role = Role.RadioButton,
         ),
-        accentModifier = if (isSelected) Modifier.limeLeftRuleForActive() else Modifier,
         contentPadding = PaddingValues(horizontal = 16.dp, vertical = 14.dp),
     ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.Top,
-            horizontalArrangement = Arrangement.SpaceBetween,
-        ) {
-            Column(verticalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.weight(1f)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        text = stringResource(id = option.nameRes).uppercase(),
-                        style = VestigeTheme.typography.h1,
-                    )
-                    EyebrowE(
-                        text = "  " + stringResource(id = option.tagRes),
-                        modifier = Modifier.padding(start = 4.dp),
-                    )
+        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    StatusDot(color = accent, filled = isSelected)
+                    EyebrowE(text = name, color = accent)
                 }
-                Text(
-                    text = stringResource(id = option.descRes),
-                    style = VestigeTheme.typography.p,
-                    color = colors.dim,
-                )
+                if (isSelected) {
+                    EyebrowE(text = stringResource(id = R.string.onboarding_persona_selected), color = colors.lime)
+                }
             }
-            PersonaCheckIndicator(isSelected = isSelected)
+            Text(text = name, style = VestigeTheme.typography.h1)
+            Text(
+                text = stringResource(id = option.cardRes),
+                style = VestigeTheme.typography.p,
+                color = colors.dim,
+            )
         }
     }
 }
 
-@Composable
-private fun PersonaCheckIndicator(isSelected: Boolean) {
-    val colors = VestigeTheme.colors
-    Box(
-        modifier = Modifier
-            .size(28.dp)
-            .padding(2.dp),
-        contentAlignment = Alignment.Center,
-    ) {
-        if (isSelected) {
-            Text(text = "✓", style = VestigeTheme.typography.title, color = colors.lime)
-        } else {
-            Text(text = "□", style = VestigeTheme.typography.title, color = colors.dim)
-        }
-    }
-}
-
-private data class PersonaOption(val persona: Persona, val nameRes: Int, val tagRes: Int, val descRes: Int)
+private data class PersonaOption(val persona: Persona, val nameRes: Int, val cardRes: Int)
 
 private fun personaOptions(): List<PersonaOption> = listOf(
     PersonaOption(
         Persona.WITNESS,
         R.string.onboarding_persona_witness_name,
-        R.string.onboarding_persona_witness_tag,
-        R.string.onboarding_persona_witness_desc,
+        R.string.onboarding_persona_witness_card,
     ),
     PersonaOption(
         Persona.HARDASS,
         R.string.onboarding_persona_hardass_name,
-        R.string.onboarding_persona_hardass_tag,
-        R.string.onboarding_persona_hardass_desc,
+        R.string.onboarding_persona_hardass_card,
     ),
     PersonaOption(
         Persona.EDITOR,
         R.string.onboarding_persona_editor_name,
-        R.string.onboarding_persona_editor_tag,
-        R.string.onboarding_persona_editor_desc,
+        R.string.onboarding_persona_editor_card,
     ),
 )
-
-private fun personaNameRes(persona: Persona): Int = when (persona) {
-    Persona.WITNESS -> R.string.onboarding_persona_witness_name
-    Persona.HARDASS -> R.string.onboarding_persona_hardass_name
-    Persona.EDITOR -> R.string.onboarding_persona_editor_name
-}

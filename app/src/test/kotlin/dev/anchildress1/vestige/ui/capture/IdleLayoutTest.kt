@@ -4,8 +4,8 @@ import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertHasClickAction
 import androidx.compose.ui.test.assertIsDisplayed
-import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
@@ -28,26 +28,30 @@ class IdleLayoutTest {
     val composeRule = createComposeRule()
 
     @Test
-    fun `renders date strip headline content`() {
+    fun `renders the empty-state line when there is no peek`() {
         composeRule.setContent { VestigeTheme { idleLayout() } }
-        composeRule.onNodeWithText("NOW · THU MAY 8").assertIsDisplayed()
-        composeRule.onNodeWithText("12", substring = true).assertIsDisplayed()
-        composeRule.onNodeWithText("STREAK").assertIsDisplayed()
+        composeRule.onNodeWithText(CaptureCopy.NO_ENTRIES_YET).assertExists()
     }
 
     @Test
-    fun `renders the four stat labels`() {
-        composeRule.setContent { VestigeTheme { idleLayout() } }
-        composeRule.onNodeWithText("KEPT").assertIsDisplayed()
-        composeRule.onNodeWithText("ACTIVE").assertIsDisplayed()
-        composeRule.onNodeWithText("HITS/MO").assertIsDisplayed()
-        composeRule.onNodeWithText("CLOUD").assertIsDisplayed()
+    fun `renders the patterns peek instead of the empty line when active`() {
+        composeRule.setContent {
+            VestigeTheme {
+                idleLayout(
+                    chrome = IdleChromeCallbacks(
+                        patternsPeek = CapturePatternsPeek(2, listOf("Tuesday Meetings", "The Email"), emptySet()),
+                    ),
+                )
+            }
+        }
+        composeRule.onNodeWithText("● 2 ACTIVE PATTERNS").assertExists()
+        composeRule.onAllNodesWithText(CaptureCopy.NO_ENTRIES_YET).assertCountEquals(0)
     }
 
     @Test
     fun `renders hero question text`() {
         composeRule.setContent { VestigeTheme { idleLayout() } }
-        composeRule.onNodeWithText("WHAT JUST HAPPENED?", substring = true).assertIsDisplayed()
+        composeRule.onNodeWithText("WHAT HAPPENED?", substring = true).assertIsDisplayed()
     }
 
     @Test
@@ -64,14 +68,25 @@ class IdleLayoutTest {
     }
 
     @Test
-    fun `REC button is disabled when model is not ready`() {
+    fun `REC is replaced by a spinner and a what-you're-waiting-on line when not ready`() {
         composeRule.setContent {
             VestigeTheme {
                 idleLayout(readiness = ModelReadiness.Loading)
             }
         }
-        composeRule.onNodeWithContentDescription(CaptureCopy.REC_LABEL_IDLE)
-            .assertIsNotEnabled()
+        // No REC button (and no diagnostic banner) — a spinner + status line stand in.
+        composeRule.onAllNodesWithContentDescription(CaptureCopy.REC_LABEL_IDLE).assertCountEquals(0)
+        composeRule.onNodeWithText(CaptureCopy.MODEL_LOADING_LINE).assertIsDisplayed()
+    }
+
+    @Test
+    fun `download progress is threaded into the model-waiting line`() {
+        composeRule.setContent {
+            VestigeTheme {
+                idleLayout(readiness = ModelReadiness.Downloading(percent = 42))
+            }
+        }
+        composeRule.onNodeWithText(CaptureCopy.MODEL_DOWNLOADING_LINE_FMT.format(42)).assertIsDisplayed()
     }
 
     @Test
@@ -99,38 +114,28 @@ class IdleLayoutTest {
     }
 
     @Test
-    fun `error band renders informational state when readiness is Loading`() {
-        composeRule.setContent {
-            VestigeTheme { idleLayout(readiness = ModelReadiness.Loading) }
-        }
-        composeRule.onNodeWithText(CaptureCopy.MODEL_LOADING_LINE).assertIsDisplayed()
-    }
-
-    @Test
     fun `error band is absent when Ready and no error`() {
         composeRule.setContent { VestigeTheme { idleLayout() } }
-        composeRule.onAllNodesWithText(CaptureCopy.MODEL_LOADING_LINE).assertCountEquals(0)
         composeRule.onAllNodesWithText(CaptureCopy.MIC_DENIED_LINE).assertCountEquals(0)
     }
 
     @Test
-    fun `patterns link is hidden when no callback is provided (neg)`() {
+    fun `bottom nav patterns tab is always present`() {
         composeRule.setContent { VestigeTheme { idleLayout() } }
-        composeRule.onAllNodesWithText(CaptureCopy.PATTERNS_LINK).assertCountEquals(0)
+        composeRule.onNodeWithText("PATTERNS").assertExists()
     }
 
     @Test
-    fun `patterns link is announced and fires onPatternsTap when wired (pos)`() {
+    fun `bottom nav PATTERNS tab fires onPatternsTap`() {
         var patternsTaps = 0
         composeRule.setContent {
             VestigeTheme {
                 idleLayout(chrome = IdleChromeCallbacks(onPatternsTap = { patternsTaps += 1 }))
             }
         }
-        // assertExists (not assertIsDisplayed) — the link sits past a Spacer(weight=1f) in the
-        // Column, and Robolectric's headless viewport can clip it off-screen even though the
-        // node is composed.
-        composeRule.onNodeWithContentDescription(CaptureCopy.PATTERNS_LINK)
+        // The tab sits past a Spacer(weight=1f); assertExists + semantics-action click avoids
+        // Robolectric's headless-viewport clipping.
+        composeRule.onNodeWithText("PATTERNS")
             .assertExists()
             .assertHasClickAction()
             .performSemanticsAction(SemanticsActions.OnClick)
@@ -149,14 +154,6 @@ class IdleLayoutTest {
     ) {
         IdleLayout(
             state = CaptureUiState.Idle(persona = persona, modelReadiness = readiness, error = error),
-            stats = CaptureStats(kept = 31, active = 3, hitsThisMonth = 47, cloud = 0),
-            meta = CaptureMeta(
-                weekdayLabel = "THU",
-                monthDayLabel = "MAY 8",
-                timeLabel = "09:41",
-                dayNumber = 134,
-                streakDays = 12,
-            ),
             onRecTap = onRecTap,
             onTypeTap = onTypeTap,
             chrome = chrome,

@@ -43,7 +43,10 @@ fun RecButton(
     contentDescription: String = DEFAULT_CD,
 ) {
     val colors = VestigeTheme.colors
-    val coralOrDim = if (enabled) colors.coral else colors.faint
+    // Ring + halo carry the coral "heat" affordance; the centre dot stays neutral gray (it is
+    // not a live signal here — recording is its own screen). Disabled collapses both to faint.
+    val ringColor = if (enabled) colors.coral else colors.faint
+    val dotColor = if (enabled) colors.dim else colors.faint
     val pulse by rememberSbPulse()
     val dotAlpha = if (enabled) DOT_ALPHA_MIN + pulse * (1f - DOT_ALPHA_MIN) else DOT_ALPHA_DISABLED
     Box(
@@ -53,12 +56,12 @@ fun RecButton(
                 role = Role.Button
                 this.contentDescription = contentDescription
             }
-            // Halo paints behind the body — `level=0.6f` matches the screenshot's idle bloom. Live
-            // halo amplitude is owned by `LiveLayout`; here we want a steady visual ring.
-            .coralHaloOnRecording(level = if (enabled) IDLE_HALO_LEVEL else 0f, color = coralOrDim)
+            // Halo paints behind the body — `level=0.6f` matches the screenshot's idle bloom.
+            // Live halo amplitude is owned by `LiveLayout`; here we want a steady ring.
+            .coralHaloOnRecording(level = if (enabled) IDLE_HALO_LEVEL else 0f, color = ringColor)
             .clip(CircleShape)
             .background(colors.deep, CircleShape)
-            .border(width = BORDER_WIDTH, color = coralOrDim, shape = CircleShape)
+            .border(width = BORDER_WIDTH, color = ringColor, shape = CircleShape)
             .clickable(enabled = enabled, onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
@@ -71,7 +74,7 @@ fun RecButton(
                     .size(DOT_SIZE)
                     .alpha(dotAlpha)
                     .clip(CircleShape)
-                    .background(coralOrDim, CircleShape),
+                    .background(dotColor, CircleShape),
             )
             Text(
                 text = "REC",

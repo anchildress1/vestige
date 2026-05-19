@@ -164,7 +164,7 @@
     <string name="settings_section_model">MODEL</string>
     <string name="settings_section_about">ABOUT</string>
     <string name="settings_export">Export all entries</string>
-    <string name="settings_export_desc">Zip of per-entry markdown</string>
+    <string name="settings_export_desc">Zip of markdown plus stored data snapshot</string>
     <!-- SAF picks the destination, so the copy stays location-agnostic per docs/ux-copy.md
          §System Messages. Failure is surfaced honestly — a silently-broken export is the bug. -->
     <string name="settings_export_success">Entries exported.</string>

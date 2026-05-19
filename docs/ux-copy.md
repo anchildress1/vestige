@@ -610,7 +610,7 @@ Section: **Persona**
 - Default persona: {Witness / Hardass / Editor}
 
 Section: **Data**
-- Export all entries (zip of markdown)
+- Export all entries (zip of markdown + stored data snapshot)
 - Delete all data
 
 Section: **Model**
@@ -623,7 +623,7 @@ Section: **About**
 - Source code (link to GitHub)
 - License
 
-> _Story 4.9 reconciliation:_ the screen header is `Settings.` (this section named no header string — derived to match the `Model status.` screen-header pattern). The **Model** section is a single **Model status** row that opens the Story 4.4 screen; Re-download / Delete model live there with their canonical confirm dialogs, so they are reached by delegation rather than duplicated here (one destructive-confirm implementation, per KISS / no-duplicate-flows). The **Persona** section lists the three names only (no descriptions — settings is not the onboarding pitch). Export uses the Storage Access Framework `CreateDocument` picker — no `FileProvider`, no storage permission (`AGENTS.md` storage constraint). Delete-all wipes ObjectBox (entry/pattern/tag/callout) + every markdown file + onboarding prefs, then returns to the first-run flow.
+> _Story 4.9 reconciliation:_ the screen header is `Settings.` (this section named no header string — derived to match the `Model status.` screen-header pattern). The **Model** section is a single **Model status** row that opens the Story 4.4 screen; Re-download / Delete model live there with their canonical confirm dialogs, so they are reached by delegation rather than duplicated here (one destructive-confirm implementation, per KISS / no-duplicate-flows). The **Persona** section lists the three names only (no descriptions — settings is not the onboarding pitch). Export uses the Storage Access Framework `CreateDocument` picker — no `FileProvider`, no storage permission (`AGENTS.md` storage constraint). The zip contains readable entry markdown plus `vestige-export.json`, a full stored-data snapshot for later recovery. Delete-all wipes ObjectBox (entry/pattern/tag/callout) + every markdown file + onboarding prefs, then returns to the first-run flow.
 
 > _Final-polish reconciliation (2026-05-18):_ shipped specifics on top of the above —
 > back eyebrow `← BACK · SETTINGS`; section eyebrows `PERSONA` / `DATA` / `MODEL` / `ABOUT`
@@ -727,7 +727,7 @@ A short forbidden-copy list. If any of these end up in a build, it's a regressio
 - Skip duration is fixed at 7 days in v1.
 - Pattern closure is model-detected only. Users cannot manually resolve or close a pattern. Closed is earned by the data, not declared.
 - User-facing lifecycle actions are exactly two: Skip and Drop. No third option.
-- Export format is a zip of per-entry markdown files only. Rolled-up `.md` and PDF are v1.5+.
+- Export format is a zip with per-entry markdown plus `vestige-export.json` for ObjectBox rows, pattern links, vectors, cooldown state, and onboarding settings. Rolled-up `.md` and PDF are v1.5+.
 - No first-time mock data. Empty means empty; demo seed data is a dev/demo setup concern, not user-facing fiction.
 - Loading copy: `Reading the file.` for Roast generation. _(2026-05-18, ADR-014 §Addendum: single-entry capture no longer shows a `Reading the entry.` page — post-stop is a brief borderless spinner, then the app opens the entry's detail in History. The "Reading the entry." quotes in the Capture/Inference walkthroughs above are superseded.)_
 - No user name or handle in onboarding. Anonymity is on-brand and the feature didn't pass the demo-impact test. Handle system deferred to v1.5 (see `backlog.md`).

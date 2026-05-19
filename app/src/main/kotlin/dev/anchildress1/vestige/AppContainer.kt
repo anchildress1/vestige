@@ -50,6 +50,7 @@ import dev.anchildress1.vestige.storage.VestigeBoxStore
 import dev.anchildress1.vestige.ui.capture.ModelReadiness
 import dev.anchildress1.vestige.ui.components.ModelDownloadProgress
 import dev.anchildress1.vestige.ui.onboarding.DownloadProgressTracker
+import dev.anchildress1.vestige.ui.onboarding.OnboardingPrefs
 import io.objectbox.BoxStore
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
@@ -77,8 +78,6 @@ import java.time.Instant
 import java.time.ZoneId
 import java.time.ZonedDateTime
 import java.util.concurrent.atomic.AtomicBoolean
-import java.util.zip.ZipEntry
-import java.util.zip.ZipOutputStream
 
 /** Process-singleton hub for Phase-2 cross-cutting concerns. */
 @Suppress(
@@ -664,23 +663,14 @@ class AppContainer(
         _dataRevision.value += 1
     }
 
-    /** Stream a zip of every entry markdown file into [out] (caller owns/closes the stream). */
+    /** Stream a zip of every user-data row plus readable entry markdown into [out]. */
     suspend fun zipAllEntriesTo(out: OutputStream) {
         withContext(ioDispatcher) {
-            ZipOutputStream(out).use { zip ->
-                markdownStore.listAll().forEach { file ->
-                    zip.putNextEntry(ZipEntry(file.name))
-                    // closeEntry must run for every opened entry, else `use` closing the stream
-                    // over a dangling entry yields a malformed archive. Contain a secondary
-                    // close failure so it can't be thrown out of finally and mask the primary
-                    // read exception (the read is the true root cause).
-                    try {
-                        file.inputStream().use { it.copyTo(zip) }
-                    } finally {
-                        runCatching { zip.closeEntry() }
-                    }
-                }
-            }
+            VestigeDataExporter(
+                boxStore = boxStore,
+                markdownStore = markdownStore,
+                onboardingPrefs = OnboardingPrefs.from(applicationContext),
+            ).writeTo(out)
         }
     }
 

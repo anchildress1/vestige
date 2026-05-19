@@ -38,6 +38,7 @@ stt-N : conditional on stop-and-test outcome (see PRD §"Build philosophy: build
 | `ios-port` | v2 | platform | 17-day deadline, Android-only locked | Android v1 ships + iOS interest + bandwidth |
 | `cloud-sync` | v2 | platform | privacy story is the differentiator; cloud compromises it | explicit opt-in encrypted sync (never default) |
 | `auto-export` | v1.5 | data | manual export ships in v1; auto adds Settings + scheduling + perms | user reports of data loss because manual export wasn't done |
+| `debug-reimport-provenance` | v1.5 | data | v1 export now includes markdown plus `vestige-export.json` with ObjectBox rows, links, vectors, cooldowns, and settings — enough for manual debugging. A real debug re-import still needs id remapping, ObjectBox schema metadata, app/build provenance, model artifact checksums, and prompt/schema hashes. Importer UX does not improve the 90s pitch or 5-min walkthrough | post-submission debugging needs restoring exported state into a dev build; define filename-based relation remapping and provenance fields before implementing importer |
 | `multilingual` | v2 | localization | Gemma 4 audio is multilingual; v1 prompts are English-only | v2 release targeting non-English market |
 | `notifications` | v1.5 | engagement | notification fatigue conflicts with anti-pushy brand | clear ADHD-specific use case for scheduled reminders |
 | `light-theme` | v2 | design | dark mode is on-brand; visual system designed dark-only | user base explicitly requesting it |

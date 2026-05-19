@@ -24,7 +24,7 @@ Wrap the app in a coherent, dark, atmospheric UX that meets the 10-second judge 
 - [x] Persistent Local Model Status surface exists and is reachable from app shell or settings; status is accurate. _(Story 4.4 — state-aware AppTop pill + Model Status screen + re-download/delete; also linked from Settings (4.9).)_
 - [ ] Capture screen polished per `poc/Energy Direction.html` capture frames + `poc/screenshots/{capture-still,capture-running}.png` — `AppTop` shell with `GEMMA 4 · LOCAL ONLY` ↔ `GEMMA 4 · LISTENING LIVE` swap (pill stays lime in both states; coral is REC button + destructive only — see `design-guidelines.md` §"Capture Screen / AppTop status pill"), big REC record button (idle: outline; recording: coral fill + pulsing `StatusDot` + live timer + `TickRule` 30s countdown), `sbBars` audio meter primitive while recording, transcription appearing post-inference (latency budget per `adrs/ADR-002-multi-lens-extraction-pattern.md` §"Latency budget" — 1–5 s target unmet on E4B CPU, currently ~24–33 s per `docs/stories/phase-2-core-loop.md` §Story 2.3 device record), entry transcript with muted user transcription + primary model follow-up (single-turn-per-capture per the STT-B v1 scope choice; see `adrs/ADR-005-stt-b-scope-and-v1-single-turn.md`). The Mist `MistHero` / `AudioMeter` halo composition is **not** built — superseded by ADR-011.
 - [ ] History list, Entry Detail, Pattern List, and Pattern Detail are all polished and navigable per their `design-guidelines.md` specs.
-- [x] Settings screen P0 scope works: persona default, export all entries (zip of markdown), delete all data, model status / re-download / delete. _(Story 4.9 — SAF zip export, typed-DELETE wipe, Model-section delegates to the 4.4 screen.)_
+- [x] Settings screen P0 scope works: persona default, export all entries (markdown + stored-data snapshot zip), delete all data, model status / re-download / delete. _(Story 4.9 — SAF zip export, typed-DELETE wipe, Model-section delegates to the 4.4 screen.)_
 - [x] Empty states across major screens use the locked microcopy from `ux-copy.md` §"Empty states". _(Story 4.10 — History-empty a11y fixed, pattern-detail no-sources copy reconciled, entry-detail zero-obs verified; peek/filter-empty deferred with the unshipped peek/chips.)_
 - [x] Top three error states polished: download fail/stall, inference timeout/fail, mic permission denied/unavailable. _(Story 4.11 — incl. new system-level mic-blocked + "Use typed entry instead"; download fail/stall via 4.3.)_
 - [ ] Notification permission flow ships in onboarding as the optional Wiring switch; notification tap target lands on the entry detail of the most-recent-in-flight extraction. Lifecycle fallback evaluation per ADR-004 §"Fallback Trigger" recorded by end of Phase 4 day 1 if invoked.
@@ -268,16 +268,16 @@ Checked bullets above are the historical record that the Mist tokens shipped to 
 
 ### Story 4.9 — Settings screen (P0 scope)
 
-**As** the user, **I need** a settings screen with the v1 P0 scope from `PRD.md` §Phase 4 / `ux-copy.md` §Settings — persona default, export all entries (markdown zip), delete all data, model status / re-download / delete — **so that** the privacy and data-sovereignty claims have implementations a judge can poke.
+**As** the user, **I need** a settings screen with the v1 P0 scope from `PRD.md` §Phase 4 / `ux-copy.md` §Settings — persona default, export all entries (markdown + stored-data snapshot zip), delete all data, model status / re-download / delete — **so that** the privacy and data-sovereignty claims have implementations a judge can poke.
 
 **Done when:**
 - [x] Settings reachable from the app shell. _(`Settings` link in the Capture idle chrome next to Patterns/History, wired `IdleChromeCallbacks.onSettingsTap` → `PostOnboardingScreen.Settings`.)_
 - [x] Sections per `ux-copy.md` §Settings: _(`SettingsScreen`.)_
   - **Persona**: default persona (Witness / Hardass / Editor) — selectable radio rows, persists via `OnboardingPrefs.setDefaultPersona` + reflects live in capture chrome.
-  - **Data**: Export all entries (zip of markdown) + Delete all data (typed-`DELETE` destructive flow).
+  - **Data**: Export all entries (markdown + stored-data snapshot zip) + Delete all data (typed-`DELETE` destructive flow).
   - **Model**: single **Model status** row → the Story 4.4 screen, which owns Re-download + Delete model with their canonical confirms (delegation, not duplicated — recorded in `ux-copy.md`).
   - **About**: version (read off the installed package), GitHub source link (`ACTION_VIEW`), Polyform Shield license label.
-- [x] Export all entries: `AppContainer.zipAllEntriesTo(OutputStream)` zips every `MarkdownEntryStore` file; the screen uses the SAF `CreateDocument("application/zip")` picker — no `FileProvider`, no storage permission (`AGENTS.md` storage constraint satisfied via the system picker).
+- [x] Export all entries: `AppContainer.zipAllEntriesTo(OutputStream)` zips every `MarkdownEntryStore` file under `entries/` plus `vestige-export.json` with ObjectBox rows, pattern links, vectors, cooldown state, and onboarding settings; the screen uses the SAF `CreateDocument("application/zip")` picker — no `FileProvider`, no storage permission (`AGENTS.md` storage constraint satisfied via the system picker).
 - [x] Delete all data: `ux-copy.md` §"Destructive Confirmations / Delete all data" — typed `DELETE` arms the destructive confirm; `AppContainer.wipeAllData()` clears ObjectBox (entry/pattern/tag/callout) + every markdown file, `OnboardingPrefs.reset()` returns the user to onboarding.
 - [x] **Settings explicitly NOT in v1 P0**: pattern threshold, cooldown, default-input toggle, transcription-visibility toggle — not added.
 

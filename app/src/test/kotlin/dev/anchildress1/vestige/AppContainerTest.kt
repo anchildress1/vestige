@@ -683,6 +683,58 @@ class AppContainerTest {
     }
 
     @Test
+    fun `pause cancels the in-flight pull, frees the mutex, and a re-download still runs`(@TempDir tempRoot: File) =
+        runTest {
+            val modelFile = File(tempRoot, "main-model.litertlm")
+            val artifactStore = fakeArtifactStore(artifactFile = modelFile, expectedByteSize = 2L)
+            val firstPullGate = CompletableDeferred<Unit>()
+            var downloadCalls = 0
+            coEvery { artifactStore.download(any()) } coAnswers {
+                if (downloadCalls++ == 0) {
+                    firstPullGate.await() // in-flight; holds modelMutationMutex until cancelled
+                    ModelArtifactState.Complete
+                } else {
+                    modelFile.writeText("xx")
+                    ModelArtifactState.Complete
+                }
+            }
+            val context = mockk<Context>(relaxed = true) {
+                every { filesDir } returns tempRoot
+                every { cacheDir } returns File(tempRoot, "cache").apply { mkdirs() }
+            }
+            val container = AppContainer(
+                applicationContext = context,
+                boxStoreFactory = { mockk<BoxStore>(relaxed = true) },
+                markdownStoreFactory = { mockk<MarkdownEntryStore>(relaxed = true) },
+                modelPathLoader = { modelFile.absolutePath },
+                backgroundEngineFactory = { _, _ -> mockk<LiteRtLmEngine>(relaxed = true) },
+                mainModelArtifactStoreFactory = { _, _, _ -> artifactStore },
+                recoveredEntryIdsLoader = { emptyList() },
+                foregroundServiceIntentFactory = { Intent("dev.anchildress1.vestige.TEST_START") },
+                foregroundServiceStarter = {},
+                scope = this,
+            )
+
+            container.redownloadMainModel()
+            advanceUntilIdle() // first pull is now suspended inside download(), holding the mutex
+
+            container.pauseMainModelDownload()
+            advanceUntilIdle()
+            // cancelAndJoin must have unwound the mutation before re-probe: progress cleared and
+            // readiness no longer Downloading (the fake store has no .part, so the re-probe resolves
+            // Absent→Loading; a real .part would resolve Paused — either is "not wedged").
+            assertEquals(null, container.downloadProgressFlow.value)
+            assertTrue(container.modelReadinessFlow.value !is ModelReadiness.Downloading)
+
+            // The regression: a follow-up re-download must NOT silently no-op on a still-held mutex.
+            container.redownloadMainModel()
+            advanceUntilIdle()
+            coVerify(exactly = 2) { artifactStore.download(any()) }
+            assertTrue(modelFile.exists(), "the second re-pull must actually run, not be dropped")
+            assertEquals(ModelReadiness.Ready, container.modelReadinessFlow.value)
+        }
+
+    @Test
     fun `redownloadMainModel closes the initialized engine so the same wrapper can be reinitialized`(
         @TempDir tempRoot: File,
     ) = runTest {

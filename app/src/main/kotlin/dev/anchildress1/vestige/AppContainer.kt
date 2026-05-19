@@ -57,6 +57,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -475,9 +476,9 @@ class AppContainer(
      * Host calls on lifecycle ON_RESUME (or when an action might have changed model state — e.g.
      * Settings → Delete model, or a Phase-4 download-complete event). Readiness is
      * **artifact-presence based**: a full-size artifact on disk is `Ready` — the engine is
-     * loaded lazily on the first inference, not proactively (ADR-012 §Addendum 2026-05-18:
-     * proactive pre-warm regressed into a startup GPU-init crash and is reverted). On the
-     * Ready transition the PENDING-extraction recovery sweep still runs.
+     * loaded lazily on the first inference, not proactively, because proactive pre-warm
+     * regressed into a startup GPU-init crash. On the Ready transition the
+     * PENDING-extraction recovery sweep still runs.
      */
     fun refreshModelReadiness() {
         scope.launch {
@@ -569,9 +570,14 @@ class AppContainer(
      * live instead of wedging the view in a dead progress state.
      */
     fun pauseMainModelDownload() {
-        redownloadJob?.cancel()
+        val job = redownloadJob
         redownloadJob = null
         scope.launch {
+            // cancelAndJoin (not bare cancel): the in-flight redownload holds modelMutationMutex
+            // and only releases it in its `finally` during cancellation unwind. Re-probing or a
+            // follow-up Re-download before that unwind completes would hit the still-held
+            // tryLock() and silently no-op, stranding the user on a dead Paused screen.
+            job?.cancelAndJoin()
             _downloadProgressFlow.value = null
             _modelReadinessFlow.value = ModelReadiness.Paused
             refreshModelReadiness()

@@ -8,6 +8,7 @@ import dev.anchildress1.vestige.inference.ForegroundResult
 import dev.anchildress1.vestige.inference.ForegroundStreamEvent
 import dev.anchildress1.vestige.inference.HistoryChunk
 import dev.anchildress1.vestige.model.Persona
+import dev.anchildress1.vestige.storage.EntryPersistenceException
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
@@ -378,6 +379,11 @@ class CaptureViewModel(
                 Log.w(TAG, "Follow-up generation timed out for entry $entryId", timeout)
             } catch (cancel: CancellationException) {
                 throw cancel
+            } catch (persist: EntryPersistenceException) {
+                // Persistence failure (disk full, markdown dir gone) is a different class than a
+                // transient inference miss — error-tier so the lost-follow-up disk case is
+                // greppable instead of hiding under the warn-tier generic handler.
+                Log.e(TAG, "Follow-up persist failed for entry $entryId", persist)
             } catch (@Suppress("TooGenericExceptionCaught") error: Exception) {
                 Log.w(TAG, "Follow-up generation failed for entry $entryId (${error.javaClass.simpleName})")
             }

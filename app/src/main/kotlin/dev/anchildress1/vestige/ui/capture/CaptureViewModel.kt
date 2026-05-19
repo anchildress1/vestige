@@ -348,11 +348,7 @@ class CaptureViewModel(
         null
     }
 
-    private suspend fun persistPending(
-        text: String,
-        persona: Persona,
-        durationMs: Long,
-    ): Long = saveAndExtract(
+    private suspend fun persistPending(text: String, persona: Persona, durationMs: Long): Long = saveAndExtract(
         text = text,
         capturedAt = ZonedDateTime.now(clock.withZone(zoneId)),
         persona = persona,

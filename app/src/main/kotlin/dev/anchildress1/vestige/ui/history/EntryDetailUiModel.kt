@@ -47,6 +47,9 @@ data class EntryDetailUiModel(
                 observations = parseObservations(entity.entryObservationsJson),
                 tags = entity.tags.map { it.name }.sorted(),
                 extraction = when (entity.extractionStatus) {
+                    // COMPLETED with no receipt payload → NO_READ (no lens section). A row whose
+                    // receipt column predates this schema reads the same; legacy rows are dev-only
+                    // (prerelease, no backward-compat) so they get no distinct state.
                     ExtractionStatus.COMPLETED ->
                         if (hasLensReceiptPayload) {
                             ExtractionDisplay.COMPLETE

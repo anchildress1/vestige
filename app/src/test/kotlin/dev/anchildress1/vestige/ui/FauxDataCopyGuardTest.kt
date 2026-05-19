@@ -13,9 +13,11 @@ class FauxDataCopyGuardTest {
     @Test
     fun `main source tree contains no known fixture literals`() {
         val violations = mutableListOf<String>()
+        var scanned = 0
         mainDir().walkTopDown()
-            .filter { it.isFile && (it.extension == "kt" || it.extension == "xml") }
+            .filter { it.isFile && it.extension in SCANNED_EXTENSIONS }
             .forEach { file ->
+                scanned++
                 file.readLines().forEachIndexed { idx, line ->
                     if (FORBIDDEN.any { it.containsMatchIn(line) }) {
                         violations += "${file.name}:${idx + 1} -> ${line.trim()}"
@@ -23,6 +25,8 @@ class FauxDataCopyGuardTest {
                 }
             }
 
+        // A zero-file walk would pass vacuously — fail loud if mainDir() resolved wrong.
+        assertTrue("Guard scanned no source files — mainDir() resolved incorrectly", scanned > 0)
         assertTrue(
             "Fixture/demo literals leaked into app/src/main: $violations",
             violations.isEmpty(),
@@ -42,6 +46,8 @@ class FauxDataCopyGuardTest {
     }
 
     private companion object {
+        val SCANNED_EXTENSIONS = setOf("kt", "xml", "txt")
+
         val FORBIDDEN = listOf(
             Regex("""\bTuesday Meetings\b"""),
             Regex("""Fourth entry mentions Tuesday meetings""", RegexOption.IGNORE_CASE),

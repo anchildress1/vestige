@@ -421,7 +421,7 @@ class AppContainer(
      * finishes (~15 s+); the user expects it moments after the transcript.
      */
     suspend fun attachFollowUp(entryId: Long, followUpText: String) {
-        withContext(Dispatchers.IO) { entryStore.attachFollowUp(entryId, followUpText) }
+        withContext(ioDispatcher) { entryStore.attachFollowUp(entryId, followUpText) }
         _dataRevision.value += 1
     }
 

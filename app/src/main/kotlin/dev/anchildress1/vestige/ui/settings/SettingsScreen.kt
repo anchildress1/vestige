@@ -370,7 +370,6 @@ private fun personaDescRes(persona: Persona): Int = when (persona) {
 
 @Composable
 private fun DeleteAllDialog(onConfirm: () -> Unit, onDismiss: () -> Unit) {
-    val colors = VestigeTheme.colors
     var typed by remember { mutableStateOf("") }
     val armed = typed == DELETE_TOKEN
     // Same scoreboard confirm card as the model-delete, but this wipe is irreversible so it

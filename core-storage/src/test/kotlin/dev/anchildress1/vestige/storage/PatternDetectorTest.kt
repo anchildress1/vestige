@@ -363,6 +363,31 @@ class PatternDetectorTest {
     }
 
     @Test
+    fun `temporal relative weekday block uses injected zone when local hour differs from UTC`() {
+        val pacific = ZoneId.of("America/Los_Angeles")
+        val laterClock = Clock.fixed(Instant.parse("2026-05-20T12:00:00Z"), ZoneOffset.UTC)
+        val pacificDetector = PatternDetector(boxStore, laterClock, zoneId = pacific)
+        val utcDetector = PatternDetector(boxStore, laterClock, zoneId = ZoneOffset.UTC)
+        putEntry(timestamp = Instant.parse("2026-05-05T21:00:00Z"))
+        putEntry(timestamp = Instant.parse("2026-05-12T21:30:00Z"))
+        putEntry(timestamp = Instant.parse("2026-05-19T22:00:00Z"))
+
+        val pacificPattern = pacificDetector.detect().single {
+            it.kind == PatternKind.TEMPORAL_RELATIVE &&
+                it.signatureJson.contains("\"relation\":\"weekday_time_block\"")
+        }
+
+        assertTrue(pacificPattern.signatureJson.contains("\"day_of_week\":\"tuesday\""))
+        assertTrue(pacificPattern.signatureJson.contains("\"time_block\":\"afternoon\""))
+        assertNull(
+            utcDetector.detect().firstOrNull {
+                it.kind == PatternKind.TEMPORAL_RELATIVE &&
+                    it.signatureJson.contains("\"time_block\":\"afternoon\"")
+            },
+        )
+    }
+
+    @Test
     fun `temporal relative requires distinct dates for weekday time blocks`() {
         val laterClock = Clock.fixed(Instant.parse("2026-05-20T12:00:00Z"), ZoneOffset.UTC)
         val laterDetector = PatternDetector(boxStore, laterClock, zoneId = ZoneOffset.UTC)
@@ -407,6 +432,30 @@ class PatternDetectorTest {
 
         assertEquals(3, pattern.supportingEntryCount)
         assertTrue(pattern.signatureJson.contains("\"day_of_month\":1"))
+    }
+
+    @Test
+    fun `temporal relative month-start uses injected zone when local date differs from UTC`() {
+        val pacific = ZoneId.of("America/Los_Angeles")
+        val laterClock = Clock.fixed(Instant.parse("2026-05-20T12:00:00Z"), ZoneOffset.UTC)
+        val pacificDetector = PatternDetector(boxStore, laterClock, zoneId = pacific)
+        val utcDetector = PatternDetector(boxStore, laterClock, zoneId = ZoneOffset.UTC)
+        putEntry(timestamp = Instant.parse("2026-03-01T00:30:00Z"))
+        putEntry(timestamp = Instant.parse("2026-04-01T00:30:00Z"))
+        putEntry(timestamp = Instant.parse("2026-05-01T00:30:00Z"))
+
+        assertNotNull(
+            utcDetector.detect().firstOrNull {
+                it.kind == PatternKind.TEMPORAL_RELATIVE &&
+                    it.signatureJson.contains("\"relation\":\"month_start\"")
+            },
+        )
+        assertNull(
+            pacificDetector.detect().firstOrNull {
+                it.kind == PatternKind.TEMPORAL_RELATIVE &&
+                    it.signatureJson.contains("\"relation\":\"month_start\"")
+            },
+        )
     }
 
     @Test

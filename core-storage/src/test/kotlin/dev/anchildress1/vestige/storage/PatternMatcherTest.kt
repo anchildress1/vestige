@@ -234,6 +234,18 @@ class PatternMatcherTest {
     }
 
     @Test
+    fun `temporal relative uses injected zone when matching weekday time block`() {
+        val entry = putEntry(timestamp = Instant.parse("2026-05-19T21:00:00Z"))
+        val p = pattern(
+            PatternKind.TEMPORAL_RELATIVE,
+            "{\"relation\":\"weekday_time_block\",\"day_of_week\":\"tuesday\",\"time_block\":\"afternoon\"}",
+        )
+
+        assertTrue(PatternMatcher.matches(entry, p, java.time.ZoneId.of("America/Los_Angeles")))
+        assertFalse(PatternMatcher.matches(entry, p, ZoneOffset.UTC))
+    }
+
+    @Test
     fun `temporal relative rejects different weekday time block`() {
         val entry = putEntry(timestamp = Instant.parse("2026-05-19T09:00:00Z"))
         val p = pattern(
@@ -253,6 +265,18 @@ class PatternMatcherTest {
         )
 
         assertTrue(PatternMatcher.matches(entry, p, ZoneOffset.UTC))
+    }
+
+    @Test
+    fun `temporal relative uses injected zone when matching first of month`() {
+        val entry = putEntry(timestamp = Instant.parse("2026-05-01T00:30:00Z"))
+        val p = pattern(
+            PatternKind.TEMPORAL_RELATIVE,
+            "{\"relation\":\"month_start\",\"day_of_month\":1}",
+        )
+
+        assertTrue(PatternMatcher.matches(entry, p, ZoneOffset.UTC))
+        assertFalse(PatternMatcher.matches(entry, p, java.time.ZoneId.of("America/Los_Angeles")))
     }
 
     @Test

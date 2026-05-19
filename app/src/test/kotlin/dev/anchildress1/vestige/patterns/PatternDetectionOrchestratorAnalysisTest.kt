@@ -18,10 +18,13 @@ import dev.anchildress1.vestige.testing.openInMemoryBoxStore
 import io.mockk.coEvery
 import io.mockk.mockk
 import io.objectbox.BoxStore
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -147,6 +150,77 @@ class PatternDetectionOrchestratorAnalysisTest {
         assertEquals("Temporal text.", callout?.text)
     }
 
+    @Test
+    fun `existing active temporal pattern updates title and callout from later analysis`() = runTest {
+        coEvery { engine.generateText(any(), any()) } returnsMany listOf(
+            "{\"title\":\"First Cut\",\"callout\":\"You started landing here on Tuesday afternoons.\"}",
+            "{\"title\":\"Tuesday Drag\",\"callout\":\"You keep landing here on Tuesday afternoons.\"}",
+        )
+
+        commitTuesdayAfternoons(SIX_DISTINCT_TEXTS)
+
+        val temporal = patternStore.all().single { it.kind == PatternKind.TEMPORAL_RELATIVE }
+        assertEquals("Tuesday Drag", temporal.title)
+        assertEquals("You keep landing here on Tuesday afternoons.", temporal.latestCalloutText)
+    }
+
+    @Test
+    fun `snoozed temporal pattern freezes the callout the user last saw`() = runTest {
+        coEvery { engine.generateText(any(), any()) } returnsMany listOf(
+            "{\"title\":\"First Cut\",\"callout\":\"You started landing here on Tuesday afternoons.\"}",
+            "{\"title\":\"Drifted\",\"callout\":\"This must not overwrite the frozen callout.\"}",
+        )
+
+        commitTuesdayAfternoons(SIX_DISTINCT_TEXTS.take(3))
+        val patternId = patternStore.all().single { it.kind == PatternKind.TEMPORAL_RELATIVE }.patternId
+        patternStore.transitionState(
+            patternId,
+            PatternState.SNOOZED,
+            snoozedUntilMs = now.toEpochMilli() + 30L * 24 * 60 * 60 * 1000,
+        )
+
+        commitTuesdayAfternoons(SIX_DISTINCT_TEXTS.drop(3), startIndex = 3)
+
+        val temporal = patternStore.findByPatternId(patternId)!!
+        assertEquals(PatternState.SNOOZED, temporal.state)
+        assertEquals("First Cut", temporal.title)
+        assertEquals("You started landing here on Tuesday afternoons.", temporal.latestCalloutText)
+    }
+
+    @Test
+    fun `generator failure persists a deterministic fallback, not an empty callout`() = runTest {
+        coEvery { engine.generateText(any(), any()) } throws RuntimeException("oom")
+
+        commitTuesdayAfternoons(SIX_DISTINCT_TEXTS.take(3))
+
+        val temporal = patternStore.all().single { it.kind == PatternKind.TEMPORAL_RELATIVE }
+        assertTrue("title must not be blank", temporal.title.isNotBlank())
+        assertTrue("callout must not be blank", temporal.latestCalloutText.isNotBlank())
+        assertTrue("callout must not be model JSON", !temporal.latestCalloutText.contains("{"))
+    }
+
+    @Test
+    fun `cancellation during analysis propagates and is not swallowed`() = runTest {
+        coEvery { engine.generateText(any(), any()) } throws CancellationException("stop")
+
+        val thrown = runCatching {
+            commitTuesdayAfternoons(SIX_DISTINCT_TEXTS.take(3))
+        }.exceptionOrNull()
+
+        assertTrue(thrown is CancellationException)
+        assertNotNull(thrown)
+    }
+
+    private suspend fun commitTuesdayAfternoons(texts: List<String>, startIndex: Int = 0) {
+        texts.forEachIndexed { offset, text ->
+            val tuesday = TUESDAYS[startIndex + offset]
+            orchestrator.onEntryCommitted(
+                putEntry(templateLabel = null, text = text, timestamp = Instant.parse(tuesday)),
+                Persona.WITNESS,
+            )
+        }
+    }
+
     private fun putEntry(templateLabel: TemplateLabel?, text: String = "", timestamp: Instant = now): EntryEntity {
         val entry = EntryEntity(
             entryText = text,
@@ -156,5 +230,20 @@ class PatternDetectionOrchestratorAnalysisTest {
         )
         boxStore.boxFor(EntryEntity::class.java).put(entry)
         return entry
+    }
+
+    private companion object {
+        // Six consecutive Tuesdays at 14:00Z (afternoon block) — same weekday_time_block
+        // signature across runs. Distinct entry text per row so no vocab pattern co-forms,
+        // keeping exactly one analysis engine call per detection cycle.
+        val TUESDAYS = listOf(
+            "2026-03-31T14:00:00Z",
+            "2026-04-07T14:00:00Z",
+            "2026-04-14T14:00:00Z",
+            "2026-04-21T14:00:00Z",
+            "2026-04-28T14:00:00Z",
+            "2026-05-05T14:00:00Z",
+        )
+        val SIX_DISTINCT_TEXTS = listOf("alpha", "bravo", "charlie", "delta", "echo", "foxtrot")
     }
 }

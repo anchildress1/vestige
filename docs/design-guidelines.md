@@ -288,7 +288,7 @@ Forbidden across all personas: "thank you for sharing," "how does that make you 
 > _Addendum (2026-05-18) — capture final-polish reconciliation._ This section previously read *"Both states render lime — coral never appears on the pill."* That contradicted `ux-copy.md` §Capture ("pill stays lime in every state except LISTENING") and the final capture comp (`poc/capture-recording-final.png`), which shows a coral `LISTENING` pill. The comp + ux-copy win: the recording pill is coral. The coral here reads as "the machine is hot / it is listening" — an intentional, single sanctioned coral-on-pill state, not the scattered coral the old rule guarded against.
 
 **Recording-state changes to the stack:**
-- The AppTop right slot carries the hamburger menu (Settings/system nav) on every screen, recording included — there is no per-state persona switcher and no duplicate timer pill. The persona is fixed for the duration of a recording; switching mid-recording is forbidden. The canonical recording timer is the in-content 96sp display + remaining-seconds countdown, not a chrome pill. _(Addendum 2026-05-18 — capture final-polish: this previously said "the right slot is empty during recording." The final comps + product direction put the menu button on all pages; only the duplicate timer pill was removed.)_
+- The AppTop right slot carries the hamburger menu (Settings/system nav) on every screen, recording included — there is no per-state persona switcher and no duplicate timer pill. The persona is fixed for the duration of a recording; switching mid-recording is forbidden. The canonical recording timer is the in-content 96sp display + remaining-seconds countdown, not a chrome pill. _(Addendum 2026-05-18 — capture final-polish: this previously said "the right slot is empty during recording." The final comps + product direction put the menu button on all pages; only the duplicate timer pill was removed.)_ _(Addendum 2026-05-18b — **recording is modal, superseding the prior addendum**: the AppTop right slot **and** the bottom navigation are removed while `CaptureUiState` is `Recording`. An active mic capture must not be routable away from with no stop/discard control; the only exits are `STOP · FILE IT` and `DISCARD · DON'T SAVE`. Menu + bottom nav return on idle. The "menu on every screen including recording" rule holds for every screen **except** active recording.)_
 - The patterns peek card and footer metadata can dim or fade out during active recording — capture is the only surface that matters in that state. Do not collapse the layout; just lower contrast.
 - The hero title can swap to a recording-state line per `ux-copy.md`, or stay; do not invent here.
 - 30s cap pre-warn at 27s of recorded audio (elapsed is anchored to the first sample, same clock as the cap, so ~3s lead): single-fire system tone on the notification stream (not a bundled chime). Respects notification volume — silent if the device's notification volume is. Minimum-viable signal so the user knows the cap is firing — no cap-moment cue, the brief submitting spinner carries that.
@@ -351,6 +351,19 @@ Shows:
 - Avoid: `Preparing your personalized AI experience`, `Hang tight`, `Almost there!`
 
 This screen is part of how a 10-second judge realizes "this is a local AI app, not a cloud chatbot." Make it visible.
+
+> _Addendum (2026-05-18) — scoreboard rebuild._ Rebuilt to `poc/model-detail-final.png`;
+> the "Shows" list above is superseded. The screen is now: annotated `MODEL STATUS.`
+> headline; a readiness status **band** (lime border/eyebrow `● MODEL READY · RUNNING
+> LOCALLY` when Ready, coral `● MODEL · NOT READY` otherwise; polite live region); a stat
+> ribbon (`ON DISK` = the **actual** artifact size, `0` once deleted — not the nominal
+> 3.66 GB — and a permanently-`0` coral `CLOUD CALLS`); an `● ON-DEVICE STACK` of three
+> bordered rows (Gemma 4 E4B / EmbeddingGemma 300M / LiteRT-LM 0.11.0) whose trailing dot
+> **and** the stack eyebrow follow readiness (lime Ready / coral gone); a coral
+> `● NETWORK GATE · SEALED` band; and Re-download / Delete outline actions that route
+> through the shared scoreboard `VestigeConfirmCard` (disabled while a download is in
+> flight). Full copy: `ux-copy.md` §"Local Model Status". The 10-second-judge intent is
+> unchanged — the honest stack + sealed-gate + zero-cloud-calls make "local AI" legible.
 
 ### Persona Selector
 

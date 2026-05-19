@@ -55,6 +55,8 @@ The positioning is deliberate: cognition tracker, not journal app. Patterns are 
 
 Phase-4 P0 shipped. The capture loop, history, pattern list + detail, settings, model-status, and the onboarding model-download UX are implemented against the canonical spec under [`docs/`](docs). Pattern lifecycle actions are Skip / Drop / Restart — closure is model-detected only (v1.5, see [`backlog.md`](docs/backlog.md) §`pattern-auto-close`). On-device verification (fresh install on the Galaxy S24 Ultra, STT no-regression round-trip) is the remaining gate before the v1 cut; risk through phases 1–3 was managed via five stop-and-test points (STT-A–E). Full README pass + demo video land in Phase 6 — see [`docs/PRD.md`](docs/PRD.md) §Timeline.
 
+The active `feat/onboarding-final-polish` branch brings every surface to pixel parity with the final scoreboard comps (`poc/*-final.png`): the rebuilt Model Status screen (status band · on-device stack · sealed network-gate · actual-on-disk size), the shared destructive-confirm card, the redesigned Settings/Capture/History/Patterns/Entry-detail screens, and Lucide bottom-nav icons. It also corrects a readiness bug — model readiness now gates on real engine warmup, not just artifact presence (see [ADR-013 §Addendum](docs/adrs/ADR-013-typed-entry-requires-foreground-model.md)) — and makes active recording modal (no menu/nav while the mic is live). Screen-flow diagrams: [`docs/diagrams/user-flows.md`](docs/diagrams/user-flows.md).
+
 ---
 
 ## Features
@@ -263,7 +265,7 @@ adb uninstall dev.anchildress1.vestige
 
 ## Configuration
 
-v1 has effectively zero configuration. The model artifact downloads on first launch over Wi-Fi (~3.7 GB) into `Context.filesDir/models/`. A cheap presence + size probe gates UI readiness on every cold start; full SHA-256 verification is deferred to the engine load path so onboarding never hashes the multi-GB artifact on the UI thread (Story 4.3). Persona default is set during onboarding and changeable from settings. Pattern detection threshold (10 entries) and callout cooldown (3 entries) are hardcoded for v1 per [`docs/ux-copy.md` §"Locked v1 behavior"](docs/ux-copy.md). No env vars, no `.env` file, no remote-config layer — adding any of those is a P0 violation per [ADR-001 §Q7](docs/adrs/ADR-001-stack-and-build-infra.md).
+v1 has effectively zero configuration. The model artifact downloads on first launch over Wi-Fi (~3.7 GB) into `Context.filesDir/models/`. A presence + size probe resolves the artifact state, then readiness holds at `Loading` until `engine.initialize()` actually completes — a full-size file on disk is *not* `Ready` on its own, so REC/typed stay gated while a cold first inference would still stall ([ADR-013 §Addendum](docs/adrs/ADR-013-typed-entry-requires-foreground-model.md)). Full SHA-256 integrity is deferred to the engine load path so onboarding never hashes the multi-GB artifact on the UI thread (Story 4.3). Persona default is set during onboarding and changeable from settings. Pattern detection threshold (10 entries) and callout cooldown (3 entries) are hardcoded for v1 per [`docs/ux-copy.md` §"Locked v1 behavior"](docs/ux-copy.md). No env vars, no `.env` file, no remote-config layer — adding any of those is a P0 violation per [ADR-001 §Q7](docs/adrs/ADR-001-stack-and-build-infra.md).
 
 ---
 

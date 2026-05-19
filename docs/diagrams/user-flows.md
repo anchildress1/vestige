@@ -110,3 +110,47 @@ flowchart TD
     MS --> DEL["Delete model<br/>app inert until re-download · entries stay"]
     RDL -- "failure" --> LOAD["→ Loading (no model on disk)"]
 ```
+
+---
+
+## 6. Post-onboarding screen navigation
+
+How the shipped surfaces connect after first-run. Three bottom-nav tabs
+(Capture / Patterns / History) are mutually reachable on every primary screen. The
+hamburger menu opens Settings from any primary screen and **toggles closed** back to the
+screen it was opened from. Active recording is **modal**: the menu and bottom nav are
+removed, so the only exits are STOP or DISCARD. Opening a detail and then tab-navigating
+away **clears** the detail state first, so re-entering the host lands on the list, not a
+stale detail.
+
+```mermaid
+flowchart TD
+    accTitle: Post-onboarding screen navigation map
+    accDescr: Capture, Patterns, and History are mutually reachable via the bottom navigation on every primary screen. Tapping Record enters a modal Recording state with no menu or bottom nav; Discard returns to idle Capture and Stop persists the entry and opens its detail in the History stack. The hamburger menu opens Settings from any primary screen and toggles closed back to the origin screen. Settings Model row and the Capture AppTop status pill both open the Model Status screen, which has the bottom nav with no active tab. History and Patterns open an entry or pattern detail; navigating to another tab from a detail clears the detail state so the host returns to its list.
+
+    subgraph TABS["Bottom nav — mutually reachable"]
+        CAP["Capture (Idle)"]
+        PAT["Patterns list"]
+        HIS["History list"]
+    end
+
+    CAP -- "tap Record" --> REC["Recording — MODAL<br/>no menu · no bottom nav"]
+    REC -- "DISCARD (silent)" --> CAP
+    REC -- "STOP · FILE IT" --> SUB["brief filing spinner<br/>(call-1 in flight)"]
+    SUB -- "entry persists" --> ED["Entry detail<br/>(History stack · extracting → resolved)"]
+
+    HIS -- "tap row" --> ED
+    PAT -- "tap card" --> PD["Pattern detail"]
+    PD -- "tap source entry" --> ED
+    ED -- "back / tab-nav<br/>(clears detail state)" --> HIS
+    PD -- "back / tab-nav<br/>(clears detail state)" --> PAT
+
+    CAP -- "AppTop status pill" --> MS["Model Status<br/>(bottom nav · no active tab)"]
+    CAP -- "menu" --> SET["Settings"]
+    PAT -- "menu" --> SET
+    HIS -- "menu" --> SET
+    SET -- "menu again (toggles closed → origin)" --> TABS
+    SET -- "Model status row" --> MS
+    MS -- "back" --> SET
+    MS -- "bottom nav" --> TABS
+```

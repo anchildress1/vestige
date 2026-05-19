@@ -180,6 +180,13 @@ Status pill if paused (no Wi-Fi): `DOWNLOAD PAUSED`
 > redesign and were removed. The model-not-ready state is now a big page spinner + the line
 > above; the diagnostic band is mic / inference only.
 
+> _Readiness-meaning note (2026-05-18, ADR-013 §Addendum):_ `Loading` is now an **honest
+> engine-warm** state, not a sub-frame flash. A full-size artifact on disk is no longer
+> `Ready` on its own — readiness holds at `Loading` (showing `Loading the model. One
+> moment.`) until `engine.initialize()` actually completes, so REC/typed stay gated while a
+> cold first inference would still stall. `Loading` legitimately covers both "no artifact"
+> and "artifact present, engine warming".
+
 ### Center — record action
 
 Record button label (when idle green dot, screen-reader content description):
@@ -212,6 +219,11 @@ Behavior (per `adrs/ADR-001-stack-and-build-infra.md` §Q8):
 - Visible only while `CaptureUiState` is `Recording`. Hidden once the user has tapped `STOP · FILE IT` (foreground call is in flight).
 
 There is no error copy, no destructive confirmation copy, no post-discard toast. Silent dismissal is the contract.
+
+> _Recording-modal note (2026-05-18):_ while `CaptureUiState` is `Recording` the screen is
+> **modal** — the AppTop hamburger menu and the bottom navigation are both removed (the
+> AppTop right slot is empty). An active mic capture cannot be routed away from; the only
+> exits are `STOP · FILE IT` and `DISCARD · DON'T SAVE`. The menu/nav return on idle.
 
 ### Type affordance (bottom)
 
@@ -253,42 +265,65 @@ card.
 
 ## Local Model Status (standalone screen)
 
-Reachable from settings or status indicator chevron in app shell.
+Reachable from the Settings **Model status** row or the tappable AppTop status pill.
 
-Header:
-> **Model status.**
+> _Final-polish reconciliation (2026-05-18):_ rebuilt to the scoreboard comp
+> `poc/model-detail-final.png`. The plain `Model status.` header + the bullet status-state
+> list below are superseded by the structure here. Strings are verbatim from
+> `app/src/main/res/values/strings.xml` (`model_status_*`). The earlier _Story 4.4
+> reconciliation_ note is retained immediately below as historical context for why the v1
+> runtime has only four states.
 
-Status states:
+> _Story 4.4 reconciliation (historical):_ the v1 runtime has four `ModelReadiness` states —
+> `Ready` / `Loading` / `Downloading(percent)` / `Paused`. The screen renders `Paused` as
+> **`Download stalled.`**; a user-initiated **Re-download** surfaces as **Downloading** (not a
+> distinct `Updating`); a failed re-download falls back to `Loading`. `Stalled` / `Failed` /
+> `Updating` are not separate runtime states in v1.
 
-- **Ready:** `Model ready. Running locally.`
-- **Loading:** `Loading model.`
-- **Downloading:** `Downloading model. Wi-Fi only.` + progress
-- **Stalled:** `Download stalled.` + Retry button
-- **Failed:** `Network choked.` + Retry button
-- **Updating:** `Updating model.` + progress
+Chrome:
+> Back eyebrow: `← SETTINGS · MODEL STATUS`
+> Headline: `MODEL STATUS` (ink) + `.` (coral) — annotated, same treatment as `SETTINGS.`
 
-> _Story 4.4 reconciliation:_ the v1 runtime has four `ModelReadiness` states — `Ready` / `Loading` / `Downloading(percent)` / `Paused`. The screen renders `Paused` as **`Download stalled.`**; a user-initiated **Re-download** surfaces as **Downloading** (not a distinct `Updating`); a failed re-download falls back to `Loading` (no model on disk — honest). `Stalled` / `Failed` / `Updating` are not separate runtime states in v1 and were not spun up as such (demo-gate / no new abstraction layer). The confirm dialogs use the canonical §"Destructive Confirmations" wording below, not this section's shorter summary.
+Status band (lime border + eyebrow when Ready, coral otherwise; polite live region):
+> Eyebrow — Ready: `● MODEL READY · RUNNING LOCALLY`
+> Eyebrow — not Ready: `● MODEL · NOT READY`
+> Body — Ready: `Gemma 4 E4B · {size} · v{version} · On-device`
+> Body — Loading: `Loading model.`
+> Body — Downloading: `Downloading model. Wi-Fi only.` + ` {N}%`
+> Body — Paused: `Download stalled.`
 
-Detail line (always visible when loaded):
-> Gemma 4 E4B · 3.66 GB · v{version} · On-device
+Stat ribbon:
+> `{on-disk size}` · `ON DISK` — the *actual* artifact size; reads `0` once the model is
+> deleted (not the nominal 3.66 GB).
+> `0` · `CLOUD CALLS` (coral value — it is always zero, by design)
 
-Settings actions:
+On-device stack (`● ON-DEVICE STACK` eyebrow; rows carry a trailing dot — lime when Ready,
+coral when the model is gone, matching the band):
+> `Gemma 4 E4B` · `TRANSCRIBE + EXTRACT` · `{size}`
+> `EmbeddingGemma 300M` · `VECTOR · HYBRID` · `210 MB`
+> `LiteRT-LM 0.11.0` · `RUNTIME` · `NATIVE`
+
+Network-gate band (coral border):
+> Eyebrow: `● NETWORK GATE · SEALED`
+> Body: `Allowlist: model artifact host only.`
+
+Actions (outline buttons, disabled while a download is in flight):
 - **Re-download model**
 - **Delete model**
 
-Re-download confirm:
-> This downloads ~3.7 GB again. Wi-Fi recommended.
->
-> **Re-download** / Cancel
-
-Delete confirm:
-> Deletes the model file. The app won't work until re-downloaded.
->
-> **Delete model** / Cancel
+Both route through the shared scoreboard confirm card (`VestigeConfirmCard`) using the
+canonical §"Destructive Confirmations" wording below — not a Material dialog, not a shorter
+summary. Bottom nav is present (no tab active — Model Status is a menu destination).
 
 ---
 
 ## Persona Selector (settings)
+
+> _Final-polish reconciliation (2026-05-18):_ persona is **not** a standalone screen with a
+> Save button. It is the `PERSONA` section of the Settings screen — three name-only rows; the
+> active one carries a `SELECTED` tag and a lime treatment; tapping a row commits immediately
+> (no Save action, no descriptions — Settings is not the onboarding pitch). The header /
+> subhead / Save copy below is superseded and kept only as historical context.
 
 Header:
 > **Persona.**
@@ -296,13 +331,8 @@ Header:
 Subhead:
 > Default voice. Changes how the model talks back. You can override per capture.
 
-Persona descriptions (same as onboarding):
-- **Witness** — Observes. Names the pattern. Keeps quiet otherwise.
-- **Hardass** — Sharper. Less padding. More action.
-- **Editor** — Cuts vague words until they confess.
-
-Primary action:
-> **Save**
+Selected-row tag:
+> SELECTED
 
 ---
 
@@ -560,6 +590,17 @@ Section: **About**
 - License
 
 > _Story 4.9 reconciliation:_ the screen header is `Settings.` (this section named no header string — derived to match the `Model status.` screen-header pattern). The **Model** section is a single **Model status** row that opens the Story 4.4 screen; Re-download / Delete model live there with their canonical confirm dialogs, so they are reached by delegation rather than duplicated here (one destructive-confirm implementation, per KISS / no-duplicate-flows). The **Persona** section lists the three names only (no descriptions — settings is not the onboarding pitch). Export uses the Storage Access Framework `CreateDocument` picker — no `FileProvider`, no storage permission (`AGENTS.md` storage constraint). Delete-all wipes ObjectBox (entry/pattern/tag/callout) + every markdown file + onboarding prefs, then returns to the first-run flow.
+
+> _Final-polish reconciliation (2026-05-18):_ shipped specifics on top of the above —
+> back eyebrow `← BACK · SETTINGS`; section eyebrows `PERSONA` / `DATA` / `MODEL` / `ABOUT`
+> each lead with a **gray** dot (neutral section marker, not a live-status signal); every
+> row uses one uniform trailing `→` glyph (the Model status row matches the rest — no
+> special chevron). The active persona row carries a `SELECTED` tag. The **About** section
+> folds the license **under** the version line as a second dim line: `Version` / `v{version}`
+> with `Polyform Shield 1.0.0` beneath it; `Source code` opens the GitHub repo. Delete-all
+> uses the shared scoreboard `VestigeConfirmCard` (armed only when the field reads `DELETE`).
+> Tapping the AppTop menu button while Settings is open **closes** Settings and returns to
+> the screen it was opened from (Capture / Patterns / History) — the menu toggles.
 
 ### Locked v1 behavior (not configurable)
 

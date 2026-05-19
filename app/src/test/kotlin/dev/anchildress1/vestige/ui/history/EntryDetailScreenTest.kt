@@ -5,6 +5,7 @@ import androidx.compose.ui.test.assertHasClickAction
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -201,6 +202,17 @@ class EntryDetailScreenTest {
         composeRule.onAllNodesWithTag("entry_field_grid").assertCountEquals(0)
         composeRule.onAllNodesWithTag("entry_extracting").assertCountEquals(0)
         composeRule.onNodeWithText("debug fixture without receipts").assertExists()
+    }
+
+    @Test
+    fun `fresh detail never renders known demo fixture phrases`() {
+        val id = createCompleted("just recorded this now")
+        setDetail(id)
+        composeRule.onAllNodesWithText("Tuesday Meetings", substring = true).assertCountEquals(0)
+        composeRule.onAllNodesWithText(
+            "Fourth entry mentions Tuesday meetings. State before: cruising. After: crashed.",
+            substring = true,
+        ).assertCountEquals(0)
     }
 
     @Test

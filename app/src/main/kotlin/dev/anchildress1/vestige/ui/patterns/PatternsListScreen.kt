@@ -24,7 +24,6 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.withStyle
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.anchildress1.vestige.model.Persona
@@ -198,31 +197,3 @@ private fun SectionHeader(section: PatternSection) {
         modifier = Modifier.padding(top = 4.dp, bottom = 4.dp),
     )
 }
-
-@Preview
-@Composable
-private fun PatternsListPreview() {
-    VestigeTheme {
-        PatternsLoadedList(
-            cards = listOf(
-                PatternCardUi(
-                    patternId = "abc",
-                    kindLabel = "TEMPLATE RECURRENCE",
-                    title = "Tuesday Meetings",
-                    observation = "Fourth entry mentions Tuesday meetings. State before: cruising. After: crashed.",
-                    supportingCount = 4,
-                    totalEntryCount = 12,
-                    lastSeenLabel = "May 7",
-                    section = PatternSection.ACTIVE,
-                    traceHits = PREVIEW_TRACE_HITS,
-                    availableActions = setOf(PatternAction.DROP, PatternAction.SKIP),
-                ),
-            ),
-            onCardClick = {},
-            actions = PatternActionCallbacks(onDrop = {}, onSkip = {}, onRestart = {}),
-        )
-    }
-}
-
-// Mirrors the POC's `traceHits` for the Tuesday Meetings sample so the @Preview matches.
-private val PREVIEW_TRACE_HITS = setOf(3, 10, 17, 24, 26, 28)

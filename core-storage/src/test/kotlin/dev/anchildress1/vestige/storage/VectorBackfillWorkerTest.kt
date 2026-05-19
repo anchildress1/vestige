@@ -47,8 +47,9 @@ class VectorBackfillWorkerTest {
 
     @After
     fun tearDown() {
-        boxStore.close()
-        BoxStore.deleteAllFiles(dataDir)
+        // runTest leaves ObjectBox readers owned by coroutine runner threads during @After.
+        // Force-closing the in-memory store here logs non-owner transaction destruction.
+        boxStore.closeThreadResources()
     }
 
     @Test

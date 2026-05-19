@@ -804,7 +804,7 @@ class AppContainerTest {
         var attempts = 0
         val engine = mockk<LiteRtLmEngine>(relaxed = true)
         coEvery { engine.initialize() } coAnswers {
-            if (attempts++ == 0) error("warm boom")
+            if (attempts++ == 0) throw FakeWarmupFailure()
             0
         }
         val container = AppContainer(
@@ -829,6 +829,47 @@ class AppContainerTest {
         advanceUntilIdle()
         assertEquals(ModelReadiness.Ready, container.modelReadinessFlow.value)
         coVerify(exactly = 2) { engine.initialize() }
+    }
+
+    @Test
+    fun `stale warmup cannot publish Ready after model delete starts`(@TempDir tempRoot: File) = runTest {
+        val modelFile = File(tempRoot, "main-model.litertlm").apply { writeText("xx") }
+        val artifactStore = fakeArtifactStore(artifactFile = modelFile, expectedByteSize = 2L)
+        val context = mockk<Context>(relaxed = true) {
+            every { filesDir } returns tempRoot
+            every { cacheDir } returns File(tempRoot, "cache").apply { mkdirs() }
+        }
+        val warmGate = CompletableDeferred<Unit>()
+        val engine = mockk<LiteRtLmEngine>(relaxed = true)
+        coEvery { engine.initialize() } coAnswers {
+            warmGate.await()
+            0
+        }
+        val container = AppContainer(
+            applicationContext = context,
+            boxStoreFactory = { mockk<BoxStore>(relaxed = true) },
+            markdownStoreFactory = { mockk<MarkdownEntryStore>(relaxed = true) },
+            modelPathLoader = { modelFile.absolutePath },
+            backgroundEngineFactory = { _, _ -> engine },
+            mainModelArtifactStoreFactory = { _, _, _ -> artifactStore },
+            recoveredEntryIdsLoader = { emptyList() },
+            foregroundServiceIntentFactory = { Intent("dev.anchildress1.vestige.TEST_START") },
+            foregroundServiceStarter = {},
+            scope = this,
+        )
+
+        container.refreshModelReadiness()
+        advanceUntilIdle()
+        assertEquals(ModelReadiness.Loading, container.modelReadinessFlow.value)
+
+        container.deleteMainModel()
+        advanceUntilIdle()
+        warmGate.complete(Unit)
+        advanceUntilIdle()
+
+        assertFalse(modelFile.exists())
+        assertEquals(ModelReadiness.Loading, container.modelReadinessFlow.value)
+        coVerify(exactly = 1) { engine.initialize() }
     }
 
     @Test
@@ -1309,6 +1350,8 @@ class AppContainerTest {
     private companion object {
         val CAPTURED_AT: ZonedDateTime = ZonedDateTime.of(2026, 5, 11, 7, 21, 24, 0, ZoneId.of("America/New_York"))
     }
+
+    private class FakeWarmupFailure : Exception("warm boom")
 
     @Test
     fun `launchVectorBackfillIfReady runs cleanup-only work without probing artifact state`() = runTest {

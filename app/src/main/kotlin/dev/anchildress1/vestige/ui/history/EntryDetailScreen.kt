@@ -126,13 +126,19 @@ private fun EntryDetailContent(model: EntryDetailUiModel, onBack: () -> Unit, mo
             FollowUpCard(personaName = model.personaName, body = model.followUp)
         }
 
-        if (model.extractionComplete) {
-            ThreeLensRead()
-            FieldGrid()
-        } else {
-            ExtractingBand()
-            LensSkeletonRow()
-            FieldSkeletonGrid()
+        when {
+            model.extractionComplete -> {
+                ThreeLensRead()
+                FieldGrid()
+            }
+
+            model.extractionFailed -> ExtractionFailedBand()
+
+            else -> {
+                ExtractingBand()
+                LensSkeletonRow()
+                FieldSkeletonGrid()
+            }
         }
 
         EntryTagsRow(tags = model.tags)
@@ -262,6 +268,26 @@ private fun ExtractingBand() {
             EyebrowE(text = EntryDetailSeed.EXTRACTING_EYEBROW, color = colors.lime)
             Text(text = EntryDetailSeed.EXTRACTING_BODY, style = VestigeTheme.typography.p, color = colors.dim)
         }
+    }
+}
+
+@Composable
+private fun ExtractionFailedBand() {
+    val colors = VestigeTheme.colors
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(colors.s1)
+            .testTag("entry_extracting_failed")
+            .semantics(mergeDescendants = true) {
+                liveRegion = LiveRegionMode.Polite
+                contentDescription = "${EntryDetailSeed.FAILED_EYEBROW}. ${EntryDetailSeed.FAILED_BODY}"
+            }
+            .padding(horizontal = 14.dp, vertical = 12.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        EyebrowE(text = EntryDetailSeed.FAILED_EYEBROW, color = colors.coral)
+        Text(text = EntryDetailSeed.FAILED_BODY, style = VestigeTheme.typography.p, color = colors.dim)
     }
 }
 

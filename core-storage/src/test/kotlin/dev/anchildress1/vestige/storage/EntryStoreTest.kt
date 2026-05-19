@@ -219,13 +219,17 @@ class EntryStoreTest {
     }
 
     @Test
-    fun `attachFollowUp drops a late follow-up once the row is terminal`() {
+    fun `attachFollowUp preserves a late follow-up once the row is completed`() {
         val id = entryStore.createPendingEntry(SAMPLE_TEXT, SAMPLE_INSTANT)
         entryStore.completeEntry(id, resolvedSample(), TemplateLabel.AFTERMATH)
 
-        entryStore.attachFollowUp(id, "too late")
+        entryStore.attachFollowUp(id, "still valid")
 
-        assertNull(boxStore.boxFor<EntryEntity>().get(id).followUpText)
+        val row = boxStore.boxFor<EntryEntity>().get(id)
+        assertEquals("still valid", row.followUpText)
+        assertEquals(ExtractionStatus.COMPLETED, row.extractionStatus)
+        val mdFile = File(File(markdownDir, "entries"), row.markdownFilename)
+        assertTrue(mdFile.readText().contains("follow_up: still valid"))
     }
 
     @Test

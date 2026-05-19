@@ -183,8 +183,8 @@ dependencies {
 
 // ObjectBox loads its JNI .so once per JVM via System.load; a second test class in the same
 // JVM can't re-System.load it, leaving NativeLibraryLoader in a poisoned state. The normal unit
-// task excludes these and a split forkEvery=1 task runs them. Kover needs most of them inline for
-// coverage, but one PatternsHostTest method fails under Kover instrumentation and stays split.
+// task excludes these and a split forkEvery=1 task runs them. Kover runs them inline with
+// forkEvery=1 so coverage stays above the gate.
 val objectBoxBackedAppTests = setOf(
     "dev.anchildress1.vestige.AppContainerTest",
     "dev.anchildress1.vestige.debug.DebugPatternSeederTest",
@@ -204,22 +204,22 @@ val objectBoxBackedAppTests = setOf(
 val isKoverTaskRequested = gradle.startParameter.taskNames.any {
     it.contains("kover", ignoreCase = true)
 }
-val koverSplitOnlyObjectBoxTests = setOf(
-    "*PatternsHostTest.*tab navigation*",
-)
 
 tasks.withType<Test>().configureEach {
     useJUnitPlatform()
 
     if (name == "testDebugUnitTest") {
-        val excludedTests = if (isKoverTaskRequested) koverSplitOnlyObjectBoxTests else objectBoxBackedAppTests
-        excludedTests.forEach { filter.excludeTestsMatching(it) }
-        if (isKoverTaskRequested) forkEvery = 1
-        finalizedBy("testDebugObjectBoxUnitTest")
+        if (isKoverTaskRequested) {
+            forkEvery = 1
+        } else {
+            objectBoxBackedAppTests.forEach { filter.excludeTestsMatching(it) }
+            finalizedBy("testDebugObjectBoxUnitTest")
+        }
     }
 }
 
 afterEvaluate {
+    if (isKoverTaskRequested) return@afterEvaluate
     val debugUnitTest = tasks.named<Test>("testDebugUnitTest")
 
     tasks.register<Test>("testDebugObjectBoxUnitTest") {
@@ -232,8 +232,6 @@ afterEvaluate {
         forkEvery = 1
         shouldRunAfter(debugUnitTest)
 
-        val includedTests = if (isKoverTaskRequested) koverSplitOnlyObjectBoxTests else objectBoxBackedAppTests
-        if (isKoverTaskRequested) outputs.upToDateWhen { false }
-        includedTests.forEach { filter.includeTestsMatching(it) }
+        objectBoxBackedAppTests.forEach { filter.includeTestsMatching(it) }
     }
 }

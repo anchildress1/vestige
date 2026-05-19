@@ -85,26 +85,26 @@ class PatternsListViewModelTest {
     }
 
     @Test
-    fun `empty state stays NO_ENTRIES at nine completed entries (one below the threshold)`() = runTest(testDispatcher) {
-        seedEntries(9)
+    fun `empty state stays NO_ENTRIES at two completed entries (one below the threshold)`() = runTest(testDispatcher) {
+        seedEntries(2)
         val vm = newViewModel()
         vm.state.test {
             val terminal = expectMostRecentItem()
             assertEquals(
-                PatternsListUiState.Empty(PatternsListUiState.EmptyReason.NO_ENTRIES, 9),
+                PatternsListUiState.Empty(PatternsListUiState.EmptyReason.NO_ENTRIES, 2),
                 terminal,
             )
         }
     }
 
     @Test
-    fun `empty state becomes NO_PATTERNS at the ten-entry threshold with no patterns`() = runTest(testDispatcher) {
-        seedEntries(10)
+    fun `empty state becomes NO_PATTERNS at the three-entry threshold with no patterns`() = runTest(testDispatcher) {
+        seedEntries(3)
         val vm = newViewModel()
         vm.state.test {
             val terminal = expectMostRecentItem()
             assertEquals(
-                PatternsListUiState.Empty(PatternsListUiState.EmptyReason.NO_PATTERNS, 10),
+                PatternsListUiState.Empty(PatternsListUiState.EmptyReason.NO_PATTERNS, 3),
                 terminal,
             )
         }

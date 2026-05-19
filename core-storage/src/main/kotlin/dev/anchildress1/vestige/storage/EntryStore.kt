@@ -172,6 +172,20 @@ class EntryStore(private val boxStore: BoxStore, private val markdownStore: Mark
             .use { it.find(0, 1).firstOrNull() }
     }
 
+    /** Single earliest completed entry, or `null` when none exist. Feeds the days-since-first stat. */
+    fun firstCompleted(): EntryEntity? = boxStore.callClosingThreadResources {
+        boxStore.boxFor<EntryEntity>()
+            .query()
+            .equal(
+                EntryEntity_.extractionStatus,
+                ExtractionStatus.COMPLETED.name,
+                QueryBuilder.StringOrder.CASE_SENSITIVE,
+            )
+            .order(EntryEntity_.timestampEpochMs)
+            .build()
+            .use { it.find(0, 1).firstOrNull() }
+    }
+
     /**
      * Append one observation to an already-completed entry's persisted list. Used by the
      * pattern-detection orchestrator when a callout fires after `completeEntry` has already

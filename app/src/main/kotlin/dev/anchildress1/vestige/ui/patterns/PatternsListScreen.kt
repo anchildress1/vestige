@@ -37,8 +37,6 @@ import dev.anchildress1.vestige.ui.components.accentedHeadline
 import dev.anchildress1.vestige.ui.theme.VestigeTheme
 import java.util.Locale
 
-private const val PATTERN_WINDOW_DAYS = "30"
-
 @Composable
 @Suppress("LongParameterList") // Screen seam: vm + open/persona/nav/menu callbacks + modifier.
 fun PatternsListScreen(
@@ -66,7 +64,9 @@ fun PatternsListScreen(
                 style = VestigeTheme.typography.displayBig,
                 modifier = Modifier.padding(horizontal = 18.dp, vertical = 12.dp),
             )
-            PatternsStatRibbon(state)
+            // Stats ribbon shows only when there is data to read — matches History's headline-
+            // then-content shape; an empty surface stays a single status band, not "0 of 0."
+            (state as? PatternsListUiState.Loaded)?.let { PatternsStatRibbon(it) }
             Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
                 when (val s = state) {
                     PatternsListUiState.Loading -> Unit
@@ -99,27 +99,22 @@ fun PatternsListScreen(
 private val SNACKBAR_NAV_CLEARANCE = 84.dp
 
 @Composable
-private fun PatternsStatRibbon(state: PatternsListUiState) {
-    val loaded = state as? PatternsListUiState.Loaded
-    val vestiges = loaded?.cards?.size ?: 0
-    val entries = when (state) {
-        is PatternsListUiState.Empty -> state.entryCount
-        is PatternsListUiState.Loaded -> state.cards.firstOrNull()?.totalEntryCount?.toInt() ?: 0
-        PatternsListUiState.Loading -> 0
-    }
+private fun PatternsStatRibbon(loaded: PatternsListUiState.Loaded) {
+    val vestiges = loaded.cards.size
+    val entries = loaded.entryCount
+    val days = loaded.daysSinceFirstCapped
     Box(
         modifier = Modifier
             .padding(horizontal = 18.dp, vertical = 8.dp)
             .semantics(mergeDescendants = true) {
-                contentDescription =
-                    "$vestiges vestiges, $entries entries, last $PATTERN_WINDOW_DAYS days"
+                contentDescription = "$vestiges vestiges, $entries entries, last $days days"
             },
     ) {
         StatRibbon(
             items = listOf(
                 StatItem(value = "$vestiges", label = "VESTIGES"),
                 StatItem(value = "$entries", label = "ENTRIES"),
-                StatItem(value = PATTERN_WINDOW_DAYS, label = "DAYS"),
+                StatItem(value = "$days", label = "DAYS"),
             ),
         )
     }
@@ -133,23 +128,22 @@ private fun PatternsEmptyState(empty: PatternsListUiState.Empty) {
     val body = stringResource(copy.bodyRes)
     // Status band per AGENTS.md: announced politely, no click action, single merged description
     // in the spoken (sentence-case) form — the display uppercases purely visually.
-    Column(
+    // Top-aligned form mirrors HistoryScreen's empty state — headline sits under the page title,
+    // not floated in the middle, so the two surfaces feel the same when there is no data.
+    Box(
         modifier = Modifier
             .fillMaxSize()
+            .padding(horizontal = 20.dp, vertical = 24.dp)
             .semantics(mergeDescendants = true) {
                 liveRegion = LiveRegionMode.Polite
                 contentDescription = "$header $body"
-            }
-            .padding(horizontal = 18.dp),
-        verticalArrangement = Arrangement.Center,
+            },
+        contentAlignment = Alignment.TopStart,
     ) {
-        Text(text = accentedHeadline(header, colors.ink, colors.lime), style = VestigeTheme.typography.displayBig)
-        Text(
-            text = body,
-            style = VestigeTheme.typography.p,
-            color = colors.dim,
-            modifier = Modifier.padding(top = 16.dp),
-        )
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(text = accentedHeadline(header, colors.ink, colors.lime), style = VestigeTheme.typography.displayBig)
+            Text(text = body, style = VestigeTheme.typography.p, color = colors.dim)
+        }
     }
 }
 

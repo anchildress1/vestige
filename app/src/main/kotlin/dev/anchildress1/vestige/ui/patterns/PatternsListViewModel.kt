@@ -61,7 +61,11 @@ class PatternsListViewModel(
         val totalEntries = entryStore.countCompleted()
         val visible = patternStore.findVisibleSortedByLastSeen()
         when {
-            visible.isNotEmpty() -> PatternsListUiState.Loaded(visible.toCards(totalEntries))
+            visible.isNotEmpty() -> PatternsListUiState.Loaded(
+                cards = visible.toCards(totalEntries),
+                entryCount = totalEntries.toInt(),
+                daysSinceFirstCapped = daysSinceFirstEntry(),
+            )
 
             // Below the detection threshold the honest copy is "keep recording", not
             // "nothing repeating" — there has not yet been a detection pass to find anything.
@@ -70,6 +74,12 @@ class PatternsListViewModel(
 
             else -> PatternsListUiState.Empty(PatternsListUiState.EmptyReason.NO_PATTERNS, totalEntries.toInt())
         }
+    }
+
+    private fun daysSinceFirstEntry(): Int {
+        val first = entryStore.firstCompleted() ?: return 1
+        val elapsedMs = (clock.millis() - first.timestampEpochMs).coerceAtLeast(0L)
+        return ((elapsedMs / MS_PER_DAY).toInt() + 1).coerceIn(1, PatternsListUiState.MAX_STAT_DAYS)
     }
 
     private fun List<PatternEntity>.toCards(totalEntries: Long): List<PatternCardUi> {
@@ -188,8 +198,10 @@ class PatternsListViewModel(
     private companion object {
         const val TAG = "PatternsListVM"
 
-        // The pattern detector runs once every 10 committed entries; below that there is
-        // nothing for it to have surfaced yet.
-        const val PATTERN_SURFACE_MIN_ENTRIES = 10L
+        // The pattern detector runs once every [DETECTION_INTERVAL] committed entries; below that
+        // there has not yet been a detection pass to surface anything.
+        const val PATTERN_SURFACE_MIN_ENTRIES = 3L
+
+        const val MS_PER_DAY: Long = 24L * 60 * 60 * 1000
     }
 }

@@ -71,7 +71,7 @@
     <!-- Empty states per docs/ux-copy.md §"Pattern List / Empty states". The VESTIGES/ENTRIES/
          DAYS counts now render as the shared StatRibbon, not a copy string. -->
     <string name="patterns_empty_day1_header">Nothing to read yet.</string>
-    <string name="patterns_empty_day1_body">Patterns surface after 10 entries. Keep recording.</string>
+    <string name="patterns_empty_day1_body">Patterns surface after 3 entries. Keep recording.</string>
     <string name="patterns_empty_none_header">No repeating pattern detected.</string>
     <string name="patterns_empty_none_body">The model looked. Nothing came back twice.</string>
     <string name="pattern_detail_seen_in">Seen in:</string>

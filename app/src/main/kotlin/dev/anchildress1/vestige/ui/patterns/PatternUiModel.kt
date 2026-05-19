@@ -49,7 +49,19 @@ sealed interface PatternsListUiState {
             require(entryCount >= 0) { "entryCount must be non-negative" }
         }
     }
-    data class Loaded(val cards: List<PatternCardUi>) : PatternsListUiState
+    data class Loaded(val cards: List<PatternCardUi>, val entryCount: Int, val daysSinceFirstCapped: Int) :
+        PatternsListUiState {
+        init {
+            require(entryCount >= 0) { "entryCount must be non-negative" }
+            require(daysSinceFirstCapped in 1..MAX_STAT_DAYS) {
+                "daysSinceFirstCapped must be in 1..$MAX_STAT_DAYS, got $daysSinceFirstCapped"
+            }
+        }
+    }
+
+    companion object {
+        const val MAX_STAT_DAYS: Int = 30
+    }
 
     enum class EmptyReason {
         /** Fewer than the detection threshold of entries — the Day-1 "keep recording" state. */

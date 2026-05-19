@@ -55,6 +55,11 @@ class FauxDataCopyGuardTest {
             Regex("""After:\s*crashed\.""", RegexOption.IGNORE_CASE),
             Regex("""\bThe Email\b"""),
             Regex(""""Tired"\s+drift""", RegexOption.IGNORE_CASE),
+            Regex("""battery yanked""", RegexOption.IGNORE_CASE),
+            Regex("""post-meeting energy crash""", RegexOption.IGNORE_CASE),
+            Regex("""matches Tue-Meetings""", RegexOption.IGNORE_CASE),
+            Regex("""rosy pocket""", RegexOption.IGNORE_CASE),
+            Regex("""go-pro""", RegexOption.IGNORE_CASE),
         )
     }
 }

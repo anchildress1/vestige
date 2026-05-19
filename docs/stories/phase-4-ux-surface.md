@@ -10,7 +10,7 @@
 
 ## Goal
 
-Wrap the app in a coherent, dark, atmospheric UX that meets the 10-second judge test — opening the app makes it obvious this is a *local AI cognition tracker*, not another journaling app. Onboarding handles the 3.66 GB model download gracefully. Capture, History, Patterns, and Settings are all reachable, navigable, and styled to the locked palette and typography. Three top error states have polished handling. Empty states use the locked microcopy. P1 features (per-capture persona selection, Re-eval/Reading screen if STT-D passed, Roast me bottom sheet if pattern evidence is solid) ship if scope holds.
+Wrap the app in a coherent, dark, atmospheric UX that meets the 10-second judge test — opening the app makes it obvious this is a *local AI cognition tracker*, not another journaling app. Onboarding handles the 3.66 GB model download gracefully. Capture, History, Patterns, and Settings are all reachable, navigable, and styled to the locked palette and typography. Three top error states have polished handling. Empty states use the locked microcopy. P1 extras (per-capture persona selection, Re-eval/Reading screen, Roast me bottom sheet) are deferred to v2 on this branch.
 
 **Output of this phase:** the demo-ready app on the reference device. Every primary surface from `design-guidelines.md` §"Screen Specs" is implemented to spec. Phase 5 (demo optimization) starts with a stable, polished app — not a half-styled scaffold.
 
@@ -19,7 +19,7 @@ Wrap the app in a coherent, dark, atmospheric UX that meets the 10-second judge 
 ## Phase-level acceptance criteria
 
 - [ ] Design language pass complete per ADR-011 §"Token additions": Scoreboard palette (`floor` / `deep` / `s1` / `s2` / `s3` / `ink` / `dim` / `faint` / `ghost` / `hair` / `lime` / `coral` / `teal` / `ember` + soft variants), three-font system (`Anton` display / `Space Grotesk` body / `JetBrains Mono` forensic), `sb*` motion keyframes, tape-grain surface texture on cards (halftone on call-outs), Scoreboard primitives (`BigStat` / `Pill` / `Delta` / `TraceBarE` / `StatRibbon` / `TickRule` / `EyebrowE` / `StatusDot` / `AppTop`) applied across all screens. Mist symbols deleted from `:app`. Contrast targets unchanged: body ≥4.5:1 (WCAG AA), primary content ≥7:1 (AAA).
-- [ ] Onboarding 3-screen hub flow per `ux-copy.md` §Onboarding works end-to-end on a fresh install on the reference S24 Ultra.
+- [x] Onboarding 3-screen hub flow per `ux-copy.md` §Onboarding works end-to-end on a fresh install on the reference S24 Ultra. _(Verified on-device.)_
 - [x] Model download UX handles Wi-Fi gating, real progress, retry on stall/failure, and survives app restart mid-download. _(Story 4.3 — ETA + stall watchdog + corrupt re-pull + cheap `probe()`; on-device restart-mid-download still a manual-check.)_
 - [x] Persistent Local Model Status surface exists and is reachable from app shell or settings; status is accurate. _(Story 4.4 — state-aware AppTop pill + Model Status screen + re-download/delete; also linked from Settings (4.9).)_
 - [ ] Capture screen polished per `poc/capture-*-final.png` — `AppTop` shell with `GEMMA 4 · LOCAL ONLY` ↔ `GEMMA 4 · LISTENING LIVE` swap (pill stays lime in both states; coral is REC button + destructive only — see `design-guidelines.md` §"Capture Screen / AppTop status pill"), big REC record button (idle: outline; recording: coral fill + pulsing `StatusDot` + live timer + `TickRule` 30s countdown), `sbBars` audio meter primitive while recording, transcription appearing post-inference on the GPU-only runtime path, entry transcript with muted user transcription + primary model follow-up (single-turn-per-capture per the STT-B v1 scope choice; see `adrs/ADR-005-stt-b-scope-and-v1-single-turn.md`). The Mist `MistHero` / `AudioMeter` halo composition is **not** built — superseded by ADR-011.
@@ -27,16 +27,18 @@ Wrap the app in a coherent, dark, atmospheric UX that meets the 10-second judge 
 - [x] Settings screen P0 scope works: persona default, export all entries (markdown + stored-data snapshot zip), delete all data, model status / re-download / delete. _(Story 4.9 — SAF zip export, typed-DELETE wipe, Model-section delegates to the 4.4 screen.)_
 - [x] Empty states across major screens use the locked microcopy from `ux-copy.md` §"Empty states". _(Story 4.10 — History-empty a11y fixed, pattern-detail no-sources copy reconciled, entry-detail zero-obs verified; peek/filter-empty deferred with the unshipped peek/chips.)_
 - [x] Top three error states polished: download fail/stall, inference timeout/fail, mic permission denied/unavailable. _(Story 4.11 — incl. new system-level mic-blocked + "Use typed entry instead"; download fail/stall via 4.3.)_
-- [ ] Notification permission flow ships in onboarding as the optional Wiring switch; notification tap target lands on the entry detail of the most-recent-in-flight extraction. Lifecycle fallback evaluation per ADR-004 §"Fallback Trigger" recorded by end of Phase 4 day 1 if invoked.
-- [ ] P1 stories shipped or explicitly punted to v1.5 with a recorded reason (scope held / didn't hold).
+- [ ] Notification permission flow ships in onboarding as the optional Wiring switch. / ~~Notification tap target lands on the entry detail of the most-recent-in-flight extraction.~~ Deferred to v2. Lifecycle fallback evaluation per ADR-004 §"Fallback Trigger" recorded by end of Phase 4 day 1 if invoked.
+- [x] P1 stories are explicitly resolved for this branch: / ~~ship in v1 scope~~ → deferred to v2 with recorded reasons (Stories 4.12, 4.13, 4.14).
 - [ ] Demo-gate UI polish pass (Story 4.15) complete — every post-onboarding surface consumes `AppTop` (now including a Settings gear icon top-right) + the Scoreboard primitives shipped in 4.1.5, no Material `TopAppBar` / `Button` / `OutlinedButton` / `TextButton` left in `:app/src/main/kotlin/dev/anchildress1/vestige/ui/**` for in-app affordances, and the primitive-reuse grep audit lands in the PR description.
-- [ ] POC-shaped data surfaces live (Stories 4.6 + 4.8) — History and Patterns keep their list screens, Entry Detail and Pattern Detail keep their dedicated layouts, and every slot binds to actual stored/model output instead of screenshot seed data. Pattern source rows deep-link to the matching Entry Detail by `entryId`; ADR-004 notification deep-link stays entry-detail-first for the completed or in-flight entry.
+- [ ] POC-shaped data surfaces live (Stories 4.6 + 4.8) — History and Patterns keep their list screens, Entry Detail and Pattern Detail keep their dedicated layouts, and every slot binds to actual stored/model output instead of screenshot seed data. Pattern source rows deep-link to the matching Entry Detail by `entryId`. / ~~ADR-004 notification deep-link stays entry-detail-first for the completed or in-flight entry.~~ Deferred to v2.
 
 ---
 
 ## Stories
 
 ### Story 4.1 — Design language pass
+
+**Status:** Done.
 
 **As** the AI implementor, **I need** the canonical visual system from `poc/design-review.md` applied as Compose theme tokens, primitives, and reusable styles, **so that** every Phase 4 UI story implements against shared tokens and primitives instead of re-deciding colors, type, or shapes per screen.
 
@@ -60,6 +62,8 @@ Checked bullets above are the historical record that the Mist tokens shipped to 
 ---
 
 ### Story 4.1.5 — Scoreboard design language re-pass
+
+**Status:** Done.
 
 **As** the AI implementor, **I need** the Scoreboard visual language from `poc/energy-tokens.jsx` + `poc/Energy Direction.html` translated into Compose theme tokens, primitives, and motion specs, **so that** every Phase 4 UI story from 4.2 onward implements against the Scoreboard system instead of the retired Mist system — and so the Mist symbols stop existing in `:app`.
 
@@ -91,14 +95,16 @@ Checked bullets above are the historical record that the Mist tokens shipped to 
 - [x] Notification permission ships as the optional `Notify` switch in Wiring, not as a dedicated screen. On Android 13+, tapping the row requests `POST_NOTIFICATIONS`; skipping leaves the row pending without blocking app entry. (`OnboardingHost` permission launcher + `notifSwitch`; pre-API-33 short-circuits to granted because channel registration in `VestigeApplication` covers older devices.)
 - [x] Screen 3 — Model download: hands off to Story 4.3. The screen is entered only for active/resumable downloads, auto-returns to Wiring when the artifact verifies, and restored no-Wi-Fi entries unwind back to Wiring instead of presenting a dead end. (`ModelDownloadPlaceholderScreen`; `OnboardingHost`; `OnboardingHostTest`.)
 - [x] Each onboarding screen uses one primary action and the design tokens from Story 4.1. (Shared `OnboardingScaffold`; `PersonaCard` uses `VestigeListCard` + `limeLeftRuleForActive` per ADR-011 — no per-screen color or shape overrides.)
-- [ ] Onboarding state survives backgrounding — closing the app between screens resumes at the same step. (Code: `OnboardingPrefs` now persists the current `OnboardingStep` synchronously on every transition; `OnboardingHost` rehydrates from prefs and refreshes Wi-Fi / model readiness on `ON_RESUME`. Verify on-device by backgrounding mid-flow and re-opening.)
-- [ ] After completion, opening the app skips onboarding and lands directly on Capture. (Code: `MainActivity` reads `OnboardingPrefs.isComplete` on every `setContent` and routes to the post-onboarding shell when true; the post-onboarding shell stays at `PhaseOneShell` until Story 4.5 polishes Capture. Verify on-device by completing onboarding once, force-stopping, and re-launching.)
+- [x] Onboarding state survives backgrounding — closing the app between screens resumes at the same step. (Code: `OnboardingPrefs` now persists the current `OnboardingStep` synchronously on every transition; `OnboardingHost` rehydrates from prefs and refreshes Wi-Fi / model readiness on `ON_RESUME`.)
+- [x] After completion, opening the app skips onboarding and lands directly on Capture. (Code: `MainActivity` reads `OnboardingPrefs.isComplete` on every `setContent` and routes to the post-onboarding shell when true; the post-onboarding shell stays at `PhaseOneShell` until Story 4.5 polishes Capture. Verified on-device by completing onboarding once, force-stopping, and re-launching.)
 
 **Notes / risks:** No "Welcome to your journey" copy anywhere, ever. `ux-copy.md` §"Things to NEVER Write" is the litmus test. The notification permission and channel registration plumbing land in Phase 2 Story 2.6.5; this story owns the user-facing Wiring switch only.
 
 ---
 
 ### Story 4.3 — Model download UX
+
+**Status:** Done.
 
 **As** the user during onboarding (or returning to settings), **I need** the model download to handle real progress, real ETA, retry on failure, pause/resume, and Wi-Fi gating gracefully, **so that** the 3.66 GB download — which is the literal first impression on every install — doesn't feel broken.
 
@@ -118,6 +124,8 @@ Checked bullets above are the historical record that the Mist tokens shipped to 
 
 ### Story 4.4 — Persistent Local Model Status surface
 
+**Status:** Done.
+
 **As** the user (and as a judge taking the 10-second test), **I need** the app shell to surface a local-AI status indicator that's always visible (or one-tap accessible from settings), **so that** "this is local AI" is legible at a glance, not hidden in a deep menu.
 
 **Done when:**
@@ -135,17 +143,19 @@ Checked bullets above are the historical record that the Mist tokens shipped to 
 
 ### Story 4.4.5 — Lifecycle fallback evaluation gate
 
+**Status:** Deferred to v2 (non-UI lifecycle track).
+
 **As** the AI implementor at the end of Phase 4 day 1, **I need** to evaluate the conditional foreground service state machine (Phase 2 Story 2.6.5) against the ADR-004 §"Fallback Trigger" criteria, **so that** if the state machine has bugs or eats more time than the Phase 4 budget allows, we switch to the Option 1 always-on fallback before it derails the rest of Phase 4.
 
 **Done when:**
-- [ ] At end of Phase 4 day 1 (or when Story 2.6.5 first surfaces a bug blocking Phase 4 UI work, whichever comes first), evaluate against ADR-004 §"Fallback Trigger" criteria 1–3.
-- [ ] If none of the trigger criteria fire: record `Trigger recorded: not invoked, evaluated {date}` inline in ADR-004 and proceed with the conditional state machine.
-- [ ] If any trigger criterion fires: record `Trigger recorded: invoked {date}, reason: {one-line reason}` inline in ADR-004 and apply the §"Fallback action" steps:
+- [x] / ~~At end of Phase 4 day 1 (or when Story 2.6.5 first surfaces a bug blocking Phase 4 UI work, whichever comes first), evaluate against ADR-004 §"Fallback Trigger" criteria 1–3.~~ Deferred to v2.
+- [x] / ~~If none of the trigger criteria fire: record `Trigger recorded: not invoked, evaluated {date}` inline in ADR-004 and proceed with the conditional state machine.~~ Deferred to v2.
+- [x] / ~~If any trigger criterion fires: record `Trigger recorded: invoked {date}, reason: {one-line reason}` inline in ADR-004 and apply the §"Fallback action" steps:~~ Deferred to v2.
   - Replace conditional state machine with `startForeground()` in `Application.onCreate()`.
   - Replace `stopForeground()` calls with no-ops.
   - Update notification text to `Local model active.` (and update `ux-copy.md` §"Loading States" + the Wiring `Notify` row copy in the same change).
-- [ ] If the fallback fires, also update Story 4.2's Wiring `Notify` done-when bullet and `ux-copy.md` §Onboarding to match the always-on framing.
-- [ ] Phase 4 day 1 ends with the lifecycle decision recorded one way or the other — no third state of "we'll figure it out later."
+- [x] / ~~If the fallback fires, also update Story 4.2's Wiring `Notify` done-when bullet and `ux-copy.md` §Onboarding to match the always-on framing.~~ Deferred to v2.
+- [x] / ~~Phase 4 day 1 ends with the lifecycle decision recorded one way or the other — no third state of "we'll figure it out later."~~ Deferred to v2.
 
 **Notes / risks:** This is a small but mandatory gate. The point is to prevent the state-machine implementation from quietly slipping into Phase 4 day 3 while UI work waits. If it's broken, switch fast and ship with the simpler model. ADR-004 explicitly designed for this fallback — using it is on-brand, not a regression.
 
@@ -176,8 +186,8 @@ Checked bullets above are the historical record that the Mist tokens shipped to 
 - [x] Type affordance: small `Type` button at the bottom of the screen per `ux-copy.md` §"Capture Screen / Type affordance". Expanding opens a text input with placeholder `What just happened.` and a `Log entry` action. _(`OrTypeButton` opens `TypeEntrySheet`; submit fires `viewModel.submitTyped(text)`.)_
 - [x] Discard affordance during recording per `adrs/ADR-001-stack-and-build-infra.md` §Q8: secondary `DISCARD · NO SAVE` text link below `STOP · FILE IT`, single-tap, no confirmation, no toast, returns to idle synchronously. `CaptureSession` exposes a `DISCARDED` terminal state reachable only from `RECORDING`. Audio buffer destroyed in the same call stack — no staging escape, no Gemma 4 call, no `Entry` row, no `Undo`. Hidden once foreground call is in flight. Copy: `ux-copy.md` §"Capture Screen — Discard". Visual register: `design-guidelines.md` §"Capture Screen / Discard". _(LiveLayout `DiscardLink`; VM `discard()` uses `cancelAndJoin` so AudioCapture's `releaseAndOverwrite` runs before Idle flips; CaptureSession.DISCARDED terminal in place with full pos/neg/err/edge tests.)_
 - [x] Persona switcher chrome: top-right pill `WITNESS ▾` (or active persona) per `ux-copy.md` §"Capture Screen / Status row". Tapping opens the persona selector. Per-capture selection (Story 4.12) hooks into this — the chosen persona applies to the next capture's foreground call. _(AppTop right-slot renders the persona pill in Idle (`{persona} ▾`). Hidden during Recording — persona is fixed for the duration of a take per `design-guidelines.md` §"Capture Screen / Recording-state changes". The tap-to-open selector sheet is the Story 4.12 hook; 4.5 ships the chrome.)_
-- [ ] Patterns peek: card per `ux-copy.md` §"Capture Screen / Patterns peek" showing `{N} active patterns` with a one-line teaser. Empty state when none. _(Deferred — out of scope for this PR per the Story 4.5 scope-split. Tracked for a follow-up branch.)_
-- [ ] Footer metadata: `Last entry · {date} · {duration}` per `ux-copy.md` §"Capture Screen / Footer metadata". History link. _(Deferred — out of scope for this PR per the Story 4.5 scope-split. Tracked for a follow-up branch.)_
+- [x] / ~~Patterns peek: card per `ux-copy.md` §"Capture Screen / Patterns peek" showing `{N} active patterns` with a one-line teaser. Empty state when none.~~ _(Deferred to v2.)_
+- [x] / ~~Footer metadata: `Last entry · {date} · {duration}` per `ux-copy.md` §"Capture Screen / Footer metadata". History link.~~ _(Deferred to v2.)_
 - [x] The dead-middle problem from earlier mockups is resolved: empty space carries faint mist-gradient atmosphere or surfaces ambient state (last entry summary, current pattern peek). No literal forgotten pixels. _(Scoreboard fills the surface with DateStrip + StatRibbon + Hero + REC + OrType; no dead-middle expanse remains. Footer "Last entry" + patterns-peek deferred to follow-up branches per the scope-split.)_
 
 **Notes / risks:** `design-guidelines.md` calls out the `WITNESS / Record.` precious-typography problem from the earlier mockup. Don't reintroduce centered persona labels above primary actions. The persona is named in the chrome dropdown; the center of the screen is for the action.
@@ -193,12 +203,12 @@ Checked bullets above are the historical record that the Mist tokens shipped to 
 - [x] Each row shows: timestamp (relative for recent, absolute for older), template label (the agent-emitted one), and a one-line snippet from `entry_text`. (`HistoryRow` via `HistorySummary.from`; date via `HistoryDateFormatter`; template label as `Pill`; snippet capped at 80 chars.) _(**Template-label `Pill` superseded — Story 4.16.** The label is structurally always `AUDIT`; the row drops the Pill and leads with the date. See §Story 4.16 + `backlog.md` §`archetype-template-labeling`.)_
 - [x] Rows are sorted reverse-chronologically by `timestamp`. (`EntryStore.listCompleted` uses `orderDesc(timestampEpochMs)`.)
 - [x] Tapping a row opens Entry Detail for that entry. `EntryDetailScreen.kt` stays: the POC screenshot is the layout contract, and the implementation binds real entry data into that contract instead of replacing it with inline expansion.
-- [ ] History and Patterns remain separate top-level destinations reachable from the app shell. A shared tab primitive is not required for v1 unless a future POC screenshot adds it.
+- [x] History and Patterns remain separate top-level destinations reachable from the app shell. A shared tab primitive is not required for v1 unless a future POC screenshot adds it.
 - [x] Empty state: per `ux-copy.md` §"Capture history (no entries yet)" — eyebrow `HISTORY`, header `No entries yet.`, body `First one takes 30 seconds.` (`HistoryEmptyState`; locked copy asserted in `HistoryScreenTest`.)
-- [x] No filter / search affordance in v1. Filter chips are P2 / v1.5 (`backlog.md` candidate, not yet logged — add only if user explicitly asks). (Absence asserted in `HistoryScreenTest`.)
-- [ ] Performance: list renders smoothly on the reference device with at least 100 entries (smoke test with seeded data). `LazyColumn` + `AnimatedVisibility` on expansion is the rendering path; the bounded dataset (≤ ~200 entries in a typical 30-day window) handles natively. Requires on-device verification.
-- [ ] Cross-view inbound nav: when a Pattern Detail source row is tapped, the app opens Entry Detail for the matched `entryId`. If the row originated from Pattern Detail, predictive back returns to the pattern surface.
-- [ ] Notification deep-link per ADR-004 §"Notification Contract": tapping the `Reading the entry.` system-shade notification opens Entry Detail for the just-completed or most-recent in-flight entry.
+- [x] No filter / search affordance in v1. Filter chips are deferred to v2 (`backlog.md` candidate, not yet logged — add only if user explicitly asks). (Absence asserted in `HistoryScreenTest`.)
+- [x] / ~~Performance: list renders smoothly on the reference device with at least 100 entries (smoke test with seeded data).~~ `LazyColumn` + `AnimatedVisibility` on expansion is the rendering path; the bounded dataset (≤ ~200 entries in a typical 30-day window) handles natively. _(Deferred for demo branch.)_
+- [x] Cross-view inbound nav: when a Pattern Detail source row is tapped, the app opens Entry Detail for the matched `entryId`. If the row originated from Pattern Detail, predictive back returns to the pattern surface.
+- [x] / ~~Notification deep-link per ADR-004 §"Notification Contract": tapping the `Reading the entry.` system-shade notification opens Entry Detail for the just-completed or most-recent in-flight entry.~~ _(Deferred to v2.)_
 
 **Notes / risks:** History is the third-most-touched destination after Capture and Patterns. Don't bloat it with metadata chips, relative-time animations, or pattern-membership badges (that's Patterns' job — see "responsibility without overlap" rule). Plain rows, restrained typography, fast scroll, one expansion per tap.
 
@@ -211,14 +221,14 @@ Checked bullets above are the historical record that the Mist tokens shipped to 
 **Done when:**
 - [x] Body shows: the entry transcript (one USER turn + one MODEL turn per the v1 single-turn lifecycle, user transcription muted, model follow-up primary, same treatment as Story 4.5).
 - [x] Source-link integration: tapping a pattern source from Pattern Detail navigates to this Entry Detail screen and highlights the target entry context.
-- [x] Notification tap target deep-links here per ADR-004 §"Notification Contract": tapping the system-shade `Reading the entry.` notification opens this screen for the most recent relevant entry.
+- [x] / ~~Notification tap target deep-links here per ADR-004 §"Notification Contract": tapping the system-shade `Reading the entry.` notification opens this screen for the most recent relevant entry.~~ _(Deferred to v2.)_
 - [x] Header title is the filed time from the real entry timestamp (`10:04 PM` style), not a template label or screenshot title.
 - [x] Tags row renders model-extracted tags as quiet chips. (`EntryDetailScreen.EntryTagsRow` binds `EntryDetailUiModel.tags` from persisted `EntryEntity.tags`; empty tag list omits the section.)
 - [x] Observation / receipt blocks render actual stored extraction fields: primary/secondary lens outputs, model follow-up, per-entry observations, and evidence references. (`EntryDetailScreen` now renders `entry_observations` from persisted `entryObservationsJson` including `text` + `evidence` + `fields`; extraction sections are gated by `ExtractionDisplay` and omitted when absent. Regression guard: `FauxDataCopyGuardTest` + fresh-entry assertion in `EntryDetailScreenTest`.)
-- [ ] Reading / Re-eval section is **deferred to Story 4.13** as P1 contingent.
-- [ ] Vocabulary chip cloud below the observation is **deferred to Story 4.13** if it ships at all (it ships only if STT-E passed; otherwise the observation copy carries the vocabulary observation in plain text).
-- [ ] Source-link nav remains entry-detail-first: pattern source rows navigate to the matched Entry Detail by `entryId`. The brief-highlight on the receiving entry is preserved.
-- [ ] Notification tap target remains entry-detail-first. Fallback (no in-flight entry) is History.
+- [x] / ~~Reading / Re-eval section is **deferred to Story 4.13** as P1 contingent.~~ Deferred to v2.
+- [x] Vocabulary evidence remains in receipts/observations. / ~~Vocabulary chip cloud below the observation is **deferred to Story 4.13** if it ships at all (it ships only if STT-E passed; otherwise the observation copy carries the vocabulary observation in plain text).~~ Deferred to v2.
+- [x] Source-link nav remains entry-detail-first: pattern source rows navigate to the matched Entry Detail by `entryId`. The brief-highlight on the receiving entry is preserved.
+- [x] / ~~Notification tap target remains entry-detail-first. Fallback (no in-flight entry) is History.~~ _(Deferred to v2.)_
 
 **Notes / risks:** Don't show audio waveform or play-back controls — audio doesn't persist. The entry detail is the *text and receipts* view. Per `design-guidelines.md` §"Entry transcript", the user's transcribed words show but never as a waveform. The main risk is data binding drift: if a POC slot has no runtime field, either wire the real field or omit the slot; never backfill it with screenshot prose.
 
@@ -229,13 +239,13 @@ Checked bullets above are the historical record that the Mist tokens shipped to 
 **As** the user, **I need** the Patterns list and Pattern Detail layouts from `poc/patterns-final.png`, `poc/pattern-lifecycle-final.png`, and `poc/pattern-detail-final.png` to show actual stored pattern evidence, **so that** a pattern claim is sourceable instead of decorative. Patterns owns clustered evidence; Entry Detail owns full transcripts.
 
 **Done when:**
-- [ ] Pattern list header includes the `Roast me` button per `ux-copy.md` §"Pattern List / Action button" (the Roast bottom sheet itself is Story 4.14, P1 contingent — the button can land here as a no-op or hidden state if Story 4.14 doesn't ship). _(Punted — Story 4.14 has not shipped. Per `AGENTS.md` "don't ship dead UI" the button is omitted, not stubbed. Lands when 4.14 lands.)_
-- [ ] Filter chips: `All · Active · Skipped · Closed · Dropped` per `ux-copy.md` §"Pattern List / Filter chips" + `spec-pattern-action-buttons.md` §P1.1. Default `All` (filter chips are P1 — defer until P0 actions stable). _(Punted to v1.5 — spec §P1.1 explicitly forbids implementing before P0 ships; P0 ships in this PR. Section structure is the base it sits on.)_
+- [x] / ~~Pattern list header includes the `Roast me` button per `ux-copy.md` §"Pattern List / Action button"~~ _(Deferred to v2 with Story 4.14; no dead button ships in v1.)_
+- [x] / ~~Filter chips: `All · Active · Skipped · Closed · Dropped` per `ux-copy.md` §"Pattern List / Filter chips" + `spec-pattern-action-buttons.md` §P1.1.~~ _(Deferred to v2; v1 remains chronological/state sections without chip filtering.)_
 - [ ] Empty states per `ux-copy.md` §"Pattern List / Empty states" + `spec-pattern-action-buttons.md` §P1.2:
   - [x] Fewer than 10 entries (Day 1): eyebrow `VESTIGES · 0 ENTRIES · 30 DAYS`, header `Nothing to read yet.`, body `Patterns surface after 10 entries. Keep recording.` (`NO_ENTRIES` reason fires at `countCompleted() < 10`; structured eyebrow/header/body via `emptyCopyFor`; eyebrow count parameterized — live count, not literal 0 — per the design-guidelines live-count intent. Band a11y: merged `contentDescription` + `liveRegion`, no click action.)
   - [x] Has entries, no pattern detected: header `No repeating pattern detected.`, body `The model looked. Nothing came back twice.` (`NO_PATTERNS` reason, no eyebrow.)
-  - Active tab empty (all snoozed or closed): eyebrow `ACTIVE`, header `Nothing active.`, sub `{N} snoozed · {N} closed` _(Punted with filter chips — spec §P1.2 is the chip-selected-Active state; no chip surface in P0.)_
-  - Filter returns nothing: `Nothing matches.` _(Punted with filter chips — no filter surface in P0.)_
+  - [x] / ~~Active tab empty (all snoozed or closed): eyebrow `ACTIVE`, header `Nothing active.`, sub `{N} snoozed · {N} closed`~~ _(Deferred with filter chips to v2.)_
+  - [x] / ~~Filter returns nothing: `Nothing matches.`~~ _(Deferred with filter chips to v2.)_
 - [x] Pattern card uses the lime left-rule (`limeLeftRuleForActive`) per ADR-011 + `design-guidelines.md` §"Pattern card" only on cards with `state = ACTIVE`. Snoozed / closed / dropped cards lose the rule. (Gated on `card.section == PatternSection.ACTIVE`; DROPPED cards additionally render at reduced alpha per spec §Visual.)
 - [x] Pattern card embeds the `TraceBarE` primitive per ADR-011 §"New primitives" + `poc/energy-tokens.jsx`. Lime accent + peak on active; ember on snoozed; teal on closed / dropped; teal-dim on below-threshold (already wired in Story 4.1.5 via `patternCardTraceBarStyleFor`). (Preserved through the rename via `cardSectionToneFor`; SKIPPED→ember, CLOSED/DROPPED→teal.)
 - [x] Pattern action surfaces — overflow menu + Pattern Detail action row — use `Skip` / `Drop` on ACTIVE patterns and `Restart` on non-active patterns per `ux-copy.md` §"Pattern List / Card actions" + `spec-pattern-action-buttons.md` §P0.1 / P0.3. `Mark resolved` stays system-only. `Restart` undo on a skipped pattern must restore the original `snoozedUntil`, not mint a fresh window. (`PatternAction` = `{DROP, SKIP, RESTART}`; the user `markResolved` path retired per ADR-003 Addendum 2026-05-13; `restart` undo restores `previousSnoozedUntil`.)
@@ -258,6 +268,8 @@ Checked bullets above are the historical record that the Mist tokens shipped to 
 
 ### Story 4.9 — Settings screen (P0 scope)
 
+**Status:** Done.
+
 **As** the user, **I need** a settings screen with the v1 P0 scope from `PRD.md` §Phase 4 / `ux-copy.md` §Settings — persona default, export all entries (markdown + stored-data snapshot zip), delete all data, model status / re-download / delete — **so that** the privacy and data-sovereignty claims have implementations a judge can poke.
 
 **Done when:**
@@ -279,12 +291,14 @@ Checked bullets above are the historical record that the Mist tokens shipped to 
 
 ### Story 4.10 — Empty states across major screens
 
+**Status:** Done.
+
 **As** the user, **I need** every primary screen to render gracefully when it has no data — first launch, no entries, no patterns, filter returning nothing — using the locked microcopy from `ux-copy.md` §"Empty States", **so that** the app never shows a blank surface or a generic "Nothing here yet :)".
 
 **Done when:**
 - [x] Capture screen patterns peek empty: `Nothing repeating yet.` _(The patterns-peek surface itself was deferred out of Story 4.5 by its scope-split (tracked for a follow-up branch); the locked copy ships **with** the peek when the peek lands. Not a P0 regression — there is no peek surface to render empty in this build.)_
 - [x] History list empty. _(Implemented copy is `No entries yet.` / `First one takes 30 seconds.` — verbatim from `ux-copy.md` §"Empty States · Capture history". The story's inline `Nothing on file.` token is pre-`ux-copy` drift; `ux-copy.md` is the text authority and wins. Story 4.10 fix: `HistoryEmptyState` was a11y-noncompliant — added `liveRegion=Polite` + merged `contentDescription`, no role / no click, matching the Pattern-list empty band; unit-asserted.)_
-- [x] Pattern list empty (per state). _(The two P0 states shipped in Story 4.8 — `Nothing to read yet.` (<10 entries) and `No repeating pattern detected.` — render with band a11y. `Nothing active.` / `Nothing matches.` are coupled to the filter chips, which Story 4.8 explicitly punted to v1.5; not P0 here.)_
+- [x] Pattern list empty (per state). _(The two P0 states shipped in Story 4.8 — `Nothing to read yet.` (<10 entries) and `No repeating pattern detected.` — render with band a11y. `Nothing active.` / `Nothing matches.` are coupled to the filter chips, which Story 4.8 explicitly punted to v2; not P0 here.)_
 - [x] Entry detail zero-observations omits gracefully. _(`EntryDetailScreen.EntryReadingCard` early-returns when `energyDescriptor == null && observations.isEmpty()` — the section is omitted entirely, no "No observations" sad-face. Already correct; verified.)_
 - [x] Settings sections are never empty. _(Persona/Data/Model/About always render their action rows by construction — Story 4.9.)_
 - [x] Onboarding has no empty states — sequential hub flow only. _(Unchanged.)_
@@ -296,6 +310,8 @@ Checked bullets above are the historical record that the Mist tokens shipped to 
 ---
 
 ### Story 4.11 — Top three error states
+
+**Status:** Done.
 
 **As** the user, **I need** the three most-likely failure modes — model download fail/stall, inference timeout/fail, mic permission denied/unavailable — to render clear error states with retry affordances per `ux-copy.md` §"Error States", **so that** the most predictable failure paths in the demo (or in real use) don't end the capture without a clear recovery path.
 
@@ -314,17 +330,19 @@ Checked bullets above are the historical record that the Mist tokens shipped to 
 
 ### Story 4.12 — P1: Per-capture persona selection
 
+**Status:** Deferred to v2. v1 uses Settings-selected default persona only.
+
 **Reframed from "P1: Per-session persona override"** by the STT-B v1 scope choice (see `adrs/ADR-005-stt-b-scope-and-v1-single-turn.md`, which amends `adrs/ADR-002-multi-lens-extraction-pattern.md` §"Multi-turn behavior"). The original story assumed mid-session persona switches on a multi-turn `CaptureSession`; v1 makes each `CaptureSession` single-use, so persona is selected *before* a fresh capture, not switched *during* an ongoing one.
 
 **As** the user, **I need** to choose a persona before each capture by tapping the persona dropdown chrome from Story 4.5, **so that** I can pick a different tone (Witness / Hardass / Editor) for an entry without leaving the capture screen and without affecting any prior entry's recorded persona.
 
 **Done when:**
-- [ ] Tapping the persona dropdown in the capture screen chrome opens a small selector (segmented control or list) with the three personas and a checkmark on the currently-selected one.
-- [ ] Selecting a different persona updates the next capture's active persona — `CaptureViewModel.setPersona(selectedPersona)` on the idle screen sets the persona the next `startRecording` carries into the foreground call. (`CaptureSession` was retired 2026-05-17; ADR-005 §Addendum.)
-- [ ] The chrome label updates to reflect the newly-selected persona (`WITNESS ▾` → `HARDASS ▾`).
-- [ ] Selection does not affect prior entries. Each saved entry's `Turn.persona` records the persona that authored it (Story 2.3 invariant).
-- [ ] The selection does not persist as a default — that's a separate Settings action (Story 4.9). It's per-capture-scoped.
-- [ ] Per-capture selection is **P1**: ships only if Phase 4 scope holds. If we're behind, this drops to v1.5 with the note "captures always use the Settings default persona; switch from Settings between captures."
+- [x] / ~~Tapping the persona dropdown in the capture screen chrome opens a small selector (segmented control or list) with the three personas and a checkmark on the currently-selected one.~~
+- [x] / ~~Selecting a different persona updates the next capture's active persona — `CaptureViewModel.setPersona(selectedPersona)` on the idle screen sets the persona the next `startRecording` carries into the foreground call. (`CaptureSession` was retired 2026-05-17; ADR-005 §Addendum.)~~
+- [x] / ~~The chrome label updates to reflect the newly-selected persona (`WITNESS ▾` → `HARDASS ▾`).~~
+- [x] / ~~Selection does not affect prior entries. Each saved entry's `Turn.persona` records the persona that authored it (Story 2.3 invariant).~~
+- [x] / ~~The selection does not persist as a default — that's a separate Settings action (Story 4.9). It's per-capture-scoped.~~
+- [x] / ~~Per-capture selection is **P1**: ships only if Phase 4 scope holds.~~ Deferred to v2; captures use the Settings default persona in v1.
 
 **Notes / risks:** Story 2.3 (post-fallback) already exposes the per-capture persona API. This is purely UI plumbing. The "switch mid-session" behavior the original story assumed no longer exists at the lifecycle level — the persona selector applies prospectively, not retroactively.
 
@@ -332,40 +350,44 @@ Checked bullets above are the historical record that the Mist tokens shipped to 
 
 ### Story 4.13 — P1: Reading / Re-eval on entry detail
 
-**Skipped if STT-D failed in Phase 2** (multi-lens architecture was dropped). If STT-D passed, this story is **P1**: ships only if Phase 4 scope holds.
+**Status:** Deferred to v2.
+
+**Deferred by scope decision on this branch.** Requirements below remain as the historical implementation spec for v2.
 
 **As** the user, **I need** an expandable "Reading" section on the entry detail screen that re-runs the 3-lens pipeline against the saved transcript and shows the diff per surface field, letting me accept the new shape or keep the original, **so that** I can re-process old entries with the latest prompts and see *how the model got here* per `concept-locked.md` §"Re-eval (\"Reading\")".
 
 **Done when:**
-- [ ] Entry detail screen shows a collapsed "Reading" section by default. Expanding opens the per-lens output view per `design-guidelines.md` §"Pattern Detail" (similar treatment).
-- [ ] An action affordance `Re-read this entry` (label per `ux-copy.md` §"Re-eval / Reading") triggers a fresh 3-lens pass via Story 2.6's background worker on the existing `entry_text`.
-- [ ] **Re-eval cost confirmation per `adrs/ADR-002-multi-lens-extraction-pattern.md` §Q3:** on the *second* re-read tap within 60 seconds, show the soft-confirm copy `Costs ~30s of inference. Continue?` from `ux-copy.md` §"Re-eval / Reading" before triggering another pipeline pass. First tap of the session goes through without the prompt.
-- [ ] During re-read, a placeholder per `ux-copy.md` §"Loading States — Roast generation" or similar shows. The user can leave the screen and the work continues in the background.
-- [ ] When the re-read completes, the per-lens outputs are shown side-by-side with the original convergence-resolved fields. Differences are highlighted.
-- [ ] User affordances: `Apply this read` (replaces the saved canonical fields with the new ones) or `Keep original` (discards the new read).
-- [ ] If the re-read converges to the same shape, copy: `Confirmed. Same shape.`
-- [ ] Vocabulary chips appear in the Reading section if STT-E passed and Story 3.4 shipped.
+- [x] / ~~Entry detail screen shows a collapsed "Reading" section by default. Expanding opens the per-lens output view per `design-guidelines.md` §"Pattern Detail" (similar treatment).~~
+- [x] / ~~An action affordance `Re-read this entry` (label per `ux-copy.md` §"Re-eval / Reading") triggers a fresh 3-lens pass via Story 2.6's background worker on the existing `entry_text`.~~
+- [x] / ~~**Re-eval cost confirmation per `adrs/ADR-002-multi-lens-extraction-pattern.md` §Q3:** on the *second* re-read tap within 60 seconds, show the soft-confirm copy `Costs ~30s of inference. Continue?` from `ux-copy.md` §"Re-eval / Reading" before triggering another pipeline pass. First tap of the session goes through without the prompt.~~
+- [x] / ~~During re-read, a placeholder per `ux-copy.md` §"Loading States — Roast generation" or similar shows. The user can leave the screen and the work continues in the background.~~
+- [x] / ~~When the re-read completes, the per-lens outputs are shown side-by-side with the original convergence-resolved fields. Differences are highlighted.~~
+- [x] / ~~User affordances: `Apply this read` (replaces the saved canonical fields with the new ones) or `Keep original` (discards the new read).~~
+- [x] / ~~If the re-read converges to the same shape, copy: `Confirmed. Same shape.`~~
+- [x] / ~~Vocabulary chips appear in the Reading section if STT-E passed and Story 3.4 shipped.~~
 
-**Notes / risks:** This is the architecture's most legible demo moment. If it doesn't ship, the technical walkthrough loses that beat. If we're tight on time, prioritize this over Story 4.14.
+**Notes / risks:** This was a high-value walkthrough beat, but it is intentionally deferred to v2 for this branch.
 
 ---
 
 ### Story 4.14 — P1: Roast me bottom sheet
 
-**Ships only if "normal pattern evidence is already solid"** (per `PRD.md` §P1) — meaning Story 4.8's pattern list and detail are demo-ready and we're not still chasing pattern-engine bugs. Otherwise, defer to v1.5 (`backlog.md` candidate, not yet logged — log if cut).
+**Status:** Deferred to v2.
+
+**Deferred by scope decision on this branch.** Requirements below remain as the historical implementation spec for v2.
 
 **As** the user, **I need** a Roast me bottom sheet from the patterns screen that produces 3-5 short, persona-flavored cuts on my full history per `design-guidelines.md` §"The Roast" and `ux-copy.md` §"The Roast", **so that** I have an on-demand "tell me what's repeating, sharper" moment that's distinct from the patterns list's data view.
 
 **Done when:**
-- [ ] Tapping `Roast me` from Story 4.8's pattern list header opens the `Sheet` primitive per `poc/design-review.md` §3.1 (`ModalBottomSheet` in Compose, scrim with backdrop blur, `vesSlide` in). `glow` accent.
-- [ ] Sheet header shows `{Persona} · Roast · {date}` in `JetBrains Mono` per design-review §2.2.
-- [ ] Body shows 3-5 lines (per `design-guidelines.md` §"The Roast — body") generated by a single model call composing the pattern data + persona system prompt with the explicit Roast tone instructions.
-- [ ] Lines are *cuts*, not data recitations per the test in `design-guidelines.md` §"The Roast — distinction" — *"Tuesday meetings have a body count"* not *"Tuesday meetings: four entries"*.
-- [ ] Footer: `Drawn from {N} entries · Last 30 days`, plus `Close` action only. Wipe-and-start-over is **not** in the Roast footer per `ux-copy.md` §"The Roast (modal bottom sheet)" — destructive flows live in Settings, not Roast.
-- [ ] Roast is ephemeral — not saved as a separate artifact. Regenerates fresh on each tap.
-- [ ] Insufficient data fallback: if fewer than 10 entries, show `Insufficient data. Come back when you've left more behind.` per `ux-copy.md` §"The Roast — empty fallback".
+- [x] / ~~Tapping `Roast me` from Story 4.8's pattern list header opens the `Sheet` primitive per `poc/design-review.md` §3.1 (`ModalBottomSheet` in Compose, scrim with backdrop blur, `vesSlide` in). `glow` accent.~~
+- [x] / ~~Sheet header shows `{Persona} · Roast · {date}` in `JetBrains Mono` per design-review §2.2.~~
+- [x] / ~~Body shows 3-5 lines (per `design-guidelines.md` §"The Roast — body") generated by a single model call composing the pattern data + persona system prompt with the explicit Roast tone instructions.~~
+- [x] / ~~Lines are *cuts*, not data recitations per the test in `design-guidelines.md` §"The Roast — distinction" — *"Tuesday meetings have a body count"* not *"Tuesday meetings: four entries"*.~~
+- [x] / ~~Footer: `Drawn from {N} entries · Last 30 days`, plus `Close` action only. Wipe-and-start-over is **not** in the Roast footer per `ux-copy.md` §"The Roast (modal bottom sheet)" — destructive flows live in Settings, not Roast.~~
+- [x] / ~~Roast is ephemeral — not saved as a separate artifact. Regenerates fresh on each tap.~~
+- [x] / ~~Insufficient data fallback: if fewer than 10 entries, show `Insufficient data. Come back when you've left more behind.` per `ux-copy.md` §"The Roast — empty fallback".~~
 
-**Notes / risks:** The hardest part is the system prompt that gets the model to produce *cuts*, not stats. Tune this against actual pattern data; if the model keeps producing flat data recitations, the prompt is wrong, not the architecture.
+**Notes / risks:** The hardest part is the system prompt that gets the model to produce *cuts*, not stats. This stays deferred to v2.
 
 ---
 
@@ -500,13 +522,14 @@ If a Phase 4 story starts pulling a backlog entry or a Phase 5/6 task, stop. Ref
 
 Phase 5 starts when all the following are true:
 
-- [ ] Stories 4.1 – 4.11 plus 4.4.5, 4.15, 4.16 are Done. Stories 4.6, 4.7, and 4.8 keep the POC-shaped list/detail navigation contract; checked bullets remain as historical evidence of what shipped before the data-binding correction. Stories 4.12 – 4.14 are P1; their state is recorded as Done or Punted-to-v1.5 with a reason.
+- [x] Completed stories are checked and marked Done: 4.1, 4.1.5, 4.3, 4.4, 4.9, 4.10, 4.11, 4.16.
+- [ ] Remaining story gate to start Phase 5: 4.2, 4.4.5, 4.5, 4.6, 4.7, 4.8, and 4.15 are Done; 4.12–4.14 are already / ~~v1~~ deferred to v2 with recorded reasons.
 - [ ] ADR-004 lifecycle decision recorded inline in the ADR (conditional state machine kept, or fallback applied with date + reason).
-- [ ] Onboarding flow runs end-to-end on a fresh install on the reference S24 Ultra.
+- [x] Onboarding flow runs end-to-end on a fresh install on the reference S24 Ultra.
 - [ ] Capture screen, History list, Entry Detail, Pattern List, Pattern Detail, Local Model Status, and Settings all load and navigate correctly.
 - [ ] Top 3 error states render correctly when triggered intentionally.
 - [ ] No regressions to STT-A / STT-B / STT-C / STT-D / STT-E outcomes from Phases 1–3.
 - [ ] APK installs cleanly on the reference device + at least one secondary device (any 2024+ flagship Android with 8+ GB RAM, 6+ GB free storage).
 - [ ] No new entries logged to `backlog.md` from Phase 4 work that change the v1 contract.
 
-If P1 stories were cut: log them in `backlog.md` (Story 4.13 → `reading-on-entry-detail` if it didn't ship; Story 4.14 → `roast-bottom-sheet` if it didn't ship). Update the dev.to post draft (Phase 6 work) to mention the v1.5 path for any cut features.
+If P1 stories were cut: log them in `backlog.md` (Story 4.13 → `reading-on-entry-detail` if it didn't ship; Story 4.14 → `roast-bottom-sheet` if it didn't ship). Update the dev.to post draft (Phase 6 work) to mention the v2 path for any cut features.

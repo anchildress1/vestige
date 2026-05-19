@@ -14,11 +14,7 @@ private val SOURCE_DATE_TIME: DateTimeFormatter = DateTimeFormatter.ofPattern("M
 
 private const val MILLIS_PER_DAY = 86_400_000L
 
-fun formatShortDate(
-    epochMs: Long,
-    zone: ZoneId = ZoneId.systemDefault(),
-    includeTime: Boolean = false,
-): String {
+fun formatShortDate(epochMs: Long, zone: ZoneId = ZoneId.systemDefault(), includeTime: Boolean = false): String {
     val instant = Instant.ofEpochMilli(epochMs).atZone(zone)
     return if (includeTime) SOURCE_DATE_TIME.format(instant) else SHORT_DATE.format(instant)
 }

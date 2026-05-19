@@ -55,6 +55,17 @@ private fun LensTone.color(): Color {
 }
 
 @Composable
+private fun statusTone(status: String): Color {
+    val colors = VestigeTheme.colors
+    return when (status) {
+        EntryDetailCopy.THREE_LENS_STATUS_CONFLICT -> colors.coral
+        EntryDetailCopy.THREE_LENS_STATUS_CANDIDATE -> colors.teal
+        EntryDetailCopy.THREE_LENS_STATUS_AMBIGUOUS -> colors.ember
+        else -> colors.lime
+    }
+}
+
+@Composable
 fun EntryDetailScreen(
     viewModel: EntryDetailViewModel,
     onBack: () -> Unit,
@@ -128,8 +139,8 @@ private fun EntryDetailContent(model: EntryDetailUiModel, onBack: () -> Unit, mo
 
         when {
             model.extractionComplete -> {
-                ThreeLensRead()
-                FieldGrid()
+                ThreeLensRead(status = model.lensStatus, lenses = model.lenses)
+                FieldGrid(fields = model.fields)
             }
 
             model.extractionFailed -> ExtractionFailedBand()
@@ -172,7 +183,7 @@ private fun FollowUpCard(personaName: String, body: String) {
 }
 
 @Composable
-private fun ThreeLensRead() {
+private fun ThreeLensRead(status: String, lenses: List<LensRead>) {
     val colors = VestigeTheme.colors
     Column(
         modifier = Modifier.fillMaxWidth().testTag("entry_three_lens"),
@@ -187,19 +198,19 @@ private fun ThreeLensRead() {
             verticalAlignment = Alignment.CenterVertically,
         ) {
             EyebrowE(
-                text = EntryDetailSeed.THREE_LENS_EYEBROW,
+                text = EntryDetailCopy.THREE_LENS_EYEBROW,
                 modifier = Modifier.weight(1f),
                 color = colors.lime,
                 maxLines = 1,
                 softWrap = false,
             )
-            EyebrowE(text = EntryDetailSeed.THREE_LENS_STATUS, color = colors.coral, maxLines = 1)
+            EyebrowE(text = status, color = statusTone(status), maxLines = 1)
         }
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            EntryDetailSeed.lenses.forEach { lens ->
+            lenses.forEach { lens ->
                 Column(
                     modifier = Modifier.weight(1f),
                     verticalArrangement = Arrangement.spacedBy(4.dp),
@@ -213,7 +224,7 @@ private fun ThreeLensRead() {
 }
 
 @Composable
-private fun FieldGrid() {
+private fun FieldGrid(fields: List<FieldRow>) {
     val colors = VestigeTheme.colors
     Column(
         modifier = Modifier
@@ -222,7 +233,7 @@ private fun FieldGrid() {
             .testTag("entry_field_grid"),
         verticalArrangement = Arrangement.spacedBy(0.dp),
     ) {
-        EntryDetailSeed.fields.forEach { field ->
+        fields.forEach { field ->
             Row(
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 12.dp),
                 horizontalArrangement = Arrangement.spacedBy(10.dp),
@@ -257,7 +268,7 @@ private fun ExtractingBand() {
             .semantics(mergeDescendants = true) {
                 liveRegion = LiveRegionMode.Polite
                 contentDescription =
-                    "${EntryDetailSeed.EXTRACTING_EYEBROW}. ${EntryDetailSeed.EXTRACTING_BODY}"
+                    "${EntryDetailCopy.EXTRACTING_EYEBROW}. ${EntryDetailCopy.EXTRACTING_BODY}"
             }
             .padding(horizontal = 14.dp, vertical = 12.dp),
         horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -265,8 +276,8 @@ private fun ExtractingBand() {
     ) {
         VestigeSpinner()
         Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            EyebrowE(text = EntryDetailSeed.EXTRACTING_EYEBROW, color = colors.lime)
-            Text(text = EntryDetailSeed.EXTRACTING_BODY, style = VestigeTheme.typography.p, color = colors.dim)
+            EyebrowE(text = EntryDetailCopy.EXTRACTING_EYEBROW, color = colors.lime)
+            Text(text = EntryDetailCopy.EXTRACTING_BODY, style = VestigeTheme.typography.p, color = colors.dim)
         }
     }
 }
@@ -281,13 +292,13 @@ private fun ExtractionFailedBand() {
             .testTag("entry_extracting_failed")
             .semantics(mergeDescendants = true) {
                 liveRegion = LiveRegionMode.Polite
-                contentDescription = "${EntryDetailSeed.FAILED_EYEBROW}. ${EntryDetailSeed.FAILED_BODY}"
+                contentDescription = "${EntryDetailCopy.FAILED_EYEBROW}. ${EntryDetailCopy.FAILED_BODY}"
             }
             .padding(horizontal = 14.dp, vertical = 12.dp),
         verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
-        EyebrowE(text = EntryDetailSeed.FAILED_EYEBROW, color = colors.coral)
-        Text(text = EntryDetailSeed.FAILED_BODY, style = VestigeTheme.typography.p, color = colors.dim)
+        EyebrowE(text = EntryDetailCopy.FAILED_EYEBROW, color = colors.coral)
+        Text(text = EntryDetailCopy.FAILED_BODY, style = VestigeTheme.typography.p, color = colors.dim)
     }
 }
 

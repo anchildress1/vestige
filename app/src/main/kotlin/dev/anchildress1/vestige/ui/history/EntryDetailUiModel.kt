@@ -1,9 +1,7 @@
 package dev.anchildress1.vestige.ui.history
 
-import android.util.Log
 import dev.anchildress1.vestige.model.ExtractionStatus
 import dev.anchildress1.vestige.storage.EntryEntity
-import org.json.JSONArray
 import java.time.ZoneId
 
 /** Immutable UI projection for a single entry detail. */
@@ -20,6 +18,9 @@ data class EntryDetailUiModel(
     val followUp: String?,
     val personaName: String,
     val energyDescriptor: String?,
+    val lensStatus: String,
+    val lenses: List<LensRead>,
+    val fields: List<FieldRow>,
     val observations: List<ObservationLine>,
     val tags: List<String>,
     /** Until the 3-lens extraction resolves the screen shows the spinner/skeleton state. */
@@ -40,31 +41,23 @@ data class EntryDetailUiModel(
             followUp = entity.followUpText?.takeIf(String::isNotBlank),
             personaName = entity.persona.name,
             energyDescriptor = entity.energyDescriptor,
+            lensStatus = lensStatus(entity.confidenceJson),
+            lenses = buildLensReads(entity.lensReceiptsJson),
+            fields = buildFieldRows(entity),
             observations = parseObservations(entity.entryObservationsJson),
             tags = entity.tags.map { it.name }.sorted(),
             extractionComplete = entity.extractionStatus == ExtractionStatus.COMPLETED,
             extractionFailed = entity.extractionStatus == ExtractionStatus.FAILED ||
                 entity.extractionStatus == ExtractionStatus.TIMED_OUT,
         )
-
-        private fun parseObservations(json: String): List<ObservationLine> {
-            if (json.isBlank() || json.trim() == "[]") return emptyList()
-            return runCatching {
-                val array = JSONArray(json)
-                (0 until array.length()).mapNotNull { i ->
-                    val obj = array.optJSONObject(i)
-                    val text = obj?.optString("text")?.takeIf { it.isNotBlank() }
-                    text?.let { ObservationLine(it) }
-                }
-            }.getOrElse {
-                // Surfaced so an empty reading card is debuggable, but never the payload:
-                // observation text is private journal content (no-telemetry/privacy invariant).
-                Log.w("EntryDetailUiModel", "malformed entryObservationsJson (len=${json.length})")
-                emptyList()
-            }
-        }
     }
 }
+
+enum class LensTone { CANONICAL, CONFLICT, AMBIGUOUS, CANDIDATE }
+
+data class LensRead(val label: String, val value: String, val tone: LensTone)
+
+data class FieldRow(val label: String, val value: String, val tone: LensTone)
 
 data class ObservationLine(val text: String)
 

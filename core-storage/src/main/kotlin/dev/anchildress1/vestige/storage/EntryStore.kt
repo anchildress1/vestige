@@ -1,6 +1,7 @@
 package dev.anchildress1.vestige.storage
 
 import dev.anchildress1.vestige.model.ConfidenceVerdict
+import dev.anchildress1.vestige.model.EntryLensReceipt
 import dev.anchildress1.vestige.model.EntryObservation
 import dev.anchildress1.vestige.model.ExtractionStatus
 import dev.anchildress1.vestige.model.ObservationEvidence
@@ -89,6 +90,7 @@ class EntryStore(private val boxStore: BoxStore, private val markdownStore: Mark
         resolved: ResolvedExtraction,
         templateLabel: TemplateLabel?,
         observations: List<EntryObservation> = emptyList(),
+        lensReceipts: List<EntryLensReceipt> = emptyList(),
     ) {
         boxStore.runInTx {
             val box = boxStore.boxFor<EntryEntity>()
@@ -96,6 +98,7 @@ class EntryStore(private val boxStore: BoxStore, private val markdownStore: Mark
                 ?: throw EntryPersistenceException("No entry row id=$entryId to complete")
             applyResolved(entry, resolved, templateLabel)
             entry.entryObservationsJson = observationsJson(observations)
+            entry.lensReceiptsJson = EntryLensReceiptJson.encode(lensReceipts)
             entry.extractionStatus = ExtractionStatus.COMPLETED
             entry.lastError = null
             attachTags(entry, resolved)

@@ -9,9 +9,13 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import dev.anchildress1.vestige.model.ConfidenceVerdict
+import dev.anchildress1.vestige.model.EntryLensReceipt
 import dev.anchildress1.vestige.model.ExtractionStatus
+import dev.anchildress1.vestige.model.Lens
 import dev.anchildress1.vestige.model.Persona
 import dev.anchildress1.vestige.model.ResolvedExtraction
+import dev.anchildress1.vestige.model.ResolvedField
 import dev.anchildress1.vestige.storage.EntryEntity
 import dev.anchildress1.vestige.storage.EntryStore
 import dev.anchildress1.vestige.storage.MarkdownEntryStore
@@ -105,14 +109,46 @@ class EntryDetailScreenTest {
     }
 
     @Test
-    fun `resolved view shows the three-lens read and field grid (seed)`() {
-        val id = createCompleted("battery got yanked")
+    fun `resolved view shows persisted three-lens receipts and field grid`() {
+        val id = entryStore.createPendingEntry("battery got yanked", FIXTURE_INSTANT)
+        entryStore.completeEntry(
+            id,
+            ResolvedExtraction(
+                mapOf(
+                    "tags" to ResolvedField(listOf("meeting", "battery-yanked"), ConfidenceVerdict.CANONICAL),
+                    "energy_descriptor" to ResolvedField(
+                        "crashed",
+                        ConfidenceVerdict.CANONICAL_WITH_CONFLICT,
+                    ),
+                ),
+            ),
+            null,
+            lensReceipts = listOf(
+                EntryLensReceipt(
+                    lens = Lens.LITERAL,
+                    extracted = true,
+                    fields = mapOf("energy_descriptor" to "battery yanked"),
+                ),
+                EntryLensReceipt(
+                    lens = Lens.INFERENTIAL,
+                    extracted = true,
+                    fields = mapOf("energy_descriptor" to "post-meeting energy crash"),
+                ),
+                EntryLensReceipt(
+                    lens = Lens.SKEPTICAL,
+                    extracted = true,
+                    fields = mapOf("energy_descriptor" to "not tired vs yanked"),
+                    flags = listOf("vocabulary-contradiction:not tired:battery yanked"),
+                ),
+            ),
+        )
         setDetail(id)
         composeRule.onNodeWithTag("entry_three_lens").assertIsDisplayed()
         composeRule.onNodeWithTag("entry_field_grid").assertIsDisplayed()
-        composeRule.onNodeWithText(EntryDetailSeed.THREE_LENS_EYEBROW).assertIsDisplayed()
+        composeRule.onNodeWithText(EntryDetailCopy.THREE_LENS_EYEBROW).assertIsDisplayed()
         composeRule.onNodeWithText("battery yanked").assertIsDisplayed()
         composeRule.onNodeWithText("crashed").assertIsDisplayed()
+        composeRule.onNodeWithText(EntryDetailCopy.THREE_LENS_STATUS_CONFLICT).assertIsDisplayed()
         // The extracting/skeleton branch is not the resolved view.
         composeRule.onAllNodesWithTag("entry_extracting").assertCountEquals(0)
     }

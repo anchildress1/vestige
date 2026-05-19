@@ -1,10 +1,14 @@
 package dev.anchildress1.vestige.ui.history
 
 import app.cash.turbine.test
+import dev.anchildress1.vestige.model.ConfidenceVerdict
+import dev.anchildress1.vestige.model.EntryLensReceipt
 import dev.anchildress1.vestige.model.EntryObservation
+import dev.anchildress1.vestige.model.Lens
 import dev.anchildress1.vestige.model.ObservationEvidence
 import dev.anchildress1.vestige.model.Persona
 import dev.anchildress1.vestige.model.ResolvedExtraction
+import dev.anchildress1.vestige.model.ResolvedField
 import dev.anchildress1.vestige.model.TemplateLabel
 import dev.anchildress1.vestige.storage.EntryEntity
 import dev.anchildress1.vestige.storage.EntryStore
@@ -339,6 +343,50 @@ class EntryDetailViewModelTest {
         vm.state.test {
             val loaded = awaitItem() as EntryDetailUiState.Loaded
             assertTrue(loaded.model.tags.isEmpty())
+        }
+    }
+
+    // --- lens receipts ---
+
+    @Test
+    fun `lens receipts are projected into compact reads and field rows`() = runTest {
+        val id = entryStore.createPendingEntry("battery got yanked", FIXTURE_INSTANT)
+        entryStore.completeEntry(
+            id,
+            ResolvedExtraction(
+                mapOf(
+                    "tags" to ResolvedField(listOf("meeting", "battery-yanked"), ConfidenceVerdict.CANONICAL),
+                    "energy_descriptor" to ResolvedField(
+                        "crashed",
+                        ConfidenceVerdict.CANONICAL_WITH_CONFLICT,
+                    ),
+                ),
+            ),
+            TemplateLabel.AFTERMATH,
+            lensReceipts = listOf(
+                EntryLensReceipt(
+                    lens = Lens.LITERAL,
+                    extracted = true,
+                    fields = mapOf("energy_descriptor" to "battery yanked"),
+                ),
+                EntryLensReceipt(
+                    lens = Lens.SKEPTICAL,
+                    extracted = true,
+                    fields = mapOf("energy_descriptor" to "not tired vs yanked"),
+                    flags = listOf("vocabulary-contradiction:not tired:battery got yanked"),
+                ),
+            ),
+        )
+        val vm = buildVm(id)
+
+        vm.state.test {
+            val loaded = awaitItem() as EntryDetailUiState.Loaded
+            assertEquals(3, loaded.model.lenses.size)
+            assertEquals("battery yanked", loaded.model.lenses.first { it.label == "LITERAL" }.value)
+            assertEquals(LensTone.CONFLICT, loaded.model.lenses.first { it.label == "SKEPTICAL" }.tone)
+            assertEquals(EntryDetailCopy.THREE_LENS_STATUS_CONFLICT, loaded.model.lensStatus)
+            assertEquals("crashed", loaded.model.fields.first { it.label == "STATE" }.value)
+            assertEquals(LensTone.CONFLICT, loaded.model.fields.first { it.label == "STATE" }.tone)
         }
     }
 

@@ -261,10 +261,8 @@ Then `YOU · TRANSCRIPT` (dim user transcription), `▸ TAGS` chips, and the sha
 (HISTORY active). No +NEW-ENTRY action (Capture tab covers it); no stat ribbon; no reading
 card.
 
-> _Final-polish note (2026-05-18):_ the 3-lens read + field grid + the extracting state have
-> no model backing yet. Their content is a temporary user-approved UI seed in
-> `EntryDetailSeed.kt` (overrides the AGENTS.md no-fiction guardrail for this screen only),
-> isolated so it's obvious and trivial to delete on real extraction wiring.
+> _Final-polish note (2026-05-19):_ the 3-lens read + field grid are wired from persisted
+> parsed lens receipts and resolved fields. Raw model responses are not stored.
 
 ---
 

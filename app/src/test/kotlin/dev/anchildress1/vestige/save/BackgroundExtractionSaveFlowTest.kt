@@ -4,10 +4,13 @@ import dev.anchildress1.vestige.inference.BackgroundExtractionRequest
 import dev.anchildress1.vestige.inference.BackgroundExtractionResult
 import dev.anchildress1.vestige.inference.BackgroundExtractionWorker
 import dev.anchildress1.vestige.inference.ExtractionStatusListener
+import dev.anchildress1.vestige.inference.LensResult
 import dev.anchildress1.vestige.inference.ObservationGenerator
 import dev.anchildress1.vestige.model.ConfidenceVerdict
 import dev.anchildress1.vestige.model.EntryObservation
 import dev.anchildress1.vestige.model.ExtractionStatus
+import dev.anchildress1.vestige.model.Lens
+import dev.anchildress1.vestige.model.LensExtraction
 import dev.anchildress1.vestige.model.ObservationEvidence
 import dev.anchildress1.vestige.model.ResolvedExtraction
 import dev.anchildress1.vestige.model.ResolvedField
@@ -140,7 +143,7 @@ class BackgroundExtractionSaveFlowTest {
         // inside the same persistence transaction. With the two-tier refactor, the callout flows
         // through `appendObservation` instead of being returned on the save outcome.
         coVerifyOrder {
-            entryStore.completeEntry(ENTRY_ID, resolved, TemplateLabel.AFTERMATH, emptyList())
+            entryStore.completeEntry(ENTRY_ID, resolved, TemplateLabel.AFTERMATH, emptyList(), emptyList())
             orchestrator.onEntryCommitted(storedEntry, dev.anchildress1.vestige.model.Persona.WITNESS)
             entryStore.appendObservation(ENTRY_ID, callout, any())
             orchestrator.settleReservedCallout(storedEntry, fired = true)
@@ -309,9 +312,62 @@ class BackgroundExtractionSaveFlowTest {
             entryStore.createPendingEntry(SAMPLE_TEXT, SAMPLE_TIMESTAMP.toInstant(), 0L)
             worker.extract(any(), any())
             observationGenerator.generate(SAMPLE_TEXT, resolved, SAMPLE_TIMESTAMP)
-            entryStore.completeEntry(ENTRY_ID, resolved, TemplateLabel.AFTERMATH, observations)
+            entryStore.completeEntry(ENTRY_ID, resolved, TemplateLabel.AFTERMATH, observations, emptyList())
         }
         coVerify(exactly = 0) { entryStore.failEntry(any(), any(), any()) }
+    }
+
+    @Test
+    fun `success routes parsed lens receipts to completeEntry without raw responses`() = runTest {
+        every { entryStore.createPendingEntry(any(), any(), any()) } returns ENTRY_ID
+        val resolved = canonicalSample()
+        val lensResults = listOf(
+            LensResult(
+                lens = Lens.LITERAL,
+                extraction = LensExtraction(
+                    lens = Lens.LITERAL,
+                    fields = mapOf("tags" to listOf("standup"), "energy_descriptor" to "flattened"),
+                ),
+                rawResponse = """{"private":"raw response stays out"}""",
+                attemptCount = 1,
+                elapsedMs = 900L,
+                lastError = null,
+            ),
+            LensResult(
+                lens = Lens.SKEPTICAL,
+                extraction = null,
+                rawResponse = "bad json",
+                attemptCount = 2,
+                elapsedMs = 1_400L,
+                lastError = "parse-fail",
+            ),
+        )
+        coEvery { worker.extract(any(), any()) } returns BackgroundExtractionResult.Success(
+            totalElapsedMs = 25_000L,
+            lensResults = lensResults,
+            modelCallCount = 3,
+            resolved = resolved,
+            templateLabel = TemplateLabel.AFTERMATH,
+        )
+        coEvery { observationGenerator.generate(any(), any(), any()) } returns emptyList()
+
+        flow.saveAndExtract(SAMPLE_TEXT, SAMPLE_TIMESTAMP)
+
+        coVerify {
+            entryStore.completeEntry(
+                ENTRY_ID,
+                resolved,
+                TemplateLabel.AFTERMATH,
+                emptyList(),
+                match { receipts ->
+                    receipts.size == 2 &&
+                        receipts[0].lens == Lens.LITERAL &&
+                        receipts[0].fields["energy_descriptor"] == "flattened" &&
+                        receipts[1].extracted.not() &&
+                        receipts[1].lastError == "parse-fail"
+                },
+            )
+        }
     }
 
     @Test
@@ -332,7 +388,7 @@ class BackgroundExtractionSaveFlowTest {
         assertEquals(ENTRY_ID, outcome.entryId)
         // Generator threw → empty observation list persisted instead of aborting the save.
         coVerify(exactly = 1) {
-            entryStore.completeEntry(ENTRY_ID, resolved, TemplateLabel.AFTERMATH, emptyList())
+            entryStore.completeEntry(ENTRY_ID, resolved, TemplateLabel.AFTERMATH, emptyList(), emptyList())
         }
     }
 
@@ -353,7 +409,7 @@ class BackgroundExtractionSaveFlowTest {
             entryStore.failEntry(ENTRY_ID, ExtractionStatus.FAILED, "all-lenses-parse-fail")
         }
         coVerify(exactly = 0) {
-            entryStore.completeEntry(any(), any(), any(), any())
+            entryStore.completeEntry(any(), any(), any(), any(), any())
             observationGenerator.generate(any(), any(), any())
         }
     }
@@ -440,7 +496,7 @@ class BackgroundExtractionSaveFlowTest {
         coVerifyOrder {
             downstream.onUpdate(ExtractionStatus.RUNNING, 0, null)
             observationGenerator.generate(SAMPLE_TEXT, canonicalSample(), SAMPLE_TIMESTAMP)
-            entryStore.completeEntry(ENTRY_ID, canonicalSample(), TemplateLabel.AFTERMATH, emptyList())
+            entryStore.completeEntry(ENTRY_ID, canonicalSample(), TemplateLabel.AFTERMATH, emptyList(), emptyList())
             downstream.onUpdate(ExtractionStatus.COMPLETED, 0, null)
         }
         verify(exactly = 0) { entryStore.failEntry(any(), any(), any()) }
@@ -474,7 +530,7 @@ class BackgroundExtractionSaveFlowTest {
         }
         coEvery { observationGenerator.generate(any(), any(), any()) } returns emptyList()
         every {
-            entryStore.completeEntry(ENTRY_ID, resolved, TemplateLabel.AFTERMATH, emptyList())
+            entryStore.completeEntry(ENTRY_ID, resolved, TemplateLabel.AFTERMATH, emptyList(), emptyList())
         } throws IllegalStateException("disk blew up")
 
         // Persistence failure is caught inside the detached extraction, routed through
@@ -483,7 +539,7 @@ class BackgroundExtractionSaveFlowTest {
 
         coVerifyOrder {
             downstream.onUpdate(ExtractionStatus.RUNNING, 0, null)
-            entryStore.completeEntry(ENTRY_ID, resolved, TemplateLabel.AFTERMATH, emptyList())
+            entryStore.completeEntry(ENTRY_ID, resolved, TemplateLabel.AFTERMATH, emptyList(), emptyList())
             entryStore.failEntry(ENTRY_ID, ExtractionStatus.FAILED, "persistence-error:IllegalStateException")
             downstream.onUpdate(ExtractionStatus.FAILED, 0, "persistence-error:IllegalStateException")
         }
@@ -693,7 +749,7 @@ class BackgroundExtractionSaveFlowTest {
         )
         coEvery { observationGenerator.generate(any(), any(), any()) } returns emptyList()
         every {
-            entryStore.completeEntry(ENTRY_ID, resolved, TemplateLabel.AFTERMATH, emptyList())
+            entryStore.completeEntry(ENTRY_ID, resolved, TemplateLabel.AFTERMATH, emptyList(), emptyList())
         } throws IllegalStateException("primary disk error")
         // Compensation also throws — the failure must not mask the original IllegalStateException.
         every {
@@ -706,7 +762,7 @@ class BackgroundExtractionSaveFlowTest {
         flowWithMockListener.saveAndExtract(SAMPLE_TEXT, SAMPLE_TIMESTAMP)
 
         coVerifyOrder {
-            entryStore.completeEntry(ENTRY_ID, resolved, TemplateLabel.AFTERMATH, emptyList())
+            entryStore.completeEntry(ENTRY_ID, resolved, TemplateLabel.AFTERMATH, emptyList(), emptyList())
             entryStore.failEntry(ENTRY_ID, ExtractionStatus.FAILED, "persistence-error:IllegalStateException")
             downstream.onUpdate(ExtractionStatus.FAILED, 0, "persistence-error:IllegalStateException")
         }
@@ -842,7 +898,7 @@ class BackgroundExtractionSaveFlowTest {
         )
         coEvery { observationGenerator.generate(any(), any(), any()) } returns emptyList()
         every {
-            entryStore.completeEntry(ENTRY_ID, resolved, TemplateLabel.AFTERMATH, emptyList())
+            entryStore.completeEntry(ENTRY_ID, resolved, TemplateLabel.AFTERMATH, emptyList(), emptyList())
         } throws IllegalStateException("disk blew up")
 
         flowWithCallback.saveAndExtract(SAMPLE_TEXT, SAMPLE_TIMESTAMP)
@@ -876,7 +932,7 @@ class BackgroundExtractionSaveFlowTest {
         flowWithCallback.saveAndExtract(SAMPLE_TEXT, SAMPLE_TIMESTAMP)
 
         coVerify(exactly = 1) {
-            entryStore.completeEntry(ENTRY_ID, resolved, TemplateLabel.AFTERMATH, emptyList())
+            entryStore.completeEntry(ENTRY_ID, resolved, TemplateLabel.AFTERMATH, emptyList(), emptyList())
         }
         coVerify(exactly = 0) { entryStore.failEntry(any(), any(), any()) }
         assertTrue(listenerEvents.contains(ExtractionStatus.COMPLETED))

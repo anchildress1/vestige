@@ -1,6 +1,7 @@
 package dev.anchildress1.vestige.storage
 
 import dev.anchildress1.vestige.model.ConfidenceVerdict
+import dev.anchildress1.vestige.model.EntryLensReceipt
 import dev.anchildress1.vestige.model.EntryObservation
 import dev.anchildress1.vestige.model.ExtractionStatus
 import dev.anchildress1.vestige.model.Lens
@@ -348,6 +349,40 @@ class EntryStoreTest {
         assertEquals("vocabulary_contradictions", first.getJSONArray("fields").getString(0))
         val second = array.getJSONObject(1)
         assertEquals("commitment-flag", second.getString("evidence"))
+    }
+
+    @Test
+    fun `completeEntry serializes lens receipts for sourceable entry read`() {
+        val id = entryStore.createPendingEntry(SAMPLE_TEXT, SAMPLE_INSTANT)
+        val receipts = listOf(
+            EntryLensReceipt(
+                lens = Lens.LITERAL,
+                extracted = true,
+                fields = mapOf("tags" to listOf("standup"), "energy_descriptor" to "flattened"),
+                attemptCount = 1,
+                elapsedMs = 900L,
+            ),
+            EntryLensReceipt(
+                lens = Lens.SKEPTICAL,
+                extracted = true,
+                fields = mapOf("energy_descriptor" to "flattened"),
+                flags = listOf("vocabulary-contradiction:fine:flattened"),
+                attemptCount = 1,
+                elapsedMs = 1_100L,
+            ),
+        )
+
+        entryStore.completeEntry(id, resolvedSample(), TemplateLabel.AFTERMATH, lensReceipts = receipts)
+
+        val row = boxStore.boxFor<EntryEntity>().get(id)
+        val decoded = EntryLensReceiptJson.decode(row.lensReceiptsJson)
+        assertEquals(2, decoded.size)
+        assertEquals(Lens.LITERAL, decoded[0].lens)
+        assertEquals("flattened", decoded[0].fields["energy_descriptor"])
+        assertEquals(listOf("vocabulary-contradiction:fine:flattened"), decoded[1].flags)
+
+        val mdFile = File(File(markdownDir, "entries"), row.markdownFilename)
+        assertTrue("markdown should include lens_receipts", mdFile.readText().contains("lens_receipts: ["))
     }
 
     @Test

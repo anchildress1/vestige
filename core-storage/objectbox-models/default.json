@@ -5,7 +5,7 @@
   "entities": [
     {
       "id": "1:8495295597095795304",
-      "lastPropertyId": "18:2320472029631766667",
+      "lastPropertyId": "19:3372537850009881235",
       "name": "EntryEntity",
       "properties": [
         {
@@ -104,6 +104,11 @@
           "id": "18:2320472029631766667",
           "name": "vectorSchemaVersion",
           "type": 5
+        },
+        {
+          "id": "19:3372537850009881235",
+          "name": "lensReceiptsJson",
+          "type": 9
         }
       ],
       "relations": [

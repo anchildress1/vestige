@@ -6,7 +6,9 @@ import dev.anchildress1.vestige.inference.BackgroundExtractionResult
 import dev.anchildress1.vestige.inference.BackgroundExtractionWorker
 import dev.anchildress1.vestige.inference.ExtractionStatusListener
 import dev.anchildress1.vestige.inference.HistoryChunk
+import dev.anchildress1.vestige.inference.LensResult
 import dev.anchildress1.vestige.inference.ObservationGenerator
+import dev.anchildress1.vestige.model.EntryLensReceipt
 import dev.anchildress1.vestige.model.EntryObservation
 import dev.anchildress1.vestige.model.ExtractionStatus
 import dev.anchildress1.vestige.model.Persona
@@ -192,7 +194,13 @@ class BackgroundExtractionSaveFlow(
             lastError = null,
             terminalRelay = terminalRelay,
         ) {
-            entryStore.completeEntry(entryId, result.resolved, result.templateLabel, observations)
+            entryStore.completeEntry(
+                entryId,
+                result.resolved,
+                result.templateLabel,
+                observations,
+                result.lensResults.toReceipts(),
+            )
         }
         schedulePatternOrchestration(entryId, persona)
         runEntryFinalization(entryId)
@@ -415,6 +423,18 @@ class BackgroundExtractionSaveFlow(
     private companion object {
         private const val TAG = "VestigeSaveFlow"
     }
+}
+
+private fun List<LensResult>.toReceipts(): List<EntryLensReceipt> = map { result ->
+    EntryLensReceipt(
+        lens = result.lens,
+        extracted = result.extraction != null,
+        fields = result.extraction?.fields.orEmpty(),
+        flags = result.extraction?.flags.orEmpty(),
+        attemptCount = result.attemptCount,
+        elapsedMs = result.elapsedMs,
+        lastError = result.lastError,
+    )
 }
 
 /**

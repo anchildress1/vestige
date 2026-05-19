@@ -50,6 +50,9 @@ class EntryEntity(
     /** JSON list of `{ text, evidence, fields[] }`. */
     var entryObservationsJson: String = "[]",
 
+    /** JSON list of parsed per-lens extraction receipts. */
+    var lensReceiptsJson: String = "[]",
+
     /** JSON `field → ConfidenceVerdict.name`. */
     var confidenceJson: String = "{}",
 

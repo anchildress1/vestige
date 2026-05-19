@@ -16,7 +16,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.contentDescription
@@ -35,6 +34,7 @@ import dev.anchildress1.vestige.ui.components.BottomTab
 import dev.anchildress1.vestige.ui.components.StatItem
 import dev.anchildress1.vestige.ui.components.StatRibbon
 import dev.anchildress1.vestige.ui.components.VestigeBottomNav
+import dev.anchildress1.vestige.ui.components.accentedHeadline
 import dev.anchildress1.vestige.ui.theme.VestigeTheme
 import java.util.Locale
 
@@ -142,7 +142,7 @@ private fun PatternsEmptyState(empty: PatternsListUiState.Empty) {
             .padding(horizontal = 18.dp),
         verticalArrangement = Arrangement.Center,
     ) {
-        Text(text = accentedHeadline(header, colors.ink, colors.lime), style = VestigeTheme.typography.displayBig)
+        Text(text = accentedHeadline(header, colors.ink, colors.coral), style = VestigeTheme.typography.displayBig)
         Text(
             text = body,
             style = VestigeTheme.typography.p,
@@ -150,17 +150,6 @@ private fun PatternsEmptyState(empty: PatternsListUiState.Empty) {
             modifier = Modifier.padding(top = 16.dp),
         )
     }
-}
-
-// Uppercased headline with the final whitespace-delimited token accented (e.g. "YET." lime),
-// matching poc/patterns-empty-final.png. Single-word headers render fully accented.
-private fun accentedHeadline(raw: String, inkColor: Color, accentColor: Color) = buildAnnotatedString {
-    val up = raw.uppercase(Locale.US)
-    val split = up.lastIndexOf(' ')
-    if (split > 0) {
-        withStyle(SpanStyle(color = inkColor)) { append(up.substring(0, split + 1)) }
-    }
-    withStyle(SpanStyle(color = accentColor)) { append(up.substring(split + 1)) }
 }
 
 @Composable

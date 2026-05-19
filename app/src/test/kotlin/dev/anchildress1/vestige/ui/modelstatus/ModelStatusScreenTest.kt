@@ -106,6 +106,15 @@ class ModelStatusScreenTest {
     }
 
     @Test
+    fun `a deleted model surfaces the re-download error, not the loading line`() {
+        screen(readiness = ModelReadiness.Loading, onDiskLabel = "0")
+        composeRule.onNodeWithContentDescription(
+            "Model file unreadable. Re-download from settings.",
+        ).assertIsDisplayed()
+        composeRule.onAllNodesWithContentDescription("Loading model.").assertCountEquals(0)
+    }
+
+    @Test
     fun `status band renders Paused as stalled copy`() {
         screen(readiness = ModelReadiness.Paused)
         composeRule.onNodeWithContentDescription("Download stalled.").assertIsDisplayed()

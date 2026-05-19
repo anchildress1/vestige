@@ -197,10 +197,14 @@ private fun StatusBand(info: ModelStatusInfo) {
     val eyebrow = stringResource(
         id = if (ready) R.string.model_status_band_ready else R.string.model_status_band_pending,
     )
-    val body = if (ready) {
-        stringResource(id = R.string.model_status_detail, info.sizeLabel, info.versionName)
-    } else {
-        readinessLine(info.readiness)
+    // Loading covers both "engine warming" (artifact on disk) and "no artifact" (deleted). A
+    // deleted model isn't loading anything — surface the canonical ux-copy model error instead
+    // of the warming line. `onDiskLabel == "0"` is the route's no-bytes-on-disk signal.
+    val absent = info.readiness is ModelReadiness.Loading && info.onDiskLabel == "0"
+    val body = when {
+        ready -> stringResource(id = R.string.model_status_detail, info.sizeLabel, info.versionName)
+        absent -> stringResource(id = R.string.model_status_absent)
+        else -> readinessLine(info.readiness)
     }
     Column(
         modifier = Modifier
@@ -280,17 +284,20 @@ private fun NetworkGateBand(active: Boolean) {
     val eyebrow = stringResource(
         id = if (active) R.string.model_status_gate_active_eyebrow else R.string.model_status_gate_eyebrow,
     )
+    // Active allowlisting during a pull reads as "this is on / working" — lime, the design's
+    // active accent. Sealed-at-rest stays coral (the alarm/destructive register).
+    val accent = if (active) colors.lime else colors.coral
     Column(
         modifier = Modifier
             .fillMaxWidth()
             .clip(VestigeTheme.shapes.m)
-            .border(width = 1.dp, color = colors.coral, shape = VestigeTheme.shapes.m)
+            .border(width = 1.dp, color = accent, shape = VestigeTheme.shapes.m)
             .background(colors.s1)
             .semantics(mergeDescendants = true) { contentDescription = body }
             .padding(horizontal = 14.dp, vertical = 12.dp),
         verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
-        EyebrowE(text = eyebrow, color = colors.coral, maxLines = 1, softWrap = false)
+        EyebrowE(text = eyebrow, color = accent, maxLines = 1, softWrap = false)
         Text(text = body, style = VestigeTheme.typography.p, color = colors.dim)
     }
 }

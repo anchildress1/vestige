@@ -134,7 +134,7 @@ private fun HeroBlock() {
                 full = CaptureCopy.HERO_QUESTION,
                 highlightSuffix = CaptureCopy.HERO_HIGHLIGHT_FROM_END,
                 inkColor = colors.ink,
-                accentColor = colors.lime,
+                accentColor = colors.coral,
             ),
             style = VestigeTheme.typography.displayBig.copy(fontSize = 38.sp, lineHeight = 38.sp),
         )

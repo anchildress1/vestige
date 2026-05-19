@@ -6,7 +6,10 @@ package dev.anchildress1.vestige.ui.capture
  */
 object CaptureCopy {
     const val HERO_QUESTION: String = "WHAT HAPPENED?"
-    const val HERO_HIGHLIGHT_FROM_END: String = "HAPPENED?"
+
+    // Only the trailing "?" is the coral accent — the rest of the hero is ink. Matches the
+    // empty-state treatment (terminal punctuation accented, not the word).
+    const val HERO_HIGHLIGHT_FROM_END: String = "?"
 
     const val OR_TYPE: String = "OR TYPE →"
 

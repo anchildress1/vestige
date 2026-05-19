@@ -29,6 +29,7 @@ import dev.anchildress1.vestige.ui.components.AppTop
 import dev.anchildress1.vestige.ui.components.AppTopStatuses
 import dev.anchildress1.vestige.ui.components.BottomTab
 import dev.anchildress1.vestige.ui.components.VestigeBottomNav
+import dev.anchildress1.vestige.ui.components.accentedHeadline
 import dev.anchildress1.vestige.ui.theme.VestigeTheme
 
 @Composable
@@ -94,7 +95,10 @@ private fun HistoryEmptyState(modifier: Modifier = Modifier) {
         contentAlignment = Alignment.TopStart,
     ) {
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text(text = HistoryCopy.EMPTY_HEADER, style = VestigeTheme.typography.h1, color = colors.ink)
+            Text(
+                text = accentedHeadline(HistoryCopy.EMPTY_HEADER, colors.ink, colors.coral),
+                style = VestigeTheme.typography.displayBig,
+            )
             Text(text = HistoryCopy.EMPTY_BODY, style = VestigeTheme.typography.p, color = colors.dim)
         }
     }

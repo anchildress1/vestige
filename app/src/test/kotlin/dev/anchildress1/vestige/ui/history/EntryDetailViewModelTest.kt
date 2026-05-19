@@ -145,6 +145,7 @@ class EntryDetailViewModelTest {
             val loaded = awaitItem() as EntryDetailUiState.Loaded
             assertEquals(2, loaded.model.observations.size)
             assertEquals("You used \"fine\" twice.", loaded.model.observations[0].text)
+            assertEquals("vocabulary-contradiction", loaded.model.observations[0].evidence)
         }
     }
 
@@ -225,6 +226,23 @@ class EntryDetailViewModelTest {
             val loaded = awaitItem() as EntryDetailUiState.Loaded
             assertEquals(1, loaded.model.observations.size)
             assertEquals("You said fine twice.", loaded.model.observations[0].text)
+            assertTrue(loaded.model.observations[0].fields.isEmpty())
+        }
+    }
+
+    @Test
+    fun `observations parse fields array when present`() = runTest {
+        val id = createCompleted("fields in observations")
+        val box = boxStore.boxFor(EntryEntity::class.java)
+        box.get(id).also {
+            it.entryObservationsJson =
+                """[{"text":"Notice this.","evidence":"theme-noticing","fields":["tags","energy_descriptor"]}]"""
+        }.let(box::put)
+        val vm = buildVm(id)
+
+        vm.state.test {
+            val loaded = awaitItem() as EntryDetailUiState.Loaded
+            assertEquals(listOf("tags", "energy_descriptor"), loaded.model.observations[0].fields)
         }
     }
 

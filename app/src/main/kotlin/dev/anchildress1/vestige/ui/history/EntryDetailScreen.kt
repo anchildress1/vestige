@@ -42,6 +42,7 @@ import dev.anchildress1.vestige.ui.components.VestigeBottomNav
 import dev.anchildress1.vestige.ui.components.VestigeSpinner
 import dev.anchildress1.vestige.ui.components.limeLeftRuleForActive
 import dev.anchildress1.vestige.ui.theme.VestigeTheme
+import java.util.Locale
 
 @Composable
 private fun LensTone.color(): Color {
@@ -154,6 +155,7 @@ private fun EntryDetailContent(model: EntryDetailUiModel, onBack: () -> Unit, mo
             }
         }
 
+        ObservationRows(model.observations)
         EntryTagsRow(tags = model.tags)
         // Transcript sits at the very bottom of the scroll, after the tags.
         TranscriptBlock(
@@ -254,6 +256,34 @@ private fun FieldGrid(fields: List<FieldRow>) {
                     modifier = Modifier.weight(FIELD_VALUE_WEIGHT),
                 )
                 EyebrowE(text = field.tone.name, color = field.tone.color(), maxLines = 1, softWrap = false)
+            }
+        }
+    }
+}
+
+@Composable
+private fun ObservationRows(observations: List<ObservationLine>) {
+    if (observations.isEmpty()) return
+    val colors = VestigeTheme.colors
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(colors.s1)
+            .testTag("entry_observations"),
+        verticalArrangement = Arrangement.spacedBy(0.dp),
+    ) {
+        Column(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 12.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            EyebrowE(text = EntryDetailCopy.OBSERVATIONS_EYEBROW, color = colors.lime)
+            observations.forEach { line ->
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text(text = line.text, style = VestigeTheme.typography.p, color = colors.ink)
+                    observationMeta(line)?.let { meta ->
+                        EyebrowE(text = meta, color = colors.dim)
+                    }
+                }
             }
         }
     }
@@ -391,6 +421,20 @@ private fun TagChip(tag: String, color: Color) {
     ) {
         Text(text = tag, style = VestigeTheme.typography.eyebrow, color = color)
     }
+}
+
+private fun observationMeta(observation: ObservationLine): String? {
+    val evidence = observation.evidence
+        ?.replace('-', ' ')
+        ?.uppercase(Locale.ROOT)
+        ?.takeIf(String::isNotBlank)
+    val fields = observation.fields
+        .map(String::trim)
+        .filter(String::isNotEmpty)
+        .joinToString(", ")
+        .takeIf(String::isNotBlank)
+    val joined = listOfNotNull(evidence, fields).joinToString(" · ")
+    return joined.takeIf(String::isNotBlank)
 }
 
 private const val FIELD_LABEL_WEIGHT = 0.32f

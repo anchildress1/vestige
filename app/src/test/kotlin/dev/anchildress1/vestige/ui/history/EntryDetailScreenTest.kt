@@ -155,6 +155,36 @@ class EntryDetailScreenTest {
     }
 
     @Test
+    fun `observations block renders persisted observation text evidence and fields`() {
+        val id = entryStore.createPendingEntry("said fine twice", FIXTURE_INSTANT)
+        entryStore.completeEntry(
+            id,
+            ResolvedExtraction(emptyMap()),
+            null,
+            observations = listOf(
+                dev.anchildress1.vestige.model.EntryObservation(
+                    text = "You used fine twice.",
+                    evidence = dev.anchildress1.vestige.model.ObservationEvidence.VOCABULARY_CONTRADICTION,
+                    fields = listOf("vocabulary_contradictions", "tags"),
+                ),
+            ),
+            lensReceipts = listOf(
+                EntryLensReceipt(
+                    lens = Lens.LITERAL,
+                    extracted = true,
+                    fields = mapOf("tags" to listOf("fine")),
+                ),
+            ),
+        )
+
+        setDetail(id)
+
+        composeRule.onNodeWithTag("entry_observations").assertExists()
+        composeRule.onNodeWithText("You used fine twice.").assertExists()
+        composeRule.onNodeWithText("VOCABULARY CONTRADICTION · vocabulary_contradictions, tags").assertExists()
+    }
+
+    @Test
     fun `pending entry shows the extracting branch, not the resolved read`() {
         val id = entryStore.createPendingEntry("still extracting", FIXTURE_INSTANT)
         setDetail(id)

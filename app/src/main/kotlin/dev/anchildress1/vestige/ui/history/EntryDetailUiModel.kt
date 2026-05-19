@@ -71,7 +71,7 @@ data class LensRead(val label: String, val value: String, val tone: LensTone)
 
 data class FieldRow(val label: String, val value: String, val tone: LensTone)
 
-data class ObservationLine(val text: String)
+data class ObservationLine(val text: String, val evidence: String? = null, val fields: List<String> = emptyList())
 
 sealed interface EntryDetailUiState {
     object Loading : EntryDetailUiState

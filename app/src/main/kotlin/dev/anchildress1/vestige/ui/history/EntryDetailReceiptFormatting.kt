@@ -16,7 +16,15 @@ internal fun parseObservations(json: String): List<ObservationLine> {
         (0 until array.length()).mapNotNull { i ->
             val obj = array.optJSONObject(i)
             val text = obj?.optString("text")?.takeIf { it.isNotBlank() }
-            text?.let { ObservationLine(it) }
+            val evidence = obj?.optString("evidence")?.takeIf { it.isNotBlank() }
+            val fields = obj?.optJSONArray("fields")
+                ?.let { values ->
+                    (0 until values.length()).mapNotNull { idx ->
+                        values.optString(idx).takeIf(String::isNotBlank)
+                    }
+                }
+                ?: emptyList()
+            text?.let { ObservationLine(text = it, evidence = evidence, fields = fields) }
         }
     }.getOrElse {
         // Surfaced so an empty reading card is debuggable, but never the payload:

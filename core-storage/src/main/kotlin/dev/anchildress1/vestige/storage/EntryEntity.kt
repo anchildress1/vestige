@@ -104,3 +104,7 @@ class EntryEntity(
         const val CURRENT_VECTOR_SCHEMA_VERSION = 1
     }
 }
+
+/** `lensReceiptsJson` as a non-null JSON array — `"[]"` for null/blank legacy rows. */
+val EntryEntity.lensReceiptsJsonOrEmpty: String
+    get() = lensReceiptsJson?.trim()?.takeIf(String::isNotEmpty) ?: "[]"

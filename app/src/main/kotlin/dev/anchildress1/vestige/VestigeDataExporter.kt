@@ -6,6 +6,7 @@ import dev.anchildress1.vestige.storage.MarkdownEntryStore
 import dev.anchildress1.vestige.storage.PatternEntity
 import dev.anchildress1.vestige.storage.TagEntity
 import dev.anchildress1.vestige.storage.callClosingThreadResources
+import dev.anchildress1.vestige.storage.lensReceiptsJsonOrEmpty
 import dev.anchildress1.vestige.ui.onboarding.OnboardingPrefs
 import io.objectbox.BoxStore
 import org.json.JSONArray
@@ -77,7 +78,7 @@ internal class VestigeDataExporter(
                     .putNullable("recurrence_link", entry.recurrenceLink)
                     .putNullable("stated_commitment_json", entry.statedCommitmentJson)
                     .put("entry_observations_json", entry.entryObservationsJson)
-                    .put("lens_receipts_json", entry.lensReceiptsJson ?: "[]")
+                    .put("lens_receipts_json", entry.lensReceiptsJsonOrEmpty)
                     .put("confidence_json", entry.confidenceJson)
                     .put("extraction_status", entry.extractionStatus.name)
                     .put("duration_ms", entry.durationMs)

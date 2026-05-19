@@ -2,6 +2,7 @@ package dev.anchildress1.vestige.ui.history
 
 import dev.anchildress1.vestige.model.ExtractionStatus
 import dev.anchildress1.vestige.storage.EntryEntity
+import dev.anchildress1.vestige.storage.lensReceiptsJsonOrEmpty
 import java.time.ZoneId
 
 /** Immutable UI projection for a single entry detail. */
@@ -27,8 +28,7 @@ data class EntryDetailUiModel(
 ) {
     companion object {
         fun from(entity: EntryEntity, zoneId: ZoneId): EntryDetailUiModel {
-            val lensReceipts = entity.lensReceiptsJson?.trim().orEmpty()
-            val hasLensReceiptPayload = lensReceipts.isNotEmpty() && lensReceipts != "[]"
+            val hasLensReceiptPayload = entity.lensReceiptsJsonOrEmpty != "[]"
             return EntryDetailUiModel(
                 id = entity.id,
                 timeOfDayLabel = HistoryDateFormatter.formatClock12(entity.timestampEpochMs, zoneId),

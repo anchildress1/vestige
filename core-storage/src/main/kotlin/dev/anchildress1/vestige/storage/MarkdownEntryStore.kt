@@ -47,7 +47,7 @@ class MarkdownEntryStore(private val baseDir: File) {
             entry.tags.map { it.name }.sorted().forEach { tag -> appendLine("  - $tag") }
             append("confidence: ").append(yamlJsonInline(entry.confidenceJson)).append('\n')
             append("entry_observations: ").append(yamlJsonInline(entry.entryObservationsJson)).append('\n')
-            append("lens_receipts: ").append(yamlJsonInline(entry.lensReceiptsJson ?: "[]")).append('\n')
+            append("lens_receipts: ").append(yamlJsonInline(entry.lensReceiptsJsonOrEmpty)).append('\n')
             append(FRONTMATTER_FENCE).append('\n')
             append('\n')
             append(entry.entryText)

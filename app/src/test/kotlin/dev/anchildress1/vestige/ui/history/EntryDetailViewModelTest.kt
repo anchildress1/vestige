@@ -452,6 +452,38 @@ class EntryDetailViewModelTest {
         }
     }
 
+    @Test
+    fun `vocab field does not backfill tag text when receipts contain no vocabulary evidence`() = runTest {
+        val id = entryStore.createPendingEntry("plain transcript", FIXTURE_INSTANT)
+        entryStore.completeEntry(
+            id,
+            ResolvedExtraction(
+                mapOf(
+                    "tags" to ResolvedField(
+                        listOf("rosy-pocket", "go-pro"),
+                        ConfidenceVerdict.CANONICAL,
+                    ),
+                ),
+            ),
+            null,
+            lensReceipts = listOf(
+                EntryLensReceipt(
+                    lens = Lens.LITERAL,
+                    extracted = true,
+                    fields = mapOf("tags" to listOf("rosy-pocket", "go-pro")),
+                ),
+            ),
+        )
+        val vm = buildVm(id)
+
+        vm.state.test {
+            val loaded = awaitItem() as EntryDetailUiState.Loaded
+            val vocab = loaded.model.fields.first { it.label == "VOCAB" }
+            assertEquals("—", vocab.value)
+            assertEquals(LensTone.AMBIGUOUS, vocab.tone)
+        }
+    }
+
     // --- word count ---
 
     @Test

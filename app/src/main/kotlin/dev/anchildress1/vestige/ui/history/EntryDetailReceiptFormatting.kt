@@ -56,18 +56,18 @@ internal fun buildFieldRows(entity: EntryEntity): List<FieldRow> {
     val tagsText = entity.tags.map { it.name }.sorted().take(DISPLAY_LIMIT).joinToString(", ").ifBlank { DASH }
     val vocabValue = when {
         receipts == null -> EntryDetailCopy.LENS_UNREADABLE
-        else -> receipts.asSequence().mapNotNull { displayValue(it.fields[KEY_VOCAB]) }.firstOrNull() ?: tagsText
+        else -> receipts.asSequence().mapNotNull { displayValue(it.fields[KEY_VOCAB]) }.firstOrNull() ?: DASH
     }
     val vocabTone = if (receipts == null) {
         LensTone.CONFLICT
     } else {
-        confidence[KEY_VOCAB].toTone(confidence[KEY_TAGS].toTone())
+        confidence[KEY_VOCAB].toTone()
     }
     return listOf(
         FieldRow(
             label = "BEHAVIOR",
             value = tagsText,
-            tone = confidence[KEY_TAGS].toTone(fallback = LensTone.CANONICAL),
+            tone = confidence[KEY_TAGS].toTone(),
         ),
         FieldRow(
             label = "STATE",

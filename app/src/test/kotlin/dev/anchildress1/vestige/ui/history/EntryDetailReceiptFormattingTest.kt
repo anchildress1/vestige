@@ -162,7 +162,7 @@ class EntryDetailReceiptFormattingTest {
     @Test
     fun `observation parses text, evidence and non-blank fields`() {
         val line = parseObservations(
-            """[{"text":"slept poorly","evidence":"energy","fields":["energy_descriptor","  "," tags "]}]""",
+            """[{"text":"slept poorly","evidence":"energy","fields":["energy_descriptor","  ","tags"]}]""",
         ).single()
 
         assertEquals("slept poorly", line.text)

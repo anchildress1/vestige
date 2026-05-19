@@ -187,6 +187,7 @@ dependencies {
 // forkEvery=1 so coverage stays above the gate.
 val objectBoxBackedAppTests = setOf(
     "dev.anchildress1.vestige.AppContainerTest",
+    "dev.anchildress1.vestige.VestigeDataExporterTest",
     "dev.anchildress1.vestige.debug.DebugPatternSeederTest",
     "dev.anchildress1.vestige.patterns.PatternDetectionOrchestratorAnalysisTest",
     "dev.anchildress1.vestige.patterns.PatternDetectionOrchestratorTest",

@@ -256,6 +256,9 @@ extracting). Top → bottom: AppTop pill + hamburger; `← BACK`; the filed **ti
 - **Extracting:** `● EXTRACTING · 3 LENSES` with an animated spinner +
   "Convergence resolves in the background. Open the entry later for the full read.", and the
   lens/field areas render as skeletons.
+- **Unreadable receipt:** a stored lens receipt that exists but cannot be parsed reads
+  `unreadable` (coral / CONFLICT tone) instead of `not run` — a corrupt blob must not be
+  misrepresented as "the lens never ran".
 
 Then `YOU · TRANSCRIPT` (dim user transcription), `▸ TAGS` chips, and the shared bottom nav
 (HISTORY active). No +NEW-ENTRY action (Capture tab covers it); no stat ribbon; no reading

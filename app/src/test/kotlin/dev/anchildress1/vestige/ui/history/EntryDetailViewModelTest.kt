@@ -390,6 +390,25 @@ class EntryDetailViewModelTest {
         }
     }
 
+    @Test
+    fun `corrupt lens receipts read as unreadable, not as lens-never-ran`() = runTest {
+        val id = createCompleted("battery got yanked")
+        val box = boxStore.boxFor(EntryEntity::class.java)
+        box.get(id).also { it.lensReceiptsJson = "{not valid json" }.let(box::put)
+        val vm = buildVm(id)
+
+        vm.state.test {
+            val loaded = awaitItem() as EntryDetailUiState.Loaded
+            loaded.model.lenses.forEach {
+                assertEquals(EntryDetailCopy.LENS_UNREADABLE, it.value)
+                assertEquals(LensTone.CONFLICT, it.tone)
+            }
+            val vocab = loaded.model.fields.first { it.label == "VOCAB" }
+            assertEquals(EntryDetailCopy.LENS_UNREADABLE, vocab.value)
+            assertEquals(LensTone.CONFLICT, vocab.tone)
+        }
+    }
+
     // --- word count ---
 
     @Test

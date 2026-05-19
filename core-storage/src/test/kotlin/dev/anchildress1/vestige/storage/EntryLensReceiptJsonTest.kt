@@ -3,6 +3,7 @@ package dev.anchildress1.vestige.storage
 import dev.anchildress1.vestige.model.EntryLensReceipt
 import dev.anchildress1.vestige.model.Lens
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -43,5 +44,12 @@ class EntryLensReceiptJsonTest {
     @Test
     fun `decode returns empty list for malformed json`() {
         assertTrue(EntryLensReceiptJson.decode("{not-json").isEmpty())
+    }
+
+    @Test
+    fun `decodeOrNull returns null for corrupt blob but empty list for legit empty`() {
+        assertNull(EntryLensReceiptJson.decodeOrNull("{not-json"))
+        assertEquals(emptyList<EntryLensReceipt>(), EntryLensReceiptJson.decodeOrNull("[]"))
+        assertEquals(emptyList<EntryLensReceipt>(), EntryLensReceiptJson.decodeOrNull("  "))
     }
 }

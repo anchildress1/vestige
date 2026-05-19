@@ -23,6 +23,7 @@ object EntryDetailCopy {
     const val LENS_MISSING = "not run"
     const val LENS_NO_OPINION = "no opinion"
     const val LENS_NO_FIELDS = "no fields"
+    const val LENS_UNREADABLE = "unreadable"
 
     const val BACK_LABEL = "←"
     const val BACK_CD = "Back"

@@ -27,7 +27,11 @@ internal fun parseObservations(json: String): List<ObservationLine> {
 }
 
 internal fun buildLensReads(json: String): List<LensRead> {
-    val byLens = EntryLensReceiptJson.decode(json).associateBy { it.lens }
+    val decoded = EntryLensReceiptJson.decodeOrNull(json)
+        ?: return Lens.entries.map { lens ->
+            LensRead(label = lens.name, value = EntryDetailCopy.LENS_UNREADABLE, tone = LensTone.CONFLICT)
+        }
+    val byLens = decoded.associateBy { it.lens }
     return Lens.entries.map { lens ->
         val receipt = byLens[lens]
         LensRead(
@@ -40,8 +44,17 @@ internal fun buildLensReads(json: String): List<LensRead> {
 
 internal fun buildFieldRows(entity: EntryEntity): List<FieldRow> {
     val confidence = parseConfidence(entity.confidenceJson)
-    val receipts = EntryLensReceiptJson.decode(entity.lensReceiptsJson)
+    val receipts = EntryLensReceiptJson.decodeOrNull(entity.lensReceiptsJson)
     val tagsText = entity.tags.map { it.name }.sorted().take(DISPLAY_LIMIT).joinToString(", ").ifBlank { DASH }
+    val vocabValue = when {
+        receipts == null -> EntryDetailCopy.LENS_UNREADABLE
+        else -> receipts.asSequence().mapNotNull { displayValue(it.fields[KEY_VOCAB]) }.firstOrNull() ?: tagsText
+    }
+    val vocabTone = if (receipts == null) {
+        LensTone.CONFLICT
+    } else {
+        confidence[KEY_VOCAB].toTone(confidence[KEY_TAGS].toTone())
+    }
     return listOf(
         FieldRow(
             label = "BEHAVIOR",
@@ -53,14 +66,7 @@ internal fun buildFieldRows(entity: EntryEntity): List<FieldRow> {
             value = entity.energyDescriptor?.takeIf(String::isNotBlank) ?: DASH,
             tone = confidence[KEY_ENERGY].toTone(),
         ),
-        FieldRow(
-            label = "VOCAB",
-            value = receipts.asSequence()
-                .mapNotNull { displayValue(it.fields[KEY_VOCAB]) }
-                .firstOrNull()
-                ?: tagsText,
-            tone = confidence[KEY_VOCAB].toTone(confidence[KEY_TAGS].toTone()),
-        ),
+        FieldRow(label = "VOCAB", value = vocabValue, tone = vocabTone),
         FieldRow(
             label = "PROMISES",
             value = commitmentText(entity.statedCommitmentJson) ?: DASH,

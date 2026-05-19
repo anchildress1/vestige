@@ -112,12 +112,12 @@ class EntryStore(private val boxStore: BoxStore, private val markdownStore: Mark
     }
 
     /** Read-only lookup. Returns `null` for missing rows so callers can act without throwing. */
-    fun readEntry(entryId: Long): EntryEntity? = boxStore.callInReadTxClosingThreadResources {
+    fun readEntry(entryId: Long): EntryEntity? = boxStore.callClosingThreadResources {
         boxStore.boxFor<EntryEntity>().get(entryId)
     }
 
     /** Most-recent entry still in-flight, or `null` when no notification deep-link target exists. */
-    fun mostRecentNonTerminalEntryId(): Long? = boxStore.callInReadTxClosingThreadResources {
+    fun mostRecentNonTerminalEntryId(): Long? = boxStore.callClosingThreadResources {
         boxStore.boxFor<EntryEntity>()
             .query()
             .`in`(EntryEntity_.extractionStatus, NON_TERMINAL_STATUS_NAMES, QueryBuilder.StringOrder.CASE_SENSITIVE)
@@ -127,12 +127,12 @@ class EntryStore(private val boxStore: BoxStore, private val markdownStore: Mark
     }
 
     /** Total persisted rows, regardless of extraction terminality. */
-    fun count(): Long = boxStore.callInReadTxClosingThreadResources {
+    fun count(): Long = boxStore.callClosingThreadResources {
         boxStore.boxFor<EntryEntity>().count()
     }
 
     /** Completed entries only — denominator for pattern stats and pattern-empty-state gating. */
-    fun countCompleted(): Long = boxStore.callInReadTxClosingThreadResources {
+    fun countCompleted(): Long = boxStore.callClosingThreadResources {
         boxStore.boxFor<EntryEntity>()
             .query()
             .equal(
@@ -145,7 +145,7 @@ class EntryStore(private val boxStore: BoxStore, private val markdownStore: Mark
     }
 
     /** Most-recent completed entries, newest first. [limit] is a guard, not pagination. */
-    fun listCompleted(limit: Int = 100): List<EntryEntity> = boxStore.callInReadTxClosingThreadResources {
+    fun listCompleted(limit: Int = 100): List<EntryEntity> = boxStore.callClosingThreadResources {
         boxStore.boxFor<EntryEntity>()
             .query()
             .equal(
@@ -159,7 +159,7 @@ class EntryStore(private val boxStore: BoxStore, private val markdownStore: Mark
     }
 
     /** Single most-recent completed entry, or `null` when none exist. */
-    fun lastCompleted(): EntryEntity? = boxStore.callInReadTxClosingThreadResources {
+    fun lastCompleted(): EntryEntity? = boxStore.callClosingThreadResources {
         boxStore.boxFor<EntryEntity>()
             .query()
             .equal(

@@ -44,7 +44,7 @@ class RetrievalRepo(
         if (queryTerms.isEmpty()) return emptyList()
         val queryTokens = queryTerms.toSet()
 
-        val (storedTagKeys, entries) = boxStore.callInReadTxClosingThreadResources {
+        val (storedTagKeys, entries) = boxStore.callClosingThreadResources {
             val entryBox = boxStore.boxFor<EntryEntity>()
             val tagBox = boxStore.boxFor<TagEntity>()
             RetrievalSnapshot(

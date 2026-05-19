@@ -158,23 +158,23 @@ class VectorBackfillWorker(private val boxStore: BoxStore, private val embedder:
         entryBox.put(entry)
     }
 
-    private fun pendingEmbeddingCount(): Long = boxStore.callInReadTxClosingThreadResources {
+    private fun pendingEmbeddingCount(): Long = boxStore.callClosingThreadResources {
         pendingEmbeddingQuery().use { it.count() }
     }
 
-    private fun pendingLegacyCleanupCount(): Long = boxStore.callInReadTxClosingThreadResources {
+    private fun pendingLegacyCleanupCount(): Long = boxStore.callClosingThreadResources {
         pendingLegacyCleanupQuery().use { it.count() }
     }
 
     private fun loadEmbeddingBatch(afterIdExclusive: Long, limit: Long): List<EntryEntity> =
-        boxStore.callInReadTxClosingThreadResources {
+        boxStore.callClosingThreadResources {
             pendingEmbeddingQuery(
                 afterIdExclusive = afterIdExclusive,
             ).use { it.find(0, limit) }
         }
 
     private fun loadLegacyCleanupBatch(afterIdExclusive: Long, limit: Long): List<EntryEntity> =
-        boxStore.callInReadTxClosingThreadResources {
+        boxStore.callClosingThreadResources {
             pendingLegacyCleanupQuery(
                 afterIdExclusive = afterIdExclusive,
             ).use { it.find(0, limit) }

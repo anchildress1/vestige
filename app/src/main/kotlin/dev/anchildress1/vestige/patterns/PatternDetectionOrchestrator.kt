@@ -20,7 +20,7 @@ import dev.anchildress1.vestige.storage.PatternDetector
 import dev.anchildress1.vestige.storage.PatternEntity
 import dev.anchildress1.vestige.storage.PatternMatcher
 import dev.anchildress1.vestige.storage.PatternStore
-import dev.anchildress1.vestige.storage.callInReadTxClosingThreadResources
+import dev.anchildress1.vestige.storage.callClosingThreadResources
 import io.objectbox.BoxStore
 import io.objectbox.query.QueryBuilder
 import kotlinx.coroutines.CancellationException
@@ -211,7 +211,7 @@ class PatternDetectionOrchestrator(
 
     private fun loadSupporting(ids: List<Long>): List<EntryEntity> {
         if (ids.isEmpty()) return emptyList()
-        return boxStore.callInReadTxClosingThreadResources {
+        return boxStore.callClosingThreadResources {
             val box = boxStore.boxFor(EntryEntity::class.java)
             ids.mapNotNull { box.get(it) }
         }
@@ -225,7 +225,7 @@ class PatternDetectionOrchestrator(
     }
 }
 
-private fun completedEntryCount(boxStore: BoxStore): Long = boxStore.callInReadTxClosingThreadResources {
+private fun completedEntryCount(boxStore: BoxStore): Long = boxStore.callClosingThreadResources {
     boxStore.boxFor(EntryEntity::class.java)
         .query()
         .equal(EntryEntity_.extractionStatus, ExtractionStatus.COMPLETED.name, QueryBuilder.StringOrder.CASE_SENSITIVE)

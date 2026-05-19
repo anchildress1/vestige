@@ -84,6 +84,7 @@ internal object PatternSignature {
  * Construct only via [Signature.of] — [patternId] is `sha256(json)` by construction, so the
  * content-addressable contract can't be broken by a hand-built mismatched pair.
  */
+@ConsistentCopyVisibility
 internal data class Signature private constructor(
     val kind: PatternKind,
     val json: String,

@@ -12,6 +12,8 @@ import dev.anchildress1.vestige.model.ObservationEvidence
 import dev.anchildress1.vestige.model.ResolvedExtraction
 import dev.anchildress1.vestige.model.ResolvedField
 import dev.anchildress1.vestige.model.TemplateLabel
+import dev.anchildress1.vestige.patterns.PatternDetectionOrchestrator
+import dev.anchildress1.vestige.storage.EntryEntity
 import dev.anchildress1.vestige.storage.EntryStore
 import io.mockk.coEvery
 import io.mockk.coVerify
@@ -146,45 +148,34 @@ class BackgroundExtractionSaveFlowTest {
     }
 
     @Test
-    fun `pattern orchestration keeps UI completion early and finalizes only after the append path settles`() = runTest {
+    fun `pattern orchestration detaches after terminal completion and reports callout append`() = runTest {
         val orchestrator = mockk<dev.anchildress1.vestige.patterns.PatternDetectionOrchestrator>()
         val downstream: ExtractionStatusListener = mockk(relaxed = true)
         val lifecycleEvents = mutableListOf<String>()
-        val flowWithOrch = BackgroundExtractionSaveFlow(
-            entryStore = entryStore,
-            worker = worker,
-            observationGenerator = observationGenerator,
+        val orchestrationStarted = CompletableDeferred<Unit>()
+        val releaseOrchestration = CompletableDeferred<Unit>()
+        val calloutAppendReported = CompletableDeferred<Unit>()
+        val flowWithOrch = buildPatternFlow(
+            orchestrator = orchestrator,
             lifecycleCallbacks = BackgroundExtractionLifecycleCallbacks(
                 listenerFactory = { downstream },
                 onEntryFinalized = { lifecycleEvents += "finalized:$it" },
+                onPatternCalloutAppended = {
+                    lifecycleEvents += "pattern:$it"
+                    calloutAppendReported.complete(Unit)
+                },
             ),
-            scope = flowScope,
-            patternOrchestrator = orchestrator,
         )
-        val storedEntry = dev.anchildress1.vestige.storage.EntryEntity(
-            id = ENTRY_ID,
-            extractionStatus = ExtractionStatus.COMPLETED,
-        )
-        val callout = dev.anchildress1.vestige.model.EntryObservation(
-            text = "Worth noting.",
-            evidence = dev.anchildress1.vestige.model.ObservationEvidence.PATTERN_CALLOUT,
-            fields = emptyList(),
-        )
+        val storedEntry = completedEntry()
+        val callout = patternCallout()
         val resolved = canonicalSample()
-        every { entryStore.createPendingEntry(any(), any(), any()) } returns ENTRY_ID
-        every { entryStore.readEntry(ENTRY_ID) } returns storedEntry
-        coEvery { worker.extract(any(), any()) } returns BackgroundExtractionResult.Success(
-            totalElapsedMs = 25_000L,
-            lensResults = emptyList(),
-            modelCallCount = 3,
-            resolved = resolved,
-            templateLabel = TemplateLabel.AFTERMATH,
-        )
-        coEvery { observationGenerator.generate(any(), any(), any()) } returns emptyList()
+        stubSuccessfulPatternExtraction(storedEntry, resolved)
         coEvery {
             orchestrator.onEntryCommitted(storedEntry, dev.anchildress1.vestige.model.Persona.WITNESS)
-        } answers {
+        } coAnswers {
             lifecycleEvents += "orchestrate"
+            orchestrationStarted.complete(Unit)
+            releaseOrchestration.await()
             callout
         }
         coEvery { downstream.onUpdate(ExtractionStatus.COMPLETED, 0, null) } answers {
@@ -200,10 +191,17 @@ class BackgroundExtractionSaveFlowTest {
         }
 
         flowWithOrch.saveAndExtract(SAMPLE_TEXT, SAMPLE_TIMESTAMP)
+        orchestrationStarted.await()
 
         coVerify(exactly = 1) { downstream.onUpdate(ExtractionStatus.COMPLETED, 0, null) }
         assertEquals(
-            listOf("completed", "orchestrate", "append", "settle", "finalized:$ENTRY_ID"),
+            listOf("completed", "finalized:$ENTRY_ID", "orchestrate"),
+            lifecycleEvents,
+        )
+        releaseOrchestration.complete(Unit)
+        calloutAppendReported.await()
+        assertEquals(
+            listOf("completed", "finalized:$ENTRY_ID", "orchestrate", "append", "settle", "pattern:$ENTRY_ID"),
             lifecycleEvents,
         )
     }
@@ -904,6 +902,42 @@ class BackgroundExtractionSaveFlowTest {
         assertEquals(ExtractionStatus.PENDING, listenerEvents.first())
         assertTrue(listenerEvents.contains(ExtractionStatus.COMPLETED))
     }
+
+    private fun buildPatternFlow(
+        orchestrator: PatternDetectionOrchestrator,
+        lifecycleCallbacks: BackgroundExtractionLifecycleCallbacks,
+    ): BackgroundExtractionSaveFlow = BackgroundExtractionSaveFlow(
+        entryStore = entryStore,
+        worker = worker,
+        observationGenerator = observationGenerator,
+        lifecycleCallbacks = lifecycleCallbacks,
+        scope = flowScope,
+        patternOrchestrator = orchestrator,
+    )
+
+    private fun stubSuccessfulPatternExtraction(storedEntry: EntryEntity, resolved: ResolvedExtraction) {
+        every { entryStore.createPendingEntry(any(), any(), any()) } returns ENTRY_ID
+        every { entryStore.readEntry(ENTRY_ID) } returns storedEntry
+        coEvery { worker.extract(any(), any()) } returns BackgroundExtractionResult.Success(
+            totalElapsedMs = 25_000L,
+            lensResults = emptyList(),
+            modelCallCount = 3,
+            resolved = resolved,
+            templateLabel = TemplateLabel.AFTERMATH,
+        )
+        coEvery { observationGenerator.generate(any(), any(), any()) } returns emptyList()
+    }
+
+    private fun completedEntry(): EntryEntity = EntryEntity(
+        id = ENTRY_ID,
+        extractionStatus = ExtractionStatus.COMPLETED,
+    )
+
+    private fun patternCallout(): EntryObservation = EntryObservation(
+        text = "Worth noting.",
+        evidence = ObservationEvidence.PATTERN_CALLOUT,
+        fields = emptyList(),
+    )
 
     private companion object {
         private const val ENTRY_ID: Long = 42L

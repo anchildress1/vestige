@@ -352,6 +352,7 @@ class AppContainer(
             BackgroundExtractionLifecycleCallbacks(
                 listenerFactory = ::extractionStatusListener,
                 onEntryFinalized = { launchVectorBackfillIfReady() },
+                onPatternCalloutAppended = { _dataRevision.value += 1 },
             ),
             scope,
             patternDetectionOrchestrator,

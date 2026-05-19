@@ -21,6 +21,7 @@ import java.time.ZonedDateTime
 data class BackgroundExtractionLifecycleCallbacks(
     val listenerFactory: (Long) -> ExtractionStatusListener,
     val onEntryFinalized: (Long) -> Unit = {},
+    val onPatternCalloutAppended: (Long) -> Unit = {},
 )
 
 /**
@@ -40,8 +41,9 @@ data class BackgroundExtractionLifecycleCallbacks(
  *   5. Detached: terminal worker states are buffered until persistence succeeds.
  *   6. Detached: `Success` → `EntryStore.completeEntry`; `Failed` / `TimedOut` → `failEntry`.
  *   7. Detached: once storage succeeds, the buffered terminal state is forwarded to the listener.
- *   8. Detached: success-only post-processing finishes, then [onEntryFinalized] fires for
- *      derived-work follow-ons like vector backfill.
+ *   8. Detached: success-only derived-work scheduling fires, then [onEntryFinalized] fires for
+ *      follow-ons like vector backfill. Pattern callout work continues on its own coroutine and
+ *      reports [onPatternCalloutAppended] when it changes entry-visible state.
  */
 @Suppress("TooManyFunctions") // Pipeline + handlers + helpers; splitting hides the linear flow.
 class BackgroundExtractionSaveFlow(
@@ -192,16 +194,27 @@ class BackgroundExtractionSaveFlow(
         ) {
             entryStore.completeEntry(entryId, result.resolved, result.templateLabel, observations)
         }
-        // Runs after the terminal commit so a callout failure can't unwind the resolved
-        // entry. Best-effort — failures are swallowed in runPatternOrchestration.
-        runPatternOrchestration(entryId, persona)
+        schedulePatternOrchestration(entryId, persona)
         runEntryFinalization(entryId)
     }
 
-    private suspend fun runPatternOrchestration(entryId: Long, persona: Persona): EntryObservation? {
-        val orchestrator = patternOrchestrator ?: return null
-        return try {
-            persistOrchestratorCallout(orchestrator, entryId, persona)
+    private fun schedulePatternOrchestration(entryId: Long, persona: Persona) {
+        val orchestrator = patternOrchestrator ?: return
+        scope.launch {
+            runPatternOrchestration(orchestrator, entryId, persona)
+        }
+    }
+
+    private suspend fun runPatternOrchestration(
+        orchestrator: PatternDetectionOrchestrator,
+        entryId: Long,
+        persona: Persona,
+    ) {
+        try {
+            val callout = persistOrchestratorCallout(orchestrator, entryId, persona)
+            if (callout != null) {
+                reportPatternCalloutAppended(entryId)
+            }
         } catch (cancellation: CancellationException) {
             throw cancellation
         } catch (@Suppress("TooGenericExceptionCaught") error: Exception) {
@@ -211,7 +224,6 @@ class BackgroundExtractionSaveFlow(
                 "Pattern orchestration failed for entryId=$entryId: " +
                     "${error.javaClass.simpleName} ${error.message}",
             )
-            null
         }
     }
 
@@ -263,6 +275,20 @@ class BackgroundExtractionSaveFlow(
             Log.w(
                 TAG,
                 "onEntryFinalized failed for entryId=$entryId: ${error.javaClass.simpleName} ${error.message}",
+            )
+        }
+    }
+
+    private fun reportPatternCalloutAppended(entryId: Long) {
+        try {
+            lifecycleCallbacks.onPatternCalloutAppended(entryId)
+        } catch (cancellation: CancellationException) {
+            throw cancellation
+        } catch (@Suppress("TooGenericExceptionCaught") error: Exception) {
+            Log.w(
+                TAG,
+                "onPatternCalloutAppended failed for entryId=$entryId: " +
+                    "${error.javaClass.simpleName} ${error.message}",
             )
         }
     }

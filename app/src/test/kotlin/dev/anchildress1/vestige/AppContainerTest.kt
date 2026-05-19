@@ -247,6 +247,34 @@ class AppContainerTest {
     }
 
     @Test
+    fun `backgroundExtractionSaveFlow pattern callout callback bumps data revision`() {
+        val saveFlow = mockk<BackgroundExtractionSaveFlow>(relaxed = true)
+        var lifecycleCallbacks: dev.anchildress1.vestige.save.BackgroundExtractionLifecycleCallbacks? = null
+        val container = AppContainer(
+            applicationContext = mockk<Context>(relaxed = true),
+            boxStoreFactory = { mockk<BoxStore>(relaxed = true) },
+            markdownStoreFactory = { mockk<MarkdownEntryStore>(relaxed = true) },
+            modelPathLoader = { "/tmp/fake-model.litertlm" },
+            backgroundEngineFactory = { _, _ -> mockk<LiteRtLmEngine>(relaxed = true) },
+            backgroundExtractionSaveFlowFactory = { _, _, _, callbacks, _, _ ->
+                lifecycleCallbacks = callbacks
+                saveFlow
+            },
+            recoveredEntryIdsLoader = { emptyList() },
+            foregroundServiceIntentFactory = { Intent("dev.anchildress1.vestige.TEST_START") },
+            foregroundServiceStarter = {},
+        )
+
+        container.backgroundExtractionSaveFlow
+        assertNotNull(lifecycleCallbacks)
+        val revisionBefore = container.dataRevision.value
+
+        lifecycleCallbacks!!.onPatternCalloutAppended(7L)
+
+        assertTrue(container.dataRevision.value > revisionBefore)
+    }
+
+    @Test
     fun `requireEmbedder builds the process-scoped embedder from complete embedding artifacts once`() = runTest {
         val embedder = mockk<Embedder>(relaxed = true)
         val modelStore = mockk<ModelArtifactStore>()

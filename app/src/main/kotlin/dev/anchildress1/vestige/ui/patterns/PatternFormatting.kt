@@ -10,11 +10,18 @@ import java.util.Locale
 
 /** Short, ND-friendly date format for cards + source rows. Avoids the year — pattern cadence is recent. */
 private val SHORT_DATE: DateTimeFormatter = DateTimeFormatter.ofPattern("MMM d", Locale.ENGLISH)
+private val SOURCE_DATE_TIME: DateTimeFormatter = DateTimeFormatter.ofPattern("MMM d · HH:mm", Locale.ENGLISH)
 
 private const val MILLIS_PER_DAY = 86_400_000L
 
-fun formatShortDate(epochMs: Long, zone: ZoneId = ZoneId.systemDefault()): String =
-    SHORT_DATE.format(Instant.ofEpochMilli(epochMs).atZone(zone))
+fun formatShortDate(
+    epochMs: Long,
+    zone: ZoneId = ZoneId.systemDefault(),
+    includeTime: Boolean = false,
+): String {
+    val instant = Instant.ofEpochMilli(epochMs).atZone(zone)
+    return if (includeTime) SOURCE_DATE_TIME.format(instant) else SHORT_DATE.format(instant)
+}
 
 /** Trimmed leading slice of an entry — caps the source snippet so cards stay scannable. */
 fun snippetOf(entryText: String, maxLen: Int = MAX_SNIPPET_LEN): String {

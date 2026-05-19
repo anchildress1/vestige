@@ -36,6 +36,7 @@ import org.robolectric.annotation.Config
 import java.io.File
 import java.time.Clock
 import java.time.Instant
+import java.time.ZoneId
 import java.time.ZoneOffset
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -98,6 +99,10 @@ class PatternDetailViewModelTest {
             val sourceTimestamps = loaded.sources.map { it.entryId }
             // Entries seeded with ascending timestamps; sources should be reverse order.
             assertEquals(entries.reversed().map { it.id }, sourceTimestamps)
+            assertEquals(
+                formatShortDate(entries.last().timestampEpochMs, ZoneId.systemDefault(), includeTime = true),
+                loaded.sources.first().dateLabel,
+            )
             assertFalse(loaded.isTerminal)
             assertNull(loaded.terminalLabel)
             assertEquals(

@@ -43,6 +43,7 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import java.io.File
+import java.time.ZoneId
 
 /**
  * Pos / neg / edge + a11y coverage for the detail screen.
@@ -115,8 +116,12 @@ class PatternDetailScreenTest {
         composeRule.onNodeWithText("Tuesday Meetings").assertIsDisplayed()
         composeRule.onAllNodesWithText("Aftermath").assertCountEquals(0)
         composeRule.onNodeWithText("Fourth entry mentions Tuesday meetings.").assertIsDisplayed()
+        composeRule.onNodeWithText(
+            formatShortDate(MAY_12_2026_EPOCH_MS, ZoneId.systemDefault(), includeTime = true),
+        ).performScrollTo().assertIsDisplayed()
         // Action row + sources live below the new card stack; scrolling brings them into view.
         composeRule.onNodeWithText("crashed after standup").performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithText("→").performScrollTo().assertIsDisplayed()
         composeRule.onNodeWithText("WORDS YOU USED").performScrollTo().assertIsDisplayed()
         composeRule.onNodeWithContentDescription("word used: crashed").performScrollTo().assertIsDisplayed()
         // Active patterns expose user actions Drop + Skip only; Restart belongs to terminal patterns.

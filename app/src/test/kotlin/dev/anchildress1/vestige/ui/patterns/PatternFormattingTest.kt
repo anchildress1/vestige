@@ -95,6 +95,23 @@ class PatternFormattingTest {
 
     // endregion
 
+    // region formatShortDate (includeTime=true)
+
+    @Test
+    fun `formatShortDate emits MMM d and 24-hour time when includeTime is true`() {
+        val ms = Instant.parse("2026-05-12T12:05:00Z").toEpochMilli()
+        assertEquals("May 12 · 12:05", formatShortDate(ms, ZoneOffset.UTC, includeTime = true))
+    }
+
+    @Test
+    fun `formatShortDate includeTime honours non-UTC zone boundaries`() {
+        // 23:30 UTC on the 12th is 02:30 on the 13th in UTC+3.
+        val ms = Instant.parse("2026-05-12T23:30:00Z").toEpochMilli()
+        assertEquals("May 13 · 02:30", formatShortDate(ms, ZoneOffset.ofHours(3), includeTime = true))
+    }
+
+    // endregion
+
     // region actionSnackbarMessageRes
 
     @Test

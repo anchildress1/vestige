@@ -42,6 +42,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.anchildress1.vestige.R
 import dev.anchildress1.vestige.model.PatternState
+import dev.anchildress1.vestige.ui.components.EyebrowE
 import dev.anchildress1.vestige.ui.components.VestigeListCard
 import dev.anchildress1.vestige.ui.components.VestigeListCardInteraction
 import dev.anchildress1.vestige.ui.components.VestigeScaffold
@@ -282,16 +283,31 @@ private fun SourceRow(source: PatternSourceUi, onClick: () -> Unit) {
         interaction = VestigeListCardInteraction.Click(onClick = onClick),
     ) {
         Row(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 12.dp, vertical = 10.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                EyebrowE(text = source.dateLabel, maxLines = 1, softWrap = false)
+                Text(
+                    text = source.snippet,
+                    style = MaterialTheme.typography.bodyMedium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
             Text(
-                text = source.dateLabel,
-                style = MaterialTheme.typography.bodyMedium,
+                text = "→",
+                style = MaterialTheme.typography.titleMedium,
                 color = VestigeTheme.colors.dim,
+                maxLines = 1,
+                softWrap = false,
             )
-            Text(text = "—", color = VestigeTheme.colors.dim)
-            Text(text = source.snippet, style = MaterialTheme.typography.bodyMedium)
         }
     }
 }

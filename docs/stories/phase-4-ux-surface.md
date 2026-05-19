@@ -213,8 +213,8 @@ Checked bullets above are the historical record that the Mist tokens shipped to 
 - [x] Source-link integration: tapping a pattern source from Pattern Detail navigates to this Entry Detail screen and highlights the target entry context.
 - [x] Notification tap target deep-links here per ADR-004 §"Notification Contract": tapping the system-shade `Reading the entry.` notification opens this screen for the most recent relevant entry.
 - [x] Header title is the filed time from the real entry timestamp (`10:04 PM` style), not a template label or screenshot title.
-- [ ] Tags row renders model-extracted tags as quiet chips. Interim treatment uses `Pill` outlined-`dim`; replace with the `Chip` primitive if `tag-chip-primitive-split` (backlog v1.5) ships first.
-- [ ] Observation / receipt blocks render actual stored extraction fields: primary/secondary lens outputs, model follow-up, per-entry observations, and evidence references. **Any block with no stored data is omitted entirely** — no placeholder string, no faux demo value.
+- [x] Tags row renders model-extracted tags as quiet chips. (`EntryDetailScreen.EntryTagsRow` binds `EntryDetailUiModel.tags` from persisted `EntryEntity.tags`; empty tag list omits the section.)
+- [x] Observation / receipt blocks render actual stored extraction fields: primary/secondary lens outputs, model follow-up, per-entry observations, and evidence references. (`EntryDetailScreen` now renders `entry_observations` from persisted `entryObservationsJson` including `text` + `evidence` + `fields`; extraction sections are gated by `ExtractionDisplay` and omitted when absent. Regression guard: `FauxDataCopyGuardTest` + fresh-entry assertion in `EntryDetailScreenTest`.)
 - [ ] Reading / Re-eval section is **deferred to Story 4.13** as P1 contingent.
 - [ ] Vocabulary chip cloud below the observation is **deferred to Story 4.13** if it ships at all (it ships only if STT-E passed; otherwise the observation copy carries the vocabulary observation in plain text).
 - [ ] Source-link nav remains entry-detail-first: pattern source rows navigate to the matched Entry Detail by `entryId`. The brief-highlight on the receiving entry is preserved.
@@ -246,8 +246,8 @@ Checked bullets above are the historical record that the Mist tokens shipped to 
 - [x] Source list rows are clickable to Entry Detail (Story 4.7).
 - [x] Action row at the bottom uses the same action contract as the list: `Skip` / `Drop` on ACTIVE, `Restart` otherwise (spec §P0.1 / P0.3).
 - [x] Dropped patterns surface `Dropped {date}.` Closed patterns (v1.5) surface `Closed {date}. No new entries matched in {N} days.` and hide the action row entirely. (`terminalLabelFor`; detail action row gated `state != CLOSED`; banner carries status-band a11y. CLOSED unreachable in v1 — covered by seeded tests for v1.5 readiness.)
-- [ ] Pattern Detail renders actual source rows: `EyebrowE` `{MMM D · HH:MM}` + one-line snippet (first ~60 chars of `entry_text`, ellipsized) + a trailing affordance. Tap target: whole row.
-- [ ] Pattern Detail source-row tap opens Entry Detail for the matched `entryId`. Predictive-back returns to Pattern Detail.
+- [x] Pattern Detail renders actual source rows: `EyebrowE` `{MMM D · HH:MM}` + one-line snippet (first ~60 chars of `entry_text`, ellipsized) + a trailing affordance. Tap target: whole row. (`PatternDetailViewModel.toSourceRow` now maps `formatSourceDateTime` + `snippetOf`; `SourceRow` renders `EyebrowE`, one-line body, and trailing arrow affordance.)
+- [x] Pattern Detail source-row tap opens Entry Detail for the matched `entryId`. Predictive-back returns to Pattern Detail. (`PatternDetailScreenTest` and `PatternsHostTest` cover row click callback + detail→entry route with back unwinding to Pattern Detail.)
 - [x] Vocabulary chips below the observation ship only when backed by stored vocabulary/embedding data. (`PatternDetailViewModel.vocabularyFrom` tokenizes `buildEmbeddingText(entry)` across supporting rows; empty distilled embedding text omits the card, so screenshot seed vocabulary never renders.)
 
 **Notes / risks:** `Roast me` button visibility is gated on Story 4.14 shipping. If 4.14 doesn't ship in v1, hide the button rather than showing a button that does nothing. (Per `AGENTS.md` and the scope rule, don't ship dead UI.)

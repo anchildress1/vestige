@@ -155,7 +155,7 @@ class PatternDetailViewModel(
 
     private fun EntryEntity.toSourceRow() = PatternSourceUi(
         entryId = id,
-        dateLabel = formatShortDate(timestampEpochMs),
+        dateLabel = formatShortDate(timestampEpochMs, includeTime = true),
         snippet = snippetOf(entryText),
     )
 

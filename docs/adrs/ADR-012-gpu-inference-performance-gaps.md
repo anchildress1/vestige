@@ -81,6 +81,30 @@ The `prebuilt/` directory referenced in the original decision does not exist in 
 
 ---
 
+### Addendum (2026-05-18) — Decision 2 reverted: pre-warm regressed into a startup crash
+
+**Decision 2 (pre-warm on the model-ready transition) is reverted.** On-device (Galaxy S24
+Ultra), proactively kicking `ensureBackgroundEngineInitialized()` early — as the first SDK
+touch in the process, off the readiness coroutine, while the user waits at the Capture
+spinner — reliably crashes during GPU engine init (`AdrenoGLES` / `tflite` OpenCL bring-up;
+full tombstone not yet captured). The lazy path (init on first inference) did not crash in
+the same way, so the regression is the *timing/context* of the proactive launch, not the
+engine config.
+
+- `AppContainer.refreshModelReadiness()` no longer pre-warms. Readiness is **artifact-presence
+  based**: a full-size artifact on disk is `Ready`; `ensureBackgroundEngineInitialized()`
+  fires lazily on the first inference (its pre-Decision-2 behavior). The
+  `scope.launch { ensureBackgroundEngineInitialized() }` pre-warm launch + the later
+  engine-warm gate (`kickEngineWarmup`) are removed.
+- **Trade-off accepted:** the ~15s first-tap stall Decision 2 set out to remove returns. That
+  is strictly better than an app that crashes before the user can act. The stall is a
+  contained, reproducible signal; the crash was an app-won't-start wall.
+- **Revisit when:** a real tombstone identifies the faulting frame. Re-introducing pre-warm
+  requires a new decision that addresses *where/when* init runs (not racing the embedder /
+  other native init, on a safe thread) — superseding this addendum, not reverting it.
+
+---
+
 ## Consequences
 
 - Engine init stall moves to app-open background (hidden from user on any session where model was already present at launch).

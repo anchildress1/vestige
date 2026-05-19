@@ -218,9 +218,6 @@ class AppContainer(
     private var backgroundEngineInitialized = false
 
     @Volatile
-    private var engineWarmupKicked = false
-
-    @Volatile
     private var embedderInstance: Embedder? = null
 
     val networkGate: NetworkGate = networkGateFactory()
@@ -476,64 +473,25 @@ class AppContainer(
     /**
      * Re-probes the model artifact and emits the latest [ModelReadiness] to [modelReadinessFlow].
      * Host calls on lifecycle ON_RESUME (or when an action might have changed model state — e.g.
-     * Settings → Delete model, or a Phase-4 download-complete event). A full-size artifact alone
-     * is *not* `Ready`: the engine still has to load it. Readiness stays `Loading` until
-     * [ensureBackgroundEngineInitialized] completes, then flips to `Ready` and kicks the
-     * PENDING-extraction recovery sweep.
+     * Settings → Delete model, or a Phase-4 download-complete event). Readiness is
+     * **artifact-presence based**: a full-size artifact on disk is `Ready` — the engine is
+     * loaded lazily on the first inference, not proactively (ADR-012 §Addendum 2026-05-18:
+     * proactive pre-warm regressed into a startup GPU-init crash and is reverted). On the
+     * Ready transition the PENDING-extraction recovery sweep still runs.
      */
     fun refreshModelReadiness() {
         scope.launch {
             // Serialize probe→compare→set so concurrent callers (lifecycle resume + a model
             // action) can't interleave and let an older probe overwrite a newer readiness.
-            // Each caller queues and re-probes after the prior completes.
             readinessRefreshMutex.withLock {
                 val previous = _modelReadinessFlow.value
-                val probed = probeModelReadiness(previous)
-                // The size-only probe reports `Ready` the moment the artifact is on disk, but
-                // `engine.initialize()` (up to ~10 s) hasn't run yet — REC/typed must not unlock
-                // while the first inference would still eat the cold-start warmup. Hold at
-                // `Loading` (the honest "warming up" state) until the engine can actually serve.
-                val artifactReady = probed is ModelReadiness.Ready
-                val current =
-                    if (artifactReady && !backgroundEngineInitialized) ModelReadiness.Loading else probed
-                if (previous != current) _modelReadinessFlow.value = current
-                when {
-                    artifactReady && !backgroundEngineInitialized -> kickEngineWarmup()
-
-                    current is ModelReadiness.Ready && previous !is ModelReadiness.Ready ->
-                        scope.launch { recoverPendingExtractions() }
+                val current = probeModelReadiness(previous)
+                if (previous == current) return@withLock
+                _modelReadinessFlow.value = current
+                if (current is ModelReadiness.Ready && previous !is ModelReadiness.Ready) {
+                    scope.launch { recoverPendingExtractions() }
                 }
             }
-        }
-    }
-
-    /**
-     * Loads the engine off the readiness lock (initialize can take ~10 s), then flips readiness
-     * to `Ready` and drains PENDING recovery. Kicked at most once per warm cycle; a failed warmup
-     * re-arms so the next ON_RESUME retries instead of wedging at `Loading` forever.
-     */
-    private fun kickEngineWarmup() {
-        if (engineWarmupKicked) return
-        engineWarmupKicked = true
-        scope.launch {
-            val warmed = runCatching { ensureBackgroundEngineInitialized() }
-                .onFailure { Log.e(TAG, "Engine warmup failed; readiness stays Loading", it) }
-                .isSuccess && backgroundEngineInitialized
-            readinessRefreshMutex.withLock {
-                // Engine is warm — publish Ready iff a model is still on disk. Cheap presence
-                // probe (size, no multi-GB hash) is the right gate: the engine load already
-                // validated the artifact, and a delete/redownload mid-warmup leaves either a
-                // non-Complete probe or a non-Loading readiness, so we never clobber a
-                // Downloading/Paused/absent state into a false Ready.
-                val present = mainModelArtifactStore.probe() is ModelArtifactState.Complete
-                if (warmed && present && _modelReadinessFlow.value is ModelReadiness.Loading) {
-                    _modelReadinessFlow.value = ModelReadiness.Ready
-                } else {
-                    // Re-arm so the next ON_RESUME / probe can retry instead of wedging at Loading.
-                    engineWarmupKicked = false
-                }
-            }
-            if (warmed) recoverPendingExtractions()
         }
     }
 
@@ -833,9 +791,6 @@ class AppContainer(
 
     private suspend fun resetBackgroundEngine() {
         backgroundEngineInitMutex.withLock {
-            // Re-arm warmup unconditionally: a delete/redownload mid-warmup must let the next
-            // refresh kick a fresh cycle, even if `initialize()` hadn't finished yet.
-            engineWarmupKicked = false
             if (!backgroundEngineInitialized) return
             // Keep the wrapper instance so every collaborator holding `backgroundEngine` sees the
             // same object; `LiteRtLmEngine.close()` clears the native handle and supports re-init.

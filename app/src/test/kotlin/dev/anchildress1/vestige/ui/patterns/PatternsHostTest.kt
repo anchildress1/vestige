@@ -80,7 +80,10 @@ class PatternsHostTest {
 
     @After
     fun tearDown() {
-        boxStore.close()
+        composeRule.activityRule.scenario.close()
+        // Compose host tests still have ObjectBox readers owned by runner threads during @After.
+        // Closing the in-memory store here force-destroys them from the wrong thread.
+        boxStore.closeThreadResources()
         cleanupObjectBoxTempRoot(tempRoot, dataDir)
     }
 

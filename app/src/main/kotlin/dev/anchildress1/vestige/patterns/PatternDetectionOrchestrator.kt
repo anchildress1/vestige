@@ -20,6 +20,7 @@ import dev.anchildress1.vestige.storage.PatternDetector
 import dev.anchildress1.vestige.storage.PatternEntity
 import dev.anchildress1.vestige.storage.PatternMatcher
 import dev.anchildress1.vestige.storage.PatternStore
+import dev.anchildress1.vestige.storage.callInReadTxClosingThreadResources
 import io.objectbox.BoxStore
 import io.objectbox.query.QueryBuilder
 import kotlinx.coroutines.CancellationException
@@ -210,8 +211,10 @@ class PatternDetectionOrchestrator(
 
     private fun loadSupporting(ids: List<Long>): List<EntryEntity> {
         if (ids.isEmpty()) return emptyList()
-        val box = boxStore.boxFor(EntryEntity::class.java)
-        return ids.mapNotNull { box.get(it) }
+        return boxStore.callInReadTxClosingThreadResources {
+            val box = boxStore.boxFor(EntryEntity::class.java)
+            ids.mapNotNull { box.get(it) }
+        }
     }
 
     companion object {
@@ -222,11 +225,13 @@ class PatternDetectionOrchestrator(
     }
 }
 
-private fun completedEntryCount(boxStore: BoxStore): Long = boxStore.boxFor(EntryEntity::class.java)
-    .query()
-    .equal(EntryEntity_.extractionStatus, ExtractionStatus.COMPLETED.name, QueryBuilder.StringOrder.CASE_SENSITIVE)
-    .build()
-    .use { it.count() }
+private fun completedEntryCount(boxStore: BoxStore): Long = boxStore.callInReadTxClosingThreadResources {
+    boxStore.boxFor(EntryEntity::class.java)
+        .query()
+        .equal(EntryEntity_.extractionStatus, ExtractionStatus.COMPLETED.name, QueryBuilder.StringOrder.CASE_SENSITIVE)
+        .build()
+        .use { it.count() }
+}
 
 // A TEMPORAL_RELATIVE pattern that lands on the deterministic callout means model analysis
 // failed or was rejected (the generator already logged the specific reason). Surface the

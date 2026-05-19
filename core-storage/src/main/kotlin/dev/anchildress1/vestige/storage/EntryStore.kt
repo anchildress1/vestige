@@ -112,41 +112,65 @@ class EntryStore(private val boxStore: BoxStore, private val markdownStore: Mark
     }
 
     /** Read-only lookup. Returns `null` for missing rows so callers can act without throwing. */
-    fun readEntry(entryId: Long): EntryEntity? = boxStore.boxFor<EntryEntity>().get(entryId)
+    fun readEntry(entryId: Long): EntryEntity? = boxStore.callInReadTxClosingThreadResources {
+        boxStore.boxFor<EntryEntity>().get(entryId)
+    }
 
     /** Most-recent entry still in-flight, or `null` when no notification deep-link target exists. */
-    fun mostRecentNonTerminalEntryId(): Long? = boxStore.boxFor<EntryEntity>()
-        .query()
-        .`in`(EntryEntity_.extractionStatus, NON_TERMINAL_STATUS_NAMES, QueryBuilder.StringOrder.CASE_SENSITIVE)
-        .orderDesc(EntryEntity_.id)
-        .build()
-        .use { it.findFirst()?.id }
+    fun mostRecentNonTerminalEntryId(): Long? = boxStore.callInReadTxClosingThreadResources {
+        boxStore.boxFor<EntryEntity>()
+            .query()
+            .`in`(EntryEntity_.extractionStatus, NON_TERMINAL_STATUS_NAMES, QueryBuilder.StringOrder.CASE_SENSITIVE)
+            .orderDesc(EntryEntity_.id)
+            .build()
+            .use { it.findFirst()?.id }
+    }
 
     /** Total persisted rows, regardless of extraction terminality. */
-    fun count(): Long = boxStore.boxFor<EntryEntity>().count()
+    fun count(): Long = boxStore.callInReadTxClosingThreadResources {
+        boxStore.boxFor<EntryEntity>().count()
+    }
 
     /** Completed entries only — denominator for pattern stats and pattern-empty-state gating. */
-    fun countCompleted(): Long = boxStore.boxFor<EntryEntity>()
-        .query()
-        .equal(EntryEntity_.extractionStatus, ExtractionStatus.COMPLETED.name, QueryBuilder.StringOrder.CASE_SENSITIVE)
-        .build()
-        .use { it.count() }
+    fun countCompleted(): Long = boxStore.callInReadTxClosingThreadResources {
+        boxStore.boxFor<EntryEntity>()
+            .query()
+            .equal(
+                EntryEntity_.extractionStatus,
+                ExtractionStatus.COMPLETED.name,
+                QueryBuilder.StringOrder.CASE_SENSITIVE,
+            )
+            .build()
+            .use { it.count() }
+    }
 
     /** Most-recent completed entries, newest first. [limit] is a guard, not pagination. */
-    fun listCompleted(limit: Int = 100): List<EntryEntity> = boxStore.boxFor<EntryEntity>()
-        .query()
-        .equal(EntryEntity_.extractionStatus, ExtractionStatus.COMPLETED.name, QueryBuilder.StringOrder.CASE_SENSITIVE)
-        .orderDesc(EntryEntity_.timestampEpochMs)
-        .build()
-        .use { it.find(0, limit.toLong()) }
+    fun listCompleted(limit: Int = 100): List<EntryEntity> = boxStore.callInReadTxClosingThreadResources {
+        boxStore.boxFor<EntryEntity>()
+            .query()
+            .equal(
+                EntryEntity_.extractionStatus,
+                ExtractionStatus.COMPLETED.name,
+                QueryBuilder.StringOrder.CASE_SENSITIVE,
+            )
+            .orderDesc(EntryEntity_.timestampEpochMs)
+            .build()
+            .use { it.find(0, limit.toLong()) }
+    }
 
     /** Single most-recent completed entry, or `null` when none exist. */
-    fun lastCompleted(): EntryEntity? = boxStore.boxFor<EntryEntity>()
-        .query()
-        .equal(EntryEntity_.extractionStatus, ExtractionStatus.COMPLETED.name, QueryBuilder.StringOrder.CASE_SENSITIVE)
-        .orderDesc(EntryEntity_.timestampEpochMs)
-        .build()
-        .use { it.find(0, 1).firstOrNull() }
+    fun lastCompleted(): EntryEntity? = boxStore.callInReadTxClosingThreadResources {
+        boxStore.boxFor<EntryEntity>()
+            .query()
+            .equal(
+                EntryEntity_.extractionStatus,
+                ExtractionStatus.COMPLETED.name,
+                QueryBuilder.StringOrder.CASE_SENSITIVE,
+            )
+            .orderDesc(EntryEntity_.timestampEpochMs)
+            .build()
+            .use { it.find(0, 1).firstOrNull() }
+    }
 
     /**
      * Append one observation to an already-completed entry's persisted list. Used by the

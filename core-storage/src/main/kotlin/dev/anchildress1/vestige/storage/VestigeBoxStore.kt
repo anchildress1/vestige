@@ -27,12 +27,14 @@ object VestigeBoxStore {
      * by id ascending. The caller owns the [BoxStore] — this avoids the duplicate-open crash
      * once `EntryStore` (architecture-brief §"AppContainer Ownership") owns BoxStore lifecycle.
      */
-    fun findNonTerminalEntryIds(boxStore: BoxStore): List<Long> = boxStore.boxFor<EntryEntity>()
-        .query()
-        .`in`(EntryEntity_.extractionStatus, NON_TERMINAL_STATUS_NAMES, QueryBuilder.StringOrder.CASE_SENSITIVE)
-        .order(EntryEntity_.id)
-        .build()
-        .use { query -> query.findIds().toList() }
+    fun findNonTerminalEntryIds(boxStore: BoxStore): List<Long> = boxStore.callInReadTxClosingThreadResources {
+        boxStore.boxFor<EntryEntity>()
+            .query()
+            .`in`(EntryEntity_.extractionStatus, NON_TERMINAL_STATUS_NAMES, QueryBuilder.StringOrder.CASE_SENSITIVE)
+            .order(EntryEntity_.id)
+            .build()
+            .use { query -> query.findIds().toList() }
+    }
 
     private val NON_TERMINAL_STATUS_NAMES: Array<String> = arrayOf(
         ExtractionStatus.PENDING.name,

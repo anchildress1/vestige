@@ -47,6 +47,7 @@ import dev.anchildress1.vestige.storage.RetrievalRepo
 import dev.anchildress1.vestige.storage.TagEntity
 import dev.anchildress1.vestige.storage.VectorBackfillWorker
 import dev.anchildress1.vestige.storage.VestigeBoxStore
+import dev.anchildress1.vestige.storage.closeAfterCleaningThreadResources
 import dev.anchildress1.vestige.ui.capture.ModelReadiness
 import dev.anchildress1.vestige.ui.components.ModelDownloadProgress
 import dev.anchildress1.vestige.ui.onboarding.DownloadProgressTracker
@@ -914,7 +915,7 @@ class AppContainer(
         if (backgroundEngineDelegate.isInitialized()) {
             backgroundEngine.close()
         }
-        boxStore.close()
+        boxStore.closeAfterCleaningThreadResources()
     }
 
     private fun dispatchStartForegroundService() {

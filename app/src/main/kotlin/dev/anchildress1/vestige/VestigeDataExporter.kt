@@ -5,6 +5,7 @@ import dev.anchildress1.vestige.storage.EntryEntity
 import dev.anchildress1.vestige.storage.MarkdownEntryStore
 import dev.anchildress1.vestige.storage.PatternEntity
 import dev.anchildress1.vestige.storage.TagEntity
+import dev.anchildress1.vestige.storage.callInReadTxClosingThreadResources
 import dev.anchildress1.vestige.ui.onboarding.OnboardingPrefs
 import io.objectbox.BoxStore
 import org.json.JSONArray
@@ -48,7 +49,7 @@ internal class VestigeDataExporter(
         .put("default_persona", onboardingPrefs.defaultPersona.name)
         .put("current_step", onboardingPrefs.currentStep.name)
 
-    private fun entriesJson(): JSONArray = boxStore.callInReadTx<JSONArray> {
+    private fun entriesJson(): JSONArray = boxStore.callInReadTxClosingThreadResources {
         boxStore.boxFor(EntryEntity::class.java).all
             .sortedBy { it.id }
             .fold(JSONArray()) { arr, entry ->
@@ -78,7 +79,7 @@ internal class VestigeDataExporter(
             }
     }
 
-    private fun patternsJson(): JSONArray = boxStore.callInReadTx<JSONArray> {
+    private fun patternsJson(): JSONArray = boxStore.callInReadTxClosingThreadResources {
         boxStore.boxFor(PatternEntity::class.java).all
             .sortedBy { it.id }
             .fold(JSONArray()) { arr, pattern ->
@@ -105,7 +106,7 @@ internal class VestigeDataExporter(
             }
     }
 
-    private fun tagsJson(): JSONArray = boxStore.callInReadTx<JSONArray> {
+    private fun tagsJson(): JSONArray = boxStore.callInReadTxClosingThreadResources {
         boxStore.boxFor(TagEntity::class.java).all
             .sortedBy { it.name }
             .fold(JSONArray()) { arr, tag ->
@@ -118,7 +119,7 @@ internal class VestigeDataExporter(
             }
     }
 
-    private fun calloutCooldownsJson(): JSONArray = boxStore.callInReadTx<JSONArray> {
+    private fun calloutCooldownsJson(): JSONArray = boxStore.callInReadTxClosingThreadResources {
         boxStore.boxFor(CalloutCooldownEntity::class.java).all
             .sortedBy { it.id }
             .fold(JSONArray()) { arr, cooldown ->

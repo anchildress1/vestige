@@ -98,6 +98,11 @@ This string is the same one used for mid-capture inference loading copy (see §"
 
 ### Screen 3 — Model download
 
+> _Shared-card note (2026-05-18):_ the progress block here is the **same** `ModelDownloadCard`
+> the Settings → Model Status downloading state renders (one component, two hosts) — see
+> §"Local Model Status" Downloading-state reconciliation. Only the surrounding chrome differs
+> (`STEP 3 OF 3` + no bottom nav here; scoreboard + bottom nav there).
+
 Header:
 > **Download model.**
 
@@ -307,9 +312,21 @@ Network-gate band (coral border):
 > Eyebrow: `● NETWORK GATE · SEALED`
 > Body: `Allowlist: model artifact host only.`
 
-Actions (outline buttons, disabled while a download is in flight):
+Actions (outline buttons):
 - **Re-download model**
 - **Delete model**
+
+> _Downloading-state reconciliation (2026-05-18, `poc/model-detail-downloading-final.png`):_
+> while `readiness` is `Downloading` the screen swaps to the **shared download card** — the
+> exact same hero-percent / ETA / progress-bar / bytes / MB·s block onboarding Screen 3 uses
+> (one `ModelDownloadCard`, two hosts; the inner card is pixel-identical across both comps).
+> Layout in this state: AppTop pill `● GEMMA 4 · DOWNLOADING · {N}%`; a lime band
+> `● DOWNLOADING MODEL · WI-FI ONLY` wrapping the card (polite live region); the stat ribbon
+> becomes `{GB pulled}` · `GB PULLED` + `0` · `CLOUD CALLS`; the network-gate band switches
+> to `● NETWORK GATE · ALLOWLIST ACTIVE 1 HOST` / `Model artifact host only. Closes the
+> moment the pull completes.`; the on-device stack is hidden; the action row is a single
+> full-width **PAUSE**. PAUSE cancels the in-flight pull and keeps the `.part` so a later
+> Re-download resumes via HTTP-Range; readiness drops to `Paused`.
 
 Both route through the shared scoreboard confirm card (`VestigeConfirmCard`) using the
 canonical §"Destructive Confirmations" wording below — not a Material dialog, not a shorter

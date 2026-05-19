@@ -7,7 +7,6 @@ import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertHasClickAction
 import androidx.compose.ui.test.assertIsDisplayed
-import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onAllNodesWithText
@@ -17,6 +16,7 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import dev.anchildress1.vestige.ui.capture.ModelReadiness
+import dev.anchildress1.vestige.ui.components.ModelDownloadProgress
 import dev.anchildress1.vestige.ui.theme.VestigeTheme
 import org.junit.Assert.assertEquals
 import org.junit.Rule
@@ -32,11 +32,14 @@ class ModelStatusScreenTest {
     @get:Rule
     val composeRule = createComposeRule()
 
+    @Suppress("LongParameterList") // Test fixture mirrors the route callbacks.
     private fun screen(
         readiness: ModelReadiness = ModelReadiness.Ready,
         onDiskLabel: String = "3.66 GB",
+        downloadProgress: ModelDownloadProgress? = null,
         onReDownload: () -> Unit = {},
         onDelete: () -> Unit = {},
+        onPause: () -> Unit = {},
         onExit: () -> Unit = {},
     ) {
         composeRule.setContent {
@@ -47,9 +50,11 @@ class ModelStatusScreenTest {
                         sizeLabel = "3.66 GB",
                         onDiskLabel = onDiskLabel,
                         versionName = "1.0.0",
+                        downloadProgress = downloadProgress,
                     ),
                     onReDownload = onReDownload,
                     onDelete = onDelete,
+                    onPause = onPause,
                     onExit = onExit,
                 )
             }
@@ -107,18 +112,42 @@ class ModelStatusScreenTest {
     }
 
     @Test
-    fun `status band renders Downloading copy with the percent`() {
-        screen(readiness = ModelReadiness.Downloading(percent = 50))
+    fun `downloading state shows the shared progress card, pulled ribbon and active gate`() {
+        screen(
+            readiness = ModelReadiness.Downloading(percent = 38),
+            downloadProgress = ModelDownloadProgress(
+                fraction = 0.38f,
+                currentBytes = 1_491_308_339L,
+                expectedBytes = 3_928_180_000L,
+                etaSeconds = 258L,
+                mbps = 6.4f,
+            ),
+        )
+        composeRule.onNodeWithContentDescription("Downloading model. 38 percent.").assertIsDisplayed()
+        composeRule.onNodeWithContentDescription("1.39 gigabytes pulled, 0 cloud calls").assertExists()
         composeRule.onNodeWithContentDescription(
-            "Downloading model. Wi-Fi only. 50%",
-        ).assertIsDisplayed()
+            "Model artifact host only. Closes the moment the pull completes.",
+        ).assertExists()
     }
 
     @Test
-    fun `model actions disable while a download is in flight`() {
-        screen(readiness = ModelReadiness.Downloading(percent = 50))
-        composeRule.onNodeWithContentDescription("Re-download model").assertIsNotEnabled()
-        composeRule.onNodeWithContentDescription("Delete model").assertIsNotEnabled()
+    fun `downloading state replaces re-download and delete with a working PAUSE`() {
+        var paused = 0
+        screen(
+            readiness = ModelReadiness.Downloading(percent = 50),
+            downloadProgress = ModelDownloadProgress(
+                fraction = 0.5f,
+                currentBytes = 1_964_090_000L,
+                expectedBytes = 3_928_180_000L,
+                etaSeconds = 120L,
+                mbps = 8f,
+            ),
+            onPause = { paused++ },
+        )
+        composeRule.onAllNodesWithContentDescription("Re-download model").assertCountEquals(0)
+        composeRule.onAllNodesWithContentDescription("Delete model").assertCountEquals(0)
+        composeRule.onNodeWithContentDescription("PAUSE").performScrollTo().performClick()
+        assertEquals(1, paused)
     }
 
     @Test

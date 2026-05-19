@@ -37,10 +37,12 @@ import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import dev.anchildress1.vestige.R
 import dev.anchildress1.vestige.ui.capture.ModelReadiness
+import dev.anchildress1.vestige.ui.capture.appTopStatusFor
 import dev.anchildress1.vestige.ui.components.AppTop
-import dev.anchildress1.vestige.ui.components.AppTopStatuses
 import dev.anchildress1.vestige.ui.components.BottomTab
 import dev.anchildress1.vestige.ui.components.EyebrowE
+import dev.anchildress1.vestige.ui.components.ModelDownloadCard
+import dev.anchildress1.vestige.ui.components.ModelDownloadProgress
 import dev.anchildress1.vestige.ui.components.StatItem
 import dev.anchildress1.vestige.ui.components.StatRibbon
 import dev.anchildress1.vestige.ui.components.VestigeBottomNav
@@ -60,6 +62,7 @@ fun ModelStatusScreen(
     info: ModelStatusInfo,
     onReDownload: () -> Unit,
     onDelete: () -> Unit,
+    onPause: () -> Unit,
     onExit: () -> Unit,
     onNavSelect: (BottomTab) -> Unit = {},
     modifier: Modifier = Modifier,
@@ -67,11 +70,11 @@ fun ModelStatusScreen(
     BackHandler(onBack = onExit)
     var pending by remember { mutableStateOf(PendingConfirm.None) }
     val colors = VestigeTheme.colors
-    val actionsEnabled = info.readiness !is ModelReadiness.Downloading
+    val downloading = info.readiness is ModelReadiness.Downloading
 
     Box(modifier = modifier.fillMaxSize().background(colors.floor)) {
         Column(modifier = Modifier.fillMaxSize()) {
-            AppTop(persona = "", status = AppTopStatuses.Ready, onMenuTap = onExit)
+            AppTop(persona = "", status = appTopStatusFor(info.readiness), onMenuTap = onExit)
             Box(
                 modifier = Modifier
                     .clickable(role = Role.Button, onClick = onExit)
@@ -96,48 +99,61 @@ fun ModelStatusScreen(
                     .padding(horizontal = 18.dp, vertical = 16.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {
-                val stackLive = info.readiness is ModelReadiness.Ready
-                val stackAccent = if (stackLive) colors.lime else colors.coral
-                StatusBand(info)
-                ModelStatRibbon(onDiskLabel = info.onDiskLabel)
-                EyebrowE(text = stringResource(id = R.string.model_status_stack_eyebrow), color = stackAccent)
-                StackRow(
-                    name = stringResource(id = R.string.model_status_stack_main_name),
-                    role = stringResource(id = R.string.model_status_stack_main_role),
-                    size = info.sizeLabel,
-                    dotColor = stackAccent,
-                )
-                StackRow(
-                    name = stringResource(id = R.string.model_status_stack_embed_name),
-                    role = stringResource(id = R.string.model_status_stack_embed_role),
-                    size = stringResource(id = R.string.model_status_stack_embed_size),
-                    dotColor = stackAccent,
-                )
-                StackRow(
-                    name = stringResource(id = R.string.model_status_stack_runtime_name),
-                    role = stringResource(id = R.string.model_status_stack_runtime_role),
-                    size = stringResource(id = R.string.model_status_stack_runtime_size),
-                    dotColor = stackAccent,
-                )
-                NetworkGateBand()
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                ) {
+                if (downloading) {
+                    DownloadingBand(progress = info.downloadProgress)
+                    PulledRibbon(progress = info.downloadProgress)
+                    NetworkGateBand(active = true)
                     OutlineAction(
-                        label = stringResource(id = R.string.model_status_redownload),
+                        label = stringResource(id = R.string.model_status_pause),
                         color = colors.dim,
-                        enabled = actionsEnabled,
-                        onClick = { pending = PendingConfirm.ReDownload },
-                        modifier = Modifier.weight(1f),
+                        enabled = true,
+                        onClick = onPause,
+                        modifier = Modifier.fillMaxWidth(),
                     )
-                    OutlineAction(
-                        label = stringResource(id = R.string.model_status_delete),
-                        color = colors.coral,
-                        enabled = actionsEnabled,
-                        onClick = { pending = PendingConfirm.Delete },
-                        modifier = Modifier.weight(1f),
+                } else {
+                    val stackLive = info.readiness is ModelReadiness.Ready
+                    val stackAccent = if (stackLive) colors.lime else colors.coral
+                    StatusBand(info)
+                    ModelStatRibbon(onDiskLabel = info.onDiskLabel)
+                    EyebrowE(text = stringResource(id = R.string.model_status_stack_eyebrow), color = stackAccent)
+                    StackRow(
+                        name = stringResource(id = R.string.model_status_stack_main_name),
+                        role = stringResource(id = R.string.model_status_stack_main_role),
+                        size = info.sizeLabel,
+                        dotColor = stackAccent,
                     )
+                    StackRow(
+                        name = stringResource(id = R.string.model_status_stack_embed_name),
+                        role = stringResource(id = R.string.model_status_stack_embed_role),
+                        size = stringResource(id = R.string.model_status_stack_embed_size),
+                        dotColor = stackAccent,
+                    )
+                    StackRow(
+                        name = stringResource(id = R.string.model_status_stack_runtime_name),
+                        role = stringResource(id = R.string.model_status_stack_runtime_role),
+                        size = stringResource(id = R.string.model_status_stack_runtime_size),
+                        dotColor = stackAccent,
+                    )
+                    NetworkGateBand(active = false)
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    ) {
+                        OutlineAction(
+                            label = stringResource(id = R.string.model_status_redownload),
+                            color = colors.dim,
+                            enabled = true,
+                            onClick = { pending = PendingConfirm.ReDownload },
+                            modifier = Modifier.weight(1f),
+                        )
+                        OutlineAction(
+                            label = stringResource(id = R.string.model_status_delete),
+                            color = colors.coral,
+                            enabled = true,
+                            onClick = { pending = PendingConfirm.Delete },
+                            modifier = Modifier.weight(1f),
+                        )
+                    }
                 }
             }
             VestigeBottomNav(active = null, onSelect = onNavSelect)
@@ -256,9 +272,14 @@ private fun StackRow(name: String, role: String, size: String, dotColor: Color) 
 }
 
 @Composable
-private fun NetworkGateBand() {
+private fun NetworkGateBand(active: Boolean) {
     val colors = VestigeTheme.colors
-    val body = stringResource(id = R.string.model_status_gate_body)
+    val body = stringResource(
+        id = if (active) R.string.model_status_gate_active_body else R.string.model_status_gate_body,
+    )
+    val eyebrow = stringResource(
+        id = if (active) R.string.model_status_gate_active_eyebrow else R.string.model_status_gate_eyebrow,
+    )
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -269,15 +290,58 @@ private fun NetworkGateBand() {
             .padding(horizontal = 14.dp, vertical = 12.dp),
         verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
-        EyebrowE(
-            text = stringResource(id = R.string.model_status_gate_eyebrow),
-            color = colors.coral,
-            maxLines = 1,
-            softWrap = false,
-        )
+        EyebrowE(text = eyebrow, color = colors.coral, maxLines = 1, softWrap = false)
         Text(text = body, style = VestigeTheme.typography.p, color = colors.dim)
     }
 }
+
+@Composable
+private fun DownloadingBand(progress: ModelDownloadProgress?) {
+    val colors = VestigeTheme.colors
+    val pct = progress?.fraction?.let { (it * PERCENT).toInt() }
+    val announce = if (pct != null) "Downloading model. $pct percent." else "Downloading model."
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(VestigeTheme.shapes.m)
+            .border(width = 1.dp, color = colors.lime, shape = VestigeTheme.shapes.m)
+            .background(colors.s1)
+            .semantics(mergeDescendants = true) {
+                liveRegion = LiveRegionMode.Polite
+                contentDescription = announce
+            }
+            .padding(horizontal = 14.dp, vertical = 12.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        EyebrowE(
+            text = stringResource(id = R.string.model_status_downloading_eyebrow),
+            color = colors.lime,
+            maxLines = 1,
+            softWrap = false,
+        )
+        ModelDownloadCard(progress = progress, wifiConnected = true)
+    }
+}
+
+@Composable
+private fun PulledRibbon(progress: ModelDownloadProgress?) {
+    val pulled = progress?.currentBytes?.let { "%.2f".format(it / BYTES_PER_GB) } ?: "—"
+    Box(
+        modifier = Modifier.semantics(mergeDescendants = true) {
+            contentDescription = "$pulled gigabytes pulled, 0 cloud calls"
+        },
+    ) {
+        StatRibbon(
+            items = listOf(
+                StatItem(value = pulled, label = stringResource(id = R.string.model_status_pulled_label)),
+                StatItem(value = "0", label = "CLOUD CALLS", color = VestigeTheme.colors.coral),
+            ),
+        )
+    }
+}
+
+private const val PERCENT = 100
+private const val BYTES_PER_GB = 1_073_741_824.0
 
 @Composable
 private fun OutlineAction(label: String, color: Color, enabled: Boolean, onClick: () -> Unit, modifier: Modifier) {

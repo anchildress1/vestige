@@ -365,6 +365,14 @@ This screen is part of how a 10-second judge realizes "this is a local AI app, n
 > flight). Full copy: `ux-copy.md` §"Local Model Status". The 10-second-judge intent is
 > unchanged — the honest stack + sealed-gate + zero-cloud-calls make "local AI" legible.
 
+> _Addendum (2026-05-18b) — one download card._ The `Downloading` state shares the **same**
+> `ModelDownloadCard` onboarding Screen 3 uses (`poc/onboarding-download-final.png` ==
+> `poc/model-detail-downloading-final.png` for the inner block; chrome differs only). Hero
+> percent stays the 88sp number. The state swaps the stack for the card in a lime
+> `● DOWNLOADING MODEL · WI-FI ONLY` band, the ribbon to `GB PULLED`, the gate band to its
+> `ALLOWLIST ACTIVE 1 HOST` variant, and the action row to a single **PAUSE** that cancels
+> the pull but keeps the `.part` (HTTP-Range resume) and drops readiness to `Paused`.
+
 ### Persona Selector
 
 Three options, segmented control or simple list. No avatars, no carousel, no character illustrations.

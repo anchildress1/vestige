@@ -375,6 +375,7 @@ private fun SettingsRoute(
 @androidx.compose.runtime.Composable
 private fun ModelStatusRoute(container: AppContainer, onExit: () -> Unit, onNavigateTab: (BottomTab) -> Unit) {
     val modelReadiness by container.modelReadinessFlow.collectAsStateWithLifecycle()
+    val downloadProgress by container.downloadProgressFlow.collectAsStateWithLifecycle()
     val context = LocalContext.current
     // buildConfig isn't enabled for this module — read the version off the installed package
     // instead of generating BuildConfig (a build-config change is out of scope here).
@@ -393,9 +394,11 @@ private fun ModelStatusRoute(container: AppContainer, onExit: () -> Unit, onNavi
             sizeLabel = gigabyteLabel(container.mainModelExpectedByteSize),
             onDiskLabel = onDiskLabel,
             versionName = versionName,
+            downloadProgress = downloadProgress,
         ),
         onReDownload = container::redownloadMainModel,
         onDelete = container::deleteMainModel,
+        onPause = container::pauseMainModelDownload,
         onExit = onExit,
         onNavSelect = onNavigateTab,
         modifier = Modifier.fillMaxSize(),

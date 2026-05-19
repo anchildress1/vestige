@@ -47,6 +47,8 @@ import dev.anchildress1.vestige.storage.TagEntity
 import dev.anchildress1.vestige.storage.VectorBackfillWorker
 import dev.anchildress1.vestige.storage.VestigeBoxStore
 import dev.anchildress1.vestige.ui.capture.ModelReadiness
+import dev.anchildress1.vestige.ui.components.ModelDownloadProgress
+import dev.anchildress1.vestige.ui.onboarding.DownloadProgressTracker
 import io.objectbox.BoxStore
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
@@ -73,6 +75,7 @@ import java.time.Instant
 import java.time.ZoneId
 import java.time.ZonedDateTime
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicLong
 import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
 
@@ -217,6 +220,8 @@ class AppContainer(
 
     @Volatile
     private var engineWarmupKicked = false
+
+    private val engineWarmupGeneration = AtomicLong(0L)
 
     @Volatile
     private var embedderInstance: Embedder? = null
@@ -367,6 +372,14 @@ class AppContainer(
         MutableStateFlow(ModelReadiness.Loading)
     val modelReadinessFlow: StateFlow<ModelReadiness> = _modelReadinessFlow.asStateFlow()
 
+    // Live byte/speed/eta of an in-flight model pull — the Model Status downloading view
+    // collects this for the same rich card onboarding shows. `null` when no pull is running.
+    private val _downloadProgressFlow: MutableStateFlow<ModelDownloadProgress?> = MutableStateFlow(null)
+    val downloadProgressFlow: StateFlow<ModelDownloadProgress?> = _downloadProgressFlow.asStateFlow()
+
+    @Volatile
+    private var redownloadJob: Job? = null
+
     private val _dataRevision: MutableStateFlow<Long> = MutableStateFlow(0L)
     val dataRevision: StateFlow<Long> = _dataRevision.asStateFlow()
 
@@ -505,12 +518,15 @@ class AppContainer(
     private fun kickEngineWarmup() {
         if (engineWarmupKicked) return
         engineWarmupKicked = true
+        val warmupGeneration = engineWarmupGeneration.get()
         scope.launch {
             val warmed = runCatching { ensureBackgroundEngineInitialized() }
                 .onFailure { Log.e(TAG, "Engine warmup failed; readiness stays Loading", it) }
                 .isSuccess && backgroundEngineInitialized
             readinessRefreshMutex.withLock {
-                if (warmed) {
+                val stillCurrent = warmupGeneration == engineWarmupGeneration.get()
+                val artifactStillReady = verifiedMainModelState() is ModelArtifactState.Complete
+                if (warmed && stillCurrent && artifactStillReady) {
                     if (_modelReadinessFlow.value is ModelReadiness.Loading) {
                         _modelReadinessFlow.value = ModelReadiness.Ready
                     }
@@ -563,7 +579,7 @@ class AppContainer(
      * it from one source. Per `ux-copy.md` §"Destructive Confirmations / Re-download model".
      */
     fun redownloadMainModel() {
-        scope.launch {
+        redownloadJob = scope.launch {
             runMainModelMutation(name = "re-download model") {
                 cancelTrackedExtractionsAndResetLifecycle()
                 resetBackgroundEngine()
@@ -587,6 +603,24 @@ class AppContainer(
         }
     }
 
+    /**
+     * User tapped PAUSE on the Model Status downloading view. Cancel the in-flight pull — the
+     * `.part` file is left on disk (it is only renamed to the final artifact on a clean
+     * completion), so a later Re-download resumes it via HTTP-Range. Drop readiness to `Paused`
+     * before re-probing: the probe reads a leftover `.part` as `Downloading` only when the
+     * previous state was `Downloading`, so seeding `Paused` keeps the retry/delete affordances
+     * live instead of wedging the view in a dead progress state.
+     */
+    fun pauseMainModelDownload() {
+        redownloadJob?.cancel()
+        redownloadJob = null
+        scope.launch {
+            _downloadProgressFlow.value = null
+            _modelReadinessFlow.value = ModelReadiness.Paused
+            refreshModelReadiness()
+        }
+    }
+
     private fun deleteArtifactFiles(artifact: File) {
         if (!File(artifact.parentFile, "${artifact.name}.part").delete()) {
             Log.w(TAG, "Failed to delete model part file")
@@ -597,17 +631,43 @@ class AppContainer(
     private fun computeDownloadPercent(current: Long, expected: Long): Int =
         if (expected > 0L) ((current * PCT_MAX) / expected).toInt().coerceIn(0, PCT_MAX) else 0
 
-    private suspend fun runDownload(store: ModelArtifactStore): ModelArtifactState? = try {
-        store.download { current, expected ->
-            _modelReadinessFlow.value = ModelReadiness.Downloading(computeDownloadPercent(current, expected))
+    private fun downloadFraction(current: Long, expected: Long): Float? =
+        if (expected > 0L) (current.toDouble() / expected).toFloat() else null
+
+    private suspend fun runDownload(store: ModelArtifactStore): ModelArtifactState? {
+        var mbps: Float? = null
+        var eta: Long? = null
+        // Reuse the onboarding tracker so Model Status shows the exact same ETA/MB·s math the
+        // first-run download does — one progress source, two hosts.
+        val tracker = DownloadProgressTracker(
+            onState = { st ->
+                if (st is ModelArtifactState.Partial) {
+                    _downloadProgressFlow.value = ModelDownloadProgress(
+                        fraction = downloadFraction(st.currentBytes, st.expectedBytes),
+                        currentBytes = st.currentBytes,
+                        expectedBytes = st.expectedBytes,
+                        etaSeconds = eta,
+                        mbps = mbps,
+                    )
+                }
+            },
+            onSpeed = { mbps = it },
+            onEta = { eta = it },
+        )
+        return try {
+            store.download { current, expected ->
+                tracker.onProgress(current, expected)
+                _modelReadinessFlow.value = ModelReadiness.Downloading(computeDownloadPercent(current, expected))
+            }
+        } catch (cancel: kotlinx.coroutines.CancellationException) {
+            throw cancel
+        } catch (@Suppress("TooGenericExceptionCaught") error: Exception) {
+            Log.e(TAG, "Model re-download failed", error)
+            null
+        } finally {
+            _downloadProgressFlow.value = null
+            networkGate.seal()
         }
-    } catch (cancel: kotlinx.coroutines.CancellationException) {
-        throw cancel
-    } catch (@Suppress("TooGenericExceptionCaught") error: Exception) {
-        Log.e(TAG, "Model re-download failed", error)
-        null
-    } finally {
-        networkGate.seal()
     }
 
     private fun handleCorruptDownloadResult(store: ModelArtifactStore, result: ModelArtifactState?) {
@@ -773,6 +833,7 @@ class AppContainer(
     }
 
     private suspend fun resetBackgroundEngine() {
+        engineWarmupGeneration.incrementAndGet()
         backgroundEngineInitMutex.withLock {
             // Re-arm warmup unconditionally: a delete/redownload mid-warmup must let the next
             // refresh kick a fresh cycle, even if `initialize()` hadn't finished yet.

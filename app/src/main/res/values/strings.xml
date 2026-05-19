@@ -134,6 +134,11 @@
     <string name="model_status_stack_runtime_size">NATIVE</string>
     <string name="model_status_gate_eyebrow">● NETWORK GATE · SEALED</string>
     <string name="model_status_gate_body">Allowlist: model artifact host only.</string>
+    <string name="model_status_gate_active_eyebrow">● NETWORK GATE · ALLOWLIST ACTIVE 1 HOST</string>
+    <string name="model_status_gate_active_body">Model artifact host only. Closes the moment the pull completes.</string>
+    <string name="model_status_downloading_eyebrow">● DOWNLOADING MODEL · WI-FI ONLY</string>
+    <string name="model_status_pulled_label">GB PULLED</string>
+    <string name="model_status_pause">PAUSE</string>
     <string name="model_status_header">Model status.</string>
     <string name="model_status_loading">Loading model.</string>
     <string name="model_status_downloading">Downloading model. Wi-Fi only.</string>

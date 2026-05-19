@@ -32,8 +32,8 @@ object EntryLensReceiptJson {
 
     /**
      * Returns the parsed receipts, an empty list for a legitimately-empty blob, or `null` when the
-     * blob is non-empty but unparseable — so a corrupt receipt is not silently rendered as
-     * "lens never ran".
+     * blob is non-empty but not a valid receipt array — malformed JSON, an unknown lens, or an
+     * out-of-range counter — so a corrupt receipt is not silently rendered as "lens never ran".
      */
     fun decodeOrNull(json: String?): List<EntryLensReceipt>? {
         if (json.isNullOrBlank() || json.trim() == "[]") return emptyList()

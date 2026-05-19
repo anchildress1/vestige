@@ -119,6 +119,17 @@ class MarkdownEntryStoreTest {
     }
 
     @Test
+    fun `legacy null lensReceiptsJson writes as empty array and round-trips`() {
+        val entry = EntryEntity(timestampEpochMs = ISO_TIMESTAMP_MS, lensReceiptsJson = null)
+        boxStore.boxFor<EntryEntity>().put(entry)
+
+        val written = store.write(entry)
+
+        assertTrue(written.readText().contains("lens_receipts: []"))
+        assertEquals("[]", store.read(written).lensReceiptsJson)
+    }
+
+    @Test
     fun `existing markdownFilename on an entry is reused on rewrite`() {
         val entryBox = boxStore.boxFor<EntryEntity>()
         val entry = EntryEntity(timestampEpochMs = ISO_TIMESTAMP_MS, entryText = "first")

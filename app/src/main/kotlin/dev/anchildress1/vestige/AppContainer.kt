@@ -75,7 +75,6 @@ import java.time.Instant
 import java.time.ZoneId
 import java.time.ZonedDateTime
 import java.util.concurrent.atomic.AtomicBoolean
-import java.util.concurrent.atomic.AtomicLong
 import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
 
@@ -220,8 +219,6 @@ class AppContainer(
 
     @Volatile
     private var engineWarmupKicked = false
-
-    private val engineWarmupGeneration = AtomicLong(0L)
 
     @Volatile
     private var embedderInstance: Embedder? = null
@@ -518,19 +515,21 @@ class AppContainer(
     private fun kickEngineWarmup() {
         if (engineWarmupKicked) return
         engineWarmupKicked = true
-        val warmupGeneration = engineWarmupGeneration.get()
         scope.launch {
             val warmed = runCatching { ensureBackgroundEngineInitialized() }
                 .onFailure { Log.e(TAG, "Engine warmup failed; readiness stays Loading", it) }
                 .isSuccess && backgroundEngineInitialized
             readinessRefreshMutex.withLock {
-                val stillCurrent = warmupGeneration == engineWarmupGeneration.get()
-                val artifactStillReady = verifiedMainModelState() is ModelArtifactState.Complete
-                if (warmed && stillCurrent && artifactStillReady) {
-                    if (_modelReadinessFlow.value is ModelReadiness.Loading) {
-                        _modelReadinessFlow.value = ModelReadiness.Ready
-                    }
+                // Engine is warm — publish Ready iff a model is still on disk. Cheap presence
+                // probe (size, no multi-GB hash) is the right gate: the engine load already
+                // validated the artifact, and a delete/redownload mid-warmup leaves either a
+                // non-Complete probe or a non-Loading readiness, so we never clobber a
+                // Downloading/Paused/absent state into a false Ready.
+                val present = mainModelArtifactStore.probe() is ModelArtifactState.Complete
+                if (warmed && present && _modelReadinessFlow.value is ModelReadiness.Loading) {
+                    _modelReadinessFlow.value = ModelReadiness.Ready
                 } else {
+                    // Re-arm so the next ON_RESUME / probe can retry instead of wedging at Loading.
                     engineWarmupKicked = false
                 }
             }
@@ -833,7 +832,6 @@ class AppContainer(
     }
 
     private suspend fun resetBackgroundEngine() {
-        engineWarmupGeneration.incrementAndGet()
         backgroundEngineInitMutex.withLock {
             // Re-arm warmup unconditionally: a delete/redownload mid-warmup must let the next
             // refresh kick a fresh cycle, even if `initialize()` hadn't finished yet.

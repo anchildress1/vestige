@@ -197,4 +197,22 @@ class ModelStatusScreenTest {
         composeRule.onAllNodesWithContentDescription("Delete model").onLast().performClick()
         assertEquals(1, deleted)
     }
+
+    @Test
+    fun `downloading with no progress snapshot degrades the card and pulled ribbon`() {
+        screen(readiness = ModelReadiness.Downloading(percent = 0), downloadProgress = null)
+        // DownloadingBand announce → no percent; PulledRibbon currentBytes null → "—".
+        composeRule.onNodeWithContentDescription("Downloading model.").assertIsDisplayed()
+        composeRule.onNodeWithContentDescription("— gigabytes pulled, 0 cloud calls").assertExists()
+    }
+
+    @Test
+    fun `paused (not-ready, not-absent) renders the coral stack accent`() {
+        screen(readiness = ModelReadiness.Paused, onDiskLabel = "3.66 GB")
+        composeRule.onNodeWithContentDescription("Download stalled.").assertIsDisplayed()
+        // Not Ready and not absent → readinessLine, stack present with coral (not lime) accent.
+        composeRule.onNodeWithContentDescription(
+            "EmbeddingGemma 300M. VECTOR · HYBRID. 210 MB",
+        ).assertExists()
+    }
 }

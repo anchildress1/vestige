@@ -112,6 +112,29 @@ class LensResponseParserTest {
     }
 
     @Test
+    fun `blank and non-string flag entries are dropped, valid ones kept`() {
+        // encodeFlag arms: blank String -> null, non-String/Map (number, bool) -> null,
+        // non-blank String -> kept.
+        val raw = """{"flags":["keep-me","   ",42,true]}"""
+
+        val extraction = LensResponseParser.parse(Lens.SKEPTICAL, raw)
+
+        assertNotNull(extraction)
+        assertEquals(listOf("keep-me"), extraction!!.flags)
+    }
+
+    @Test
+    fun `tags drop whitespace-only and non-string entries, lowercasing the rest`() {
+        // normalizeTag arms: valid String -> trimmed+lowercased, "   " -> null, non-String -> null.
+        val raw = """{"tags":["Standup","   ",7]}"""
+
+        val extraction = LensResponseParser.parse(Lens.LITERAL, raw)
+
+        assertNotNull(extraction)
+        assertEquals(listOf("standup"), extraction!!.fields["tags"])
+    }
+
+    @Test
     fun `tolerates surrounding prose and markdown fences by extracting the first balanced object`() {
         val raw = """
             Here's the JSON:

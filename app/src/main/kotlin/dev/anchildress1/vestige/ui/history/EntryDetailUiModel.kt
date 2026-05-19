@@ -7,7 +7,7 @@ import java.time.ZoneId
 /** Immutable UI projection for a single entry detail. */
 data class EntryDetailUiModel(
     val id: Long,
-    val displayTitleLabel: String,
+    val timeOfDayLabel: String,
     val dateLabel: String,
     val filedTimeLabel: String,
     val entryNumberLabel: String,
@@ -31,7 +31,7 @@ data class EntryDetailUiModel(
             val hasLensReceiptPayload = lensReceipts.isNotEmpty() && lensReceipts != "[]"
             return EntryDetailUiModel(
                 id = entity.id,
-                displayTitleLabel = "${HistoryDateFormatter.formatMonthDay(entity.timestampEpochMs, zoneId)}.",
+                timeOfDayLabel = HistoryDateFormatter.formatClock12(entity.timestampEpochMs, zoneId),
                 dateLabel = HistoryDateFormatter.formatFullDate(entity.timestampEpochMs, zoneId),
                 filedTimeLabel = HistoryDateFormatter.formatTimeOnly(entity.timestampEpochMs, zoneId),
                 entryNumberLabel = "${EntryDetailCopy.ENTRY_NUMBER_PREFIX}${entity.id}",

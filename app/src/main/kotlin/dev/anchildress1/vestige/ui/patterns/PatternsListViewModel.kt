@@ -170,6 +170,7 @@ class PatternsListViewModel(
         val section = sectionFor(state) ?: return null
         return PatternCardUi(
             patternId = patternId,
+            kindLabel = patternKindLabel(kind),
             title = title,
             observation = latestCalloutText,
             supportingCount = supportingEntries.size,

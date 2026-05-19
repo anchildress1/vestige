@@ -389,15 +389,15 @@ Filter chips (small, secondary text — Phase 4 polish on top of the section str
 
 Pattern card structure (top → bottom):
 
-> {AGENT-EMITTED LABEL — uppercase mono eyebrow, section-tone colored: lime active / ember skipped / teal closed-dropped}
+> {PATTERN KIND — uppercase mono eyebrow from stored `pattern.kind`, section-tone colored: lime active / ember skipped / teal closed-dropped}
 > **{Pattern name}**
 > {One-line observation}
 > {30-day TraceBar}
 > {N} of {M} entries · Last seen {date}
 
-> _Final-polish reconciliation (2026-05-18):_ the category label moved **above** the name and
-> renders as an uppercase tone-colored eyebrow per `poc/pattern-lifecycle-final.png`. Tone is
-> the section tone (the comp's per-card colors are sample variety, not a per-category palette).
+> _Data-slot reconciliation (2026-05-19):_ the eyebrow slot stays because it is part of the
+> `poc/pattern-lifecycle-final.png` layout, but it binds to stored `pattern.kind`, not the
+> structurally-broken `template_label` or screenshot sample copy. Tone is the section tone.
 > The card is one shared `PatternCard` component so every surface stays identical.
 
 Card actions (per card, in overflow menu):

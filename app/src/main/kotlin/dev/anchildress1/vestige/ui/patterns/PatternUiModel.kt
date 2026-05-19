@@ -5,6 +5,7 @@ import dev.anchildress1.vestige.model.PatternState
 /** Card row payload for the Patterns list. Pure UI — no ObjectBox handles leak past the VM. */
 data class PatternCardUi(
     val patternId: String,
+    val kindLabel: String,
     val title: String,
     val observation: String,
     val supportingCount: Int,

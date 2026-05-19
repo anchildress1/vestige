@@ -29,6 +29,7 @@ class PatternCardTest {
         backLabel: String? = null,
     ) = PatternCardUi(
         patternId = "p1",
+        kindLabel = "TEMPLATE RECURRENCE",
         title = "Tuesday Meetings",
         observation = "Fourth entry mentions Tuesday meetings.",
         supportingCount = 4,
@@ -45,6 +46,7 @@ class PatternCardTest {
         composeRule.setContent {
             VestigeTheme { PatternCard(card(), onClick = {}, onDrop = {}, onSkip = {}, onRestart = {}) }
         }
+        composeRule.onNodeWithText("TEMPLATE RECURRENCE").assertIsDisplayed()
         composeRule.onNodeWithText("Tuesday Meetings").assertIsDisplayed()
         composeRule.onAllNodesWithText("AFTERMATH").assertCountEquals(0)
         composeRule.onNodeWithText("Fourth entry mentions Tuesday meetings.").assertIsDisplayed()

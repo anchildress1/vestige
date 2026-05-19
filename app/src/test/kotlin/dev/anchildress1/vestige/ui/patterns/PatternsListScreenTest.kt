@@ -171,6 +171,7 @@ class PatternsListScreenTest {
 
         composeRule.setContent { PatternsListScreen(viewModel = newViewModel(), onOpenPattern = {}) }
 
+        composeRule.onNodeWithText("TEMPLATE RECURRENCE").assertIsDisplayed()
         composeRule.onNodeWithText("Tuesday Meetings").assertIsDisplayed()
         composeRule.onAllNodesWithText("AFTERMATH").assertCountEquals(0)
         composeRule.onNodeWithText("Fourth entry mentions Tuesday meetings.").assertIsDisplayed()

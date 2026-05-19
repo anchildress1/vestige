@@ -396,7 +396,7 @@ Checked bullets above are the historical record that the Mist tokens shipped to 
 - [ ] **Patterns List body uses Scoreboard primitives end-to-end** per `poc/screenshots/patterns.png` + `poc/screens-patterns.jsx`:
   - Header: `EyebrowE` `TRACKING · LAST 30D` + `DisplayBig` (Anton) `PATTERNS` title. Not Material `headlineMedium`.
   - Section dividers (`▼ ACTIVE — STILL HITTING {N}` / `▼ RESOLVED — FADED {N}`) use mono eyebrow + count-on-right per POC.
-  - Pattern card title renders the pattern's **own display name** in `DisplayBig` (Anton, ~32 sp) — current build uses `headlineSmall` sans bold ("Audit Template" reads like a Material card). _(**Changed per §Story 4.16** — was "renders the pattern's template label"; the label is structurally always `AUDIT` so every card would read the same. Title is the pattern name; no template label, no `#01 AFTERMATH` eyebrow — pattern numbering remains out of scope.)_
+  - Pattern card title renders the pattern's **own display name** in `DisplayBig` (Anton, ~32 sp) — current build uses `headlineSmall` sans bold ("Audit Template" reads like a Material card). _(**Changed per §Story 4.16** — was "renders the pattern's template label"; the label is structurally always `AUDIT` so every card would read the same. Title is the pattern name; the POC eyebrow slot binds to stored `pattern.kind`, not `templateLabel` or screenshot sample copy.)_
   - `TraceBarE` renders the 30-day intensity sparkbar on every card with `state ∈ {ACTIVE, SNOOZED, CLOSED, DROPPED}` per `cardSectionToneFor` (already wired). The current build's audit-template card shows a dotted hairline instead of bars — verify the bars actually render on a card with ≥1 hit; if `TraceBarE` is being passed an empty series, fix the data plumbing in `PatternsListViewModel` so the call site gets the same shape `IdleLayout` consumes.
 
 - _Pattern Detail body re-skinned — **removed.** `PatternDetailScreen.kt` is deleted per Story 4.8's rewrite; pattern detail content lives inside the expanded pattern card on the Patterns view. Visual polish of the expanded-card layout (header, title block, state-transition line, source rows, action row, vocabulary chips) lives in Story 4.8._
@@ -452,7 +452,7 @@ Checked bullets above are the historical record that the Mist tokens shipped to 
   - No `Newsreader` or `MistHero` / `Glow` / `Vapor` / `Pulse(Mist)` symbol references remain in `:app` (Story 4.1.5 invariant — re-verified here).
 
 - [ ] **Same-commit doc updates** per AGENTS.md §"Tests + docs ship together":
-  - `ux-copy.md` §"Entry detail" gets the date-as-display-title rule recorded (no template label — per §Story 4.16).
+  - `ux-copy.md` §"Entry detail" keeps the timestamp-as-display-title rule recorded (no template label — per §Story 4.16).
   - `ux-copy.md` §"Pattern List / Card structure" + §"Pattern Detail / Layout" get the card title source (pattern's display name per §Story 4.16) and the card body source recorded — currently absent. `StatRibbon` / `BigStat` cell ordering is **not** in scope here (cell additions are deferred to backlog v1.5 entries `patterns-stat-ribbon-header`, `pattern-card-bigstat-of-n`, `pattern-detail-energy-stats`).
   - `design-guidelines.md` §"AppTop status pill" extended to record that the pill is mandatory chrome on every post-onboarding surface (not just Capture).
   - This story's checkboxes tick as bullets land. No new ADR — ADR-011 already authorizes the primitive set; this story is enforcement, not architecture.
@@ -479,11 +479,11 @@ Checked bullets above are the historical record that the Mist tokens shipped to 
 
 **Done when:**
 - [x] History rows (Story 4.6): the template-label `Pill` is removed. The row leads with the date; snippet + timestamp only. `HistoryRow` / `HistorySummary` stop reading `templateLabel`.
-- [x] Entry Detail (Story 4.7 / 4.15): the display title is the entry's date in `DisplayBig` (`MAY 16.`). No template label, no `AUDIT` pill. The header `AUDIT` pill (already flagged for removal in 4.15) stays removed.
-- [x] Pattern List card (Story 4.15): card title is the pattern's own display name in `DisplayBig`, never the template label. No card renders a template label or archetype eyebrow.
+- [x] Entry Detail (Story 4.7 / 4.15): the display title is the entry timestamp in `DisplayBig` (`10:04 PM`) per `poc/entry-full-final.png`. No template label, no `AUDIT` pill. The header `AUDIT` pill (already flagged for removal in 4.15) stays removed.
+- [x] Pattern List card (Story 4.15): card title is the pattern's own display name in `DisplayBig`, never the template label. The POC eyebrow slot stays, but binds to stored `pattern.kind` instead of `templateLabel`.
 - [x] Pattern Detail (Story 4.15): the `● ACTIVE · {TEMPLATE_LABEL_UPPER}` eyebrow drops the template-label segment — `● ACTIVE` only. No archetype text anywhere on the screen.
 - [x] Grep audit in the PR description: `templateLabel` / `TemplateLabel` usages in `:app/src/main/kotlin/dev/anchildress1/vestige/ui/**` drops to **0**. `core-inference` / `core-storage` references stay (the field is inert, not deleted).
-- [x] `ux-copy.md` same-commit: §"Pattern List", §"Pattern Detail", §"Entry detail" lose the `{Crashed / Deep Space / Busy Stalling / Nonstop Spiral / Goblin Hours / Brain Dump}` label lines; replaced with the date / pattern-name rule. `README.md` §About loses the template parenthetical.
+- [x] `ux-copy.md` same-commit: §"Pattern List", §"Pattern Detail", §"Entry detail" lose the `{Crashed / Deep Space / Busy Stalling / Nonstop Spiral / Goblin Hours / Brain Dump}` label lines; replaced with the timestamp / pattern-name / pattern-kind rule. `README.md` §About loses the template parenthetical.
 - [x] Coverage shape: each touched screen's existing suite updates to assert the template label / Pill is **absent** (neg assertion), not present. No suite keeps a stale "renders template label" test.
 
 **Notes / risks:** This is a removal story — the diff is deletions plus neg-assertion test flips, not new UI. Do not redesign the label, do not accept Inferential CANDIDATE in `TemplateLabeler` "while we're here" — that is the v1.5 ADR work and is explicitly out of scope (AGENTS.md: no quick fixes, no scope creep). If a surface needs a non-label title and the date doesn't fit the composition, push the gap to `backlog.md`, do not invent a replacement label.

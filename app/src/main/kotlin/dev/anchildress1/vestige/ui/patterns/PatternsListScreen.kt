@@ -207,6 +207,7 @@ private fun PatternsListPreview() {
             cards = listOf(
                 PatternCardUi(
                     patternId = "abc",
+                    kindLabel = "TEMPLATE RECURRENCE",
                     title = "Tuesday Meetings",
                     observation = "Fourth entry mentions Tuesday meetings. State before: cruising. After: crashed.",
                     supportingCount = 4,

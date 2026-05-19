@@ -14,6 +14,8 @@ import org.json.JSONObject
 import java.io.File
 import java.io.IOException
 import java.io.OutputStream
+import java.nio.file.Files
+import java.nio.file.attribute.PosixFilePermissions
 import java.time.Instant
 import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
@@ -39,7 +41,13 @@ internal class VestigeDataExporter(
         // The staged-then-copy below is the broader guarantee — TOCTOU, disk-full on `out`, or
         // any mid-archive throw still leaves no partial zip at the user's target.
         verifyMarkdownReadable(content.markdownFiles)
-        val staged = File.createTempFile("vestige-export", ".zip")
+        // POSIX 0600: the staged archive carries the full user-data export — owner-only on any
+        // shared filesystem (no-op on Android's per-app sandbox, real protection on shared JVM tmp).
+        val staged = Files.createTempFile(
+            "vestige-export",
+            ".zip",
+            PosixFilePermissions.asFileAttribute(PosixFilePermissions.fromString("rw-------")),
+        ).toFile()
         try {
             ZipOutputStream(staged.outputStream().buffered()).use { zip ->
                 zip.putTextEntry(SNAPSHOT_ENTRY, content.snapshot.toString(JSON_INDENT))

@@ -2,10 +2,17 @@ package dev.anchildress1.vestige.ui.history
 
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.hasClickAction
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
-import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import dev.anchildress1.vestige.model.Persona
 import dev.anchildress1.vestige.model.ResolvedExtraction
@@ -130,6 +137,39 @@ class HistoryHostTest {
         composeRule.waitForIdle()
         composeRule.onNodeWithTag("entry_time").assertIsDisplayed()
         assertTrue("openRequest should be consumed after routing", consumed)
+    }
+
+    @Test
+    fun `tab navigation from detail clears stale detail before leaving history`() {
+        seedCompleted("standup crashed me again", 1_000_000L)
+        val showingHistory = mutableStateOf(true)
+
+        composeRule.activity.setContent {
+            if (showingHistory.value) {
+                HistoryHost(
+                    entryStore = entryStore,
+                    persona = Persona.WITNESS,
+                    onExit = {},
+                    zoneId = ZoneOffset.UTC,
+                    dataRevision = MutableStateFlow(0L),
+                    onNavigateTab = { showingHistory.value = false },
+                )
+            } else {
+                Box(modifier = Modifier.fillMaxSize().testTag("outside_history"))
+            }
+        }
+
+        composeRule.onNodeWithTag("history_row").performClick()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag("entry_time").assertIsDisplayed()
+
+        composeRule.onNode(hasText("CAPTURE") and hasClickAction()).performClick()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag("outside_history").assertIsDisplayed()
+
+        composeRule.runOnIdle { showingHistory.value = true }
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag("history_row").assertIsDisplayed()
     }
 
     private fun seedCompleted(text: String, timestampEpochMs: Long): Long {

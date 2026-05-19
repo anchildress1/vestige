@@ -113,7 +113,8 @@ private fun HistoryDetailRoute( // NOSONAR kotlin:S107
         },
         onNavSelect = { tab ->
             // HISTORY from a detail page = pop back to the list, not a re-entry.
-            if (tab == BottomTab.HISTORY) onClearDetail() else onNavigateTab(tab)
+            onClearDetail()
+            if (tab != BottomTab.HISTORY) onNavigateTab(tab)
         },
         onMenuTap = onOpenSettings,
         highlightOnOpen = highlightOnOpen,

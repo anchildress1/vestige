@@ -2,7 +2,14 @@ package dev.anchildress1.vestige.ui.patterns
 
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.hasClickAction
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -158,6 +165,42 @@ class PatternsHostTest {
 
         composeRule.onNodeWithText("Drop").performScrollTo().assertIsDisplayed()
         composeRule.onNodeWithText("Skip").performScrollTo().assertIsDisplayed()
+    }
+
+    @Test
+    fun `tab navigation from entry detail clears stale entry detail before leaving patterns`() {
+        val supporting = listOf(seedEntry("crashed after standup"))
+        seedActivePattern("p-host-tabs", "Tuesday Meetings", "Aftermath", "Callout.", supporting)
+        val showingPatterns = mutableStateOf(true)
+
+        composeRule.activity.setContent {
+            if (showingPatterns.value) {
+                PatternsHost(
+                    patternStore = patternStore,
+                    patternRepo = patternRepo,
+                    entryStore = entryStore,
+                    zoneId = ZoneOffset.UTC,
+                    dataRevision = dataRevision,
+                    onNavigateTab = { showingPatterns.value = false },
+                )
+            } else {
+                Box(modifier = Modifier.fillMaxSize().testTag("outside_patterns"))
+            }
+        }
+
+        composeRule.onNodeWithText("Tuesday Meetings").performClick()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithText("crashed after standup").performScrollTo().performClick()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag("entry_time").assertIsDisplayed()
+
+        composeRule.onNode(hasText("HISTORY") and hasClickAction()).performClick()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag("outside_patterns").assertIsDisplayed()
+
+        composeRule.runOnIdle { showingPatterns.value = true }
+        composeRule.waitForIdle()
+        composeRule.onNodeWithText("Callout.").assertIsDisplayed()
     }
 
     private fun seedEntry(text: String): EntryEntity {

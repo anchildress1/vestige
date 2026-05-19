@@ -67,12 +67,9 @@ fun PatternsHost(
             },
             onNavSelect = { tab ->
                 // PATTERNS from a pattern's entry detail = pop back to the patterns list.
-                if (tab == BottomTab.PATTERNS) {
-                    openEntryId = null
-                    highlightEntryOnOpen = false
-                } else {
-                    onNavigateTab(tab)
-                }
+                openEntryId = null
+                highlightEntryOnOpen = false
+                if (tab != BottomTab.PATTERNS) onNavigateTab(tab)
             },
             onMenuTap = onOpenSettings,
             modifier = modifier,

@@ -181,6 +181,10 @@ dependencies {
     androidTestImplementation(libs.compose.ui.test.junit4)
 }
 
+// ObjectBox loads its JNI .so once per JVM via System.load; a second test class in the same
+// JVM can't re-System.load it, leaving NativeLibraryLoader in a poisoned state. Each of these
+// classes must run in its own fork. Non-kover: split into a forkEvery=1 task off the main
+// suite. Kover: the fork is applied to testDebugUnitTest itself, so they run inline there.
 val objectBoxBackedAppTests = setOf(
     "dev.anchildress1.vestige.AppContainerTest",
     "dev.anchildress1.vestige.debug.DebugPatternSeederTest",
@@ -215,6 +219,9 @@ tasks.withType<Test>().configureEach {
 }
 
 afterEvaluate {
+    // Under kover the ObjectBox classes run inside the forked testDebugUnitTest; registering a
+    // second task that includes the same classes would double-count coverage / waste a run.
+    if (isKoverTaskRequested) return@afterEvaluate
     val debugUnitTest = tasks.named<Test>("testDebugUnitTest")
 
     tasks.register<Test>("testDebugObjectBoxUnitTest") {

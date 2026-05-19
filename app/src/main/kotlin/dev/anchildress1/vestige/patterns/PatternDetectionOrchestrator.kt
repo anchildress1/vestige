@@ -31,7 +31,7 @@ import java.time.ZoneId
  * Wiring layer called by `BackgroundExtractionSaveFlow` after `completeEntry` so the new entry
  * is already persisted with its tags + template label. Two side effects:
  *
- * 1. Every 10th entry, run [PatternDetector] + upsert results into [PatternStore]. New patterns
+ * 1. Every [DETECTION_INTERVAL]th entry, run [PatternDetector] + upsert results into [PatternStore]. New patterns
  *    get a model-generated title (one short call via [PatternTitleGenerator]); existing rows
  *    update their supporting set and `lastSeenTimestamp` per ADR-003 step 6.
  * 2. Select one matching active pattern for the committed entry (subject to the global 3-entry

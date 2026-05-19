@@ -51,7 +51,11 @@ object EntryLensReceiptJson {
                         ?: emptyList(),
                     attemptCount = obj.optInt(KEY_ATTEMPT_COUNT, 0),
                     elapsedMs = obj.optLong(KEY_ELAPSED_MS, 0L),
-                    lastError = obj.optString(KEY_LAST_ERROR).takeIf { it.isNotBlank() },
+                    lastError = if (obj.isNull(KEY_LAST_ERROR)) {
+                        null
+                    } else {
+                        obj.optString(KEY_LAST_ERROR).takeIf(String::isNotBlank)
+                    },
                 )
             }
         }.getOrElse {

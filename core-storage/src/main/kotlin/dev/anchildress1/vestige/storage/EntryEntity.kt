@@ -50,8 +50,13 @@ class EntryEntity(
     /** JSON list of `{ text, evidence, fields[] }`. */
     var entryObservationsJson: String = "[]",
 
-    /** JSON list of parsed per-lens extraction receipts. */
-    var lensReceiptsJson: String = "[]",
+    /**
+     * JSON list of parsed per-lens extraction receipts. Nullable by necessity: this column was
+     * added after rows already existed, and ObjectBox passes `null` (not the Kotlin default) to
+     * the constructor for pre-existing rows — a non-null type crashes entity construction on
+     * every read. `null` and `"[]"` both mean "no receipts".
+     */
+    var lensReceiptsJson: String? = "[]",
 
     /** JSON `field → ConfidenceVerdict.name`. */
     var confidenceJson: String = "{}",

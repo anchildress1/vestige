@@ -28,15 +28,15 @@ object EntryLensReceiptJson {
 
     /** Lenient decode: a corrupt blob collapses to `[]`. Use [decodeOrNull] when the caller must
      *  tell "no receipts stored" apart from "stored receipts unreadable". */
-    fun decode(json: String): List<EntryLensReceipt> = decodeOrNull(json) ?: emptyList()
+    fun decode(json: String?): List<EntryLensReceipt> = decodeOrNull(json) ?: emptyList()
 
     /**
      * Returns the parsed receipts, an empty list for a legitimately-empty blob, or `null` when the
      * blob is non-empty but unparseable — so a corrupt receipt is not silently rendered as
      * "lens never ran".
      */
-    fun decodeOrNull(json: String): List<EntryLensReceipt>? {
-        if (json.isBlank() || json.trim() == "[]") return emptyList()
+    fun decodeOrNull(json: String?): List<EntryLensReceipt>? {
+        if (json.isNullOrBlank() || json.trim() == "[]") return emptyList()
         return runCatching {
             val array = JSONArray(json)
             (0 until array.length()).map { index ->

@@ -54,6 +54,13 @@ class EntryLensReceiptJsonTest {
     }
 
     @Test
+    fun `null receipts json decodes as empty, not a crash`() {
+        // Rows persisted before the lensReceiptsJson column existed read back null.
+        assertEquals(emptyList<EntryLensReceipt>(), EntryLensReceiptJson.decodeOrNull(null))
+        assertEquals(emptyList<EntryLensReceipt>(), EntryLensReceiptJson.decode(null))
+    }
+
+    @Test
     fun `decodeOrNull returns null for schema corrupt receipt rows`() {
         val corruptRows = listOf(
             """["not-object"]""",

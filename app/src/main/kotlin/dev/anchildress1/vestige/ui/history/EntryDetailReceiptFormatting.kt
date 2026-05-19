@@ -26,7 +26,7 @@ internal fun parseObservations(json: String): List<ObservationLine> {
     }
 }
 
-internal fun buildLensReads(json: String): List<LensRead> {
+internal fun buildLensReads(json: String?): List<LensRead> {
     val decoded = EntryLensReceiptJson.decodeOrNull(json)
         ?: return Lens.entries.map { lens ->
             LensRead(label = lens.name, value = EntryDetailCopy.LENS_UNREADABLE, tone = LensTone.CONFLICT)

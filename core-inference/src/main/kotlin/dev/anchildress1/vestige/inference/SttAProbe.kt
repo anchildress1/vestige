@@ -2,8 +2,6 @@ package dev.anchildress1.vestige.inference
 
 import com.google.ai.edge.litertlm.Content
 import java.io.File
-import java.nio.ByteBuffer
-import java.nio.ByteOrder
 
 /**
  * Audio plumbing harness — exercises both `Content.AudioBytes` and `Content.AudioFile` paths so
@@ -12,13 +10,26 @@ import java.nio.ByteOrder
  */
 class SttAProbe(private val engine: LiteRtLmEngine) {
 
-    suspend fun transcribeAudioBytesAsFloat32Le(samples: FloatArray, prompt: String = DEFAULT_PROMPT): String {
+    suspend fun transcribeAudioBytesAsWav(
+        samples: FloatArray,
+        sampleRateHz: Int,
+        cacheDir: File,
+        prompt: String = DEFAULT_PROMPT,
+    ): String {
         require(samples.isNotEmpty()) { "STT-A probe requires non-empty audio samples." }
-        val bytes = floatsToLittleEndianBytes(samples)
-        return engine.sendMessageContents(
-            prompt,
-            listOf(Content.AudioBytes(bytes)),
-        )
+        require(cacheDir.isDirectory) { "cacheDir must be an existing directory: $cacheDir" }
+        val temp = File.createTempFile("vestige-stt-a-bytes-", ".wav", cacheDir)
+        try {
+            WavWriter.writeMonoFloatWav(temp, samples, sampleRateHz)
+            return engine.sendMessageContents(
+                prompt,
+                listOf(Content.AudioBytes(temp.readBytes())),
+            )
+        } finally {
+            if (!temp.delete()) {
+                temp.deleteOnExit()
+            }
+        }
     }
 
     /** Caller owns the file's lifecycle. */
@@ -53,14 +64,7 @@ class SttAProbe(private val engine: LiteRtLmEngine) {
         }
     }
 
-    private fun floatsToLittleEndianBytes(samples: FloatArray): ByteArray {
-        val buffer = ByteBuffer.allocate(samples.size * BYTES_PER_FLOAT).order(ByteOrder.LITTLE_ENDIAN)
-        samples.forEach { buffer.putFloat(it) }
-        return buffer.array()
-    }
-
     companion object {
         const val DEFAULT_PROMPT: String = "Transcribe the audio. Respond with only the spoken text."
-        private const val BYTES_PER_FLOAT = 4
     }
 }

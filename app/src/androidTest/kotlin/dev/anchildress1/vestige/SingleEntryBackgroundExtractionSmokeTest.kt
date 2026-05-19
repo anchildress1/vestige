@@ -9,6 +9,8 @@ import dev.anchildress1.vestige.inference.BackgroundExtractionWorker
 import dev.anchildress1.vestige.inference.DefaultConvergenceResolver
 import dev.anchildress1.vestige.inference.LiteRtLmEngine
 import kotlinx.coroutines.runBlocking
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Assume.assumeTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -72,6 +74,15 @@ class SingleEntryBackgroundExtractionSmokeTest {
                 ),
             )
             logResult(result)
+            assertTrue(
+                "single-entry extraction must succeed; was $result",
+                result is BackgroundExtractionResult.Success,
+            )
+            assertEquals(
+                "single-entry smoke must parse every lens",
+                EXPECTED_LENS_COUNT,
+                result.lensResults.count { lens -> lens.extraction != null },
+            )
         }
     }
 
@@ -93,6 +104,7 @@ class SingleEntryBackgroundExtractionSmokeTest {
 
     private companion object {
         const val TAG = "VestigeSingleEntryBg"
+        const val EXPECTED_LENS_COUNT = 3
         val DEFAULT_CAPTURED_AT: ZonedDateTime =
             ZonedDateTime.parse("2026-05-17T12:00:00-04:00[America/New_York]")
     }

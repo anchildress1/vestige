@@ -18,18 +18,18 @@ class SttAProbeTest {
     // --- success paths (engine mocked so SDK is not invoked) ---
 
     @Test
-    fun `transcribeAudioBytesAsFloat32Le encodes samples and returns engine result`() = runTest {
+    fun `transcribeAudioBytesAsWav encodes samples and returns engine result`(@TempDir dir: File) = runTest {
         val engine = mockk<LiteRtLmEngine>()
         coEvery { engine.sendMessageContents(any(), any()) } returns "hello world"
-        val result = SttAProbe(engine).transcribeAudioBytesAsFloat32Le(floatArrayOf(0.5f, -0.5f))
+        val result = SttAProbe(engine).transcribeAudioBytesAsWav(floatArrayOf(0.5f, -0.5f), 16_000, dir)
         assertEquals("hello world", result)
     }
 
     @Test
-    fun `transcribeAudioBytesAsFloat32Le uses default prompt when none supplied`() = runTest {
+    fun `transcribeAudioBytesAsWav uses default prompt when none supplied`(@TempDir dir: File) = runTest {
         val engine = mockk<LiteRtLmEngine>()
         coEvery { engine.sendMessageContents(any(), any()) } returns "text"
-        SttAProbe(engine).transcribeAudioBytesAsFloat32Le(floatArrayOf(0.1f))
+        SttAProbe(engine).transcribeAudioBytesAsWav(floatArrayOf(0.1f), 16_000, dir)
     }
 
     @Test
@@ -57,10 +57,10 @@ class SttAProbeTest {
     }
 
     @Test
-    fun `transcribeAudioBytesAsFloat32Le rejects empty samples`() {
+    fun `transcribeAudioBytesAsWav rejects empty samples`(@TempDir dir: File) {
         val probe = SttAProbe(LiteRtLmEngine(modelPath = NOT_USED_PATH))
         assertThrows(IllegalArgumentException::class.java) {
-            runTest { probe.transcribeAudioBytesAsFloat32Le(FloatArray(0)) }
+            runTest { probe.transcribeAudioBytesAsWav(FloatArray(0), 16_000, dir) }
         }
     }
 
@@ -89,6 +89,15 @@ class SttAProbeTest {
         val nonExistent = File(dir, "does-not-exist")
         assertThrows(IllegalArgumentException::class.java) {
             runTest { probe.transcribeViaTempWav(floatArrayOf(0.1f), 16_000, nonExistent) }
+        }
+    }
+
+    @Test
+    fun `transcribeAudioBytesAsWav rejects missing cache dir`(@TempDir dir: File) {
+        val probe = SttAProbe(LiteRtLmEngine(modelPath = NOT_USED_PATH))
+        val nonExistent = File(dir, "does-not-exist")
+        assertThrows(IllegalArgumentException::class.java) {
+            runTest { probe.transcribeAudioBytesAsWav(floatArrayOf(0.1f), 16_000, nonExistent) }
         }
     }
 

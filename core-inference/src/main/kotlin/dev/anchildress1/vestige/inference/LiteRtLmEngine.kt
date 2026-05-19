@@ -24,9 +24,13 @@ import kotlinx.coroutines.withContext
 
 /** Backend selection. NPU needs the host's `nativeLibraryDir` — only Android `Context` has it. */
 sealed interface BackendChoice {
-    object Cpu : BackendChoice
     object Gpu : BackendChoice
     data class Npu(val nativeLibraryDir: String) : BackendChoice
+}
+
+/** Audio frontend backend. Gemma 4 E4B's audio adapter rejects GPU and requires CPU. */
+sealed interface AudioBackendChoice {
+    object Cpu : AudioBackendChoice
 }
 
 /**
@@ -40,8 +44,8 @@ sealed interface BackendChoice {
 @Suppress("LongParameterList") // Mirrors the SDK's EngineConfig + ConversationConfig surfaces.
 class LiteRtLmEngine(
     private val modelPath: String,
-    private val backend: BackendChoice = BackendChoice.Cpu,
-    private val audioBackend: BackendChoice? = null,
+    private val backend: BackendChoice = BackendChoice.Gpu,
+    private val audioBackend: AudioBackendChoice? = null,
     private val visionBackend: BackendChoice? = null,
     private val cacheDir: String? = null,
     private val samplerConfig: SamplerConfig = DETERMINISTIC_SAMPLER,
@@ -110,7 +114,7 @@ class LiteRtLmEngine(
      * SDK's instruction channel (the prompt's role/schema/context, no longer stuffed into the
      * message body), no initial history, no tools, and the engine's deterministic sampler.
      * Without the pinned sampler the SDK defaults pick a stochastic path that produces different
-     * output across CPU vs GPU on the same prompt.
+     * output across runs on the same prompt.
      */
     private fun conversationConfig(systemInstruction: String): ConversationConfig = ConversationConfig(
         Contents.of(systemInstruction),
@@ -299,14 +303,12 @@ class LiteRtLmEngine(
     }
 
     private fun BackendChoice.toSdkBackend(): Backend = when (this) {
-        BackendChoice.Cpu -> Backend.CPU()
         BackendChoice.Gpu -> Backend.GPU()
         is BackendChoice.Npu -> Backend.NPU(nativeLibraryDir = nativeLibraryDir)
     }
 
     private val BackendChoice.label: String
         get() = when (this) {
-            BackendChoice.Cpu -> "CPU"
             BackendChoice.Gpu -> "GPU"
             is BackendChoice.Npu -> "NPU"
         }
@@ -326,8 +328,8 @@ class LiteRtLmEngine(
         /**
          * Pinned greedy decode. `topK=1` makes generation deterministic regardless of `seed`
          * or `temperature`, but we set the rest explicitly so a future SDK change to defaults
-         * doesn't quietly bring back sampling noise. Backend parity (CPU vs GPU producing
-         * identical output for the same prompt) is the contract this constant defends.
+         * doesn't quietly bring back sampling noise. Repeatable GPU output for the same prompt is
+         * the contract this constant defends.
          */
         val DETERMINISTIC_SAMPLER: SamplerConfig = SamplerConfig(
             topK = 1,
@@ -337,3 +339,12 @@ class LiteRtLmEngine(
         )
     }
 }
+
+private fun AudioBackendChoice.toSdkBackend(): Backend = when (this) {
+    AudioBackendChoice.Cpu -> Backend.CPU()
+}
+
+private val AudioBackendChoice.label: String
+    get() = when (this) {
+        AudioBackendChoice.Cpu -> "CPU"
+    }

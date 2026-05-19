@@ -2,6 +2,7 @@ package dev.anchildress1.vestige
 
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
+import dev.anchildress1.vestige.inference.AudioBackendChoice
 import dev.anchildress1.vestige.inference.AudioCapture
 import dev.anchildress1.vestige.inference.AudioChunk
 import dev.anchildress1.vestige.inference.BackendChoice
@@ -65,8 +66,8 @@ class PerCapturePersonaSmokeTest {
 
         val engine = LiteRtLmEngine(
             modelPath = modelPath,
-            backend = BackendChoice.Cpu,
-            audioBackend = BackendChoice.Cpu,
+            backend = BackendChoice.Gpu,
+            audioBackend = AudioBackendChoice.Cpu,
             cacheDir = cacheDir.absolutePath,
         )
 
@@ -124,9 +125,8 @@ class PerCapturePersonaSmokeTest {
     }
 
     /**
-     * Default budget (60_000 ms) catches a ~2× regression past the documented ~24–33 s E4B CPU
-     * baseline without failing on the unmet 1–5 s ADR-002 target. Override with
-     * `-PlatencyBudgetMs=<ms>`.
+     * Default budget (60_000 ms) catches large regressions without pretending the unmet 1–5 s
+     * ADR-002 target is currently satisfied. Override with `-PlatencyBudgetMs=<ms>`.
      */
     private fun assertWithinLatencyBudget(captures: Map<Persona, CaptureResult>, latencyBudgetMs: Long) {
         val overruns = captures.filterValues { it.elapsedMs > latencyBudgetMs }

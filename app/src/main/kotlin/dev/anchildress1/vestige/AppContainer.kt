@@ -3,6 +3,7 @@ package dev.anchildress1.vestige
 import android.content.Context
 import android.content.Intent
 import android.util.Log
+import dev.anchildress1.vestige.inference.AudioBackendChoice
 import dev.anchildress1.vestige.inference.AudioChunk
 import dev.anchildress1.vestige.inference.BackendChoice
 import dev.anchildress1.vestige.inference.BackgroundExtractionWorker
@@ -96,16 +97,13 @@ class AppContainer(
     },
     private val embeddingArtifactManifestLoader: () -> EmbeddingArtifactManifest =
         EmbeddingArtifactManifest::loadDefault,
-    // `audioBackend = Cpu` is non-negotiable for the foreground voice path — without it the
-    // engine accepts a `Content.AudioFile` handoff and immediately SIGSEGVs in `mel_filterbank.cc`
-    // because no audio backend was attached at EngineConfig time. The reference STT-A test
-    // (`SttAAudioPlumbingTest`) enables the same backend; production must match.
     private val backgroundEngineFactory: (String, String) -> LiteRtLmEngine = { modelPath, cacheDir ->
         LiteRtLmEngine(
             modelPath = modelPath,
             backend = BackendChoice.Gpu,
-            // GPU audio path SIGSEGVs in mel_filterbank.cc — see LiteRT-LM/issues/2056
-            audioBackend = BackendChoice.Cpu,
+            // E4B rejects GPU for the audio adapter: "Model requires one of [cpu]".
+            // Text decode still runs on the GPU backend above.
+            audioBackend = AudioBackendChoice.Cpu,
             cacheDir = cacheDir,
         )
     },

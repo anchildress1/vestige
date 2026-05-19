@@ -51,7 +51,7 @@ android {
         // Forward `-P<key>=<value>` into instrumentation runner args. Consumers:
         //   modelPath, audioPath, latencyBudgetMs — existing smoke tests.
         //   manifestPath, runsPerEntry — SttDLensDivergenceTest, SttCTagStabilityTest.
-        //   inferenceBackend — STT-C/STT-D harnesses (cpu | gpu).
+        //   inferenceBackend — STT-C/STT-D harnesses (gpu only; cpu is rejected).
         //   embeddingModelPath, embeddingTokenizerPath — SttEEmbeddingComparisonTest + EmbeddingGemmaSmokeTest.
         listOf(
             "modelPath",

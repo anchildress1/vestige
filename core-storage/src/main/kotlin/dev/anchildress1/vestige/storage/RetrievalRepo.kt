@@ -59,9 +59,8 @@ class RetrievalRepo(
         }
         val queryTagKeys = QueryTagMatcher.queryKeysMatching(queryTerms, storedTagKeys)
 
-        // Defer embedding the query string until we know vector scoring will actually fire —
-        // skips the ~880 ms CPU embed cost on empty databases and during the backfill window
-        // when no entry has a stored vector yet.
+        // Defer embedding the query string until we know vector scoring will actually fire:
+        // empty databases and backfill windows have nothing to score against.
         val vectorScoringEnabled = embeddingWeight > 0f && entries.any { it.entry.vector != null }
         val queryVector: FloatArray? = if (vectorScoringEnabled) embedder(text) else null
 

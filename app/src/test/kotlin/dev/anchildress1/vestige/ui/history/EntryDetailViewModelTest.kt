@@ -27,7 +27,6 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -266,7 +265,7 @@ class EntryDetailViewModelTest {
         vm.state.test {
             val initial = awaitItem() as EntryDetailUiState.Loaded
             assertNull(initial.model.templateLabel)
-            assertFalse("pending entry must read as extraction-incomplete", initial.model.extractionComplete)
+            assertEquals(ExtractionDisplay.IN_PROGRESS, initial.model.extraction)
 
             entryStore.completeEntry(
                 id,
@@ -277,7 +276,7 @@ class EntryDetailViewModelTest {
 
             val reloaded = awaitItem() as EntryDetailUiState.Loaded
             assertEquals("AFTERMATH", reloaded.model.templateLabel)
-            assertTrue("completed entry must read as extraction-complete", reloaded.model.extractionComplete)
+            assertEquals(ExtractionDisplay.COMPLETE, reloaded.model.extraction)
         }
     }
 
@@ -343,6 +342,31 @@ class EntryDetailViewModelTest {
         vm.state.test {
             val loaded = awaitItem() as EntryDetailUiState.Loaded
             assertTrue(loaded.model.tags.isEmpty())
+        }
+    }
+
+    // --- lens status (drives the status-eyebrow tone) ---
+
+    @Test
+    fun `each confidence verdict maps to its three-lens status string`() = runTest {
+        val cases = mapOf(
+            ConfidenceVerdict.CANONICAL_WITH_CONFLICT to EntryDetailCopy.THREE_LENS_STATUS_CONFLICT,
+            ConfidenceVerdict.CANONICAL to EntryDetailCopy.THREE_LENS_STATUS_CANONICAL,
+            ConfidenceVerdict.CANDIDATE to EntryDetailCopy.THREE_LENS_STATUS_CANDIDATE,
+            ConfidenceVerdict.AMBIGUOUS to EntryDetailCopy.THREE_LENS_STATUS_AMBIGUOUS,
+        )
+        cases.forEach { (verdict, expectedStatus) ->
+            val id = entryStore.createPendingEntry("verdict ${verdict.name}", FIXTURE_INSTANT)
+            entryStore.completeEntry(
+                id,
+                ResolvedExtraction(mapOf("tags" to ResolvedField(listOf("meeting"), verdict))),
+                null,
+            )
+            val vm = buildVm(id)
+            vm.state.test {
+                val loaded = awaitItem() as EntryDetailUiState.Loaded
+                assertEquals(expectedStatus, loaded.model.lensStatus)
+            }
         }
     }
 

@@ -137,15 +137,15 @@ private fun EntryDetailContent(model: EntryDetailUiModel, onBack: () -> Unit, mo
             FollowUpCard(personaName = model.personaName, body = model.followUp)
         }
 
-        when {
-            model.extractionComplete -> {
+        when (model.extraction) {
+            ExtractionDisplay.COMPLETE -> {
                 ThreeLensRead(status = model.lensStatus, lenses = model.lenses)
                 FieldGrid(fields = model.fields)
             }
 
-            model.extractionFailed -> ExtractionFailedBand()
+            ExtractionDisplay.FAILED -> ExtractionFailedBand()
 
-            else -> {
+            ExtractionDisplay.IN_PROGRESS -> {
                 ExtractingBand()
                 LensSkeletonRow()
                 FieldSkeletonGrid()

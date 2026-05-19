@@ -23,9 +23,8 @@ data class EntryDetailUiModel(
     val fields: List<FieldRow>,
     val observations: List<ObservationLine>,
     val tags: List<String>,
-    /** Until the 3-lens extraction resolves the screen shows the spinner/skeleton state. */
-    val extractionComplete: Boolean = true,
-    val extractionFailed: Boolean = false,
+    /** One closed state — the screen can't render an extraction that is both complete and failed. */
+    val extraction: ExtractionDisplay = ExtractionDisplay.COMPLETE,
 ) {
     companion object {
         fun from(entity: EntryEntity, zoneId: ZoneId): EntryDetailUiModel = EntryDetailUiModel(
@@ -46,12 +45,16 @@ data class EntryDetailUiModel(
             fields = buildFieldRows(entity),
             observations = parseObservations(entity.entryObservationsJson),
             tags = entity.tags.map { it.name }.sorted(),
-            extractionComplete = entity.extractionStatus == ExtractionStatus.COMPLETED,
-            extractionFailed = entity.extractionStatus == ExtractionStatus.FAILED ||
-                entity.extractionStatus == ExtractionStatus.TIMED_OUT,
+            extraction = when (entity.extractionStatus) {
+                ExtractionStatus.COMPLETED -> ExtractionDisplay.COMPLETE
+                ExtractionStatus.FAILED, ExtractionStatus.TIMED_OUT -> ExtractionDisplay.FAILED
+                ExtractionStatus.PENDING, ExtractionStatus.RUNNING -> ExtractionDisplay.IN_PROGRESS
+            },
         )
     }
 }
+
+enum class ExtractionDisplay { IN_PROGRESS, COMPLETE, FAILED }
 
 enum class LensTone { CANONICAL, CONFLICT, AMBIGUOUS, CANDIDATE }
 

@@ -55,6 +55,11 @@ class PatternDetector(
             detectGoblinHours(withinGoblinWindow)?.let { add(it) }
             addAll(detectCommitments(withinWindow))
             addAll(detectVocab(withinWindow))
+            addAll(
+                TemporalRelativePatternDetector(zoneId).detect(withinWindow).map {
+                    detected(it.signature, it.supporting)
+                },
+            )
         }
     }
 

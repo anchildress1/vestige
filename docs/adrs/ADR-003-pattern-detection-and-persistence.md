@@ -518,3 +518,37 @@ domain.
 
 Implementation queued for post-Phase-4. Story file gets entries per item; tracking lives
 in stories, work-decision rationale lives here.
+
+### Addendum (2026-05-19) — Temporal-relative deterministic candidates
+
+ADR-014 moved pattern analysis into a background lane and made the old threshold trigger
+stale. This addendum extends the deterministic detector so that lane has calendar-shaped
+evidence before any model interpretation runs.
+
+What changes:
+
+- `PatternKind.TEMPORAL_RELATIVE` is added as a deterministic primitive.
+- The detector emits a `weekday_time_block` signature when at least three distinct local
+  dates share the same weekday and broad local time block (`morning`, `afternoon`,
+  `evening`, `night`) inside the 90-day window.
+- The detector emits a `month_start` signature when at least three distinct months have a
+  completed entry on day 1 inside the 90-day window.
+- Matching uses the same local timezone rules as detection, so per-entry callout
+  selection can support an existing temporal pattern without re-running the detector.
+
+What does not change:
+
+- Deterministic signatures remain content-addressable.
+- Supporting entries remain the source of truth; model text may name or summarize the
+  pattern later, but it may not invent evidence.
+- Existing primitives, lifecycle states, cooldown behavior, and ObjectBox fields stay as
+  written.
+
+Rationale:
+
+- A same-weekday/time-block cohort covers cases like "Tuesday afternoon for the previous
+  two Tuesdays" without scanning arbitrary neighbors.
+- A month-start cohort covers the recurring calendar-edge case directly.
+- Requiring distinct dates/months prevents three entries dumped on one afternoon or one
+  first-of-month from pretending to be recurrence. Because apparently we do have to tell
+  software not to lie with a straight face.

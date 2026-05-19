@@ -32,6 +32,7 @@ object PatternCalloutText {
             PatternKind.TIME_OF_DAY_CLUSTER -> goblin(count)
             PatternKind.COMMITMENT_RECURRENCE -> commitment(signature, count)
             PatternKind.VOCAB_FREQUENCY -> vocab(signature, count)
+            PatternKind.TEMPORAL_RELATIVE -> temporal(signature, count)
         }
     }
 
@@ -59,6 +60,20 @@ object PatternCalloutText {
     private fun vocab(signature: JSONObject?, count: Int): String {
         val token = signature?.optString("token").orEmpty().humanize()
         return "'$token' appears across $count entries with multiple framings."
+    }
+
+    private fun temporal(signature: JSONObject?, count: Int): String = when (signature?.optString("relation")) {
+        TemporalPatternRules.RELATION_WEEKDAY_TIME_BLOCK -> {
+            val day = signature.optString("day_of_week").humanize()
+            val block = signature.optString("time_block")
+            "$count $day $block entries logged. Same slot keeps showing up."
+        }
+
+        TemporalPatternRules.RELATION_MONTH_START -> {
+            "$count first-of-month entries logged. Same calendar edge keeps showing up."
+        }
+
+        else -> "$count time-relative entries logged. Same calendar slot keeps showing up."
     }
 
     private fun String.humanize(): String {

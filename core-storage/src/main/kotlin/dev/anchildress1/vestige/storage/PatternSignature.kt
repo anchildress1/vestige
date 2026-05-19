@@ -61,6 +61,24 @@ internal object PatternSignature {
         return Signature(PatternKind.VOCAB_FREQUENCY, json, sha256(json), null)
     }
 
+    fun forWeekdayTimeBlock(dayOfWeek: String, timeBlock: String): Signature {
+        val canonicalDay = TagNormalize.kebab(dayOfWeek)
+        val canonicalBlock = TagNormalize.kebab(timeBlock)
+        val kind = PatternKind.TEMPORAL_RELATIVE.serial
+        val relation = TemporalPatternRules.RELATION_WEEKDAY_TIME_BLOCK
+        val json = "{\"kind\":\"$kind\",\"relation\":\"$relation\"," +
+            "\"day_of_week\":\"$canonicalDay\",\"time_block\":\"$canonicalBlock\"}"
+        return Signature(PatternKind.TEMPORAL_RELATIVE, json, sha256(json), null)
+    }
+
+    fun forMonthStart(): Signature {
+        val kind = PatternKind.TEMPORAL_RELATIVE.serial
+        val relation = TemporalPatternRules.RELATION_MONTH_START
+        val day = TemporalPatternRules.MONTH_START_DAY
+        val json = """{"kind":"$kind","relation":"$relation","day_of_month":$day}"""
+        return Signature(PatternKind.TEMPORAL_RELATIVE, json, sha256(json), null)
+    }
+
     private fun sha256(payload: String): String {
         val digest = MessageDigest.getInstance("SHA-256").digest(payload.toByteArray(Charsets.UTF_8))
         return HexFormat.of().formatHex(digest)

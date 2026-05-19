@@ -33,6 +33,7 @@ object PatternMatcher {
             PatternKind.TIME_OF_DAY_CLUSTER -> matchesGoblin(entry, zoneId)
             PatternKind.COMMITMENT_RECURRENCE -> matchesCommitment(entry, signature)
             PatternKind.VOCAB_FREQUENCY -> matchesVocab(entry, signature)
+            PatternKind.TEMPORAL_RELATIVE -> matchesTemporal(entry, signature, zoneId)
         }
     }
 
@@ -95,6 +96,24 @@ object PatternMatcher {
             .split(VOCAB_SPLIT)
             .any { TokenStemmer.stem(it.trim()) == token }
         return tagHit || textHit
+    }
+
+    private fun matchesTemporal(entry: EntryEntity, signature: JSONObject, zoneId: ZoneId): Boolean {
+        val local = Instant.ofEpochMilli(entry.timestampEpochMs).atZone(zoneId)
+        return when (signature.optString("relation")) {
+            TemporalPatternRules.RELATION_WEEKDAY_TIME_BLOCK -> {
+                val dayOfWeek = local.dayOfWeek.name.lowercase(Locale.ROOT)
+                val timeBlock = TemporalPatternRules.timeBlockForHour(local.hour)
+                dayOfWeek == signature.optString("day_of_week") &&
+                    timeBlock == signature.optString("time_block")
+            }
+
+            TemporalPatternRules.RELATION_MONTH_START -> {
+                local.dayOfMonth == signature.optInt("day_of_month", 0)
+            }
+
+            else -> false
+        }
     }
 
     private val VOCAB_SPLIT: Regex = Regex("[^a-z0-9]+")

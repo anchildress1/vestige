@@ -1,7 +1,7 @@
 package dev.anchildress1.vestige
 
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.junit4.v2.createComposeRule
 import dev.anchildress1.vestige.inference.ForegroundResult
 import dev.anchildress1.vestige.inference.ForegroundStreamEvent
 import dev.anchildress1.vestige.model.Persona

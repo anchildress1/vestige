@@ -49,6 +49,54 @@ Expected evidence:
 - Follow-up style: asks for concrete context or next observable action
 - Forbidden style: "how did that make you feel", diagnosis, motivation theory, pep talk
 
+## Manual Voice Recording Script — Back-to-back capture
+
+Use these when recording entries through the app one after another. These preserve the same pattern pressure as the canonical corpus, but the voice is closer to the actual demo user instead of fixture-file taxidermy.
+
+This sequence is for content patterns, not calendar-relative patterns. Back-to-back recordings share today's timestamp, so they cannot honestly prove "previous two Tuesdays" or "first of the month" behavior. Use harness timestamps for those.
+
+### Meeting crash run
+
+1. "Standup ran long again. I was fine before it, then by eleven my brain had fully left the building. Opened the launch doc and just stared at it like that was a strategy."
+2. "Another Tuesday meeting, same bullshit. Went in normal, came out with concrete in my limbs. Lost the next hour rearranging tabs like a professional idiot."
+3. "Roadmap call ended and I did the little post-meeting corpse routine. Three tabs open, no motion, launch doc still sitting there judging me."
+
+Expected evidence:
+- Group-work event followed by attention / movement collapse
+- Vocabulary drift: `left the building`, `concrete in my limbs`, `corpse routine`
+- Should strengthen a Crashed / post-meeting aftermath pattern once background analysis lands
+
+### Invoice stall run
+
+4. "Invoice email is still sitting there. I opened it twice and performed the sacred ritual of closing it immediately."
+5. "I said I would send the invoice today. Instead I reorganized the desktop. Bold strategy. Absolutely not the work."
+6. "Invoice again. No mystery here. I know what to do. The cursor is just sitting there like it pays rent."
+
+Expected evidence:
+- Repeated stuck task: `invoice`
+- Explicit commitment in entry 5
+- Should strengthen Busy Stalling / commitment recurrence without moralizing or avoidance diagnosis
+
+### Decision loop run
+
+7. "Task app decision is still looping. Same three criteria, new spreadsheet, no decision. Very cool use of a human lifespan."
+8. "I keep changing the weights and pretending that is progress. It is not progress. It is spreadsheet cosplay."
+9. "Made another comparison table. Shockingly, the table did not turn into a decision through exposure therapy."
+
+Expected evidence:
+- Repeated comparison loop: `criteria`, `spreadsheet`, `weights`, `comparison table`
+- Should strengthen Nonstop Spiral without explaining the user's psychology
+
+### Optional keyword traps
+
+10. "The battery died on my keyboard during the meeting."
+11. "I crashed the test app after changing the ObjectBox entity."
+12. "Concrete shoes came up in a song lyric."
+
+Expected evidence:
+- These share keywords with the meeting-crash run but should not support the cognitive-aftereffect pattern.
+- If they do, the resolver is blending keywords instead of source meaning.
+
 ## Core Corpus
 
 Set fixture timestamps manually in the harness. Preserve local hour and weekday when listed.

@@ -1,8 +1,17 @@
 package dev.anchildress1.vestige.storage
 
+/** Temporal relation kinds. `serial` is the stable on-wire value persisted in signature JSON. */
+internal enum class TemporalRelation(val serial: String) {
+    WEEKDAY_TIME_BLOCK("weekday_time_block"),
+    MONTH_START("month_start"),
+    ;
+
+    companion object {
+        fun fromSerial(serial: String?): TemporalRelation? = entries.firstOrNull { it.serial == serial }
+    }
+}
+
 internal object TemporalPatternRules {
-    const val RELATION_WEEKDAY_TIME_BLOCK: String = "weekday_time_block"
-    const val RELATION_MONTH_START: String = "month_start"
     const val MONTH_START_DAY: Int = 1
     private const val MORNING_START_HOUR: Int = 5
     private const val MORNING_END_HOUR: Int = 11

@@ -65,7 +65,7 @@ internal object PatternSignature {
         val canonicalDay = TagNormalize.kebab(dayOfWeek)
         val canonicalBlock = TagNormalize.kebab(timeBlock)
         val kind = PatternKind.TEMPORAL_RELATIVE.serial
-        val relation = TemporalPatternRules.RELATION_WEEKDAY_TIME_BLOCK
+        val relation = TemporalRelation.WEEKDAY_TIME_BLOCK.serial
         val json = "{\"kind\":\"$kind\",\"relation\":\"$relation\"," +
             "\"day_of_week\":\"$canonicalDay\",\"time_block\":\"$canonicalBlock\"}"
         return Signature.of(PatternKind.TEMPORAL_RELATIVE, json, null)
@@ -73,7 +73,7 @@ internal object PatternSignature {
 
     fun forMonthStart(): Signature {
         val kind = PatternKind.TEMPORAL_RELATIVE.serial
-        val relation = TemporalPatternRules.RELATION_MONTH_START
+        val relation = TemporalRelation.MONTH_START.serial
         val day = TemporalPatternRules.MONTH_START_DAY
         val json = """{"kind":"$kind","relation":"$relation","day_of_month":$day}"""
         return Signature.of(PatternKind.TEMPORAL_RELATIVE, json, null)

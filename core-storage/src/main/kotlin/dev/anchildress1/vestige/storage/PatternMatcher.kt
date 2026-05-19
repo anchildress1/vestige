@@ -100,19 +100,19 @@ object PatternMatcher {
 
     private fun matchesTemporal(entry: EntryEntity, signature: JSONObject, zoneId: ZoneId): Boolean {
         val local = Instant.ofEpochMilli(entry.timestampEpochMs).atZone(zoneId)
-        return when (signature.optString("relation")) {
-            TemporalPatternRules.RELATION_WEEKDAY_TIME_BLOCK -> {
+        return when (TemporalRelation.fromSerial(signature.optString("relation"))) {
+            TemporalRelation.WEEKDAY_TIME_BLOCK -> {
                 val dayOfWeek = local.dayOfWeek.name.lowercase(Locale.ROOT)
                 val timeBlock = TemporalPatternRules.timeBlockForHour(local.hour)
                 dayOfWeek == signature.optString("day_of_week") &&
                     timeBlock == signature.optString("time_block")
             }
 
-            TemporalPatternRules.RELATION_MONTH_START -> {
+            TemporalRelation.MONTH_START -> {
                 local.dayOfMonth == signature.optInt("day_of_month", 0)
             }
 
-            else -> false
+            null -> false
         }
     }
 

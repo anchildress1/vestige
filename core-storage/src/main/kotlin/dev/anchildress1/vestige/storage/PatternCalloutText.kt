@@ -62,19 +62,20 @@ object PatternCalloutText {
         return "'$token' appears across $count entries with multiple framings."
     }
 
-    private fun temporal(signature: JSONObject?, count: Int): String = when (signature?.optString("relation")) {
-        TemporalPatternRules.RELATION_WEEKDAY_TIME_BLOCK -> {
-            val day = signature.optString("day_of_week").humanize()
-            val block = signature.optString("time_block")
-            "$count $day $block entries logged. Same slot keeps showing up."
-        }
+    private fun temporal(signature: JSONObject?, count: Int): String =
+        when (TemporalRelation.fromSerial(signature?.optString("relation"))) {
+            TemporalRelation.WEEKDAY_TIME_BLOCK -> {
+                val day = signature?.optString("day_of_week").orEmpty().humanize()
+                val block = signature?.optString("time_block").orEmpty()
+                "$count $day $block entries logged. Same slot keeps showing up."
+            }
 
-        TemporalPatternRules.RELATION_MONTH_START -> {
-            "$count first-of-month entries logged. Same calendar edge keeps showing up."
-        }
+            TemporalRelation.MONTH_START -> {
+                "$count first-of-month entries logged. Same calendar edge keeps showing up."
+            }
 
-        else -> "$count time-relative entries logged. Same calendar slot keeps showing up."
-    }
+            null -> "$count time-relative entries logged. Same calendar slot keeps showing up."
+        }
 
     private fun String.humanize(): String {
         if (isEmpty()) return ""

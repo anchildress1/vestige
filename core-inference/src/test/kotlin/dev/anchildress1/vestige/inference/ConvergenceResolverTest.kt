@@ -123,7 +123,7 @@ class ConvergenceResolverTest {
     }
 
     @Test
-    fun `all three lenses null on a nullable field resolves to canonical with null value`() {
+    fun `all three lenses null on a nullable field resolves to ambiguous with null value`() {
         val literal = LensExtraction(Lens.LITERAL, fields = mapOf("recurrence_link" to null))
         val inferential = LensExtraction(Lens.INFERENTIAL, fields = mapOf("recurrence_link" to null))
         val skeptical = LensExtraction(Lens.SKEPTICAL, fields = mapOf("recurrence_link" to null))
@@ -131,7 +131,7 @@ class ConvergenceResolverTest {
         val resolved = resolver.resolve(listOf(literal, inferential, skeptical))
 
         assertEquals(
-            ResolvedField(value = null, verdict = ConfidenceVerdict.CANONICAL),
+            ResolvedField(value = null, verdict = ConfidenceVerdict.AMBIGUOUS),
             resolved.fields["recurrence_link"],
         )
     }
@@ -261,7 +261,7 @@ class ConvergenceResolverTest {
     }
 
     @Test
-    fun `tags all empty resolves to canonical empty list`() {
+    fun `tags all empty resolves to ambiguous null`() {
         val literal = LensExtraction(Lens.LITERAL, fields = mapOf("tags" to emptyList<String>()))
         val inferential = LensExtraction(Lens.INFERENTIAL, fields = mapOf("tags" to emptyList<String>()))
         val skeptical = LensExtraction(Lens.SKEPTICAL, fields = mapOf("tags" to null))
@@ -269,8 +269,44 @@ class ConvergenceResolverTest {
         val resolved = resolver.resolve(listOf(literal, inferential, skeptical))
 
         assertEquals(
-            ResolvedField(value = emptyList<String>(), verdict = ConfidenceVerdict.CANONICAL),
+            ResolvedField(value = null, verdict = ConfidenceVerdict.AMBIGUOUS),
             resolved.fields["tags"],
+        )
+    }
+
+    @Test
+    fun `false booleans and empty lists do not count as corroborating evidence`() {
+        val literal = LensExtraction(
+            Lens.LITERAL,
+            fields = mapOf(
+                "state_shift" to false,
+                "vocabulary_contradictions" to emptyList<String>(),
+            ),
+        )
+        val inferential = LensExtraction(
+            Lens.INFERENTIAL,
+            fields = mapOf(
+                "state_shift" to false,
+                "vocabulary_contradictions" to emptyList<String>(),
+            ),
+        )
+        val skeptical = LensExtraction(
+            Lens.SKEPTICAL,
+            fields = mapOf(
+                "state_shift" to false,
+                "vocabulary_contradictions" to emptyList<String>(),
+            ),
+        )
+
+        val resolved = resolver.resolve(listOf(literal, inferential, skeptical))
+
+        assertEquals(
+            ResolvedField(value = null, verdict = ConfidenceVerdict.AMBIGUOUS),
+            resolved.fields["state_shift"],
+        )
+        assertEquals(
+            ResolvedField(value = null, verdict = ConfidenceVerdict.AMBIGUOUS),
+            resolved.fields["vocabulary_contradictions"],
         )
     }
 

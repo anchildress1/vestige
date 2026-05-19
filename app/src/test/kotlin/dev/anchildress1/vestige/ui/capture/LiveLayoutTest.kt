@@ -61,9 +61,8 @@ class LiveLayoutTest {
         composeRule.setContent {
             VestigeTheme { liveLayout(onStopTap = { stopTaps += 1 }) }
         }
-        // Bottom-anchored buttons can fall outside the unit-test viewport; invoke the click
-        // semantic action directly so the assertion does not depend on a physical hit-test.
         composeRule.onNodeWithContentDescription(CaptureCopy.REC_LABEL_RECORDING)
+            .assertIsDisplayed()
             .assertHasClickAction()
             .performSemanticsAction(SemanticsActions.OnClick)
         composeRule.runOnIdle { assertEquals(1, stopTaps) }

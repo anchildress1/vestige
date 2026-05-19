@@ -8,10 +8,13 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -48,30 +51,36 @@ fun LiveLayout(
     val timerLabel = "$mm:$ss"
     val progress = elapsedSec.toFloat() / totalSec.toFloat()
 
-    Column(modifier = modifier.fillMaxSize().background(colors.floor)) {
-        AppTop(
-            persona = state.persona.name,
-            status = AppTopStatuses.Recording,
-            rightContent = {},
-        )
-        TimerHeader(timerLabel = timerLabel, remainSec = remainSec)
-        Box(modifier = Modifier.padding(horizontal = 18.dp, vertical = 14.dp)) {
-            ChunkProgressBar(progress = progress, chunkDurationSec = totalSec)
-        }
-        Column(
-            modifier = Modifier.padding(horizontal = 18.dp, vertical = 8.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
-        ) {
-            Text(
-                text = CaptureCopy.LIVE_LEVEL_EYEBROW,
-                style = VestigeTheme.typography.eyebrow,
-                color = colors.lime,
+    Box(modifier = modifier.fillMaxSize().background(colors.floor)) {
+        Column(modifier = Modifier.fillMaxSize()) {
+            AppTop(
+                persona = state.persona.name,
+                status = AppTopStatuses.Recording,
+                rightContent = {},
             )
-            LiveLevelBars(levels = state.recentLevels)
+            TimerHeader(timerLabel = timerLabel, remainSec = remainSec)
+            Box(modifier = Modifier.padding(horizontal = 18.dp, vertical = 14.dp)) {
+                ChunkProgressBar(progress = progress, chunkDurationSec = totalSec)
+            }
+            Column(
+                modifier = Modifier.padding(horizontal = 18.dp, vertical = 8.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                Text(
+                    text = CaptureCopy.LIVE_LEVEL_EYEBROW,
+                    style = VestigeTheme.typography.eyebrow,
+                    color = colors.lime,
+                )
+                LiveLevelBars(levels = state.recentLevels)
+            }
         }
-        Spacer(modifier = Modifier.weight(1f))
         Column(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 18.dp),
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .fillMaxWidth()
+                .background(colors.floor)
+                .windowInsetsPadding(WindowInsets.navigationBars)
+                .padding(horizontal = 18.dp, vertical = 18.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             DiscardButton(onClick = onDiscardTap)

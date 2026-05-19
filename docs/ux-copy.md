@@ -367,7 +367,7 @@ Selected-row tag:
 ## Pattern List
 
 Header:
-> **Patterns**
+> **Vestiges.** *(screen headline only — brand word; the nav tab + section headers stay "Patterns" / `ACTIVE` etc. Function in navigation, brand in the heading. Reconciled 2026-05-18.)*
 
 Action button (top right) — persona-aware:
 - Witness: **Roast me**

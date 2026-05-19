@@ -59,7 +59,9 @@ fun PatternsListScreen(
             AppTop(persona = persona.name, status = AppTopStatuses.Ready, onMenuTap = onMenuTap)
             Text(
                 text = buildAnnotatedString {
-                    withStyle(SpanStyle(color = colors.ink)) { append("PATTERNS") }
+                    // Screen headline carries the brand; the nav tab + section headers stay
+                    // the functional "Patterns" word (function in navigation, brand in headings).
+                    withStyle(SpanStyle(color = colors.ink)) { append("VESTIGES") }
                     withStyle(SpanStyle(color = colors.coral)) { append(".") }
                 },
                 style = VestigeTheme.typography.displayBig,

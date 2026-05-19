@@ -4,9 +4,9 @@ import com.google.ai.edge.litertlm.Content
 import java.io.File
 
 /**
- * Audio plumbing harness — exercises both `Content.AudioBytes` and `Content.AudioFile` paths so
- * the on-device run can record which one transcribes coherently against E4B. Temp WAV is
- * always deleted in the same call.
+ * STT-A harness for on-device instrumentation tests.
+ *
+ * Kept in `androidTest` so release/runtime artifacts never carry this probe helper.
  */
 class SttAProbe(private val engine: LiteRtLmEngine) {
 

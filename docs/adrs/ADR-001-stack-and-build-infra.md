@@ -235,7 +235,7 @@ STT-A says this must work. The 30s constraint is a runtime cap — `AudioRecord`
 | Inference (32-char prompt → 2-char reply) | 3,261 ms |
 | SHA-256 pinned | `0b2a8980ce155fd97673d8e820b4d29d9c7d99b8fa6806f425d969b145bd52e0` |
 
-**STT-A device-test record (Phase 1, on-device, human-run):** the harness in `:core-inference` (`SttAProbe`) and the instrumented test at `:app/src/androidTest/.../SttAAudioPlumbingTest.kt` exercise three handoffs against Gemma 4 E4B on the S24 Ultra: `Content.AudioBytes(float32-LE bytes)`, `Content.AudioFile(<existing WAV>)`, and `transcribeViaTempWav` (PCM_FLOAT WAV written + handed off + deleted in-call). After running, fill in below. If neither byte-pack works and the file path is the only viable handoff, the temp-WAV lifecycle is the canonical path for v1.
+**STT-A device-test record (Phase 1, on-device, human-run):** the harness in `:core-inference` instrumentation test sources (`core-inference/src/androidTest/.../inference/SttAProbe.kt`) and the instrumented test at `core-inference/src/androidTest/.../inference/SttAAudioPlumbingTest.kt` exercise three handoffs against Gemma 4 E4B on the S24 Ultra: `Content.AudioBytes(float32-LE bytes)`, `Content.AudioFile(<existing WAV>)`, and `transcribeViaTempWav` (PCM_FLOAT WAV written + handed off + deleted in-call). After running, fill in below. If neither byte-pack works and the file path is the only viable handoff, the temp-WAV lifecycle is the canonical path for v1.
 
 | Field | Value |
 |---|---|

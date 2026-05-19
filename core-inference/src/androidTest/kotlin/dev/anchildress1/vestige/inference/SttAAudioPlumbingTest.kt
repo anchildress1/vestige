@@ -1,12 +1,7 @@
-package dev.anchildress1.vestige
+package dev.anchildress1.vestige.inference
 
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
-import dev.anchildress1.vestige.inference.AudioBackendChoice
-import dev.anchildress1.vestige.inference.AudioCapture
-import dev.anchildress1.vestige.inference.BackendChoice
-import dev.anchildress1.vestige.inference.LiteRtLmEngine
-import dev.anchildress1.vestige.inference.SttAProbe
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertTrue
 import org.junit.Assume.assumeTrue
@@ -31,9 +26,9 @@ import java.nio.ByteOrder
  *   adb push gemma-4-E4B-it.litertlm <BASE>/models/
  *   adb push sample.wav <BASE>/audio/
  *
- * where `<BASE>` is `/sdcard/Android/data/dev.anchildress1.vestige/files`. Then run:
+ * where `<BASE>` is `/sdcard/Android/data/dev.anchildress1.vestige.inference.test/files`. Then run:
  *
- *   ./gradlew :app:connectedDebugAndroidTest \
+ *   ./gradlew :core-inference:connectedDebugAndroidTest \
  *     -Pandroid.testInstrumentationRunnerArguments.modelPath=<BASE>/models/gemma-4-E4B-it.litertlm \
  *     -Pandroid.testInstrumentationRunnerArguments.audioPath=<BASE>/audio/sample.wav
  *

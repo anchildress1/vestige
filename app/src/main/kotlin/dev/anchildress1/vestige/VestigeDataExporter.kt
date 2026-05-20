@@ -80,6 +80,7 @@ internal class VestigeDataExporter(
         .fold(JSONArray()) { arr, entry ->
             arr.put(
                 JSONObject()
+                    .put("entry_id", stableEntryId(entry))
                     .put("objectbox_id", entry.id)
                     .put("markdown_filename", entry.markdownFilename)
                     .put("entry_text", entry.entryText)
@@ -120,7 +121,14 @@ internal class VestigeDataExporter(
                     .putNullable("snoozed_until", pattern.snoozedUntil)
                     .put("state_changed_timestamp", pattern.stateChangedTimestamp)
                     .put("latest_callout_text", pattern.latestCalloutText)
-                    .put("supporting_entry_ids", pattern.supportingEntries.map { it.id }.sorted().toJsonArray())
+                    .put(
+                        "supporting_entry_ids",
+                        pattern.supportingEntries.map(::stableEntryId).sorted().toJsonArray(),
+                    )
+                    .put(
+                        "supporting_entry_objectbox_ids",
+                        pattern.supportingEntries.map { it.id }.sorted().toJsonArray(),
+                    )
                     .put(
                         "supporting_entry_markdown_filenames",
                         pattern.supportingEntries.map { it.markdownFilename }.sorted().toJsonArray(),
@@ -165,6 +173,8 @@ internal class VestigeDataExporter(
         }
     }
 
+    private fun stableEntryId(entry: EntryEntity): String = entry.markdownFilename.removeSuffix(".md")
+
     private fun ZipOutputStream.putTextEntry(name: String, value: String) {
         putNextEntry(ZipEntry(name))
         try {
@@ -199,7 +209,7 @@ internal class VestigeDataExporter(
         const val SNAPSHOT_ENTRY = "vestige-export.json"
         const val MARKDOWN_EXPORT_DIR = "entries"
         private const val EXPORT_FORMAT = "vestige.full-export"
-        private const val EXPORT_SCHEMA_VERSION = 1
+        private const val EXPORT_SCHEMA_VERSION = 2
         private const val JSON_INDENT = 2
     }
 }

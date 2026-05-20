@@ -122,6 +122,7 @@ class VestigeDataExporterTest {
         exporter().writeTo(out)
 
         val entry = snapshotOf(out).getJSONArray("entries").getJSONObject(0)
+        assertEquals("a", entry.getString("entry_id"))
         assertTrue(entry.isNull("follow_up_text"))
         assertTrue(entry.isNull("recurrence_link"))
         assertTrue(entry.isNull("stated_commitment_json"))
@@ -196,6 +197,15 @@ class VestigeDataExporterTest {
         val exportedEntry = snapshot.getJSONArray("entries").getJSONObject(0)
         val exportedPattern = snapshot.getJSONArray("patterns").getJSONObject(0)
         assertEquals("invoice", exportedEntry.getJSONArray("tags").getString(0))
+        assertEquals("one", exportedEntry.getString("entry_id"))
+        assertEquals(
+            exportedEntry.getString("entry_id"),
+            exportedPattern.getJSONArray("supporting_entry_ids").getString(0),
+        )
+        assertEquals(
+            exportedEntry.getLong("objectbox_id"),
+            exportedPattern.getJSONArray("supporting_entry_objectbox_ids").getLong(0),
+        )
         assertEquals(
             exportedEntry.getString("markdown_filename"),
             exportedPattern.getJSONArray("supporting_entry_markdown_filenames").getString(0),

@@ -82,14 +82,22 @@ class PatternAnalysisGenerator(
             Log.w(TAG, "pattern analysis rejected reason=$reason (rawLen=${raw.length})")
             return null
         }
+
         @Suppress("ReturnCount")
         fun extractFromCandidate(root: JSONObject, recordReason: (String) -> Unit): PatternAnalysisResult? {
             val title = root.optString("title").trim().sanitizeTitle()
-            if (title == null) { recordReason("blank-title"); return null }
+            if (title == null) {
+                recordReason("blank-title")
+                return null
+            }
             val callout = root.optString("callout").trim().sanitizeCallout()
-            if (callout == null) { recordReason("blank-or-overlong-callout"); return null }
+            if (callout == null) {
+                recordReason("blank-or-overlong-callout")
+                return null
+            }
             if (forbiddenPhraseDetector(title) || forbiddenPhraseDetector(callout)) {
-                recordReason("forbidden-phrase"); return null
+                recordReason("forbidden-phrase")
+                return null
             }
             return PatternAnalysisResult(title = title, calloutText = callout)
         }

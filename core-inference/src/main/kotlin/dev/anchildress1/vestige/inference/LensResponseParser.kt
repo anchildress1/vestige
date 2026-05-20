@@ -194,14 +194,25 @@ internal object LensResponseParser {
             while (index < candidate.length) {
                 val c = candidate[index]
                 when {
-                    state.escape -> { append(c); state.escape = false }
-                    c == '\\' -> { append(c); state.escape = state.inString }
+                    state.escape -> {
+                        append(c)
+                        state.escape = false
+                    }
+
+                    c == '\\' -> {
+                        append(c)
+                        state.escape = state.inString
+                    }
+
                     c == '"' -> handleQuoteChar(candidate, index, state)
+
                     (c == '\n' || c == '\r') && state.inString ->
                         index = handleNewlineInString(c, candidate, index, state)
+
                     else -> {
                         append(c)
-                        state.stringSawWhitespace = state.stringSawWhitespace || (state.inString && c.isWhitespace())
+                        state.stringSawWhitespace =
+                            state.stringSawWhitespace || (state.inString && c.isWhitespace())
                     }
                 }
                 index += 1
@@ -238,12 +249,7 @@ internal object LensResponseParser {
         }
     }
 
-    private fun StringBuilder.handleNewlineInString(
-        c: Char,
-        candidate: String,
-        index: Int,
-        state: RepairState,
-    ): Int {
+    private fun StringBuilder.handleNewlineInString(c: Char, candidate: String, index: Int, state: RepairState): Int {
         val next = nextNonWhitespaceChar(candidate, index + 1)
         if (next != null && next in VALUE_CLOSE_FOLLOWERS) {
             append('"')

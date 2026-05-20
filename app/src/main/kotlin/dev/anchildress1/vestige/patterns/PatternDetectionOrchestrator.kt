@@ -121,8 +121,11 @@ class PatternDetectionOrchestrator(
             .runCatching { generate(persona, detected) }
             .getOrElse {
                 if (it is CancellationException) throw it
-                Log.w(TAG, "title generator failed id=${detected.patternId}" +
-                    " persona=${persona.name}: ${it.javaClass.simpleName}")
+                Log.w(
+                    TAG,
+                    "title generator failed id=${detected.patternId}" +
+                        " persona=${persona.name}: ${it.javaClass.simpleName}",
+                )
                 null
             }
             ?: deterministicFallbackTitle(detected)
@@ -265,8 +268,11 @@ private suspend fun PatternAnalysisGenerator?.generatePatternAnalysis(
         ?.runCatching { generate(persona, detected, supporting.map { it.evidence }) }
         ?.getOrElse {
             if (it is CancellationException) throw it
-            Log.w("VestigePatternOrch", "pattern analysis failed id=${detected.patternId}" +
-                " kind=${detected.kind.serial}: ${it.javaClass.simpleName}")
+            Log.w(
+                "VestigePatternOrch",
+                "pattern analysis failed id=${detected.patternId}" +
+                    " kind=${detected.kind.serial}: ${it.javaClass.simpleName}",
+            )
             null
         }
 }

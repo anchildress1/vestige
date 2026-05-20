@@ -40,11 +40,7 @@ internal class VestigeDataExporter(private val boxStore: BoxStore, private val o
                 )
             }
         }
-        // Staging avoids partial archives in our own temp area, but an arbitrary OutputStream
-        // cannot provide an atomic destination guarantee. A mid-copy failure can still leave the
-        // caller's sink truncated; fixing that requires a file/Uri contract, not just this helper.
-        // POSIX 0600: the staged archive carries the full user-data export — owner-only on any
-        // shared filesystem (no-op on Android's per-app sandbox, real protection on shared JVM tmp).
+        // Stage 0600 on shared FS; the caller-supplied sink does NOT get atomicity guarantees.
         val staged = Files.createTempFile(
             "vestige-export",
             ".zip",
@@ -57,7 +53,8 @@ internal class VestigeDataExporter(private val boxStore: BoxStore, private val o
             }
             staged.inputStream().use { it.copyTo(out) }
         } finally {
-            if (!staged.delete() && staged.exists()) {
+            if (staged.exists() && !staged.delete()) {
+                Log.w(TAG, "Failed to delete staged export ${staged.absolutePath}; deferring to JVM exit")
                 staged.deleteOnExit()
             }
         }
@@ -204,6 +201,7 @@ internal class VestigeDataExporter(private val boxStore: BoxStore, private val o
     companion object {
         const val SNAPSHOT_ENTRY = "vestige-export.json"
         const val MARKDOWN_EXPORT_DIR = "entries"
+        private const val TAG = "VestigeDataExporter"
         private const val EXPORT_FORMAT = "vestige.full-export"
         private const val EXPORT_SCHEMA_VERSION = 2
         private const val JSON_INDENT = 2

@@ -87,4 +87,43 @@ class EntryMarkdownRendererTest {
         assertTrue(markdown.contains("lens_receipts: []"))
         assertTrue(markdown.endsWith("\nalready newline\n"))
     }
+
+    @Test
+    fun `render quotes YAML scalar values containing a colon`() {
+        val entry = EntryEntity(
+            markdownFilename = "x.md",
+            entryText = "body",
+            timestampEpochMs = 0L,
+            followUpText = "key: value",
+        )
+
+        val markdown = EntryMarkdownRenderer.render(entry)
+
+        assertTrue("follow_up must be quoted when it contains `:`", markdown.contains("""follow_up: "key: value""""))
+    }
+
+    @Test
+    fun `render escapes embedded newlines and quotes in scalar values`() {
+        val entry = EntryEntity(
+            markdownFilename = "x.md",
+            entryText = "body",
+            timestampEpochMs = 0L,
+            followUpText = "line1\nline2 \"quoted\"",
+        )
+
+        val markdown = EntryMarkdownRenderer.render(entry)
+
+        assertTrue(markdown.contains("""follow_up: "line1\nline2 \"quoted\"""""))
+    }
+
+    @Test
+    fun `render emits exactly two frontmatter fences`() {
+        val entry = EntryEntity(markdownFilename = "x.md", entryText = "body", timestampEpochMs = 0L)
+
+        val markdown = EntryMarkdownRenderer.render(entry)
+
+        // Count standalone `---\n` fence lines — header opens, header closes, nothing else.
+        val fenceCount = markdown.lineSequence().count { it == "---" }
+        assertEquals(2, fenceCount)
+    }
 }

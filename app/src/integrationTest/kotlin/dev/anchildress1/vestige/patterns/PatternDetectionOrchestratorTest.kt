@@ -169,6 +169,19 @@ class PatternDetectionOrchestratorTest {
     }
 
     @Test
+    fun `completed entries between cadence boundaries do not rerun detection`() = runTest {
+        repeat(3) { commitOne() }
+        val patternId = patternStore.all().single { it.kind == PatternKind.TEMPLATE_RECURRENCE }.patternId
+        assertEquals(3, patternStore.findByPatternId(patternId)!!.supportingEntries.size)
+
+        commitOne()
+        assertEquals(3, patternStore.findByPatternId(patternId)!!.supportingEntries.size)
+
+        repeat(2) { commitOne() }
+        assertEquals(6, patternStore.findByPatternId(patternId)!!.supportingEntries.size)
+    }
+
+    @Test
     fun `new pattern lands ACTIVE with a model-generated title`() = runTest {
         repeat(3) { commitOne() }
         val pattern = patternStore.all().first { it.kind == PatternKind.TEMPLATE_RECURRENCE }

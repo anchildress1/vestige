@@ -30,8 +30,8 @@ import java.time.ZoneId
 /**
  * Wiring layer called by `BackgroundExtractionSaveFlow` after `completeEntry`. Two side effects:
  *
- * 1. Once the database has at least [PATTERN_SURFACE_MIN_ENTRIES] completed entries, run
- *    [PatternDetector] + upsert results into [PatternStore] on every committed entry. New
+ * 1. Every [PATTERN_SURFACE_MIN_ENTRIES] completed entries, run [PatternDetector] + upsert
+ *    results into [PatternStore]. New
  *    temporal patterns get a model-generated title from [PatternAnalysisGenerator], falling back
  *    to [PatternTitleGenerator], then a deterministic name.
  * 2. Select one matching active pattern for the committed entry, filtered by per-pattern callout
@@ -72,7 +72,7 @@ class PatternDetectionOrchestrator(
     @Suppress("ReturnCount")
     suspend fun onEntryCommitted(entry: EntryEntity, persona: Persona): EntryObservation? {
         val entryCount = completedEntryCount(boxStore)
-        if (entryCount >= patternSurfaceMinEntries) {
+        if (entryCount >= patternSurfaceMinEntries && entryCount % patternSurfaceMinEntries == 0L) {
             runDetection(persona)
             vocabClusterUpdater.stampAll()
         }
@@ -269,9 +269,8 @@ class PatternDetectionOrchestrator(
     }
 
     companion object {
-        /** Phase 3 threshold: detection attempts once the database holds at least this many
-         * COMPLETED entries. Below this the pattern engine has no quorum to surface anything. */
-        const val PATTERN_SURFACE_MIN_ENTRIES: Long = 10
+        /** Phase 3 cadence: detection attempts every N completed entries. */
+        const val PATTERN_SURFACE_MIN_ENTRIES: Long = 3
         const val MAX_TITLE_CHARS: Int = 24
 
         private const val TAG = "VestigePatternOrch"

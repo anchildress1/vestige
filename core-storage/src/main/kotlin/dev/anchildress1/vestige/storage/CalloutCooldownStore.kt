@@ -2,124 +2,177 @@ package dev.anchildress1.vestige.storage
 
 import io.objectbox.BoxStore
 import io.objectbox.kotlin.boxFor
+import io.objectbox.query.QueryBuilder
 
 /**
- * Owner of the singleton callout-cooldown row. ADR-003 §"Cooldown" pins the suppression window to
- * three entries after a callout fires; this store keeps the counter durable across restart so a
- * background-extraction failure cannot lose the position.
+ * Owner of the per-pattern callout cooldown table. One row per `patternId`; tracks fire history,
+ * in-flight reservation, and the remaining-suppression counter that gates whether the pattern's
+ * callout can fire on subsequent entries.
  */
 class CalloutCooldownStore(private val boxStore: BoxStore) {
 
     private val box get() = boxStore.boxFor<CalloutCooldownEntity>()
 
     /**
-     * Singleton accessor. Two concurrent callers must never observe "no row" simultaneously and
-     * both insert — that would orphan one row and let subsequent reads/writes pick either at
-     * random. Wrap the check-and-create in a tx so insertion is atomic; the second caller's tx
-     * starts after the first's commit and finds the row.
+     * Row for [patternId], creating it on first access. Two concurrent callers must never observe
+     * "no row" simultaneously and both insert — that would orphan one row and let subsequent
+     * reads/writes pick either at random. The check-and-create is wrapped in a tx; the second
+     * caller's tx starts after the first's commit and finds the row.
      */
-    fun snapshot(): CalloutCooldownEntity = boxStore.callInTx<CalloutCooldownEntity> {
-        box.all.firstOrNull() ?: CalloutCooldownEntity().also { box.put(it) }
+    fun snapshotFor(patternId: String): CalloutCooldownEntity = boxStore.callInTx<CalloutCooldownEntity> {
+        val existing = box
+            .query()
+            .equal(CalloutCooldownEntity_.patternId, patternId, QueryBuilder.StringOrder.CASE_SENSITIVE)
+            .build()
+            .use { it.findFirst() }
+        existing ?: CalloutCooldownEntity(patternId = patternId).also { box.put(it) }
     }
 
     /**
-     * Clear any pending reservation that never resolved. Called once at process startup —
-     * `pendingCalloutEntryId` is durable across restarts and a process death between
-     * `tryReserveCallout` and `settleReservedCallout` would otherwise wedge every future save
-     * with `BLOCKED_BY_PENDING_RESERVATION` permanently. Any in-flight reservation is
+     * Clear any pending reservation that never resolved across every pattern's row. Called once at
+     * process startup — `pendingCalloutEntryId` is durable across restarts and a process death
+     * between `tryReserveCallout` and `settleReservedCallout` would otherwise wedge that pattern's
+     * future saves with `BLOCKED_BY_PENDING_RESERVATION` permanently. Any in-flight reservation is
      * definitionally stale once the process restarts.
      */
     fun clearStalePendingReservation() {
         boxStore.runInTx {
-            val current = snapshot()
-            if (current.pendingCalloutEntryId == null) return@runInTx
-            current.pendingCalloutEntryId = null
-            box.put(current)
+            box.all.forEach { row ->
+                if (row.pendingCalloutEntryId != null) {
+                    row.pendingCalloutEntryId = null
+                    box.put(row)
+                }
+            }
         }
     }
 
-    /** True when a callout is permitted on the next entry (no suppression remaining). */
-    fun isCalloutPermitted(): Boolean = snapshot().let { current ->
-        current.remainingSuppression == 0 && current.pendingCalloutEntryId == null
+    /**
+     * Read-only eligibility check for [patternId]. Returns `true` when no row exists for the
+     * pattern (never fired ⇒ eligible) or when the row's window is clear. Does NOT lazily create
+     * a row — the orchestrator's pre-reserve selector relies on this purity so picking a pattern
+     * doesn't itself populate the cooldown table.
+     */
+    fun isCalloutPermitted(patternId: String): Boolean {
+        val row = box
+            .query()
+            .equal(CalloutCooldownEntity_.patternId, patternId, QueryBuilder.StringOrder.CASE_SENSITIVE)
+            .build()
+            .use { it.findFirst() } ?: return true
+        return row.remainingSuppression == 0 && row.pendingCalloutEntryId == null
     }
 
     /**
-     * Atomically claim the single global callout slot for [entryId].
-     *
-     * - If the cooldown window is active, this entry spends one suppressed slot and is rejected.
-     * - If another entry already holds the slot, this entry is rejected without mutating state.
-     * - Otherwise this entry becomes the sole pending reservation until confirm/release.
+     * Patterns whose callout slot is closed right now — either inside a suppression window or
+     * holding a pending reservation. One query per call; selectors should prefer this over
+     * per-candidate `isCalloutPermitted` to avoid N+1 ObjectBox reads on the save-flow hot path.
      */
-    fun tryReserveCallout(entryId: Long): ReservationOutcome = boxStore.callInTx {
-        val current = snapshot()
+    fun ineligiblePatternIds(): Set<String> = boxStore.callInTx<Set<String>> {
+        box.all
+            .asSequence()
+            .filter { it.remainingSuppression > 0 || it.pendingCalloutEntryId != null }
+            .mapTo(mutableSetOf()) { it.patternId }
+    }
+
+    /**
+     * Atomically claim [patternId]'s callout slot for [entryId]. Returns `RESERVED` on success,
+     * `BLOCKED_BY_PENDING_RESERVATION` when another entry already holds this pattern's slot,
+     * `SUPPRESSED_BY_COOLDOWN` when this pattern's suppression window is still active. Re-reserving
+     * the same `(entryId, patternId)` pair is idempotent and returns `RESERVED`.
+     *
+     * The orchestrator's selector pre-filters by `isCalloutPermitted` so production callers should
+     * never see `SUPPRESSED_BY_COOLDOWN` — but a concurrent `settleReservedCallout` from a parallel
+     * save can land a suppression window between the filter read and this reserve write, and the
+     * store-side check is the race-safety net that handles that case gracefully.
+     */
+    fun tryReserveCallout(entryId: Long, patternId: String): ReservationOutcome = boxStore.callInTx {
+        val row = snapshotFor(patternId)
         when {
-            current.pendingCalloutEntryId == entryId -> ReservationOutcome.RESERVED
+            row.pendingCalloutEntryId == entryId -> ReservationOutcome.RESERVED
 
-            current.pendingCalloutEntryId != null -> ReservationOutcome.BLOCKED_BY_PENDING_RESERVATION
+            row.pendingCalloutEntryId != null -> ReservationOutcome.BLOCKED_BY_PENDING_RESERVATION
 
-            current.remainingSuppression > 0 -> {
-                current.remainingSuppression -= 1
-                box.put(current)
-                ReservationOutcome.SUPPRESSED_BY_COOLDOWN
-            }
+            row.remainingSuppression > 0 -> ReservationOutcome.SUPPRESSED_BY_COOLDOWN
 
             else -> {
-                current.pendingCalloutEntryId = entryId
-                box.put(current)
+                row.pendingCalloutEntryId = entryId
+                box.put(row)
                 ReservationOutcome.RESERVED
             }
         }
     }
 
-    /** Record a fired callout. Suppresses the next [windowEntries] entries. */
-    fun recordFired(entryId: Long, timestampMs: Long, windowEntries: Int = DEFAULT_WINDOW) {
-        require(windowEntries >= 0) { "windowEntries >= 0 required (got $windowEntries)" }
-        val current = snapshot()
-        current.lastCalloutEntryId = entryId
-        current.lastCalloutTimestamp = timestampMs
-        current.remainingSuppression = windowEntries
-        current.pendingCalloutEntryId = null
-        box.put(current)
-    }
-
-    /** Convert a previously reserved slot into a durable cooldown window. */
-    fun confirmReservedCallout(entryId: Long, timestampMs: Long, windowEntries: Int = DEFAULT_WINDOW) {
+    /**
+     * Test-only seam: synthesizes a fire on [patternId] without driving the reserve→confirm
+     * lifecycle. Production paths use `tryReserveCallout` + `confirmReservedCallout`.
+     */
+    fun recordFired(entryId: Long, patternId: String, timestampMs: Long, windowEntries: Int = DEFAULT_WINDOW) {
         require(windowEntries >= 0) { "windowEntries >= 0 required (got $windowEntries)" }
         boxStore.runInTx {
-            val current = snapshot()
-            check(current.pendingCalloutEntryId == entryId) {
-                "No pending callout reservation for entry id=$entryId"
+            val row = snapshotFor(patternId)
+            row.lastCalloutEntryId = entryId
+            row.lastCalloutTimestamp = timestampMs
+            row.remainingSuppression = windowEntries
+            row.pendingCalloutEntryId = null
+            box.put(row)
+        }
+    }
+
+    /**
+     * Convert a previously reserved slot into a durable cooldown window on whichever pattern's row
+     * holds [entryId] as its pending reservation. Returns the confirmed `patternId` so the caller
+     * can pass it as `except` to [decrementAllActive], or `null` when no row holds a pending
+     * reservation for [entryId] — a stale or duplicate settle. Caller decides whether `null` is
+     * a logic bug (see `PatternDetectionOrchestrator.settleReservedCallout`).
+     */
+    fun confirmReservedCallout(entryId: Long, timestampMs: Long, windowEntries: Int = DEFAULT_WINDOW): String? {
+        require(windowEntries >= 0) { "windowEntries >= 0 required (got $windowEntries)" }
+        return boxStore.callInTx<String?> {
+            val row = findByPendingEntryIdInTx(entryId) ?: return@callInTx null
+            row.lastCalloutEntryId = entryId
+            row.lastCalloutTimestamp = timestampMs
+            row.remainingSuppression = windowEntries
+            row.pendingCalloutEntryId = null
+            box.put(row)
+            row.patternId
+        }
+    }
+
+    /**
+     * Drop the reservation held by [entryId] (on whichever pattern row owns it). Returns `true`
+     * when a pending reservation was found and cleared, `false` when none matched — the caller
+     * decides whether `false` is a stale settle (legitimate) or an invariant break.
+     */
+    fun releaseReservedCallout(entryId: Long): Boolean = boxStore.callInTx<Boolean> {
+        val row = findByPendingEntryIdInTx(entryId) ?: return@callInTx false
+        row.pendingCalloutEntryId = null
+        box.put(row)
+        true
+    }
+
+    private fun findByPendingEntryIdInTx(entryId: Long): CalloutCooldownEntity? = box
+        .query()
+        .equal(CalloutCooldownEntity_.pendingCalloutEntryId, entryId)
+        .build()
+        .use { it.findFirst() }
+
+    /**
+     * Decrement `remainingSuppression` by 1 on every row whose counter > 0, except the optional
+     * [exceptPatternId]. Called once per committed entry — the just-fired pattern is excepted so
+     * its freshly-set window isn't immediately burned by this entry. Idempotent at 0.
+     */
+    fun decrementAllActive(exceptPatternId: String? = null) {
+        boxStore.runInTx {
+            box.all.forEach { row ->
+                if (row.remainingSuppression > 0 && row.patternId != exceptPatternId) {
+                    row.remainingSuppression -= 1
+                    box.put(row)
+                }
             }
-            current.lastCalloutEntryId = entryId
-            current.lastCalloutTimestamp = timestampMs
-            current.remainingSuppression = windowEntries
-            current.pendingCalloutEntryId = null
-            box.put(current)
-        }
-    }
-
-    /** Drop a reservation when the callout never becomes user-visible. */
-    fun releaseReservedCallout(entryId: Long) {
-        boxStore.runInTx {
-            val current = snapshot()
-            if (current.pendingCalloutEntryId != entryId) return@runInTx
-            current.pendingCalloutEntryId = null
-            box.put(current)
-        }
-    }
-
-    /** Decrement the counter after a non-callout entry. Idempotent at zero. */
-    fun consumeOneEntry() {
-        boxStore.runInTx {
-            val current = snapshot()
-            if (current.remainingSuppression == 0) return@runInTx
-            current.remainingSuppression -= 1
-            box.put(current)
         }
     }
 
     companion object {
-        /** ADR-003 default: suppress callouts on the next 3 entries after one fires. */
+        /** Default suppression window per Phase 3: 3 entries after a callout fires. */
         const val DEFAULT_WINDOW: Int = 3
     }
 

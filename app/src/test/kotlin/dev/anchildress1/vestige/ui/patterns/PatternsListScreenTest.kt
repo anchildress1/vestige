@@ -126,17 +126,17 @@ class PatternsListScreenTest {
 
     @Test
     fun `NO_PATTERNS empty state renders header and body, no stat ribbon`() {
-        repeat(3) { seedEntry("entry $it", ExtractionStatus.COMPLETED) }
+        repeat(10) { seedEntry("entry $it", ExtractionStatus.COMPLETED) }
         composeRule.setContent { PatternsListScreen(viewModel = newViewModel(), onOpenPattern = {}) }
         composeRule.onNodeWithText("NO REPEATING PATTERN DETECTED.").assertIsDisplayed()
         composeRule.onNodeWithText("The model looked. Nothing came back twice.").assertIsDisplayed()
         // Stats ribbon is gated on Loaded — an empty pattern surface stays a single status band.
-        composeRule.onAllNodesWithContentDescription("0 vestiges, 3 entries, last 1 days").assertCountEquals(0)
+        composeRule.onAllNodesWithContentDescription("0 vestiges, 10 entries, last 1 days").assertCountEquals(0)
     }
 
     @Test
     fun `NO_PATTERNS empty state is an announced status band with no click action (a11y)`() {
-        repeat(3) { seedEntry("entry $it", ExtractionStatus.COMPLETED) }
+        repeat(10) { seedEntry("entry $it", ExtractionStatus.COMPLETED) }
         composeRule.setContent { PatternsListScreen(viewModel = newViewModel(), onOpenPattern = {}) }
         // AGENTS.md band rule: same requirements as NO_ENTRIES — merged contentDescription +
         // polite liveRegion, no click action.

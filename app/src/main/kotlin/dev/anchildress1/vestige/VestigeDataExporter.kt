@@ -157,6 +157,7 @@ internal class VestigeDataExporter(
             arr.put(
                 JSONObject()
                     .put("objectbox_id", cooldown.id)
+                    .put("pattern_id", cooldown.patternId)
                     .putNullable("last_callout_entry_id", cooldown.lastCalloutEntryId)
                     .putNullable("last_callout_timestamp", cooldown.lastCalloutTimestamp)
                     .put("remaining_suppression", cooldown.remainingSuppression)

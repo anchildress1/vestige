@@ -61,6 +61,7 @@ class DebugPatternSeederTest {
     fun `seed clears stale callout cooldown state before rebuilding fixtures`() {
         boxStore.boxFor(CalloutCooldownEntity::class.java).put(
             CalloutCooldownEntity(
+                patternId = "stale-pattern-sha",
                 remainingSuppression = 3,
                 pendingCalloutEntryId = 99L,
                 lastCalloutEntryId = 42L,

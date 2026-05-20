@@ -28,16 +28,16 @@ import java.time.Clock
 import java.time.ZoneId
 
 /**
- * Wiring layer called by `BackgroundExtractionSaveFlow` after `completeEntry` so the new entry
- * is already persisted with its tags + template label. Two side effects:
+ * Wiring layer called by `BackgroundExtractionSaveFlow` after `completeEntry`. Two side effects:
  *
- * 1. Every [DETECTION_INTERVAL]th entry, run [PatternDetector] + upsert results into [PatternStore]. New
- *    temporal patterns get a model-generated title from [PatternAnalysisGenerator], falling back to
- *    [PatternTitleGenerator], then a deterministic name. Existing rows update their supporting set
- *    and `lastSeenTimestamp`.
- * 2. Select one matching active pattern for the committed entry (subject to the global 3-entry
- *    callout cooldown). When a callout fires, append a `PATTERN_CALLOUT` observation to the
- *    entry and record the firing.
+ * 1. Once the database has at least [PATTERN_SURFACE_MIN_ENTRIES] completed entries, run
+ *    [PatternDetector] + upsert results into [PatternStore] on every committed entry. New
+ *    temporal patterns get a model-generated title from [PatternAnalysisGenerator], falling back
+ *    to [PatternTitleGenerator], then a deterministic name.
+ * 2. Select one matching active pattern for the committed entry, filtered by per-pattern callout
+ *    cooldown. When a callout fires, append a `PATTERN_CALLOUT` observation and record the firing
+ *    on that pattern's cooldown row. Every committed entry decrements every other pattern's
+ *    active cooldown counter by one.
  *
  * The orchestrator is best-effort — any failure inside it must not propagate to the save flow.
  * Callers wrap the call in a try/catch; this class surfaces failures via [Log] only.
@@ -52,39 +52,72 @@ class PatternDetectionOrchestrator(
     private val cooldownStore: CalloutCooldownStore,
     private val clock: Clock = Clock.systemUTC(),
     private val zoneId: ZoneId = ZoneId.systemDefault(),
+    private val patternSurfaceMinEntries: Long = PATTERN_SURFACE_MIN_ENTRIES,
 ) {
 
     /**
      * Compute the optional callout for [entry] under the given [persona]. A returned observation
-     * means this entry now holds the single global callout reservation; the save flow must either
-     * confirm it after persistence or release it when append fails. Suppressed entries burn down
-     * the cooldown in the store transaction; entries blocked by another in-flight reservation just
-     * skip the callout path.
+     * means [entry] holds a callout reservation against the chosen pattern's cooldown row; the
+     * save flow must either confirm it after persistence or release it when append fails.
+     *
+     * Selection now matches before reserving: the matcher filters candidates by per-pattern
+     * cooldown eligibility (ADR-016) and picks the strongest survivor. With no eligible match,
+     * we still decrement every active cooldown so suppressed patterns count down on schedule.
      *
      * [persona] is per-call (not constructor-pinned) so the same orchestrator instance can
      * serve every session — capture sessions own persona, the orchestrator is process-scoped.
      */
+    // Early returns reflect three distinct failure paths (no match / reservation blocked /
+    // blank callout text), each with its own cleanup. A single-exit form would tangle them.
+    @Suppress("ReturnCount")
     suspend fun onEntryCommitted(entry: EntryEntity, persona: Persona): EntryObservation? {
         val entryCount = completedEntryCount(boxStore)
-        if (entryCount > 0 && entryCount % DETECTION_INTERVAL == 0L) {
+        if (entryCount >= patternSurfaceMinEntries) {
             runDetection(persona)
         }
-        if (cooldownStore.tryReserveCallout(entry.id) != CalloutCooldownStore.ReservationOutcome.RESERVED) {
+        val matched = chooseMatchingPattern(entry)
+        if (matched == null) {
+            cooldownStore.decrementAllActive()
             return null
         }
-        return prepareCallout(entry) ?: run {
-            cooldownStore.releaseReservedCallout(entry.id)
-            null
+        val outcome = cooldownStore.tryReserveCallout(entry.id, matched.patternId)
+        if (outcome != CalloutCooldownStore.ReservationOutcome.RESERVED) {
+            cooldownStore.decrementAllActive()
+            return null
         }
+        val observation = buildCalloutObservation(matched, entry.id)
+        if (observation == null) {
+            cooldownStore.releaseReservedCallout(entry.id)
+            cooldownStore.decrementAllActive()
+        }
+        return observation
     }
 
-    /** Finalize a pending reservation after the save flow either persists or drops the callout. */
+    /**
+     * Finalize a pending reservation. `fired = true` starts the matched pattern's suppression
+     * window; `fired = false` drops the reservation. Either way, all other patterns' active
+     * counters decrement once for this committed entry.
+     */
     fun settleReservedCallout(entry: EntryEntity, fired: Boolean) {
         if (fired) {
-            cooldownStore.confirmReservedCallout(entry.id, clock.millis())
+            val firedPatternId = cooldownStore.confirmReservedCallout(entry.id, clock.millis())
+            if (firedPatternId == null) {
+                // Stale or duplicate settle — the reservation either never landed or another path
+                // already settled it. Decrement everything (no pattern is excepted).
+                Log.e(TAG, "settle(fired=true) for entry id=${entry.id} found no pending reservation")
+                cooldownStore.decrementAllActive()
+            } else {
+                cooldownStore.decrementAllActive(exceptPatternId = firedPatternId)
+            }
             return
         }
-        cooldownStore.releaseReservedCallout(entry.id)
+        val released = cooldownStore.releaseReservedCallout(entry.id)
+        if (!released) {
+            // Caller contract: settle(fired=false) follows a successful onEntryCommitted that
+            // already reserved. Missing pending here is an invariant break, not a normal path.
+            Log.e(TAG, "settle(fired=false) for entry id=${entry.id} found no pending reservation")
+        }
+        cooldownStore.decrementAllActive()
     }
 
     private suspend fun runDetection(persona: Persona) {
@@ -125,6 +158,7 @@ class PatternDetectionOrchestrator(
                     TAG,
                     "title generator failed id=${detected.patternId}" +
                         " persona=${persona.name}: ${it.javaClass.simpleName}",
+                    it,
                 )
                 null
             }
@@ -183,16 +217,17 @@ class PatternDetectionOrchestrator(
         }
     }
 
-    /** Pure: returns the observation if there's a callout to fire. No side effects on cooldown. */
-    private fun prepareCallout(entry: EntryEntity): EntryObservation? {
-        val matched = chooseMatchingPattern(entry) ?: return null
+    /**
+     * Pure: builds the observation for an already-chosen [matched] pattern. A blank stored
+     * callout text means an upstream write path skipped it — log and return null so the caller
+     * releases the reservation, never persists an empty callout. ADR-003 §"Pattern primitives"
+     * requires every primitive to ship a templated callout via `PatternCalloutText.build`.
+     */
+    private fun buildCalloutObservation(matched: PatternEntity, entryId: Long): EntryObservation? {
         val text = matched.latestCalloutText
-        // ADR-003 §"Pattern primitives" guarantees every primitive ships a templated callout via
-        // PatternCalloutText.build. A blank stored value means an upstream write path skipped
-        // it — log and skip the fire, never persist an empty callout.
         return when {
             text.isBlank() -> {
-                Log.w(TAG, "active pattern ${matched.patternId} has blank latestCalloutText (entry id=${entry.id})")
+                Log.w(TAG, "active pattern ${matched.patternId} has blank latestCalloutText (entry id=$entryId)")
                 null
             }
 
@@ -207,9 +242,12 @@ class PatternDetectionOrchestrator(
     private fun chooseMatchingPattern(entry: EntryEntity): PatternEntity? {
         // Indexed ACTIVE-only query avoids the full-table scan on every committed entry — at
         // 100+ patterns this is the difference between "fine" and "the save-flow hot path is
-        // O(n)" on the reference device.
+        // O(n)" on the reference device. Cooldown eligibility is fetched once (bulk Set) instead
+        // of one ObjectBox read per candidate — selection stays O(active patterns), not O(n²).
+        val ineligible = cooldownStore.ineligiblePatternIds()
         val candidates = patternStore.findActive()
             .filter { PatternMatcher.matches(entry, it, zoneId) }
+            .filter { it.patternId !in ineligible }
         return candidates.sortedWith(
             compareByDescending<PatternEntity> { it.kind == PatternKind.TEMPORAL_RELATIVE }
                 .thenByDescending { it.supportingEntries.size }
@@ -228,7 +266,9 @@ class PatternDetectionOrchestrator(
     }
 
     companion object {
-        const val DETECTION_INTERVAL: Long = 3
+        /** Phase 3 threshold: detection attempts once the database holds at least this many
+         * COMPLETED entries. Below this the pattern engine has no quorum to surface anything. */
+        const val PATTERN_SURFACE_MIN_ENTRIES: Long = 10
         const val MAX_TITLE_CHARS: Int = 24
 
         private const val TAG = "VestigePatternOrch"

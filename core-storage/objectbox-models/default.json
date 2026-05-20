@@ -226,7 +226,7 @@
     },
     {
       "id": "4:1734609473925323709",
-      "lastPropertyId": "5:4610561580918816659",
+      "lastPropertyId": "6:2515247098657312552",
       "name": "CalloutCooldownEntity",
       "properties": [
         {
@@ -254,13 +254,20 @@
           "id": "5:4610561580918816659",
           "name": "pendingCalloutEntryId",
           "type": 6
+        },
+        {
+          "id": "6:2515247098657312552",
+          "name": "patternId",
+          "indexId": "8:1006736837999625045",
+          "type": 9,
+          "flags": 2048
         }
       ],
       "relations": []
     }
   ],
   "lastEntityId": "4:1734609473925323709",
-  "lastIndexId": "7:6029983261360149208",
+  "lastIndexId": "8:1006736837999625045",
   "lastRelationId": "2:6675457034848876041",
   "lastSequenceId": "0:0",
   "modelVersion": 5,

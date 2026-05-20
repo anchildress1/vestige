@@ -74,7 +74,7 @@ class PersonaPromptComposerTest {
                 {
                     assertTrue(
                         prompt.contains(
-                            "Do not ask for a feeling or state word unless the transcript already names one",
+                            "When the transcript already names a state word, you may ask for the missing state detail",
                         ),
                     )
                 },

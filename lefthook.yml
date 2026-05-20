@@ -20,7 +20,14 @@ commit-msg:
       run: make commitlint COMMIT_MSG_FILE={1}
 
 pre-push:
-  parallel: false
+  parallel: true
   commands:
-    ci:
-      run: make ci
+    ktlint:
+      priority: 1
+      run: make ktlint-check
+    build:
+      priority: 2
+      run: make build
+    test:
+      priority: 2
+      run: make test

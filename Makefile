@@ -181,7 +181,9 @@ verify-no-telemetry:
 
 verify: lint test-full build secret-scan verify-no-telemetry
 
-ci: lint test build verify-no-telemetry
+# Local mirror of the GitHub Actions gate. Pre-push uses this so a branch can't slide past
+# with only the incremental changed-module test path.
+ci: lint test-full build verify-no-telemetry
 
 clean:
 	$(GRADLE) clean

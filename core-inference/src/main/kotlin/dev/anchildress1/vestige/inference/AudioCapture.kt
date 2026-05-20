@@ -151,7 +151,7 @@ class AudioCapture(
     fun requestStop() {
         stopRequested.set(true)
         runCatching { activeRecord?.stop() }
-            .onFailure { Log.w(TAG, "stop() during requestStop failed: ${it.message}") }
+            .onFailure { Log.w(TAG, "stop() during requestStop failed: ${it.javaClass.simpleName}") }
     }
 
     // Release the JNI handle and zero the Kotlin-side buffers so accumulated PCM samples don't

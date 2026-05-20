@@ -39,7 +39,7 @@ import java.io.File
  * gate as stability across **three** runs per dump, so [runsPerEntry] must be ≥ 3 — below that
  * the assertion would over-pass against a thinner sample. The default 3 runs × 18 canonical
  * corpus entries × ~3 lens calls per run is a long-running on-device suite; expect tens of
- * minutes on E4B CPU. The harness rejects cherry-picked manifests so the phase gate cannot pass
+ * minutes on E4B GPU. The harness rejects cherry-picked manifests so the phase gate cannot pass
  * on a toy subset, and entries that emit zero tags across all runs hard-fail rather than
  * silently dropping out of the stability ratio.
  */

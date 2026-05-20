@@ -6,7 +6,9 @@ import dev.anchildress1.vestige.inference.BackgroundExtractionResult
 import dev.anchildress1.vestige.inference.BackgroundExtractionWorker
 import dev.anchildress1.vestige.inference.ExtractionStatusListener
 import dev.anchildress1.vestige.inference.HistoryChunk
+import dev.anchildress1.vestige.inference.LensResult
 import dev.anchildress1.vestige.inference.ObservationGenerator
+import dev.anchildress1.vestige.model.EntryLensReceipt
 import dev.anchildress1.vestige.model.EntryObservation
 import dev.anchildress1.vestige.model.ExtractionStatus
 import dev.anchildress1.vestige.model.Persona
@@ -21,6 +23,7 @@ import java.time.ZonedDateTime
 data class BackgroundExtractionLifecycleCallbacks(
     val listenerFactory: (Long) -> ExtractionStatusListener,
     val onEntryFinalized: (Long) -> Unit = {},
+    val onPatternCalloutAppended: (Long) -> Unit = {},
 )
 
 /**
@@ -40,16 +43,21 @@ data class BackgroundExtractionLifecycleCallbacks(
  *   5. Detached: terminal worker states are buffered until persistence succeeds.
  *   6. Detached: `Success` → `EntryStore.completeEntry`; `Failed` / `TimedOut` → `failEntry`.
  *   7. Detached: once storage succeeds, the buffered terminal state is forwarded to the listener.
- *   8. Detached: success-only post-processing finishes, then [onEntryFinalized] fires for
- *      derived-work follow-ons like vector backfill.
+ *   8. Detached: success-only derived-work scheduling fires, then [onEntryFinalized] fires for
+ *      follow-ons like vector backfill. Pattern callout work continues on its own coroutine and
+ *      reports [onPatternCalloutAppended] when it changes entry-visible state.
  */
-@Suppress("TooManyFunctions") // Pipeline + handlers + helpers; splitting hides the linear flow.
+@Suppress(
+    "TooManyFunctions", // Pipeline + handlers + helpers; splitting hides the linear flow.
+    "LongParameterList", // Wiring object: seams are explicit and cheaper than a fake config carrier.
+)
 class BackgroundExtractionSaveFlow(
     private val entryStore: EntryStore,
     private val worker: BackgroundExtractionWorker,
     private val observationGenerator: ObservationGenerator,
     private val lifecycleCallbacks: BackgroundExtractionLifecycleCallbacks,
     private val scope: CoroutineScope,
+    private val retrieveHistory: suspend (String) -> List<HistoryChunk> = { emptyList() },
     private val patternOrchestrator: PatternDetectionOrchestrator? = null,
 ) {
 
@@ -130,12 +138,15 @@ class BackgroundExtractionSaveFlow(
         persona: Persona,
     ) {
         try {
-            when (val result = worker.extract(request, terminalRelay.workerListener)) {
+            val requestWithHistory = request.copy(
+                retrievedHistory = resolveRetrievedHistory(entryId, entryText, request.retrievedHistory),
+            )
+            when (val result = worker.extract(requestWithHistory, terminalRelay.workerListener)) {
                 is BackgroundExtractionResult.Success -> handleSuccess(
                     entryId = entryId,
                     entryText = entryText,
                     capturedAt = capturedAt,
-                    entryAttemptCount = request.entryAttemptCount,
+                    entryAttemptCount = requestWithHistory.entryAttemptCount,
                     result = result,
                     terminalRelay = terminalRelay,
                     persona = persona,
@@ -143,14 +154,14 @@ class BackgroundExtractionSaveFlow(
 
                 is BackgroundExtractionResult.Failed -> handleFailure(
                     entryId = entryId,
-                    entryAttemptCount = request.entryAttemptCount,
+                    entryAttemptCount = requestWithHistory.entryAttemptCount,
                     result = result,
                     terminalRelay = terminalRelay,
                 )
 
                 is BackgroundExtractionResult.TimedOut -> handleTimeout(
                     entryId = entryId,
-                    entryAttemptCount = request.entryAttemptCount,
+                    entryAttemptCount = requestWithHistory.entryAttemptCount,
                     result = result,
                     terminalRelay = terminalRelay,
                 )
@@ -172,6 +183,22 @@ class BackgroundExtractionSaveFlow(
         }
     }
 
+    private suspend fun resolveRetrievedHistory(
+        entryId: Long,
+        entryText: String,
+        seededHistory: List<HistoryChunk>,
+    ): List<HistoryChunk> {
+        if (seededHistory.isNotEmpty()) return seededHistory
+        return try {
+            retrieveHistory(entryText)
+        } catch (cancellation: CancellationException) {
+            throw cancellation
+        } catch (@Suppress("TooGenericExceptionCaught") error: Exception) {
+            Log.w(TAG, "Detached retrieval degraded for entryId=$entryId (${error.javaClass.simpleName})")
+            emptyList()
+        }
+    }
+
     @Suppress("LongParameterList") // Context bundle is clearer than inventing a throwaway carrier type.
     private suspend fun handleSuccess(
         entryId: Long,
@@ -190,26 +217,42 @@ class BackgroundExtractionSaveFlow(
             lastError = null,
             terminalRelay = terminalRelay,
         ) {
-            entryStore.completeEntry(entryId, result.resolved, result.templateLabel, observations)
+            entryStore.completeEntry(
+                entryId,
+                result.resolved,
+                result.templateLabel,
+                observations,
+                result.lensResults.toReceipts(),
+            )
         }
-        // Runs after the terminal commit so a callout failure can't unwind the resolved
-        // entry. Best-effort — failures are swallowed in runPatternOrchestration.
-        runPatternOrchestration(entryId, persona)
+        schedulePatternOrchestration(entryId, persona)
         runEntryFinalization(entryId)
     }
 
-    private suspend fun runPatternOrchestration(entryId: Long, persona: Persona): EntryObservation? {
-        val orchestrator = patternOrchestrator ?: return null
-        return try {
-            persistOrchestratorCallout(orchestrator, entryId, persona)
+    private fun schedulePatternOrchestration(entryId: Long, persona: Persona) {
+        val orchestrator = patternOrchestrator ?: return
+        scope.launch {
+            runPatternOrchestration(orchestrator, entryId, persona)
+        }
+    }
+
+    private suspend fun runPatternOrchestration(
+        orchestrator: PatternDetectionOrchestrator,
+        entryId: Long,
+        persona: Persona,
+    ) {
+        try {
+            val callout = persistOrchestratorCallout(orchestrator, entryId, persona)
+            if (callout != null) {
+                reportPatternCalloutAppended(entryId)
+            }
         } catch (cancellation: CancellationException) {
             throw cancellation
         } catch (@Suppress("TooGenericExceptionCaught") error: Exception) {
             // Best-effort layer; swallow so a pattern-detection failure doesn't fail the save.
             // Log.e + throwable so the stacktrace survives — a swallowed pattern bug should be
             // recoverable from logs, not require reproducing the failure on-device.
-            Log.e(TAG, "Pattern orchestration failed for entryId=$entryId", error)
-            null
+            Log.e(TAG, "Pattern orchestration failed for entryId=$entryId: ${error.javaClass.simpleName}", error)
         }
     }
 
@@ -221,7 +264,10 @@ class BackgroundExtractionSaveFlow(
         // Elvis-return locks `entry` as non-null without relying on `val`-flow inference. A
         // future refactor that splits the method or hoists `entry` to a `var` would otherwise
         // silently surface NPE risk through the settle calls below.
-        val entry = entryStore.readEntry(entryId) ?: return null
+        val entry = entryStore.readEntry(entryId) ?: run {
+            Log.w(TAG, "persistOrchestratorCallout: entry $entryId not found — skipping callout")
+            return null
+        }
         val callout = orchestrator.onEntryCommitted(entry, persona)
         if (callout != null) {
             appendAndConfirmCallout(orchestrator, entry, entryId, callout)
@@ -258,7 +304,17 @@ class BackgroundExtractionSaveFlow(
         } catch (@Suppress("TooGenericExceptionCaught") error: Exception) {
             // Post-save follow-ons must never rewrite a persisted COMPLETED entry into a
             // failure. Log and move on; the next save / cold start can retrigger downstream work.
-            Log.w(TAG, "onEntryFinalized failed for entryId=$entryId", error)
+            Log.w(TAG, "onEntryFinalized failed for entryId=$entryId: ${error.javaClass.simpleName}", error)
+        }
+    }
+
+    private fun reportPatternCalloutAppended(entryId: Long) {
+        try {
+            lifecycleCallbacks.onPatternCalloutAppended(entryId)
+        } catch (cancellation: CancellationException) {
+            throw cancellation
+        } catch (@Suppress("TooGenericExceptionCaught") error: Exception) {
+            Log.w(TAG, "onPatternCalloutAppended failed for entryId=$entryId: ${error.javaClass.simpleName}", error)
         }
     }
 
@@ -328,8 +384,7 @@ class BackgroundExtractionSaveFlow(
         } catch (@Suppress("TooGenericExceptionCaught") compensationError: Exception) {
             Log.e(
                 TAG,
-                "Persistence compensation failed for entryId=$entryId " +
-                    "(${compensationError.javaClass.simpleName}: ${compensationError.message})",
+                "Persistence compensation failed for entryId=$entryId (${compensationError.javaClass.simpleName})",
             )
         }
         terminalRelay.emitTerminal(
@@ -384,6 +439,18 @@ class BackgroundExtractionSaveFlow(
     private companion object {
         private const val TAG = "VestigeSaveFlow"
     }
+}
+
+private fun List<LensResult>.toReceipts(): List<EntryLensReceipt> = map { result ->
+    EntryLensReceipt(
+        lens = result.lens,
+        extracted = result.extraction != null,
+        fields = result.extraction?.fields.orEmpty(),
+        flags = result.extraction?.flags.orEmpty(),
+        attemptCount = result.attemptCount,
+        elapsedMs = result.elapsedMs,
+        lastError = result.lastError,
+    )
 }
 
 /**

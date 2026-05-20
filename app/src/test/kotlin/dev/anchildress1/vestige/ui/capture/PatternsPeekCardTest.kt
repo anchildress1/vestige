@@ -1,5 +1,9 @@
 package dev.anchildress1.vestige.ui.capture
 
+import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertHasNoClickAction
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.v2.createComposeRule
@@ -34,10 +38,12 @@ class PatternsPeekCardTest {
     }
 
     @Test
-    fun `is an informational band — merged description, no click (a11y)`() {
+    fun `is an informational band — merged description, polite liveRegion, no click (a11y)`() {
         composeRule.setContent { VestigeTheme { PatternsPeekCard(peek = peek) } }
-        composeRule.onNodeWithContentDescription("● 3 ACTIVE PATTERNS", substring = true)
-            .assertHasNoClickAction()
+        val band = composeRule.onNodeWithContentDescription("● 3 ACTIVE PATTERNS", substring = true)
+        band.assertHasNoClickAction()
+        band.assert(SemanticsMatcher.keyIsDefined(SemanticsProperties.LiveRegion))
+        band.assert(SemanticsMatcher.keyNotDefined(SemanticsActions.OnClick))
     }
 
     @Test

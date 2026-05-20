@@ -24,7 +24,6 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.withStyle
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.anchildress1.vestige.model.Persona
@@ -37,8 +36,6 @@ import dev.anchildress1.vestige.ui.components.VestigeBottomNav
 import dev.anchildress1.vestige.ui.components.accentedHeadline
 import dev.anchildress1.vestige.ui.theme.VestigeTheme
 import java.util.Locale
-
-private const val PATTERN_WINDOW_DAYS = "30"
 
 @Composable
 @Suppress("LongParameterList") // Screen seam: vm + open/persona/nav/menu callbacks + modifier.
@@ -67,7 +64,9 @@ fun PatternsListScreen(
                 style = VestigeTheme.typography.displayBig,
                 modifier = Modifier.padding(horizontal = 18.dp, vertical = 12.dp),
             )
-            PatternsStatRibbon(state)
+            // Stats ribbon shows only when there is data to read — matches History's headline-
+            // then-content shape; an empty surface stays a single status band, not "0 of 0."
+            (state as? PatternsListUiState.Loaded)?.let { PatternsStatRibbon(it) }
             Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
                 when (val s = state) {
                     PatternsListUiState.Loading -> Unit
@@ -100,27 +99,22 @@ fun PatternsListScreen(
 private val SNACKBAR_NAV_CLEARANCE = 84.dp
 
 @Composable
-private fun PatternsStatRibbon(state: PatternsListUiState) {
-    val loaded = state as? PatternsListUiState.Loaded
-    val vestiges = loaded?.cards?.size ?: 0
-    val entries = when (state) {
-        is PatternsListUiState.Empty -> state.entryCount
-        is PatternsListUiState.Loaded -> state.cards.firstOrNull()?.totalEntryCount?.toInt() ?: 0
-        PatternsListUiState.Loading -> 0
-    }
+private fun PatternsStatRibbon(loaded: PatternsListUiState.Loaded) {
+    val vestiges = loaded.cards.size
+    val entries = loaded.entryCount
+    val days = loaded.daysSinceFirstCapped
     Box(
         modifier = Modifier
             .padding(horizontal = 18.dp, vertical = 8.dp)
             .semantics(mergeDescendants = true) {
-                contentDescription =
-                    "$vestiges vestiges, $entries entries, last $PATTERN_WINDOW_DAYS days"
+                contentDescription = "$vestiges vestiges, $entries entries, last $days days"
             },
     ) {
         StatRibbon(
             items = listOf(
                 StatItem(value = "$vestiges", label = "VESTIGES"),
                 StatItem(value = "$entries", label = "ENTRIES"),
-                StatItem(value = PATTERN_WINDOW_DAYS, label = "DAYS"),
+                StatItem(value = "$days", label = "DAYS"),
             ),
         )
     }
@@ -134,23 +128,22 @@ private fun PatternsEmptyState(empty: PatternsListUiState.Empty) {
     val body = stringResource(copy.bodyRes)
     // Status band per AGENTS.md: announced politely, no click action, single merged description
     // in the spoken (sentence-case) form — the display uppercases purely visually.
-    Column(
+    // Top-aligned form mirrors HistoryScreen's empty state — headline sits under the page title,
+    // not floated in the middle, so the two surfaces feel the same when there is no data.
+    Box(
         modifier = Modifier
             .fillMaxSize()
+            .padding(horizontal = 20.dp, vertical = 24.dp)
             .semantics(mergeDescendants = true) {
                 liveRegion = LiveRegionMode.Polite
                 contentDescription = "$header $body"
-            }
-            .padding(horizontal = 18.dp),
-        verticalArrangement = Arrangement.Center,
+            },
+        contentAlignment = Alignment.TopStart,
     ) {
-        Text(text = accentedHeadline(header, colors.ink, colors.lime), style = VestigeTheme.typography.displayBig)
-        Text(
-            text = body,
-            style = VestigeTheme.typography.p,
-            color = colors.dim,
-            modifier = Modifier.padding(top = 16.dp),
-        )
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(text = accentedHeadline(header, colors.ink, colors.lime), style = VestigeTheme.typography.displayBig)
+            Text(text = body, style = VestigeTheme.typography.p, color = colors.dim)
+        }
     }
 }
 
@@ -198,31 +191,3 @@ private fun SectionHeader(section: PatternSection) {
         modifier = Modifier.padding(top = 4.dp, bottom = 4.dp),
     )
 }
-
-@Preview
-@Composable
-private fun PatternsListPreview() {
-    VestigeTheme {
-        PatternsLoadedList(
-            cards = listOf(
-                PatternCardUi(
-                    patternId = "abc",
-                    title = "Tuesday Meetings",
-                    templateLabel = "Crashed",
-                    observation = "Fourth entry mentions Tuesday meetings. State before: cruising. After: crashed.",
-                    supportingCount = 4,
-                    totalEntryCount = 12,
-                    lastSeenLabel = "May 7",
-                    section = PatternSection.ACTIVE,
-                    traceHits = PREVIEW_TRACE_HITS,
-                    availableActions = setOf(PatternAction.DROP, PatternAction.SKIP),
-                ),
-            ),
-            onCardClick = {},
-            actions = PatternActionCallbacks(onDrop = {}, onSkip = {}, onRestart = {}),
-        )
-    }
-}
-
-// Mirrors the POC's `traceHits` for the Tuesday Meetings sample so the @Preview matches.
-private val PREVIEW_TRACE_HITS = setOf(3, 10, 17, 24, 26, 28)

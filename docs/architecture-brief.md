@@ -152,7 +152,7 @@ Standup ran long again. I was fine before it, then completely flattened by 11. O
 - **ObjectBox is downstream of markdown.** All writes go through `EntryStore`, which writes the markdown file first and the ObjectBox row second, in that order, in a single transactional unit. If the markdown write succeeds and ObjectBox fails, the next cold start rebuilds the row from the markdown. If the markdown write fails, no ObjectBox row exists.
 - **External markdown edits are out of scope for v1.** The user can read or back up the files, but in-place external edits are not detected and may be overwritten by a later re-eval. v1 ships with markdown as a debugging/export surface only. External-edit support is a v1.5 entry in `backlog.md` if it ever earns one.
 - **Re-eval rewrites the file.** Re-eval (P1) updates `tags`, `entry_observations`, etc. The resolver writes the new markdown atomically (write to `.tmp`, fsync, rename). Old content is not preserved unless the user explicitly rejects the new shape.
-- **Export is a copy, not a move.** Settings → Export zips a snapshot of the markdown files under `entries/`. The originals remain in-place.
+- **Export is a copy, not a move.** Settings → Export zips readable markdown files under `entries/` plus `vestige-export.json`, a structured snapshot of ObjectBox rows, pattern evidence links, vectors, callout cooldown state, and onboarding settings. The originals remain in-place.
 
 ### `schema_version`
 
@@ -202,13 +202,13 @@ Story 2.19 carries the implementation decision and wiring once Story 2.14 confir
 
 ## Retrieval History Gap (Addendum 2026-05-16)
 
-`AppContainer.saveAndExtract` accepts `retrievedHistory: List<HistoryChunk>` but `CaptureViewModel` does not perform a `RetrievalRepo.query()` before the foreground call and therefore passes no history. Retrieved history flows only into `BackgroundExtractionWorker`'s lens prompts.
+`CaptureViewModel` now persists the entry first and leaves `retrievedHistory` empty on that foreground save. Retrieval runs only after the entry is already open to the user: detached follow-up generation queries history on the saved text, and `BackgroundExtractionSaveFlow` does the same before it calls `BackgroundExtractionWorker`.
 
-The consequence: the foreground response the user sees immediately after recording has no awareness of prior entries. The background extraction does. This means the follow-up question the user receives is context-free while the structured fields are context-aware — an inversion of where context matters most from a UX standpoint.
+The consequence is deliberate: the foreground response and entry creation are no longer stalled on query embedding + vector lookup. The user gets the transcript-backed entry first; history-conditioned follow-up and history-conditioned lens extraction land afterward.
 
-**Correct behavior:** run `RetrievalRepo.query(transcription)` after the foreground transcription is available but before the follow-up is generated — or restructure the foreground call to accept prior context. Story 2.18 carries the fix.
+**Correct behavior:** foreground owns the immediate transcript / open-entry handoff; retrieval history feeds detached follow-up generation and detached background analysis after transcription lands.
 
-**Resolved 2026-05-17 (Story 2.18, option C).** The foreground voice path is now two model calls: call 1 streams the transcription from the audio and is cancelled at the `Transcription` event (no wasted follow-up generation; the temp WAV is still discarded by `ForegroundInference`'s `finally`); `AppContainer.retrieveHistory(transcription)` then runs `RetrievalRepo.query(query, topN = 3)` on `Dispatchers.Default`; call 2 (`runForegroundTextCall`) streams a follow-up conditioned on a `## PRIOR ENTRIES` prompt block (same budget as `PromptComposer`'s background history). The call-1 transcription is authoritative — call 2's echo never overwrites the verbatim user words. Typed entries are single-call (text known up front). Retrieved history is also threaded into `saveAndExtract`, so background extraction is context-aware too. Retrieval degrades to empty (capture never blocked) at two layers — `AppContainer.retrieveHistory` and `CaptureViewModel.retrieveHistorySafely`. Operator-accepted cost: the voice path is two calls; call-1 latency is masked because the transcription streams immediately. Two-call wall-clock on the reference S24 Ultra is an unrecorded manual-check measurement.
+**Corrected 2026-05-19.** Both voice and typed capture now skip retrieval on the critical path. `CaptureViewModel` saves the pending entry as soon as it has authoritative text, opens History detail immediately, and then launches follow-up retrieval/generation on `viewModelScope`. `BackgroundExtractionSaveFlow` performs its own retrieval when the caller supplied none, so structured extraction keeps prior-entry context without making the user wait. `LiteRtLmEngine` still serializes Gemma calls on the GPU, so the detached work queues behind the foreground stream rather than running in parallel.
 
 ---
 

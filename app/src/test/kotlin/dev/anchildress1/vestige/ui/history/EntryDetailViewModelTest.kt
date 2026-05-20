@@ -1,12 +1,16 @@
 package dev.anchildress1.vestige.ui.history
 
 import app.cash.turbine.test
+import dev.anchildress1.vestige.model.ConfidenceVerdict
+import dev.anchildress1.vestige.model.EntryLensReceipt
 import dev.anchildress1.vestige.model.EntryObservation
+import dev.anchildress1.vestige.model.Lens
 import dev.anchildress1.vestige.model.ObservationEvidence
 import dev.anchildress1.vestige.model.Persona
 import dev.anchildress1.vestige.model.ResolvedExtraction
-import dev.anchildress1.vestige.model.TemplateLabel
+import dev.anchildress1.vestige.model.ResolvedField
 import dev.anchildress1.vestige.storage.EntryEntity
+import dev.anchildress1.vestige.storage.EntryLensReceiptJson
 import dev.anchildress1.vestige.storage.EntryStore
 import dev.anchildress1.vestige.storage.MarkdownEntryStore
 import dev.anchildress1.vestige.testing.cleanupObjectBoxTempRoot
@@ -23,7 +27,6 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -127,35 +130,6 @@ class EntryDetailViewModelTest {
         }
     }
 
-    // --- template label ---
-
-    @Test
-    fun `templateLabel is uppercased serial when present`() = runTest {
-        val id = entryStore.createPendingEntry("aftermath entry", FIXTURE_INSTANT)
-        entryStore.completeEntry(
-            id,
-            ResolvedExtraction(emptyMap()),
-            dev.anchildress1.vestige.model.TemplateLabel.TUNNEL_EXIT,
-        )
-        val vm = buildVm(id)
-
-        vm.state.test {
-            val loaded = awaitItem() as EntryDetailUiState.Loaded
-            assertEquals("TUNNEL-EXIT", loaded.model.templateLabel)
-        }
-    }
-
-    @Test
-    fun `templateLabel is null when none extracted`() = runTest {
-        val id = createCompleted("no template here")
-        val vm = buildVm(id)
-
-        vm.state.test {
-            val loaded = awaitItem() as EntryDetailUiState.Loaded
-            assertNull(loaded.model.templateLabel)
-        }
-    }
-
     // --- observations ---
 
     @Test
@@ -172,6 +146,7 @@ class EntryDetailViewModelTest {
             val loaded = awaitItem() as EntryDetailUiState.Loaded
             assertEquals(2, loaded.model.observations.size)
             assertEquals("You used \"fine\" twice.", loaded.model.observations[0].text)
+            assertEquals("vocabulary-contradiction", loaded.model.observations[0].evidence)
         }
     }
 
@@ -213,6 +188,32 @@ class EntryDetailViewModelTest {
     }
 
     @Test
+    fun `completed entry with no lens receipts does not expose a faux read`() = runTest {
+        val id = createCompleted("debug fixture without model receipts")
+        val vm = buildVm(id)
+
+        vm.state.test {
+            val loaded = awaitItem() as EntryDetailUiState.Loaded
+            assertEquals(ExtractionDisplay.NO_READ, loaded.model.extraction)
+            assertTrue(loaded.model.lenses.all { it.value == EntryDetailCopy.LENS_MISSING })
+        }
+    }
+
+    @Test
+    fun `completed entry with malformed non-empty lens receipts still exposes unreadable receipt state`() = runTest {
+        val id = createCompleted("corrupt receipt")
+        val box = boxStore.boxFor(EntryEntity::class.java)
+        box.get(id).also { it.lensReceiptsJson = "{not valid json" }.let(box::put)
+        val vm = buildVm(id)
+
+        vm.state.test {
+            val loaded = awaitItem() as EntryDetailUiState.Loaded
+            assertEquals(ExtractionDisplay.COMPLETE, loaded.model.extraction)
+            assertTrue(loaded.model.lenses.all { it.value == EntryDetailCopy.LENS_UNREADABLE })
+        }
+    }
+
+    @Test
     fun `observations skip entries with blank or missing text`() = runTest {
         val id = createCompleted("mixed observations")
         val box = boxStore.boxFor(EntryEntity::class.java)
@@ -226,6 +227,23 @@ class EntryDetailViewModelTest {
             val loaded = awaitItem() as EntryDetailUiState.Loaded
             assertEquals(1, loaded.model.observations.size)
             assertEquals("You said fine twice.", loaded.model.observations[0].text)
+            assertTrue(loaded.model.observations[0].fields.isEmpty())
+        }
+    }
+
+    @Test
+    fun `observations parse fields array when present`() = runTest {
+        val id = createCompleted("fields in observations")
+        val box = boxStore.boxFor(EntryEntity::class.java)
+        box.get(id).also {
+            it.entryObservationsJson =
+                """[{"text":"Notice this.","evidence":"theme-noticing","fields":["tags","energy_descriptor"]}]"""
+        }.let(box::put)
+        val vm = buildVm(id)
+
+        vm.state.test {
+            val loaded = awaitItem() as EntryDetailUiState.Loaded
+            assertEquals(listOf("tags", "energy_descriptor"), loaded.model.observations[0].fields)
         }
     }
 
@@ -261,19 +279,24 @@ class EntryDetailViewModelTest {
 
         vm.state.test {
             val initial = awaitItem() as EntryDetailUiState.Loaded
-            assertNull(initial.model.templateLabel)
-            assertFalse("pending entry must read as extraction-incomplete", initial.model.extractionComplete)
+            assertEquals(ExtractionDisplay.IN_PROGRESS, initial.model.extraction)
 
             entryStore.completeEntry(
                 id,
                 ResolvedExtraction(emptyMap()),
-                TemplateLabel.AFTERMATH,
+                null,
+                lensReceipts = listOf(
+                    EntryLensReceipt(
+                        lens = Lens.LITERAL,
+                        extracted = true,
+                        fields = mapOf("tags" to listOf("pending-entry")),
+                    ),
+                ),
             )
             dataRevision.value = 1L
 
             val reloaded = awaitItem() as EntryDetailUiState.Loaded
-            assertEquals("AFTERMATH", reloaded.model.templateLabel)
-            assertTrue("completed entry must read as extraction-complete", reloaded.model.extractionComplete)
+            assertEquals(ExtractionDisplay.COMPLETE, reloaded.model.extraction)
         }
     }
 
@@ -339,6 +362,238 @@ class EntryDetailViewModelTest {
         vm.state.test {
             val loaded = awaitItem() as EntryDetailUiState.Loaded
             assertTrue(loaded.model.tags.isEmpty())
+        }
+    }
+
+    // --- lens status (drives the status-eyebrow tone) ---
+
+    @Test
+    fun `each confidence verdict maps to its three-lens status string`() = runTest {
+        val cases = mapOf(
+            ConfidenceVerdict.CANONICAL_WITH_CONFLICT to EntryDetailCopy.THREE_LENS_STATUS_CONFLICT,
+            ConfidenceVerdict.CANONICAL to EntryDetailCopy.THREE_LENS_STATUS_CANONICAL,
+            ConfidenceVerdict.CANDIDATE to EntryDetailCopy.THREE_LENS_STATUS_CANDIDATE,
+            ConfidenceVerdict.AMBIGUOUS to EntryDetailCopy.THREE_LENS_STATUS_AMBIGUOUS,
+        )
+        cases.forEach { (verdict, expectedStatus) ->
+            val id = entryStore.createPendingEntry("verdict ${verdict.name}", FIXTURE_INSTANT)
+            entryStore.completeEntry(
+                id,
+                ResolvedExtraction(mapOf("tags" to ResolvedField(listOf("meeting"), verdict))),
+                null,
+            )
+            val vm = buildVm(id)
+            vm.state.test {
+                val loaded = awaitItem() as EntryDetailUiState.Loaded
+                assertEquals(expectedStatus, loaded.model.lensStatus)
+            }
+        }
+    }
+
+    // --- lens receipts ---
+
+    @Test
+    fun `lens receipts are projected into compact reads and field rows`() = runTest {
+        val id = entryStore.createPendingEntry("battery got yanked", FIXTURE_INSTANT)
+        entryStore.completeEntry(
+            id,
+            ResolvedExtraction(
+                mapOf(
+                    "tags" to ResolvedField(listOf("meeting", "battery-yanked"), ConfidenceVerdict.CANONICAL),
+                    "energy_descriptor" to ResolvedField(
+                        "crashed",
+                        ConfidenceVerdict.CANONICAL_WITH_CONFLICT,
+                    ),
+                ),
+            ),
+            null,
+            lensReceipts = listOf(
+                EntryLensReceipt(
+                    lens = Lens.LITERAL,
+                    extracted = true,
+                    fields = mapOf("energy_descriptor" to "battery yanked"),
+                ),
+                EntryLensReceipt(
+                    lens = Lens.SKEPTICAL,
+                    extracted = true,
+                    fields = mapOf("energy_descriptor" to "not tired vs yanked"),
+                    flags = listOf("vocabulary-contradiction:not tired:battery got yanked"),
+                ),
+            ),
+        )
+        val vm = buildVm(id)
+
+        vm.state.test {
+            val loaded = awaitItem() as EntryDetailUiState.Loaded
+            assertEquals(3, loaded.model.lenses.size)
+            assertEquals("battery yanked", loaded.model.lenses.first { it.label == "LITERAL" }.value)
+            assertEquals(LensTone.CONFLICT, loaded.model.lenses.first { it.label == "SKEPTICAL" }.tone)
+            assertEquals(EntryDetailCopy.THREE_LENS_STATUS_CONFLICT, loaded.model.lensStatus)
+            assertEquals("crashed", loaded.model.fields.first { it.label == "STATE" }.value)
+            assertEquals(LensTone.CONFLICT, loaded.model.fields.first { it.label == "STATE" }.tone)
+        }
+    }
+
+    @Test
+    fun `corrupt lens receipts read as unreadable, not as lens-never-ran`() = runTest {
+        val id = createCompleted("battery got yanked")
+        val box = boxStore.boxFor(EntryEntity::class.java)
+        box.get(id).also { it.lensReceiptsJson = "{not valid json" }.let(box::put)
+        val vm = buildVm(id)
+
+        vm.state.test {
+            val loaded = awaitItem() as EntryDetailUiState.Loaded
+            loaded.model.lenses.forEach {
+                assertEquals(EntryDetailCopy.LENS_UNREADABLE, it.value)
+                assertEquals(LensTone.CONFLICT, it.tone)
+            }
+            val vocab = loaded.model.fields.first { it.label == "VOCAB" }
+            assertEquals(EntryDetailCopy.LENS_UNREADABLE, vocab.value)
+            assertEquals(LensTone.CONFLICT, vocab.tone)
+        }
+    }
+
+    @Test
+    fun `vocab field falls back to repeated lexical tag terms when contradictions are empty`() = runTest {
+        val id = entryStore.createPendingEntry("tabs stayed open and the tabs are still open", FIXTURE_INSTANT)
+        entryStore.completeEntry(
+            id,
+            ResolvedExtraction(
+                mapOf(
+                    "tags" to ResolvedField(
+                        listOf("tabs", "desk"),
+                        ConfidenceVerdict.CANONICAL,
+                    ),
+                ),
+            ),
+            null,
+            lensReceipts = listOf(
+                EntryLensReceipt(
+                    lens = Lens.LITERAL,
+                    extracted = true,
+                    fields = mapOf("tags" to listOf("tabs", "desk")),
+                ),
+                EntryLensReceipt(
+                    lens = Lens.INFERENTIAL,
+                    extracted = true,
+                    fields = mapOf("tags" to listOf("tabs-open", "desk")),
+                ),
+            ),
+        )
+        val vm = buildVm(id)
+
+        vm.state.test {
+            val loaded = awaitItem() as EntryDetailUiState.Loaded
+            val vocab = loaded.model.fields.first { it.label == "VOCAB" }
+            assertEquals("tabs", vocab.value)
+            assertEquals(LensTone.CANONICAL, vocab.tone)
+        }
+    }
+
+    @Test
+    fun `promises field falls back to receipt commitment text when legacy convergence dropped the top-level value`() =
+        runTest {
+            val id = createCompleted("drop the package off today")
+            val box = boxStore.boxFor(EntryEntity::class.java)
+            box.get(id).also {
+                it.confidenceJson = """{"stated_commitment":"AMBIGUOUS"}"""
+                it.statedCommitmentJson = null
+                it.lensReceiptsJson = EntryLensReceiptJson.encode(
+                    listOf(
+                        EntryLensReceipt(
+                            lens = Lens.LITERAL,
+                            extracted = true,
+                            fields = mapOf(
+                                "stated_commitment" to mapOf(
+                                    "text" to "drop the package off today",
+                                    "topic_or_person" to null,
+                                ),
+                            ),
+                        ),
+                        EntryLensReceipt(
+                            lens = Lens.SKEPTICAL,
+                            extracted = true,
+                            fields = mapOf(
+                                "stated_commitment" to mapOf(
+                                    "text" to "drop the package off today",
+                                    "topic_or_person" to "package",
+                                ),
+                            ),
+                        ),
+                    ),
+                )
+            }.let(box::put)
+
+            val vm = buildVm(id)
+            vm.state.test {
+                val loaded = awaitItem() as EntryDetailUiState.Loaded
+                val promises = loaded.model.fields.first { it.label == "PROMISES" }
+                assertEquals("drop the package off today", promises.value)
+                assertEquals(LensTone.CANONICAL, promises.tone)
+            }
+        }
+
+    @Test
+    fun `promises field uses candidate tone when only one lens carries the commitment`() = runTest {
+        val id = createCompleted("drop the package off today")
+        val box = boxStore.boxFor(EntryEntity::class.java)
+        box.get(id).also {
+            it.confidenceJson = """{"stated_commitment":"AMBIGUOUS"}"""
+            it.statedCommitmentJson = null
+            it.lensReceiptsJson = EntryLensReceiptJson.encode(
+                listOf(
+                    EntryLensReceipt(
+                        lens = Lens.LITERAL,
+                        extracted = true,
+                        fields = mapOf(
+                            "stated_commitment" to mapOf(
+                                "text" to "drop the package off today",
+                                "topic_or_person" to null,
+                            ),
+                        ),
+                    ),
+                ),
+            )
+        }.let(box::put)
+
+        val vm = buildVm(id)
+        vm.state.test {
+            val loaded = awaitItem() as EntryDetailUiState.Loaded
+            val promises = loaded.model.fields.first { it.label == "PROMISES" }
+            assertEquals("drop the package off today", promises.value)
+            assertEquals(LensTone.CANDIDATE, promises.tone)
+        }
+    }
+
+    @Test
+    fun `repeat field does not backfill invalid numeric receipt ids`() = runTest {
+        val id = createCompleted("same loop again")
+        val box = boxStore.boxFor(EntryEntity::class.java)
+        box.get(id).also {
+            it.confidenceJson = """{"recurrence_link":"CANONICAL"}"""
+            it.recurrenceLink = null
+            it.lensReceiptsJson = EntryLensReceiptJson.encode(
+                listOf(
+                    EntryLensReceipt(
+                        lens = Lens.LITERAL,
+                        extracted = true,
+                        fields = mapOf("recurrence_link" to "1"),
+                    ),
+                    EntryLensReceipt(
+                        lens = Lens.SKEPTICAL,
+                        extracted = true,
+                        fields = mapOf("recurrence_link" to "1"),
+                    ),
+                ),
+            )
+        }.let(box::put)
+
+        val vm = buildVm(id)
+        vm.state.test {
+            val loaded = awaitItem() as EntryDetailUiState.Loaded
+            val repeat = loaded.model.fields.first { it.label == "REPEAT" }
+            assertEquals("—", repeat.value)
+            assertEquals(LensTone.AMBIGUOUS, repeat.tone)
         }
     }
 

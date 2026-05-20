@@ -24,13 +24,15 @@ class TestVestigeApplication : VestigeApplication() {
     )
 
     /**
-     * Test hook — Robolectric reuses the JVM, so callers must release both the in-memory BoxStore
-     * (native registry, leaks into the next suite otherwise) and the lazy markdown temp root.
+     * Test hook — Robolectric reuses the JVM, so callers must release thread-local ObjectBox
+     * resources and the lazy markdown temp root.
      */
     fun releaseTempStorage() {
         // appContainer is `lateinit var` with `private set` — `::appContainer.isInitialized` isn't
         // accessible from a subclass, so swallow the UninitializedPropertyAccessException instead.
-        runCatching { appContainer.boxStore.close() }
+        // Robolectric owns app teardown on its main thread; force-closing the in-memory store
+        // there destroys reader transactions still owned by the test worker.
+        runCatching { appContainer.boxStore.closeThreadResources() }
         if (tempRoot.exists()) {
             check(tempRoot.deleteRecursively()) { "Failed to delete test temp root: $tempRoot" }
         }

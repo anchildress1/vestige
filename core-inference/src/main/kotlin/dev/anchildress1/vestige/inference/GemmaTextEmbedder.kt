@@ -12,13 +12,12 @@ import com.google.ai.edge.localagents.rag.models.Embedder as SdkEmbedder
 class GemmaTextEmbedder(
     modelPath: String,
     tokenizerPath: String,
-    useGpu: Boolean = false,
     private val taskType: EmbedData.TaskType = EmbedData.TaskType.SEMANTIC_SIMILARITY,
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
     delegateFactory: (String, String, Boolean) -> SdkEmbedder<String> = ::defaultDelegate,
 ) : Embedder {
 
-    private val delegate: SdkEmbedder<String> = delegateFactory(modelPath, tokenizerPath, useGpu)
+    private val delegate: SdkEmbedder<String> = delegateFactory(modelPath, tokenizerPath, true)
 
     override suspend fun embed(text: String): FloatArray {
         // Eager check on the caller's thread so the verify-no-SDK-call invariant is real on

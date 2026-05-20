@@ -119,14 +119,13 @@ class GemmaTextEmbedderTest {
     }
 
     @Test
-    fun `delegate factory receives constructor arguments verbatim`() {
+    fun `delegate factory receives constructor arguments and GPU flag`() {
         var capturedModel: String? = null
         var capturedTokenizer: String? = null
         var capturedGpu: Boolean? = null
         GemmaTextEmbedder(
             modelPath = "/data/model.tflite",
             tokenizerPath = "/data/spm.model",
-            useGpu = true,
         ) { m, t, g ->
             capturedModel = m
             capturedTokenizer = t

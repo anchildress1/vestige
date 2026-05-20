@@ -41,7 +41,7 @@ class LiteRtLmTextSmokeTest {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         val engine = LiteRtLmEngine(
             modelPath = modelPath,
-            backend = BackendChoice.Cpu,
+            backend = BackendChoice.Gpu,
             cacheDir = context.cacheDir.absolutePath,
         )
         engine.use {

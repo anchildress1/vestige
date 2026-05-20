@@ -25,7 +25,7 @@ internal object PatternSignature {
     fun forTemplateRecurrence(label: String): Signature {
         val canonical = TagNormalize.kebab(label)
         val json = """{"kind":"${PatternKind.TEMPLATE_RECURRENCE.serial}","label":"$canonical"}"""
-        return Signature(PatternKind.TEMPLATE_RECURRENCE, json, sha256(json), canonical)
+        return Signature.of(PatternKind.TEMPLATE_RECURRENCE, json, canonical)
     }
 
     fun forTagPair(label: String, tags: Set<String>): Signature {
@@ -35,18 +35,18 @@ internal object PatternSignature {
         val kind = PatternKind.TAG_PAIR_CO_OCCURRENCE.serial
         val tagsJson = """["${canonicalTags[0]}","${canonicalTags[1]}"]"""
         val json = """{"kind":"$kind","label":"$canonicalLabel","tags":$tagsJson}"""
-        return Signature(PatternKind.TAG_PAIR_CO_OCCURRENCE, json, sha256(json), canonicalLabel)
+        return Signature.of(PatternKind.TAG_PAIR_CO_OCCURRENCE, json, canonicalLabel)
     }
 
     fun forGoblinHours(): Signature {
         val json = """{"kind":"${PatternKind.TIME_OF_DAY_CLUSTER.serial}","bucket":"goblin"}"""
-        return Signature(PatternKind.TIME_OF_DAY_CLUSTER, json, sha256(json), null)
+        return Signature.of(PatternKind.TIME_OF_DAY_CLUSTER, json, null)
     }
 
     fun forCommitment(topicOrPerson: String): Signature {
         val canonical = TagNormalize.kebab(topicOrPerson)
         val json = """{"kind":"${PatternKind.COMMITMENT_RECURRENCE.serial}","topic_or_person":"$canonical"}"""
-        return Signature(PatternKind.COMMITMENT_RECURRENCE, json, sha256(json), null)
+        return Signature.of(PatternKind.COMMITMENT_RECURRENCE, json, null)
     }
 
     /**
@@ -58,18 +58,46 @@ internal object PatternSignature {
     fun forVocabToken(token: String): Signature {
         val canonical = TokenStemmer.stem(token.lowercase(Locale.ROOT))
         val json = """{"kind":"${PatternKind.VOCAB_FREQUENCY.serial}","token":"$canonical"}"""
-        return Signature(PatternKind.VOCAB_FREQUENCY, json, sha256(json), null)
+        return Signature.of(PatternKind.VOCAB_FREQUENCY, json, null)
     }
 
-    private fun sha256(payload: String): String {
-        val digest = MessageDigest.getInstance("SHA-256").digest(payload.toByteArray(Charsets.UTF_8))
-        return HexFormat.of().formatHex(digest)
+    fun forWeekdayTimeBlock(dayOfWeek: String, timeBlock: String): Signature {
+        val canonicalDay = TagNormalize.kebab(dayOfWeek)
+        val canonicalBlock = TemporalPatternRules.canonicalTimeBlock(timeBlock)
+        val kind = PatternKind.TEMPORAL_RELATIVE.serial
+        val relation = TemporalRelation.WEEKDAY_TIME_BLOCK.serial
+        val json = "{\"kind\":\"$kind\",\"relation\":\"$relation\"," +
+            "\"day_of_week\":\"$canonicalDay\",\"time_block\":\"$canonicalBlock\"}"
+        return Signature.of(PatternKind.TEMPORAL_RELATIVE, json, null)
+    }
+
+    fun forMonthStart(): Signature {
+        val kind = PatternKind.TEMPORAL_RELATIVE.serial
+        val relation = TemporalRelation.MONTH_START.serial
+        val day = TemporalPatternRules.MONTH_START_DAY
+        val json = """{"kind":"$kind","relation":"$relation","day_of_month":$day}"""
+        return Signature.of(PatternKind.TEMPORAL_RELATIVE, json, null)
     }
 }
 
-internal data class Signature(
+/**
+ * Construct only via [Signature.of] — [patternId] is `sha256(json)` by construction, so the
+ * content-addressable contract can't be broken by a hand-built mismatched pair.
+ */
+@ConsistentCopyVisibility
+internal data class Signature private constructor(
     val kind: PatternKind,
     val json: String,
     val patternId: String,
     val templateLabel: String?,
-)
+) {
+    companion object {
+        fun of(kind: PatternKind, json: String, templateLabel: String?): Signature =
+            Signature(kind, json, sha256(json), templateLabel)
+
+        private fun sha256(payload: String): String {
+            val digest = MessageDigest.getInstance("SHA-256").digest(payload.toByteArray(Charsets.UTF_8))
+            return HexFormat.of().formatHex(digest)
+        }
+    }
+}

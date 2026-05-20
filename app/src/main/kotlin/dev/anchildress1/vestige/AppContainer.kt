@@ -3,6 +3,7 @@ package dev.anchildress1.vestige
 import android.content.Context
 import android.content.Intent
 import android.util.Log
+import dev.anchildress1.vestige.inference.AudioBackendChoice
 import dev.anchildress1.vestige.inference.AudioChunk
 import dev.anchildress1.vestige.inference.BackendChoice
 import dev.anchildress1.vestige.inference.BackgroundExtractionWorker
@@ -15,6 +16,7 @@ import dev.anchildress1.vestige.inference.GemmaTextEmbedder
 import dev.anchildress1.vestige.inference.HistoryChunk
 import dev.anchildress1.vestige.inference.LiteRtLmEngine
 import dev.anchildress1.vestige.inference.ObservationGenerator
+import dev.anchildress1.vestige.inference.PatternAnalysisGenerator
 import dev.anchildress1.vestige.inference.PatternTitleGenerator
 import dev.anchildress1.vestige.lifecycle.BackgroundExtractionLifecycleStateMachine
 import dev.anchildress1.vestige.lifecycle.BackgroundExtractionService
@@ -46,9 +48,11 @@ import dev.anchildress1.vestige.storage.RetrievalRepo
 import dev.anchildress1.vestige.storage.TagEntity
 import dev.anchildress1.vestige.storage.VectorBackfillWorker
 import dev.anchildress1.vestige.storage.VestigeBoxStore
+import dev.anchildress1.vestige.storage.closeAfterCleaningThreadResources
 import dev.anchildress1.vestige.ui.capture.ModelReadiness
 import dev.anchildress1.vestige.ui.components.ModelDownloadProgress
 import dev.anchildress1.vestige.ui.onboarding.DownloadProgressTracker
+import dev.anchildress1.vestige.ui.onboarding.OnboardingPrefs
 import io.objectbox.BoxStore
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
@@ -76,8 +80,6 @@ import java.time.Instant
 import java.time.ZoneId
 import java.time.ZonedDateTime
 import java.util.concurrent.atomic.AtomicBoolean
-import java.util.zip.ZipEntry
-import java.util.zip.ZipOutputStream
 
 /** Process-singleton hub for Phase-2 cross-cutting concerns. */
 @Suppress(
@@ -95,16 +97,13 @@ class AppContainer(
     },
     private val embeddingArtifactManifestLoader: () -> EmbeddingArtifactManifest =
         EmbeddingArtifactManifest::loadDefault,
-    // `audioBackend = Cpu` is non-negotiable for the foreground voice path — without it the
-    // engine accepts a `Content.AudioFile` handoff and immediately SIGSEGVs in `mel_filterbank.cc`
-    // because no audio backend was attached at EngineConfig time. The reference STT-A test
-    // (`SttAAudioPlumbingTest`) enables the same backend; production must match.
     private val backgroundEngineFactory: (String, String) -> LiteRtLmEngine = { modelPath, cacheDir ->
         LiteRtLmEngine(
             modelPath = modelPath,
             backend = BackendChoice.Gpu,
-            // GPU audio path SIGSEGVs in mel_filterbank.cc — see LiteRT-LM/issues/2056
-            audioBackend = BackendChoice.Cpu,
+            // E4B rejects GPU for the audio adapter: "Model requires one of [cpu]".
+            // Text decode still runs on the GPU backend above.
+            audioBackend = AudioBackendChoice.Cpu,
             cacheDir = cacheDir,
         )
     },
@@ -160,6 +159,7 @@ class AppContainer(
         ObservationGenerator,
         BackgroundExtractionLifecycleCallbacks,
         CoroutineScope,
+        suspend (String) -> List<HistoryChunk>,
         PatternDetectionOrchestrator?,
     ) -> BackgroundExtractionSaveFlow =
         {
@@ -168,6 +168,7 @@ class AppContainer(
                 observationGenerator,
                 lifecycleCallbacks,
                 extractionScope,
+                retrieveHistory,
                 orchestrator,
             ->
             BackgroundExtractionSaveFlow(
@@ -176,6 +177,7 @@ class AppContainer(
                 observationGenerator = observationGenerator,
                 lifecycleCallbacks = lifecycleCallbacks,
                 scope = extractionScope,
+                retrieveHistory = retrieveHistory,
                 patternOrchestrator = orchestrator,
             )
         },
@@ -299,10 +301,10 @@ class AppContainer(
     }
 
     /**
-     * Off-thread prior-entry lookup feeding the foreground follow-up + background extraction.
+     * Off-thread prior-entry lookup feeding detached follow-up generation + background extraction.
      * Degrades to empty on any failure (embeddings not backfilled yet, store error) so a bad
-     * retrieval can never block a capture. Maps the top entries to context-only [HistoryChunk]s —
-     * no `patternId`, since the follow-up needs textual context, not recurrence-surface linkage.
+     * retrieval never blocks entry creation. Maps the top entries to context-only [HistoryChunk]s
+     * — no `patternId`, since follow-up generation needs textual context, not recurrence linkage.
      */
     suspend fun retrieveHistory(query: String): List<HistoryChunk> = withContext(computeDispatcher) {
         try {
@@ -328,6 +330,9 @@ class AppContainer(
     private val patternTitleGenerator: PatternTitleGenerator by lazy {
         PatternTitleGenerator(engine = backgroundEngine)
     }
+    private val patternAnalysisGenerator: PatternAnalysisGenerator by lazy {
+        PatternAnalysisGenerator(engine = backgroundEngine)
+    }
 
     val patternDetectionOrchestrator: PatternDetectionOrchestrator by lazy {
         PatternDetectionOrchestrator(
@@ -335,6 +340,7 @@ class AppContainer(
             detector = patternDetector,
             patternStore = patternStore,
             titleGenerator = patternTitleGenerator,
+            analysisGenerator = patternAnalysisGenerator,
             cooldownStore = calloutCooldownStore,
         )
     }
@@ -347,8 +353,10 @@ class AppContainer(
             BackgroundExtractionLifecycleCallbacks(
                 listenerFactory = ::extractionStatusListener,
                 onEntryFinalized = { launchVectorBackfillIfReady() },
+                onPatternCalloutAppended = { _dataRevision.value += 1 },
             ),
             scope,
+            ::retrieveHistory,
             patternDetectionOrchestrator,
         )
     }
@@ -658,23 +666,14 @@ class AppContainer(
         _dataRevision.value += 1
     }
 
-    /** Stream a zip of every entry markdown file into [out] (caller owns/closes the stream). */
+    /** Stream a zip of every user-data row plus readable entry markdown into [out]. */
     suspend fun zipAllEntriesTo(out: OutputStream) {
         withContext(ioDispatcher) {
-            ZipOutputStream(out).use { zip ->
-                markdownStore.listAll().forEach { file ->
-                    zip.putNextEntry(ZipEntry(file.name))
-                    // closeEntry must run for every opened entry, else `use` closing the stream
-                    // over a dangling entry yields a malformed archive. Contain a secondary
-                    // close failure so it can't be thrown out of finally and mask the primary
-                    // read exception (the read is the true root cause).
-                    try {
-                        file.inputStream().use { it.copyTo(zip) }
-                    } finally {
-                        runCatching { zip.closeEntry() }
-                    }
-                }
-            }
+            VestigeDataExporter(
+                boxStore = boxStore,
+                markdownStore = markdownStore,
+                onboardingPrefs = OnboardingPrefs.from(applicationContext),
+            ).writeTo(out)
         }
     }
 
@@ -918,7 +917,7 @@ class AppContainer(
         if (backgroundEngineDelegate.isInitialized()) {
             backgroundEngine.close()
         }
-        boxStore.close()
+        boxStore.closeAfterCleaningThreadResources()
     }
 
     private fun dispatchStartForegroundService() {

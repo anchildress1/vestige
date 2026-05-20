@@ -51,7 +51,7 @@ android {
         // Forward `-P<key>=<value>` into instrumentation runner args. Consumers:
         //   modelPath, audioPath, latencyBudgetMs — existing smoke tests.
         //   manifestPath, runsPerEntry — SttDLensDivergenceTest, SttCTagStabilityTest.
-        //   inferenceBackend — STT-C/STT-D harnesses (cpu | gpu).
+        //   inferenceBackend — STT-C/STT-D harnesses (gpu only; cpu is rejected).
         //   embeddingModelPath, embeddingTokenizerPath — SttEEmbeddingComparisonTest + EmbeddingGemmaSmokeTest.
         listOf(
             "modelPath",
@@ -181,11 +181,59 @@ dependencies {
     androidTestImplementation(libs.compose.ui.test.junit4)
 }
 
+// ObjectBox loads its JNI .so once per JVM via System.load; a second test class in the same
+// JVM can't re-System.load it, leaving NativeLibraryLoader in a poisoned state. The normal unit
+// task excludes these and a split forkEvery=1 task runs them. Kover runs them inline with
+// forkEvery=1 so coverage stays above the gate.
+val objectBoxBackedAppTests = setOf(
+    "dev.anchildress1.vestige.AppContainerTest",
+    "dev.anchildress1.vestige.VestigeDataExporterTest",
+    "dev.anchildress1.vestige.debug.DebugPatternSeederTest",
+    "dev.anchildress1.vestige.lifecycle.BackgroundExtractionServiceIntegrationTest",
+    "dev.anchildress1.vestige.patterns.PatternDetectionOrchestratorAnalysisTest",
+    "dev.anchildress1.vestige.patterns.PatternDetectionOrchestratorTest",
+    "dev.anchildress1.vestige.ui.history.EntryDetailScreenTest",
+    "dev.anchildress1.vestige.ui.history.EntryDetailViewModelTest",
+    "dev.anchildress1.vestige.ui.history.HistoryHostTest",
+    "dev.anchildress1.vestige.ui.history.HistoryScreenTest",
+    "dev.anchildress1.vestige.ui.history.HistoryViewModelTest",
+    "dev.anchildress1.vestige.ui.patterns.PatternDetailScreenTest",
+    "dev.anchildress1.vestige.ui.patterns.PatternDetailViewModelTest",
+    "dev.anchildress1.vestige.ui.patterns.PatternsHostTest",
+    "dev.anchildress1.vestige.ui.patterns.PatternsListScreenTest",
+    "dev.anchildress1.vestige.ui.patterns.PatternsListViewModelTest",
+)
+val isKoverTaskRequested = gradle.startParameter.taskNames.any {
+    it.contains("kover", ignoreCase = true)
+}
+
 tasks.withType<Test>().configureEach {
     useJUnitPlatform()
-    // ObjectBox loads its JNI native lib once per JVM. Compose UI tests (createComposeRule)
-    // interleave with ObjectBox-backed tests and a second test class can't re-System.load the
-    // same .so, leaving NativeLibraryLoader in a poisoned state. Forking per class isolates
-    // the native-lib state and is the canonical 2026 Compose+Robolectric guidance.
-    forkEvery = 1
+
+    if (name == "testDebugUnitTest") {
+        if (isKoverTaskRequested) {
+            forkEvery = 1
+        } else {
+            objectBoxBackedAppTests.forEach { filter.excludeTestsMatching(it) }
+            finalizedBy("testDebugObjectBoxUnitTest")
+        }
+    }
+}
+
+afterEvaluate {
+    if (isKoverTaskRequested) return@afterEvaluate
+    val debugUnitTest = tasks.named<Test>("testDebugUnitTest")
+
+    tasks.register<Test>("testDebugObjectBoxUnitTest") {
+        description = "Runs app JVM tests that need per-class ObjectBox native isolation."
+        group = "verification"
+
+        val debugTask = debugUnitTest.get()
+        testClassesDirs = debugTask.testClassesDirs
+        classpath = debugTask.classpath
+        forkEvery = 1
+        shouldRunAfter(debugUnitTest)
+
+        objectBoxBackedAppTests.forEach { filter.includeTestsMatching(it) }
+    }
 }

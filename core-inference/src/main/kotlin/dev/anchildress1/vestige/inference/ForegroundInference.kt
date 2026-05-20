@@ -116,7 +116,7 @@ class ForegroundInference(
         if (temp.delete()) return
         Log.w(TAG, "Initial delete failed for ${temp.absolutePath}; truncating audio payload")
         runCatching { temp.outputStream().use { } }
-            .onFailure { Log.w(TAG, "Truncate failed for ${temp.absolutePath}: ${it.message}") }
+            .onFailure { Log.w(TAG, "Truncate failed for ${temp.absolutePath}: ${it.javaClass.simpleName}") }
         if (temp.delete()) return
         Log.w(TAG, "Retry delete failed for ${temp.absolutePath}; scheduling deleteOnExit")
         temp.deleteOnExit()
@@ -190,7 +190,12 @@ class ForegroundInference(
                 "way (use an underscore between follow and up). Emit exactly one transcription " +
                 "block and exactly one follow_up block, in that order, and nothing else. Do not " +
                 "echo this format description. Do not nest tags. Do not produce additional " +
-                "tagged blocks. The transcription must be exact and unaltered.",
+                "tagged blocks. Do not output analysis notes, labels, bullets, or headings. " +
+                "Do not duplicate the transcription text in the follow-up. The transcription " +
+                "must be exact and unaltered. Transcribe audible speech even when music or " +
+                "background noise is present. The transcription must contain spoken words " +
+                "only; do not substitute labels, summaries, ambience descriptions, or repeated " +
+                "placeholder rows for speech.",
         ).joinToString(separator = "\n")
 
         private const val TAG = "VestigeForegroundInference"

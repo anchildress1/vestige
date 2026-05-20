@@ -79,6 +79,14 @@ The `prebuilt/` directory referenced in the original decision does not exist in 
 
 **CPU fallback is a regression, not a documented limitation.** The 24–33s foreground latency figures recorded in Phase 2 were measured before `BackendChoice.GPU` was wired. With GPU active and the Decision 2 pre-warm in place, all inference paths run on GPU. Any logcat line indicating CPU fallback is a bug to fix at root per AGENTS.md §"Atomic correctness" — do not document it as a known constraint and move on.
 
+### Addendum (2026-05-19) — GPU-only model backend, CPU-only E4B audio adapter
+
+`BackendChoice.Cpu` is removed from the app-facing LiteRT-LM model backend. Text generation, foreground follow-up decode, background extraction, and model smoke tests default to GPU, and `-PinferenceBackend=cpu` is rejected by the instrumentation harness.
+
+Gemma 4 E4B's audio adapter is separate from the model decode backend. On-device validation rejected `audioBackend=GPU` at `Engine.initialize()` with `INVALID_ARGUMENT: Audio backend constraint mismatch. Model requires one of [cpu] but Audio backend is GPU`. The implementation therefore exposes `AudioBackendChoice.Cpu` as an audio-front-end constraint only; it does not reintroduce CPU model inference.
+
+`Content.AudioBytes` must receive encoded WAV bytes, not raw float32 samples. The STT-A probe now writes PCM_S16LE WAV data before calling `Content.AudioBytes`, matching `Content.AudioFile` and temp-WAV behavior. On the reference S24 Ultra, `AudioFile`, `AudioBytes`, and temp WAV all transcribed successfully with `backend=GPU audio=CPU`.
+
 ---
 
 ## Consequences

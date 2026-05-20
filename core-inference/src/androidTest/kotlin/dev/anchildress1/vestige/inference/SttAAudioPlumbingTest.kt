@@ -1,11 +1,7 @@
-package dev.anchildress1.vestige
+package dev.anchildress1.vestige.inference
 
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
-import dev.anchildress1.vestige.inference.AudioCapture
-import dev.anchildress1.vestige.inference.BackendChoice
-import dev.anchildress1.vestige.inference.LiteRtLmEngine
-import dev.anchildress1.vestige.inference.SttAProbe
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertTrue
 import org.junit.Assume.assumeTrue
@@ -18,8 +14,8 @@ import java.nio.ByteOrder
 /**
  * Story 1.5 — STT-A existential audio plumbing test.
  *
- * Probes both `Content.AudioBytes` (raw float32-LE) and `Content.AudioFile` (mono PCM_S16LE
- * WAV — LiteRT-LM 0.11.0's miniaudio decoder rejects IEEE_FLOAT, per ADR-001 §Q4) handoffs
+ * Probes both `Content.AudioBytes` (mono PCM_S16LE WAV bytes) and `Content.AudioFile`
+ * (mono PCM_S16LE WAV — LiteRT-LM 0.11.0's miniaudio decoder rejects IEEE_FLOAT) handoffs
  * against Gemma 4 E4B on the reference device. The human running this test fills in ADR-001
  * §Q4 with which path actually produces a coherent transcription and the round-trip latency
  * for one 30-second clip.
@@ -30,9 +26,9 @@ import java.nio.ByteOrder
  *   adb push gemma-4-E4B-it.litertlm <BASE>/models/
  *   adb push sample.wav <BASE>/audio/
  *
- * where `<BASE>` is `/sdcard/Android/data/dev.anchildress1.vestige/files`. Then run:
+ * where `<BASE>` is `/sdcard/Android/data/dev.anchildress1.vestige.inference.test/files`. Then run:
  *
- *   ./gradlew :app:connectedDebugAndroidTest \
+ *   ./gradlew :core-inference:connectedDebugAndroidTest \
  *     -Pandroid.testInstrumentationRunnerArguments.modelPath=<BASE>/models/gemma-4-E4B-it.litertlm \
  *     -Pandroid.testInstrumentationRunnerArguments.audioPath=<BASE>/audio/sample.wav
  *
@@ -58,8 +54,8 @@ class SttAAudioPlumbingTest {
 
         val engine = LiteRtLmEngine(
             modelPath = modelPath,
-            backend = BackendChoice.Cpu,
-            audioBackend = BackendChoice.Cpu,
+            backend = BackendChoice.Gpu,
+            audioBackend = AudioBackendChoice.Cpu,
             cacheDir = context.cacheDir.absolutePath,
         )
 
@@ -76,7 +72,11 @@ class SttAAudioPlumbingTest {
                 probe.transcribeAudioFile(audioFile.absolutePath)
             }
             val audioBytesResult = runCatching {
-                probe.transcribeAudioBytesAsFloat32Le(samples)
+                probe.transcribeAudioBytesAsWav(
+                    samples = samples,
+                    sampleRateHz = sampleRateHz,
+                    cacheDir = context.cacheDir,
+                )
             }
             val tempWavResult = runCatching {
                 probe.transcribeViaTempWav(samples = samples, sampleRateHz = sampleRateHz, cacheDir = context.cacheDir)

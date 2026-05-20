@@ -225,9 +225,33 @@ class LensResponseParserTest {
     }
 
     @Test
-    fun `returns null when the payload is a JSON array, not an object`() {
-        // Schema requires an object; an array at the top level is a parse failure (the worker
-        // treats this lens as "no opinion" per ADR-002 §"Convergence edge cases").
+    fun `drops dangling quoted array item so the rest of the lens payload can parse`() {
+        val raw = """
+            {
+            "tags": [
+            "work",
+            "
+            ],
+            "energy_descriptor": null,
+            "state_shift": false,
+            "vocabulary_contradictions": [],
+            "stated_commitment": null,
+            "recurrence_link": null,
+            "recurrence_kind": null,
+            "flags": []
+            }
+        """.trimIndent()
+
+        val extraction = LensResponseParser.parse(Lens.SKEPTICAL, raw)
+
+        assertNotNull(extraction)
+        assertEquals(listOf("work"), extraction!!.fields["tags"])
+        assertEquals(false, extraction.fields["state_shift"])
+        assertTrue(extraction.flags.isEmpty())
+    }
+
+    @Test
+    fun `returns null when no schema-shaped object is present`() {
         assertNull(LensResponseParser.parse(Lens.LITERAL, """["tags","not","an","object"]"""))
     }
 
@@ -276,11 +300,12 @@ class LensResponseParserTest {
     }
 
     @Test
-    fun `rejects array-wrapped payload like square-bracket inner object`() {
-        // The schema requires a top-level object; `[{...}]` violates that. The parser refuses to
-        // unpack the inner object so a malformed shape can't masquerade as valid extraction data.
+    fun `accepts array-wrapped payload like square-bracket inner object`() {
         val raw = """[{"tags":["a"]}]"""
-        assertNull(LensResponseParser.parse(Lens.LITERAL, raw))
+        val extraction = LensResponseParser.parse(Lens.LITERAL, raw)
+
+        assertNotNull(extraction)
+        assertEquals(listOf("a"), extraction!!.fields["tags"])
     }
 
     @Test
@@ -296,24 +321,211 @@ class LensResponseParserTest {
     }
 
     @Test
-    fun `rejects array-wrapped payload even when bracketed prose appears first`() {
-        // Earlier bracketed prose ("[note]") doesn't change the verdict: the `[` immediately
-        // before the first `{` is still the array opener and the payload is still malformed.
+    fun `accepts array-wrapped payload when bracketed prose appears first`() {
         val raw = """[note] [{"tags":["a"]}]"""
-        assertNull(LensResponseParser.parse(Lens.LITERAL, raw))
+        val extraction = LensResponseParser.parse(Lens.LITERAL, raw)
+
+        assertNotNull(extraction)
+        assertEquals(listOf("a"), extraction!!.fields["tags"])
     }
 
     @Test
-    fun `rejects array-wrapped payload even after earlier non-JSON brace commentary`() {
-        // A leading `{kind, snippet, note}` block used to bypass the array-wrapper guard because
-        // the parser only checked the first `{` in the whole response. Each candidate brace block
-        // now gets checked independently.
+    fun `accepts array-wrapped payload after earlier non-JSON brace commentary`() {
         val raw = """
             We expect flags shaped like {kind, snippet, note}.
             [{"tags":["a"]}]
         """.trimIndent()
 
-        assertNull(LensResponseParser.parse(Lens.LITERAL, raw))
+        val extraction = LensResponseParser.parse(Lens.LITERAL, raw)
+
+        assertNotNull(extraction)
+        assertEquals(listOf("a"), extraction!!.fields["tags"])
+    }
+
+    @Test
+    fun `skips parseable prose object that does not contain schema keys`() {
+        val raw = """
+            Flag example: {"kind":"vocabulary-contradiction","snippet":"x","note":"y"}
+            Actual payload: {"tags":["work"],"flags":[]}
+        """.trimIndent()
+
+        val extraction = LensResponseParser.parse(Lens.LITERAL, raw)
+
+        assertNotNull(extraction)
+        assertEquals(listOf("work"), extraction!!.fields["tags"])
+    }
+
+    @Test
+    fun `unwraps schema object from a model-added result envelope`() {
+        val raw = """
+            {
+              "analysis": "ignored",
+              "result": {
+                "tags": ["Work"],
+                "energy_descriptor": "flat",
+                "state_shift": true,
+                "flags": []
+              }
+            }
+        """.trimIndent()
+
+        val extraction = LensResponseParser.parse(Lens.INFERENTIAL, raw)
+
+        assertNotNull(extraction)
+        assertEquals(listOf("work"), extraction!!.fields["tags"])
+        assertEquals("flat", extraction.fields["energy_descriptor"])
+        assertEquals(true, extraction.fields["state_shift"])
+    }
+
+    @Test
+    fun `repairs trailing commas in object and array payloads`() {
+        val raw = """
+            {
+              "tags": ["work",],
+              "energy_descriptor": "flat",
+              "state_shift": false,
+              "flags": [],
+            }
+        """.trimIndent()
+
+        val extraction = LensResponseParser.parse(Lens.LITERAL, raw)
+
+        assertNotNull(extraction)
+        assertEquals(listOf("work"), extraction!!.fields["tags"])
+        assertEquals(false, extraction.fields["state_shift"])
+    }
+
+    @Test
+    fun `repairs duplicate commas between sibling fields after trimming payload whitespace`() {
+        val raw = """
+
+            
+              {
+                "tags": ["standup", "payroll-doc"],
+                "energy_descriptor": "flat",
+                "state_shift": true,
+                ,"vocabulary_contradictions": [
+                  {
+                    "term_a": "fine",
+                    "term_b": "stuck",
+                    "snippet": "I said I was fine but felt stuck"
+                  }
+                ],
+                "stated_commitment": null,
+                "recurrence_link": null,
+                "recurrence_kind": null,
+                "flags": []
+              }
+            
+
+        """.trimIndent()
+
+        val extraction = LensResponseParser.parse(Lens.INFERENTIAL, raw)
+
+        assertNotNull(extraction)
+        assertEquals(listOf("standup", "payroll-doc"), extraction!!.fields["tags"])
+        assertEquals("flat", extraction.fields["energy_descriptor"])
+        assertEquals(true, extraction.fields["state_shift"])
+        @Suppress("UNCHECKED_CAST")
+        val contradictions = extraction.fields["vocabulary_contradictions"] as List<Map<String, Any?>>
+        assertEquals("fine", contradictions.single()["term_a"])
+    }
+
+    @Test
+    fun `repairs duplicate commas immediately after object open`() {
+        val raw = """
+            {
+              ,
+              "tags": ["work"],
+              "energy_descriptor": "flat",
+              "state_shift": false,
+              "vocabulary_contradictions": [],
+              "stated_commitment": null,
+              "recurrence_link": null,
+              "recurrence_kind": null,
+              "flags": []
+            }
+        """.trimIndent()
+
+        val extraction = LensResponseParser.parse(Lens.LITERAL, raw)
+
+        assertNotNull(extraction)
+        assertEquals(listOf("work"), extraction!!.fields["tags"])
+        assertEquals("flat", extraction.fields["energy_descriptor"])
+    }
+
+    @Test
+    fun `repairs unescaped quotes and missing closing quote in skeptical note string`() {
+        val raw = """
+            {
+              "tags": ["standup", "kitchen", "payroll-doc", "stuck", "muttering"],
+              "energy_descriptor": "flat",
+              "state_shift": true,
+              "vocabulary_contradictions": [
+                {
+                  "term_a": "fine",
+                  "term_b": "stuck",
+                  "snippet": "I said I was fine but felt stuck"
+                }
+              ],
+              "stated_commitment": null,
+              "recurrence_link": null,
+              "recurrence_kind": null,
+              "flags": [
+                {
+                  "kind": "vocabulary-contradiction",
+                  "snippet": "I said I was fine but felt stuck",
+                  "note": ""fine" and "stuck" are used to describe the same feeling state.
+            }]}
+        """.trimIndent()
+
+        val extraction = LensResponseParser.parse(Lens.SKEPTICAL, raw)
+
+        assertNotNull(extraction)
+        assertEquals(listOf("standup", "kitchen", "payroll-doc", "stuck", "muttering"), extraction!!.fields["tags"])
+        assertEquals(
+            listOf(
+                "vocabulary-contradiction:I said I was fine but felt stuck:" +
+                    "\"fine\" and \"stuck\" are used to describe the same feeling state.",
+            ),
+            extraction.flags,
+        )
+    }
+
+    @Test
+    fun `repairs unquoted schema keys`() {
+        val raw = """
+            {
+              tags: ["Work"],
+              energy_descriptor: "flat",
+              state_shift: false,
+              flags: []
+            }
+        """.trimIndent()
+
+        val extraction = LensResponseParser.parse(Lens.LITERAL, raw)
+
+        assertNotNull(extraction)
+        assertEquals(listOf("work"), extraction!!.fields["tags"])
+        assertEquals("flat", extraction.fields["energy_descriptor"])
+    }
+
+    @Test
+    fun `repairs curly double quotes around schema payload`() {
+        val raw = """
+            {
+              “tags”: [“Work”],
+              “energy_descriptor”: “flat”,
+              “state_shift”: false,
+              “flags”: []
+            }
+        """.trimIndent()
+
+        val extraction = LensResponseParser.parse(Lens.LITERAL, raw)
+
+        assertNotNull(extraction)
+        assertEquals(listOf("work"), extraction!!.fields["tags"])
+        assertEquals("flat", extraction.fields["energy_descriptor"])
     }
 
     @Test

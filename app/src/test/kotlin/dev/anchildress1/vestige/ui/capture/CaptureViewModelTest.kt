@@ -80,10 +80,15 @@ class CaptureViewModelTest {
 
                 voice.completeWithResult()
                 advanceUntilIdle()
-                assertTrue("capture resets to Idle", expectMostRecentItem() is CaptureUiState.Idle)
+                assertTrue(
+                    "capture stays Submitting until the UI consumes the open-entry event",
+                    expectMostRecentItem() is CaptureUiState.Submitting,
+                )
                 cancelAndIgnoreRemainingEvents()
             }
             assertEquals("host is told to open the persisted entry", 42L, awaitItem())
+            vm.onOpenEntryHandled()
+            assertTrue("capture resets only after the navigation handoff lands", vm.state.value is CaptureUiState.Idle)
             cancelAndIgnoreRemainingEvents()
         }
         assertEquals(1, save.invocations.get())
@@ -179,6 +184,58 @@ class CaptureViewModelTest {
     }
 
     @Test
+    fun `terminal foreground success persists transcription when stream scanner emitted no event`() =
+        runTest(dispatcher) {
+            val audio = AudioChunk(FloatArray(16), 16_000, isFinal = true)
+            val voice = FakeVoiceCapture(result = audio)
+            val save = RecordingSaveAndExtract()
+            val vm = newViewModel(
+                voice = voice,
+                inference = ForegroundInferenceCall { _, _ ->
+                    flowOf(ForegroundStreamEvent.Terminal(successResult("terminal-only words", "what got missed?")))
+                },
+                textInference = ForegroundTextInferenceCall { _, _, _ ->
+                    flowOf(ForegroundStreamEvent.Terminal(successResult("terminal-only words", "what got missed?")))
+                },
+                save = save,
+                initialReadiness = ModelReadiness.Ready,
+            )
+
+            vm.startRecording()
+            voice.completeWithResult()
+            advanceUntilIdle()
+
+            assertEquals("terminal-only words", save.lastText)
+            assertEquals(1, save.invocations.get())
+        }
+
+    @Test
+    fun `parse failure with recovered transcription still persists the entry`() = runTest(dispatcher) {
+        val audio = AudioChunk(FloatArray(16), 16_000, isFinal = true)
+        val voice = FakeVoiceCapture(result = audio)
+        val save = RecordingSaveAndExtract(entryId = 4L)
+        val vm = newViewModel(
+            voice = voice,
+            inference = ForegroundInferenceCall { _, _ ->
+                flowOf(ForegroundStreamEvent.Terminal(parseFailure(recoveredTranscription = "recovered words")))
+            },
+            textInference = ForegroundTextInferenceCall { _, _, _ ->
+                flowOf(ForegroundStreamEvent.Terminal(successResult("recovered words", "what did you leave out?")))
+            },
+            save = save,
+            initialReadiness = ModelReadiness.Ready,
+        )
+
+        vm.startRecording()
+        voice.completeWithResult()
+        advanceUntilIdle()
+
+        assertEquals("recovered words", save.lastText)
+        assertEquals(1, save.invocations.get())
+        assertTrue(vm.state.value is CaptureUiState.Submitting)
+    }
+
+    @Test
     fun `inference engine failure on call-1 surfaces ENGINE_FAILED`() = runTest(dispatcher) {
         val audio = AudioChunk(FloatArray(16), 16_000, isFinal = true)
         val voice = FakeVoiceCapture(result = audio)
@@ -221,6 +278,11 @@ class CaptureViewModelTest {
         advanceUntilIdle()
 
         assertEquals("entry still saved", 1, save.invocations.get())
+        assertTrue(
+            "capture stays Submitting until the UI consumes the open-entry event",
+            vm.state.value is CaptureUiState.Submitting,
+        )
+        vm.onOpenEntryHandled()
         assertTrue("capture is a clean Idle, not an error", vm.state.value is CaptureUiState.Idle)
         assertNull("no error band — the entry is safe", (vm.state.value as CaptureUiState.Idle).error)
         assertNull("no follow-up attached on a failed call-2", attach.lastFollowUp)
@@ -373,11 +435,14 @@ class CaptureViewModelTest {
     }
 
     @Test
-    fun `voice path queries lookup with call-1 transcription and threads history to save`() = runTest(dispatcher) {
+    fun `voice path opens entry before lookup resolves and threads history only to call-2`() = runTest(dispatcher) {
         val voice = FakeVoiceCapture(result = AudioChunk(FloatArray(16), 16_000, isFinal = true))
+        val lookupRelease = CompletableDeferred<Unit>()
+        val lookupCalls = AtomicInteger(0)
+        var lookupQuery: String? = null
         val history = listOf(HistoryChunk(patternId = null, text = "a prior entry about the same loop"))
-        val lookup = RecordingHistoryLookup(history)
-        val save = RecordingSaveAndExtract()
+        val save = RecordingSaveAndExtract(entryId = 88L)
+        val attach = RecordingAttachFollowUp()
         val vm = newViewModel(
             voice = voice,
             inference = ForegroundInferenceCall { _, _ ->
@@ -388,17 +453,34 @@ class CaptureViewModelTest {
                 flowOf(ForegroundStreamEvent.Terminal(successResult("echo", "what pulls you back")))
             },
             save = save,
-            lookupHistory = lookup,
+            attachFollowUp = attach,
+            lookupHistory = HistoryRetrieval { query ->
+                lookupCalls.incrementAndGet()
+                lookupQuery = query
+                lookupRelease.await()
+                history
+            },
             initialReadiness = ModelReadiness.Ready,
         )
 
-        vm.startRecording()
-        voice.completeWithResult()
-        advanceUntilIdle()
+        vm.openEntryEvents.test {
+            vm.startRecording()
+            voice.completeWithResult()
+            advanceUntilIdle()
 
-        assertEquals("i keep reopening the same ticket", lookup.lastQuery)
-        assertEquals(1, lookup.calls.get())
-        assertEquals(history, save.lastHistory)
+            assertEquals(88L, awaitItem())
+            assertEquals(1, save.invocations.get())
+            assertTrue("foreground save must no longer wait for retrieval", save.lastHistory.isEmpty())
+            assertEquals(1, lookupCalls.get())
+            assertNull("follow-up must still be waiting on retrieval", attach.lastFollowUp)
+
+            vm.onOpenEntryHandled()
+            lookupRelease.complete(Unit)
+            advanceUntilIdle()
+            cancelAndIgnoreRemainingEvents()
+        }
+        assertEquals("i keep reopening the same ticket", lookupQuery)
+        assertEquals("what pulls you back", attach.lastFollowUp)
     }
 
     @Test
@@ -462,6 +544,8 @@ class CaptureViewModelTest {
             vm.submitTyped("just got off the call again")
             advanceUntilIdle()
             assertEquals(5L, awaitItem())
+            assertTrue(vm.state.value is CaptureUiState.Submitting)
+            vm.onOpenEntryHandled()
             cancelAndIgnoreRemainingEvents()
         }
         assertEquals(1, save.invocations.get())
@@ -493,7 +577,7 @@ class CaptureViewModelTest {
     }
 
     @Test
-    fun `submitTyped threads looked-up history to save and call-2`() = runTest(dispatcher) {
+    fun `submitTyped threads looked-up history only to call-2`() = runTest(dispatcher) {
         val history = listOf(HistoryChunk(patternId = null, text = "earlier note"))
         val lookup = RecordingHistoryLookup(history)
         val save = RecordingSaveAndExtract()
@@ -511,7 +595,7 @@ class CaptureViewModelTest {
         advanceUntilIdle()
 
         assertEquals("just got off the call again", lookup.lastQuery)
-        assertEquals(history, save.lastHistory)
+        assertTrue(save.lastHistory.isEmpty())
         assertEquals(1, save.invocations.get())
     }
 

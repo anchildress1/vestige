@@ -27,8 +27,11 @@ fun interface ConvergenceResolver {
  * Lens parse failures are honored by the caller — a missing lens is treated as no opinion. With
  * only one surviving lens the entry is under-evidenced; every field (populated or not) resolves
  * to AMBIGUOUS rather than minting candidates from a single witness. With two surviving the
- * threshold collapses to "both must agree."
+ * threshold collapses to "both must agree." Semantic no-op values (`null`, `false`, blank text,
+ * empty lists/maps) do not count as corroborating evidence.
  */
+// One resolver helper per ResolvedField; bound by the schema, not arbitrary surface.
+@Suppress("TooManyFunctions")
 class DefaultConvergenceResolver : ConvergenceResolver {
 
     override fun resolve(extractions: List<LensExtraction>): ResolvedExtraction {
@@ -46,21 +49,23 @@ class DefaultConvergenceResolver : ConvergenceResolver {
     ): ResolvedField {
         val matchingFlags = skepticalFlags.filter { flagBelongsToField(it, key) }
         val populated: List<Pair<Lens, Any>> = Lens.entries.mapNotNull { lens ->
-            byLens[lens]?.fields?.get(key)?.let { lens to it }
+            val raw = byLens[lens]?.fields?.get(key) ?: return@mapNotNull null
+            meaningfulValue(raw)?.let { lens to raw }
         }
         return when {
             key == TAGS_KEY -> resolveTags(byLens, skepticalFlags)
 
+            key == STATED_COMMITMENT_KEY -> resolveCommitment(byLens, matchingFlags)
+
             // Two of three lenses parse-failed: per ADR-002 §"Edge case — lens errors mid-call",
             // the surviving lens lacks corroboration, so every populated field is ambiguous.
-            byLens.size == MIN_SURVIVING_LENSES_FOR_AMBIGUOUS -> ResolvedField(
-                value = null,
-                verdict = ConfidenceVerdict.AMBIGUOUS,
-                flags = matchingFlags,
-            )
+            byLens.size == MIN_SURVIVING_LENSES_FOR_AMBIGUOUS -> ambiguousField(matchingFlags)
 
-            populated.isEmpty() ->
-                ResolvedField(value = null, verdict = ConfidenceVerdict.CANONICAL, flags = matchingFlags)
+            populated.isEmpty() -> ambiguousField(matchingFlags)
+
+            populated.size == 1 &&
+                populated.single().first == Lens.SKEPTICAL &&
+                matchingFlags.isNotEmpty() -> ambiguousField(matchingFlags)
 
             populated.size == 1 -> ResolvedField(
                 value = populated.single().second,
@@ -70,6 +75,55 @@ class DefaultConvergenceResolver : ConvergenceResolver {
             )
 
             else -> resolveMultiple(key, populated, matchingFlags)
+        }
+    }
+
+    private fun resolveCommitment(byLens: Map<Lens, LensExtraction>, matchingFlags: List<String>): ResolvedField {
+        val populated = Lens.entries.mapNotNull { lens ->
+            val raw =
+                byLens[lens]?.fields?.get(STATED_COMMITMENT_KEY) as? Map<*, *>
+                    ?: return@mapNotNull null
+            lens.takeIf { meaningfulValue(raw) != null }?.let { it to raw }
+        }
+        return when {
+            byLens.size == MIN_SURVIVING_LENSES_FOR_AMBIGUOUS -> ambiguousField(matchingFlags)
+
+            populated.isEmpty() -> ambiguousField(matchingFlags)
+
+            populated.size == 1 &&
+                populated.single().first == Lens.SKEPTICAL &&
+                matchingFlags.isNotEmpty() -> ambiguousField(matchingFlags)
+
+            populated.size == 1 -> ResolvedField(
+                value = populated.single().second,
+                verdict = ConfidenceVerdict.CANDIDATE,
+                flags = matchingFlags,
+                sourceLens = populated.single().first,
+            )
+
+            else -> {
+                val normalized = populated.map { (lens, map) ->
+                    lens to map.toCommitmentIdentity()
+                }
+                val entryIds = normalized
+                    .mapNotNull { (_, identity) -> identity.entryId.takeIf { identity.hasEntryId } }
+                    .distinct()
+                val nonNullTopics = normalized
+                    .mapNotNull { (_, identity) -> identity.topicOrPerson }
+                    .distinct()
+                when {
+                    entryIds.size > 1 -> disagreementField(matchingFlags)
+
+                    nonNullTopics.size > 1 -> disagreementField(matchingFlags)
+
+                    else -> canonicalCommitmentField(
+                        representative = populated.first().second,
+                        nonNullTopics = nonNullTopics,
+                        entryIds = entryIds,
+                        matchingFlags = matchingFlags,
+                    )
+                }
+            }
         }
     }
 
@@ -96,6 +150,31 @@ class DefaultConvergenceResolver : ConvergenceResolver {
         }
     }
 
+    private fun disagreementField(matchingFlags: List<String>) = ResolvedField(
+        value = null,
+        verdict = ConfidenceVerdict.AMBIGUOUS,
+        flags = listOf(LENS_DISAGREEMENT_FLAG) + matchingFlags,
+    )
+
+    private fun canonicalCommitmentField(
+        representative: Map<*, *>,
+        nonNullTopics: List<String>,
+        entryIds: List<Any>,
+        matchingFlags: List<String>,
+    ): ResolvedField {
+        val patched = enrichCommitmentRepresentative(
+            representative = representative,
+            agreedTopic = nonNullTopics.singleOrNull(),
+            agreedEntryId = entryIds.singleOrNull(),
+        )
+        val verdict = if (matchingFlags.isEmpty()) {
+            ConfidenceVerdict.CANONICAL
+        } else {
+            ConfidenceVerdict.CANONICAL_WITH_CONFLICT
+        }
+        return ResolvedField(value = patched, verdict = verdict, flags = matchingFlags)
+    }
+
     private fun resolveTags(byLens: Map<Lens, LensExtraction>, skepticalFlags: List<String>): ResolvedField {
         val matchingFlags = skepticalFlags.filter { flagBelongsToField(it, TAGS_KEY) }
         if (byLens.size == MIN_SURVIVING_LENSES_FOR_AMBIGUOUS) {
@@ -116,8 +195,8 @@ class DefaultConvergenceResolver : ConvergenceResolver {
         // count as the same tag.
         return when {
             populated.isEmpty() -> ResolvedField(
-                value = emptyList<String>(),
-                verdict = ConfidenceVerdict.CANONICAL,
+                value = null,
+                verdict = ConfidenceVerdict.AMBIGUOUS,
                 flags = matchingFlags,
             )
 
@@ -181,7 +260,7 @@ class DefaultConvergenceResolver : ConvergenceResolver {
      * tightening lands when STT-C surfaces real flakiness.
      */
     private fun stemForCount(tag: String): String {
-        val lower = tag.lowercase()
+        val lower = tag.lowercase().replace("-", "")
         if (lower.length <= MIN_STEM_LENGTH) return lower
         return when {
             lower.endsWith(IES_SUFFIX) -> lower.dropLast(IES_SUFFIX.length) + "y"
@@ -193,25 +272,45 @@ class DefaultConvergenceResolver : ConvergenceResolver {
 
     private fun canonicalize(key: String, value: Any): Any = when (key) {
         ENERGY_DESCRIPTOR_KEY -> (value as? String)?.trim()?.lowercase() ?: value
-        STATED_COMMITMENT_KEY -> canonicalizeCommitment(value)
         else -> value
     }
 
-    private fun canonicalizeCommitment(value: Any): Any {
-        // ADR-002 §"Per-field agreement" — commitment agreement is "same topic_or_person AND same
-        // entry_id reference." Both keys are nullable in the lens output (entry_id is injected by
-        // storage post-resolver; topic_or_person can be null per `lenses/output-schema.txt`), so
-        // any commitment Map produces a CommitmentIdentity. `hasEntryId` distinguishes "entry_id
-        // not yet assigned" from "entry_id explicitly null" — without it two lenses tagged with
-        // different storage entry_ids would still converge as null-vs-null.
-        val commitment = value as? Map<*, *> ?: return value
-        val entryId = commitment[ENTRY_ID_KEY]
+    private fun meaningfulValue(value: Any?): Any? = when (value) {
+        null -> null
+        is String -> value.takeIf(String::isNotBlank)
+        is Boolean -> value.takeIf { it }
+        is List<*> -> value.takeIf { values -> values.any { meaningfulValue(it) != null } }
+        is Map<*, *> -> value.takeIf { values -> values.values.any { meaningfulValue(it) != null } }
+        else -> value
+    }
+
+    private fun Map<*, *>.toCommitmentIdentity(): CommitmentIdentity {
+        val entryId = this[ENTRY_ID_KEY]
         return CommitmentIdentity(
-            topicOrPerson = commitment[TOPIC_OR_PERSON_KEY],
-            entryId = entryId,
-            hasEntryId = commitment.containsKey(ENTRY_ID_KEY),
+            topicOrPerson = (this[TOPIC_OR_PERSON_KEY] as? String)?.trim()?.takeIf(String::isNotBlank)?.lowercase(),
+            entryId = (entryId as? String)?.trim()?.takeIf(String::isNotBlank) ?: entryId,
+            hasEntryId = containsKey(ENTRY_ID_KEY),
         )
     }
+
+    private fun enrichCommitmentRepresentative(
+        representative: Map<*, *>,
+        agreedTopic: String?,
+        agreedEntryId: Any?,
+    ): Map<String, Any?> {
+        val normalized = representative.entries.associate { (key, value) -> key.toString() to value }
+            .toMutableMap()
+        if (normalized[TOPIC_OR_PERSON_KEY] !is String || normalized[TOPIC_OR_PERSON_KEY].toString().isBlank()) {
+            normalized[TOPIC_OR_PERSON_KEY] = agreedTopic
+        }
+        if (!normalized.containsKey(ENTRY_ID_KEY) && agreedEntryId != null) {
+            normalized[ENTRY_ID_KEY] = agreedEntryId
+        }
+        return normalized
+    }
+
+    private fun ambiguousField(flags: List<String>): ResolvedField =
+        ResolvedField(value = null, verdict = ConfidenceVerdict.AMBIGUOUS, flags = flags)
 
     private fun flagBelongsToField(flag: String, field: String): Boolean =
         FLAG_KIND_TO_FIELD[flag.substringBefore(':')] == field
@@ -240,4 +339,4 @@ class DefaultConvergenceResolver : ConvergenceResolver {
     }
 }
 
-private data class CommitmentIdentity(val topicOrPerson: Any?, val entryId: Any?, val hasEntryId: Boolean)
+private data class CommitmentIdentity(val topicOrPerson: String?, val entryId: Any?, val hasEntryId: Boolean)

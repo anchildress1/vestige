@@ -76,6 +76,7 @@ class MarkdownEntryStoreTest {
         assertEquals(entry.statedCommitmentJson, readBack.statedCommitmentJson)
         assertEquals(entry.confidenceJson, readBack.confidenceJson)
         assertEquals(entry.entryObservationsJson, readBack.entryObservationsJson)
+        assertEquals(entry.lensReceiptsJson, readBack.lensReceiptsJson)
         assertEquals(ExtractionStatus.COMPLETED, readBack.extractionStatus)
         assertEquals(0, readBack.attemptCount)
         assertNull(readBack.lastError)
@@ -98,6 +99,7 @@ class MarkdownEntryStoreTest {
             templateLabel = TemplateLabel.AFTERMATH,
             energyDescriptor = "flattened",
             extractionStatus = ExtractionStatus.PENDING,
+            lensReceiptsJson = """[{"lens":"LITERAL","extracted":true,"fields":{"tags":["standup"]}}]""",
         )
         entry.tags.add(standup)
         entry.tags.add(flattened)
@@ -113,6 +115,18 @@ class MarkdownEntryStoreTest {
         assertEquals(Persona.HARDASS, readBack.persona)
         assertEquals(TemplateLabel.AFTERMATH, readBack.templateLabel)
         assertEquals("flattened", readBack.energyDescriptor)
+        assertTrue(readBack.lensReceiptsJson.orEmpty().contains("LITERAL"))
+    }
+
+    @Test
+    fun `legacy null lensReceiptsJson writes as empty array and round-trips`() {
+        val entry = EntryEntity(timestampEpochMs = ISO_TIMESTAMP_MS, lensReceiptsJson = null)
+        boxStore.boxFor<EntryEntity>().put(entry)
+
+        val written = store.write(entry)
+
+        assertTrue(written.readText().contains("lens_receipts: []"))
+        assertEquals("[]", store.read(written).lensReceiptsJson)
     }
 
     @Test
@@ -264,6 +278,7 @@ class MarkdownEntryStoreTest {
                   - work
                 confidence: {"templateLabel":"CANONICAL"}
                 entry_observations: [{"text":"stared at doc","evidence":"capture","fields":["focus"]}]
+                lens_receipts: [{"lens":"SKEPTICAL","extracted":true,"fields":{"energy_descriptor":"flattened"}}]
                 ---
 
                 Standup ran long again.
@@ -279,6 +294,7 @@ class MarkdownEntryStoreTest {
             readBack.statedCommitmentJson,
         )
         assertEquals("""{"templateLabel":"CANONICAL"}""", readBack.confidenceJson)
+        assertTrue(readBack.lensReceiptsJson.orEmpty().contains("SKEPTICAL"))
         assertEquals(Instant.parse("2026-05-09T14:32:15Z").toEpochMilli(), readBack.timestampEpochMs)
     }
 

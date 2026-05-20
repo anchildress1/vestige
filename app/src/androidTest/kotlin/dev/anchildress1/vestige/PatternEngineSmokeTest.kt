@@ -116,7 +116,7 @@ class PatternEngineSmokeTest {
         when (result) {
             is BackgroundExtractionResult.Success -> {
                 entryStore.completeEntry(entryId, result.resolved, result.templateLabel)
-                val label = result.templateLabel?.serial ?: "null"
+                val label = result.templateLabel.serial
                 android.util.Log.i(TAG, "entry=${entry.id} template=$label elapsed=${result.totalElapsedMs}ms")
             }
 

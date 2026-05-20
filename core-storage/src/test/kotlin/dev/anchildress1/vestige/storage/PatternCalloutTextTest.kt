@@ -100,4 +100,34 @@ class PatternCalloutTextTest {
         assertEquals("3 entries with a commitment about .", commitment)
         assertEquals("'' appears across 4 entries with multiple framings.", vocab)
     }
+
+    @Test
+    fun `temporal weekday callout names the calendar slot`() {
+        val text = PatternCalloutText.build(
+            detected(
+                PatternKind.TEMPORAL_RELATIVE,
+                "{\"relation\":\"weekday_time_block\",\"day_of_week\":\"tuesday\",\"time_block\":\"afternoon\"}",
+            ),
+        )
+
+        assertEquals("3 Tuesday afternoon entries logged. Same slot keeps showing up.", text)
+    }
+
+    @Test
+    fun `temporal month-start callout names the calendar edge`() {
+        val text = PatternCalloutText.build(
+            detected(PatternKind.TEMPORAL_RELATIVE, "{\"relation\":\"month_start\",\"day_of_month\":1}"),
+        )
+
+        assertEquals("3 first-of-month entries logged. Same calendar edge keeps showing up.", text)
+    }
+
+    @Test
+    fun `temporal with unknown relation falls back to generic calendar-slot copy`() {
+        val text = PatternCalloutText.build(
+            detected(PatternKind.TEMPORAL_RELATIVE, "{\"relation\":\"unknown_future_kind\"}"),
+        )
+
+        assertEquals("3 time-relative entries logged. Same calendar slot keeps showing up.", text)
+    }
 }

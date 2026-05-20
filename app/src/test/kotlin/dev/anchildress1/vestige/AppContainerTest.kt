@@ -2,6 +2,7 @@ package dev.anchildress1.vestige
 
 import android.content.Context
 import android.content.Intent
+import android.content.SharedPreferences
 import dev.anchildress1.vestige.inference.BackgroundExtractionResult
 import dev.anchildress1.vestige.inference.Embedder
 import dev.anchildress1.vestige.inference.ForegroundResult
@@ -18,9 +19,11 @@ import dev.anchildress1.vestige.model.PatternKind
 import dev.anchildress1.vestige.model.PatternState
 import dev.anchildress1.vestige.save.BackgroundExtractionSaveFlow
 import dev.anchildress1.vestige.save.SaveOutcome
+import dev.anchildress1.vestige.storage.CalloutCooldownEntity
 import dev.anchildress1.vestige.storage.EntryEntity
 import dev.anchildress1.vestige.storage.MarkdownEntryStore
 import dev.anchildress1.vestige.storage.PatternEntity
+import dev.anchildress1.vestige.storage.TagEntity
 import dev.anchildress1.vestige.storage.VectorBackfillWorker
 import dev.anchildress1.vestige.testing.cleanupObjectBoxTempRoot
 import dev.anchildress1.vestige.testing.newInMemoryObjectBoxDirectory
@@ -40,6 +43,7 @@ import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
+import org.json.JSONObject
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertNotNull
@@ -228,7 +232,7 @@ class AppContainerTest {
             markdownStoreFactory = { mockk<MarkdownEntryStore>(relaxed = true) },
             modelPathLoader = { "/tmp/fake-model.litertlm" },
             backgroundEngineFactory = { _, _ -> mockk<LiteRtLmEngine>(relaxed = true) },
-            backgroundExtractionSaveFlowFactory = { _, _, _, callbacks, _, _ ->
+            backgroundExtractionSaveFlowFactory = { _, _, _, callbacks, _, _, _ ->
                 lifecycleCallbacks = callbacks
                 saveFlow
             },
@@ -244,6 +248,34 @@ class AppContainerTest {
         lifecycleCallbacks!!.onEntryFinalized(7L)
 
         assertEquals(1, scheduled)
+    }
+
+    @Test
+    fun `backgroundExtractionSaveFlow pattern callout callback bumps data revision`() {
+        val saveFlow = mockk<BackgroundExtractionSaveFlow>(relaxed = true)
+        var lifecycleCallbacks: dev.anchildress1.vestige.save.BackgroundExtractionLifecycleCallbacks? = null
+        val container = AppContainer(
+            applicationContext = mockk<Context>(relaxed = true),
+            boxStoreFactory = { mockk<BoxStore>(relaxed = true) },
+            markdownStoreFactory = { mockk<MarkdownEntryStore>(relaxed = true) },
+            modelPathLoader = { "/tmp/fake-model.litertlm" },
+            backgroundEngineFactory = { _, _ -> mockk<LiteRtLmEngine>(relaxed = true) },
+            backgroundExtractionSaveFlowFactory = { _, _, _, callbacks, _, _, _ ->
+                lifecycleCallbacks = callbacks
+                saveFlow
+            },
+            recoveredEntryIdsLoader = { emptyList() },
+            foregroundServiceIntentFactory = { Intent("dev.anchildress1.vestige.TEST_START") },
+            foregroundServiceStarter = {},
+        )
+
+        container.backgroundExtractionSaveFlow
+        assertNotNull(lifecycleCallbacks)
+        val revisionBefore = container.dataRevision.value
+
+        lifecycleCallbacks!!.onPatternCalloutAppended(7L)
+
+        assertTrue(container.dataRevision.value > revisionBefore)
     }
 
     @Test
@@ -335,7 +367,7 @@ class AppContainerTest {
             markdownStoreFactory = { mockk<MarkdownEntryStore>(relaxed = true) },
             modelPathLoader = { "/tmp/fake-model.litertlm" },
             backgroundEngineFactory = { _, _ -> engine },
-            backgroundExtractionSaveFlowFactory = { _, _, _, _, _, _ -> saveFlow },
+            backgroundExtractionSaveFlowFactory = { _, _, _, _, _, _, _ -> saveFlow },
             recoveredEntryIdsLoader = { emptyList() },
             foregroundServiceIntentFactory = { Intent("dev.anchildress1.vestige.TEST_START") },
             foregroundServiceStarter = {},
@@ -380,7 +412,7 @@ class AppContainerTest {
             markdownStoreFactory = { mockk<MarkdownEntryStore>(relaxed = true) },
             modelPathLoader = { "/tmp/fake-model.litertlm" },
             backgroundEngineFactory = { _, _ -> engine },
-            backgroundExtractionSaveFlowFactory = { _, _, _, _, _, _ -> saveFlow },
+            backgroundExtractionSaveFlowFactory = { _, _, _, _, _, _, _ -> saveFlow },
             recoveredEntryIdsLoader = { emptyList() },
             foregroundServiceIntentFactory = { Intent("dev.anchildress1.vestige.TEST_START") },
             foregroundServiceStarter = {},
@@ -407,7 +439,7 @@ class AppContainerTest {
             markdownStoreFactory = { mockk<MarkdownEntryStore>(relaxed = true) },
             modelPathLoader = { "/tmp/fake-model.litertlm" },
             backgroundEngineFactory = { _, _ -> engine },
-            backgroundExtractionSaveFlowFactory = { _, _, _, _, _, _ -> saveFlow },
+            backgroundExtractionSaveFlowFactory = { _, _, _, _, _, _, _ -> saveFlow },
             recoveredEntryIdsLoader = { emptyList() },
             foregroundServiceIntentFactory = { Intent("dev.anchildress1.vestige.TEST_START") },
             foregroundServiceStarter = {},
@@ -443,7 +475,7 @@ class AppContainerTest {
             markdownStoreFactory = { mockk<MarkdownEntryStore>(relaxed = true) },
             modelPathLoader = { "/tmp/fake-model.litertlm" },
             backgroundEngineFactory = { _, _ -> engine },
-            backgroundExtractionSaveFlowFactory = { _, _, _, _, _, _ -> saveFlow },
+            backgroundExtractionSaveFlowFactory = { _, _, _, _, _, _, _ -> saveFlow },
             recoveredEntryIdsLoader = { emptyList() },
             foregroundServiceIntentFactory = { Intent("dev.anchildress1.vestige.TEST_START") },
             foregroundServiceStarter = {},
@@ -559,7 +591,7 @@ class AppContainerTest {
             modelPathLoader = { modelFile.absolutePath },
             backgroundEngineFactory = { _, _ -> engineMock },
             mainModelArtifactStoreFactory = { _, _, _ -> artifactStore },
-            backgroundExtractionSaveFlowFactory = { _, _, _, _, _, _ -> saveFlow },
+            backgroundExtractionSaveFlowFactory = { _, _, _, _, _, _, _ -> saveFlow },
             recoveredEntryIdsLoader = { emptyList() },
             foregroundServiceIntentFactory = { Intent("dev.anchildress1.vestige.TEST_START") },
             foregroundServiceStarter = {},
@@ -654,7 +686,7 @@ class AppContainerTest {
             modelPathLoader = { modelFile.absolutePath },
             backgroundEngineFactory = { _, _ -> engineMock },
             mainModelArtifactStoreFactory = { _, _, _ -> artifactStore },
-            backgroundExtractionSaveFlowFactory = { _, _, _, _, _, _ -> saveFlow },
+            backgroundExtractionSaveFlowFactory = { _, _, _, _, _, _, _ -> saveFlow },
             recoveredEntryIdsLoader = { emptyList() },
             foregroundServiceIntentFactory = { Intent("dev.anchildress1.vestige.TEST_START") },
             foregroundServiceStarter = {},
@@ -1072,7 +1104,7 @@ class AppContainerTest {
                 modelPathLoader = { File(tempRoot, "m").absolutePath },
                 backgroundEngineFactory = { _, _ -> mockk<LiteRtLmEngine>(relaxed = true) },
                 mainModelArtifactStoreFactory = { _, _, _ -> fakeArtifactStore(File(tempRoot, "m"), 1L) },
-                backgroundExtractionSaveFlowFactory = { _, _, _, _, _, _ -> saveFlow },
+                backgroundExtractionSaveFlowFactory = { _, _, _, _, _, _, _ -> saveFlow },
                 recoveredEntryIdsLoader = { emptyList() },
                 foregroundServiceIntentFactory = { Intent("dev.anchildress1.vestige.TEST_START") },
                 foregroundServiceStarter = {},
@@ -1092,36 +1124,51 @@ class AppContainerTest {
     }
 
     @Test
-    fun `zipAllEntriesTo streams every entry markdown file into the zip`(@TempDir tempRoot: File) = runTest {
-        File(tempRoot, "entries").mkdirs()
-        File(tempRoot, "entries/one.md").writeText("first")
-        File(tempRoot, "entries/two.md").writeText("second")
-        val container = AppContainer(
-            applicationContext = mockk<Context>(relaxed = true) { every { filesDir } returns tempRoot },
-            boxStoreFactory = { mockk<BoxStore>(relaxed = true) },
-            markdownStoreFactory = { MarkdownEntryStore(tempRoot) },
-            modelPathLoader = { File(tempRoot, "m").absolutePath },
-            backgroundEngineFactory = { _, _ -> mockk<LiteRtLmEngine>(relaxed = true) },
-            recoveredEntryIdsLoader = { emptyList() },
-            foregroundServiceIntentFactory = { Intent("dev.anchildress1.vestige.TEST_START") },
-            foregroundServiceStarter = {},
-            scope = this,
-        )
-        val out = ByteArrayOutputStream()
+    fun `zipAllEntriesTo streams markdown and complete user data snapshot into the zip`(@TempDir tempRoot: File) =
+        runTest {
+            val boxDir = newInMemoryObjectBoxDirectory("export")
+            val box = openInMemoryBoxStore(boxDir)
+            File(tempRoot, "entries").mkdirs()
+            File(tempRoot, "entries/one.md").writeText("first")
+            File(tempRoot, "entries/two.md").writeText("second")
+            try {
+                seedExportSnapshotFixture(box)
+                val container = AppContainer(
+                    applicationContext = mockk<Context>(relaxed = true) {
+                        every { filesDir } returns tempRoot
+                        every { getSharedPreferences("vestige.onboarding", Context.MODE_PRIVATE) } returns
+                            mockOnboardingPrefs(complete = true, persona = "HARDASS")
+                    },
+                    boxStoreFactory = { box },
+                    markdownStoreFactory = { MarkdownEntryStore(tempRoot) },
+                    modelPathLoader = { File(tempRoot, "m").absolutePath },
+                    backgroundEngineFactory = { _, _ -> mockk<LiteRtLmEngine>(relaxed = true) },
+                    recoveredEntryIdsLoader = { emptyList() },
+                    foregroundServiceIntentFactory = { Intent("dev.anchildress1.vestige.TEST_START") },
+                    foregroundServiceStarter = {},
+                    scope = this,
+                )
+                val out = ByteArrayOutputStream()
 
-        container.zipAllEntriesTo(out)
+                container.zipAllEntriesTo(out)
 
-        val names = mutableListOf<String>()
-        ZipInputStream(out.toByteArray().inputStream()).use { zip ->
-            generateSequence { zip.nextEntry }.forEach { names += it.name }
+                val zipEntries = unzipTextEntries(out)
+                assertEquals(
+                    listOf("entries/one.md", "entries/two.md", VestigeDataExporter.SNAPSHOT_ENTRY),
+                    zipEntries.keys.sorted(),
+                )
+                assertEquals("first", zipEntries["entries/one.md"])
+                assertEquals("second", zipEntries["entries/two.md"])
+                assertCompleteUserDataSnapshot(zipEntries.getValue(VestigeDataExporter.SNAPSHOT_ENTRY))
+            } finally {
+                box.close()
+            }
         }
-        assertEquals(listOf("one.md", "two.md"), names.sorted())
-    }
 
     @Test
-    fun `zipAllEntriesTo surfaces a mid-archive read failure and leaves prior entries intact`(
-        @TempDir tempRoot: File,
-    ) = runTest {
+    fun `zipAllEntriesTo propagates read failure without writing a partial archive`(@TempDir tempRoot: File) = runTest {
+        val boxDir = newInMemoryObjectBoxDirectory("export-fail")
+        val box = openInMemoryBoxStore(boxDir)
         val good = File(tempRoot, "good.md").apply { writeText("first") }
         // Never created — file.inputStream() throws FileNotFoundException after putNextEntry,
         // exercising the try/finally{closeEntry()} path.
@@ -1129,30 +1176,34 @@ class AppContainerTest {
         val markdownStore = mockk<MarkdownEntryStore>(relaxed = true) {
             every { listAll() } returns listOf(good, missing)
         }
-        val container = AppContainer(
-            applicationContext = mockk<Context>(relaxed = true) { every { filesDir } returns tempRoot },
-            boxStoreFactory = { mockk<BoxStore>(relaxed = true) },
-            markdownStoreFactory = { markdownStore },
-            modelPathLoader = { File(tempRoot, "m").absolutePath },
-            backgroundEngineFactory = { _, _ -> mockk<LiteRtLmEngine>(relaxed = true) },
-            recoveredEntryIdsLoader = { emptyList() },
-            foregroundServiceIntentFactory = { Intent("dev.anchildress1.vestige.TEST_START") },
-            foregroundServiceStarter = {},
-            scope = this,
-        )
-        val out = ByteArrayOutputStream()
+        try {
+            val container = AppContainer(
+                applicationContext = mockk<Context>(relaxed = true) {
+                    every { filesDir } returns tempRoot
+                    every { getSharedPreferences("vestige.onboarding", Context.MODE_PRIVATE) } returns
+                        mockOnboardingPrefs()
+                },
+                boxStoreFactory = { box },
+                markdownStoreFactory = { markdownStore },
+                modelPathLoader = { File(tempRoot, "m").absolutePath },
+                backgroundEngineFactory = { _, _ -> mockk<LiteRtLmEngine>(relaxed = true) },
+                recoveredEntryIdsLoader = { emptyList() },
+                foregroundServiceIntentFactory = { Intent("dev.anchildress1.vestige.TEST_START") },
+                foregroundServiceStarter = {},
+                scope = this,
+            )
+            val out = ByteArrayOutputStream()
 
-        val raised = runCatching { container.zipAllEntriesTo(out) }
+            val raised = runCatching { container.zipAllEntriesTo(out) }
 
-        // The export is honest about failure — a failed entry read propagates, never swallowed.
-        assertTrue(raised.isFailure, "a mid-archive read failure must propagate, not be swallowed")
-        // closeEntry() ran in finally, so the archive stays parseable and the entry written
-        // before the failure survives instead of being orphaned by a dangling open entry.
-        val names = mutableListOf<String>()
-        ZipInputStream(out.toByteArray().inputStream()).use { zip ->
-            generateSequence { zip.nextEntry }.forEach { names += it.name }
+            // The export is honest about failure — a failed entry read propagates, never swallowed.
+            assertTrue(raised.isFailure, "a mid-archive read failure must propagate, not be swallowed")
+            // The archive is staged in full before any byte reaches the caller's target, so a
+            // mid-archive failure leaves no truncated zip the user could mistake for a backup.
+            assertEquals(0, out.size(), "a failed export must not write a partial archive to the target")
+        } finally {
+            box.close()
         }
-        assertTrue(names.contains("good.md"), "the entry completed before the failure must remain in the archive")
     }
 
     @Test
@@ -1638,7 +1689,7 @@ class AppContainerTest {
             modelPathLoader = { modelFile.absolutePath },
             backgroundEngineFactory = { _, _ -> mockk<LiteRtLmEngine>(relaxed = true) },
             mainModelArtifactStoreFactory = { _, _, _ -> artifactStore },
-            backgroundExtractionSaveFlowFactory = { _, _, _, _, _, _ -> saveFlow },
+            backgroundExtractionSaveFlowFactory = { _, _, _, _, _, _, _ -> saveFlow },
             recoveredEntryIdsLoader = { emptyList() },
             foregroundServiceIntentFactory = { Intent("dev.anchildress1.vestige.TEST_START") },
             foregroundServiceStarter = {},
@@ -1670,7 +1721,7 @@ class AppContainerTest {
             modelPathLoader = { modelFile.absolutePath },
             backgroundEngineFactory = { _, _ -> engine },
             mainModelArtifactStoreFactory = { _, _, _ -> artifactStore },
-            backgroundExtractionSaveFlowFactory = { _, _, _, _, _, _ -> saveFlow },
+            backgroundExtractionSaveFlowFactory = { _, _, _, _, _, _, _ -> saveFlow },
             recoveredEntryIdsLoader = { emptyList() },
             foregroundServiceIntentFactory = { Intent("dev.anchildress1.vestige.TEST_START") },
             foregroundServiceStarter = {},
@@ -1723,7 +1774,7 @@ class AppContainerTest {
                 modelPathLoader = { modelFile.absolutePath },
                 backgroundEngineFactory = { _, _ -> mockk<LiteRtLmEngine>(relaxed = true) },
                 mainModelArtifactStoreFactory = { _, _, _ -> artifactStore },
-                backgroundExtractionSaveFlowFactory = { _, _, _, _, _, _ -> saveFlow },
+                backgroundExtractionSaveFlowFactory = { _, _, _, _, _, _, _ -> saveFlow },
                 recoveredEntryIdsLoader = { emptyList() },
                 foregroundServiceIntentFactory = { Intent("dev.anchildress1.vestige.TEST_START") },
                 foregroundServiceStarter = {},
@@ -1760,7 +1811,7 @@ class AppContainerTest {
                 modelPathLoader = { modelFile.absolutePath },
                 backgroundEngineFactory = { _, _ -> engine },
                 mainModelArtifactStoreFactory = { _, _, _ -> artifactStore },
-                backgroundExtractionSaveFlowFactory = { _, _, _, _, _, _ -> saveFlow },
+                backgroundExtractionSaveFlowFactory = { _, _, _, _, _, _, _ -> saveFlow },
                 recoveredEntryIdsLoader = { emptyList() },
                 foregroundServiceIntentFactory = { Intent("dev.anchildress1.vestige.TEST_START") },
                 foregroundServiceStarter = {},
@@ -1801,7 +1852,7 @@ class AppContainerTest {
             modelPathLoader = { modelFile.absolutePath },
             backgroundEngineFactory = { _, _ -> engine },
             mainModelArtifactStoreFactory = { _, _, _ -> artifactStore },
-            backgroundExtractionSaveFlowFactory = { _, _, _, _, _, _ -> saveFlow },
+            backgroundExtractionSaveFlowFactory = { _, _, _, _, _, _, _ -> saveFlow },
             recoveredEntryIdsLoader = { emptyList() },
             foregroundServiceIntentFactory = { Intent("dev.anchildress1.vestige.TEST_START") },
             foregroundServiceStarter = {},
@@ -1906,5 +1957,82 @@ class AppContainerTest {
         )
         boxStore.boxFor(PatternEntity::class.java).put(entity)
         return patternId
+    }
+
+    private fun seedExportSnapshotFixture(boxStore: BoxStore) {
+        val tag = TagEntity(name = "invoice", entryCount = 1)
+        boxStore.boxFor(TagEntity::class.java).put(tag)
+        val entry = EntryEntity(
+            markdownFilename = "one.md",
+            entryText = "Invoice again.",
+            followUpText = "You said invoice again.",
+            persona = dev.anchildress1.vestige.model.Persona.HARDASS,
+            timestampEpochMs = 123L,
+            statedCommitmentJson = """{"topic_or_person":"invoice"}""",
+            extractionStatus = ExtractionStatus.COMPLETED,
+            durationMs = 456L,
+            vector = FloatArray(EntryEntity.EMBEDDING_DIMENSIONS.toInt()) { 0.25f },
+            vectorSchemaVersion = EntryEntity.CURRENT_VECTOR_SCHEMA_VERSION,
+        )
+        boxStore.boxFor(EntryEntity::class.java).put(entry)
+        entry.tags.add(tag)
+        boxStore.boxFor(EntryEntity::class.java).put(entry)
+        val pattern = PatternEntity(
+            patternId = "pattern-1",
+            kind = PatternKind.COMMITMENT_RECURRENCE,
+            signatureJson = """{"topic_or_person":"invoice"}""",
+            title = "Invoice Email",
+            firstSeenTimestamp = 100L,
+            lastSeenTimestamp = 123L,
+            state = PatternState.ACTIVE,
+            latestCalloutText = "Invoice keeps showing up.",
+        )
+        boxStore.boxFor(PatternEntity::class.java).put(pattern)
+        pattern.supportingEntries.add(entry)
+        boxStore.boxFor(PatternEntity::class.java).put(pattern)
+        boxStore.boxFor(CalloutCooldownEntity::class.java).put(
+            CalloutCooldownEntity(
+                lastCalloutEntryId = entry.id,
+                lastCalloutTimestamp = 999L,
+                remainingSuppression = 2,
+            ),
+        )
+    }
+
+    private fun assertCompleteUserDataSnapshot(rawSnapshot: String) {
+        val snapshot = JSONObject(rawSnapshot)
+        assertEquals("vestige.full-export", snapshot.getString("format"))
+        assertEquals(true, snapshot.getJSONObject("settings").getBoolean("onboarding_complete"))
+        assertEquals("HARDASS", snapshot.getJSONObject("settings").getString("default_persona"))
+        val entryJson = snapshot.getJSONArray("entries").getJSONObject(0)
+        assertEquals("one.md", entryJson.getString("markdown_filename"))
+        assertEquals("one", entryJson.getString("entry_id"))
+        assertEquals("Invoice again.", entryJson.getString("entry_text"))
+        assertEquals("HARDASS", entryJson.getString("persona"))
+        assertEquals(EntryEntity.EMBEDDING_DIMENSIONS.toInt(), entryJson.getJSONArray("vector").length())
+        assertEquals("invoice", entryJson.getJSONArray("tags").getString(0))
+        val patternJson = snapshot.getJSONArray("patterns").getJSONObject(0)
+        assertEquals("commitment_recurrence", patternJson.getString("kind"))
+        assertEquals("one", patternJson.getJSONArray("supporting_entry_ids").getString(0))
+        assertEquals("one.md", patternJson.getJSONArray("supporting_entry_markdown_filenames").getString(0))
+        assertEquals("invoice", snapshot.getJSONArray("tags").getJSONObject(0).getString("name"))
+        assertEquals(2, snapshot.getJSONArray("callout_cooldowns").getJSONObject(0).getInt("remaining_suppression"))
+    }
+
+    private fun mockOnboardingPrefs(complete: Boolean = false, persona: String? = null): SharedPreferences = mockk {
+        every { getBoolean("complete", false) } returns complete
+        every { getString("default_persona", null) } returns persona
+        every { getString("current_step", null) } returns null
+    }
+
+    private fun unzipTextEntries(out: ByteArrayOutputStream): Map<String, String> {
+        val entries = linkedMapOf<String, String>()
+        ZipInputStream(out.toByteArray().inputStream()).use { zip ->
+            while (true) {
+                val entry = zip.nextEntry ?: break
+                entries[entry.name] = zip.readBytes().toString(Charsets.UTF_8)
+            }
+        }
+        return entries
     }
 }

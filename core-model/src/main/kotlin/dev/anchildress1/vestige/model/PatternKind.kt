@@ -7,6 +7,7 @@ enum class PatternKind(val serial: String) {
     TIME_OF_DAY_CLUSTER("time_of_day_cluster"),
     COMMITMENT_RECURRENCE("commitment_recurrence"),
     VOCAB_FREQUENCY("vocab_frequency"),
+    TEMPORAL_RELATIVE("temporal_relative"),
     ;
 
     companion object {

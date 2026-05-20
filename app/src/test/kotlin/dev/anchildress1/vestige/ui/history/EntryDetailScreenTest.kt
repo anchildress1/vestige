@@ -1,17 +1,26 @@
 package dev.anchildress1.vestige.ui.history
 
+import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertHasClickAction
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import dev.anchildress1.vestige.model.ConfidenceVerdict
+import dev.anchildress1.vestige.model.EntryLensReceipt
 import dev.anchildress1.vestige.model.ExtractionStatus
+import dev.anchildress1.vestige.model.Lens
 import dev.anchildress1.vestige.model.Persona
 import dev.anchildress1.vestige.model.ResolvedExtraction
+import dev.anchildress1.vestige.model.ResolvedField
 import dev.anchildress1.vestige.storage.EntryEntity
 import dev.anchildress1.vestige.storage.EntryStore
 import dev.anchildress1.vestige.storage.MarkdownEntryStore
@@ -73,10 +82,11 @@ class EntryDetailScreenTest {
     }
 
     @Test
-    fun `time hero and transcription are displayed`() {
+    fun `date hero and transcription are displayed`() {
         val id = createCompleted("standup was brutal today")
         setDetail(id)
         composeRule.onNodeWithTag("entry_time").assertIsDisplayed()
+        composeRule.onNodeWithText("7:21 AM").assertIsDisplayed()
         // Transcript is the very-bottom block now — it exists in the scroll, below the fold.
         composeRule.onNodeWithTag("entry_transcription").assertExists()
         composeRule.onNodeWithText("standup was brutal today").assertExists()
@@ -105,16 +115,100 @@ class EntryDetailScreenTest {
     }
 
     @Test
-    fun `resolved view shows the three-lens read and field grid (seed)`() {
-        val id = createCompleted("battery got yanked")
+    fun `resolved view shows persisted three-lens receipts and field grid`() {
+        val id = entryStore.createPendingEntry("battery got yanked", FIXTURE_INSTANT)
+        entryStore.completeEntry(
+            id,
+            ResolvedExtraction(
+                mapOf(
+                    "tags" to ResolvedField(listOf("meeting", "battery-yanked"), ConfidenceVerdict.CANONICAL),
+                    "energy_descriptor" to ResolvedField(
+                        "crashed",
+                        ConfidenceVerdict.CANONICAL_WITH_CONFLICT,
+                    ),
+                ),
+            ),
+            null,
+            lensReceipts = listOf(
+                EntryLensReceipt(
+                    lens = Lens.LITERAL,
+                    extracted = true,
+                    fields = mapOf("energy_descriptor" to "battery yanked"),
+                ),
+                EntryLensReceipt(
+                    lens = Lens.INFERENTIAL,
+                    extracted = true,
+                    fields = mapOf("energy_descriptor" to "post-meeting energy crash"),
+                ),
+                EntryLensReceipt(
+                    lens = Lens.SKEPTICAL,
+                    extracted = true,
+                    fields = mapOf("energy_descriptor" to "not tired vs yanked"),
+                    flags = listOf("vocabulary-contradiction:not tired:battery yanked"),
+                ),
+            ),
+        )
         setDetail(id)
         composeRule.onNodeWithTag("entry_three_lens").assertIsDisplayed()
         composeRule.onNodeWithTag("entry_field_grid").assertIsDisplayed()
-        composeRule.onNodeWithText(EntryDetailSeed.THREE_LENS_EYEBROW).assertIsDisplayed()
+        composeRule.onNodeWithText(EntryDetailCopy.THREE_LENS_EYEBROW).assertIsDisplayed()
         composeRule.onNodeWithText("battery yanked").assertIsDisplayed()
         composeRule.onNodeWithText("crashed").assertIsDisplayed()
+        composeRule.onNodeWithText(EntryDetailCopy.THREE_LENS_STATUS_CONFLICT).assertIsDisplayed()
         // The extracting/skeleton branch is not the resolved view.
         composeRule.onAllNodesWithTag("entry_extracting").assertCountEquals(0)
+    }
+
+    @Test
+    fun `observations block renders persisted observation text evidence and fields`() {
+        val id = entryStore.createPendingEntry("said fine twice", FIXTURE_INSTANT)
+        entryStore.completeEntry(
+            id,
+            ResolvedExtraction(emptyMap()),
+            null,
+            observations = listOf(
+                dev.anchildress1.vestige.model.EntryObservation(
+                    text = "You used fine twice.",
+                    evidence = dev.anchildress1.vestige.model.ObservationEvidence.VOCABULARY_CONTRADICTION,
+                    fields = listOf("vocabulary_contradictions", "tags"),
+                ),
+            ),
+            lensReceipts = listOf(
+                EntryLensReceipt(
+                    lens = Lens.LITERAL,
+                    extracted = true,
+                    fields = mapOf("tags" to listOf("fine")),
+                ),
+            ),
+        )
+
+        setDetail(id)
+
+        composeRule.onNodeWithTag("entry_observations").assertExists()
+        composeRule.onNodeWithText("You used fine twice.").assertExists()
+        composeRule.onNodeWithText("VOCABULARY CONTRADICTION · vocabulary_contradictions, tags").assertExists()
+    }
+
+    @Test
+    fun `observations block is an announced status band with no click action (a11y)`() {
+        val id = entryStore.createPendingEntry("fine was said twice", FIXTURE_INSTANT)
+        entryStore.completeEntry(
+            id,
+            ResolvedExtraction(emptyMap()),
+            null,
+            observations = listOf(
+                dev.anchildress1.vestige.model.EntryObservation(
+                    text = "You used fine twice.",
+                    evidence = dev.anchildress1.vestige.model.ObservationEvidence.VOCABULARY_CONTRADICTION,
+                    fields = emptyList(),
+                ),
+            ),
+            lensReceipts = emptyList(),
+        )
+        setDetail(id)
+        val band = composeRule.onNodeWithTag("entry_observations")
+        band.assert(SemanticsMatcher.keyIsDefined(SemanticsProperties.LiveRegion))
+        band.assert(SemanticsMatcher.keyNotDefined(SemanticsActions.OnClick))
     }
 
     @Test
@@ -124,6 +218,27 @@ class EntryDetailScreenTest {
         composeRule.onNodeWithTag("entry_extracting").assertExists()
         composeRule.onAllNodesWithTag("entry_three_lens").assertCountEquals(0)
         composeRule.onAllNodesWithTag("entry_field_grid").assertCountEquals(0)
+    }
+
+    @Test
+    fun `completed entry with no lens receipts hides the three-lens static shell`() {
+        val id = createCompleted("debug fixture without receipts")
+        setDetail(id)
+        composeRule.onAllNodesWithTag("entry_three_lens").assertCountEquals(0)
+        composeRule.onAllNodesWithTag("entry_field_grid").assertCountEquals(0)
+        composeRule.onAllNodesWithTag("entry_extracting").assertCountEquals(0)
+        composeRule.onNodeWithText("debug fixture without receipts").assertExists()
+    }
+
+    @Test
+    fun `fresh detail never renders known demo fixture phrases`() {
+        val id = createCompleted("just recorded this now")
+        setDetail(id)
+        composeRule.onAllNodesWithText("Tuesday Meetings", substring = true).assertCountEquals(0)
+        composeRule.onAllNodesWithText(
+            "Fourth entry mentions Tuesday meetings. State before: cruising. After: crashed.",
+            substring = true,
+        ).assertCountEquals(0)
     }
 
     @Test

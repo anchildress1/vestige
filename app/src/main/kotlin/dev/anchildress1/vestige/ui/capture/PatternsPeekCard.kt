@@ -9,7 +9,9 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import dev.anchildress1.vestige.ui.components.EyebrowE
@@ -32,7 +34,10 @@ fun PatternsPeekCard(peek: CapturePatternsPeek, modifier: Modifier = Modifier) {
             .fillMaxWidth()
             .background(colors.s1)
             .border(width = 1.dp, color = colors.hair)
-            .semantics(mergeDescendants = true) { contentDescription = "$eyebrow. $teaser" }
+            .semantics(mergeDescendants = true) {
+                liveRegion = LiveRegionMode.Polite
+                contentDescription = "$eyebrow. $teaser"
+            }
             .padding(horizontal = 14.dp, vertical = 12.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {

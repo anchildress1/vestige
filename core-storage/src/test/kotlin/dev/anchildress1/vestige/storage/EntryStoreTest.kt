@@ -439,6 +439,49 @@ class EntryStoreTest {
     }
 
     @Test
+    fun `createPendingEntry suffix loop produces -3 -10 on deeper collisions`() {
+        val stem = "2026-05-15T07-21-24Z--standup-ran-long-fine-then-compl"
+        // Seed 9 stored-filename collisions: base, -2, -3, …, -9. The 10th createPendingEntry
+        // call must produce `-10.md`.
+        boxStore.boxFor<EntryEntity>().put(
+            EntryEntity(
+                markdownFilename = "$stem.md",
+                entryText = SAMPLE_TEXT,
+                timestampEpochMs = SAMPLE_INSTANT.toEpochMilli(),
+                extractionStatus = ExtractionStatus.COMPLETED,
+            ),
+        )
+        (2..9).forEach { idx ->
+            boxStore.boxFor<EntryEntity>().put(
+                EntryEntity(
+                    markdownFilename = "$stem-$idx.md",
+                    entryText = SAMPLE_TEXT,
+                    timestampEpochMs = SAMPLE_INSTANT.toEpochMilli(),
+                    extractionStatus = ExtractionStatus.COMPLETED,
+                ),
+            )
+        }
+
+        val id = entryStore.createPendingEntry(SAMPLE_TEXT, SAMPLE_INSTANT)
+
+        assertEquals("$stem-10.md", boxStore.boxFor<EntryEntity>().get(id).markdownFilename)
+    }
+
+    @Test
+    fun `listCompletedMissingLensReceipts excludes rows with non-empty receipts even at high limit`() {
+        val missing = entryStore.createPendingEntry("missing", SAMPLE_INSTANT)
+        val complete = entryStore.createPendingEntry("complete", SAMPLE_INSTANT.plusSeconds(60))
+        entryStore.completeEntry(missing, emptyResolved, templateLabel = null)
+        entryStore.completeEntry(complete, emptyResolved, templateLabel = null, lensReceipts = listOf(sampleReceipt()))
+
+        // High limit proves the filter, not the limit, excluded the receipted row.
+        val rows = entryStore.listCompletedMissingLensReceipts(limit = 100)
+
+        assertEquals(1, rows.size)
+        assertEquals("missing", rows.single().entryText)
+    }
+
+    @Test
     fun `createPendingEntry appends suffix when blank legacy row derives same export filename`() {
         boxStore.boxFor<EntryEntity>().put(
             EntryEntity(

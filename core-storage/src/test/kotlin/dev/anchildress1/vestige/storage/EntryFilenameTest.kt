@@ -3,8 +3,6 @@ package dev.anchildress1.vestige.storage
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
-import org.junit.jupiter.api.io.TempDir
-import java.io.File
 import java.time.Instant
 
 class EntryFilenameTest {
@@ -54,18 +52,4 @@ class EntryFilenameTest {
         assertEquals("2026-05-09T14-32-15Z--quick-capture-standup.md", filename)
     }
 
-    @Test
-    fun `resolveUnique returns input when no file exists`(@TempDir dir: File) {
-        val name = "2026-05-09T14-32-15Z--quick.md"
-        assertEquals(name, EntryFilename.resolveUnique(dir, name))
-    }
-
-    @Test
-    fun `resolveUnique appends -2 -3 on collision`(@TempDir dir: File) {
-        val name = "2026-05-09T14-32-15Z--quick.md"
-        File(dir, name).writeText("")
-        assertEquals("2026-05-09T14-32-15Z--quick-2.md", EntryFilename.resolveUnique(dir, name))
-        File(dir, "2026-05-09T14-32-15Z--quick-2.md").writeText("")
-        assertEquals("2026-05-09T14-32-15Z--quick-3.md", EntryFilename.resolveUnique(dir, name))
-    }
 }

@@ -17,14 +17,8 @@ import java.io.IOException
 import java.time.Instant
 
 /**
- * ObjectBox owner for entry rows.
- *
- * Two-phase lifecycle:
- *   1. [createPendingEntry] — foreground call returned. Persist `entry_text` + saved persona +
- *      optional `follow_up` + timestamp + `extraction_status=PENDING`. Returns the assigned
- *      entry id so the caller can register an
- *      [dev.anchildress1.vestige.inference.ExtractionStatusListener][listener] against it.
- *   2. [completeEntry] / [failEntry] — background extraction terminal updates the row.
+ * ObjectBox owner for entry rows. Persists the two-phase pending → completed/failed lifecycle
+ * (ADR-001 §Q3).
  */
 // Two-phase lifecycle + observation append + read APIs land naturally above the default ceiling.
 @Suppress("TooManyFunctions")
@@ -241,26 +235,35 @@ class EntryStore(private val boxStore: BoxStore) {
 
     private fun uniqueMarkdownFilename(box: io.objectbox.Box<EntryEntity>, entry: EntryEntity): String {
         val baseName = EntryFilename.buildFilename(entry.timestampEpochMs, entry.entryText)
-        if (!markdownFilenameExists(box, baseName)) return baseName
+        // Hoist the blank-row scan once: blank rows derive their filename via
+        // `EntryMarkdownRenderer.filenameFor`, and the set is invariant across the suffix loop.
+        val blankRowDerivedNames = box.query()
+            .equal(EntryEntity_.markdownFilename, "", QueryBuilder.StringOrder.CASE_SENSITIVE)
+            .build()
+            .use { query -> query.find().mapTo(HashSet()) { EntryMarkdownRenderer.filenameFor(it) } }
+        if (!markdownFilenameExists(box, baseName, blankRowDerivedNames)) return baseName
         val stem = baseName.removeSuffix(".md")
         var suffix = 2
-        while (true) {
+        while (suffix <= MAX_FILENAME_SUFFIX) {
             val candidate = "$stem-$suffix.md"
-            if (!markdownFilenameExists(box, candidate)) return candidate
+            if (!markdownFilenameExists(box, candidate, blankRowDerivedNames)) return candidate
             suffix++
         }
+        throw EntryPersistenceException(
+            "uniqueMarkdownFilename exhausted $MAX_FILENAME_SUFFIX suffixes for stem=$stem — refusing to loop",
+        )
     }
 
-    private fun markdownFilenameExists(box: io.objectbox.Box<EntryEntity>, filename: String): Boolean {
+    private fun markdownFilenameExists(
+        box: io.objectbox.Box<EntryEntity>,
+        filename: String,
+        blankRowDerivedNames: Set<String>,
+    ): Boolean {
         val storedMatch = box.query()
             .equal(EntryEntity_.markdownFilename, filename, QueryBuilder.StringOrder.CASE_SENSITIVE)
             .build()
             .use { it.count() > 0 }
-        if (storedMatch) return true
-        return box.query()
-            .equal(EntryEntity_.markdownFilename, "", QueryBuilder.StringOrder.CASE_SENSITIVE)
-            .build()
-            .use { query -> query.find().any { EntryMarkdownRenderer.filenameFor(it) == filename } }
+        return storedMatch || filename in blankRowDerivedNames
     }
 
     private fun applyResolved(entry: EntryEntity, resolved: ResolvedExtraction, templateLabel: TemplateLabel?) {
@@ -332,6 +335,7 @@ class EntryStore(private val boxStore: BoxStore) {
     }
 
     private companion object {
+        private const val MAX_FILENAME_SUFFIX = 1000
         private const val KEY_TAGS = "tags"
         private const val KEY_ENERGY = "energy_descriptor"
         private const val KEY_RECURRENCE = "recurrence_link"

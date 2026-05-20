@@ -12,18 +12,17 @@ import io.objectbox.annotation.VectorDistanceType
 import io.objectbox.relation.ToMany
 
 /**
- * Structured cache of one entry. Markdown is the source of truth — if this row is wiped the app
- * rebuilds from markdown.
+ * Structured entry row. ObjectBox is the app's internal source of truth.
  */
-@Suppress("LongParameterList") // Persistence shape mirrors the 12-field markdown frontmatter.
+@Suppress("LongParameterList") // Persistence shape mirrors the stored entry schema.
 @Entity
 class EntryEntity(
     @Id var id: Long = 0,
 
-    /** Primary, stable filename for the markdown source-of-truth file. */
+    /** Stable filename used when export renders this row as markdown. */
     @Index var markdownFilename: String = "",
 
-    /** Transcription or typed input. Mirrors the markdown body. */
+    /** Transcription or typed input. */
     var entryText: String = "",
 
     /** Foreground follow-up shown as the model turn in the saved single-turn transcript. */
@@ -33,7 +32,7 @@ class EntryEntity(
     @Convert(converter = PersonaConverter::class, dbType = String::class)
     var persona: Persona = Persona.WITNESS,
 
-    /** UTC epoch millis. Markdown frontmatter persists ISO-8601 seconds; this is the index form. */
+    /** UTC epoch millis. */
     var timestampEpochMs: Long = 0,
 
     @Convert(converter = TemplateLabelConverter::class, dbType = String::class)
@@ -86,8 +85,7 @@ class EntryEntity(
     /**
      * Schema version of [vector]. Bumped when the embedding *source* changes (not the model)
      * so previously-embedded rows are recognized as stale and re-backfilled. Operational
-     * field — absent from the markdown source-of-truth; a rebuild-from-markdown defaults it
-     * to 0 and the backfill sweep correctly re-runs.
+     * field; export includes it in the structured JSON snapshot, not entry markdown.
      */
     var vectorSchemaVersion: Int = 0,
 ) {

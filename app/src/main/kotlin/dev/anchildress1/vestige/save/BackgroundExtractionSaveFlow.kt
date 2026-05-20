@@ -113,6 +113,7 @@ class BackgroundExtractionSaveFlow(
         entryText: String,
         capturedAt: ZonedDateTime,
         persona: Persona = Persona.WITNESS,
+        timeoutMs: Long? = null,
     ): Job {
         val terminalRelay = DeferredTerminalRelay(lifecycleCallbacks.listenerFactory(entryId))
         terminalRelay.workerListener.onUpdate(ExtractionStatus.PENDING, 0, null)
@@ -121,7 +122,7 @@ class BackgroundExtractionSaveFlow(
             capturedAt = capturedAt,
             retrievedHistory = emptyList(),
             entryAttemptCount = 0,
-            timeoutMs = null,
+            timeoutMs = timeoutMs,
         )
         return scope.launch {
             runDetachedExtraction(entryId, entryText, capturedAt, request, terminalRelay, persona)

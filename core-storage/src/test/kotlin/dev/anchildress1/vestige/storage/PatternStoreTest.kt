@@ -39,7 +39,7 @@ class PatternStoreTest {
 
     @After
     fun tearDown() {
-        boxStore.close()
+        boxStore.closeAfterCleaningThreadResources()
         BoxStore.deleteAllFiles(dataDir)
     }
 
@@ -365,7 +365,7 @@ class PatternStoreTest {
     fun `state survives BoxStore close and reopen by name`() {
         val seeded = seed()
         store.transitionState(seeded.patternId, PatternState.SNOOZED, snoozedUntilMs = now.toEpochMilli() + 1_000)
-        boxStore.close()
+        boxStore.closeAfterCleaningThreadResources()
         // In-memory stores are keyed by their `memory:` URI — reopening with the same path
         // reattaches to the same registry. Disk durability lives in VestigeBoxStoreOpenTest.
         boxStore = openInMemoryBoxStore(dataDir)

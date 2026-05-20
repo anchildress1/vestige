@@ -32,7 +32,7 @@ class CalloutCooldownStoreTest {
 
     @After
     fun tearDown() {
-        boxStore.close()
+        boxStore.closeAfterCleaningThreadResources()
         BoxStore.deleteAllFiles(dataDir)
     }
 
@@ -177,7 +177,7 @@ class CalloutCooldownStoreTest {
         // pattern sees BLOCKED_BY_PENDING_RESERVATION for the rest of the install.
         store.tryReserveCallout(entryId = 42L, patternId = PATTERN_A)
         store.tryReserveCallout(entryId = 84L, patternId = PATTERN_B)
-        boxStore.close()
+        boxStore.closeAfterCleaningThreadResources()
         boxStore = openInMemoryBoxStore(dataDir)
         store = CalloutCooldownStore(boxStore)
         assertEquals(42L, store.snapshotFor(PATTERN_A).pendingCalloutEntryId)
@@ -217,7 +217,7 @@ class CalloutCooldownStoreTest {
     fun `state survives BoxStore close and reopen by name`() {
         store.recordFired(entryId = 9L, patternId = PATTERN_A, timestampMs = 1_000L)
         store.decrementAllActive()
-        boxStore.close()
+        boxStore.closeAfterCleaningThreadResources()
         // Reopening the same `memory:` URI reattaches to ObjectBox's in-process registry — that's
         // process-local idempotency, not on-disk durability. Disk persistence is covered by the
         // production wiring's open(Context) test.

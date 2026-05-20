@@ -18,7 +18,6 @@ import androidx.compose.ui.test.performClick
 import dev.anchildress1.vestige.model.Persona
 import dev.anchildress1.vestige.model.ResolvedExtraction
 import dev.anchildress1.vestige.storage.EntryStore
-import dev.anchildress1.vestige.storage.MarkdownEntryStore
 import dev.anchildress1.vestige.storage.closeAfterCleaningThreadResources
 import dev.anchildress1.vestige.testing.cleanupObjectBoxTempRoot
 import dev.anchildress1.vestige.testing.newInMemoryObjectBoxDirectory
@@ -59,10 +58,7 @@ class HistoryHostTest {
         tempRoot = newModuleTempRoot("vestige-history-host-")
         dataDir = newInMemoryObjectBoxDirectory("ob-history-host-")
         boxStore = openInMemoryBoxStore(dataDir)
-        entryStore = EntryStore(
-            boxStore,
-            MarkdownEntryStore(File(tempRoot, "md-${System.nanoTime()}").apply { mkdirs() }),
-        )
+        entryStore = EntryStore(boxStore)
     }
 
     @After

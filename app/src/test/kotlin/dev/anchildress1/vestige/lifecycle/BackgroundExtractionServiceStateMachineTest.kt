@@ -177,6 +177,34 @@ class BackgroundExtractionServiceStateMachineTest {
     }
 
     @Test
+    fun `start failure can reset PROMOTING without scheduling retry`() = runTest {
+        var promoteCount = 0
+        val machine = machine(this, foregroundStartRetryDelay = 1.seconds) { promoteCount += 1 }
+        machine.onInFlightCountChange(1)
+
+        machine.onForegroundStartFailed(retry = false)
+        machine.onInFlightCountChange(2)
+        advanceTimeBy(1_001L)
+
+        assertEquals(BackgroundExtractionLifecycleState.NORMAL, machine.state.value)
+        assertEquals(1, promoteCount)
+    }
+
+    @Test
+    fun `foreground start suppression clears when queue drains`() = runTest {
+        var promoteCount = 0
+        val machine = machine(this, foregroundStartRetryDelay = 1.seconds) { promoteCount += 1 }
+        machine.onInFlightCountChange(1)
+        machine.onForegroundStartFailed(retry = false)
+
+        machine.onInFlightCountChange(0)
+        machine.onInFlightCountChange(1)
+
+        assertEquals(BackgroundExtractionLifecycleState.PROMOTING, machine.state.value)
+        assertEquals(2, promoteCount)
+    }
+
+    @Test
     fun `onPromoteRequested fires on every PROMOTING transition including the DEMOTING bounce`() = runTest {
         var promoteCount = 0
         val machine = machine(this) { promoteCount += 1 }

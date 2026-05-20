@@ -66,6 +66,18 @@ internal object EntryFilename {
         }
     }
 
+    /** Returns [baseName] unchanged on no collision, otherwise appends `-2`, `-3`, … */
+    fun resolveUnique(baseName: String, existingNames: Set<String>): String {
+        if (baseName !in existingNames) return baseName
+        val stem = baseName.removeSuffix(".md")
+        var suffix = 2
+        while (true) {
+            val candidate = "$stem-$suffix.md"
+            if (candidate !in existingNames) return candidate
+            suffix++
+        }
+    }
+
     private fun formatIsoSecondUtc(timestampEpochMs: Long): String {
         val instant = Instant.ofEpochMilli(timestampEpochMs).truncatedTo(ChronoUnit.SECONDS)
         return DateTimeFormatter.ISO_INSTANT.format(instant).replace(':', '-')

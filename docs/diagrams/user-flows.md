@@ -33,12 +33,12 @@ flowchart TD
 ```mermaid
 flowchart TD
     accTitle: Voice capture flow
-    accDescr: Tap record to enter RECORDING. Discard during recording ends silently with no entry. Stop and file it triggers the foreground Gemma call returning transcription and follow-up, persists markdown then ObjectBox, then runs the background three-lens extraction, convergence, observations, and pattern detection.
+    accDescr: Tap record to enter RECORDING. Discard during recording ends silently with no entry. Stop and file it triggers the foreground Gemma call returning transcription and follow-up, persists an ObjectBox row, then runs the background three-lens extraction, convergence, observations, and pattern detection.
 
     IDLE(["IDLE"]) -- "tap Record" --> REC["RECORDING"]
     REC -- "DISCARD · NO SAVE<br/>(single tap, no confirm, silent)" --> IDLE
     REC -- "STOP · FILE IT" --> FG["Foreground Gemma call<br/>→ transcription + follow-up"]
-    FG --> PERSIST["EntryStore: markdown → ObjectBox<br/>(audio discarded now)"]
+    FG --> PERSIST["EntryStore: ObjectBox row<br/>(audio discarded now)"]
     PERSIST --> SHOW["show exchange<br/>(transcription dimmed · follow-up primary)"]
     PERSIST --> BG["background: 3 sequential lenses → resolver →<br/>entry_observations → pattern detection if threshold"]
     SHOW --> IDLE
@@ -95,7 +95,7 @@ and returns to first-run.
 ```mermaid
 flowchart TD
     accTitle: Settings sections and model lifecycle
-    accDescr: Settings has Persona, Data, Model, and About sections. Export writes a SAF zip of entry markdown plus a stored-data JSON snapshot as a copy. Delete all data requires typing DELETE then wipes ObjectBox, markdown, and onboarding prefs and returns to first run. The Model row opens Model Status where Re-download and Delete live; re-download replaces the file with entries untouched, a failed re-download falls back to Loading.
+    accDescr: Settings has Persona, Data, Model, and About sections. Export writes a SAF zip of generated entry markdown plus a stored-data JSON snapshot as a copy. Delete all data requires typing DELETE then wipes ObjectBox, legacy markdown sidecars, and onboarding prefs and returns to first run. The Model row opens Model Status where Re-download and Delete live; re-download replaces the file with entries untouched, a failed re-download falls back to Loading.
 
     SET["Settings"] --> PER["Persona<br/>(3 names)"]
     SET --> DATA["Data"]
@@ -103,7 +103,7 @@ flowchart TD
     SET --> ABT["About<br/>version · source · license"]
 
     DATA --> EXP["Export all entries<br/>SAF full-data zip (copy; failures surface)"]
-    DATA --> WIPE["Delete all data<br/>type DELETE → wipe ObjectBox + markdown + prefs → first-run"]
+    DATA --> WIPE["Delete all data<br/>type DELETE → wipe ObjectBox + legacy markdown + prefs → first-run"]
 
     MOD --> MS["Local Model Status screen"]
     MS --> RDL["Re-download<br/>~3.7 GB · replaces file · entries untouched"]

@@ -52,7 +52,7 @@ Foreground is fast (transcription + follow-up only, single-turn per ADR-005). Ba
 ```mermaid
 sequenceDiagram
     accTitle: Two-tier foreground and background inference sequence
-    accDescr: User stops recording. The foreground Gemma call returns transcription and follow-up. EntryStore persists markdown first then ObjectBox and marks extraction PENDING. The background pass runs three sequential lens calls, the resolver writes fields, entry observations are generated, then pattern detection runs if the threshold is met.
+    accDescr: User stops recording. The foreground Gemma call returns transcription and follow-up. EntryStore persists an ObjectBox row and marks extraction PENDING. The background pass runs three sequential lens calls, the resolver writes fields, entry observations are generated, then pattern detection runs if the threshold is met.
 
     actor U as User
     participant Cap as CaptureViewModel
@@ -66,7 +66,7 @@ sequenceDiagram
     U->>Cap: STOP · FILE IT
     Cap->>FG: audio/text + persona (single-turn)
     FG-->>Cap: { transcription, follow_up }
-    Cap->>ES: persist (markdown → ObjectBox), status = PENDING
+    Cap->>ES: persist ObjectBox row, status = PENDING
     Note over FG,Cap: audio bytes discarded now
     ES->>BG: schedule background extraction
     BG->>LM: lens 1 — Literal

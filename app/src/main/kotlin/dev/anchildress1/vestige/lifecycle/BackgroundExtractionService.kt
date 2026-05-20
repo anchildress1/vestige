@@ -56,9 +56,13 @@ class BackgroundExtractionService : LifecycleService() {
         try {
             startForegroundCompat()
         } catch (@Suppress("TooGenericExceptionCaught") error: Exception) {
-            Log.e(TAG, "startForeground rejected", error)
+            if (error.isForegroundServiceStartNotAllowed()) {
+                Log.w(TAG, "Foreground promotion denied while app is backgrounded")
+            } else {
+                Log.e(TAG, "startForeground rejected", error)
+            }
             if (initialState == BackgroundExtractionLifecycleState.PROMOTING) {
-                machine.onForegroundStartFailed()
+                machine.onForegroundStartFailed(retry = !error.isForegroundServiceStartNotAllowed())
             }
             shutdownHandled = true
             stopSelf(startId)

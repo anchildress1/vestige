@@ -19,7 +19,7 @@ import androidx.compose.ui.unit.dp
 import dev.anchildress1.vestige.model.Persona
 import dev.anchildress1.vestige.model.ResolvedExtraction
 import dev.anchildress1.vestige.storage.EntryStore
-import dev.anchildress1.vestige.storage.MarkdownEntryStore
+import dev.anchildress1.vestige.storage.closeAfterCleaningThreadResources
 import dev.anchildress1.vestige.testing.cleanupObjectBoxTempRoot
 import dev.anchildress1.vestige.testing.newInMemoryObjectBoxDirectory
 import dev.anchildress1.vestige.testing.newModuleTempRoot
@@ -61,16 +61,13 @@ class HistoryScreenTest {
         tempRoot = newModuleTempRoot("vestige-history-screen-")
         dataDir = newInMemoryObjectBoxDirectory("ob-history-screen-")
         boxStore = openInMemoryBoxStore(dataDir)
-        entryStore = EntryStore(
-            boxStore,
-            MarkdownEntryStore(File(tempRoot, "md-${System.nanoTime()}").apply { mkdirs() }),
-        )
+        entryStore = EntryStore(boxStore)
     }
 
     @After
     fun tearDown() {
         Dispatchers.resetMain()
-        boxStore.close()
+        boxStore.closeAfterCleaningThreadResources()
         cleanupObjectBoxTempRoot(tempRoot, dataDir)
     }
 

@@ -133,6 +133,15 @@ android {
             isReturnDefaultValues = true
         }
     }
+
+    sourceSets.getByName("test") {
+        kotlin.directories.add("src/integrationTest/kotlin")
+        resources.directories.add("src/integrationTest/resources")
+    }
+    sourceSets.getByName("testDebug") {
+        kotlin.directories.add("src/integrationTest/kotlin")
+        resources.directories.add("src/integrationTest/resources")
+    }
 }
 
 dependencies {
@@ -181,10 +190,9 @@ dependencies {
     androidTestImplementation(libs.compose.ui.test.junit4)
 }
 
-// ObjectBox loads its JNI .so once per JVM via System.load; a second test class in the same
-// JVM can't re-System.load it, leaving NativeLibraryLoader in a poisoned state. The normal unit
-// task excludes these and a split forkEvery=1 task runs them. Kover runs them inline with
-// forkEvery=1 so coverage stays above the gate.
+// ObjectBox-backed tests are integration tests: real generated MyObjectBox, real BoxStore,
+// isolated in-memory stores. Keep them out of the unit task so Kover/Gradle do not make
+// every local unit run pay the JNI tax.
 val objectBoxBackedAppTests = setOf(
     "dev.anchildress1.vestige.AppContainerTest",
     "dev.anchildress1.vestige.VestigeDataExporterTest",
@@ -203,37 +211,32 @@ val objectBoxBackedAppTests = setOf(
     "dev.anchildress1.vestige.ui.patterns.PatternsListScreenTest",
     "dev.anchildress1.vestige.ui.patterns.PatternsListViewModelTest",
 )
-val isKoverTaskRequested = gradle.startParameter.taskNames.any {
-    it.contains("kover", ignoreCase = true)
-}
-
 tasks.withType<Test>().configureEach {
     useJUnitPlatform()
 
     if (name == "testDebugUnitTest") {
-        if (isKoverTaskRequested) {
-            forkEvery = 1
-        } else {
-            objectBoxBackedAppTests.forEach { filter.excludeTestsMatching(it) }
-            finalizedBy("testDebugObjectBoxUnitTest")
-        }
+        objectBoxBackedAppTests.forEach { filter.excludeTestsMatching(it) }
     }
 }
 
-afterEvaluate {
-    if (isKoverTaskRequested) return@afterEvaluate
+tasks.register<Test>("testDebugIntegrationTest") {
+    description = "Runs app integration tests backed by real in-memory ObjectBox stores."
+    group = "verification"
+
     val debugUnitTest = tasks.named<Test>("testDebugUnitTest")
+    val debugTask = debugUnitTest.get()
+    testClassesDirs = debugTask.testClassesDirs
+    classpath = debugTask.classpath
+    forkEvery = 1
+    shouldRunAfter(debugUnitTest)
 
-    tasks.register<Test>("testDebugObjectBoxUnitTest") {
-        description = "Runs app JVM tests that need per-class ObjectBox native isolation."
-        group = "verification"
+    objectBoxBackedAppTests.forEach { filter.includeTestsMatching(it) }
+}
 
-        val debugTask = debugUnitTest.get()
-        testClassesDirs = debugTask.testClassesDirs
-        classpath = debugTask.classpath
-        forkEvery = 1
-        shouldRunAfter(debugUnitTest)
-
-        objectBoxBackedAppTests.forEach { filter.includeTestsMatching(it) }
+kover {
+    currentProject {
+        instrumentation {
+            disabledForTestTasks.add("testDebugIntegrationTest")
+        }
     }
 }

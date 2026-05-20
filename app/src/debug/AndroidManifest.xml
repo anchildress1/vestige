@@ -4,12 +4,15 @@
   Registers DebugSeedReceiver so `make seed-entries` (adb am broadcast -n <component>) can
   preload fixture entries and patterns for dev iteration.
 -->
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
 
     <application>
+        <!-- Exported only in debug so adb shell can trigger deterministic reinstall fixtures. -->
         <receiver
             android:name=".debug.DebugSeedReceiver"
-            android:exported="false" />
+            android:exported="true"
+            tools:ignore="ExportedReceiver" />
     </application>
 
 </manifest>

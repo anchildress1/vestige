@@ -7,6 +7,7 @@ package dev.anchildress1.vestige
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
+import android.os.StrictMode
 import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -70,7 +71,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         val container = (application as VestigeApplication).appContainer
-        val onboardingPrefs = OnboardingPrefs.from(this)
+        val onboardingPrefs = allowLaunchPreferenceRead { OnboardingPrefs.from(this) }
         val clock = Clock.systemDefaultZone()
         val zoneId: ZoneId = ZoneId.systemDefault()
         pendingLaunchTarget = consumePostOnboardingLaunchTarget(intent, container.entryStore, nextLaunchToken++)
@@ -93,6 +94,15 @@ class MainActivity : ComponentActivity() {
         setIntent(intent)
         val container = (application as VestigeApplication).appContainer
         pendingLaunchTarget = consumePostOnboardingLaunchTarget(intent, container.entryStore, nextLaunchToken++)
+    }
+}
+
+private inline fun <T> allowLaunchPreferenceRead(block: () -> T): T {
+    val previousPolicy = StrictMode.allowThreadDiskReads()
+    return try {
+        block()
+    } finally {
+        StrictMode.setThreadPolicy(previousPolicy)
     }
 }
 

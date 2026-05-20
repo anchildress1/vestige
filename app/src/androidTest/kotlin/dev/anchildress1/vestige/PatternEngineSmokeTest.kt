@@ -11,7 +11,6 @@ import dev.anchildress1.vestige.inference.BackgroundExtractionWorker
 import dev.anchildress1.vestige.inference.DefaultConvergenceResolver
 import dev.anchildress1.vestige.inference.LiteRtLmEngine
 import dev.anchildress1.vestige.storage.EntryStore
-import dev.anchildress1.vestige.storage.MarkdownEntryStore
 import dev.anchildress1.vestige.storage.PatternDetector
 import dev.anchildress1.vestige.storage.VestigeBoxStore
 import io.objectbox.BoxStore
@@ -66,9 +65,8 @@ class PatternEngineSmokeTest {
 
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         val boxStoreDir = File(context.filesDir, "objectbox-smoke-${System.nanoTime()}")
-        val markdownDir = File(context.filesDir, "markdown-smoke-${System.nanoTime()}")
         val boxStore: BoxStore = VestigeBoxStore.openAt(boxStoreDir)
-        val entryStore = EntryStore(boxStore, MarkdownEntryStore(markdownDir))
+        val entryStore = EntryStore(boxStore)
         val backend = InferenceBackendArg.resolve(args)
         android.util.Log.i(TAG, "Phase 3 smoke using backend=$backend, ${corpus.size} entries")
 
@@ -100,7 +98,6 @@ class PatternEngineSmokeTest {
         } finally {
             boxStore.close()
             BoxStore.deleteAllFiles(boxStoreDir)
-            markdownDir.deleteRecursively()
         }
     }
 

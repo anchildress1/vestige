@@ -39,7 +39,7 @@ Adopt the locked stack from `concept-locked.md` and `runtime-research.md` verbat
 | LLM runtime | LiteRT-LM SDK (`litertlm-android`) — single runtime per `AGENTS.md` guardrail 13 | `runtime-research.md` |
 | Model artifact | `litert-community/gemma-4-E4B-it-litert-lm` | `runtime-research.md` |
 | Embeddings | EmbeddingGemma 300M via LiteRT — **STT-E passed 2026-05-12, ships in v1.** See addendum below. | `concept-locked.md`, `PRD.md` §P0 |
-| Storage | ObjectBox (structured) + markdown source-of-truth + HNSW vector index on `EntryEntity.vector`. | `concept-locked.md` |
+| Storage | ObjectBox (structured source of truth per ADR-017) + generated markdown export + HNSW vector index on `EntryEntity.vector`. | `concept-locked.md` |
 | Audio | `AudioRecord` → Gemma 4 native audio modality (no third-party STT) | `concept-locked.md` |
 | Distribution | APK via GitHub Releases. No Play Store for v1. | `PRD.md` §Submission |
 

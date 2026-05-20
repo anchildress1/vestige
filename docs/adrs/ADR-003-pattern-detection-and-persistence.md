@@ -86,7 +86,7 @@ val pattern_id = sha256(Json.encodeToString(signature)) // hex string
 **Why content-addressable instead of an autoincrement primary key.**
 - ADR-002's `recurrence_link` resolver predicate requires deterministic IDs across re-eval and across the cold-start sweep. A random UUID makes "this entry matches the same pattern as before" untestable.
 - Content addressing means re-running the pattern detection over the same data produces the same IDs. Convergence resolver (ADR-002) and pattern detection share this invariant.
-- Markdown source-of-truth (`architecture-brief.md` §"Markdown Entry Shape") stores `recurrence_link` as `pattern_id`. If we restored from markdown, the ObjectBox cache would rebuild with the same IDs.
+- ObjectBox stores `recurrence_link` as `pattern_id`; generated export markdown mirrors it for readability (ADR-017).
 
 ---
 

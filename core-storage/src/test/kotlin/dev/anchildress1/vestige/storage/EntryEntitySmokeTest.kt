@@ -39,7 +39,7 @@ class EntryEntitySmokeTest {
 
     @After
     fun tearDown() {
-        boxStore.close()
+        boxStore.closeAfterCleaningThreadResources()
         BoxStore.deleteAllFiles(dataDir)
     }
 

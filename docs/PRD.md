@@ -65,8 +65,8 @@ Edge cases:
 - **Per-entry observations:** every saved entry surfaces 1–2 behavioral or vocabulary observations from that entry alone, even before any cross-entry pattern exists. The product produces useful observable signal from entry one. Pattern-enhanced callouts remain gated at ≥10 entries + ≥3 supporting entries.
 
 **Memory:**
-- Markdown source-of-truth (one file per entry, exportable)
-- ObjectBox structured tag store + pattern store
+- ObjectBox source-of-truth for entries, tags, patterns, and vectors
+- Generated markdown export for readable backups
 - Hybrid retrieval (keyword + tags + recency) over candidate set
 - **Vector layer (EmbeddingGemma 300M + ObjectBox vector index) ships only if STT-E passes.** If STT-E fails, v1 ships keyword + tags + recency only; embeddings move to v1.5.
 - One basic history list of past entries
@@ -201,7 +201,7 @@ Sample data for STT-C, STT-D, STT-E lives in `sample-data-scenarios.md`.
 2. LiteRT-LM SDK integration, model loading, inference smoke test
 3. AudioRecord pipeline + 30s chunking (per ADR-001 Q4). **🛑 STT-A — audio input plumbing.** First test: can we feed any audio bytes to E4B via LiteRT-LM Android and get back coherent transcription? Existential. Time-box to one focused day; if it doesn't work, stop and replan.
 4. ObjectBox schema for entries, tags, patterns — including `extraction_status` / `attempt_count` / `last_error` operational fields per ADR-001 Q3
-5. Markdown source-of-truth read/write
+5. Generated markdown export renderer
 6. Persona prompt scaffold for Witness / Hardass / Editor as tone-only variants
 7. `ModelArtifactStore` interface + SHA-256 verification + retry policy (ADR-001 Q6, storage/load contract only — onboarding UX is Phase 4)
 8. `NetworkGate` abstraction with `OPEN`/`SEALED` states + StrictMode network detection in dev + dependency grep for telemetry (ADR-001 Q7)

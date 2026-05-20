@@ -4,7 +4,7 @@ import app.cash.turbine.test
 import dev.anchildress1.vestige.model.ExtractionStatus
 import dev.anchildress1.vestige.storage.EntryEntity
 import dev.anchildress1.vestige.storage.EntryStore
-import dev.anchildress1.vestige.storage.MarkdownEntryStore
+import dev.anchildress1.vestige.storage.closeAfterCleaningThreadResources
 import dev.anchildress1.vestige.testing.cleanupObjectBoxTempRoot
 import dev.anchildress1.vestige.testing.newInMemoryObjectBoxDirectory
 import dev.anchildress1.vestige.testing.newModuleTempRoot
@@ -45,16 +45,13 @@ class HistoryViewModelTest {
         tempRoot = newModuleTempRoot("vestige-history-viewmodel-")
         dataDir = newInMemoryObjectBoxDirectory("ob-history-vm-")
         boxStore = openInMemoryBoxStore(dataDir)
-        entryStore = EntryStore(
-            boxStore,
-            MarkdownEntryStore(File(tempRoot, "md-${System.nanoTime()}").apply { mkdirs() }),
-        )
+        entryStore = EntryStore(boxStore)
     }
 
     @After
     fun tearDown() {
         Dispatchers.resetMain()
-        boxStore.close()
+        boxStore.closeAfterCleaningThreadResources()
         cleanupObjectBoxTempRoot(tempRoot, dataDir)
     }
 
@@ -184,10 +181,7 @@ class HistoryViewModelTest {
     fun `err — store failure on load produces empty non-loading state`() = runTest(testDispatcher) {
         val errDataDir = newInMemoryObjectBoxDirectory("ob-history-vm-err-")
         val errBoxStore = openInMemoryBoxStore(errDataDir)
-        val errEntryStore = EntryStore(
-            errBoxStore,
-            MarkdownEntryStore(File(tempRoot, "md-err-${System.nanoTime()}").apply { mkdirs() }),
-        )
+        val errEntryStore = EntryStore(errBoxStore)
         errBoxStore.close()
 
         val vm = HistoryViewModel(errEntryStore, zoneId = java.time.ZoneOffset.UTC, ioDispatcher = testDispatcher)

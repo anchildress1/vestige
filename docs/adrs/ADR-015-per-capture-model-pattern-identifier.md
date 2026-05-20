@@ -43,7 +43,7 @@ The user waits only for step 1. Steps 2, 3, 4 are background; steps 3 and 4 are 
 | Trigger | Type | What runs | User-blocking? | Failure handling |
 |---|---|---|---|---|
 | User taps `I'm done.` | Foreground | `{transcription, follow_up}` call | Yes | Surface error in capture; entry not persisted unless transcription returns |
-| Foreground returns | Persist + enqueue | `EntryStore.createPendingEntry` → schedule background lens worker | No | Persist before scheduling; markdown is source of truth |
+| Foreground returns | Persist + enqueue | `EntryStore.createPendingEntry` → schedule background lens worker | No | Persist before scheduling; ObjectBox is source of truth per ADR-017 |
 | Background lens N completes (×3) | Background analytics | Per-lens parse + `LensResult` accumulation | No | Per-lens parse-fail → no-opinion; ADR-002 contract intact |
 | All 3 lenses complete | Background analytics | `ConvergenceResolver` writes canonical / candidate / ambiguous fields | No | ADR-001 §Q3 retry recovery |
 | `completeEntry` returns | **Background pattern identifier** | Build history slice (see §History Slice Contract); one Gemma call; parse identifier output; upsert patterns | No | On parse-fail / timeout / model unavailable → fall through to deterministic detector on the same slice |

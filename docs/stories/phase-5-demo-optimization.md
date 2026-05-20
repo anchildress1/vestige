@@ -31,7 +31,7 @@ Lock the demo. Curate the sample data set the recording will use, write the demo
 **As** the demo recorder, **I need** a curated sample data set on the reference device that produces the demo's pattern callouts and persona moments reliably, **so that** dry runs and the final recording show the magic moments instead of random output.
 
 **Done when:**
-- [ ] Sample entries are seeded into the reference device's ObjectBox + markdown source-of-truth via a dev-only data loader (not via the onboarding flow — the user is presumed to have already onboarded).
+- [ ] Sample entries are seeded into the reference device's ObjectBox via a dev-only data loader (not via the onboarding flow — the user is presumed to have already onboarded).
 - [ ] The seeded entries collectively trigger at least one polished cross-entry pattern (e.g., the canonical "Tuesday meetings → Aftermath, 4 of 12 entries" example from `design-guidelines.md` §"Pattern card / Example").
 - [ ] If STT-E passed and embeddings shipped, the seeded data includes vocabulary-drift entries so the embedding advantage is observable in the technical walkthrough.
 - [ ] Sample entries respect the brand: behavioral vocabulary, not feelings vocabulary; the model's responses on these entries land Witness/Hardass/Editor tones cleanly.

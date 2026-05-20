@@ -13,31 +13,22 @@ import io.objectbox.kotlin.boxFor
 import io.objectbox.query.QueryBuilder
 import org.json.JSONArray
 import org.json.JSONObject
-import java.io.File
 import java.io.IOException
 import java.time.Instant
 
 /**
- * Joint owner of the markdown source-of-truth and the ObjectBox `EntryEntity` row.
+ * ObjectBox owner for entry rows.
  *
- * Two-phase lifecycle per ADR-001 §Q3 and architecture-brief §"Sync direction":
+ * Two-phase lifecycle:
  *   1. [createPendingEntry] — foreground call returned. Persist `entry_text` + saved persona +
  *      optional `follow_up` + timestamp + `extraction_status=PENDING`. Returns the assigned
  *      entry id so the caller can register an
  *      [dev.anchildress1.vestige.inference.ExtractionStatusListener][listener] against it.
- *   2. [completeEntry] / [failEntry] — background extraction terminal. Updates the row + rewrites
- *      the markdown front-matter atomically.
- *
- * **Transactional contract.** Markdown is the source of truth, but the box write is staged first
- * inside `boxStore.callInTx` / `runInTx` so the row can mint its auto-id; the markdown write
- * happens next; on markdown failure the throw escapes the transaction and ObjectBox rolls back
- * the staged row before it commits. From a durable-state perspective the contract that holds is
- * "no markdown ⇒ no ObjectBox row" — the order of the in-flight operations is box-first only
- * within the un-committed transaction window.
+ *   2. [completeEntry] / [failEntry] — background extraction terminal updates the row.
  */
 // Two-phase lifecycle + observation append + read APIs land naturally above the default ceiling.
 @Suppress("TooManyFunctions")
-class EntryStore(private val boxStore: BoxStore, private val markdownStore: MarkdownEntryStore) {
+class EntryStore(private val boxStore: BoxStore) {
 
     /**
      * Persist the user transcription before extraction begins. The returned id is stable for the
@@ -64,26 +55,15 @@ class EntryStore(private val boxStore: BoxStore, private val markdownStore: Mark
         )
         return boxStore.callInTx<Long> {
             val box = boxStore.boxFor<EntryEntity>()
-            val id = box.put(entry)
-            try {
-                markdownStore.write(entry)
-            } catch (@Suppress("TooGenericExceptionCaught") writeFail: Exception) {
-                // Markdown is the source of truth; box-and-no-markdown is the inconsistency we
-                // must not ship. Roll the row back inside the same transaction.
-                throw EntryPersistenceException("Markdown write failed for entry id=$id", writeFail)
-            }
-            // Re-put so the markdown filename (assigned by MarkdownEntryStore) lands on the row.
+            entry.markdownFilename = uniqueMarkdownFilename(box, entry)
             box.put(entry)
-            id
         }
     }
 
     /**
-     * Convergence resolved successfully. Maps [resolved] + [templateLabel] + [observations] onto
-     * the row and rewrites the markdown front-matter. Status transitions to `COMPLETED`;
-     * `lastError` clears. Pass an empty [observations] list when none are available — the
-     * markdown front-matter renders `entry_observations: []` and the pattern engine ignores the
-     * row for observation surfacing.
+     * Convergence resolved successfully. Maps [resolved] + [templateLabel] + [observations] onto the row.
+     * Status transitions to `COMPLETED`; `lastError` clears. Pass an empty [observations] list when none are
+     * available — the pattern engine ignores the row for observation surfacing.
      */
     fun completeEntry(
         entryId: Long,
@@ -102,11 +82,6 @@ class EntryStore(private val boxStore: BoxStore, private val markdownStore: Mark
             entry.extractionStatus = ExtractionStatus.COMPLETED
             entry.lastError = null
             attachTags(entry, resolved)
-            try {
-                markdownStore.write(entry)
-            } catch (@Suppress("TooGenericExceptionCaught") writeFail: Exception) {
-                throw EntryPersistenceException("Markdown rewrite failed for entry id=$entryId", writeFail)
-            }
             box.put(entry)
         }
     }
@@ -158,6 +133,10 @@ class EntryStore(private val boxStore: BoxStore, private val markdownStore: Mark
             .use { it.find(0, limit.toLong()) }
     }
 
+    /** Completed rows whose 3-lens extraction receipts have not been populated yet. */
+    fun listCompletedMissingLensReceipts(limit: Int = 100): List<EntryEntity> =
+        listCompleted(limit).filter { it.lensReceiptsJsonOrEmpty == "[]" }
+
     /** Single most-recent completed entry, or `null` when none exist. */
     fun lastCompleted(): EntryEntity? = boxStore.callClosingThreadResources {
         boxStore.boxFor<EntryEntity>()
@@ -205,14 +184,6 @@ class EntryStore(private val boxStore: BoxStore, private val markdownStore: Mark
             // orchestrator-wrapper catches → callout is dropped, cooldown reservation released.
             val existing = parseObservationsForAppend(entry.entryObservationsJson, entryId)
             entry.entryObservationsJson = observationsJson(existing + observation)
-            try {
-                markdownStore.write(entry)
-            } catch (@Suppress("TooGenericExceptionCaught") writeFail: Exception) {
-                throw EntryPersistenceException(
-                    "Markdown rewrite failed appending observation to id=$entryId",
-                    writeFail,
-                )
-            }
             box.put(entry)
             afterPersist?.invoke()
         }
@@ -253,13 +224,14 @@ class EntryStore(private val boxStore: BoxStore, private val markdownStore: Mark
             val entry = box.get(entryId)
                 ?: throw EntryPersistenceException("No entry row id=$entryId to attach follow-up")
             entry.followUpText = trimmed
-            try {
-                markdownStore.write(entry)
-            } catch (@Suppress("TooGenericExceptionCaught") writeFail: Exception) {
-                throw EntryPersistenceException("Markdown rewrite failed attaching follow-up to id=$entryId", writeFail)
-            }
             box.put(entry)
         }
+    }
+
+    private fun uniqueMarkdownFilename(box: io.objectbox.Box<EntryEntity>, entry: EntryEntity): String {
+        val baseName = EntryFilename.buildFilename(entry.timestampEpochMs, entry.entryText)
+        val existing = box.all.map { it.markdownFilename }.filter(String::isNotBlank).toSet()
+        return EntryFilename.resolveUnique(baseName, existing)
     }
 
     private fun applyResolved(entry: EntryEntity, resolved: ResolvedExtraction, templateLabel: TemplateLabel?) {
@@ -347,7 +319,7 @@ class EntryStore(private val boxStore: BoxStore, private val markdownStore: Mark
     }
 }
 
-/** Failure on the markdown/ObjectBox join. The transaction the throw escapes from rolls back. */
+/** Failure while mutating entry persistence state. */
 class EntryPersistenceException(message: String, cause: Throwable? = null) : IOException(message, cause)
 
 // Top-level helpers — kept off `EntryStore` to stay under detekt's function budget.

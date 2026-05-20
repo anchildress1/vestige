@@ -16,6 +16,7 @@ import dev.anchildress1.vestige.storage.PatternDetector
 import dev.anchildress1.vestige.storage.PatternEntity
 import dev.anchildress1.vestige.storage.PatternStore
 import dev.anchildress1.vestige.storage.TagEntity
+import dev.anchildress1.vestige.storage.closeAfterCleaningThreadResources
 import dev.anchildress1.vestige.testing.newInMemoryObjectBoxDirectory
 import dev.anchildress1.vestige.testing.openInMemoryBoxStore
 import io.mockk.coEvery
@@ -86,7 +87,7 @@ class PatternDetectionOrchestratorTest {
 
     @After
     fun tearDown() {
-        boxStore.close()
+        boxStore.closeAfterCleaningThreadResources()
         BoxStore.deleteAllFiles(dataDir)
     }
 

@@ -21,7 +21,7 @@ Stand up the four-module Android scaffold, prove LiteRT-LM can run Gemma 4 E4B o
 - [x] LiteRT-LM SDK loaded; text-only inference smoke test passes on the reference device.
 - [x] **STT-A passes:** audio bytes from `AudioRecord` round-trip through Gemma 4 and produce a coherent transcription on the reference device. Time-boxed; if not passing inside one focused day, stop and replan.
 - [x] ObjectBox schema migrates cleanly with `extraction_status` / `attempt_count` / `last_error` operational fields wired.
-- [x] Markdown source-of-truth read/write contract working with the same data the ObjectBox row carries.
+- [x] Generated markdown export contract working with the same data the ObjectBox row carries.
 - [x] `ModelArtifactStore` interface implemented with SHA-256 verification and retry policy.
 - [x] `NetworkGate` shipped with `OPEN`/`SEALED` states; StrictMode network detection in dev; telemetry-library grep clean.
 - [x] Signed dummy release APK installed on the reference S24 Ultra.
@@ -130,18 +130,18 @@ If STT-A fails after the time-box: stop. Write a superseding ADR. Do not proceed
 
 ---
 
-### Story 1.7 — Markdown source-of-truth read/write
+### Story 1.7 — Export markdown renderer
 
-**As** the AI implementor, **I need** a markdown read/write contract for entries that mirrors the ObjectBox row, **so that** the privacy claim ("export everything as markdown" / "delete all data") has a real implementation path and the v1.5 hand-edit flow stays cheap.
+**As** the AI implementor, **I need** a markdown export contract for entries that mirrors the ObjectBox row, **so that** the privacy claim ("export everything as markdown" / "delete all data") has a real implementation path without dual-writing internal state.
 
 **Done when:**
-- [x] `:core-storage` exposes a `MarkdownEntryStore` that writes one file per entry to internal storage with the deterministic filename format from `architecture-brief.md` §"Markdown Entry Shape" — `{filesDir}/entries/{ISO8601-utc-second}--{slug}.md`, with kebab-case slug ≤32 chars derived from the first 5–6 content words after stop-word strip, collision suffixes `-2` / `-3`. Filenames are stable for the life of the entry.
+- [x] `:core-storage` exposes an export renderer that writes one generated markdown file per entry into the export zip with the deterministic filename format from `architecture-brief.md` §"Generated Entry Markdown" — `entries/{ISO8601-utc-second}--{slug}.md`, with kebab-case slug ≤32 chars derived from the first 5–6 content words after stop-word strip, collision suffixes `-2` / `-3`. Filenames are stable for the life of the entry.
 - [x] Markdown front-matter carries the structured fields from the ObjectBox `Entry` (template_label, tags, energy_descriptor, recurrence_link, stated_commitment, confidence per field, timestamp, entry_observations). _Observations live in frontmatter, not body — aligned with `architecture-brief.md` §"Field placement rules" which is the data-shape canonical (story originally said body; corrected here)._
 - [x] Markdown body carries the `entry_text` exactly as captured.
-- [x] Smoke test: writing a row to ObjectBox + the matching markdown file, then reading both back, produces equivalent objects.
+- [x] Smoke test: exporting an ObjectBox row produces matching markdown plus the structured snapshot.
 - [x] Audio is not written. Per `AGENTS.md` guardrail 11, only transcription text persists.
 
-**Notes / risks:** Treat the markdown file as the source of truth and ObjectBox as the index. If they diverge, the markdown wins. This story does not implement export-to-zip — that's a Phase 4 settings affordance.
+**Notes / risks:** ObjectBox is the internal source of truth. Markdown exists only in export output.
 
 ---
 

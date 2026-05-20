@@ -41,7 +41,7 @@ class PatternRepoTest {
 
     @After
     fun tearDown() {
-        boxStore.close()
+        boxStore.closeAfterCleaningThreadResources()
         BoxStore.deleteAllFiles(dataDir)
     }
 
@@ -127,7 +127,7 @@ class PatternRepoTest {
     fun `actions survive BoxStore close and reopen by name`() {
         val id = seed()
         repo.skip(id, days = 1)
-        boxStore.close()
+        boxStore.closeAfterCleaningThreadResources()
         // ObjectBox keys in-memory stores by their `memory:` URI; reopening with the same path
         // reattaches to the same backing registry. That's the invariant under test — process-
         // local close/reopen idempotency, not on-disk durability.

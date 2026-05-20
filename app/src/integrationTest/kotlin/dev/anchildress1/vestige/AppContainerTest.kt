@@ -17,14 +17,15 @@ import dev.anchildress1.vestige.model.ModelArtifactStore
 import dev.anchildress1.vestige.model.ModelManifest
 import dev.anchildress1.vestige.model.PatternKind
 import dev.anchildress1.vestige.model.PatternState
+import dev.anchildress1.vestige.model.ResolvedExtraction
 import dev.anchildress1.vestige.save.BackgroundExtractionSaveFlow
 import dev.anchildress1.vestige.save.SaveOutcome
 import dev.anchildress1.vestige.storage.CalloutCooldownEntity
 import dev.anchildress1.vestige.storage.EntryEntity
-import dev.anchildress1.vestige.storage.MarkdownEntryStore
 import dev.anchildress1.vestige.storage.PatternEntity
 import dev.anchildress1.vestige.storage.TagEntity
 import dev.anchildress1.vestige.storage.VectorBackfillWorker
+import dev.anchildress1.vestige.storage.closeAfterCleaningThreadResources
 import dev.anchildress1.vestige.testing.cleanupObjectBoxTempRoot
 import dev.anchildress1.vestige.testing.newInMemoryObjectBoxDirectory
 import dev.anchildress1.vestige.testing.openInMemoryBoxStore
@@ -66,7 +67,6 @@ class AppContainerTest {
         val container = AppContainer(
             applicationContext = mockk<Context>(relaxed = true),
             boxStoreFactory = { mockk<BoxStore>(relaxed = true) },
-            markdownStoreFactory = { mockk<MarkdownEntryStore>(relaxed = true) },
             recoveredEntryIdsLoader = { listOf(11L, 12L) },
             foregroundServiceIntentFactory = { Intent("dev.anchildress1.vestige.TEST_START") },
             foregroundServiceStarter = { serviceStarts += 1 },
@@ -90,7 +90,6 @@ class AppContainerTest {
             val container = AppContainer(
                 applicationContext = mockk<Context>(relaxed = true),
                 boxStoreFactory = { box },
-                markdownStoreFactory = { mockk<MarkdownEntryStore>(relaxed = true) },
                 recoveredEntryIdsLoader = { emptyList() },
                 foregroundServiceIntentFactory = { Intent("dev.anchildress1.vestige.TEST_START") },
                 foregroundServiceStarter = {
@@ -109,7 +108,7 @@ class AppContainerTest {
             assertEquals(2, serviceStarts)
             assertEquals(BackgroundExtractionLifecycleState.PROMOTING, container.lifecycleStateMachine.state.value)
         } finally {
-            box.close()
+            box.closeAfterCleaningThreadResources()
         }
     }
 
@@ -126,7 +125,6 @@ class AppContainerTest {
             val container = AppContainer(
                 applicationContext = mockk<Context>(relaxed = true),
                 boxStoreFactory = { box },
-                markdownStoreFactory = { mockk<MarkdownEntryStore>(relaxed = true) },
                 recoveredEntryIdsLoader = { emptyList() },
                 foregroundServiceIntentFactory = { Intent("dev.anchildress1.vestige.TEST_START") },
                 foregroundServiceStarter = { serviceStarts += 1 },
@@ -148,7 +146,7 @@ class AppContainerTest {
             assertEquals(BackgroundExtractionLifecycleState.PROMOTING, container.lifecycleStateMachine.state.value)
             assertEquals(2, serviceStarts)
         } finally {
-            box.close()
+            box.closeAfterCleaningThreadResources()
         }
     }
 
@@ -162,7 +160,6 @@ class AppContainerTest {
             val container = AppContainer(
                 applicationContext = mockk<Context>(relaxed = true),
                 boxStoreFactory = { box },
-                markdownStoreFactory = { mockk<MarkdownEntryStore>(relaxed = true) },
                 recoveredEntryIdsLoader = { emptyList() },
                 foregroundServiceIntentFactory = { Intent("dev.anchildress1.vestige.TEST_START") },
                 foregroundServiceStarter = {},
@@ -178,7 +175,7 @@ class AppContainerTest {
 
             assertEquals(BackgroundExtractionLifecycleState.KEEP_ALIVE, container.lifecycleStateMachine.state.value)
         } finally {
-            box.close()
+            box.closeAfterCleaningThreadResources()
         }
     }
 
@@ -188,7 +185,6 @@ class AppContainerTest {
         val container = AppContainer(
             applicationContext = mockk<Context>(relaxed = true),
             boxStoreFactory = { mockk(relaxed = true) },
-            markdownStoreFactory = { mockk<MarkdownEntryStore>(relaxed = true) },
             recoveredEntryIdsLoader = { emptyList() },
             foregroundServiceIntentFactory = { Intent("dev.anchildress1.vestige.TEST_START") },
             foregroundServiceStarter = {},
@@ -210,7 +206,6 @@ class AppContainerTest {
         val container = AppContainer(
             applicationContext = mockk<Context>(relaxed = true),
             boxStoreFactory = { mockk<BoxStore>(relaxed = true) },
-            markdownStoreFactory = { mockk<MarkdownEntryStore>(relaxed = true) },
             modelPathLoader = { "/tmp/fake-model.litertlm" },
             backgroundEngineFactory = { _, _ -> mockk<LiteRtLmEngine>(relaxed = true) },
             recoveredEntryIdsLoader = { emptyList() },
@@ -229,7 +224,6 @@ class AppContainerTest {
         val container = AppContainer(
             applicationContext = mockk<Context>(relaxed = true),
             boxStoreFactory = { mockk<BoxStore>(relaxed = true) },
-            markdownStoreFactory = { mockk<MarkdownEntryStore>(relaxed = true) },
             modelPathLoader = { "/tmp/fake-model.litertlm" },
             backgroundEngineFactory = { _, _ -> mockk<LiteRtLmEngine>(relaxed = true) },
             backgroundExtractionSaveFlowFactory = { _, _, _, callbacks, _, _, _ ->
@@ -257,7 +251,6 @@ class AppContainerTest {
         val container = AppContainer(
             applicationContext = mockk<Context>(relaxed = true),
             boxStoreFactory = { mockk<BoxStore>(relaxed = true) },
-            markdownStoreFactory = { mockk<MarkdownEntryStore>(relaxed = true) },
             modelPathLoader = { "/tmp/fake-model.litertlm" },
             backgroundEngineFactory = { _, _ -> mockk<LiteRtLmEngine>(relaxed = true) },
             backgroundExtractionSaveFlowFactory = { _, _, _, callbacks, _, _, _ ->
@@ -297,7 +290,6 @@ class AppContainerTest {
         val container = AppContainer(
             applicationContext = context,
             boxStoreFactory = { mockk<BoxStore>(relaxed = true) },
-            markdownStoreFactory = { mockk<MarkdownEntryStore>(relaxed = true) },
             embeddingArtifactManifestLoader = { EmbeddingArtifactManifest.loadDefault() },
             embeddingModelArtifactStoreFactory = { _, _, _ -> modelStore },
             embeddingTokenizerArtifactStoreFactory = { _, _, _ -> tokenizerStore },
@@ -330,7 +322,6 @@ class AppContainerTest {
         val container = AppContainer(
             applicationContext = mockk<Context>(relaxed = true),
             boxStoreFactory = { mockk<BoxStore>(relaxed = true) },
-            markdownStoreFactory = { mockk<MarkdownEntryStore>(relaxed = true) },
             modelPathLoader = { "/tmp/fake-model.litertlm" },
             backgroundEngineFactory = { _, _ -> engine },
             recoveredEntryIdsLoader = { emptyList() },
@@ -364,7 +355,6 @@ class AppContainerTest {
         val container = AppContainer(
             applicationContext = mockk<Context>(relaxed = true),
             boxStoreFactory = { mockk<BoxStore>(relaxed = true) },
-            markdownStoreFactory = { mockk<MarkdownEntryStore>(relaxed = true) },
             modelPathLoader = { "/tmp/fake-model.litertlm" },
             backgroundEngineFactory = { _, _ -> engine },
             backgroundExtractionSaveFlowFactory = { _, _, _, _, _, _, _ -> saveFlow },
@@ -409,7 +399,6 @@ class AppContainerTest {
         val container = AppContainer(
             applicationContext = mockk<Context>(relaxed = true),
             boxStoreFactory = { mockk<BoxStore>(relaxed = true) },
-            markdownStoreFactory = { mockk<MarkdownEntryStore>(relaxed = true) },
             modelPathLoader = { "/tmp/fake-model.litertlm" },
             backgroundEngineFactory = { _, _ -> engine },
             backgroundExtractionSaveFlowFactory = { _, _, _, _, _, _, _ -> saveFlow },
@@ -436,7 +425,6 @@ class AppContainerTest {
         val container = AppContainer(
             applicationContext = mockk<Context>(relaxed = true),
             boxStoreFactory = { mockk<BoxStore>(relaxed = true) },
-            markdownStoreFactory = { mockk<MarkdownEntryStore>(relaxed = true) },
             modelPathLoader = { "/tmp/fake-model.litertlm" },
             backgroundEngineFactory = { _, _ -> engine },
             backgroundExtractionSaveFlowFactory = { _, _, _, _, _, _, _ -> saveFlow },
@@ -472,7 +460,6 @@ class AppContainerTest {
         val container = AppContainer(
             applicationContext = mockk<Context>(relaxed = true),
             boxStoreFactory = { mockk(relaxed = true) },
-            markdownStoreFactory = { mockk<MarkdownEntryStore>(relaxed = true) },
             modelPathLoader = { "/tmp/fake-model.litertlm" },
             backgroundEngineFactory = { _, _ -> engine },
             backgroundExtractionSaveFlowFactory = { _, _, _, _, _, _, _ -> saveFlow },
@@ -509,7 +496,6 @@ class AppContainerTest {
         val container = AppContainer(
             applicationContext = context,
             boxStoreFactory = { mockk<BoxStore>(relaxed = true) },
-            markdownStoreFactory = { mockk<MarkdownEntryStore>(relaxed = true) },
             modelPathLoader = { modelFile.absolutePath },
             backgroundEngineFactory = { _, _ -> engine },
             mainModelArtifactStoreFactory = { _, _, _ -> artifactStore },
@@ -547,7 +533,6 @@ class AppContainerTest {
         val container = AppContainer(
             applicationContext = context,
             boxStoreFactory = { boxStore },
-            markdownStoreFactory = { mockk<MarkdownEntryStore>(relaxed = true) },
             recoveredEntryIdsLoader = { emptyList() },
             foregroundServiceIntentFactory = { Intent("dev.anchildress1.vestige.TEST_START") },
             foregroundServiceStarter = {},
@@ -587,7 +572,6 @@ class AppContainerTest {
         val container = AppContainer(
             applicationContext = context,
             boxStoreFactory = { mockk<BoxStore>(relaxed = true) },
-            markdownStoreFactory = { mockk<MarkdownEntryStore>(relaxed = true) },
             modelPathLoader = { modelFile.absolutePath },
             backgroundEngineFactory = { _, _ -> engineMock },
             mainModelArtifactStoreFactory = { _, _, _ -> artifactStore },
@@ -631,7 +615,6 @@ class AppContainerTest {
             val container = AppContainer(
                 applicationContext = context,
                 boxStoreFactory = { mockk<BoxStore>(relaxed = true) },
-                markdownStoreFactory = { mockk<MarkdownEntryStore>(relaxed = true) },
                 modelPathLoader = { modelFile.absolutePath },
                 backgroundEngineFactory = { _, _ -> engine },
                 mainModelArtifactStoreFactory = { _, _, _ -> artifactStore },
@@ -682,7 +665,6 @@ class AppContainerTest {
         val container = AppContainer(
             applicationContext = context,
             boxStoreFactory = { mockk<BoxStore>(relaxed = true) },
-            markdownStoreFactory = { mockk<MarkdownEntryStore>(relaxed = true) },
             modelPathLoader = { modelFile.absolutePath },
             backgroundEngineFactory = { _, _ -> engineMock },
             mainModelArtifactStoreFactory = { _, _, _ -> artifactStore },
@@ -737,7 +719,6 @@ class AppContainerTest {
             val container = AppContainer(
                 applicationContext = context,
                 boxStoreFactory = { mockk<BoxStore>(relaxed = true) },
-                markdownStoreFactory = { mockk<MarkdownEntryStore>(relaxed = true) },
                 modelPathLoader = { modelFile.absolutePath },
                 backgroundEngineFactory = { _, _ -> mockk<LiteRtLmEngine>(relaxed = true) },
                 mainModelArtifactStoreFactory = { _, _, _ -> artifactStore },
@@ -787,7 +768,6 @@ class AppContainerTest {
         val container = AppContainer(
             applicationContext = context,
             boxStoreFactory = { mockk<BoxStore>(relaxed = true) },
-            markdownStoreFactory = { mockk<MarkdownEntryStore>(relaxed = true) },
             modelPathLoader = { modelFile.absolutePath },
             backgroundEngineFactory = { _, _ -> engine },
             mainModelArtifactStoreFactory = { _, _, _ -> artifactStore },
@@ -821,7 +801,6 @@ class AppContainerTest {
         val container = AppContainer(
             applicationContext = context,
             boxStoreFactory = { mockk<BoxStore>(relaxed = true) },
-            markdownStoreFactory = { mockk<MarkdownEntryStore>(relaxed = true) },
             modelPathLoader = { modelFile.absolutePath },
             backgroundEngineFactory = { _, _ -> mockk<LiteRtLmEngine>(relaxed = true) },
             mainModelArtifactStoreFactory = { _, _, _ -> artifactStore },
@@ -851,7 +830,6 @@ class AppContainerTest {
         val container = AppContainer(
             applicationContext = context,
             boxStoreFactory = { mockk<BoxStore>(relaxed = true) },
-            markdownStoreFactory = { mockk<MarkdownEntryStore>(relaxed = true) },
             modelPathLoader = { modelFile.absolutePath },
             backgroundEngineFactory = { _, _ -> engine },
             mainModelArtifactStoreFactory = { _, _, _ -> artifactStore },
@@ -883,7 +861,6 @@ class AppContainerTest {
             val container = AppContainer(
                 applicationContext = context,
                 boxStoreFactory = { mockk<BoxStore>(relaxed = true) },
-                markdownStoreFactory = { mockk<MarkdownEntryStore>(relaxed = true) },
                 modelPathLoader = { modelFile.absolutePath },
                 backgroundEngineFactory = { _, _ -> mockk<LiteRtLmEngine>(relaxed = true) },
                 mainModelArtifactStoreFactory = { _, _, _ -> artifactStore },
@@ -910,7 +887,6 @@ class AppContainerTest {
         val container = AppContainer(
             applicationContext = context,
             boxStoreFactory = { mockk<BoxStore>(relaxed = true) },
-            markdownStoreFactory = { mockk<MarkdownEntryStore>(relaxed = true) },
             modelPathLoader = { File(tempRoot, "m").absolutePath },
             backgroundEngineFactory = { _, _ -> mockk<LiteRtLmEngine>(relaxed = true) },
             mainModelArtifactStoreFactory = { _, _, _ -> throwingStore },
@@ -952,7 +928,6 @@ class AppContainerTest {
             val container = AppContainer(
                 applicationContext = context,
                 boxStoreFactory = { mockk<BoxStore>(relaxed = true) },
-                markdownStoreFactory = { mockk<MarkdownEntryStore>(relaxed = true) },
                 modelPathLoader = { modelFile.absolutePath },
                 backgroundEngineFactory = { _, _ -> engineMock },
                 mainModelArtifactStoreFactory = { _, _, _ -> artifactStore },
@@ -988,7 +963,6 @@ class AppContainerTest {
             val container = AppContainer(
                 applicationContext = context,
                 boxStoreFactory = { mockk<BoxStore>(relaxed = true) },
-                markdownStoreFactory = { mockk<MarkdownEntryStore>(relaxed = true) },
                 modelPathLoader = { modelFile.absolutePath },
                 backgroundEngineFactory = { _, _ -> mockk<LiteRtLmEngine>(relaxed = true) },
                 mainModelArtifactStoreFactory = { _, _, _ -> artifactStore },
@@ -1024,7 +998,6 @@ class AppContainerTest {
         val container = AppContainer(
             applicationContext = context,
             boxStoreFactory = { mockk<BoxStore>(relaxed = true) },
-            markdownStoreFactory = { mockk<MarkdownEntryStore>(relaxed = true) },
             modelPathLoader = { modelFile.absolutePath },
             backgroundEngineFactory = { _, _ -> mockk<LiteRtLmEngine>(relaxed = true) },
             mainModelArtifactStoreFactory = { _, _, _ -> artifactStore },
@@ -1040,7 +1013,7 @@ class AppContainerTest {
     }
 
     @Test
-    fun `wipeAllData clears every entity box and every markdown file`(@TempDir tempRoot: File) = runTest {
+    fun `wipeAllData clears every entity box and legacy markdown files`(@TempDir tempRoot: File) = runTest {
         val boxDir = newInMemoryObjectBoxDirectory("wipe")
         val box = openInMemoryBoxStore(boxDir)
         try {
@@ -1053,7 +1026,6 @@ class AppContainerTest {
             val container = AppContainer(
                 applicationContext = mockk<Context>(relaxed = true) { every { filesDir } returns tempRoot },
                 boxStoreFactory = { box },
-                markdownStoreFactory = { MarkdownEntryStore(tempRoot) },
                 modelPathLoader = { File(tempRoot, "m").absolutePath },
                 backgroundEngineFactory = { _, _ -> mockk<LiteRtLmEngine>(relaxed = true) },
                 recoveredEntryIdsLoader = { emptyList() },
@@ -1075,7 +1047,7 @@ class AppContainerTest {
             assertEquals(BackgroundExtractionLifecycleState.NORMAL, container.lifecycleStateMachine.state.value)
             assertTrue(container.dataRevision.value > revisionBefore)
         } finally {
-            box.close()
+            box.closeAfterCleaningThreadResources()
         }
     }
 
@@ -1100,7 +1072,6 @@ class AppContainerTest {
             val container = AppContainer(
                 applicationContext = context,
                 boxStoreFactory = { box },
-                markdownStoreFactory = { MarkdownEntryStore(tempRoot) },
                 modelPathLoader = { File(tempRoot, "m").absolutePath },
                 backgroundEngineFactory = { _, _ -> mockk<LiteRtLmEngine>(relaxed = true) },
                 mainModelArtifactStoreFactory = { _, _, _ -> fakeArtifactStore(File(tempRoot, "m"), 1L) },
@@ -1119,72 +1090,25 @@ class AppContainerTest {
             assertTrue(extractionJob.isCancelled)
             assertTrue(extractionFinished.isCompleted)
         } finally {
-            box.close()
+            box.closeAfterCleaningThreadResources()
         }
     }
 
     @Test
-    fun `zipAllEntriesTo streams markdown and complete user data snapshot into the zip`(@TempDir tempRoot: File) =
-        runTest {
-            val boxDir = newInMemoryObjectBoxDirectory("export")
-            val box = openInMemoryBoxStore(boxDir)
-            File(tempRoot, "entries").mkdirs()
-            File(tempRoot, "entries/one.md").writeText("first")
-            File(tempRoot, "entries/two.md").writeText("second")
-            try {
-                seedExportSnapshotFixture(box)
-                val container = AppContainer(
-                    applicationContext = mockk<Context>(relaxed = true) {
-                        every { filesDir } returns tempRoot
-                        every { getSharedPreferences("vestige.onboarding", Context.MODE_PRIVATE) } returns
-                            mockOnboardingPrefs(complete = true, persona = "HARDASS")
-                    },
-                    boxStoreFactory = { box },
-                    markdownStoreFactory = { MarkdownEntryStore(tempRoot) },
-                    modelPathLoader = { File(tempRoot, "m").absolutePath },
-                    backgroundEngineFactory = { _, _ -> mockk<LiteRtLmEngine>(relaxed = true) },
-                    recoveredEntryIdsLoader = { emptyList() },
-                    foregroundServiceIntentFactory = { Intent("dev.anchildress1.vestige.TEST_START") },
-                    foregroundServiceStarter = {},
-                    scope = this,
-                )
-                val out = ByteArrayOutputStream()
-
-                container.zipAllEntriesTo(out)
-
-                val zipEntries = unzipTextEntries(out)
-                assertEquals(
-                    listOf("entries/one.md", "entries/two.md", VestigeDataExporter.SNAPSHOT_ENTRY),
-                    zipEntries.keys.sorted(),
-                )
-                assertEquals("first", zipEntries["entries/one.md"])
-                assertEquals("second", zipEntries["entries/two.md"])
-                assertCompleteUserDataSnapshot(zipEntries.getValue(VestigeDataExporter.SNAPSHOT_ENTRY))
-            } finally {
-                box.close()
-            }
-        }
-
-    @Test
-    fun `zipAllEntriesTo propagates read failure without writing a partial archive`(@TempDir tempRoot: File) = runTest {
-        val boxDir = newInMemoryObjectBoxDirectory("export-fail")
+    fun `zipAllEntriesTo streams generated markdown and complete user data snapshot into the zip`(
+        @TempDir tempRoot: File,
+    ) = runTest {
+        val boxDir = newInMemoryObjectBoxDirectory("export")
         val box = openInMemoryBoxStore(boxDir)
-        val good = File(tempRoot, "good.md").apply { writeText("first") }
-        // Never created — file.inputStream() throws FileNotFoundException after putNextEntry,
-        // exercising the try/finally{closeEntry()} path.
-        val missing = File(tempRoot, "missing.md")
-        val markdownStore = mockk<MarkdownEntryStore>(relaxed = true) {
-            every { listAll() } returns listOf(good, missing)
-        }
         try {
+            seedExportSnapshotFixture(box)
             val container = AppContainer(
                 applicationContext = mockk<Context>(relaxed = true) {
                     every { filesDir } returns tempRoot
                     every { getSharedPreferences("vestige.onboarding", Context.MODE_PRIVATE) } returns
-                        mockOnboardingPrefs()
+                        mockOnboardingPrefs(complete = true, persona = "HARDASS")
                 },
                 boxStoreFactory = { box },
-                markdownStoreFactory = { markdownStore },
                 modelPathLoader = { File(tempRoot, "m").absolutePath },
                 backgroundEngineFactory = { _, _ -> mockk<LiteRtLmEngine>(relaxed = true) },
                 recoveredEntryIdsLoader = { emptyList() },
@@ -1194,15 +1118,17 @@ class AppContainerTest {
             )
             val out = ByteArrayOutputStream()
 
-            val raised = runCatching { container.zipAllEntriesTo(out) }
+            container.zipAllEntriesTo(out)
 
-            // The export is honest about failure — a failed entry read propagates, never swallowed.
-            assertTrue(raised.isFailure, "a mid-archive read failure must propagate, not be swallowed")
-            // The archive is staged in full before any byte reaches the caller's target, so a
-            // mid-archive failure leaves no truncated zip the user could mistake for a backup.
-            assertEquals(0, out.size(), "a failed export must not write a partial archive to the target")
+            val zipEntries = unzipTextEntries(out)
+            assertEquals(
+                listOf("entries/one.md", VestigeDataExporter.SNAPSHOT_ENTRY),
+                zipEntries.keys.sorted(),
+            )
+            assertTrue(zipEntries.getValue("entries/one.md").contains("Invoice again."))
+            assertCompleteUserDataSnapshot(zipEntries.getValue(VestigeDataExporter.SNAPSHOT_ENTRY))
         } finally {
-            box.close()
+            box.closeAfterCleaningThreadResources()
         }
     }
 
@@ -1228,7 +1154,6 @@ class AppContainerTest {
         val container = AppContainer(
             applicationContext = context,
             boxStoreFactory = { mockk(relaxed = true) },
-            markdownStoreFactory = { mockk<MarkdownEntryStore>(relaxed = true) },
             embeddingArtifactManifestLoader = { EmbeddingArtifactManifest.loadDefault() },
             embeddingModelArtifactStoreFactory = { _, _, _ -> modelStore },
             embeddingTokenizerArtifactStoreFactory = { _, _, _ -> tokenizerStore },
@@ -1314,7 +1239,6 @@ class AppContainerTest {
         val container = AppContainer(
             applicationContext = context,
             boxStoreFactory = { mockk(relaxed = true) },
-            markdownStoreFactory = { mockk<MarkdownEntryStore>(relaxed = true) },
             embeddingArtifactManifestLoader = { EmbeddingArtifactManifest.loadDefault() },
             embeddingModelArtifactStoreFactory = { _, _, _ -> modelStore },
             embeddingTokenizerArtifactStoreFactory = { _, _, _ -> tokenizerStore },
@@ -1356,7 +1280,6 @@ class AppContainerTest {
         container = AppContainer(
             applicationContext = context,
             boxStoreFactory = { mockk(relaxed = true) },
-            markdownStoreFactory = { mockk<MarkdownEntryStore>(relaxed = true) },
             embeddingArtifactManifestLoader = { EmbeddingArtifactManifest.loadDefault() },
             embeddingModelArtifactStoreFactory = { _, _, _ -> modelStore },
             embeddingTokenizerArtifactStoreFactory = { _, _, _ -> tokenizerStore },
@@ -1388,7 +1311,6 @@ class AppContainerTest {
         val container = AppContainer(
             applicationContext = context,
             boxStoreFactory = { mockk(relaxed = true) },
-            markdownStoreFactory = { mockk<MarkdownEntryStore>(relaxed = true) },
             embeddingArtifactManifestLoader = { EmbeddingArtifactManifest.loadDefault() },
             embeddingModelArtifactStoreFactory = { _, _, _ -> modelStore },
             embeddingTokenizerArtifactStoreFactory = { _, _, _ -> tokenizerStore },
@@ -1422,7 +1344,6 @@ class AppContainerTest {
         val container = AppContainer(
             applicationContext = context,
             boxStoreFactory = { mockk<BoxStore>(relaxed = true) },
-            markdownStoreFactory = { mockk<MarkdownEntryStore>(relaxed = true) },
             modelPathLoader = {
                 modelPathCalls += 1
                 "/tmp/fake-model.litertlm"
@@ -1460,7 +1381,6 @@ class AppContainerTest {
         val container = AppContainer(
             applicationContext = context,
             boxStoreFactory = { mockk<BoxStore>(relaxed = true) },
-            markdownStoreFactory = { mockk<MarkdownEntryStore>(relaxed = true) },
             modelPathLoader = { "/tmp/fake-model.litertlm" },
             backgroundEngineFactory = { _, _ ->
                 engineFactoryCalls += 1
@@ -1487,7 +1407,6 @@ class AppContainerTest {
         val container = AppContainer(
             applicationContext = mockk<Context>(relaxed = true),
             boxStoreFactory = { boxStore },
-            markdownStoreFactory = { mockk<MarkdownEntryStore>(relaxed = true) },
             modelPathLoader = { "/tmp/fake-model.litertlm" },
             backgroundEngineFactory = { _, _ ->
                 engineFactoryCalls += 1
@@ -1516,7 +1435,6 @@ class AppContainerTest {
         val container = AppContainer(
             applicationContext = context,
             boxStoreFactory = { boxStore },
-            markdownStoreFactory = { mockk<MarkdownEntryStore>(relaxed = true) },
             modelPathLoader = { "/tmp/fake-model.litertlm" },
             backgroundEngineFactory = { _, _ -> engine },
             recoveredEntryIdsLoader = { emptyList() },
@@ -1545,7 +1463,6 @@ class AppContainerTest {
         val container = AppContainer(
             applicationContext = context,
             boxStoreFactory = { mockk<BoxStore>(relaxed = true) },
-            markdownStoreFactory = { mockk<MarkdownEntryStore>(relaxed = true) },
             modelPathLoader = { modelFile.absolutePath },
             backgroundEngineFactory = { _, _ -> mockk<LiteRtLmEngine>(relaxed = true) },
             mainModelArtifactStoreFactory = { _, _, _ -> artifactStore },
@@ -1578,7 +1495,6 @@ class AppContainerTest {
         val container = AppContainer(
             applicationContext = context,
             boxStoreFactory = { mockk<BoxStore>(relaxed = true) },
-            markdownStoreFactory = { mockk<MarkdownEntryStore>(relaxed = true) },
             modelPathLoader = { modelFile.absolutePath },
             backgroundEngineFactory = { _, _ -> mockk<LiteRtLmEngine>(relaxed = true) },
             mainModelArtifactStoreFactory = { _, _, _ -> artifactStore },
@@ -1608,7 +1524,6 @@ class AppContainerTest {
             val container = AppContainer(
                 applicationContext = context,
                 boxStoreFactory = { mockk<BoxStore>(relaxed = true) },
-                markdownStoreFactory = { mockk<MarkdownEntryStore>(relaxed = true) },
                 modelPathLoader = { modelFile.absolutePath },
                 backgroundEngineFactory = { _, _ -> mockk<LiteRtLmEngine>(relaxed = true) },
                 mainModelArtifactStoreFactory = { _, _, _ -> artifactStore },
@@ -1639,7 +1554,6 @@ class AppContainerTest {
             val container = AppContainer(
                 applicationContext = context,
                 boxStoreFactory = { mockk<BoxStore>(relaxed = true) },
-                markdownStoreFactory = { mockk<MarkdownEntryStore>(relaxed = true) },
                 modelPathLoader = { modelFile.absolutePath },
                 backgroundEngineFactory = { _, _ -> mockk<LiteRtLmEngine>(relaxed = true) },
                 mainModelArtifactStoreFactory = { _, _, _ -> artifactStore },
@@ -1685,7 +1599,6 @@ class AppContainerTest {
         val container = AppContainer(
             applicationContext = context,
             boxStoreFactory = { mockk<BoxStore>(relaxed = true) },
-            markdownStoreFactory = { mockk<MarkdownEntryStore>(relaxed = true) },
             modelPathLoader = { modelFile.absolutePath },
             backgroundEngineFactory = { _, _ -> mockk<LiteRtLmEngine>(relaxed = true) },
             mainModelArtifactStoreFactory = { _, _, _ -> artifactStore },
@@ -1698,13 +1611,12 @@ class AppContainerTest {
 
         container.recoverPendingExtractions()
 
-        coVerify(exactly = 0) { saveFlow.recoverEntry(any(), any(), any(), any()) }
+        coVerify(exactly = 0) { saveFlow.recoverEntry(any(), any(), any(), any(), any()) }
     }
 
     @Test
     fun `recoverPendingExtractions skips non-PENDING entries when scanning`(@TempDir tempRoot: File) = runTest {
         val dataDir = newInMemoryObjectBoxDirectory("recover-pending-skip-")
-        val markdownDir = File(tempRoot, "markdown").apply { mkdirs() }
         val boxStore = openInMemoryBoxStore(dataDir)
         val engine = mockk<LiteRtLmEngine>(relaxed = true)
         val saveFlow = mockk<BackgroundExtractionSaveFlow>(relaxed = true)
@@ -1717,7 +1629,6 @@ class AppContainerTest {
         val container = AppContainer(
             applicationContext = context,
             boxStoreFactory = { boxStore },
-            markdownStoreFactory = { MarkdownEntryStore(markdownDir) },
             modelPathLoader = { modelFile.absolutePath },
             backgroundEngineFactory = { _, _ -> engine },
             mainModelArtifactStoreFactory = { _, _, _ -> artifactStore },
@@ -1744,8 +1655,8 @@ class AppContainerTest {
 
             container.recoverPendingExtractions()
 
-            coVerify(exactly = 1) { saveFlow.recoverEntry(pendingId, "typed-pending", any(), any()) }
-            coVerify(exactly = 0) { saveFlow.recoverEntry(runningId, any(), any(), any()) }
+            coVerify(exactly = 1) { saveFlow.recoverEntry(pendingId, "typed-pending", any(), any(), any()) }
+            coVerify(exactly = 0) { saveFlow.recoverEntry(runningId, any(), any(), any(), any()) }
         } finally {
             container.close()
             cleanupObjectBoxTempRoot(tempRoot, dataDir)
@@ -1770,7 +1681,6 @@ class AppContainerTest {
             val container = AppContainer(
                 applicationContext = context,
                 boxStoreFactory = { throwingBoxStore },
-                markdownStoreFactory = { mockk<MarkdownEntryStore>(relaxed = true) },
                 modelPathLoader = { modelFile.absolutePath },
                 backgroundEngineFactory = { _, _ -> mockk<LiteRtLmEngine>(relaxed = true) },
                 mainModelArtifactStoreFactory = { _, _, _ -> artifactStore },
@@ -1783,19 +1693,18 @@ class AppContainerTest {
 
             container.recoverPendingExtractions()
 
-            coVerify(exactly = 0) { saveFlow.recoverEntry(any(), any(), any(), any()) }
+            coVerify(exactly = 0) { saveFlow.recoverEntry(any(), any(), any(), any(), any()) }
         }
 
     @Test
     fun `recoverPendingExtractions logs and continues when one entry's recovery throws`(@TempDir tempRoot: File) =
         runTest {
             val dataDir = newInMemoryObjectBoxDirectory("recover-pending-throws-")
-            val markdownDir = File(tempRoot, "markdown").apply { mkdirs() }
             val boxStore = openInMemoryBoxStore(dataDir)
             val engine = mockk<LiteRtLmEngine>(relaxed = true)
             val saveFlow = mockk<BackgroundExtractionSaveFlow>()
             // First call throws, second succeeds — recovery loop must not bail on the first failure.
-            coEvery { saveFlow.recoverEntry(any(), any(), any(), any()) } throws
+            coEvery { saveFlow.recoverEntry(any(), any(), any(), any(), any()) } throws
                 RuntimeException("simulated recovery failure") andThen
                 mockk<kotlinx.coroutines.Job>(relaxed = true)
             val modelFile = File(tempRoot, "ready-model.litertlm").apply { writeText("x") }
@@ -1807,7 +1716,6 @@ class AppContainerTest {
             val container = AppContainer(
                 applicationContext = context,
                 boxStoreFactory = { boxStore },
-                markdownStoreFactory = { MarkdownEntryStore(markdownDir) },
                 modelPathLoader = { modelFile.absolutePath },
                 backgroundEngineFactory = { _, _ -> engine },
                 mainModelArtifactStoreFactory = { _, _, _ -> artifactStore },
@@ -1824,8 +1732,8 @@ class AppContainerTest {
 
                 container.recoverPendingExtractions()
 
-                coVerify(exactly = 1) { saveFlow.recoverEntry(firstId, "first", any(), any()) }
-                coVerify(exactly = 1) { saveFlow.recoverEntry(secondId, "second", any(), any()) }
+                coVerify(exactly = 1) { saveFlow.recoverEntry(firstId, "first", any(), any(), any()) }
+                coVerify(exactly = 1) { saveFlow.recoverEntry(secondId, "second", any(), any(), any()) }
             } finally {
                 container.close()
                 cleanupObjectBoxTempRoot(tempRoot, dataDir)
@@ -1835,7 +1743,6 @@ class AppContainerTest {
     @Test
     fun `recoverPendingExtractions re-runs the save flow for each PENDING entry`(@TempDir tempRoot: File) = runTest {
         val dataDir = newInMemoryObjectBoxDirectory("recover-pending-")
-        val markdownDir = File(tempRoot, "markdown").apply { mkdirs() }
         val boxStore = openInMemoryBoxStore(dataDir)
         val engine = mockk<LiteRtLmEngine>(relaxed = true)
         val saveFlow = mockk<BackgroundExtractionSaveFlow>(relaxed = true)
@@ -1848,7 +1755,6 @@ class AppContainerTest {
         val container = AppContainer(
             applicationContext = context,
             boxStoreFactory = { boxStore },
-            markdownStoreFactory = { MarkdownEntryStore(markdownDir) },
             modelPathLoader = { modelFile.absolutePath },
             backgroundEngineFactory = { _, _ -> engine },
             mainModelArtifactStoreFactory = { _, _, _ -> artifactStore },
@@ -1866,9 +1772,53 @@ class AppContainerTest {
 
             container.recoverPendingExtractions()
 
-            coVerify(exactly = 1) { saveFlow.recoverEntry(firstId, "typed-1", any(), any()) }
-            coVerify(exactly = 1) { saveFlow.recoverEntry(secondId, "typed-2", any(), any()) }
+            coVerify(exactly = 1) { saveFlow.recoverEntry(firstId, "typed-1", any(), any(), any()) }
+            coVerify(exactly = 1) { saveFlow.recoverEntry(secondId, "typed-2", any(), any(), any()) }
             assertEquals(0L, container.dataRevision.value)
+        } finally {
+            container.close()
+            cleanupObjectBoxTempRoot(tempRoot, dataDir)
+        }
+    }
+
+    @Test
+    fun `backfillMissingExtractionInfo reruns extraction for completed rows without lens receipts`(
+        @TempDir tempRoot: File,
+    ) = runTest {
+        val dataDir = newInMemoryObjectBoxDirectory("missing-extraction-backfill-")
+        val boxStore = openInMemoryBoxStore(dataDir)
+        val engine = mockk<LiteRtLmEngine>(relaxed = true)
+        val saveFlow = mockk<BackgroundExtractionSaveFlow>(relaxed = true)
+        val modelFile = File(tempRoot, "ready-model.litertlm").apply { writeText("x") }
+        val artifactStore = fakeArtifactStore(artifactFile = modelFile, expectedByteSize = 1L)
+        val context = mockk<Context>(relaxed = true) {
+            every { filesDir } returns tempRoot
+            every { cacheDir } returns File(tempRoot, "cache").apply { mkdirs() }
+        }
+        val container = AppContainer(
+            applicationContext = context,
+            boxStoreFactory = { boxStore },
+            modelPathLoader = { modelFile.absolutePath },
+            backgroundEngineFactory = { _, _ -> engine },
+            mainModelArtifactStoreFactory = { _, _, _ -> artifactStore },
+            backgroundExtractionSaveFlowFactory = { _, _, _, _, _, _, _ -> saveFlow },
+            recoveredEntryIdsLoader = { emptyList() },
+            foregroundServiceIntentFactory = { Intent("dev.anchildress1.vestige.TEST_START") },
+            foregroundServiceStarter = {},
+            scope = backgroundScope,
+        )
+
+        try {
+            val firstId = container.entryStore.createPendingEntry("loaded first", CAPTURED_AT.toInstant())
+            container.entryStore.completeEntry(firstId, ResolvedExtraction(emptyMap()), templateLabel = null)
+            val secondId = container.entryStore.createPendingEntry("loaded second", CAPTURED_AT.plusDays(1).toInstant())
+            container.entryStore.completeEntry(secondId, ResolvedExtraction(emptyMap()), templateLabel = null)
+
+            val queued = container.backfillMissingExtractionInfo()
+
+            assertEquals(2, queued)
+            coVerify(exactly = 1) { saveFlow.recoverEntry(firstId, "loaded first", any(), any(), any()) }
+            coVerify(exactly = 1) { saveFlow.recoverEntry(secondId, "loaded second", any(), any(), any()) }
         } finally {
             container.close()
             cleanupObjectBoxTempRoot(tempRoot, dataDir)
@@ -1890,7 +1840,6 @@ class AppContainerTest {
         val container = AppContainer(
             applicationContext = context,
             boxStoreFactory = { boxStore },
-            markdownStoreFactory = { mockk<MarkdownEntryStore>(relaxed = true) },
             recoveredEntryIdsLoader = { emptyList() },
             foregroundServiceIntentFactory = { Intent("dev.anchildress1.vestige.TEST_START") },
             foregroundServiceStarter = {},
@@ -1923,7 +1872,6 @@ class AppContainerTest {
         val container = AppContainer(
             applicationContext = context,
             boxStoreFactory = { boxStore },
-            markdownStoreFactory = { mockk<MarkdownEntryStore>(relaxed = true) },
             recoveredEntryIdsLoader = { emptyList() },
             foregroundServiceIntentFactory = { Intent("dev.anchildress1.vestige.TEST_START") },
             foregroundServiceStarter = {},

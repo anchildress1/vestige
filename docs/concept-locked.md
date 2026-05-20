@@ -113,8 +113,8 @@ The product produces useful observable signal from entry one — not validation,
 - Pattern interpretation allowed (counts, co-occurrences, vocabulary). Feelings/motivation interpretation forbidden. "Fourth Crashed in twelve, all post-meeting" — yes. "You might be feeling overwhelmed" — never.
 
 ## Memory architecture
-- Markdown files = source of truth (one per entry, exportable, debuggable)
-- ObjectBox = on-device storage + structured tag/pattern store **(P0)**
+- ObjectBox = source of truth for entries, tags, patterns, and vectors **(P0)**
+- Markdown files = generated export output (one per entry, readable, debuggable)
 - **Vector index + EmbeddingGemma 300M ship only if STT-E passes.** EmbeddingGemma 300M via LiteRT (~200MB quantized, sub-15ms inference, pre-built `litert-community/embeddinggemma-300m`). Same runtime as the main model.
 - Hybrid retrieval P0 baseline: keyword + Gemma-extracted tags + recency. Vector (semantic similarity) layer added on top **only if STT-E passes**.
 - **If STT-E fails:** v1 ships with keyword + tags + recency only. EmbeddingGemma + vector index drop to v1.5 (see `backlog.md`).

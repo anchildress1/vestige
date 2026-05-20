@@ -41,28 +41,24 @@ class EntryStoreTest {
     private lateinit var tempRoot: File
     private lateinit var boxStore: BoxStore
     private lateinit var dataDir: File
-    private lateinit var markdownDir: File
-    private lateinit var markdownStore: MarkdownEntryStore
     private lateinit var entryStore: EntryStore
 
     @Before
     fun setUp() {
         tempRoot = newModuleTempRoot("entry-store-")
         dataDir = newInMemoryObjectBoxDirectory("objectbox-")
-        markdownDir = File(tempRoot, "markdown-${System.nanoTime()}").apply { mkdirs() }
         boxStore = openInMemoryBoxStore(dataDir)
-        markdownStore = MarkdownEntryStore(markdownDir)
-        entryStore = EntryStore(boxStore, markdownStore)
+        entryStore = EntryStore(boxStore)
     }
 
     @After
     fun tearDown() {
-        boxStore.close()
+        boxStore.closeAfterCleaningThreadResources()
         cleanupObjectBoxTempRoot(tempRoot, dataDir)
     }
 
     @Test
-    fun `createPendingEntry persists transcription with PENDING status and writes markdown body`() {
+    fun `createPendingEntry persists transcription with PENDING status and stable export filename`() {
         val id = entryStore.createPendingEntry(SAMPLE_TEXT, SAMPLE_INSTANT)
 
         val row = boxStore.boxFor<EntryEntity>().get(id)
@@ -78,10 +74,6 @@ class EntryStoreTest {
             "markdownFilename should follow the {iso}--{slug}.md contract: ${row.markdownFilename}",
             row.markdownFilename.matches(Regex("\\d{4}-\\d{2}-\\d{2}T[\\d-]+Z--[a-z0-9-]+\\.md")),
         )
-
-        val mdFile = File(File(markdownDir, "entries"), row.markdownFilename)
-        assertTrue("markdown file should exist at ${mdFile.absolutePath}", mdFile.isFile)
-        assertTrue(mdFile.readText().endsWith("$SAMPLE_TEXT\n"))
     }
 
     @Test
@@ -92,17 +84,11 @@ class EntryStoreTest {
     }
 
     @Test
-    fun `createPendingEntry stores durationMs and it round-trips through markdown`() {
+    fun `createPendingEntry stores durationMs`() {
         val id = entryStore.createPendingEntry(SAMPLE_TEXT, SAMPLE_INSTANT, durationMs = 242_000L)
 
         val row = boxStore.boxFor<EntryEntity>().get(id)
         assertEquals(242_000L, row.durationMs)
-
-        val mdFile = File(File(markdownDir, "entries"), row.markdownFilename)
-        assertTrue(
-            "markdown must contain duration_ms: 242000",
-            mdFile.readText().contains("duration_ms: 242000"),
-        )
     }
 
     @Test
@@ -117,15 +103,10 @@ class EntryStoreTest {
         val row = boxStore.boxFor<EntryEntity>().get(id)
         assertEquals("What happened right after the crash?", row.followUpText)
         assertEquals(Persona.EDITOR, row.persona)
-
-        val mdFile = File(File(markdownDir, "entries"), row.markdownFilename)
-        val markdown = mdFile.readText()
-        assertTrue(markdown.contains("persona: editor"))
-        assertTrue(markdown.contains("follow_up: What happened right after the crash?"))
     }
 
     @Test
-    fun `completeEntry rewrites markdown with full frontmatter and updates row to COMPLETED`() {
+    fun `completeEntry updates row to COMPLETED with resolved fields`() {
         val id = entryStore.createPendingEntry(SAMPLE_TEXT, SAMPLE_INSTANT)
         val resolved = resolvedSample()
 
@@ -147,11 +128,6 @@ class EntryStoreTest {
 
         val commitment = JSONObject(row.statedCommitmentJson!!)
         assertEquals("review the doc by Friday", commitment.getString("text"))
-
-        val mdFile = File(File(markdownDir, "entries"), row.markdownFilename)
-        val md = mdFile.readText()
-        assertTrue("frontmatter should include template_label", md.contains("template_label: aftermath"))
-        assertTrue("frontmatter should include tags", md.contains("  - tuesday-meeting"))
     }
 
     @Test
@@ -167,9 +143,6 @@ class EntryStoreTest {
 
         val row = boxStore.boxFor<EntryEntity>().get(id)
         assertNull(row.recurrenceLink)
-        assertTrue(
-            File(File(markdownDir, "entries"), row.markdownFilename).readText().contains("recurrence_link: null"),
-        )
     }
 
     @Test
@@ -216,7 +189,7 @@ class EntryStoreTest {
     }
 
     @Test
-    fun `attachFollowUp lands follow-up on a pending row and rewrites markdown`() {
+    fun `attachFollowUp lands follow-up on a pending row`() {
         val id = entryStore.createPendingEntry(SAMPLE_TEXT, SAMPLE_INSTANT)
 
         entryStore.attachFollowUp(id, "What did you do right after?")
@@ -224,8 +197,6 @@ class EntryStoreTest {
         val row = boxStore.boxFor<EntryEntity>().get(id)
         assertEquals("What did you do right after?", row.followUpText)
         assertEquals(ExtractionStatus.PENDING, row.extractionStatus)
-        val mdFile = File(File(markdownDir, "entries"), row.markdownFilename)
-        assertTrue(mdFile.readText().contains("follow_up: What did you do right after?"))
     }
 
     @Test
@@ -247,8 +218,6 @@ class EntryStoreTest {
         val row = boxStore.boxFor<EntryEntity>().get(id)
         assertEquals("still valid", row.followUpText)
         assertEquals(ExtractionStatus.COMPLETED, row.extractionStatus)
-        val mdFile = File(File(markdownDir, "entries"), row.markdownFilename)
-        assertTrue(mdFile.readText().contains("follow_up: still valid"))
     }
 
     @Test
@@ -265,23 +234,6 @@ class EntryStoreTest {
         entryStore.failEntry(first, ExtractionStatus.FAILED, "done failing")
 
         assertEquals(second, entryStore.mostRecentNonTerminalEntryId())
-    }
-
-    @Test
-    fun `createPendingEntry rolls back row when markdown write fails`() {
-        // Make the entries directory a regular file so mkdirs() fails inside MarkdownEntryStore.
-        val entriesPath = File(markdownDir, "entries")
-        markdownDir.mkdirs()
-        entriesPath.writeText("not-a-directory")
-
-        val countBefore = boxStore.boxFor<EntryEntity>().count()
-        val failure = assertThrows(EntryPersistenceException::class.java) {
-            entryStore.createPendingEntry(SAMPLE_TEXT, SAMPLE_INSTANT)
-        }
-        assertNotNull(failure.cause)
-
-        val countAfter = boxStore.boxFor<EntryEntity>().count()
-        assertEquals(countBefore, countAfter)
     }
 
     @Test
@@ -396,9 +348,6 @@ class EntryStoreTest {
         assertEquals(Lens.LITERAL, decoded[0].lens)
         assertEquals("flattened", decoded[0].fields["energy_descriptor"])
         assertEquals(listOf("vocabulary-contradiction:fine:flattened"), decoded[1].flags)
-
-        val mdFile = File(File(markdownDir, "entries"), row.markdownFilename)
-        assertTrue("markdown should include lens_receipts", mdFile.readText().contains("lens_receipts: ["))
     }
 
     @Test

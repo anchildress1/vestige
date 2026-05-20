@@ -6,10 +6,10 @@ import dev.anchildress1.vestige.model.PatternKind
 import dev.anchildress1.vestige.model.PatternState
 import dev.anchildress1.vestige.storage.EntryEntity
 import dev.anchildress1.vestige.storage.EntryStore
-import dev.anchildress1.vestige.storage.MarkdownEntryStore
 import dev.anchildress1.vestige.storage.PatternEntity
 import dev.anchildress1.vestige.storage.PatternRepo
 import dev.anchildress1.vestige.storage.PatternStore
+import dev.anchildress1.vestige.storage.closeAfterCleaningThreadResources
 import dev.anchildress1.vestige.testing.cleanupObjectBoxTempRoot
 import dev.anchildress1.vestige.testing.newInMemoryObjectBoxDirectory
 import dev.anchildress1.vestige.testing.newModuleTempRoot
@@ -56,10 +56,7 @@ class PatternsListViewModelTest {
         tempRoot = newModuleTempRoot("vestige-patterns-list-viewmodel-")
         dataDir = newInMemoryObjectBoxDirectory("ob-patterns-list-")
         boxStore = openInMemoryBoxStore(dataDir)
-        entryStore = EntryStore(
-            boxStore,
-            MarkdownEntryStore(File(tempRoot, "md-${System.nanoTime()}").apply { mkdirs() }),
-        )
+        entryStore = EntryStore(boxStore)
         patternStore = PatternStore(boxStore, baseClock)
         patternRepo = PatternRepo(patternStore, baseClock)
     }
@@ -67,7 +64,7 @@ class PatternsListViewModelTest {
     @After
     fun tearDown() {
         Dispatchers.resetMain()
-        boxStore.close()
+        boxStore.closeAfterCleaningThreadResources()
         cleanupObjectBoxTempRoot(tempRoot, dataDir)
     }
 

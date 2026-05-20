@@ -5,13 +5,13 @@ import dev.anchildress1.vestige.model.PatternKind
 import dev.anchildress1.vestige.model.PatternState
 import dev.anchildress1.vestige.storage.CalloutCooldownEntity
 import dev.anchildress1.vestige.storage.EntryEntity
-import dev.anchildress1.vestige.storage.MarkdownEntryStore
 import dev.anchildress1.vestige.storage.PatternEntity
 import dev.anchildress1.vestige.storage.PatternStore
 import dev.anchildress1.vestige.storage.TagEntity
 import io.objectbox.BoxStore
 import java.io.File
 import java.security.MessageDigest
+import java.time.Instant
 
 /**
  * Debug-only fixture seeder. Lets the dev verify the pattern UI with real cards on a device.
@@ -19,7 +19,7 @@ import java.security.MessageDigest
  */
 object DebugPatternSeeder {
 
-    private const val ENTRY_COUNT = 12
+    private data class SeedEntry(val text: String, val timestamp: Instant, val durationMs: Long)
 
     private data class SeedPattern(
         val signature: String,
@@ -31,43 +31,21 @@ object DebugPatternSeeder {
 
     @Suppress("MagicNumber") // Fixture timestamps + corpus shape are deliberately concrete.
     fun seed(filesDir: File, boxStore: BoxStore, patternStore: PatternStore) {
-        val markdownStore = MarkdownEntryStore(filesDir)
+        File(filesDir, "entries").deleteRecursively()
         boxStore.runInTx {
-            markdownStore.listAll().forEach(File::delete)
             boxStore.boxFor(EntryEntity::class.java).removeAll()
             boxStore.boxFor(PatternEntity::class.java).removeAll()
             boxStore.boxFor(TagEntity::class.java).removeAll()
             boxStore.boxFor(CalloutCooldownEntity::class.java).removeAll()
 
-            data class SeedEntry(val text: String, val durationMs: Long)
-            val seedEntries = listOf(
-                SeedEntry("crashed after standup, wired until 2am", 18_000L),
-                SeedEntry("tuesday meeting again, same concrete shoes", 22_000L),
-                SeedEntry("wrote that doc in one sitting, surprising", 15_000L),
-                SeedEntry("wired until 2am, can't tell if good or bad", 27_000L),
-                SeedEntry("another tuesday, another aftermath", 12_000L),
-                SeedEntry("shipped the thing, immediate crash", 20_000L),
-                SeedEntry("decided to rewrite the migration, third time this week", 28_000L),
-                SeedEntry("rewrote it again, this version is the one", 19_000L),
-                SeedEntry("tuesday standup landed harder than expected", 24_000L),
-                SeedEntry("audit cycle hit; reviewed everything twice", 16_000L),
-                SeedEntry("concrete shoes on the morning standup", 11_000L),
-                SeedEntry("crashed at 3pm, no warning, just gone", 25_000L),
-            )
-            val baseMs = System.currentTimeMillis() - DAY_MS * ENTRY_COUNT
-            val entries = seedEntries.mapIndexed { idx, seed ->
+            val entries = seedEntries().mapIndexed { idx, seed ->
                 EntryEntity(
                     markdownFilename = "debug-seed-$idx.md",
                     entryText = seed.text,
-                    timestampEpochMs = baseMs + idx * DAY_MS,
+                    timestampEpochMs = seed.timestamp.toEpochMilli(),
                     durationMs = seed.durationMs,
                     extractionStatus = ExtractionStatus.COMPLETED,
-                ).also {
-                    // put first so ObjectBox initializes the lateinit ToMany<TagEntity> field
-                    // before MarkdownEntryStore.write() iterates entry.tags
-                    boxStore.boxFor(EntryEntity::class.java).put(it)
-                    markdownStore.write(it)
-                }
+                ).also { boxStore.boxFor(EntryEntity::class.java).put(it) }
             }
 
             // Two ACTIVE patterns wired to disjoint entry slices so the list has multiple cards
@@ -95,6 +73,26 @@ object DebugPatternSeeder {
             )
         }
     }
+
+    @Suppress("MagicNumber") // Fixture timestamps + durations are deliberately concrete.
+    private fun seedEntries() = listOf(
+        SeedEntry("crashed after standup, wired until 2am", Instant.parse("2026-05-07T18:42:00Z"), 18_000L),
+        SeedEntry("tuesday meeting again, same concrete shoes", Instant.parse("2026-05-05T14:10:00Z"), 22_000L),
+        SeedEntry("wrote that doc in one sitting, surprising", Instant.parse("2026-05-08T10:24:00Z"), 15_000L),
+        SeedEntry("wired until 2am, can't tell if good or bad", Instant.parse("2026-05-09T06:13:00Z"), 27_000L),
+        SeedEntry("another tuesday, another aftermath", Instant.parse("2026-05-12T15:30:00Z"), 12_000L),
+        SeedEntry("shipped the thing, immediate crash", Instant.parse("2026-05-13T21:08:00Z"), 20_000L),
+        SeedEntry(
+            "decided to rewrite the migration, third time this week",
+            Instant.parse("2026-05-14T16:45:00Z"),
+            28_000L,
+        ),
+        SeedEntry("rewrote it again, this version is the one", Instant.parse("2026-05-16T11:05:00Z"), 19_000L),
+        SeedEntry("tuesday standup landed harder than expected", Instant.parse("2026-05-19T13:55:00Z"), 24_000L),
+        SeedEntry("audit cycle hit; reviewed everything twice", Instant.parse("2026-05-18T19:22:00Z"), 16_000L),
+        SeedEntry("concrete shoes on the morning standup", Instant.parse("2026-05-19T08:40:00Z"), 11_000L),
+        SeedEntry("crashed at 3pm, no warning, just gone", Instant.parse("2026-05-20T19:00:00Z"), 25_000L),
+    )
 
     private fun seedPattern(patternStore: PatternStore, fixture: SeedPattern) {
         val signature = fixture.signature
@@ -129,6 +127,4 @@ object DebugPatternSeeder {
         MessageDigest.getInstance("SHA-256").digest(text.toByteArray()).joinToString("") {
             "%02x".format(it)
         }
-
-    private const val DAY_MS: Long = 24L * 60 * 60 * 1000
 }

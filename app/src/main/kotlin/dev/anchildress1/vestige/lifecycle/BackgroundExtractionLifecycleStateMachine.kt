@@ -25,18 +25,20 @@ class BackgroundExtractionLifecycleStateMachine(
     private var inFlightCount: Int = 0
     private var keepAliveJob: Job? = null
     private var foregroundStartRetryJob: Job? = null
+    private var foregroundStartSuppressedUntilIdle: Boolean = false
 
     @Synchronized
     fun onInFlightCountChange(count: Int) {
         require(count >= 0) { "inFlightCount must be ≥ 0 (got $count)" }
         inFlightCount = count
         if (count == 0) {
+            foregroundStartSuppressedUntilIdle = false
             foregroundStartRetryJob?.cancel()
             foregroundStartRetryJob = null
         }
         when (mutableState.value) {
             BackgroundExtractionLifecycleState.NORMAL -> {
-                if (count > 0) {
+                if (count > 0 && !foregroundStartSuppressedUntilIdle) {
                     foregroundStartRetryJob?.cancel()
                     foregroundStartRetryJob = null
                     transition(BackgroundExtractionLifecycleState.PROMOTING)
@@ -74,10 +76,14 @@ class BackgroundExtractionLifecycleStateMachine(
 
     /** Reset on platform start failure so the machine doesn't wedge in PROMOTING. */
     @Synchronized
-    fun onForegroundStartFailed() {
+    fun onForegroundStartFailed(retry: Boolean = true) {
         if (mutableState.value == BackgroundExtractionLifecycleState.PROMOTING) {
             transition(BackgroundExtractionLifecycleState.NORMAL)
-            if (inFlightCount > 0) scheduleForegroundStartRetry()
+            if (retry && inFlightCount > 0) {
+                scheduleForegroundStartRetry()
+            } else if (inFlightCount > 0) {
+                foregroundStartSuppressedUntilIdle = true
+            }
         }
     }
 
@@ -88,6 +94,7 @@ class BackgroundExtractionLifecycleStateMachine(
         keepAliveJob = null
         foregroundStartRetryJob?.cancel()
         foregroundStartRetryJob = null
+        foregroundStartSuppressedUntilIdle = false
         transition(BackgroundExtractionLifecycleState.NORMAL)
         if (inFlightCount > 0) transition(BackgroundExtractionLifecycleState.PROMOTING)
     }

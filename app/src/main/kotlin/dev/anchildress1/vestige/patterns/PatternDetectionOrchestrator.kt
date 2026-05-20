@@ -23,19 +23,14 @@ import java.time.Clock
 import java.time.ZoneId
 
 /**
- * Wiring layer called by `BackgroundExtractionSaveFlow` after `completeEntry` so the new entry
- * is already persisted with its tags + template label. Two side effects:
+ * Wiring layer called by `BackgroundExtractionSaveFlow` after `completeEntry`. Two side effects:
  *
  * 1. Once the database has at least [PATTERN_SURFACE_MIN_ENTRIES] completed entries, run
- *    [PatternDetector] + upsert results into [PatternStore] on **every** committed entry
- *    (Phase 3 §"end of session" semantics — each capture is its own session). New patterns get
- *    a model-generated title (one short call via [PatternTitleGenerator]); existing rows update
- *    their supporting set and `lastSeenTimestamp` per ADR-003 step 6.
- * 2. Select one matching active pattern for the committed entry, filtered by **per-pattern**
- *    callout cooldown (3 entries since that pattern last fired, per ADR-016). When a callout
- *    fires, append a `PATTERN_CALLOUT` observation to the entry and record the firing on that
- *    pattern's cooldown row. Every committed entry decrements every other pattern's active
- *    cooldown counter by one.
+ *    [PatternDetector] + upsert results into [PatternStore] on every committed entry.
+ * 2. Select one matching active pattern for the committed entry, filtered by per-pattern callout
+ *    cooldown. When a callout fires, append a `PATTERN_CALLOUT` observation and record the firing
+ *    on that pattern's cooldown row. Every committed entry decrements every other pattern's
+ *    active cooldown counter by one.
  *
  * The orchestrator is best-effort — any failure inside it must not propagate to the save flow.
  * Callers wrap the call in a try/catch; this class surfaces failures via [Log] only.
@@ -224,8 +219,8 @@ class PatternDetectionOrchestrator(
     private fun chooseMatchingPattern(entry: EntryEntity): PatternEntity? {
         // Indexed ACTIVE-only query avoids the full-table scan on every committed entry — at
         // 100+ patterns this is the difference between "fine" and "the save-flow hot path is
-        // O(n)" on the reference device. Per-pattern cooldown filters in-flight before tiebreak
-        // so the strongest *eligible* candidate wins (ADR-016).
+        // O(n)" on the reference device. The cooldown filter drops suppressed-or-already-reserved
+        // candidates before the tiebreak so the strongest eligible survivor wins.
         val candidates = patternStore.findActive()
             .filter { PatternMatcher.matches(entry, it, zoneId) }
             .filter { cooldownStore.isCalloutPermitted(it.patternId) }

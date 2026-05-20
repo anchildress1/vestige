@@ -5,9 +5,9 @@ import io.objectbox.kotlin.boxFor
 import io.objectbox.query.QueryBuilder
 
 /**
- * Owner of the per-pattern callout cooldown table per ADR-016. One row per `patternId`; the row
- * tracks fire history, in-flight reservation, and suppression counter. Replaces ADR-003's
- * singleton model — see ADR-016 for the rationale on the global→per-pattern flip.
+ * Owner of the per-pattern callout cooldown table. One row per `patternId`; tracks fire history,
+ * in-flight reservation, and the remaining-suppression counter that gates whether the pattern's
+ * callout can fire on subsequent entries.
  */
 class CalloutCooldownStore(private val boxStore: BoxStore) {
 
@@ -59,17 +59,15 @@ class CalloutCooldownStore(private val boxStore: BoxStore) {
     }
 
     /**
-     * Atomically claim [patternId]'s callout slot for [entryId].
+     * Atomically claim [patternId]'s callout slot for [entryId]. Returns `RESERVED` on success,
+     * `BLOCKED_BY_PENDING_RESERVATION` when another entry already holds this pattern's slot,
+     * `SUPPRESSED_BY_COOLDOWN` when this pattern's suppression window is still active. Re-reserving
+     * the same `(entryId, patternId)` pair is idempotent and returns `RESERVED`.
      *
-     * - If another entry already holds [patternId]'s slot, this entry is rejected without mutating
-     *   state.
-     * - Otherwise this entry becomes the sole pending reservation on [patternId]'s row until
-     *   confirm/release.
-     *
-     * Cooldown suppression is enforced upstream by the orchestrator's `isCalloutPermitted` filter
-     * at pattern selection — by the time we get here, the pattern is eligible. Concurrent
-     * suppression-then-reserve cannot collide because both run inside the same `runInTx` in the
-     * orchestrator's `onEntryCommitted`.
+     * The orchestrator's selector pre-filters by `isCalloutPermitted` so production callers should
+     * never see `SUPPRESSED_BY_COOLDOWN` — but a concurrent `settleReservedCallout` from a parallel
+     * save can land a suppression window between the filter read and this reserve write, and the
+     * store-side check is the race-safety net that handles that case gracefully.
      */
     fun tryReserveCallout(entryId: Long, patternId: String): ReservationOutcome = boxStore.callInTx {
         val row = snapshotFor(patternId)
@@ -89,8 +87,8 @@ class CalloutCooldownStore(private val boxStore: BoxStore) {
     }
 
     /**
-     * Record a fired callout on [patternId]. Suppresses the next [windowEntries] entries on that
-     * pattern. Used for direct fires that didn't go through reserve/confirm (tests, future paths).
+     * Test-only seam: synthesizes a fire on [patternId] without driving the reserve→confirm
+     * lifecycle. Production paths use `tryReserveCallout` + `confirmReservedCallout`.
      */
     fun recordFired(entryId: Long, patternId: String, timestampMs: Long, windowEntries: Int = DEFAULT_WINDOW) {
         require(windowEntries >= 0) { "windowEntries >= 0 required (got $windowEntries)" }

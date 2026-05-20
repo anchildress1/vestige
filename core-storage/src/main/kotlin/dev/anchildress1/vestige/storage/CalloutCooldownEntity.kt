@@ -5,9 +5,10 @@ import io.objectbox.annotation.Id
 import io.objectbox.annotation.Index
 
 /**
- * Per-pattern cooldown row per ADR-016. One row per `patternId`; the row tracks that pattern's
- * fire history, its in-flight reservation, and its remaining-suppression counter. Replaces the
- * singleton model ADR-003 §"Cooldown (callout-side only, global)" originally specified.
+ * Per-pattern callout-cooldown row. One row per `patternId`; tracks fire history, in-flight
+ * reservation, and remaining-suppression counter. `remainingSuppression > 0` and
+ * `pendingCalloutEntryId != null` are mutually exclusive in valid states (suppression starts
+ * only after a reservation confirms; reserving requires a clear window).
  */
 @Entity
 class CalloutCooldownEntity(

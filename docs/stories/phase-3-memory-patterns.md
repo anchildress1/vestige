@@ -20,7 +20,7 @@ Stand up the memory layer (hybrid retrieval over saved entries) and the pattern 
 - [ ] **STT-E resolved** — EmbeddingGemma either ships in v1 (if it visibly outperforms tag-only on prepared sample data) or defers to v1.5. The decision is recorded in ADR-001 §"Locked Stack" Storage row and `backlog.md`.
 - [ ] If STT-E passed: vector field is added to the `Entry` ObjectBox schema, vectors are computed for all existing entries, and `RetrievalRepo` returns hybrid (keyword + tags + recency + vector) results.
 - [ ] If STT-E failed: no vector field, no vector index, no EmbeddingGemma artifact. Schema and APK ship without them.
-- [x] Pattern detection runs at end of session and surfaces cross-entry patterns when threshold conditions are met (≥10 entries, ≥3 supporting entries per pattern, cooldown of 3 entries since last pattern of the same shape). _(Per-capture trigger gated on `PATTERN_SURFACE_MIN_ENTRIES = 10`; `PatternDetector.SUPPORTING_THRESHOLD = 3` per primitive; per-pattern cooldown via `CalloutCooldownStore` indexed by `patternId` per ADR-016.)_
+- [x] Pattern detection runs at end of session and surfaces cross-entry patterns when threshold conditions are met (≥10 entries, ≥3 supporting entries per pattern, cooldown of 3 entries since last pattern of the same shape).
 - [ ] Patterns persist in ObjectBox per ADR-003 with lifecycle states: `active`, `dismissed`, `snoozed`, `resolved`, `below_threshold`.
 - [ ] Pattern actions (dismiss / snooze / mark-resolved) work and survive app restart.
 - [ ] Pattern detail shows the pattern claim, count, recurrence timing, source snippets (date + short text), and the active persona's voice on the surfaced pattern.

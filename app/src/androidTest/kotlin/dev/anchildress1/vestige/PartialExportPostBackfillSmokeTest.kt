@@ -14,7 +14,6 @@ import kotlinx.coroutines.withTimeout
 import org.json.JSONObject
 import org.junit.After
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertTrue
 import org.junit.Assume.assumeTrue
 import org.junit.Before
@@ -36,9 +35,8 @@ import java.util.zip.ZipInputStream
  *     → VestigeDataExporter.writeTo → unzip → assert.
  *
  * Asserts (against real model output, not seed text):
- *   - Fix #1: empty-tag rows ship `tags: []` inline; populated rows ship the multi-line block.
- *   - Fix #3: `entries[].attempt_count` is > 0 on every successfully-backfilled row.
- *   - Fix #5: `settings.current_step` is JSON null because onboarding is complete.
+ *   - Empty-tag rows ship `tags: []` inline; populated rows ship the multi-line block.
+ *   - `settings.current_step` is JSON null when onboarding is complete.
  *   - Seed-contract honesty: post-backfill, status is COMPLETED and receipts are non-empty.
  *   - Anticipated-content: at least one of the documented expected-tag variants for each row
  *     lands in the resolved tags (loose match — same normalization DemoExamples uses).
@@ -151,14 +149,6 @@ class PartialExportPostBackfillSmokeTest {
                 ?: error("export carried unknown markdown_filename $filename")
             val tags = (0 until entry.getJSONArray("tags").length())
                 .map { entry.getJSONArray("tags").getString(it) }
-
-            // Fix #3 (end-to-end): attempt_count bumped through real EntryStore.completeEntry.
-            val attemptCount = entry.getInt("attempt_count")
-            assertNotEquals(
-                "row ${sample.id}: attempt_count must bump on every terminal completion",
-                0,
-                attemptCount,
-            )
 
             // Seed-contract honesty post-backfill: status is COMPLETED *and* receipts are real.
             assertEquals("COMPLETED", entry.getString("extraction_status"))

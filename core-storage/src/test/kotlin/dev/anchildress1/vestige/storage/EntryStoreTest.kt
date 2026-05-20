@@ -169,7 +169,7 @@ class EntryStoreTest {
     }
 
     @Test
-    fun `failEntry sets terminal status, lastError, and bumps attemptCount`() {
+    fun `failEntry sets terminal status and lastError without touching attemptCount`() {
         val id = entryStore.createPendingEntry(SAMPLE_TEXT, SAMPLE_INSTANT)
 
         entryStore.failEntry(id, ExtractionStatus.FAILED, "lens-parse-fail")
@@ -177,30 +177,7 @@ class EntryStoreTest {
         val row = boxStore.boxFor<EntryEntity>().get(id)
         assertEquals(ExtractionStatus.FAILED, row.extractionStatus)
         assertEquals("lens-parse-fail", row.lastError)
-        assertEquals(1, row.attemptCount)
-    }
-
-    @Test
-    fun `attemptCount accumulates across recovery cycles (fail then complete)`() {
-        val id = entryStore.createPendingEntry(SAMPLE_TEXT, SAMPLE_INSTANT)
-
-        entryStore.failEntry(id, ExtractionStatus.TIMED_OUT, "deadline")
-        entryStore.failEntry(id, ExtractionStatus.FAILED, "lens-parse-fail")
-        entryStore.completeEntry(id, resolvedSample(), TemplateLabel.AFTERMATH)
-
-        val row = boxStore.boxFor<EntryEntity>().get(id)
-        assertEquals(ExtractionStatus.COMPLETED, row.extractionStatus)
-        assertEquals("attemptCount must sum every terminal transition", 3, row.attemptCount)
-    }
-
-    @Test
-    fun `completeEntry bumps attemptCount on first success`() {
-        val id = entryStore.createPendingEntry(SAMPLE_TEXT, SAMPLE_INSTANT)
-
-        entryStore.completeEntry(id, resolvedSample(), TemplateLabel.AFTERMATH)
-
-        val row = boxStore.boxFor<EntryEntity>().get(id)
-        assertEquals(1, row.attemptCount)
+        assertEquals(0, row.attemptCount)
     }
 
     @Test

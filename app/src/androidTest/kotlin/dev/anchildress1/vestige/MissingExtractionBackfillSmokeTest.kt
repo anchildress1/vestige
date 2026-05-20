@@ -22,7 +22,7 @@ import java.io.File
 /**
  * End-to-end on-device check that `launchMissingExtractionBackfill()` actually fills in
  * the lens receipts on every seeded row that ships under the COMPLETED-with-empty-receipts
- * seed contract, and that each successful completion bumps the row's `attemptCount`.
+ * seed contract.
  *
  * Requires the main model artifact already pushed (the typical `make reinstall` posture).
  * If the model is missing this test self-skips via `assumeTrue` — no spurious red.
@@ -77,7 +77,6 @@ class MissingExtractionBackfillSmokeTest {
         val after = box.all.associateBy { it.id }
         val nonCompleted = after.values.filter { it.extractionStatus != ExtractionStatus.COMPLETED }
         val unfilled = after.values.filter { it.lensReceiptsJson.isNullOrEmpty() || it.lensReceiptsJson == "[]" }
-        val zeroAttempts = after.values.filter { it.attemptCount == 0 }
 
         assertTrue(
             "backfill must finish every seeded row as COMPLETED; failures: " +
@@ -87,11 +86,6 @@ class MissingExtractionBackfillSmokeTest {
         assertTrue(
             "backfill left ${unfilled.size}/${after.size} rows without lens receipts: ${unfilled.map { it.id }}",
             unfilled.isEmpty(),
-        )
-        assertTrue(
-            "row attempt_count must bump on every terminal extraction — ${zeroAttempts.size}/${after.size}" +
-                " rows are still at 0: ${zeroAttempts.map { it.id }}",
-            zeroAttempts.isEmpty(),
         )
 
         awaitVocabVectors()

@@ -67,7 +67,7 @@ class EntryEntity(
     /** Millis of captured audio; 0 for typed entries or pre-duration rows. */
     var durationMs: Long = 0L,
 
-    /** Count of terminal extraction cycles this row has gone through (COMPLETED + FAILED + TIMED_OUT). */
+    /** Retry budget; cap at 3. */
     var attemptCount: Int = 0,
 
     /** Compact failure reason (timeout / parse-fail / OOM / lens-error). */

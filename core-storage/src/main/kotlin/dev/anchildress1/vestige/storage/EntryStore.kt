@@ -75,7 +75,6 @@ class EntryStore(private val boxStore: BoxStore) {
             entry.lensReceiptsJson = EntryLensReceiptJson.encode(lensReceipts)
             entry.extractionStatus = ExtractionStatus.COMPLETED
             entry.lastError = null
-            entry.attemptCount += 1
             attachTags(entry, resolved)
             box.put(entry)
         }
@@ -210,7 +209,6 @@ class EntryStore(private val boxStore: BoxStore) {
                 ?: throw EntryPersistenceException("No entry row id=$entryId to fail")
             entry.extractionStatus = status
             entry.lastError = lastError
-            entry.attemptCount += 1
             box.put(entry)
         }
     }

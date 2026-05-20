@@ -73,6 +73,16 @@ class DebugPatternSeederTest {
     }
 
     @Test
+    fun `seed is idempotent — re-running produces the same row counts`() {
+        DebugPatternSeeder.seed(filesDir, boxStore, patternStore)
+        DebugPatternSeeder.seed(filesDir, boxStore, patternStore)
+
+        assertEquals(35L, entryStore.count())
+        assertEquals(35L, entryStore.countCompleted())
+        assertEquals(3, patternStore.findVisibleSortedByLastSeen().size)
+    }
+
+    @Test
     fun `seed clears stale callout cooldown state before rebuilding fixtures`() {
         boxStore.boxFor(CalloutCooldownEntity::class.java).put(
             CalloutCooldownEntity(

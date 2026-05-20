@@ -29,10 +29,7 @@ object EmbeddingClustering {
      * haven't been backfilled yet and would distort the metric. Returns clusters sorted by
      * descending size; singletons are kept (they still represent a distinct framing).
      */
-    fun cluster(
-        members: List<EntryEntity>,
-        maxCosineDistance: Double = DEFAULT_MAX_COSINE_DISTANCE,
-    ): List<Cluster> {
+    fun cluster(members: List<EntryEntity>, maxCosineDistance: Double = DEFAULT_MAX_COSINE_DISTANCE): List<Cluster> {
         require(maxCosineDistance in 0.0..2.0) {
             "maxCosineDistance must be in [0,2] (got $maxCosineDistance)"
         }
@@ -63,10 +60,7 @@ object EmbeddingClustering {
         return assembleClusters(vectored, labels)
     }
 
-    private fun closestPair(
-        normalized: List<FloatArray>,
-        labels: IntArray,
-    ): Triple<Int, Int, Double>? {
+    private fun closestPair(normalized: List<FloatArray>, labels: IntArray): Triple<Int, Int, Double>? {
         var bestI = -1
         var bestJ = -1
         var bestDist = Double.MAX_VALUE
@@ -148,8 +142,5 @@ object EmbeddingClustering {
         return 1.0 - dot
     }
 
-    data class Cluster(
-        val clusterId: String,
-        val members: List<EntryEntity>,
-    )
+    data class Cluster(val clusterId: String, val members: List<EntryEntity>)
 }

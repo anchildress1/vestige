@@ -88,10 +88,7 @@ private fun composeDescription(segments: List<VocabDistributionSegment>, totalWe
  * proportions; the bar handles the division.
  */
 @Immutable
-data class VocabDistributionSegment(
-    val label: String,
-    val weight: Float,
-)
+data class VocabDistributionSegment(val label: String, val weight: Float)
 
 object VocabDistributionBarDefaults {
     val Height: Dp = 16.dp

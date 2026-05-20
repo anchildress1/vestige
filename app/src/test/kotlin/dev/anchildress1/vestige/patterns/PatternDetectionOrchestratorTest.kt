@@ -848,7 +848,7 @@ class PatternDetectionOrchestratorTest {
     @Test
     fun `vocab clustering is skipped when supporting set is below the minimum`() = runTest {
         val supporting = (1..3).map { i ->
-            putEntry(text = "tired ${i}", timestamp = now.plusSeconds(i.toLong())).also {
+            putEntry(text = "tired $i", timestamp = now.plusSeconds(i.toLong())).also {
                 it.vector = nearAxisVector(axis = 0)
                 boxStore.boxFor(EntryEntity::class.java).put(it)
             }

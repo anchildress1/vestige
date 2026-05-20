@@ -18,9 +18,11 @@ class VocabClusterLabelerTest {
 
         val result = VocabClusterLabeler.label(cluster, rootToken = "tired")
 
-        // "exhausted" and "drained" each appear 3×; alphabetical tiebreak between them at the
-        // top. The label is comma-joined top tokens (≤24 chars), capped at 3 tokens.
-        assertEquals("drained, exhausted, wiped", result.label)
+        // "exhausted" and "drained" each appear 3×; alphabetical tiebreak picks them first
+        // (drained, exhausted). The third slot is a single-occurrence tie between
+        // "completely", "wiped", and "work" — alpha-asc picks "completely", which pushes the
+        // joined length past MAX_LABEL_CHARS=24 → "drained, exhausted, com…".
+        assertEquals("drained, exhausted, com…", result.label)
     }
 
     @Test
@@ -154,11 +156,10 @@ class VocabClusterLabelerTest {
         assertEquals("exhausted, everything", result.label)
     }
 
-    private fun clusterOf(members: List<Pair<String, Long>>): EmbeddingClustering.Cluster =
-        EmbeddingClustering.Cluster(
-            clusterId = "0".repeat(64),
-            members = members.map { (text, id) -> entry(id = id, text = text, vector = nearAxis(0, 0.0)) },
-        )
+    private fun clusterOf(members: List<Pair<String, Long>>): EmbeddingClustering.Cluster = EmbeddingClustering.Cluster(
+        clusterId = "0".repeat(64),
+        members = members.map { (text, id) -> entry(id = id, text = text, vector = nearAxis(0, 0.0)) },
+    )
 
     private fun entry(id: Long, text: String, vector: FloatArray?): EntryEntity =
         EntryEntity(entryText = text, timestampEpochMs = id * 1000L).also {

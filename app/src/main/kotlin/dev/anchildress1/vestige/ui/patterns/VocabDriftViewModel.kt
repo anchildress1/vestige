@@ -2,11 +2,11 @@ package dev.anchildress1.vestige.ui.patterns
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import dev.anchildress1.vestige.model.PatternKind
 import dev.anchildress1.vestige.storage.EntryStore
 import dev.anchildress1.vestige.storage.PatternStore
 import dev.anchildress1.vestige.storage.VocabCluster
 import dev.anchildress1.vestige.storage.VocabClustersCodec
-import dev.anchildress1.vestige.model.PatternKind
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow

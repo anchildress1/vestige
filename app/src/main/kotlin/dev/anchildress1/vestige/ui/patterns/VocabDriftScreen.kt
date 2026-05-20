@@ -42,11 +42,7 @@ import dev.anchildress1.vestige.ui.theme.VestigeTheme
  * thing; embeddings saw three.
  */
 @Composable
-fun VocabDriftScreen(
-    viewModel: VocabDriftViewModel,
-    onBack: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
+fun VocabDriftScreen(viewModel: VocabDriftViewModel, onBack: () -> Unit, modifier: Modifier = Modifier) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val colors = VestigeTheme.colors
     Column(modifier = modifier.fillMaxSize().background(colors.floor)) {

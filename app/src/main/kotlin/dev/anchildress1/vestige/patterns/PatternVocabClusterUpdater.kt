@@ -22,10 +22,7 @@ import org.json.JSONObject
  * Re-reads the row inside the write tx to avoid clobbering a concurrent state transition out
  * of ACTIVE — ADR-003 §step 6 requires the write to honor the current lifecycle state.
  */
-internal class PatternVocabClusterUpdater(
-    private val boxStore: BoxStore,
-    private val patternStore: PatternStore,
-) {
+internal class PatternVocabClusterUpdater(private val boxStore: BoxStore, private val patternStore: PatternStore) {
 
     fun stampAll() {
         patternStore.findActive()

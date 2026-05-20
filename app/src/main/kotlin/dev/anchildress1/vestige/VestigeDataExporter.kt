@@ -206,7 +206,9 @@ internal class VestigeDataExporter(private val boxStore: BoxStore, private val o
         const val MARKDOWN_EXPORT_DIR = "entries"
         private const val TAG = "VestigeDataExporter"
         private const val EXPORT_FORMAT = "vestige.full-export"
-        private const val EXPORT_SCHEMA_VERSION = 2
+        // v3 (2026-05-20): `settings.current_step` is nullable — JSON null once
+        // `onboarding_complete` is true. v2 emitted the OnboardingPrefs sentinel default.
+        private const val EXPORT_SCHEMA_VERSION = 3
         private const val JSON_INDENT = 2
     }
 }

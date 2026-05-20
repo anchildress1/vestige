@@ -122,7 +122,7 @@ class VestigeDataExporterTest {
         exporter().writeTo(out)
 
         val snapshot = snapshotOf(out)
-        assertEquals(2, snapshot.getInt("schema_version"))
+        assertEquals(3, snapshot.getInt("schema_version"))
         assertTrue(snapshot.has("tags"))
         assertEquals(0, snapshot.getJSONArray("tags").length())
         assertTrue(snapshot.has("callout_cooldowns"))

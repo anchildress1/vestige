@@ -69,10 +69,10 @@ private fun composeDescription(segments: List<VocabDistributionSegment>, totalWe
     // Round to nearest, then absorb any rounding drift into the last segment so the announced
     // percentages always sum to 100. Floor-on-each (the previous behavior) under-reports and
     // can leave the user hearing "33%, 33%, 33%" for an even split.
-    val rounded = segments.map { (it.weight / totalWeight * PERCENT_SCALE).roundToInt() }.toMutableList()
-    val drift = PERCENT_SCALE.toInt() - rounded.sum()
-    if (rounded.isNotEmpty()) rounded[rounded.lastIndex] += drift
-    val parts = segments.zip(rounded) { segment, pct -> "${segment.label}: $pct%" }
+    val rounded = segments.map { (it.weight / totalWeight * PERCENT_SCALE).roundToInt() }
+    val head = rounded.dropLast(1)
+    val balanced = head + (PERCENT_SCALE.toInt() - head.sum())
+    val parts = segments.zip(balanced) { segment, pct -> "${segment.label}: $pct%" }
     return "Vocabulary distribution: ${parts.joinToString(", ")}."
 }
 

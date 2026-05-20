@@ -52,6 +52,7 @@ class PatternDetectorTest {
         templateLabel: TemplateLabel? = null,
         timestamp: Instant = now,
         tagNames: List<String> = emptyList(),
+        energyDescriptor: String? = null,
         commitmentTopic: String? = null,
         extractionStatus: ExtractionStatus = ExtractionStatus.COMPLETED,
     ): EntryEntity {
@@ -60,6 +61,7 @@ class PatternDetectorTest {
             entryText = text,
             timestampEpochMs = timestamp.toEpochMilli(),
             templateLabel = templateLabel,
+            energyDescriptor = energyDescriptor,
             statedCommitmentJson = commitmentTopic?.let { """{"topic_or_person":"$it","text":"do it"}""" },
             extractionStatus = extractionStatus,
         )
@@ -97,6 +99,18 @@ class PatternDetectorTest {
         assertEquals(1, patterns.size)
         assertEquals(3, patterns.first().supportingEntryCount)
         assertEquals("aftermath", patterns.first().templateLabel)
+    }
+
+    @Test
+    fun `audit fallback labels do not surface as template recurrence patterns`() {
+        repeat(4) { putEntry(templateLabel = TemplateLabel.AUDIT) }
+
+        assertTrue(
+            "audit is fallback metadata and should not become a user-visible pattern",
+            detector.detect().none {
+                it.kind == PatternKind.TEMPLATE_RECURRENCE && it.templateLabel == TemplateLabel.AUDIT.serial
+            },
+        )
     }
 
     @Test
@@ -234,6 +248,22 @@ class PatternDetectorTest {
         repeat(4) { putEntry(text = "I am tired again", templateLabel = null) }
         val patterns = detector.detect().filter { it.kind == PatternKind.VOCAB_FREQUENCY }
         assertTrue(patterns.any { it.signatureJson.contains("\"token\":\"tired\"") })
+    }
+
+    @Test
+    fun `vocab pattern folds tired-state vocabulary variants into the tired root`() {
+        putEntry(text = "exhausted again, every limb gave up at once", energyDescriptor = "exhausted")
+        putEntry(text = "drained to the bone, eyes won't focus", energyDescriptor = "drained to the bone")
+        putEntry(text = "sluggish, the brain fog is back", tagNames = listOf("brain-fog", "sluggish"))
+        putEntry(text = "wired-tired, body wants sleep, brain refuses", tagNames = listOf("wired", "tired"))
+        putEntry(text = "amped but exhausted, my body and brain disagree", energyDescriptor = "amped but exhausted")
+        putEntry(text = "can't sleep, can't focus, both tanks empty", tagNames = listOf("tanks-empty"))
+
+        val pattern = detector.detect().single {
+            it.kind == PatternKind.VOCAB_FREQUENCY && it.signatureJson.contains("\"token\":\"tired\"")
+        }
+
+        assertEquals(6, pattern.supportingEntryCount)
     }
 
     @Test

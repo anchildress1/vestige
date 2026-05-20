@@ -65,6 +65,7 @@ class PatternDetector(
 
     private fun detectTemplateRecurrence(entries: List<EntryEntity>): List<DetectedPattern> = entries
         .filter { it.templateLabel != null }
+        .filterNot { it.templateLabel == TemplateLabel.AUDIT }
         .groupBy { it.templateLabel!! }
         .filterValues { it.size >= SUPPORTING_THRESHOLD }
         .map { (label, supporting) ->
@@ -74,6 +75,7 @@ class PatternDetector(
 
     private fun detectTagPair(entries: List<EntryEntity>): List<DetectedPattern> = entries
         .filter { it.templateLabel != null }
+        .filterNot { it.templateLabel == TemplateLabel.AUDIT }
         .groupBy { it.templateLabel!! }
         .flatMap { (label, group) ->
             pairsWithinGroup(group)
@@ -156,15 +158,24 @@ class PatternDetector(
     }
 
     private fun vocabTokensFor(entry: EntryEntity): Set<String> {
-        val fromTags = entry.tags.map { TokenStemmer.stem(it.name) }
+        val fromTags = entry.tags.map { it.name.toVocabToken() }
+        val fromEnergy = entry.energyDescriptor
+            ?.split(WORD_SPLIT)
+            ?.mapNotNull { it.toVocabToken().takeIf(String::isNotEmpty) }
+            .orEmpty()
         val fromText = entry.entryText
             .lowercase(Locale.ROOT)
             .split(WORD_SPLIT)
             .asSequence()
             .map { it.trim() }
             .filter { it.length >= MIN_VOCAB_LENGTH }
-            .map { TokenStemmer.stem(it) }
-        return (fromTags.asSequence() + fromText).toSet()
+            .map { it.toVocabToken() }
+        return (fromTags.asSequence() + fromEnergy + fromText).toSet()
+    }
+
+    private fun String.toVocabToken(): String {
+        val token = TokenStemmer.stem(this.lowercase(Locale.ROOT).trim())
+        return VOCAB_ROOT_ALIASES[token] ?: token
     }
 
     private fun detected(signature: Signature, supporting: List<EntryEntity>): DetectedPattern {
@@ -189,6 +200,33 @@ class PatternDetector(
 
         internal const val MIN_VOCAB_LENGTH = 4
         internal val WORD_SPLIT: Regex = Regex("[^a-z0-9]+")
+        internal val VOCAB_ROOT_ALIASES: Map<String, String> = mapOf(
+            "amped" to "tired",
+            "anxiou" to "tired",
+            "anxious" to "tired",
+            "blurry" to "tired",
+            "bone" to "tired",
+            "burnt" to "tired",
+            "caffeine" to "tired",
+            "depleted" to "tired",
+            "drained" to "tired",
+            "empty" to "tired",
+            "exhausted" to "tired",
+            "fog" to "tired",
+            "foggy" to "tired",
+            "fume" to "tired",
+            "fumes" to "tired",
+            "heavy" to "tired",
+            "heavier" to "tired",
+            "molasse" to "tired",
+            "molasses" to "tired",
+            "sluggish" to "tired",
+            "sleep" to "tired",
+            "static" to "tired",
+            "tank" to "tired",
+            "wired" to "tired",
+            "wiped" to "tired",
+        )
     }
 }
 

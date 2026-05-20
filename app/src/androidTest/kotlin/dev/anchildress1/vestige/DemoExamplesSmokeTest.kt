@@ -14,6 +14,7 @@ import dev.anchildress1.vestige.inference.HistoryChunk
 import dev.anchildress1.vestige.inference.LensResult
 import dev.anchildress1.vestige.inference.LiteRtLmEngine
 import dev.anchildress1.vestige.model.Persona
+import dev.anchildress1.vestige.model.TemplateLabel
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.runBlocking
 import org.json.JSONArray
@@ -96,6 +97,14 @@ class DemoExamplesSmokeTest {
                     EXPECTED_LENS_COUNT,
                     result.lensResults.count { it.extraction != null },
                 )
+
+                example.expectedTemplateLabel?.let { expected ->
+                    assertEquals(
+                        "${example.id}: template label must match the intended demo shape",
+                        expected,
+                        result.templateLabel,
+                    )
+                }
 
                 example.expectedEnergyAnchor?.let { expected ->
                     val energy = result.resolved.fields[KEY_ENERGY]?.value as? String
@@ -257,6 +266,7 @@ class DemoExamplesSmokeTest {
         val entryText: String,
         val retrievedHistory: List<HistoryChunk> = emptyList(),
         val followUpAnchors: Set<String>,
+        val expectedTemplateLabel: TemplateLabel? = null,
         val expectedEnergyAnchor: String? = null,
         val expectedPatternId: String? = null,
         val expectedResolvedTags: Set<String> = emptySet(),
@@ -305,6 +315,7 @@ class DemoExamplesSmokeTest {
                     "vaped while reading i had three tabs open i knew with the three tabs " +
                     "are four and they're still sitting there open",
                 followUpAnchors = setOf("hollow", "evaporated", "tabs", "coffee", "all-hands"),
+                expectedTemplateLabel = TemplateLabel.AFTERMATH,
                 expectedEnergyAnchor = "hollow",
                 expectedResolvedTags = setOf(
                     "hollow-routine",
@@ -369,6 +380,7 @@ class DemoExamplesSmokeTest {
                     ),
                 ),
                 followUpAnchors = setOf("couch", "spreadsheet", "dimensions", "reviews", "rows"),
+                expectedTemplateLabel = TemplateLabel.DECISION_SPIRAL,
                 expectedPatternId = COUCH_PATTERN_ID,
                 expectedResolvedTags = setOf("couch", "spreadsheet", "comparing"),
             ),

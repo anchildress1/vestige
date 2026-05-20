@@ -234,13 +234,38 @@ class VectorBackfillWorkerTest {
     }
 
     @Test
-    fun `COMPLETED row with nothing distillable clears any legacy vector, stamps schema, and terminates the sweep`() =
+    fun `COMPLETED row with nothing distillable but no lens receipts stays stale for post-extraction retry`() =
         runTest {
             val id = insertEntry(
                 tagNames = emptyList(),
                 observations = emptyList(),
                 commitmentTopic = null,
                 vector = FloatArray(DIMS) { 0.5f },
+                lensReceiptsJson = "[]",
+            )
+            val worker = VectorBackfillWorker(boxStore) { error("embedder must not be called for blank distillation") }
+
+            val stats = worker.backfill()
+
+            assertEquals(1, stats.total)
+            assertEquals(0, stats.processed)
+            assertEquals(0, stats.failed)
+            assertEquals(1, stats.skipped)
+            val row = boxStore.boxFor<EntryEntity>()[id]
+            assertNull("no vector — null is a zero cosine contribution", row.vector)
+            assertEquals("pre-extraction seed row must be retried after LLM receipts land", 0, row.vectorSchemaVersion)
+            assertTrue("stale seed row must remain pending", worker.hasPendingWork())
+        }
+
+    @Test
+    fun `COMPLETED row with terminal receipts and nothing distillable stamps schema and terminates the sweep`() =
+        runTest {
+            val id = insertEntry(
+                tagNames = emptyList(),
+                observations = emptyList(),
+                commitmentTopic = null,
+                vector = FloatArray(DIMS) { 0.5f },
+                lensReceiptsJson = """[{"lens":"LITERAL","extracted":false}]""",
             )
             val worker = VectorBackfillWorker(boxStore) { error("embedder must not be called for blank distillation") }
 
@@ -290,6 +315,22 @@ class VectorBackfillWorkerTest {
         val row = boxStore.boxFor<EntryEntity>()[target]
         assertNull(row.vector)
         assertEquals(0, row.vectorSchemaVersion)
+    }
+
+    @Test
+    fun `embedding pass does not resurrect a row deleted while the embedder is running`() = runTest {
+        val target = insertEntry(tagNames = listOf("deleted-during-embed"))
+        val entryBox = boxStore.boxFor<EntryEntity>()
+        val worker = VectorBackfillWorker(boxStore) {
+            entryBox.remove(target)
+            FloatArray(DIMS) { 1f }
+        }
+
+        val stats = worker.backfill()
+
+        assertEquals(1, stats.total)
+        assertEquals(1, stats.processed)
+        assertNull("deleted row must stay deleted, not be re-put from a stale batch entity", entryBox.get(target))
     }
 
     @Test
@@ -374,6 +415,7 @@ class VectorBackfillWorkerTest {
         status: ExtractionStatus = ExtractionStatus.COMPLETED,
         vector: FloatArray? = null,
         vectorSchemaVersion: Int = 0,
+        lensReceiptsJson: String? = null,
     ): Long {
         val entryBox = boxStore.boxFor<EntryEntity>()
         val tagBox = boxStore.boxFor<TagEntity>()
@@ -399,6 +441,7 @@ class VectorBackfillWorkerTest {
             markdownFilename = "test-${System.nanoTime()}.md",
             statedCommitmentJson = commitmentJson,
             entryObservationsJson = observationsJson,
+            lensReceiptsJson = lensReceiptsJson,
             extractionStatus = status,
             vector = vector,
             vectorSchemaVersion = vectorSchemaVersion,

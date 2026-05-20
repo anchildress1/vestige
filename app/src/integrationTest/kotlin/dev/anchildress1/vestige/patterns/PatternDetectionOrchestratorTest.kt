@@ -603,6 +603,60 @@ class PatternDetectionOrchestratorTest {
     }
 
     @Test
+    fun `new pattern insert rechecks inside the write transaction when another writer wins the race`() = runTest {
+        val supporting = (1..3).map { putEntry(templateLabel = TemplateLabel.AFTERMATH) }
+        val detector: PatternDetector = mockk()
+        val detected = DetectedPattern(
+            patternId = PATTERN_A_ID,
+            kind = PatternKind.TEMPLATE_RECURRENCE,
+            signatureJson = "{\"kind\":\"template_recurrence\",\"label\":\"aftermath\"}",
+            templateLabel = TemplateLabel.AFTERMATH.serial,
+            supportingEntryIds = supporting.map { it.id },
+            firstSeenTimestamp = now.minusSeconds(60).toEpochMilli(),
+            lastSeenTimestamp = now.toEpochMilli(),
+        )
+        every { detector.detect() } returns listOf(detected)
+        coEvery { engine.generateText(any(), any()) } coAnswers {
+            patternStore.put(
+                PatternEntity(
+                    patternId = PATTERN_A_ID,
+                    kind = PatternKind.TEMPLATE_RECURRENCE,
+                    signatureJson = detected.signatureJson,
+                    title = "Concurrent Winner",
+                    templateLabel = TemplateLabel.AFTERMATH.serial,
+                    firstSeenTimestamp = 1L,
+                    lastSeenTimestamp = 2L,
+                    state = PatternState.ACTIVE,
+                    latestCalloutText = "winner callout",
+                ),
+            )
+            "Late Writer"
+        }
+        val raceOrchestrator = PatternDetectionOrchestrator(
+            boxStore = boxStore,
+            detector = detector,
+            patternStore = patternStore,
+            titleGenerator = PatternTitleGenerator(
+                engine = engine,
+                personaPromptComposer = { "P" },
+                templateLoader = { "T" },
+                forbiddenPhraseDetector = { false },
+            ),
+            cooldownStore = cooldownStore,
+            clock = clock,
+            zoneId = ZoneOffset.UTC,
+            patternSurfaceMinEntries = 4L,
+        )
+
+        raceOrchestrator.onEntryCommitted(putEntry(templateLabel = TemplateLabel.AFTERMATH), Persona.WITNESS)
+
+        val patterns = patternStore.all().filter { it.patternId == PATTERN_A_ID }
+        assertEquals("unique patternId must stay a single row", 1, patterns.size)
+        assertEquals("Concurrent Winner", patterns.single().title)
+        assertEquals(supporting.map { it.id }.toSet(), patterns.single().supportingEntries.map { it.id }.toSet())
+    }
+
+    @Test
     fun `failed entries do not advance the every-3 completed-entry cadence`() = runTest {
         repeat(2) { commitOne() }
         repeat(2) {

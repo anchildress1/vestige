@@ -28,7 +28,7 @@ class TemplateLabeler {
         val tags = resolved.tagSet()
 
         return when {
-            isAftermath(energy, stateShift) -> TemplateLabel.AFTERMATH
+            isAftermath(energy, stateShift, tags) -> TemplateLabel.AFTERMATH
             tags.containsAny(DECISION_SPIRAL_TAGS) -> TemplateLabel.DECISION_SPIRAL
             tags.containsAny(TUNNEL_EXIT_TAGS) -> TemplateLabel.TUNNEL_EXIT
             tags.containsAny(CONCRETE_SHOES_TAGS) -> TemplateLabel.CONCRETE_SHOES
@@ -37,8 +37,10 @@ class TemplateLabeler {
         }
     }
 
-    private fun isAftermath(energy: String?, stateShift: Boolean): Boolean =
-        stateShift && energy?.trim()?.lowercase() == CRASHED
+    private fun isAftermath(energy: String?, stateShift: Boolean, tags: Set<String>): Boolean =
+        energy?.trim()?.lowercase() in STANDALONE_AFTERMATH_ENERGIES ||
+            (stateShift && energy?.trim()?.lowercase() == CRASHED) ||
+            tags.containsAny(AFTERMATH_TAGS)
 
     private fun isGoblinHours(capturedAt: ZonedDateTime, tags: Set<String>): Boolean =
         capturedAt.hour in GOBLIN_HOURS_RANGE && tags.containsAny(LATE_NIGHT_TAGS)
@@ -77,7 +79,19 @@ class TemplateLabeler {
         // `tunnel` is the energy descriptor list, not a tag — it lands in `energy_descriptor`.
         val TUNNEL_EXIT_TAGS = setOf("tunnel-exit")
 
-        val DECISION_SPIRAL_TAGS = setOf("decision-loop", "decision-spiral")
+        val DECISION_SPIRAL_TAGS = setOf(
+            "comparing",
+            "decision-loop",
+            "decision-spiral",
+            "rewrite",
+            "rewrite-migration",
+            "rewrote-again",
+            "spreadsheet",
+        )
+
+        val STANDALONE_AFTERMATH_ENERGIES = setOf("hollow")
+
+        val AFTERMATH_TAGS = setOf("aftermath", "all-hands", "crash", "crashed", "hollow", "hollow-thing")
 
         // Resistance / paralysis vocabulary — kept narrow on purpose. STT-C tag stability will
         // expand or trim this list with measured evidence; widening it before then risks

@@ -117,7 +117,10 @@ class VectorBackfillWorker(private val boxStore: BoxStore, private val embedder:
         val text = buildEmbeddingText(entry)
         if (text.isBlank()) {
             Log.d(TAG, "Skipped embedding for entry ${entry.id} — no embeddable text after distillation")
-            clearVectorAndMarkCurrent(entryBox, entry)
+            clearVector(entryBox, entry)
+            if (entry.hasTerminalExtractionPayload()) {
+                markVectorSchemaCurrent(entryBox, entry)
+            }
             BackfillProgress(processed = 0, failed = 0, skipped = 1)
         } else {
             embedAndPersist(entryBox, entry, text)
@@ -136,26 +139,29 @@ class VectorBackfillWorker(private val boxStore: BoxStore, private val embedder:
         // Non-COMPLETED rows may still resolve later, so clear the stale cosine signal now but
         // leave the stale schema in place. When extraction finally lands, the COMPLETED row will
         // still qualify for the distilled re-embed pass.
-        entry.vector = null
-        entryBox.put(entry)
+        val current = entryBox.get(entry.id) ?: return
+        current.vector = null
+        entryBox.put(current)
     }
 
-    private fun clearVectorAndMarkCurrent(entryBox: Box<EntryEntity>, entry: EntryEntity) {
-        // A COMPLETED row with no valid distilled target must contribute zero cosine signal and
-        // stop re-queuing forever. Clear the vector, then mark the row current.
-        clearVector(entryBox, entry)
-        entry.vectorSchemaVersion = EntryEntity.CURRENT_VECTOR_SCHEMA_VERSION
-        entryBox.put(entry)
+    private fun markVectorSchemaCurrent(entryBox: Box<EntryEntity>, entry: EntryEntity) {
+        val current = entryBox.get(entry.id) ?: return
+        current.vectorSchemaVersion = EntryEntity.CURRENT_VECTOR_SCHEMA_VERSION
+        entryBox.put(current)
     }
+
+    private fun EntryEntity.hasTerminalExtractionPayload(): Boolean =
+        !lensReceiptsJson.isNullOrBlank() && lensReceiptsJson != "[]"
 
     private suspend fun embedAndPersist(entryBox: Box<EntryEntity>, entry: EntryEntity, text: String) {
         val vector = embedder(text)
         check(vector.size.toLong() == EntryEntity.EMBEDDING_DIMENSIONS) {
             "Embedder returned ${vector.size}-d vector; expected ${EntryEntity.EMBEDDING_DIMENSIONS}"
         }
-        entry.vector = vector
-        entry.vectorSchemaVersion = EntryEntity.CURRENT_VECTOR_SCHEMA_VERSION
-        entryBox.put(entry)
+        val current = entryBox.get(entry.id) ?: return
+        current.vector = vector
+        current.vectorSchemaVersion = EntryEntity.CURRENT_VECTOR_SCHEMA_VERSION
+        entryBox.put(current)
     }
 
     private fun pendingEmbeddingCount(): Long = boxStore.callClosingThreadResources {

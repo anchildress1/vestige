@@ -28,7 +28,7 @@ class PatternCalloutTextTest {
         val text = PatternCalloutText.build(
             detected(PatternKind.TEMPLATE_RECURRENCE, "{\"label\":\"aftermath\"}", templateLabel = "aftermath"),
         )
-        assertEquals("3 Aftermath entries logged. Worth noting.", text)
+        assertEquals("3 Aftermath entries share the same resolved shape.", text)
     }
 
     @Test
@@ -47,7 +47,7 @@ class PatternCalloutTextTest {
     @Test
     fun `goblin callout never mentions a label`() {
         val text = PatternCalloutText.build(detected(PatternKind.TIME_OF_DAY_CLUSTER, "{\"bucket\":\"goblin\"}"))
-        assertEquals("3 entries between midnight and 5am. Same admin loop.", text)
+        assertEquals("3 entries landed between midnight and 5am.", text)
     }
 
     @Test
@@ -63,7 +63,7 @@ class PatternCalloutTextTest {
         val text = PatternCalloutText.build(
             detected(PatternKind.VOCAB_FREQUENCY, "{\"token\":\"tired\"}", supporting = listOf(1L, 2L, 3L, 4L)),
         )
-        assertEquals("'Tired' appears across 4 entries with multiple framings.", text)
+        assertEquals("\"Tired\" spans 4 entries with multiple framings.", text)
     }
 
     @Test
@@ -77,7 +77,7 @@ class PatternCalloutTextTest {
     @Test
     fun `template recurrence falls back cleanly when signature json is malformed`() {
         val text = PatternCalloutText.build(detected(PatternKind.TEMPLATE_RECURRENCE, "{bad-json"))
-        assertEquals("3  entries logged. Worth noting.", text)
+        assertEquals("3 entries share the same resolved shape.", text)
     }
 
     @Test
@@ -98,7 +98,7 @@ class PatternCalloutTextTest {
         )
 
         assertEquals("3 entries with a commitment about .", commitment)
-        assertEquals("'' appears across 4 entries with multiple framings.", vocab)
+        assertEquals("\"\" spans 4 entries with multiple framings.", vocab)
     }
 
     @Test

@@ -184,11 +184,17 @@ class PatternDetectionOrchestrator(
         // Tx wraps insert + supporting-relation attach so a concurrent save can't see the row
         // mid-state (insert visible but evidence set still empty).
         boxStore.runInTx {
-            patternStore.put(entity)
-            val saved = patternStore.findByPatternId(detected.patternId) ?: return@runInTx
-            saved.supportingEntries.clear()
-            saved.supportingEntries.addAll(supporting.map { it.entity })
-            patternStore.put(saved)
+            val current = patternStore.findByPatternId(detected.patternId)
+            if (current == null) {
+                patternStore.put(entity)
+                val saved = patternStore.findByPatternId(detected.patternId) ?: return@runInTx
+                saved.supportingEntries.clear()
+                saved.supportingEntries.addAll(supporting.map { it.entity })
+                patternStore.put(saved)
+            } else {
+                applySupportingAndCallout(current, detected, supporting, analysis)
+                patternStore.put(current)
+            }
         }
     }
 

@@ -33,6 +33,7 @@ import dev.anchildress1.vestige.model.ModelManifest
 import dev.anchildress1.vestige.model.NetworkGate
 import dev.anchildress1.vestige.model.Persona
 import dev.anchildress1.vestige.patterns.PatternDetectionOrchestrator
+import dev.anchildress1.vestige.patterns.PatternVocabClusterUpdater
 import dev.anchildress1.vestige.save.BackgroundExtractionLifecycleCallbacks
 import dev.anchildress1.vestige.save.BackgroundExtractionSaveFlow
 import dev.anchildress1.vestige.save.SaveOutcome
@@ -961,6 +962,10 @@ class AppContainer(
             if (stats.failed > 0) {
                 Log.e(TAG, "Vector backfill: ${stats.failed}/${stats.total} failures; will retry on next trigger")
             }
+            if (stats.processed > 0) {
+                PatternVocabClusterUpdater(boxStore, patternStore).stampAll()
+                _dataRevision.value += 1
+            }
             VectorBackfillOutcome.COMPLETE
         }
     }
@@ -1014,7 +1019,7 @@ class AppContainer(
         const val TAG = "VestigeAppContainer"
         const val MODEL_ARTIFACTS_SUBDIR = "models"
         const val DEFAULT_MISSING_EXTRACTION_BACKFILL_LIMIT = 100
-        const val MISSING_EXTRACTION_BACKFILL_TIMEOUT_MS = 90_000L
+        const val MISSING_EXTRACTION_BACKFILL_TIMEOUT_MS = 180_000L
         const val VECTOR_BACKFILL_RETRY_DELAY_MS = 5_000L
         const val VECTOR_BACKFILL_MAX_RETRIES = 12
         const val PCT_MAX = 100

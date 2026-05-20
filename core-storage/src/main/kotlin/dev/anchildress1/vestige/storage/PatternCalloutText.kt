@@ -32,7 +32,11 @@ object PatternCalloutText {
 
     private fun templateRecurrence(signature: JSONObject?, count: Int): String {
         val label = signature?.optString("label").orEmpty().humanize()
-        return "$count $label entries logged. Worth noting."
+        return if (label.isBlank()) {
+            "$count entries share the same resolved shape."
+        } else {
+            "$count $label entries share the same resolved shape."
+        }
     }
 
     private fun tagPair(signature: JSONObject?, count: Int): String {
@@ -44,7 +48,7 @@ object PatternCalloutText {
         return "$label entries: $joined across $count entries."
     }
 
-    private fun goblin(count: Int): String = "$count entries between midnight and 5am. Same admin loop."
+    private fun goblin(count: Int): String = "$count entries landed between midnight and 5am."
 
     private fun commitment(signature: JSONObject?, count: Int): String {
         val topic = signature?.optString("topic_or_person").orEmpty().humanize()
@@ -53,7 +57,7 @@ object PatternCalloutText {
 
     private fun vocab(signature: JSONObject?, count: Int): String {
         val token = signature?.optString("token").orEmpty().humanize()
-        return "'$token' appears across $count entries with multiple framings."
+        return "\"$token\" spans $count entries with multiple framings."
     }
 
     private fun temporal(signature: JSONObject?, count: Int): String =

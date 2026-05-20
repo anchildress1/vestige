@@ -14,7 +14,7 @@ import io.objectbox.relation.ToMany
 /**
  * Structured entry row. ObjectBox is the app's internal source of truth.
  */
-@Suppress("LongParameterList") // Persistence shape mirrors the stored entry schema.
+@Suppress("LongParameterList")
 @Entity
 class EntryEntity(
     @Id var id: Long = 0,
@@ -83,9 +83,8 @@ class EntryEntity(
     var vector: FloatArray? = null,
 
     /**
-     * Schema version of [vector]. Bumped when the embedding *source* changes (not the model)
-     * so previously-embedded rows are recognized as stale and re-backfilled. Operational
-     * field; export includes it in the structured JSON snapshot, not entry markdown.
+     * Schema version of [vector]. Bumped when the embedding source changes (not the model) so
+     * previously-embedded rows are recognized as stale and re-backfilled.
      */
     var vectorSchemaVersion: Int = 0,
 ) {

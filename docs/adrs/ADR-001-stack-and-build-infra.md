@@ -39,7 +39,7 @@ Adopt the locked stack from `concept-locked.md` and `runtime-research.md` verbat
 | LLM runtime | LiteRT-LM SDK (`litertlm-android`) — single runtime per `AGENTS.md` guardrail 13 | `runtime-research.md` |
 | Model artifact | `litert-community/gemma-4-E4B-it-litert-lm` | `runtime-research.md` |
 | Embeddings | EmbeddingGemma 300M via LiteRT — **STT-E passed 2026-05-12, ships in v1.** See addendum below. | `concept-locked.md`, `PRD.md` §P0 |
-| Storage | ObjectBox (structured source of truth per ADR-017) + generated markdown export + HNSW vector index on `EntryEntity.vector`. | `concept-locked.md` |
+| Storage | ObjectBox (structured) + markdown source-of-truth + HNSW vector index on `EntryEntity.vector`. | `concept-locked.md` |
 | Audio | `AudioRecord` → Gemma 4 native audio modality (no third-party STT) | `concept-locked.md` |
 | Distribution | APK via GitHub Releases. No Play Store for v1. | `PRD.md` §Submission |
 
@@ -462,6 +462,10 @@ Corrects two cited facts in the 2026-05-16 addendum above (additive — that add
 **Verification (independent, version-matched).** Decompiling the pinned `litertlm-android:0.11.0` AAR and reading Google's own source at GitHub tag `v0.11.0` confirms these exist on the shipped artifact and are used correctly in `LiteRtLmEngine`: `EngineConfig.maxNumTokens` / `maxNumImages`; `SamplerConfig(topK, topP, temperature, seed)` with `Double` topP/temperature; `Conversation.sendMessage(Contents)` and `sendMessageAsync(Contents): Flow<Message>`; `Contents.of(List<Content>)`. The `EngineConfig` / `SamplerConfig` / streaming / `systemInstruction` / MTP-ordering wiring conforms to the documented v0.11.0 API.
 
 **Consequence.** The authoritative reference for SDK conformance is the version-matched Google source at tag `v0.11.0` (or the AAR itself), not the getting-started page. Do not "fix" code to match that page — it under-documents the artifact.
+
+### Addendum (2026-05-20) — Storage SOT inverted (ObjectBox is the SOT)
+
+The §"Locked Stack" row above is the historical record of v1's storage assumption (markdown source-of-truth, ObjectBox as structured cache). It is superseded by **ADR-017**: ObjectBox is the entry source of truth; markdown is generated at export only. The HNSW vector index on `EntryEntity.vector` is unchanged.
 
 ---
 

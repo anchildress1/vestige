@@ -43,7 +43,7 @@ The user waits only for step 1. Steps 2, 3, 4 are background; steps 3 and 4 are 
 | Trigger | Type | What runs | User-blocking? | Failure handling |
 |---|---|---|---|---|
 | User taps `I'm done.` | Foreground | `{transcription, follow_up}` call | Yes | Surface error in capture; entry not persisted unless transcription returns |
-| Foreground returns | Persist + enqueue | `EntryStore.createPendingEntry` → schedule background lens worker | No | Persist before scheduling; ObjectBox is source of truth per ADR-017 |
+| Foreground returns | Persist + enqueue | `EntryStore.createPendingEntry` → schedule background lens worker | No | Persist before scheduling; markdown is source of truth |
 | Background lens N completes (×3) | Background analytics | Per-lens parse + `LensResult` accumulation | No | Per-lens parse-fail → no-opinion; ADR-002 contract intact |
 | All 3 lenses complete | Background analytics | `ConvergenceResolver` writes canonical / candidate / ambiguous fields | No | ADR-001 §Q3 retry recovery |
 | `completeEntry` returns | **Background pattern identifier** | Build history slice (see §History Slice Contract); one Gemma call; parse identifier output; upsert patterns | No | On parse-fail / timeout / model unavailable → fall through to deterministic detector on the same slice |
@@ -171,3 +171,7 @@ When this ADR's status flips to **Accepted** and the implementing story lands, t
 - `core-inference/src/main/resources/patterns/` — new prompt resource for the identifier schema.
 - `app/.../patterns/PatternDetectionOrchestrator.kt` — `DETECTION_INTERVAL` removed; `onEntryCommitted` calls the identifier directly. `chooseMatchingPattern` reads identifier-produced patterns the same way as deterministic-produced ones.
 - `docs/architecture-brief.md` — refresh the "pattern engine" section to reflect the model-primary, deterministic-fallback topology.
+
+### Addendum (2026-05-20) — Storage SOT inverted (see ADR-017)
+
+The "markdown is source of truth" cell in the §"Lifecycle Contract" table above is now historical. **ADR-017** inverts the storage SOT: ObjectBox is authoritative; markdown is generated at export only. The persist-before-scheduling invariant still holds.

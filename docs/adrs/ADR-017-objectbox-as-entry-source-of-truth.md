@@ -4,8 +4,8 @@
 **Date:** 2026-05-20
 **Deciders:** Ashley (sole owner). AI implementors read this as authoritative.
 **Supersedes:**
-- ADR-001 storage clause "ObjectBox (structured) + markdown source-of-truth..."
-- `architecture-brief.md` pre-2026-05-20 "Markdown Entry Shape" source-of-truth contract
+- ADR-001 storage clause "ObjectBox (structured) + markdown source-of-truth..." (see ADR-001 Addendum 2026-05-20)
+- The "Markdown Entry Shape" source-of-truth contract previously described in `architecture-brief.md` (since rewritten by this ADR)
 
 ---
 

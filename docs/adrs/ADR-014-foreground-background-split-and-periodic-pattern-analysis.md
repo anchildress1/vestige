@@ -41,7 +41,7 @@ The user only ever waits for step 1. Steps 2 and 3 deliver the same eventual inf
 | Trigger | Type | What runs | User-blocking? | Failure handling |
 |---|---|---|---|---|
 | User taps `I'm done.` | Foreground | Foreground call (transcription + persona-flavored follow-up) | Yes — `Reading the entry.` state until response | Surface error in capture; entry not persisted unless transcription returns |
-| Foreground returns | Persist + enqueue | `EntryStore.persist(entry_text, follow_up, persona)` then enqueue background lens worker | No | Persist succeeds before background scheduled; ObjectBox is source of truth per ADR-017 |
+| Foreground returns | Persist + enqueue | `EntryStore.persist(entry_text, follow_up, persona)` then enqueue background lens worker | No | Persist succeeds before background scheduled; markdown is source of truth |
 | Background lens N completes | Background analytics | Per-lens parse + accumulate `LensResult` | No | Per-lens parse-fail → `no opinion`; resolver runs on survivors; ≥2 fail → all-ambiguous (ADR-002 contract holds) |
 | All 3 lenses complete | Background analytics | `ConvergenceResolver.resolve` runs; writes canonical / candidate / ambiguous fields per ADR-002 | No | Per ADR-001 §Q3 retry-based recovery |
 | `EntryStore.write` count % 5 == 0 | Background pattern | `PatternDetector` pass against the rolling 90-day window per ADR-003 | No | Patterns view updates atomically; partial completion leaves prior pattern state intact; only one pattern pass in flight per process |
@@ -137,3 +137,7 @@ Refines the background-pattern lane; does not supersede the foreground/backgroun
   owned by ADR-003.
 - The model's role in pattern analysis (title + callout, no existence decision) is documented
   in ADR-015, which supersedes the implicit scope boundary in this addendum.
+
+### Addendum (2026-05-20) — Storage SOT inverted (see ADR-017)
+
+The "markdown is source of truth" cell in the §"Lifecycle Contract" table above is now historical. **ADR-017** inverts the storage SOT: ObjectBox is authoritative; markdown is generated at export only. The persist-before-background-scheduled invariant still holds — only the SOT direction changes.

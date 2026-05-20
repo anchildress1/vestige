@@ -802,6 +802,191 @@ class PatternDetectionOrchestratorTest {
     }
 
     @Test
+    fun `vocab clustering second pass stamps vocabClustersJson on active VOCAB_FREQUENCY patterns`() = runTest {
+        // Six entries reuse the same root word "tired"; their vectors split cleanly into two
+        // axes so the agglomerative cut produces two clusters.
+        val groupA = (1..3).map { i ->
+            putEntry(text = "tired exhausted drained $i", timestamp = now.plusSeconds(i.toLong())).also {
+                it.vector = nearAxisVector(axis = 0)
+                boxStore.boxFor(EntryEntity::class.java).put(it)
+            }
+        }
+        val groupB = (4..6).map { i ->
+            putEntry(text = "tired sluggish foggy $i", timestamp = now.plusSeconds(i.toLong())).also {
+                it.vector = nearAxisVector(axis = 1)
+                boxStore.boxFor(EntryEntity::class.java).put(it)
+            }
+        }
+        val supporting = groupA + groupB
+        val pattern = PatternEntity(
+            patternId = PATTERN_A_ID,
+            kind = PatternKind.VOCAB_FREQUENCY,
+            signatureJson = "{\"kind\":\"vocab_frequency\",\"token\":\"tired\"}",
+            title = "Tired",
+            templateLabel = null,
+            firstSeenTimestamp = 1L,
+            lastSeenTimestamp = 7L,
+            state = PatternState.ACTIVE,
+            latestCalloutText = "tired appears across 6 entries",
+        )
+        patternStore.put(pattern)
+        val stored = patternStore.findByPatternId(PATTERN_A_ID)!!
+        stored.supportingEntries.addAll(supporting)
+        patternStore.put(stored)
+
+        // A single commit at/above the detection threshold triggers the second pass.
+        repeat(3) { commitOne() }
+
+        val fresh = patternStore.findByPatternId(PATTERN_A_ID)!!
+        val clusters = dev.anchildress1.vestige.storage.VocabClustersCodec.decode(fresh.vocabClustersJson)
+        assertEquals("expected two clusters from two distinct vocabularies", 2, clusters.size)
+        assertTrue(
+            "clusters must cover every supporting entry",
+            clusters.flatMap { it.memberEntryIds }.toSet() == supporting.map { it.id }.toSet(),
+        )
+    }
+
+    @Test
+    fun `vocab clustering second pass is a no-op when evidence is unchanged`() = runTest {
+        val groupA = (1..3).map { i ->
+            putEntry(text = "tired exhausted $i", timestamp = now.plusSeconds(i.toLong())).also {
+                it.vector = nearAxisVector(axis = 0)
+                boxStore.boxFor(EntryEntity::class.java).put(it)
+            }
+        }
+        val groupB = (4..6).map { i ->
+            putEntry(text = "tired foggy $i", timestamp = now.plusSeconds(i.toLong())).also {
+                it.vector = nearAxisVector(axis = 1)
+                boxStore.boxFor(EntryEntity::class.java).put(it)
+            }
+        }
+        val pattern = PatternEntity(
+            patternId = PATTERN_A_ID,
+            kind = PatternKind.VOCAB_FREQUENCY,
+            signatureJson = "{\"kind\":\"vocab_frequency\",\"token\":\"tired\"}",
+            title = "Tired",
+            templateLabel = null,
+            firstSeenTimestamp = 1L,
+            lastSeenTimestamp = 7L,
+            state = PatternState.ACTIVE,
+            latestCalloutText = "tired",
+        )
+        patternStore.put(pattern)
+        val stored = patternStore.findByPatternId(PATTERN_A_ID)!!
+        stored.supportingEntries.addAll(groupA + groupB)
+        patternStore.put(stored)
+
+        // First commit triggers the second pass.
+        repeat(3) { commitOne() }
+        val firstJson = patternStore.findByPatternId(PATTERN_A_ID)!!.vocabClustersJson
+        assertTrue("first run must stamp", firstJson.isNotBlank())
+
+        // Second commit: same evidence ⇒ same JSON ⇒ no re-stamp.
+        commitOne()
+        val secondJson = patternStore.findByPatternId(PATTERN_A_ID)!!.vocabClustersJson
+        assertEquals("identical evidence must produce identical envelope", firstJson, secondJson)
+    }
+
+    @Test
+    fun `vocab clustering does not stamp a pattern that is not ACTIVE`() = runTest {
+        val members = (1..6).map { i ->
+            putEntry(text = "tired $i", timestamp = now.plusSeconds(i.toLong())).also {
+                it.vector = nearAxisVector(axis = 0)
+                boxStore.boxFor(EntryEntity::class.java).put(it)
+            }
+        }
+        val pattern = PatternEntity(
+            patternId = PATTERN_A_ID,
+            kind = PatternKind.VOCAB_FREQUENCY,
+            signatureJson = "{\"kind\":\"vocab_frequency\",\"token\":\"tired\"}",
+            title = "Tired",
+            templateLabel = null,
+            firstSeenTimestamp = 1L,
+            lastSeenTimestamp = 7L,
+            state = PatternState.SNOOZED, // not ACTIVE
+            latestCalloutText = "tired",
+        )
+        patternStore.put(pattern)
+        val stored = patternStore.findByPatternId(PATTERN_A_ID)!!
+        stored.supportingEntries.addAll(members)
+        patternStore.put(stored)
+
+        repeat(3) { commitOne() }
+
+        assertEquals("", patternStore.findByPatternId(PATTERN_A_ID)!!.vocabClustersJson)
+    }
+
+    @Test
+    fun `vocab clustering ignores non-VOCAB_FREQUENCY active patterns`() = runTest {
+        val members = (1..6).map { i ->
+            putEntry(text = "tired $i", timestamp = now.plusSeconds(i.toLong())).also {
+                it.vector = nearAxisVector(axis = 0)
+                boxStore.boxFor(EntryEntity::class.java).put(it)
+            }
+        }
+        val pattern = PatternEntity(
+            patternId = PATTERN_A_ID,
+            kind = PatternKind.TEMPORAL_RELATIVE,
+            signatureJson = "{}",
+            title = "T",
+            templateLabel = null,
+            firstSeenTimestamp = 1L,
+            lastSeenTimestamp = 7L,
+            state = PatternState.ACTIVE,
+            latestCalloutText = "t",
+        )
+        patternStore.put(pattern)
+        val stored = patternStore.findByPatternId(PATTERN_A_ID)!!
+        stored.supportingEntries.addAll(members)
+        patternStore.put(stored)
+
+        repeat(3) { commitOne() }
+
+        assertEquals("", patternStore.findByPatternId(PATTERN_A_ID)!!.vocabClustersJson)
+    }
+
+    @Test
+    fun `vocab clustering is skipped when supporting set is below the minimum`() = runTest {
+        val supporting = (1..3).map { i ->
+            putEntry(text = "tired $i", timestamp = now.plusSeconds(i.toLong())).also {
+                it.vector = nearAxisVector(axis = 0)
+                boxStore.boxFor(EntryEntity::class.java).put(it)
+            }
+        }
+        val pattern = PatternEntity(
+            patternId = PATTERN_A_ID,
+            kind = PatternKind.VOCAB_FREQUENCY,
+            signatureJson = "{\"kind\":\"vocab_frequency\",\"token\":\"tired\"}",
+            title = "Tired",
+            templateLabel = null,
+            firstSeenTimestamp = 1L,
+            lastSeenTimestamp = 4L,
+            state = PatternState.ACTIVE,
+            latestCalloutText = "tired appears across 3 entries",
+        )
+        patternStore.put(pattern)
+        val stored = patternStore.findByPatternId(PATTERN_A_ID)!!
+        stored.supportingEntries.addAll(supporting)
+        patternStore.put(stored)
+
+        repeat(3) { commitOne() }
+
+        val fresh = patternStore.findByPatternId(PATTERN_A_ID)!!
+        assertEquals(
+            "below the floor of ${dev.anchildress1.vestige.storage.EmbeddingClustering.MIN_SUPPORTING_ENTRIES}" +
+                " the second pass is a no-op",
+            "",
+            fresh.vocabClustersJson,
+        )
+    }
+
+    private fun nearAxisVector(axis: Int): FloatArray {
+        val v = FloatArray(VOCAB_TEST_EMBED_DIM)
+        v[axis % VOCAB_TEST_EMBED_DIM] = 1.0f
+        return v
+    }
+
+    @Test
     fun `temporal pattern without analysisGenerator falls back to deterministic callout`() = runTest {
         // Three consecutive Tuesday afternoons → weekday_time_block TEMPORAL_RELATIVE
         val tuesdays = listOf(
@@ -830,5 +1015,6 @@ class PatternDetectionOrchestratorTest {
         const val TEST_DETECTION_THRESHOLD: Long = 3
         const val PATTERN_A_ID: String = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
         const val PATTERN_B_ID: String = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        const val VOCAB_TEST_EMBED_DIM: Int = 768 // Matches EntryEntity.EMBEDDING_DIMENSIONS
     }
 }

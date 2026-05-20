@@ -48,11 +48,13 @@ class DebugPatternSeederTest {
 
     @Test
     fun `seed writes completed entries and pattern fixtures`() {
+        // 12 narrative entries + 23 vocab-drift entries (8 exhaustion + 8 cognitive-fog + 7
+        // wired-tired) = 35 total. The vocab pattern joins the 2 narrative patterns ⇒ 3.
         DebugPatternSeeder.seed(filesDir, boxStore, patternStore)
 
-        assertEquals(12L, entryStore.count())
-        assertEquals(12L, entryStore.countCompleted())
-        assertEquals(2, patternStore.findVisibleSortedByLastSeen().size)
+        assertEquals(35L, entryStore.count())
+        assertEquals(35L, entryStore.countCompleted())
+        assertEquals(3, patternStore.findVisibleSortedByLastSeen().size)
     }
 
     @Test

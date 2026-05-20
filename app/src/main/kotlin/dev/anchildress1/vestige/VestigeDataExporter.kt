@@ -125,6 +125,7 @@ internal class VestigeDataExporter(private val boxStore: BoxStore, private val o
                     .putNullable("snoozed_until", pattern.snoozedUntil)
                     .put("state_changed_timestamp", pattern.stateChangedTimestamp)
                     .put("latest_callout_text", pattern.latestCalloutText)
+                    .put("vocab_clusters_json", pattern.vocabClustersJson)
                     .put(
                         "supporting_entry_ids",
                         pattern.supportingEntries.map(::stableEntryId).sorted().toJsonArray(),

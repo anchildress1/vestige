@@ -7,11 +7,16 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
+    <permission
+        android:name="dev.anchildress1.vestige.permission.DEBUG_SEED"
+        android:protectionLevel="normal" />
+
     <application>
         <!-- Exported only in debug so adb shell can trigger deterministic reinstall fixtures. -->
         <receiver
             android:name=".debug.DebugSeedReceiver"
             android:exported="true"
+            android:permission="dev.anchildress1.vestige.permission.DEBUG_SEED"
             tools:ignore="ExportedReceiver" />
     </application>
 

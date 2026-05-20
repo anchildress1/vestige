@@ -52,6 +52,9 @@ class PatternEntity(
 
     /** Pre-rendered callout line; appended to per-entry observation when this pattern fires. */
     var latestCalloutText: String = "",
+
+    /** Vocab-drift enrichment for VOCAB_FREQUENCY rows. Encoded per [VocabClustersCodec]. */
+    var vocabClustersJson: String = "",
 ) {
     lateinit var supportingEntries: ToMany<EntryEntity>
 }

@@ -550,5 +550,4 @@ Rationale:
   two Tuesdays" without scanning arbitrary neighbors.
 - A month-start cohort covers the recurring calendar-edge case directly.
 - Requiring distinct dates/months prevents three entries dumped on one afternoon or one
-  first-of-month from pretending to be recurrence. Because apparently we do have to tell
-  software not to lie with a straight face.
+  first-of-month from pretending to be recurrence.

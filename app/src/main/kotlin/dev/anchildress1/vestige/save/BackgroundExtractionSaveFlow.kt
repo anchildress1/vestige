@@ -139,7 +139,7 @@ class BackgroundExtractionSaveFlow(
     ) {
         try {
             val requestWithHistory = request.copy(
-                retrievedHistory = resolveRetrievedHistory(entryText, request.retrievedHistory),
+                retrievedHistory = resolveRetrievedHistory(entryId, entryText, request.retrievedHistory),
             )
             when (val result = worker.extract(requestWithHistory, terminalRelay.workerListener)) {
                 is BackgroundExtractionResult.Success -> handleSuccess(
@@ -184,6 +184,7 @@ class BackgroundExtractionSaveFlow(
     }
 
     private suspend fun resolveRetrievedHistory(
+        entryId: Long,
         entryText: String,
         seededHistory: List<HistoryChunk>,
     ): List<HistoryChunk> {
@@ -193,7 +194,7 @@ class BackgroundExtractionSaveFlow(
         } catch (cancellation: CancellationException) {
             throw cancellation
         } catch (@Suppress("TooGenericExceptionCaught") error: Exception) {
-            Log.w(TAG, "Detached retrieval degraded (${error.javaClass.simpleName})")
+            Log.w(TAG, "Detached retrieval degraded for entryId=$entryId (${error.javaClass.simpleName})")
             emptyList()
         }
     }
@@ -261,7 +262,10 @@ class BackgroundExtractionSaveFlow(
         // Elvis-return locks `entry` as non-null without relying on `val`-flow inference. A
         // future refactor that splits the method or hoists `entry` to a `var` would otherwise
         // silently surface NPE risk through the settle calls below.
-        val entry = entryStore.readEntry(entryId) ?: return null
+        val entry = entryStore.readEntry(entryId) ?: run {
+            Log.w(TAG, "persistOrchestratorCallout: entry $entryId not found — skipping callout")
+            return null
+        }
         val callout = orchestrator.onEntryCommitted(entry, persona)
         if (callout != null) {
             appendAndConfirmCallout(orchestrator, entry, entryId, callout)

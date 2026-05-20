@@ -279,7 +279,7 @@ class PatternsListViewModelTest {
         vm.drop("p-stale-list")
         assertEquals(PatternState.DROPPED, patternStore.findByPatternId("p-stale-list")?.state)
         // Snackbar callback fires SKIP-undo against a now-DROPPED row — PatternRepo throws.
-        vm.undo(PatternUndo("p-stale-list", PatternAction.SKIP))
+        vm.undo(PatternUndo.Skip("p-stale-list"))
         assertEquals(PatternState.DROPPED, patternStore.findByPatternId("p-stale-list")?.state)
         vm.state.test {
             val loaded = expectMostRecentItem() as PatternsListUiState.Loaded
@@ -294,7 +294,7 @@ class PatternsListViewModelTest {
         val vm = newViewModel()
         vm.drop("p3")
         assertEquals(PatternState.DROPPED, patternStore.findByPatternId("p3")?.state)
-        vm.undo(PatternUndo("p3", PatternAction.DROP))
+        vm.undo(PatternUndo.Drop("p3"))
         assertEquals(PatternState.ACTIVE, patternStore.findByPatternId("p3")?.state)
         vm.state.test {
             val loaded = expectMostRecentItem() as PatternsListUiState.Loaded
@@ -315,9 +315,10 @@ class PatternsListViewModelTest {
             vm.restart("p-restart-snooze-list")
             val event = awaitItem()
             assertEquals(PatternAction.RESTART, event.action)
-            assertEquals(PatternState.SNOOZED, event.undo?.previousState)
-            assertEquals(originalSnoozedUntil, event.undo?.previousSnoozedUntil)
-            vm.undo(event.undo!!)
+            val restoreUndo = event.undo as PatternUndo.Restart
+            assertEquals(PatternState.SNOOZED, restoreUndo.previousState)
+            assertEquals(originalSnoozedUntil, restoreUndo.previousSnoozedUntil)
+            vm.undo(restoreUndo)
         }
 
         val row = patternStore.findByPatternId("p-restart-snooze-list")!!

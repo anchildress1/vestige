@@ -1,5 +1,9 @@
 package dev.anchildress1.vestige.ui.history
 
+import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertHasClickAction
 import androidx.compose.ui.test.assertIsDisplayed
@@ -183,6 +187,28 @@ class EntryDetailScreenTest {
         composeRule.onNodeWithTag("entry_observations").assertExists()
         composeRule.onNodeWithText("You used fine twice.").assertExists()
         composeRule.onNodeWithText("VOCABULARY CONTRADICTION · vocabulary_contradictions, tags").assertExists()
+    }
+
+    @Test
+    fun `observations block is an announced status band with no click action (a11y)`() {
+        val id = entryStore.createPendingEntry("fine was said twice", FIXTURE_INSTANT)
+        entryStore.completeEntry(
+            id,
+            ResolvedExtraction(emptyMap()),
+            null,
+            observations = listOf(
+                dev.anchildress1.vestige.model.EntryObservation(
+                    text = "You used fine twice.",
+                    evidence = dev.anchildress1.vestige.model.ObservationEvidence.VOCABULARY_CONTRADICTION,
+                    fields = emptyList(),
+                ),
+            ),
+            lensReceipts = emptyList(),
+        )
+        setDetail(id)
+        val band = composeRule.onNodeWithTag("entry_observations")
+        band.assert(SemanticsMatcher.keyIsDefined(SemanticsProperties.LiveRegion))
+        band.assert(SemanticsMatcher.keyNotDefined(SemanticsActions.OnClick))
     }
 
     @Test

@@ -185,90 +185,88 @@ internal object LensResponseParser {
         return repaired.takeIf { it != candidate }
     }
 
-    // Character-level repair scanner — the branches are the spec, splitting them up obscures
-    // the malformed-quote shapes this is documenting against real-device model output.
-    @Suppress("LongMethod", "CyclomaticComplexMethod", "ComplexCondition")
+    // Character-level repair scanner — each arm matches a distinct malformed-quote shape
+    // observed in real-device model output. Helpers carry the mutable traversal state.
     private fun repairMalformedQuotedStrings(candidate: String): String? {
+        val state = RepairState()
         val repaired = buildString(candidate.length + 8) {
-            var inString = false
-            var escape = false
-            var stringStartIndex = -1
-            var stringSawWhitespace = false
-            var insertedLeadingContentQuote = false
             var index = 0
             while (index < candidate.length) {
                 val c = candidate[index]
                 when {
-                    escape -> {
-                        append(c)
-                        escape = false
-                    }
-
-                    c == '\\' -> {
-                        append(c)
-                        if (inString) {
-                            escape = true
-                        }
-                    }
-
-                    c == '"' -> {
-                        if (!inString) {
-                            append(c)
-                            inString = true
-                            stringStartIndex = length
-                            stringSawWhitespace = false
-                            insertedLeadingContentQuote = false
-                        } else {
-                            val next = nextNonWhitespaceChar(candidate, index + 1)
-                            if (next == null || next in STRING_CLOSE_FOLLOWERS) {
-                                append(c)
-                                inString = false
-                                stringStartIndex = -1
-                            } else {
-                                if (!insertedLeadingContentQuote &&
-                                    !stringSawWhitespace &&
-                                    stringStartIndex >= 0 &&
-                                    next.isLetter()
-                                ) {
-                                    insert(stringStartIndex, "\\\"")
-                                    insertedLeadingContentQuote = true
-                                }
-                                append("\\\"")
-                            }
-                        }
-                    }
-
-                    (c == '\n' || c == '\r') && inString -> {
-                        val next = nextNonWhitespaceChar(candidate, index + 1)
-                        if (next != null && next in VALUE_CLOSE_FOLLOWERS) {
-                            append('"')
-                            append(c)
-                            inString = false
-                        } else {
-                            if (c == '\r' && candidate.getOrNull(index + 1) == '\n') {
-                                append("\\n")
-                                index += 1
-                            } else {
-                                append("\\n")
-                            }
-                        }
-                    }
-
+                    state.escape -> { append(c); state.escape = false }
+                    c == '\\' -> { append(c); state.escape = state.inString }
+                    c == '"' -> handleQuoteChar(candidate, index, state)
+                    (c == '\n' || c == '\r') && state.inString ->
+                        index = handleNewlineInString(c, candidate, index, state)
                     else -> {
                         append(c)
-                        if (inString && c.isWhitespace()) {
-                            stringSawWhitespace = true
-                        }
+                        state.stringSawWhitespace = state.stringSawWhitespace || (state.inString && c.isWhitespace())
                     }
                 }
                 index += 1
             }
-            if (inString) {
-                append('"')
-            }
+            if (state.inString) append('"')
         }
         return repaired.takeIf { it != candidate }
     }
+
+    private fun StringBuilder.handleQuoteChar(candidate: String, index: Int, state: RepairState) {
+        if (!state.inString) {
+            append('"')
+            state.inString = true
+            state.stringStartIndex = length
+            state.stringSawWhitespace = false
+            state.insertedLeadingContentQuote = false
+            return
+        }
+        val next = nextNonWhitespaceChar(candidate, index + 1)
+        if (next == null || next in STRING_CLOSE_FOLLOWERS) {
+            append('"')
+            state.inString = false
+            state.stringStartIndex = -1
+        } else {
+            val canInsertLeadingQuote = !state.insertedLeadingContentQuote &&
+                !state.stringSawWhitespace &&
+                state.stringStartIndex >= 0 &&
+                next.isLetter()
+            if (canInsertLeadingQuote) {
+                insert(state.stringStartIndex, "\\\"")
+                state.insertedLeadingContentQuote = true
+            }
+            append("\\\"")
+        }
+    }
+
+    private fun StringBuilder.handleNewlineInString(
+        c: Char,
+        candidate: String,
+        index: Int,
+        state: RepairState,
+    ): Int {
+        val next = nextNonWhitespaceChar(candidate, index + 1)
+        if (next != null && next in VALUE_CLOSE_FOLLOWERS) {
+            append('"')
+            append(c)
+            state.inString = false
+            return index
+        }
+        return if (c == '\r' && candidate.getOrNull(index + 1) == '\n') {
+            append("\\n")
+            index + 1
+        } else {
+            append("\\n")
+            index
+        }
+    }
+
+    private class RepairState(
+        var inString: Boolean = false,
+        var escape: Boolean = false,
+        var stringStartIndex: Int = -1,
+        var stringSawWhitespace: Boolean = false,
+        var insertedLeadingContentQuote: Boolean = false,
+    )
 
     private fun nextNonWhitespaceChar(candidate: String, startIndex: Int): Char? {
         var index = startIndex

@@ -155,7 +155,7 @@ class PatternFormattingTest {
     fun `undoLabelResFor returns the Undo resource when the undo payload is present`() {
         assertEquals(
             dev.anchildress1.vestige.R.string.pattern_undo,
-            undoLabelResFor(PatternUndo("any-id", PatternAction.DROP)),
+            undoLabelResFor(PatternUndo.Drop("any-id")),
         )
     }
 

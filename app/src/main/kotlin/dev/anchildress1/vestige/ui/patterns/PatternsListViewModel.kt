@@ -3,7 +3,6 @@ package dev.anchildress1.vestige.ui.patterns
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import dev.anchildress1.vestige.model.PatternState
 import dev.anchildress1.vestige.storage.EntryStore
 import dev.anchildress1.vestige.storage.PatternEntity
 import dev.anchildress1.vestige.storage.PatternRepo
@@ -104,9 +103,8 @@ class PatternsListViewModel(
                     val priorState = current.state
                     val priorSnoozedUntil = current.snoozedUntil
                     patternRepo.restart(patternId)
-                    PatternUndo(
+                    PatternUndo.Restart(
                         patternId = patternId,
-                        action = PatternAction.RESTART,
                         previousState = priorState,
                         previousSnoozedUntil = priorSnoozedUntil,
                     )
@@ -125,15 +123,15 @@ class PatternsListViewModel(
         viewModelScope.launch {
             withContext(ioDispatcher) {
                 runCatching {
-                    when (undo.action) {
-                        PatternAction.DROP -> patternRepo.drop(undo.patternId, undo = true)
+                    when (undo) {
+                        is PatternUndo.Drop -> patternRepo.drop(undo.patternId, undo = true)
 
-                        PatternAction.SKIP -> patternRepo.skip(undo.patternId, undo = true)
+                        is PatternUndo.Skip -> patternRepo.skip(undo.patternId, undo = true)
 
-                        PatternAction.RESTART -> patternRepo.restart(
+                        is PatternUndo.Restart -> patternRepo.restart(
                             patternId = undo.patternId,
                             undo = true,
-                            previousState = undo.previousState ?: PatternState.ACTIVE,
+                            previousState = undo.previousState,
                             previousSnoozedUntil = undo.previousSnoozedUntil,
                         )
                     }
@@ -141,9 +139,8 @@ class PatternsListViewModel(
                     if (failure is CancellationException) throw failure
                     // A stale undo (e.g. skip→drop→tap-undo on the older skip snackbar) routes
                     // a SNOOZED→ACTIVE transition through a row already in DROPPED. PatternRepo/
-                    // PatternStore throw on illegal lifecycle moves per ADR-003; ignore the
-                    // throw so the UI doesn't crash, and the refresh below replays the
-                    // persisted state back onto the list.
+                    // PatternStore throw on illegal lifecycle moves; ignore the throw so the UI
+                    // doesn't crash, and the refresh below replays the persisted state onto the list.
                     Log.w(TAG, "Ignoring stale undo for ${undo.patternId}", failure)
                 }
             }
@@ -172,7 +169,14 @@ class PatternsListViewModel(
                     .isSuccess
             }
             _state.value = loadState()
-            if (applied) _events.emit(PatternActionEvent(patternId, action, PatternUndo(patternId, action)))
+            if (applied) {
+                val undo: PatternUndo = when (action) {
+                    PatternAction.DROP -> PatternUndo.Drop(patternId)
+                    PatternAction.SKIP -> PatternUndo.Skip(patternId)
+                    PatternAction.RESTART -> error("restart dispatched through wrong path")
+                }
+                _events.emit(PatternActionEvent(patternId, action, undo))
+            }
         }
     }
 

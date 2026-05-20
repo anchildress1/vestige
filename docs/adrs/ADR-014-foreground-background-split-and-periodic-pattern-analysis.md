@@ -135,3 +135,5 @@ Refines the background-pattern lane; does not supersede the foreground/backgroun
   parallel inference.
 - Deterministic signatures, supporting entries, lifecycle states, and cooldown behavior remain
   owned by ADR-003.
+- The model's role in pattern analysis (title + callout, no existence decision) is documented
+  in ADR-015, which supersedes the implicit scope boundary in this addendum.

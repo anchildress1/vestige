@@ -82,25 +82,25 @@ class PatternAnalysisGenerator(
             Log.w(TAG, "pattern analysis rejected reason=$reason (rawLen=${raw.length})")
             return null
         }
+        @Suppress("ReturnCount")
+        fun extractFromCandidate(root: JSONObject, recordReason: (String) -> Unit): PatternAnalysisResult? {
+            val title = root.optString("title").trim().sanitizeTitle()
+            if (title == null) { recordReason("blank-title"); return null }
+            val callout = root.optString("callout").trim().sanitizeCallout()
+            if (callout == null) { recordReason("blank-or-overlong-callout"); return null }
+            if (forbiddenPhraseDetector(title) || forbiddenPhraseDetector(callout)) {
+                recordReason("forbidden-phrase"); return null
+            }
+            return PatternAnalysisResult(title = title, calloutText = callout)
+        }
         var sawJson = false
         var firstStructuredReason: String? = null
         parseableObjects(raw).forEach { root ->
             sawJson = true
-            val title = root.optString("title").trim().sanitizeTitle()
-            if (title == null) {
-                if (firstStructuredReason == null) firstStructuredReason = "blank-title"
-                return@forEach
+            val result = extractFromCandidate(root) { reason ->
+                if (firstStructuredReason == null) firstStructuredReason = reason
             }
-            val callout = root.optString("callout").trim().sanitizeCallout()
-            if (callout == null) {
-                if (firstStructuredReason == null) firstStructuredReason = "blank-or-overlong-callout"
-                return@forEach
-            }
-            if (forbiddenPhraseDetector(title) || forbiddenPhraseDetector(callout)) {
-                if (firstStructuredReason == null) firstStructuredReason = "forbidden-phrase"
-                return@forEach
-            }
-            return PatternAnalysisResult(title = title, calloutText = callout)
+            if (result != null) return result
         }
         return rejected(firstStructuredReason ?: if (sawJson) "no-analysis-object" else "no-json")
     }

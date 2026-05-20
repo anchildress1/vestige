@@ -1,5 +1,6 @@
 package dev.anchildress1.vestige
 
+import android.util.Log
 import dev.anchildress1.vestige.storage.CalloutCooldownEntity
 import dev.anchildress1.vestige.storage.EntryEntity
 import dev.anchildress1.vestige.storage.MarkdownEntryStore
@@ -197,7 +198,12 @@ internal class VestigeDataExporter(
     }
 
     private fun ZipOutputStream.closeEntrySafely() {
-        runCatching { closeEntry() }
+        try {
+            closeEntry()
+        } catch (e: IOException) {
+            Log.e("VestigeDataExporter", "ZipEntry close failed — archive may be corrupt", e)
+            throw e
+        }
     }
 
     private fun JSONObject.putNullable(key: String, value: Any?): JSONObject = put(key, value ?: JSONObject.NULL)

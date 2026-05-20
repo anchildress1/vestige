@@ -6,13 +6,8 @@ import org.json.JSONObject
 import java.util.Locale
 
 /**
- * Deterministic callout-text builder per ADR-003 §"Pattern primitives (v1)" examples. ADR-003
- * caps pattern-engine work at one short model call per newly-active pattern (title only); the
- * callout text is templated from the signature + supporting count so it stays sourced by
- * construction (AGENTS.md guardrail 12) and never invents interpretive language.
- *
- * Persona-flavored variants live in `:core-inference` if v1.5 brings them in; for v1 the
- * templated string already mirrors the ADR's "Witness tone" examples.
+ * Deterministic callout-text builder. Text is templated from signature fields and supporting-entry
+ * count; it never invents language not derivable from the stored data.
  */
 object PatternCalloutText {
 

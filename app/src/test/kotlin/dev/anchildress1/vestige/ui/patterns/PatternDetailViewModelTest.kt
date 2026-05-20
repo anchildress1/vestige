@@ -270,7 +270,7 @@ class PatternDetailViewModelTest {
         assertEquals(PatternState.DROPPED, patternStore.findByPatternId("p-stale")?.state)
         // Tap-undo on the older SKIP snackbar — PatternRepo.skip(undo=true) requires SNOOZED,
         // but the row is DROPPED → throws. runCatching must swallow it.
-        vm.undo(PatternUndo("p-stale", PatternAction.SKIP))
+        vm.undo(PatternUndo.Skip("p-stale"))
         // State unchanged; VM didn't crash.
         assertEquals(PatternState.DROPPED, patternStore.findByPatternId("p-stale")?.state)
         vm.state.test {
@@ -341,9 +341,10 @@ class PatternDetailViewModelTest {
             vm.restart()
             val event = awaitItem()
             assertEquals(PatternAction.RESTART, event.action)
-            assertEquals(PatternState.SNOOZED, event.undo?.previousState)
-            assertEquals(originalSnoozedUntil, event.undo?.previousSnoozedUntil)
-            vm.undo(event.undo!!)
+            val restoreUndo = event.undo as PatternUndo.Restart
+            assertEquals(PatternState.SNOOZED, restoreUndo.previousState)
+            assertEquals(originalSnoozedUntil, restoreUndo.previousSnoozedUntil)
+            vm.undo(restoreUndo)
         }
 
         val row = patternStore.findByPatternId("p-restart-snooze-detail")!!

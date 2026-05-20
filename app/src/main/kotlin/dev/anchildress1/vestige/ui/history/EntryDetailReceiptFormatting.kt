@@ -75,14 +75,11 @@ internal fun buildFieldRows(entity: EntryEntity): List<FieldRow> {
         vocabFallback != null -> vocabFallback
         else -> DASH
     }
-    val vocabTone = if (receipts == null) {
-        LensTone.CONFLICT
-    } else if (vocabFromReceipts != null) {
-        receiptFieldTone(receipts, KEY_VOCAB)
-    } else if (vocabFallback != null) {
-        receiptLexicalTone(entity.entryText, receipts)
-    } else {
-        confidence[KEY_VOCAB].toTone()
+    val vocabTone = when {
+        receipts == null -> LensTone.CONFLICT
+        vocabFromReceipts != null -> receiptFieldTone(receipts, KEY_VOCAB)
+        vocabFallback != null -> receiptLexicalTone(entity.entryText, receipts)
+        else -> confidence[KEY_VOCAB].toTone()
     }
     val topLevelCommitment = commitmentText(entity.statedCommitmentJson)
     val commitmentValue = topLevelCommitment

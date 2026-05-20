@@ -31,9 +31,10 @@ import java.time.ZoneId
  * Wiring layer called by `BackgroundExtractionSaveFlow` after `completeEntry` so the new entry
  * is already persisted with its tags + template label. Two side effects:
  *
- * 1. Every [DETECTION_INTERVAL]th entry, run [PatternDetector] + upsert results into [PatternStore]. New patterns
- *    get a model-generated title (one short call via [PatternTitleGenerator]); existing rows
- *    update their supporting set and `lastSeenTimestamp` per ADR-003 step 6.
+ * 1. Every [DETECTION_INTERVAL]th entry, run [PatternDetector] + upsert results into [PatternStore]. New
+ *    temporal patterns get a model-generated title from [PatternAnalysisGenerator], falling back to
+ *    [PatternTitleGenerator], then a deterministic name. Existing rows update their supporting set
+ *    and `lastSeenTimestamp`.
  * 2. Select one matching active pattern for the committed entry (subject to the global 3-entry
  *    callout cooldown). When a callout fires, append a `PATTERN_CALLOUT` observation to the
  *    entry and record the firing.
@@ -120,7 +121,8 @@ class PatternDetectionOrchestrator(
             .runCatching { generate(persona, detected) }
             .getOrElse {
                 if (it is CancellationException) throw it
-                Log.w(TAG, "title generator threw ${it.javaClass.simpleName}")
+                Log.w(TAG, "title generator failed id=${detected.patternId}" +
+                    " persona=${persona.name}: ${it.javaClass.simpleName}")
                 null
             }
             ?: deterministicFallbackTitle(detected)
@@ -154,8 +156,8 @@ class PatternDetectionOrchestrator(
         val expired = pattern.state == PatternState.SNOOZED &&
             pattern.snoozedUntil != null &&
             clock.millis() >= pattern.snoozedUntil!!
-        // Route through the validator chokepoint — ADR-003 §"Auto-promotion of snoozed → active"
-        // is an explicit transition and must be auditable via `PatternStore.transitionState`.
+        // Route through the validator chokepoint — transitions must be auditable via
+        // PatternStore.transitionState, not mutated in place.
         return if (expired) patternStore.transitionState(pattern.patternId, PatternState.ACTIVE) else null
     }
 
@@ -168,10 +170,9 @@ class PatternDetectionOrchestrator(
         pattern.lastSeenTimestamp = detected.lastSeenTimestamp
         pattern.supportingEntries.clear()
         pattern.supportingEntries.addAll(supporting.map { it.entity })
-        // ADR-003 step 6: `latestCalloutText` updates on the ACTIVE branch only. The silent-update
-        // branches (snoozed within window, dismissed, resolved) accumulate supporting entries but
-        // freeze the callout the user last saw — re-surfacing in v1.5 must show that string,
-        // not arbitrary drift from later evidence.
+        // `latestCalloutText` updates only on the ACTIVE branch. Non-active branches accumulate
+        // supporting entries but freeze the callout string the user last saw — re-surfacing must
+        // show that version, not later drift.
         if (pattern.state == PatternState.ACTIVE) {
             logDegradedIfTemporal(detected, analysis)
             if (analysis != null) pattern.title = analysis.title
@@ -264,7 +265,8 @@ private suspend fun PatternAnalysisGenerator?.generatePatternAnalysis(
         ?.runCatching { generate(persona, detected, supporting.map { it.evidence }) }
         ?.getOrElse {
             if (it is CancellationException) throw it
-            Log.w("VestigePatternOrch", "pattern analysis generator threw ${it.javaClass.simpleName}")
+            Log.w("VestigePatternOrch", "pattern analysis failed id=${detected.patternId}" +
+                " kind=${detected.kind.serial}: ${it.javaClass.simpleName}")
             null
         }
 }

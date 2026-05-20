@@ -269,7 +269,8 @@ private fun ObservationRows(observations: List<ObservationLine>) {
         modifier = Modifier
             .fillMaxWidth()
             .background(colors.s1)
-            .testTag("entry_observations"),
+            .testTag("entry_observations")
+            .semantics(mergeDescendants = true) { liveRegion = LiveRegionMode.Polite },
         verticalArrangement = Arrangement.spacedBy(0.dp),
     ) {
         Column(

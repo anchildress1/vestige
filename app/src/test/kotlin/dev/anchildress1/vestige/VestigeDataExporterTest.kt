@@ -102,6 +102,20 @@ class VestigeDataExporterTest {
     }
 
     @Test
+    fun `snapshot top-level sections include schema_version, tags, and callout_cooldowns`() {
+        val out = ByteArrayOutputStream()
+
+        exporter().writeTo(out)
+
+        val snapshot = snapshotOf(out)
+        assertEquals(2, snapshot.getInt("schema_version"))
+        assertTrue(snapshot.has("tags"))
+        assertEquals(0, snapshot.getJSONArray("tags").length())
+        assertTrue(snapshot.has("callout_cooldowns"))
+        assertEquals(0, snapshot.getJSONArray("callout_cooldowns").length())
+    }
+
+    @Test
     fun `null entry columns serialize as JSON null, populated columns as their value`() {
         putEntry(
             EntryEntity(

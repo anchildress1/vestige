@@ -108,7 +108,7 @@ object PromptComposer {
         }
         return buildString {
             append("## RETRIEVED HISTORY")
-            chunks.forEachIndexed { index, chunk ->
+            chunks.forEach { chunk ->
                 append('\n')
                 val metadata = chunk.patternId?.let { "pattern_id=$it" } ?: "context-only"
                 append("- $metadata\n")

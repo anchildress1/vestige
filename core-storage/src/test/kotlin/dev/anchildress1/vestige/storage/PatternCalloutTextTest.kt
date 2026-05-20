@@ -121,4 +121,13 @@ class PatternCalloutTextTest {
 
         assertEquals("3 first-of-month entries logged. Same calendar edge keeps showing up.", text)
     }
+
+    @Test
+    fun `temporal with unknown relation falls back to generic calendar-slot copy`() {
+        val text = PatternCalloutText.build(
+            detected(PatternKind.TEMPORAL_RELATIVE, "{\"relation\":\"unknown_future_kind\"}"),
+        )
+
+        assertEquals("3 time-relative entries logged. Same calendar slot keeps showing up.", text)
+    }
 }

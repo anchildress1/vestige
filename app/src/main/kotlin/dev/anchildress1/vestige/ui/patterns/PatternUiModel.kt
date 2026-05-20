@@ -23,6 +23,13 @@ data class PatternCardUi(
         check(backLabel == null || section == PatternSection.SKIPPED) {
             "backLabel must be null for non-SKIPPED cards (section=$section)"
         }
+        require(traceHits.all { it in 0 until TRACE_DAYS }) {
+            "traceHits indices must be in 0 until $TRACE_DAYS"
+        }
+    }
+
+    companion object {
+        const val TRACE_DAYS: Int = 30
     }
 }
 
@@ -52,6 +59,7 @@ sealed interface PatternsListUiState {
     data class Loaded(val cards: List<PatternCardUi>, val entryCount: Int, val daysSinceFirstCapped: Int) :
         PatternsListUiState {
         init {
+            require(cards.isNotEmpty()) { "Loaded state must have at least one card" }
             require(entryCount >= 0) { "entryCount must be non-negative" }
             require(daysSinceFirstCapped in 1..MAX_STAT_DAYS) {
                 "daysSinceFirstCapped must be in 1..$MAX_STAT_DAYS, got $daysSinceFirstCapped"
@@ -105,14 +113,14 @@ data class PatternActionEvent(val patternId: String, val action: PatternAction, 
 /** Card-action callbacks bundled so composables stay within detekt's parameter ceiling. */
 data class PatternActionCallbacks<T>(val onDrop: (T) -> Unit, val onSkip: (T) -> Unit, val onRestart: (T) -> Unit = {})
 
-/**
- * Inverse-action payload the snackbar reissues if the user taps `Undo` while it's alive.
- * [previousState] / [previousSnoozedUntil] are non-null only for RESTART so the undo path can
- * restore the exact pre-restart snapshot.
- */
-data class PatternUndo(
-    val patternId: String,
-    val action: PatternAction,
-    val previousState: PatternState? = null,
-    val previousSnoozedUntil: Long? = null,
-)
+/** Inverse-action payload the snackbar reissues if the user taps `Undo` while it's alive. */
+sealed interface PatternUndo {
+    val patternId: String
+    data class Drop(override val patternId: String) : PatternUndo
+    data class Skip(override val patternId: String) : PatternUndo
+    data class Restart(
+        override val patternId: String,
+        val previousState: PatternState,
+        val previousSnoozedUntil: Long?,
+    ) : PatternUndo
+}

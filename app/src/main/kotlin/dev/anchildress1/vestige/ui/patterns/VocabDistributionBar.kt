@@ -17,20 +17,13 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import dev.anchildress1.vestige.ui.theme.VestigeColors
 import dev.anchildress1.vestige.ui.theme.VestigeTheme
 
 /**
- * Stacked horizontal proportion bar — one weighted segment per vocab cluster. Used on the
- * Vocab Drift surface to show how the supporting entries of a `VOCAB_FREQUENCY` pattern split
- * across distinct framings. Segments adopt accent colors in the Scoreboard palette order
- * (lime → coral → teal → ember), wrapping past index 3.
- *
- * Bar height defaults to 16.dp — meaningful glyph, not a hairline. Hairlines belong to the
- * Scoreboard tick rules; this is a body element.
- *
- * A single merged [contentDescription] is set on the bar's outer `Row` so the entire glyph
- * announces as one element to screen readers (matching the AGENTS.md band a11y rule for
- * status surfaces) rather than 3+ unlabeled boxes.
+ * Stacked horizontal proportion bar — one weighted segment per vocab cluster. The whole row
+ * carries a single merged contentDescription so screen readers announce one informational
+ * glyph instead of N unlabeled boxes.
  */
 @Composable
 fun VocabDistributionBar(
@@ -40,8 +33,8 @@ fun VocabDistributionBar(
 ) {
     require(segments.isNotEmpty()) { "VocabDistributionBar requires at least one segment" }
     val totalWeight = segments.sumOf { it.weight.toDouble() }.toFloat()
-    require(totalWeight > 0f) { "VocabDistributionBar weights must sum > 0 (got $totalWeight)" }
     val description = composeDescription(segments, totalWeight)
+    val colors = VestigeTheme.colors
     Row(
         modifier = modifier
             .fillMaxWidth()
@@ -56,22 +49,18 @@ fun VocabDistributionBar(
                 modifier = Modifier
                     .weight(segment.weight)
                     .fillMaxHeight()
-                    .background(accentForIndex(index)),
+                    .background(vocabAccentForIndex(index, colors)),
             )
         }
     }
 }
 
-@Composable
-private fun accentForIndex(index: Int): Color {
-    // Wrap past the 4-color band — defensive only; the orchestrator's vocab pass produces a
-    // handful of clusters in practice, not dozens.
-    val accents = listOf(
-        VestigeTheme.colors.lime,
-        VestigeTheme.colors.coral,
-        VestigeTheme.colors.teal,
-        VestigeTheme.colors.ember,
-    )
+/**
+ * Returns the cluster-card accent for [index]. Wraps past 4 — defensive only; production
+ * patterns produce a handful of clusters, not dozens.
+ */
+internal fun vocabAccentForIndex(index: Int, colors: VestigeColors): Color {
+    val accents = listOf(colors.lime, colors.coral, colors.teal, colors.ember)
     return accents[index % accents.size]
 }
 
@@ -83,12 +72,16 @@ private fun composeDescription(segments: List<VocabDistributionSegment>, totalWe
     return "Vocabulary distribution: ${parts.joinToString(", ")}."
 }
 
-/**
- * One cluster's slice. [weight] is normalized at render — pass raw member counts or precomputed
- * proportions; the bar handles the division.
- */
+/** One cluster's slice. [weight] is normalized at render; pass raw member counts or proportions. */
 @Immutable
-data class VocabDistributionSegment(val label: String, val weight: Float)
+data class VocabDistributionSegment(val label: String, val weight: Float) {
+    init {
+        require(label.isNotBlank()) { "VocabDistributionSegment.label must be non-blank" }
+        require(weight > 0f && weight.isFinite()) {
+            "VocabDistributionSegment.weight must be positive finite (got $weight)"
+        }
+    }
+}
 
 object VocabDistributionBarDefaults {
     val Height: Dp = 16.dp

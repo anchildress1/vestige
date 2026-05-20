@@ -1,18 +1,6 @@
 package dev.anchildress1.vestige.storage
 
-/**
- * Deterministic label / description / example derivation for an embedding cluster. No model
- * calls — the vocab-drift surface ships a stable summary even when the LLM is offline. The
- * label and description summarize the cluster's *distinctive* framings: tokens that appear
- * across this cluster's entries but are not the pattern's root token (the "tired" / "stuck"
- * the cluster is a framing *of*).
- *
- * Label format: lowercase comma-joined top tokens, ≤24 chars including the comma and space
- * separators. Description format: `<N> entries · framings: a, b, c`.
- *
- * Example entry: the cluster member whose vector is closest to the cluster centroid
- * (mean of L2-normalized member vectors). Tiebreaks by entryId ascending.
- */
+/** Deterministic label + description + centroid-example derivation for an [EmbeddingClustering.Cluster]. */
 object VocabClusterLabeler {
 
     /** Hard cap on label length so the screen layout doesn't have to truncate at render. */
@@ -30,13 +18,11 @@ object VocabClusterLabeler {
      */
     fun label(cluster: EmbeddingClustering.Cluster, rootToken: String): VocabCluster {
         val tokens = topDistinctiveTokens(cluster.members, rootToken)
-        val example = exampleEntryId(cluster.members)
-        return VocabCluster(
-            clusterId = cluster.clusterId,
+        return VocabCluster.of(
+            members = cluster.members.map { it.id },
             label = renderLabel(tokens),
             description = renderDescription(cluster.members.size, tokens),
-            exampleEntryId = example,
-            memberEntryIds = cluster.members.map { it.id },
+            exampleEntryId = exampleEntryId(cluster.members),
         )
     }
 

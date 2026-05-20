@@ -31,30 +31,29 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.anchildress1.vestige.ui.components.AppTop
 import dev.anchildress1.vestige.ui.components.AppTopStatuses
 import dev.anchildress1.vestige.ui.components.EyebrowE
-import dev.anchildress1.vestige.ui.theme.VestigeColors
 import dev.anchildress1.vestige.ui.theme.VestigeTheme
 
-/**
- * Vocab Drift surface — the EmbeddingGemma payoff page. Renders the per-cluster split of a
- * single `VOCAB_FREQUENCY` pattern's supporting entries: one root token (e.g. "tired"),
- * multiple framings (e.g. "exhausted, drained, wiped" / "sluggish, foggy" / "wired-tired,
- * anxious-tired"). The story it tells the user: tag matching saw these 23 entries as one
- * thing; embeddings saw three.
- */
+/** Vocab Drift surface — renders persisted clusters for a single VOCAB_FREQUENCY pattern. */
 @Composable
 fun VocabDriftScreen(viewModel: VocabDriftViewModel, onBack: () -> Unit, modifier: Modifier = Modifier) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val colors = VestigeTheme.colors
     Column(modifier = modifier.fillMaxSize().background(colors.floor)) {
-        AppTop(
-            persona = "",
-            status = AppTopStatuses.Ready,
-            onMenuTap = onBack,
-        )
+        AppTop(persona = "", status = AppTopStatuses.Ready, onMenuTap = onBack)
         when (val s = state) {
             VocabDriftUiState.Loading -> Spacer(Modifier.weight(1f))
 
-            VocabDriftUiState.NotFound -> NotFoundBody(modifier = Modifier.weight(1f))
+            VocabDriftUiState.NotFound -> StatusBandBody(
+                text = VocabDriftCopy.NOT_FOUND,
+                testTag = VocabDriftTestTags.NOT_FOUND_BAND,
+                modifier = Modifier.weight(1f),
+            )
+
+            VocabDriftUiState.NotYetClustered -> StatusBandBody(
+                text = VocabDriftCopy.NOT_YET_CLUSTERED,
+                testTag = VocabDriftTestTags.NOT_YET_CLUSTERED_BAND,
+                modifier = Modifier.weight(1f),
+            )
 
             is VocabDriftUiState.Loaded -> VocabDriftBody(
                 state = s,
@@ -65,9 +64,7 @@ fun VocabDriftScreen(viewModel: VocabDriftViewModel, onBack: () -> Unit, modifie
 }
 
 @Composable
-private fun NotFoundBody(modifier: Modifier = Modifier) {
-    // Status band per AGENTS.md: role + contentDescription + liveRegion + no click action.
-    val text = VocabDriftCopy.NOT_FOUND
+private fun StatusBandBody(text: String, testTag: String, modifier: Modifier = Modifier) {
     Box(
         modifier = modifier
             .fillMaxWidth()
@@ -76,7 +73,7 @@ private fun NotFoundBody(modifier: Modifier = Modifier) {
                 contentDescription = text
                 liveRegion = LiveRegionMode.Polite
             }
-            .testTag(VocabDriftTestTags.NOT_FOUND_BAND),
+            .testTag(testTag),
         contentAlignment = Alignment.TopStart,
     ) {
         Text(text = text, style = VestigeTheme.typography.p, color = VestigeTheme.colors.dim)
@@ -95,7 +92,11 @@ private fun VocabDriftBody(state: VocabDriftUiState.Loaded, modifier: Modifier =
     ) {
         Header(state)
         VocabDistributionBar(segments = state.clusters.map { it.toSegment() })
-        ClusterColumn(clusters = state.clusters, colors = colors)
+        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            state.clusters.forEachIndexed { index, cluster ->
+                ClusterCard(cluster = cluster, accent = vocabAccentForIndex(index, colors))
+            }
+        }
     }
 }
 
@@ -115,21 +116,6 @@ private fun Header(state: VocabDriftUiState.Loaded) {
         Text(text = headlineText, style = VestigeTheme.typography.h2, color = colors.ink)
         Text(text = subtext, style = VestigeTheme.typography.pCompact, color = colors.dim)
     }
-}
-
-@Composable
-private fun ClusterColumn(clusters: List<VocabClusterUiModel>, colors: VestigeColors) {
-    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        clusters.forEachIndexed { index, cluster ->
-            ClusterCard(cluster = cluster, accent = accentForIndex(index, colors))
-        }
-    }
-}
-
-@Composable
-private fun accentForIndex(index: Int, colors: VestigeColors): Color {
-    val accents = listOf(colors.lime, colors.coral, colors.teal, colors.ember)
-    return accents[index % accents.size]
 }
 
 @Composable
@@ -169,6 +155,8 @@ private val MIN_CARD_HEIGHT = 64.dp
 object VocabDriftCopy {
     const val EYEBROW: String = "VOCAB DRIFT"
     const val NOT_FOUND: String =
+        "Vocab drift isn't available for this pattern."
+    const val NOT_YET_CLUSTERED: String =
         "Not enough evidence yet. Vocab drift surfaces after the model finds at least six related entries."
 
     fun subtitle(clusterCount: Int): String = when (clusterCount) {
@@ -179,6 +167,7 @@ object VocabDriftCopy {
 
 object VocabDriftTestTags {
     const val NOT_FOUND_BAND: String = "VocabDrift_NotFound"
+    const val NOT_YET_CLUSTERED_BAND: String = "VocabDrift_NotYetClustered"
     private const val ID_PREFIX_CHARS: Int = 8
 
     fun clusterCardTag(clusterId: String): String = "VocabDrift_Cluster_${clusterId.take(ID_PREFIX_CHARS)}"

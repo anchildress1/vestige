@@ -47,7 +47,7 @@ fun PatternsHost( // NOSONAR kotlin:S107
     val vocabDriftViewModel = remember(openVocabDriftPatternId, patternStore, entryStore) {
         openVocabDriftPatternId?.let { VocabDriftViewModel(it, patternStore, entryStore) }
     }
-    LaunchedEffect(revision, detailViewModel, vocabDriftViewModel) {
+    LaunchedEffect(revision) {
         listViewModel.refresh()
         detailViewModel?.refresh()
         vocabDriftViewModel?.refresh()

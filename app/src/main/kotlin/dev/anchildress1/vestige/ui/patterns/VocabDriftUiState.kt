@@ -1,21 +1,28 @@
 package dev.anchildress1.vestige.ui.patterns
 
+import androidx.compose.runtime.Immutable
+
 /** State for the Vocab Drift screen — see [VocabDriftViewModel] for the load path. */
 sealed interface VocabDriftUiState {
 
     data object Loading : VocabDriftUiState
 
-    /**
-     * The pattern row was missing or wasn't a vocab-frequency pattern, or its clusters column
-     * was empty / corrupted. Either way the UI shows a brief absent-data line and a back affordance.
-     */
+    /** Wrong pattern id / wrong kind / missing root token. Surface as an "absent" status band. */
     data object NotFound : VocabDriftUiState
 
     /**
-     * Resolved snapshot. [totalEntries] is the sum across [clusters] (every supporting entry
-     * landed in some cluster). [rootToken] is the canonical word the clusters are framings of —
-     * the UI uses it as the headline; never duplicates it inside a cluster label.
+     * Right kind, right id — but the orchestrator's clustering pass hasn't produced clusters
+     * yet (supporting set still below the floor, or embeddings still backfilling). The user
+     * sees a different, more hopeful copy than [NotFound].
      */
+    data object NotYetClustered : VocabDriftUiState
+
+    /**
+     * Resolved snapshot. [totalEntries] is the sum across [clusters]. [rootToken] is the
+     * canonical word the clusters are framings of — the UI uses it as the headline and never
+     * repeats it inside a cluster label.
+     */
+    @Immutable
     data class Loaded(
         val patternTitle: String,
         val rootToken: String,
@@ -24,11 +31,8 @@ sealed interface VocabDriftUiState {
     ) : VocabDriftUiState
 }
 
-/**
- * UI projection of a single [dev.anchildress1.vestige.storage.VocabCluster]. The screen never
- * reads ObjectBox entities directly — the ViewModel resolves the example snippet at load time
- * so the renderer stays pure.
- */
+/** UI projection of a single [dev.anchildress1.vestige.storage.VocabCluster]. */
+@Immutable
 data class VocabClusterUiModel(
     val clusterId: String,
     val label: String,

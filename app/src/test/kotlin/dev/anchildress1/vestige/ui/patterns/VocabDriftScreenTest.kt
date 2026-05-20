@@ -5,6 +5,7 @@ import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -140,9 +141,33 @@ class VocabDriftScreenTest {
     }
 
     @Test
-    fun `pattern with blank clusters json renders not found`() {
-        // Wrong shape: pattern exists but its clusters column is empty.
+    fun `pattern with blank clusters json renders NotYetClustered band`() {
+        // Right pattern, right kind — orchestrator hasn't stamped clusters yet.
         seedPattern(supporting = emptyList(), clusters = emptyList())
+
+        composeRule.setContent {
+            VocabDriftScreen(viewModel = newViewModel(), onBack = {})
+        }
+
+        val band = composeRule.onNodeWithTag(VocabDriftTestTags.NOT_YET_CLUSTERED_BAND)
+        band.assertIsDisplayed()
+        band.assert(SemanticsMatcher.keyIsDefined(SemanticsProperties.LiveRegion))
+    }
+
+    @Test
+    fun `non-vocab-frequency pattern renders NotFound`() {
+        // Deep-link to a TEMPORAL_RELATIVE pattern by id — VM must guard the kind.
+        val pattern = PatternEntity(
+            patternId = PATTERN_ID,
+            kind = PatternKind.TEMPORAL_RELATIVE,
+            signatureJson = "{}",
+            title = "Whatever",
+            templateLabel = null,
+            firstSeenTimestamp = 1L,
+            lastSeenTimestamp = 1L,
+            state = PatternState.ACTIVE,
+        )
+        patternStore.put(pattern)
 
         composeRule.setContent {
             VocabDriftScreen(viewModel = newViewModel(), onBack = {})
@@ -151,12 +176,43 @@ class VocabDriftScreenTest {
         composeRule.onNodeWithTag(VocabDriftTestTags.NOT_FOUND_BAND).assertIsDisplayed()
     }
 
-    private fun fakeCluster(label: String, idStart: Long, idEnd: Long): VocabCluster = VocabCluster(
-        clusterId = "%064d".format(idStart),
+    @Test
+    fun `example snippet collapses whitespace and ellipsizes past 140 chars`() {
+        val box = boxStore.boxFor(EntryEntity::class.java)
+        val longText = "tabs\tand\n\n   spaces   " + "x".repeat(200)
+        val example = EntryEntity(
+            markdownFilename = "vocab-long.md",
+            entryText = longText,
+            timestampEpochMs = 1L,
+            durationMs = 5_000L,
+            extractionStatus = ExtractionStatus.COMPLETED,
+        ).also { box.put(it) }
+        seedPattern(
+            supporting = listOf(example),
+            clusters = listOf(
+                VocabCluster.of(
+                    members = listOf(example.id),
+                    label = "long",
+                    description = "1 entry · framings: long",
+                    exampleEntryId = example.id,
+                ),
+            ),
+        )
+
+        composeRule.setContent {
+            VocabDriftScreen(viewModel = newViewModel(), onBack = {})
+        }
+
+        // Collapsed whitespace = single spaces. 140-char cap → trailing ellipsis.
+        composeRule.onAllNodesWithText("\"tabs and spaces ", substring = true)[0].assertExists()
+        composeRule.onAllNodesWithText("…\"", substring = true)[0].assertExists()
+    }
+
+    private fun fakeCluster(label: String, idStart: Long, idEnd: Long): VocabCluster = VocabCluster.of(
+        members = (idStart..idEnd).toList(),
         label = label,
         description = "${idEnd - idStart + 1} entries · framings: $label",
         exampleEntryId = idStart,
-        memberEntryIds = (idStart..idEnd).toList(),
     )
 
     private fun seedSupportingEntries(count: Int, marker: String): List<EntryEntity> {
@@ -183,7 +239,7 @@ class VocabDriftScreenTest {
             lastSeenTimestamp = 100L,
             state = PatternState.ACTIVE,
             latestCalloutText = "tired across multiple framings",
-            vocabClustersJson = VocabClustersCodec.encode(clusters),
+            vocabClustersJson = VocabClustersCodec.encode(clusters, evidenceHash = "test-hash"),
         )
         patternStore.put(pattern)
         val stored = patternStore.findByPatternId(PATTERN_ID)!!

@@ -1,5 +1,6 @@
 package dev.anchildress1.vestige.ui.patterns
 
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dev.anchildress1.vestige.model.PatternKind
@@ -7,6 +8,7 @@ import dev.anchildress1.vestige.storage.EntryStore
 import dev.anchildress1.vestige.storage.PatternStore
 import dev.anchildress1.vestige.storage.VocabCluster
 import dev.anchildress1.vestige.storage.VocabClustersCodec
+import dev.anchildress1.vestige.storage.vocabRootTokenOrNull
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -14,16 +16,8 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import org.json.JSONObject
 
-/**
- * Loads a single `VOCAB_FREQUENCY` pattern + its persisted clusters. No clustering happens
- * here — the orchestrator already stamped `vocabClustersJson`. This VM just decodes, resolves
- * each cluster's example entry into a UI-ready snippet, and surfaces the result.
- *
- * Construction mirrors [PatternDetailViewModel] — patternId is constructor-injected, the host
- * lays the VM down with `remember(patternId, …)` so it tears down on back-navigation.
- */
+/** Loads a single `VOCAB_FREQUENCY` pattern's persisted clusters + resolves example snippets. */
 class VocabDriftViewModel(
     private val patternId: String,
     private val patternStore: PatternStore,
@@ -48,32 +42,32 @@ class VocabDriftViewModel(
         val pattern = patternStore.findByPatternId(patternId) ?: return@withContext VocabDriftUiState.NotFound
         if (pattern.kind != PatternKind.VOCAB_FREQUENCY) return@withContext VocabDriftUiState.NotFound
         val clusters = VocabClustersCodec.decode(pattern.vocabClustersJson)
-        if (clusters.isEmpty()) return@withContext VocabDriftUiState.NotFound
+        if (clusters.isEmpty()) return@withContext VocabDriftUiState.NotYetClustered
 
-        val rootToken = runCatching {
-            JSONObject(pattern.signatureJson).optString("token", "")
-        }.getOrDefault("")
-        val totalEntries = clusters.sumOf { it.memberEntryIds.size }
-        val uiClusters = clusters.map { it.toUiModel() }
-
+        val rootToken = vocabRootTokenOrNull(pattern.signatureJson) ?: run {
+            Log.e(TAG, "vocab-frequency pattern missing token pid=${pattern.patternId}")
+            return@withContext VocabDriftUiState.NotFound
+        }
         VocabDriftUiState.Loaded(
             patternTitle = pattern.title,
             rootToken = rootToken,
-            totalEntries = totalEntries,
-            clusters = uiClusters,
+            totalEntries = clusters.sumOf { it.memberEntryIds.size },
+            clusters = clusters.map { it.toUiModel() },
         )
     }
 
     private fun VocabCluster.toUiModel(): VocabClusterUiModel {
-        val snippet = entryStore.readEntry(exampleEntryId)
-            ?.entryText
-            ?.let { snippetOf(it) }
-            .orEmpty()
+        val entry = entryStore.readEntry(exampleEntryId)
+        if (entry == null) {
+            // Stale cluster row — example entry was deleted out from under us. Log + render
+            // blank snippet rather than crash; user still sees the label + count.
+            Log.w(TAG, "vocab cluster example entry missing pid=$patternId cid=$clusterId eid=$exampleEntryId")
+        }
         return VocabClusterUiModel(
             clusterId = clusterId,
             label = label,
             description = description,
-            exampleSnippet = snippet,
+            exampleSnippet = entry?.entryText?.let(::snippetOf).orEmpty(),
             memberCount = memberEntryIds.size,
         )
     }
@@ -84,6 +78,7 @@ class VocabDriftViewModel(
     }
 
     private companion object {
+        const val TAG: String = "VestigeVocabDriftVM"
         const val MAX_SNIPPET_CHARS: Int = 140
         val WHITESPACE_RUN: Regex = Regex("""\s+""")
     }

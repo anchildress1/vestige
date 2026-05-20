@@ -114,6 +114,73 @@ class EmbeddingClusteringTest {
         EmbeddingClustering.cluster(members, maxCosineDistance = 5.0)
     }
 
+    @Test
+    fun `disjoint member sets of the same size yield distinct cluster ids`() {
+        val groupA = (1L..6L).map { id -> entry(id = id, vector = nearVector(axis = 0, jitter = id * 0.001)) }
+        val groupB = (10L..15L).map { id -> entry(id = id, vector = nearVector(axis = 1, jitter = id * 0.001)) }
+
+        val a = EmbeddingClustering.cluster(groupA)
+        val b = EmbeddingClustering.cluster(groupB)
+
+        assertEquals(1, a.size)
+        assertEquals(1, b.size)
+        assertNotEquals(a[0].clusterId, b[0].clusterId)
+    }
+
+    @Test
+    fun `all-zero vector entries are dropped from the input`() {
+        val healthy = (1L..6L).map { id -> entry(id = id, vector = nearVector(axis = 0, jitter = id * 0.001)) }
+        val zero = entry(id = 99L, vector = FloatArray(EMBED_DIM))
+
+        val clusters = EmbeddingClustering.cluster(healthy + zero)
+
+        assertEquals(1, clusters.size)
+        assertEquals(healthy.map { it.id }, clusters[0].members.map { it.id })
+    }
+
+    @Test
+    fun `NaN or Infinity vector entries are dropped from the input`() {
+        val healthy = (1L..6L).map { id -> entry(id = id, vector = nearVector(axis = 0, jitter = id * 0.001)) }
+        val nan = entry(id = 100L, vector = FloatArray(EMBED_DIM).apply { this[0] = Float.NaN })
+        val inf = entry(id = 101L, vector = FloatArray(EMBED_DIM).apply { this[0] = Float.POSITIVE_INFINITY })
+
+        val clusters = EmbeddingClustering.cluster(healthy + listOf(nan, inf))
+
+        assertEquals(1, clusters.size)
+        assertEquals(healthy.map { it.id }, clusters[0].members.map { it.id })
+    }
+
+    @Test(expected = IllegalArgumentException::class)
+    fun `dimension-mismatched usable vectors throw`() {
+        val good = (1L..6L).map { id -> entry(id = id, vector = nearVector(axis = 0, jitter = id * 0.001)) }
+        val mismatched = entry(id = 99L, vector = FloatArray(EMBED_DIM + 4).also { it[0] = 1f })
+        EmbeddingClustering.cluster(good + mismatched)
+    }
+
+    @Test
+    fun `distance exactly at the cut merges, just past it does not`() {
+        // Cosine-distance merge condition is `bestDist > maxCosineDistance` (strict). At cut → merge.
+        val v0 = FloatArray(EMBED_DIM).apply { this[0] = 1f }
+        val v1 = FloatArray(EMBED_DIM).apply {
+            this[0] = 0.7f
+            this[1] = kotlin.math.sqrt(1f - 0.49f)
+        }
+        val members = listOf(
+            entry(id = 1L, vector = v0.copyOf()),
+            entry(id = 2L, vector = v0.copyOf()),
+            entry(id = 3L, vector = v0.copyOf()),
+            entry(id = 4L, vector = v1.copyOf()),
+            entry(id = 5L, vector = v1.copyOf()),
+            entry(id = 6L, vector = v1.copyOf()),
+        )
+
+        val merged = EmbeddingClustering.cluster(members, maxCosineDistance = 0.30)
+        val split = EmbeddingClustering.cluster(members, maxCosineDistance = 0.29)
+
+        assertEquals(1, merged.size)
+        assertEquals(2, split.size)
+    }
+
     private fun entry(id: Long, vector: FloatArray?): EntryEntity =
         EntryEntity(entryText = "entry $id", timestampEpochMs = id * 1000L).also {
             it.id = id

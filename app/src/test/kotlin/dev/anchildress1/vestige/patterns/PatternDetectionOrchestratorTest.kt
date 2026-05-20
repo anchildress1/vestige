@@ -846,6 +846,105 @@ class PatternDetectionOrchestratorTest {
     }
 
     @Test
+    fun `vocab clustering second pass is a no-op when evidence is unchanged`() = runTest {
+        val groupA = (1..3).map { i ->
+            putEntry(text = "tired exhausted $i", timestamp = now.plusSeconds(i.toLong())).also {
+                it.vector = nearAxisVector(axis = 0)
+                boxStore.boxFor(EntryEntity::class.java).put(it)
+            }
+        }
+        val groupB = (4..6).map { i ->
+            putEntry(text = "tired foggy $i", timestamp = now.plusSeconds(i.toLong())).also {
+                it.vector = nearAxisVector(axis = 1)
+                boxStore.boxFor(EntryEntity::class.java).put(it)
+            }
+        }
+        val pattern = PatternEntity(
+            patternId = PATTERN_A_ID,
+            kind = PatternKind.VOCAB_FREQUENCY,
+            signatureJson = "{\"kind\":\"vocab_frequency\",\"token\":\"tired\"}",
+            title = "Tired",
+            templateLabel = null,
+            firstSeenTimestamp = 1L,
+            lastSeenTimestamp = 7L,
+            state = PatternState.ACTIVE,
+            latestCalloutText = "tired",
+        )
+        patternStore.put(pattern)
+        val stored = patternStore.findByPatternId(PATTERN_A_ID)!!
+        stored.supportingEntries.addAll(groupA + groupB)
+        patternStore.put(stored)
+
+        // First commit triggers the second pass.
+        repeat(3) { commitOne() }
+        val firstJson = patternStore.findByPatternId(PATTERN_A_ID)!!.vocabClustersJson
+        assertTrue("first run must stamp", firstJson.isNotBlank())
+
+        // Second commit: same evidence ⇒ same JSON ⇒ no re-stamp.
+        commitOne()
+        val secondJson = patternStore.findByPatternId(PATTERN_A_ID)!!.vocabClustersJson
+        assertEquals("identical evidence must produce identical envelope", firstJson, secondJson)
+    }
+
+    @Test
+    fun `vocab clustering does not stamp a pattern that is not ACTIVE`() = runTest {
+        val members = (1..6).map { i ->
+            putEntry(text = "tired $i", timestamp = now.plusSeconds(i.toLong())).also {
+                it.vector = nearAxisVector(axis = 0)
+                boxStore.boxFor(EntryEntity::class.java).put(it)
+            }
+        }
+        val pattern = PatternEntity(
+            patternId = PATTERN_A_ID,
+            kind = PatternKind.VOCAB_FREQUENCY,
+            signatureJson = "{\"kind\":\"vocab_frequency\",\"token\":\"tired\"}",
+            title = "Tired",
+            templateLabel = null,
+            firstSeenTimestamp = 1L,
+            lastSeenTimestamp = 7L,
+            state = PatternState.SNOOZED, // not ACTIVE
+            latestCalloutText = "tired",
+        )
+        patternStore.put(pattern)
+        val stored = patternStore.findByPatternId(PATTERN_A_ID)!!
+        stored.supportingEntries.addAll(members)
+        patternStore.put(stored)
+
+        repeat(3) { commitOne() }
+
+        assertEquals("", patternStore.findByPatternId(PATTERN_A_ID)!!.vocabClustersJson)
+    }
+
+    @Test
+    fun `vocab clustering ignores non-VOCAB_FREQUENCY active patterns`() = runTest {
+        val members = (1..6).map { i ->
+            putEntry(text = "tired $i", timestamp = now.plusSeconds(i.toLong())).also {
+                it.vector = nearAxisVector(axis = 0)
+                boxStore.boxFor(EntryEntity::class.java).put(it)
+            }
+        }
+        val pattern = PatternEntity(
+            patternId = PATTERN_A_ID,
+            kind = PatternKind.TEMPORAL_RELATIVE,
+            signatureJson = "{}",
+            title = "T",
+            templateLabel = null,
+            firstSeenTimestamp = 1L,
+            lastSeenTimestamp = 7L,
+            state = PatternState.ACTIVE,
+            latestCalloutText = "t",
+        )
+        patternStore.put(pattern)
+        val stored = patternStore.findByPatternId(PATTERN_A_ID)!!
+        stored.supportingEntries.addAll(members)
+        patternStore.put(stored)
+
+        repeat(3) { commitOne() }
+
+        assertEquals("", patternStore.findByPatternId(PATTERN_A_ID)!!.vocabClustersJson)
+    }
+
+    @Test
     fun `vocab clustering is skipped when supporting set is below the minimum`() = runTest {
         val supporting = (1..3).map { i ->
             putEntry(text = "tired $i", timestamp = now.plusSeconds(i.toLong())).also {

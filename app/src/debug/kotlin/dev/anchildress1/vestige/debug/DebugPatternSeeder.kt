@@ -142,14 +142,15 @@ object DebugPatternSeeder {
         val saved = patternStore.findByPatternId(pattern.patternId)
             ?: error("debug seed: vocab-drift pattern did not persist")
         saved.supportingEntries.addAll(tiredEntries)
-        // Run the same clustering pipeline production would so the screen has data immediately,
-        // independent of whether the orchestrator's second pass has run yet.
+        // Pre-stamp so the screen renders before the next save runs the orchestrator's pass.
         val clusters = EmbeddingClustering.cluster(tiredEntries)
-        if (clusters.isNotEmpty()) {
-            saved.vocabClustersJson = VocabClustersCodec.encode(
-                clusters.map { VocabClusterLabeler.label(it, rootToken = "tired") },
-            )
+        check(clusters.isNotEmpty()) {
+            "debug seed: vocab-drift clustering produced no clusters — synthetic vectors broke"
         }
+        saved.vocabClustersJson = VocabClustersCodec.encode(
+            clusters = clusters.map { VocabClusterLabeler.label(it, rootToken = "tired") },
+            evidenceHash = VocabClustersCodec.evidenceHashOf(tiredEntries.map { it.id }),
+        )
         patternStore.put(saved)
     }
 

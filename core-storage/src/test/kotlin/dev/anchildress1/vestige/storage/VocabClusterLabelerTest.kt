@@ -99,7 +99,7 @@ class VocabClusterLabelerTest {
             entry(id = 14L, text = "e", vector = nearAxis(axis = 0, perturb = 0.0)),
             entry(id = 15L, text = "f", vector = nearAxis(axis = 0, perturb = 0.0)),
         )
-        val cluster = EmbeddingClustering.Cluster(clusterId = "x".repeat(64), members = members)
+        val cluster = EmbeddingClustering.Cluster.of(members)
 
         val result = VocabClusterLabeler.label(cluster, rootToken = "")
 
@@ -156,10 +156,10 @@ class VocabClusterLabelerTest {
         assertEquals("exhausted, everything", result.label)
     }
 
-    private fun clusterOf(members: List<Pair<String, Long>>): EmbeddingClustering.Cluster = EmbeddingClustering.Cluster(
-        clusterId = "0".repeat(64),
-        members = members.map { (text, id) -> entry(id = id, text = text, vector = nearAxis(0, 0.0)) },
-    )
+    private fun clusterOf(members: List<Pair<String, Long>>): EmbeddingClustering.Cluster =
+        EmbeddingClustering.Cluster.of(
+            members.map { (text, id) -> entry(id = id, text = text, vector = nearAxis(0, 0.0)) },
+        )
 
     private fun entry(id: Long, text: String, vector: FloatArray?): EntryEntity =
         EntryEntity(entryText = text, timestampEpochMs = id * 1000L).also {

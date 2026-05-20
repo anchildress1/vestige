@@ -1,20 +1,8 @@
 package dev.anchildress1.vestige.storage
 
-import java.security.MessageDigest
-
 /**
- * Deterministic agglomerative clustering over per-entry embedding vectors. Designed for the
- * vocab-drift surface: cluster the embeddings of a `VOCAB_FREQUENCY` pattern's supporting
- * entries so the UI can show "N distinct framings of the same underlying state."
- *
- * Determinism guarantees:
- * - Input order does not affect output. Inputs are sorted by `entryId` before clustering.
- * - No randomness, no learned parameters, no seeds. Same evidence ⇒ identical clusters.
- * - Cluster ids are content-addressable (SHA-256 hex of sorted member entry ids).
- *
- * Algorithm: average-linkage agglomerative clustering on cosine distance, cut at
- * [maxCosineDistance]. Implementation is O(N² · log N) — fine for the v1 ceiling of a few
- * hundred supporting entries per pattern; if that ever grows, swap in HDBSCAN.
+ * Deterministic agglomerative clustering (average-linkage cosine, sorted by entryId for
+ * input-order stability) for vocab-drift enrichment. Same evidence ⇒ identical clusters.
  */
 object EmbeddingClustering {
 
@@ -36,15 +24,22 @@ object EmbeddingClustering {
         val vectored = members
             .asSequence()
             .filter { it.vector != null }
+            // Drop pathological vectors so they can't poison the metric. Zero-norm produces
+            // 1.0 distance to everything (singleton spam); NaN/Inf break the comparator.
+            .filter { it.vector!!.isUsableVector() }
             .sortedBy { it.id } // input-order stability
             .toList()
         if (vectored.size < MIN_SUPPORTING_ENTRIES) return emptyList()
+        val dim = vectored.first().vector!!.size
+        require(vectored.all { it.vector!!.size == dim }) {
+            "all input vectors must share the same dimension (saw $dim and ${vectored.first {
+                it.vector!!.size != dim
+            }.vector!!.size})"
+        }
 
         val normalized = vectored.map { l2Normalize(it.vector!!) }
         val labels = IntArray(vectored.size) { it }
 
-        // Build initial pairwise cosine distances. Average-linkage means we recompute as
-        // clusters merge by tracking running cluster sums (not full pair-recompute).
         var done = false
         while (!done) {
             val (bestI, bestJ, bestDist) = closestPair(normalized, labels) ?: break
@@ -64,10 +59,6 @@ object EmbeddingClustering {
         var bestI = -1
         var bestJ = -1
         var bestDist = Double.MAX_VALUE
-        // Use average linkage: distance between clusters = mean pairwise cosine distance
-        // over members of each cluster. Walking the full N² pair table on every merge is
-        // acceptable at the v1 cap (~200 entries); the savings of incremental linkage update
-        // aren't worth the bookkeeping until we see real perf pressure.
         for (i in normalized.indices) {
             for (j in i + 1 until normalized.size) {
                 if (labels[i] == labels[j]) continue
@@ -107,31 +98,33 @@ object EmbeddingClustering {
             byLabel.getOrPut(labels[i]) { mutableListOf() }.add(members[i])
         }
         return byLabel.values
-            .map { group ->
-                val sortedMembers = group.sortedBy { it.id }
-                Cluster(
-                    clusterId = clusterIdOf(sortedMembers.map { it.id }),
-                    members = sortedMembers,
-                )
-            }
+            .map { Cluster.of(it) }
             .sortedWith(
                 compareByDescending<Cluster> { it.members.size }
                     .thenBy { it.members.first().id },
             )
     }
 
-    private fun clusterIdOf(sortedMemberIds: List<Long>): String {
-        val canonical = sortedMemberIds.joinToString(",")
-        val bytes = MessageDigest.getInstance("SHA-256").digest(canonical.toByteArray())
-        return bytes.joinToString("") { byte -> "%02x".format(byte) }
-    }
-
     private fun l2Normalize(vector: FloatArray): FloatArray {
         var sumSq = 0.0
         for (v in vector) sumSq += v.toDouble() * v.toDouble()
         val norm = kotlin.math.sqrt(sumSq).toFloat()
-        if (norm == 0f) return vector.copyOf() // pathological all-zero vector; keep as-is
+        // Pre-filtered upstream by [isUsableVector] — norm > 0, all finite — so this is safe.
         return FloatArray(vector.size) { vector[it] / norm }
+    }
+
+    private fun FloatArray.isUsableVector(): Boolean {
+        if (isEmpty()) return false
+        var sumSq = 0.0
+        var nonFinite = false
+        for (v in this) {
+            if (!v.isFinite()) {
+                nonFinite = true
+                break
+            }
+            sumSq += v.toDouble() * v.toDouble()
+        }
+        return !nonFinite && sumSq > 0.0
     }
 
     private fun cosineDistance(a: FloatArray, b: FloatArray): Double {
@@ -142,5 +135,22 @@ object EmbeddingClustering {
         return 1.0 - dot
     }
 
-    data class Cluster(val clusterId: String, val members: List<EntryEntity>)
+    /**
+     * One clustering result. Constructor is private so [clusterId] always matches the SHA-256
+     * hash of the sorted member ids — the content-addressable invariant the orchestrator's
+     * dirty-bit gate relies on.
+     */
+    @Suppress("DataClassPrivateConstructor")
+    data class Cluster private constructor(val clusterId: String, val members: List<EntryEntity>) {
+        internal companion object {
+            internal fun of(members: List<EntryEntity>): Cluster {
+                require(members.isNotEmpty()) { "EmbeddingClustering.Cluster.members must be non-empty" }
+                val sorted = members.sortedBy { it.id }
+                return Cluster(
+                    clusterId = VocabCluster.sha256Hex(sorted.map { it.id }),
+                    members = sorted,
+                )
+            }
+        }
+    }
 }

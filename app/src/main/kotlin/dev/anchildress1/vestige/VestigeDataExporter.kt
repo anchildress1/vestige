@@ -86,7 +86,7 @@ internal class VestigeDataExporter(private val boxStore: BoxStore, private val o
             JSONObject()
                 .put("entry_id", stableEntryId(entry))
                 .put("objectbox_id", entry.id)
-                .put("markdown_filename", entry.markdownFilename)
+                .put("markdown_filename", EntryMarkdownRenderer.filenameFor(entry))
                 .put("entry_text", entry.entryText)
                 .putNullable("follow_up_text", entry.followUpText)
                 .put("persona", entry.persona.name)

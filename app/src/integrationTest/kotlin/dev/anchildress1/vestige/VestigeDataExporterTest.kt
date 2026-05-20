@@ -158,6 +158,20 @@ class VestigeDataExporterTest {
     }
 
     @Test
+    fun `blank legacy markdownFilename exports resolved filename in entry snapshot`() {
+        putEntry(
+            EntryEntity(markdownFilename = "", entryText = "legacy row", timestampEpochMs = 0L),
+        )
+        val out = ByteArrayOutputStream()
+
+        exporter().writeTo(out)
+
+        val entry = snapshotOf(out).getJSONArray("entries").getJSONObject(0)
+        assertEquals("1970-01-01T00-00-00Z--legacy-row", entry.getString("entry_id"))
+        assertEquals("1970-01-01T00-00-00Z--legacy-row.md", entry.getString("markdown_filename"))
+    }
+
+    @Test
     fun `populated lensReceiptsJson is exported verbatim`() {
         val receipts = """[{"lens":"LITERAL","extracted":true}]"""
         val entity = putEntry(

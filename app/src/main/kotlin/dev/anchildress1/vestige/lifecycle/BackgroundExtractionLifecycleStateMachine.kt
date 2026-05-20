@@ -28,7 +28,7 @@ class BackgroundExtractionLifecycleStateMachine(
     private var foregroundStartSuppressedUntilIdle: Boolean = false
 
     @Synchronized
-    fun onInFlightCountChange(count: Int) {
+    fun onInFlightCountChange(count: Int, allowSuppressedPromotion: Boolean = false) {
         require(count >= 0) { "inFlightCount must be ≥ 0 (got $count)" }
         inFlightCount = count
         if (count == 0) {
@@ -38,7 +38,8 @@ class BackgroundExtractionLifecycleStateMachine(
         }
         when (mutableState.value) {
             BackgroundExtractionLifecycleState.NORMAL -> {
-                if (count > 0 && !foregroundStartSuppressedUntilIdle) {
+                if (count > 0 && (!foregroundStartSuppressedUntilIdle || allowSuppressedPromotion)) {
+                    foregroundStartSuppressedUntilIdle = false
                     foregroundStartRetryJob?.cancel()
                     foregroundStartRetryJob = null
                     transition(BackgroundExtractionLifecycleState.PROMOTING)

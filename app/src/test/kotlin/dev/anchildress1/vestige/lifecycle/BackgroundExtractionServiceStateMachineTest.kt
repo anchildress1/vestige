@@ -205,6 +205,19 @@ class BackgroundExtractionServiceStateMachineTest {
     }
 
     @Test
+    fun `foreground start suppression retries when app returns to foreground`() = runTest {
+        var promoteCount = 0
+        val machine = machine(this, foregroundStartRetryDelay = 1.seconds) { promoteCount += 1 }
+        machine.onInFlightCountChange(1)
+        machine.onForegroundStartFailed(retry = false)
+
+        machine.onInFlightCountChange(1, allowSuppressedPromotion = true)
+
+        assertEquals(BackgroundExtractionLifecycleState.PROMOTING, machine.state.value)
+        assertEquals(2, promoteCount)
+    }
+
+    @Test
     fun `onPromoteRequested fires on every PROMOTING transition including the DEMOTING bounce`() = runTest {
         var promoteCount = 0
         val machine = machine(this) { promoteCount += 1 }

@@ -134,8 +134,19 @@ class EntryStore(private val boxStore: BoxStore) {
     }
 
     /** Completed rows whose 3-lens extraction receipts have not been populated yet. */
-    fun listCompletedMissingLensReceipts(limit: Int = 100): List<EntryEntity> =
-        listCompleted(limit).filter { it.lensReceiptsJsonOrEmpty == "[]" }
+    fun listCompletedMissingLensReceipts(limit: Int = 100): List<EntryEntity> = boxStore.callClosingThreadResources {
+        boxStore.boxFor<EntryEntity>()
+            .query()
+            .equal(
+                EntryEntity_.extractionStatus,
+                ExtractionStatus.COMPLETED.name,
+                QueryBuilder.StringOrder.CASE_SENSITIVE,
+            )
+            .filter { it.lensReceiptsJsonOrEmpty == "[]" }
+            .orderDesc(EntryEntity_.timestampEpochMs)
+            .build()
+            .use { it.find().take(limit) }
+    }
 
     /** Single most-recent completed entry, or `null` when none exist. */
     fun lastCompleted(): EntryEntity? = boxStore.callClosingThreadResources {
@@ -240,10 +251,17 @@ class EntryStore(private val boxStore: BoxStore) {
         }
     }
 
-    private fun markdownFilenameExists(box: io.objectbox.Box<EntryEntity>, filename: String): Boolean = box.query()
-        .equal(EntryEntity_.markdownFilename, filename, QueryBuilder.StringOrder.CASE_SENSITIVE)
-        .build()
-        .use { it.count() > 0 }
+    private fun markdownFilenameExists(box: io.objectbox.Box<EntryEntity>, filename: String): Boolean {
+        val storedMatch = box.query()
+            .equal(EntryEntity_.markdownFilename, filename, QueryBuilder.StringOrder.CASE_SENSITIVE)
+            .build()
+            .use { it.count() > 0 }
+        if (storedMatch) return true
+        return box.query()
+            .equal(EntryEntity_.markdownFilename, "", QueryBuilder.StringOrder.CASE_SENSITIVE)
+            .build()
+            .use { query -> query.find().any { EntryMarkdownRenderer.filenameFor(it) == filename } }
+    }
 
     private fun applyResolved(entry: EntryEntity, resolved: ResolvedExtraction, templateLabel: TemplateLabel?) {
         entry.templateLabel = templateLabel

@@ -174,6 +174,7 @@ private fun PostOnboardingResumeEffects(container: AppContainer) {
         // Skip windows that elapse off-screen must wake up no matter which post-onboarding
         // surface the user returns to, not just Capture.
         container.sweepExpiredSkips()
+        container.retryForegroundPromotionIfWorkActive()
     }
 }
 

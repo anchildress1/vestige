@@ -438,6 +438,25 @@ class EntryStoreTest {
         assertEquals("2026-05-15T07-21-24Z--standup-ran-long-fine-then-compl-2.md", secondName)
     }
 
+    @Test
+    fun `createPendingEntry appends suffix when blank legacy row derives same export filename`() {
+        boxStore.boxFor<EntryEntity>().put(
+            EntryEntity(
+                markdownFilename = "",
+                entryText = SAMPLE_TEXT,
+                timestampEpochMs = SAMPLE_INSTANT.toEpochMilli(),
+                extractionStatus = ExtractionStatus.COMPLETED,
+            ),
+        )
+
+        val id = entryStore.createPendingEntry(SAMPLE_TEXT, SAMPLE_INSTANT)
+
+        assertEquals(
+            "2026-05-15T07-21-24Z--standup-ran-long-fine-then-compl-2.md",
+            boxStore.boxFor<EntryEntity>().get(id).markdownFilename,
+        )
+    }
+
     private fun resolvedSample() = ResolvedExtraction(
         mapOf(
             "tags" to ResolvedField(
@@ -492,6 +511,24 @@ class EntryStoreTest {
         assertEquals(3, rows.size)
     }
 
+    @Test
+    fun `listCompletedMissingLensReceipts filters missing receipts before applying limit`() {
+        val olderMissing = entryStore.createPendingEntry("older missing", SAMPLE_INSTANT)
+        val newerComplete = entryStore.createPendingEntry("newer complete", SAMPLE_INSTANT.plusSeconds(60))
+        entryStore.completeEntry(olderMissing, emptyResolved, templateLabel = null)
+        entryStore.completeEntry(
+            newerComplete,
+            emptyResolved,
+            templateLabel = null,
+            lensReceipts = listOf(sampleReceipt()),
+        )
+
+        val rows = entryStore.listCompletedMissingLensReceipts(limit = 1)
+
+        assertEquals(1, rows.size)
+        assertEquals("older missing", rows.single().entryText)
+    }
+
     // lastCompleted tests
 
     @Test
@@ -524,6 +561,14 @@ class EntryStoreTest {
     }
 
     private val emptyResolved = ResolvedExtraction(emptyMap())
+
+    private fun sampleReceipt() = EntryLensReceipt(
+        lens = Lens.LITERAL,
+        extracted = true,
+        fields = mapOf("tags" to listOf("standup")),
+        attemptCount = 1,
+        elapsedMs = 900L,
+    )
 
     private companion object {
         // 2026-05-11T07:21:24Z — fixed, arbitrary fixture instant; value is not significant.

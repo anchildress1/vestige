@@ -441,6 +441,11 @@ class AppContainer(
         lifecycleStateMachine.onInFlightCountChange(statusBus.inFlightCount.value)
     }
 
+    fun retryForegroundPromotionIfWorkActive() {
+        foregroundPromotionDeniedLogged.set(false)
+        lifecycleStateMachine.onInFlightCountChange(statusBus.inFlightCount.value, allowSuppressedPromotion = true)
+    }
+
     fun extractionStatusListener(entryId: Long): ExtractionStatusListener = ExtractionStatusListener { status, _, _ ->
         reportExtractionStatus(entryId, status)
         if (status.isTerminal()) {

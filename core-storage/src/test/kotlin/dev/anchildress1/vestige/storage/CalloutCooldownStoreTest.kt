@@ -228,6 +228,76 @@ class CalloutCooldownStoreTest {
         assertEquals(9L, store.snapshotFor(PATTERN_A).lastCalloutEntryId)
     }
 
+    @Test
+    fun `decrementAllActive is a no-op on an empty table`() {
+        // No rows created — no NPE, no exception, no spurious puts.
+        store.decrementAllActive()
+        store.decrementAllActive(exceptPatternId = PATTERN_A)
+        assertTrue(store.isCalloutPermitted(PATTERN_A))
+    }
+
+    @Test
+    fun `decrementAllActive with except naming a row that does not exist still sweeps everyone else`() {
+        store.recordFired(entryId = 1L, patternId = PATTERN_A, timestampMs = 1_000L)
+
+        store.decrementAllActive(exceptPatternId = "no-such-pattern")
+
+        assertEquals(2, store.snapshotFor(PATTERN_A).remainingSuppression)
+    }
+
+    @Test
+    fun `decrementAllActive does not underflow patterns already at zero`() {
+        // A at 0 (never fired), B at 3 (just fired). Decrement once.
+        store.recordFired(entryId = 1L, patternId = PATTERN_B, timestampMs = 1_000L)
+
+        store.decrementAllActive()
+
+        assertEquals(0, store.snapshotFor(PATTERN_A).remainingSuppression)
+        assertEquals(2, store.snapshotFor(PATTERN_B).remainingSuppression)
+    }
+
+    @Test
+    fun `confirmReservedCallout finds and confirms the right pattern when multiple have pending reservations`() {
+        store.tryReserveCallout(entryId = 42L, patternId = PATTERN_A)
+        store.tryReserveCallout(entryId = 84L, patternId = PATTERN_B)
+
+        val firedPatternId = store.confirmReservedCallout(entryId = 84L, timestampMs = 2_000L)
+
+        assertEquals(PATTERN_B, firedPatternId)
+        // A's pending reservation must be untouched.
+        assertEquals(42L, store.snapshotFor(PATTERN_A).pendingCalloutEntryId)
+        assertEquals(0, store.snapshotFor(PATTERN_A).remainingSuppression)
+        // B's row reflects the fire.
+        assertNull(store.snapshotFor(PATTERN_B).pendingCalloutEntryId)
+        assertEquals(3, store.snapshotFor(PATTERN_B).remainingSuppression)
+    }
+
+    @Test
+    fun `releaseReservedCallout clears only the matching pattern's pending`() {
+        store.tryReserveCallout(entryId = 42L, patternId = PATTERN_A)
+        store.tryReserveCallout(entryId = 84L, patternId = PATTERN_B)
+
+        assertTrue(store.releaseReservedCallout(entryId = 42L))
+
+        assertNull(store.snapshotFor(PATTERN_A).pendingCalloutEntryId)
+        // B's reservation untouched.
+        assertEquals(84L, store.snapshotFor(PATTERN_B).pendingCalloutEntryId)
+    }
+
+    @Test
+    fun `re-reserving the same entry-pattern pair is idempotent`() {
+        assertEquals(
+            CalloutCooldownStore.ReservationOutcome.RESERVED,
+            store.tryReserveCallout(entryId = 42L, patternId = PATTERN_A),
+        )
+        // Second call returns RESERVED without flipping state into a wedge.
+        assertEquals(
+            CalloutCooldownStore.ReservationOutcome.RESERVED,
+            store.tryReserveCallout(entryId = 42L, patternId = PATTERN_A),
+        )
+        assertEquals(42L, store.snapshotFor(PATTERN_A).pendingCalloutEntryId)
+    }
+
     private companion object {
         const val PATTERN_A = "pattern-a-sha"
         const val PATTERN_B = "pattern-b-sha"

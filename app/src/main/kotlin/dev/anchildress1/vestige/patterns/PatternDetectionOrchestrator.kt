@@ -44,6 +44,7 @@ class PatternDetectionOrchestrator(
     private val cooldownStore: CalloutCooldownStore,
     private val clock: Clock = Clock.systemUTC(),
     private val zoneId: ZoneId = ZoneId.systemDefault(),
+    private val patternSurfaceMinEntries: Long = PATTERN_SURFACE_MIN_ENTRIES,
 ) {
 
     /**
@@ -63,7 +64,7 @@ class PatternDetectionOrchestrator(
     @Suppress("ReturnCount")
     suspend fun onEntryCommitted(entry: EntryEntity, persona: Persona): EntryObservation? {
         val entryCount = completedEntryCount(boxStore)
-        if (entryCount >= PATTERN_SURFACE_MIN_ENTRIES) {
+        if (entryCount >= patternSurfaceMinEntries) {
             runDetection(persona)
         }
         val matched = chooseMatchingPattern(entry)

@@ -43,6 +43,9 @@ import java.time.ZoneOffset
 @OptIn(ExperimentalCoroutinesApi::class)
 @RunWith(RobolectricTestRunner::class)
 @Config(manifest = Config.NONE, application = android.app.Application::class)
+@Suppress("LargeClass") // Single coherent suite covering detection cadence, callout selection,
+// cooldown semantics, and per-pattern isolation — splitting it would scatter the orchestrator
+// contract across files without reducing the surface area being tested.
 class PatternDetectionOrchestratorTest {
 
     private lateinit var boxStore: BoxStore
@@ -76,6 +79,8 @@ class PatternDetectionOrchestratorTest {
             cooldownStore = cooldownStore,
             clock = clock,
             zoneId = ZoneOffset.UTC,
+            // Tests verify the cadence semantic; production threshold lives in the companion.
+            patternSurfaceMinEntries = TEST_DETECTION_THRESHOLD,
         )
     }
 
@@ -181,7 +186,7 @@ class PatternDetectionOrchestratorTest {
         // Seed an active pattern manually so we can test the per-entry callout pathway in isolation.
         patternStore.put(
             PatternEntity(
-                patternId = "x".repeat(64),
+                patternId = PATTERN_A_ID,
                 kind = PatternKind.TEMPLATE_RECURRENCE,
                 signatureJson = "{\"label\":\"aftermath\"}",
                 title = "Aftermath",
@@ -203,7 +208,7 @@ class PatternDetectionOrchestratorTest {
     fun `cooldown suppresses callouts on the next three entries after firing`() = runTest {
         patternStore.put(
             PatternEntity(
-                patternId = "x".repeat(64),
+                patternId = PATTERN_A_ID,
                 kind = PatternKind.TEMPLATE_RECURRENCE,
                 signatureJson = "{\"label\":\"aftermath\"}",
                 title = "Aftermath",
@@ -230,7 +235,7 @@ class PatternDetectionOrchestratorTest {
     fun `non-matching entry does not fire even when active patterns exist`() = runTest {
         patternStore.put(
             PatternEntity(
-                patternId = "x".repeat(64),
+                patternId = PATTERN_A_ID,
                 kind = PatternKind.TEMPLATE_RECURRENCE,
                 signatureJson = "{\"label\":\"aftermath\"}",
                 title = "Aftermath",
@@ -249,7 +254,7 @@ class PatternDetectionOrchestratorTest {
     fun `non-matching entries still consume the global cooldown window`() = runTest {
         patternStore.put(
             PatternEntity(
-                patternId = "x".repeat(64),
+                patternId = PATTERN_A_ID,
                 kind = PatternKind.TEMPLATE_RECURRENCE,
                 signatureJson = "{\"label\":\"aftermath\"}",
                 title = "Aftermath",
@@ -275,7 +280,7 @@ class PatternDetectionOrchestratorTest {
         // The save flow must confirm it after append succeeds or release it after append fails.
         patternStore.put(
             PatternEntity(
-                patternId = "x".repeat(64),
+                patternId = PATTERN_A_ID,
                 kind = PatternKind.TEMPLATE_RECURRENCE,
                 signatureJson = "{\"label\":\"aftermath\"}",
                 title = "Aftermath",
@@ -292,12 +297,12 @@ class PatternDetectionOrchestratorTest {
         assertEquals(
             "entry holds the pending reservation until append resolves",
             entry.id,
-            cooldownStore.snapshotFor("x".repeat(64)).pendingCalloutEntryId,
+            cooldownStore.snapshotFor(PATTERN_A_ID).pendingCalloutEntryId,
         )
         assertEquals(
             "no fire confirmed yet, so suppression window stays at 0",
             0,
-            cooldownStore.snapshotFor("x".repeat(64)).remainingSuppression,
+            cooldownStore.snapshotFor(PATTERN_A_ID).remainingSuppression,
         )
     }
 
@@ -305,7 +310,7 @@ class PatternDetectionOrchestratorTest {
     fun `matched pattern with blank callout text returns null without touching cooldown`() = runTest {
         patternStore.put(
             PatternEntity(
-                patternId = "x".repeat(64),
+                patternId = PATTERN_A_ID,
                 kind = PatternKind.TEMPLATE_RECURRENCE,
                 signatureJson = "{\"label\":\"aftermath\"}",
                 title = "Aftermath",
@@ -319,14 +324,14 @@ class PatternDetectionOrchestratorTest {
         val first = orchestrator.onEntryCommitted(putEntry(templateLabel = TemplateLabel.AFTERMATH), Persona.WITNESS)
         assertNull(first)
         // Reservation was released, so a follow-up entry with valid pattern would fire normally.
-        assertTrue(cooldownStore.isCalloutPermitted("x".repeat(64)))
+        assertTrue(cooldownStore.isCalloutPermitted(PATTERN_A_ID))
     }
 
     @Test
     fun `pending reservation blocks another matching entry from sneaking through`() = runTest {
         patternStore.put(
             PatternEntity(
-                patternId = "x".repeat(64),
+                patternId = PATTERN_A_ID,
                 kind = PatternKind.TEMPLATE_RECURRENCE,
                 signatureJson = "{\"label\":\"aftermath\"}",
                 title = "Aftermath",
@@ -345,14 +350,14 @@ class PatternDetectionOrchestratorTest {
 
         assertNotNull(firstCallout)
         assertNull("second entry must block behind the in-flight reservation", secondCallout)
-        assertEquals(firstEntry.id, cooldownStore.snapshotFor("x".repeat(64)).pendingCalloutEntryId)
+        assertEquals(firstEntry.id, cooldownStore.snapshotFor(PATTERN_A_ID).pendingCalloutEntryId)
     }
 
     @Test
     fun `dropped patterns do not surface as callouts even when matching`() = runTest {
         patternStore.put(
             PatternEntity(
-                patternId = "x".repeat(64),
+                patternId = PATTERN_A_ID,
                 kind = PatternKind.TEMPLATE_RECURRENCE,
                 signatureJson = "{\"label\":\"aftermath\"}",
                 title = "Aftermath",
@@ -470,6 +475,7 @@ class PatternDetectionOrchestratorTest {
             cooldownStore = cooldownStore,
             clock = laterClock,
             zoneId = ZoneOffset.UTC,
+            patternSurfaceMinEntries = TEST_DETECTION_THRESHOLD,
         )
         // Three more matching entries → detection upserts and promotes the row to ACTIVE.
         repeat(3) {
@@ -539,6 +545,7 @@ class PatternDetectionOrchestratorTest {
             cooldownStore = cooldownStore,
             clock = clock,
             zoneId = ZoneOffset.UTC,
+            patternSurfaceMinEntries = TEST_DETECTION_THRESHOLD,
         )
 
         fallbackOrchestrator.onEntryCommitted(putEntry(templateLabel = TemplateLabel.AFTERMATH), Persona.WITNESS)
@@ -585,6 +592,7 @@ class PatternDetectionOrchestratorTest {
             cooldownStore = cooldownStore,
             clock = clock,
             zoneId = ZoneOffset.UTC,
+            patternSurfaceMinEntries = TEST_DETECTION_THRESHOLD,
         )
 
         freshOrchestrator.onEntryCommitted(
@@ -627,6 +635,7 @@ class PatternDetectionOrchestratorTest {
             cooldownStore = cooldownStore,
             clock = clock,
             zoneId = ZoneOffset.UTC,
+            patternSurfaceMinEntries = TEST_DETECTION_THRESHOLD,
         )
 
         cancelOrchestrator.onEntryCommitted(putEntry(templateLabel = TemplateLabel.AFTERMATH), Persona.WITNESS)
@@ -644,5 +653,118 @@ class PatternDetectionOrchestratorTest {
         repeat(3) { commitOne() }
         val persisted = patternStore.findByPatternId(original.patternId)!!
         assertEquals(PatternState.SNOOZED, persisted.state)
+    }
+
+    @Test
+    fun `per-pattern isolation — A in cooldown but B fires the same entry`() = runTest {
+        // Both patterns match the AFTERMATH template; A has higher supporting count → would win
+        // the tiebreak if eligible. A is in suppression; B is clear. The selector must skip A.
+        patternStore.put(
+            PatternEntity(
+                patternId = PATTERN_A_ID,
+                kind = PatternKind.TEMPLATE_RECURRENCE,
+                signatureJson = "{\"label\":\"aftermath-a\"}",
+                title = "Aftermath A",
+                templateLabel = TemplateLabel.AFTERMATH.serial,
+                firstSeenTimestamp = 1L,
+                lastSeenTimestamp = 9L,
+                state = PatternState.ACTIVE,
+                latestCalloutText = "A says.",
+            ),
+        )
+        patternStore.put(
+            PatternEntity(
+                patternId = PATTERN_B_ID,
+                kind = PatternKind.TEMPLATE_RECURRENCE,
+                signatureJson = "{\"label\":\"aftermath-b\"}",
+                title = "Aftermath B",
+                templateLabel = TemplateLabel.AFTERMATH.serial,
+                firstSeenTimestamp = 1L,
+                lastSeenTimestamp = 2L,
+                state = PatternState.ACTIVE,
+                latestCalloutText = "B says.",
+            ),
+        )
+        // A's cooldown window is wide open; B is clear.
+        cooldownStore.recordFired(entryId = 1L, patternId = PATTERN_A_ID, timestampMs = 1L)
+
+        val callout = orchestrator.onEntryCommitted(putEntry(templateLabel = TemplateLabel.AFTERMATH), Persona.WITNESS)
+
+        assertNotNull("unrelated B should fire while A is in cooldown", callout)
+        assertEquals("B says.", callout?.text)
+        // A's suppression window untouched by B's fire.
+        assertEquals(3, cooldownStore.snapshotFor(PATTERN_A_ID).remainingSuppression)
+    }
+
+    @Test
+    fun `settleReservedCallout fired keeps the fired pattern's window at full 3`() = runTest {
+        // After commitOne fires A and settles, A.remainingSuppression must be 3 (not 2). Regression
+        // catches: settle dropping `exceptPatternId` from decrementAllActive would burn the
+        // freshly-set window to 2 on the same entry that set it.
+        patternStore.put(
+            PatternEntity(
+                patternId = PATTERN_A_ID,
+                kind = PatternKind.TEMPLATE_RECURRENCE,
+                signatureJson = "{\"label\":\"aftermath\"}",
+                title = "Aftermath",
+                templateLabel = TemplateLabel.AFTERMATH.serial,
+                firstSeenTimestamp = 1L,
+                lastSeenTimestamp = 2L,
+                state = PatternState.ACTIVE,
+                latestCalloutText = "Worth noting.",
+            ),
+        )
+
+        val callout = commitOne()
+
+        assertNotNull(callout)
+        assertEquals(3, cooldownStore.snapshotFor(PATTERN_A_ID).remainingSuppression)
+    }
+
+    @Test
+    fun `selector picks the eligible weaker candidate when the stronger one is in cooldown`() = runTest {
+        // A has 5 supporting entries (would win the tiebreak); B has 1. A is in suppression.
+        // Per ADR-016 + Phase 3, B should be the one to fire.
+        val aRow = PatternEntity(
+            patternId = PATTERN_A_ID,
+            kind = PatternKind.TEMPLATE_RECURRENCE,
+            signatureJson = "{\"label\":\"aftermath-a\"}",
+            title = "Aftermath A",
+            templateLabel = TemplateLabel.AFTERMATH.serial,
+            firstSeenTimestamp = 1L,
+            lastSeenTimestamp = 9L,
+            state = PatternState.ACTIVE,
+            latestCalloutText = "A loud.",
+        )
+        patternStore.put(aRow)
+        // Inflate A's supporting set so its tiebreak weight is real.
+        val aSupporting = (1..5).map { putEntry(templateLabel = TemplateLabel.AFTERMATH) }
+        val storedA = patternStore.findByPatternId(PATTERN_A_ID)!!
+        storedA.supportingEntries.addAll(aSupporting)
+        patternStore.put(storedA)
+        patternStore.put(
+            PatternEntity(
+                patternId = PATTERN_B_ID,
+                kind = PatternKind.TEMPLATE_RECURRENCE,
+                signatureJson = "{\"label\":\"aftermath-b\"}",
+                title = "Aftermath B",
+                templateLabel = TemplateLabel.AFTERMATH.serial,
+                firstSeenTimestamp = 1L,
+                lastSeenTimestamp = 2L,
+                state = PatternState.ACTIVE,
+                latestCalloutText = "B quiet.",
+            ),
+        )
+        cooldownStore.recordFired(entryId = 999L, patternId = PATTERN_A_ID, timestampMs = 1L)
+
+        val callout = orchestrator.onEntryCommitted(putEntry(templateLabel = TemplateLabel.AFTERMATH), Persona.WITNESS)
+
+        assertEquals("B quiet.", callout?.text)
+    }
+
+    private companion object {
+        const val TEST_DETECTION_THRESHOLD: Long = 3
+        const val PATTERN_A_ID: String = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        const val PATTERN_B_ID: String = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
     }
 }

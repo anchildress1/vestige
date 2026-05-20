@@ -298,6 +298,37 @@ class CalloutCooldownStoreTest {
         assertEquals(42L, store.snapshotFor(PATTERN_A).pendingCalloutEntryId)
     }
 
+    @Test
+    fun `ineligiblePatternIds is empty when nothing is suppressed or reserved`() {
+        // No rows + a permitted-snapshot row both produce the same result.
+        assertEquals(emptySet<String>(), store.ineligiblePatternIds())
+        store.snapshotFor(PATTERN_A) // creates an all-zero row
+        assertEquals(emptySet<String>(), store.ineligiblePatternIds())
+    }
+
+    @Test
+    fun `ineligiblePatternIds includes patterns inside a suppression window`() {
+        store.recordFired(entryId = 1L, patternId = PATTERN_A, timestampMs = 1_000L)
+
+        assertEquals(setOf(PATTERN_A), store.ineligiblePatternIds())
+    }
+
+    @Test
+    fun `ineligiblePatternIds includes patterns holding a pending reservation`() {
+        store.tryReserveCallout(entryId = 42L, patternId = PATTERN_A)
+
+        assertEquals(setOf(PATTERN_A), store.ineligiblePatternIds())
+    }
+
+    @Test
+    fun `ineligiblePatternIds returns every closed slot, leaves cleared patterns out`() {
+        store.recordFired(entryId = 1L, patternId = PATTERN_A, timestampMs = 1_000L)
+        store.tryReserveCallout(entryId = 42L, patternId = PATTERN_B)
+        store.snapshotFor("pattern-c-sha") // permitted (zero counters, no pending)
+
+        assertEquals(setOf(PATTERN_A, PATTERN_B), store.ineligiblePatternIds())
+    }
+
     private companion object {
         const val PATTERN_A = "pattern-a-sha"
         const val PATTERN_B = "pattern-b-sha"

@@ -282,7 +282,7 @@ class PatternDetectionOrchestratorTest {
     }
 
     @Test
-    fun `non-matching entries still consume the global cooldown window`() = runTest {
+    fun `non-matching entries still burn down the fired pattern's cooldown window`() = runTest {
         patternStore.put(
             PatternEntity(
                 patternId = PATTERN_A_ID,
@@ -296,9 +296,9 @@ class PatternDetectionOrchestratorTest {
                 latestCalloutText = "Worth noting.",
             ),
         )
-        // Fire once → cooldown counter set to 3.
+        // Fire once → A's per-pattern cooldown counter set to 3.
         commitOne()
-        // Three committed entries later — matching or not — the global cooldown is spent.
+        // Three committed entries later — matching or not — A's counter has decremented to 0.
         repeat(3) { commitOne(templateLabel = TemplateLabel.TUNNEL_EXIT) }
         // Fourth entry after the callout is eligible again.
         val nextMatch = commitOne()
@@ -307,8 +307,9 @@ class PatternDetectionOrchestratorTest {
 
     @Test
     fun `onEntryCommitted holds a reservation until the save flow confirms or releases it`() = runTest {
-        // The orchestrator now reserves the single global slot before returning the callout.
-        // The save flow must confirm it after append succeeds or release it after append fails.
+        // The orchestrator reserves the matched pattern's per-pattern slot before returning the
+        // callout. The save flow must confirm it after append succeeds or release it after append
+        // fails — leaving a pending reservation wedges that pattern until clearStalePendingReservation.
         patternStore.put(
             PatternEntity(
                 patternId = PATTERN_A_ID,

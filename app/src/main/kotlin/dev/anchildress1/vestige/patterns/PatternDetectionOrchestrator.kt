@@ -220,11 +220,12 @@ class PatternDetectionOrchestrator(
     private fun chooseMatchingPattern(entry: EntryEntity): PatternEntity? {
         // Indexed ACTIVE-only query avoids the full-table scan on every committed entry — at
         // 100+ patterns this is the difference between "fine" and "the save-flow hot path is
-        // O(n)" on the reference device. The cooldown filter drops suppressed-or-already-reserved
-        // candidates before the tiebreak so the strongest eligible survivor wins.
+        // O(n)" on the reference device. Cooldown eligibility is fetched once (bulk Set) instead
+        // of one ObjectBox read per candidate — selection stays O(active patterns), not O(n²).
+        val ineligible = cooldownStore.ineligiblePatternIds()
         val candidates = patternStore.findActive()
             .filter { PatternMatcher.matches(entry, it, zoneId) }
-            .filter { cooldownStore.isCalloutPermitted(it.patternId) }
+            .filter { it.patternId !in ineligible }
         return candidates.sortedWith(
             compareByDescending<PatternEntity> { it.supportingEntries.size }
                 .thenByDescending { it.lastSeenTimestamp },

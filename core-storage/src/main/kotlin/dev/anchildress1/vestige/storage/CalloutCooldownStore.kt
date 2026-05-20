@@ -20,14 +20,13 @@ class CalloutCooldownStore(private val boxStore: BoxStore) {
      * caller's tx starts after the first's commit and finds the row.
      */
     fun snapshotFor(patternId: String): CalloutCooldownEntity = boxStore.callInTx<CalloutCooldownEntity> {
-        findByPatternId(patternId) ?: CalloutCooldownEntity(patternId = patternId).also { box.put(it) }
+        val existing = box
+            .query()
+            .equal(CalloutCooldownEntity_.patternId, patternId, QueryBuilder.StringOrder.CASE_SENSITIVE)
+            .build()
+            .use { it.findFirst() }
+        existing ?: CalloutCooldownEntity(patternId = patternId).also { box.put(it) }
     }
-
-    private fun findByPatternId(patternId: String): CalloutCooldownEntity? = box
-        .query()
-        .equal(CalloutCooldownEntity_.patternId, patternId, QueryBuilder.StringOrder.CASE_SENSITIVE)
-        .build()
-        .use { it.findFirst() }
 
     /**
      * Clear any pending reservation that never resolved across every pattern's row. Called once at
@@ -54,8 +53,24 @@ class CalloutCooldownStore(private val boxStore: BoxStore) {
      * doesn't itself populate the cooldown table.
      */
     fun isCalloutPermitted(patternId: String): Boolean {
-        val row = findByPatternId(patternId) ?: return true
+        val row = box
+            .query()
+            .equal(CalloutCooldownEntity_.patternId, patternId, QueryBuilder.StringOrder.CASE_SENSITIVE)
+            .build()
+            .use { it.findFirst() } ?: return true
         return row.remainingSuppression == 0 && row.pendingCalloutEntryId == null
+    }
+
+    /**
+     * Patterns whose callout slot is closed right now — either inside a suppression window or
+     * holding a pending reservation. One query per call; selectors should prefer this over
+     * per-candidate `isCalloutPermitted` to avoid N+1 ObjectBox reads on the save-flow hot path.
+     */
+    fun ineligiblePatternIds(): Set<String> = boxStore.callInTx<Set<String>> {
+        box.all
+            .asSequence()
+            .filter { it.remainingSuppression > 0 || it.pendingCalloutEntryId != null }
+            .mapTo(mutableSetOf()) { it.patternId }
     }
 
     /**

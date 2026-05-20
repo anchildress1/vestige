@@ -122,8 +122,11 @@ class PatternCooldownSmokeTest {
             lensReceipts = emptyList(),
         )
         val entry = entryStore.readEntry(id)!!
-        val callout = orchestrator.onEntryCommitted(entry, Persona.WITNESS)
-        orchestrator.settleReservedCallout(entry, fired = callout != null)
+        val callout = orchestrator.onEntryCommitted(entry, Persona.WITNESS) ?: return null
+        // settle only when a reservation actually exists. onEntryCommitted's no-match and
+        // blocked-reserve paths already decremented; a second settle would double-decrement and
+        // log an invariant break for what's a normal no-callout entry.
+        orchestrator.settleReservedCallout(entry, fired = true)
         return callout
     }
 

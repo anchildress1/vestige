@@ -56,7 +56,9 @@ internal class VestigeDataExporter(
             }
             staged.inputStream().use { it.copyTo(out) }
         } finally {
-            staged.delete()
+            if (!staged.delete() && staged.exists()) {
+                staged.deleteOnExit()
+            }
         }
     }
 

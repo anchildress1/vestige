@@ -251,19 +251,41 @@ class PatternDetectorTest {
     }
 
     @Test
-    fun `vocab pattern folds tired-state vocabulary variants into the tired root`() {
+    fun `vocab pattern folds true-synonym variants into the tired root`() {
+        // One entry per kept alias — covers every key in VOCAB_ROOT_ALIASES so a typo regression
+        // (e.g. "drained" → "draind") would drop the count below 6.
         putEntry(text = "exhausted again, every limb gave up at once", energyDescriptor = "exhausted")
-        putEntry(text = "drained to the bone, eyes won't focus", energyDescriptor = "drained to the bone")
-        putEntry(text = "sluggish, the brain fog is back", tagNames = listOf("brain-fog", "sluggish"))
-        putEntry(text = "wired-tired, body wants sleep, brain refuses", tagNames = listOf("wired", "tired"))
-        putEntry(text = "amped but exhausted, my body and brain disagree", energyDescriptor = "amped but exhausted")
-        putEntry(text = "can't sleep, can't focus, both tanks empty", tagNames = listOf("tanks-empty"))
+        putEntry(text = "drained to the bone, eyes won't focus", energyDescriptor = "drained")
+        putEntry(text = "sluggish, the brain fog is back", tagNames = listOf("sluggish"))
+        putEntry(text = "wiped from another all-day", tagNames = listOf("wiped"))
+        putEntry(text = "depleted, body feels heavier today", energyDescriptor = "depleted")
+        putEntry(text = "burnt out, screen looks blurry from inside out", tagNames = listOf("burnt-out"))
 
         val pattern = detector.detect().single {
             it.kind == PatternKind.VOCAB_FREQUENCY && it.signatureJson.contains("\"token\":\"tired\"")
         }
 
         assertEquals(6, pattern.supportingEntryCount)
+    }
+
+    @Test
+    fun `vocab pattern does not fold arousal-up vocabulary onto tired`() {
+        // Regression guard: prior alias map collapsed "wired", "amped", "anxious", "static",
+        // "caffeine", "empty" onto "tired" — that lies about user vocabulary because the
+        // underlying state (arousal-up vs arousal-down) is different. Make sure these stay
+        // distinct from "tired".
+        putEntry(text = "wired-tired, body wants sleep, brain refuses", tagNames = listOf("wired"))
+        putEntry(text = "amped but somehow still spent", energyDescriptor = "amped")
+        putEntry(text = "anxious-tired, lying down doesn't count as rest", tagNames = listOf("anxious"))
+        putEntry(text = "running on caffeine and adrenaline", energyDescriptor = "caffeine")
+
+        val tiredPattern = detector.detect().firstOrNull {
+            it.kind == PatternKind.VOCAB_FREQUENCY && it.signatureJson.contains("\"token\":\"tired\"")
+        }
+        // None of these entries contain the literal "tired" token outside of compound words
+        // (`wired-tired`, `anxious-tired`). The compound splits via WORD_SPLIT, so "tired"
+        // appears in 2 of 4 entries — below VOCAB_THRESHOLD (4). No false-positive pattern.
+        assertEquals(null, tiredPattern)
     }
 
     @Test

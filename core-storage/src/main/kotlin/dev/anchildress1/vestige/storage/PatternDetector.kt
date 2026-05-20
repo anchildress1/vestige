@@ -200,31 +200,18 @@ class PatternDetector(
 
         internal const val MIN_VOCAB_LENGTH = 4
         internal val WORD_SPLIT: Regex = Regex("[^a-z0-9]+")
+
+        // True-synonym fold for "tired" — thesaurus equivalents only. Lexical near-misses
+        // (different inflections, plurals) are handled by [TokenStemmer.stem] upstream.
+        // Semantic rewrites that change product claims (e.g., "wired" → "tired" inverts
+        // arousal direction) do NOT belong here. Pattern callouts source counts; aliasing
+        // arousal-up onto arousal-down silently lies about the user's vocabulary.
         internal val VOCAB_ROOT_ALIASES: Map<String, String> = mapOf(
-            "amped" to "tired",
-            "anxiou" to "tired",
-            "anxious" to "tired",
-            "blurry" to "tired",
-            "bone" to "tired",
             "burnt" to "tired",
-            "caffeine" to "tired",
             "depleted" to "tired",
             "drained" to "tired",
-            "empty" to "tired",
             "exhausted" to "tired",
-            "fog" to "tired",
-            "foggy" to "tired",
-            "fume" to "tired",
-            "fumes" to "tired",
-            "heavy" to "tired",
-            "heavier" to "tired",
-            "molasse" to "tired",
-            "molasses" to "tired",
             "sluggish" to "tired",
-            "sleep" to "tired",
-            "static" to "tired",
-            "tank" to "tired",
-            "wired" to "tired",
             "wiped" to "tired",
         )
     }

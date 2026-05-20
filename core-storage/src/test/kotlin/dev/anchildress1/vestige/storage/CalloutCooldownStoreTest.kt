@@ -7,7 +7,6 @@ import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
-import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -138,10 +137,10 @@ class CalloutCooldownStoreTest {
     }
 
     @Test
-    fun `confirmReservedCallout throws when no pending reservation matches the entry`() {
-        assertThrows(IllegalStateException::class.java) {
-            store.confirmReservedCallout(entryId = 999L, timestampMs = 1_000L)
-        }
+    fun `confirmReservedCallout returns null when no pending reservation matches the entry`() {
+        // Stale / duplicate settle is a recoverable condition surfaced to the caller via null,
+        // not via throw — the orchestrator logs and decrements everything.
+        assertNull(store.confirmReservedCallout(entryId = 999L, timestampMs = 1_000L))
     }
 
     @Test
@@ -158,10 +157,16 @@ class CalloutCooldownStoreTest {
     }
 
     @Test
-    fun `releaseReservedCallout is a no-op when no pending reservation matches`() {
-        // No throw, no row creation.
-        store.releaseReservedCallout(entryId = 999L)
+    fun `releaseReservedCallout returns false when no pending reservation matches`() {
+        assertFalse(store.releaseReservedCallout(entryId = 999L))
         // No rows materialised for an unknown entry.
+        assertTrue(store.isCalloutPermitted(PATTERN_A))
+    }
+
+    @Test
+    fun `releaseReservedCallout returns true when a pending reservation is cleared`() {
+        store.tryReserveCallout(entryId = 42L, patternId = PATTERN_A)
+        assertTrue(store.releaseReservedCallout(entryId = 42L))
         assertTrue(store.isCalloutPermitted(PATTERN_A))
     }
 

@@ -206,11 +206,9 @@ class BackgroundExtractionSaveFlow(
             throw cancellation
         } catch (@Suppress("TooGenericExceptionCaught") error: Exception) {
             // Best-effort layer; swallow so a pattern-detection failure doesn't fail the save.
-            Log.w(
-                TAG,
-                "Pattern orchestration failed for entryId=$entryId: " +
-                    "${error.javaClass.simpleName} ${error.message}",
-            )
+            // Log.e + throwable so the stacktrace survives — a swallowed pattern bug should be
+            // recoverable from logs, not require reproducing the failure on-device.
+            Log.e(TAG, "Pattern orchestration failed for entryId=$entryId", error)
             null
         }
     }
@@ -260,10 +258,7 @@ class BackgroundExtractionSaveFlow(
         } catch (@Suppress("TooGenericExceptionCaught") error: Exception) {
             // Post-save follow-ons must never rewrite a persisted COMPLETED entry into a
             // failure. Log and move on; the next save / cold start can retrigger downstream work.
-            Log.w(
-                TAG,
-                "onEntryFinalized failed for entryId=$entryId: ${error.javaClass.simpleName} ${error.message}",
-            )
+            Log.w(TAG, "onEntryFinalized failed for entryId=$entryId", error)
         }
     }
 
@@ -315,7 +310,7 @@ class BackgroundExtractionSaveFlow(
         // Generator failures must not block the save — the entry's resolved fields are the
         // load-bearing surface; observations are additive and may be regenerated later under
         // re-eval (Phase 4). Persist an empty list and move on.
-        Log.w(TAG, "ObservationGenerator threw ${error.javaClass.simpleName} for entryId=$entryId")
+        Log.w(TAG, "ObservationGenerator threw ${error.javaClass.simpleName} for entryId=$entryId", error)
         emptyList()
     }
 

@@ -107,13 +107,14 @@ class CalloutCooldownStore(private val boxStore: BoxStore) {
     /**
      * Convert a previously reserved slot into a durable cooldown window on whichever pattern's row
      * holds [entryId] as its pending reservation. Returns the confirmed `patternId` so the caller
-     * can pass it as `except` to [decrementAllActive] without re-scanning.
+     * can pass it as `except` to [decrementAllActive], or `null` when no row holds a pending
+     * reservation for [entryId] — a stale or duplicate settle. Caller decides whether `null` is
+     * a logic bug (see `PatternDetectionOrchestrator.settleReservedCallout`).
      */
-    fun confirmReservedCallout(entryId: Long, timestampMs: Long, windowEntries: Int = DEFAULT_WINDOW): String {
+    fun confirmReservedCallout(entryId: Long, timestampMs: Long, windowEntries: Int = DEFAULT_WINDOW): String? {
         require(windowEntries >= 0) { "windowEntries >= 0 required (got $windowEntries)" }
-        return boxStore.callInTx<String> {
-            val row = findByPendingEntryIdInTx(entryId)
-                ?: error("No pending callout reservation for entry id=$entryId")
+        return boxStore.callInTx<String?> {
+            val row = findByPendingEntryIdInTx(entryId) ?: return@callInTx null
             row.lastCalloutEntryId = entryId
             row.lastCalloutTimestamp = timestampMs
             row.remainingSuppression = windowEntries
@@ -123,13 +124,16 @@ class CalloutCooldownStore(private val boxStore: BoxStore) {
         }
     }
 
-    /** Drop the reservation held by [entryId] (on whichever pattern row owns it). */
-    fun releaseReservedCallout(entryId: Long) {
-        boxStore.runInTx {
-            val row = findByPendingEntryIdInTx(entryId) ?: return@runInTx
-            row.pendingCalloutEntryId = null
-            box.put(row)
-        }
+    /**
+     * Drop the reservation held by [entryId] (on whichever pattern row owns it). Returns `true`
+     * when a pending reservation was found and cleared, `false` when none matched — the caller
+     * decides whether `false` is a stale settle (legitimate) or an invariant break.
+     */
+    fun releaseReservedCallout(entryId: Long): Boolean = boxStore.callInTx<Boolean> {
+        val row = findByPendingEntryIdInTx(entryId) ?: return@callInTx false
+        row.pendingCalloutEntryId = null
+        box.put(row)
+        true
     }
 
     private fun findByPendingEntryIdInTx(entryId: Long): CalloutCooldownEntity? = box

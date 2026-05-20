@@ -90,18 +90,29 @@ class PatternDetectionOrchestrator(
     }
 
     /**
-     * Finalize a pending reservation after the save flow either persists or drops the callout.
-     * On confirm, the just-fired pattern's row starts a 3-entry suppression window; every other
-     * pattern's active counter decrements by one for this committed entry. On release, all active
-     * counters decrement (the entry committed; no pattern is excepted).
+     * Finalize a pending reservation. `fired = true` starts the matched pattern's suppression
+     * window; `fired = false` drops the reservation. Either way, all other patterns' active
+     * counters decrement once for this committed entry.
      */
     fun settleReservedCallout(entry: EntryEntity, fired: Boolean) {
         if (fired) {
             val firedPatternId = cooldownStore.confirmReservedCallout(entry.id, clock.millis())
-            cooldownStore.decrementAllActive(exceptPatternId = firedPatternId)
+            if (firedPatternId == null) {
+                // Stale or duplicate settle — the reservation either never landed or another path
+                // already settled it. Decrement everything (no pattern is excepted).
+                Log.e(TAG, "settle(fired=true) for entry id=${entry.id} found no pending reservation")
+                cooldownStore.decrementAllActive()
+            } else {
+                cooldownStore.decrementAllActive(exceptPatternId = firedPatternId)
+            }
             return
         }
-        cooldownStore.releaseReservedCallout(entry.id)
+        val released = cooldownStore.releaseReservedCallout(entry.id)
+        if (!released) {
+            // Caller contract: settle(fired=false) follows a successful onEntryCommitted that
+            // already reserved. Missing pending here is an invariant break, not a normal path.
+            Log.e(TAG, "settle(fired=false) for entry id=${entry.id} found no pending reservation")
+        }
         cooldownStore.decrementAllActive()
     }
 
@@ -133,7 +144,7 @@ class PatternDetectionOrchestrator(
             .runCatching { generate(persona, detected) }
             .getOrElse {
                 if (it is CancellationException) throw it
-                Log.w(TAG, "title generator threw ${it.javaClass.simpleName}: ${it.message}")
+                Log.w(TAG, "title generator threw ${it.javaClass.simpleName}", it)
                 null
             }
             ?: deterministicFallbackTitle(detected)

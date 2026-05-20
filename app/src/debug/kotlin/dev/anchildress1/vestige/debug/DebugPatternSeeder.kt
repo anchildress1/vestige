@@ -16,7 +16,6 @@ import dev.anchildress1.vestige.storage.vocabPatternIdentity
 import io.objectbox.BoxStore
 import java.io.File
 import java.security.MessageDigest
-import java.util.HexFormat
 
 /**
  * Debug-only fixture seeder. Lets the dev verify the pattern UI with real cards on a device.
@@ -229,10 +228,18 @@ object DebugPatternSeeder {
         patternStore.put(saved)
     }
 
-    private fun sha256Hex(text: String): String = HexFormat.of()
-        .formatHex(MessageDigest.getInstance("SHA-256").digest(text.toByteArray()))
+    // Byte-mask + `String.format` avoids `java.util.HexFormat` (API 34+); the explicit
+    // `toInt() and BYTE_MASK` defeats the sign-extension bug that the naked
+    // `"%02x".format(byte)` shorthand triggers on negative digest bytes.
+    private fun sha256Hex(text: String): String =
+        MessageDigest.getInstance("SHA-256").digest(text.toByteArray()).joinToString("") {
+            "%02x".format(it.toInt() and BYTE_MASK)
+        }
 
     private const val DAY_MS: Long = 24L * 60 * 60 * 1000
+
+    /** Unsigned-byte mask for sign-safe `byte.toInt() and BYTE_MASK` hex formatting. */
+    private const val BYTE_MASK: Int = 0xff
 
     /** Matches [dev.anchildress1.vestige.storage.EntryEntity.EMBEDDING_DIMENSIONS]. */
     private const val VECTOR_DIMENSIONS: Int = 768

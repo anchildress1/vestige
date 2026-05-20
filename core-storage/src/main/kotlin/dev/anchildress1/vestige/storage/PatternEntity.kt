@@ -52,6 +52,14 @@ class PatternEntity(
 
     /** Pre-rendered callout line; appended to per-entry observation when this pattern fires. */
     var latestCalloutText: String = "",
+
+    /**
+     * Vocab clustering enrichment stamped by the orchestrator's second pass on
+     * `VOCAB_FREQUENCY` rows whose supporting set is large enough. Empty string when
+     * clustering hasn't run or the pattern's kind doesn't carry vocab semantics. Schema is
+     * documented on [VocabClustersCodec].
+     */
+    var vocabClustersJson: String = "",
 ) {
     lateinit var supportingEntries: ToMany<EntryEntity>
 }

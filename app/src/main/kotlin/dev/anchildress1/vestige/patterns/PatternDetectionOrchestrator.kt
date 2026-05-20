@@ -74,6 +74,7 @@ class PatternDetectionOrchestrator(
         val entryCount = completedEntryCount(boxStore)
         if (entryCount >= patternSurfaceMinEntries) {
             runDetection(persona)
+            vocabClusterUpdater.stampAll()
         }
         val matched = chooseMatchingPattern(entry)
         if (matched == null) {
@@ -126,6 +127,15 @@ class PatternDetectionOrchestrator(
             upsert(pattern, persona)
         }
     }
+
+    /**
+     * Second-pass enrichment: cluster each ACTIVE `VOCAB_FREQUENCY` pattern's supporting
+     * entries by embedding similarity and stamp the result on `vocabClustersJson`. Skips
+     * patterns whose supporting set is below [EmbeddingClustering.MIN_SUPPORTING_ENTRIES] or
+     * whose embeddings haven't been backfilled. Re-runs are idempotent: identical evidence
+     * yields identical cluster ids and the same encoded JSON.
+     */
+    private val vocabClusterUpdater = PatternVocabClusterUpdater(boxStore, patternStore)
 
     private suspend fun upsert(detected: DetectedPattern, persona: Persona) {
         val existing = patternStore.findByPatternId(detected.patternId)

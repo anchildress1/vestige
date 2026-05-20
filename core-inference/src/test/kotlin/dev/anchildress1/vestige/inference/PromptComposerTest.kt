@@ -125,8 +125,9 @@ class PromptComposerTest {
     fun `chunks without a pattern id render as context only`() {
         val chunks = listOf(HistoryChunk(patternId = null, text = "ad-hoc historical chunk"))
         val text = PromptComposer.compose(Lens.LITERAL, entry, retrievedHistory = chunks).systemInstruction
-        assertTrue(text.contains("pattern_id unavailable; context-only"))
+        assertTrue(text.contains("- [1] context-only"))
         assertFalse(text.contains("pattern_id=null"))
+        assertFalse(text.contains("pattern_id unavailable"))
     }
 
     @Test

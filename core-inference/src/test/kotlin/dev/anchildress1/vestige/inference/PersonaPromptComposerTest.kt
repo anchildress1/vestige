@@ -71,6 +71,13 @@ class PersonaPromptComposerTest {
                 { assertTrue(prompt.contains("The non-obvious missing detail")) },
                 { assertTrue(prompt.contains("What got blank, locked, scattered")) },
                 { assertTrue(prompt.contains("Use artifact names only when they belong to the missing detail")) },
+                {
+                    assertTrue(
+                        prompt.contains(
+                            "Do not ask for a feeling or state word unless the transcript already names one",
+                        ),
+                    )
+                },
                 { assertTrue(prompt.contains("Ask one recall question about the original moment")) },
                 { assertTrue(prompt.contains("Do not ask for a next action, deadline, plan")) },
                 { assertTrue(prompt.contains("Keep the question anchored to recall")) },

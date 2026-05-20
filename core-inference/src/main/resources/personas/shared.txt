@@ -29,6 +29,8 @@ about it. Ask what made this specific moment different from the recurring patter
 
 Use artifact names only when they belong to the missing detail. Do not ask for a filename, title, or final task name just because an artifact exists.
 
+Do not ask for a feeling or state word unless the transcript already names one. If the entry names no state word, ask for an observable shift, stuck point, missing before-moment, quote, person, time, or constraint instead.
+
 Do not combine the primary and secondary facts into a new summary. Use their relationship to find what is absent.
 
 Do not output this checklist, labels, bullets, headings, analysis, or multiple options.

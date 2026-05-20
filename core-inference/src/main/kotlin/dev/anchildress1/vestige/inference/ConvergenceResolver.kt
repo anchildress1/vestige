@@ -66,6 +66,14 @@ class DefaultConvergenceResolver : ConvergenceResolver {
             populated.isEmpty() ->
                 ResolvedField(value = null, verdict = ConfidenceVerdict.AMBIGUOUS, flags = matchingFlags)
 
+            populated.size == 1 &&
+                populated.single().first == Lens.SKEPTICAL &&
+                matchingFlags.isNotEmpty() -> ResolvedField(
+                value = null,
+                verdict = ConfidenceVerdict.AMBIGUOUS,
+                flags = matchingFlags,
+            )
+
             populated.size == 1 -> ResolvedField(
                 value = populated.single().second,
                 verdict = ConfidenceVerdict.CANDIDATE,
@@ -185,7 +193,7 @@ class DefaultConvergenceResolver : ConvergenceResolver {
      * tightening lands when STT-C surfaces real flakiness.
      */
     private fun stemForCount(tag: String): String {
-        val lower = tag.lowercase()
+        val lower = tag.lowercase().replace("-", "")
         if (lower.length <= MIN_STEM_LENGTH) return lower
         return when {
             lower.endsWith(IES_SUFFIX) -> lower.dropLast(IES_SUFFIX.length) + "y"

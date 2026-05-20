@@ -43,6 +43,14 @@ internal object ObservationResponseParser {
     )
 
     private const val MAX_OBSERVATIONS = 2
+    private val KNOWN_FIELDS = setOf(
+        "tags",
+        "energy_descriptor",
+        "recurrence_link",
+        "stated_commitment",
+        "vocabulary_contradictions",
+    )
+    private val VOCAB_FIELDS = setOf("vocabulary_contradictions", "tags")
 
     fun parse(raw: String): List<EntryObservation>? {
         val root = findFirstParseableObject(raw) ?: return null
@@ -74,8 +82,19 @@ internal object ObservationResponseParser {
         val fields = (obj.opt("fields") as? JSONArray)?.let { arr ->
             (0 until arr.length()).mapNotNull { idx -> (arr.opt(idx) as? String)?.trim()?.takeIf { it.isNotEmpty() } }
         } ?: emptyList()
+        if (!fieldsAreValid(evidence, fields)) return null
 
         return EntryObservation(text = text, evidence = evidence, fields = fields)
+    }
+
+    private fun fieldsAreValid(evidence: ObservationEvidence, fields: List<String>): Boolean = when (evidence) {
+        ObservationEvidence.COMMITMENT_FLAG -> fields == listOf("stated_commitment")
+        ObservationEvidence.VOCABULARY_CONTRADICTION ->
+            fields.isEmpty() || ("vocabulary_contradictions" in fields && fields.all { it in VOCAB_FIELDS })
+        ObservationEvidence.VOLUNTEERED_CONTEXT,
+        ObservationEvidence.THEME_NOTICING,
+        -> fields.all { it in KNOWN_FIELDS }
+        ObservationEvidence.PATTERN_CALLOUT -> false
     }
 
     private fun findFirstParseableObject(raw: String): JSONObject? {

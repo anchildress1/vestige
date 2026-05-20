@@ -135,7 +135,7 @@ class EntryStoreTest {
         assertEquals(ExtractionStatus.COMPLETED, row.extractionStatus)
         assertEquals(TemplateLabel.AFTERMATH, row.templateLabel)
         assertEquals("crashed", row.energyDescriptor)
-        assertEquals("a3f9c2b8d4e7f1a2", row.recurrenceLink)
+        assertEquals("a3f9c2b8d4e7f1a2b3c4d5e6f7890abc1234567890abcdef1234567890abcdef", row.recurrenceLink)
         assertNull(row.lastError)
 
         val tagNames = row.tags.map { it.name }.sorted()
@@ -152,6 +152,24 @@ class EntryStoreTest {
         val md = mdFile.readText()
         assertTrue("frontmatter should include template_label", md.contains("template_label: aftermath"))
         assertTrue("frontmatter should include tags", md.contains("  - tuesday-meeting"))
+    }
+
+    @Test
+    fun `completeEntry drops invalid recurrence sentinels instead of persisting them`() {
+        val id = entryStore.createPendingEntry(SAMPLE_TEXT, SAMPLE_INSTANT)
+        val resolved = ResolvedExtraction(
+            mapOf(
+                "recurrence_link" to ResolvedField("pattern_id_unavailable", ConfidenceVerdict.CANDIDATE),
+            ),
+        )
+
+        entryStore.completeEntry(id, resolved, TemplateLabel.AUDIT)
+
+        val row = boxStore.boxFor<EntryEntity>().get(id)
+        assertNull(row.recurrenceLink)
+        assertTrue(
+            File(File(markdownDir, "entries"), row.markdownFilename).readText().contains("recurrence_link: null"),
+        )
     }
 
     @Test
@@ -290,9 +308,7 @@ class EntryStoreTest {
         assertEquals(ConfidenceVerdict.AMBIGUOUS.name, confidence.getString("energy_descriptor"))
         assertEquals(ConfidenceVerdict.CANDIDATE.name, confidence.getString("recurrence_link"))
         assertNull(row.energyDescriptor)
-        // CANDIDATE tag values are still persisted as the row's recurrenceLink scalar — the
-        // pattern engine consults the verdict map before promoting them.
-        assertEquals("abc", row.recurrenceLink)
+        assertNull(row.recurrenceLink)
     }
 
     @Test
@@ -468,7 +484,10 @@ class EntryStoreTest {
                 ConfidenceVerdict.CANONICAL,
             ),
             "energy_descriptor" to ResolvedField("crashed", ConfidenceVerdict.CANONICAL),
-            "recurrence_link" to ResolvedField("a3f9c2b8d4e7f1a2", ConfidenceVerdict.CANONICAL),
+            "recurrence_link" to ResolvedField(
+                "a3f9c2b8d4e7f1a2b3c4d5e6f7890abc1234567890abcdef1234567890abcdef",
+                ConfidenceVerdict.CANONICAL,
+            ),
             "stated_commitment" to ResolvedField(
                 mapOf(
                     "text" to "review the doc by Friday",

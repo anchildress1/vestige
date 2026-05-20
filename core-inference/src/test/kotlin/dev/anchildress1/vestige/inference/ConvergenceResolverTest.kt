@@ -180,6 +180,48 @@ class ConvergenceResolverTest {
     }
 
     @Test
+    fun `skeptical-only contradicted field does not mint a candidate`() {
+        val flag = "state-behavior-mismatch:fine:claims fine but described as stalled"
+        val literal = LensExtraction(Lens.LITERAL, fields = mapOf("energy_descriptor" to null))
+        val inferential = LensExtraction(Lens.INFERENTIAL, fields = mapOf("energy_descriptor" to null))
+        val skeptical = LensExtraction(
+            Lens.SKEPTICAL,
+            fields = mapOf("energy_descriptor" to "fine"),
+            flags = listOf(flag),
+        )
+
+        val resolved = resolver.resolve(listOf(literal, inferential, skeptical))
+        assertEquals(
+            ResolvedField(
+                value = null,
+                verdict = ConfidenceVerdict.AMBIGUOUS,
+                flags = listOf(flag),
+            ),
+            resolved.fields["energy_descriptor"],
+        )
+    }
+
+    @Test
+    fun `tag majority ignores separator drift and keeps first surface form`() {
+        val literal = LensExtraction(
+            Lens.LITERAL,
+            fields = mapOf("tags" to listOf("re-organizing-photo-library")),
+        )
+        val inferential = LensExtraction(
+            Lens.INFERENTIAL,
+            fields = mapOf("tags" to listOf("reorganizing-photo-library")),
+        )
+        val skeptical = LensExtraction(Lens.SKEPTICAL, fields = mapOf("tags" to listOf("other-tag")))
+
+        val resolved = resolver.resolve(listOf(literal, inferential, skeptical))
+
+        assertEquals(
+            ResolvedField(value = listOf("re-organizing-photo-library"), verdict = ConfidenceVerdict.CANONICAL),
+            resolved.fields["tags"],
+        )
+    }
+
+    @Test
     fun `two surviving lenses agree resolves to canonical`() {
         val literal = LensExtraction(Lens.LITERAL, fields = mapOf("template_label" to "aftermath"))
         val skeptical = LensExtraction(Lens.SKEPTICAL, fields = mapOf("template_label" to "aftermath"))

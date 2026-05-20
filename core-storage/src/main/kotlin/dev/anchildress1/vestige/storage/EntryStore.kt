@@ -265,7 +265,7 @@ class EntryStore(private val boxStore: BoxStore, private val markdownStore: Mark
     private fun applyResolved(entry: EntryEntity, resolved: ResolvedExtraction, templateLabel: TemplateLabel?) {
         entry.templateLabel = templateLabel
         entry.energyDescriptor = stringField(resolved, KEY_ENERGY)
-        entry.recurrenceLink = stringField(resolved, KEY_RECURRENCE)
+        entry.recurrenceLink = recurrenceField(resolved)
         entry.statedCommitmentJson = commitmentJson(resolved)
         entry.confidenceJson = confidenceJson(resolved)
     }
@@ -307,6 +307,12 @@ class EntryStore(private val boxStore: BoxStore, private val markdownStore: Mark
         return (field.value as? String)?.takeIf { it.isNotBlank() }
     }
 
+    private fun recurrenceField(resolved: ResolvedExtraction): String? =
+        stringField(resolved, KEY_RECURRENCE)
+            ?.trim()
+            ?.lowercase()
+            ?.takeIf { it.matches(PATTERN_ID_REGEX) }
+
     private fun commitmentJson(resolved: ResolvedExtraction): String? {
         val map = resolved.fields[KEY_COMMITMENT]?.value as? Map<*, *>
         return map?.let {
@@ -331,6 +337,7 @@ class EntryStore(private val boxStore: BoxStore, private val markdownStore: Mark
         private const val KEY_RECURRENCE = "recurrence_link"
         private const val KEY_COMMITMENT = "stated_commitment"
         private const val KEY_TOPIC_OR_PERSON = "topic_or_person"
+        private val PATTERN_ID_REGEX = Regex("[0-9a-f]{64}")
         private val NON_TERMINAL_STATUSES = setOf(ExtractionStatus.PENDING, ExtractionStatus.RUNNING)
         private val NON_TERMINAL_STATUS_NAMES: Array<String> =
             NON_TERMINAL_STATUSES.map(ExtractionStatus::name).toTypedArray()

@@ -1,5 +1,6 @@
 package dev.anchildress1.vestige.debug
 
+import android.util.Log
 import dev.anchildress1.vestige.model.ExtractionStatus
 import dev.anchildress1.vestige.model.PatternKind
 import dev.anchildress1.vestige.model.PatternState
@@ -35,7 +36,10 @@ object DebugPatternSeeder {
 
     @Suppress("MagicNumber") // Fixture timestamps + corpus shape are deliberately concrete.
     fun seed(filesDir: File, boxStore: BoxStore, patternStore: PatternStore) {
-        File(filesDir, "entries").deleteRecursively()
+        val legacyEntriesDir = File(filesDir, "entries")
+        if (legacyEntriesDir.exists() && !legacyEntriesDir.deleteRecursively()) {
+            Log.w(TAG, "Failed to clear legacy entries dir before seed — leftover markdown may confuse demo state")
+        }
         boxStore.runInTx {
             boxStore.boxFor(EntryEntity::class.java).removeAll()
             boxStore.boxFor(PatternEntity::class.java).removeAll()
@@ -227,6 +231,8 @@ object DebugPatternSeeder {
         MessageDigest.getInstance("SHA-256").digest(text.toByteArray()).joinToString("") {
             "%02x".format(it.toInt() and BYTE_MASK)
         }
+
+    private const val TAG = "VestigeDebugPatternSeeder"
 
     private val VOCAB_BASE_TIMESTAMP: Instant = Instant.parse("2026-05-01T12:00:00Z")
 

@@ -6,6 +6,7 @@ import android.content.Intent
 import android.util.Log
 import dev.anchildress1.vestige.VestigeApplication
 import dev.anchildress1.vestige.ui.onboarding.OnboardingPrefs
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -47,6 +48,13 @@ class DebugSeedReceiver : BroadcastReceiver() {
                     Log.d(TAG, "queued missing extraction backfill")
                 }
                 Log.d(TAG, "seed complete")
+            } catch (cancel: CancellationException) {
+                throw cancel
+            } catch (@Suppress("TooGenericExceptionCaught") error: Throwable) {
+                // Without this catch the launch swallows the throw and pendingResult.finish() in
+                // `finally` reports success to ADB. Devs would then chase phantom "why isn't the
+                // demo data here" failures on the next reinstall.
+                Log.e(TAG, "Debug seed FAILED", error)
             } finally {
                 pendingResult.finish()
             }

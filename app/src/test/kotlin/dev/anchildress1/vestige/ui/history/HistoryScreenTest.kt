@@ -140,7 +140,7 @@ class HistoryScreenTest {
     }
 
     @Test
-    fun `row shows timestamp, snippet and record-secs word-count meta`() {
+    fun `row shows timestamp, snippet and compact duration word-count meta`() {
         // 1_000_000 ms past epoch, UTC → 12:16 AM · JAN 1; seeded duration 0s, 4 words.
         seedCompleted("standup crashed me again", 1_000_000L)
 
@@ -148,7 +148,7 @@ class HistoryScreenTest {
         composeRule.onNodeWithText("12:16 AM").assertIsDisplayed()
         composeRule.onNodeWithText("JAN 1").assertIsDisplayed()
         composeRule.onNodeWithText("standup crashed me again", substring = true).assertIsDisplayed()
-        composeRule.onNodeWithText("0 · 4 WORDS").assertIsDisplayed()
+        composeRule.onNodeWithText("0s · 4 WORDS").assertIsDisplayed()
     }
 
     // a11y — tap target ≥ 48 dp

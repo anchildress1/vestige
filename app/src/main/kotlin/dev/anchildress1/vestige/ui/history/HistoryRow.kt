@@ -27,7 +27,11 @@ private const val MS_PER_SECOND = 1_000L
 fun HistoryRow(summary: HistorySummary, onClick: (() -> Unit)?, modifier: Modifier = Modifier) {
     val colors = VestigeTheme.colors
     val seconds = summary.durationMs / MS_PER_SECOND
-    val meta = "$seconds · ${summary.wordCount} WORDS"
+    val durationLabel = summary.durationMs
+        .takeIf { it > 0L }
+        ?.let(HistoryDurationFormatter::format)
+        ?: "0s"
+    val meta = "$durationLabel · ${summary.wordCount} WORDS"
     val a11yDesc = "${summary.timeLabel} ${summary.dateLabel} · ${summary.snippet} · " +
         "$seconds seconds · ${summary.wordCount} words"
 

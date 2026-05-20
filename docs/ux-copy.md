@@ -693,7 +693,7 @@ Forbidden tooltips:
 |---|---|
 | Initial app load (model loading from disk) | `Loading.` |
 | First-run model download | `Downloading model.` *(see Onboarding 6)* |
-| Mid-session inference (after tap-stop, awaiting call-1 transcription) | *(no copy — a brief borderless spinner; see note below)* |
+| Mid-session inference (after tap-stop, awaiting call-1 transcription) | `Reading the entry.` |
 | Pattern recalculation after entry | *(silent, background — no copy unless it fails)* |
 | Roast generation | `Reading the file.` |
 | Settings save | *(silent — control state changes inline)* |
@@ -732,5 +732,5 @@ A short forbidden-copy list. If any of these end up in a build, it's a regressio
 - User-facing lifecycle actions are exactly two: Skip and Drop. No third option.
 - Export format is a zip with per-entry markdown plus `vestige-export.json` for ObjectBox rows, pattern links, vectors, cooldown state, and onboarding settings. Rolled-up `.md` and PDF are v1.5+.
 - No first-time mock data. Empty means empty; demo seed data is a dev/demo setup concern, not user-facing fiction.
-- Loading copy: `Reading the file.` for Roast generation. _(2026-05-18, ADR-014 §Addendum: single-entry capture no longer shows a `Reading the entry.` page — post-stop is a brief borderless spinner, then the app opens the entry's detail in History. The "Reading the entry." quotes in the Capture/Inference walkthroughs above are superseded.)_
+- Loading copy: `Reading the file.` for Roast generation.
 - No user name or handle in onboarding. Anonymity is on-brand and the feature didn't pass the demo-impact test. Handle system deferred to v1.5 (see `backlog.md`).

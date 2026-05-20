@@ -74,7 +74,10 @@ internal class VestigeDataExporter(private val boxStore: BoxStore, private val o
     private fun settingsJson(): JSONObject = JSONObject()
         .put("onboarding_complete", onboardingPrefs.isComplete)
         .put("default_persona", onboardingPrefs.defaultPersona.name)
-        .put("current_step", onboardingPrefs.currentStep.name)
+        // currentStep returns a default sentinel when no resume target is stored. Once onboarding
+        // is complete there is no resume target — export null so importers don't mistake the
+        // sentinel for live resume state.
+        .putNullable("current_step", if (onboardingPrefs.isComplete) null else onboardingPrefs.currentStep.name)
 
     private fun sortedEntries(): List<EntryEntity> = boxStore.boxFor(EntryEntity::class.java).all.sortedBy { it.id }
 

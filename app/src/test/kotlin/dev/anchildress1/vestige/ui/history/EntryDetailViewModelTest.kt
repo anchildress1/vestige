@@ -534,6 +534,38 @@ class EntryDetailViewModelTest {
         }
 
     @Test
+    fun `promises field uses candidate tone when only one lens carries the commitment`() = runTest {
+        val id = createCompleted("drop the package off today")
+        val box = boxStore.boxFor(EntryEntity::class.java)
+        box.get(id).also {
+            it.confidenceJson = """{"stated_commitment":"AMBIGUOUS"}"""
+            it.statedCommitmentJson = null
+            it.lensReceiptsJson = EntryLensReceiptJson.encode(
+                listOf(
+                    EntryLensReceipt(
+                        lens = Lens.LITERAL,
+                        extracted = true,
+                        fields = mapOf(
+                            "stated_commitment" to mapOf(
+                                "text" to "drop the package off today",
+                                "topic_or_person" to null,
+                            ),
+                        ),
+                    ),
+                ),
+            )
+        }.let(box::put)
+
+        val vm = buildVm(id)
+        vm.state.test {
+            val loaded = awaitItem() as EntryDetailUiState.Loaded
+            val promises = loaded.model.fields.first { it.label == "PROMISES" }
+            assertEquals("drop the package off today", promises.value)
+            assertEquals(LensTone.CANDIDATE, promises.tone)
+        }
+    }
+
+    @Test
     fun `repeat field does not backfill invalid numeric receipt ids`() = runTest {
         val id = createCompleted("same loop again")
         val box = boxStore.boxFor(EntryEntity::class.java)

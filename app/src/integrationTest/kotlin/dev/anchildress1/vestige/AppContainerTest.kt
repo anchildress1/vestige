@@ -113,6 +113,43 @@ class AppContainerTest {
     }
 
     @Test
+    fun `retryForegroundPromotionIfWorkActive promotes when the state machine is suppressed and work is queued`() =
+        runTest {
+            // Drive suppression through the state-machine API directly — the FGS-rejection predicate
+            // is SDK-gated and unit-test JVMs report SDK_INT=0. The pure-state-machine test in
+            // BackgroundExtractionServiceStateMachineTest covers the rejection branch under
+            // Robolectric; this test proves the AppContainer wiring (denied flag + ON_RESUME hook).
+            var serviceStarts = 0
+            val boxDir = newInMemoryObjectBoxDirectory("retry-on-resume")
+            val box = openInMemoryBoxStore(boxDir)
+            try {
+                val entryId = box.boxFor(EntryEntity::class.java)
+                    .put(EntryEntity(entryText = "x", timestampEpochMs = 1))
+                val container = AppContainer(
+                    applicationContext = mockk<Context>(relaxed = true),
+                    boxStoreFactory = { box },
+                    recoveredEntryIdsLoader = { emptyList() },
+                    foregroundServiceIntentFactory = { Intent("dev.anchildress1.vestige.TEST_START") },
+                    foregroundServiceStarter = { serviceStarts += 1 },
+                    scope = backgroundScope,
+                )
+
+                container.reportExtractionStatus(entryId = entryId, status = ExtractionStatus.RUNNING)
+                assertEquals(1, serviceStarts)
+                container.lifecycleStateMachine.onForegroundStartFailed(retry = false)
+                assertEquals(BackgroundExtractionLifecycleState.NORMAL, container.lifecycleStateMachine.state.value)
+
+                container.retryForegroundPromotionIfWorkActive()
+                advanceUntilIdle()
+
+                assertEquals(2, serviceStarts)
+                assertEquals(BackgroundExtractionLifecycleState.PROMOTING, container.lifecycleStateMachine.state.value)
+            } finally {
+                box.closeAfterCleaningThreadResources()
+            }
+        }
+
+    @Test
     fun `work arriving during DEMOTING re-dispatches the foreground service after the platform ack`() = runTest {
         var serviceStarts = 0
         val boxDir = newInMemoryObjectBoxDirectory("demoting")
@@ -1052,6 +1089,36 @@ class AppContainerTest {
     }
 
     @Test
+    fun `wipeAllData skips legacy markdown directory cleanup when no entries dir exists`(@TempDir tempRoot: File) =
+        runTest {
+            val boxDir = newInMemoryObjectBoxDirectory("wipe-no-legacy")
+            val box = openInMemoryBoxStore(boxDir)
+            try {
+                // No entries/ directory exists on fresh installs. wipeAllData must complete without
+                // logging the legacy-dir warning and without throwing.
+                assertFalse(File(tempRoot, "entries").exists())
+
+                val container = AppContainer(
+                    applicationContext = mockk<Context>(relaxed = true) { every { filesDir } returns tempRoot },
+                    boxStoreFactory = { box },
+                    modelPathLoader = { File(tempRoot, "m").absolutePath },
+                    backgroundEngineFactory = { _, _ -> mockk<LiteRtLmEngine>(relaxed = true) },
+                    recoveredEntryIdsLoader = { emptyList() },
+                    foregroundServiceIntentFactory = { Intent("dev.anchildress1.vestige.TEST_START") },
+                    foregroundServiceStarter = {},
+                    foregroundServiceStopper = {},
+                    scope = this,
+                )
+
+                container.wipeAllData()
+
+                assertFalse(File(tempRoot, "entries").exists())
+            } finally {
+                box.closeAfterCleaningThreadResources()
+            }
+        }
+
+    @Test
     fun `wipeAllData cancels detached extraction jobs before returning`(@TempDir tempRoot: File) = runTest {
         val boxDir = newInMemoryObjectBoxDirectory("wipe-jobs")
         val box = openInMemoryBoxStore(boxDir)
@@ -1814,9 +1881,11 @@ class AppContainerTest {
             val secondId = container.entryStore.createPendingEntry("loaded second", CAPTURED_AT.plusDays(1).toInstant())
             container.entryStore.completeEntry(secondId, ResolvedExtraction(emptyMap()), templateLabel = null)
 
-            val queued = container.backfillMissingExtractionInfo()
+            val outcome = container.backfillMissingExtractionInfo()
 
-            assertEquals(2, queued)
+            assertEquals(2, outcome.candidates)
+            assertEquals(2, outcome.queued)
+            assertEquals(0, outcome.failed)
             coVerify(exactly = 1) { saveFlow.recoverEntry(firstId, "loaded first", any(), any(), any()) }
             coVerify(exactly = 1) { saveFlow.recoverEntry(secondId, "loaded second", any(), any(), any()) }
         } finally {

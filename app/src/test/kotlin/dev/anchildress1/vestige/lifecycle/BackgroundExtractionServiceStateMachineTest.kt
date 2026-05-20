@@ -17,11 +17,13 @@ class BackgroundExtractionServiceStateMachineTest {
     private fun machine(
         scope: TestScope,
         foregroundStartRetryDelay: Duration = 5.seconds,
+        backgroundStartRetryDelay: Duration = 60.seconds,
         onPromoteRequested: () -> Unit = {},
     ): BackgroundExtractionLifecycleStateMachine = BackgroundExtractionLifecycleStateMachine(
         scope = scope,
         keepAlive = 30.seconds,
         foregroundStartRetryDelay = foregroundStartRetryDelay,
+        backgroundStartRetryDelay = backgroundStartRetryDelay,
         onPromoteRequested = onPromoteRequested,
     )
 
@@ -270,5 +272,25 @@ class BackgroundExtractionServiceStateMachineTest {
 
         machine.onForegroundStopConfirmed()
         assertEquals(BackgroundExtractionLifecycleState.NORMAL, machine.state.value)
+    }
+
+    @Test
+    fun `backgrounded suppression self-heals after the timed backoff with work still in flight`() = runTest {
+        var promoteCount = 0
+        val machine = machine(this, backgroundStartRetryDelay = 60.seconds) { promoteCount += 1 }
+        machine.onInFlightCountChange(1)
+        assertEquals(1, promoteCount)
+
+        machine.onForegroundStartFailed(retry = false)
+        assertEquals(BackgroundExtractionLifecycleState.NORMAL, machine.state.value)
+
+        // While the app stays backgrounded the in-flight count never drops to zero, but a delayed
+        // retry must still fire — otherwise a queued extraction is stranded for the rest of the run.
+        machine.onInFlightCountChange(1)
+        advanceTimeBy(60_001L)
+        advanceUntilIdle()
+
+        assertEquals(BackgroundExtractionLifecycleState.PROMOTING, machine.state.value)
+        assertEquals(2, promoteCount)
     }
 }

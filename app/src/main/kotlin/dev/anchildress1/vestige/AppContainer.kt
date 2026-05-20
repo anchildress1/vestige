@@ -312,7 +312,7 @@ class AppContainer(
         } catch (cancel: CancellationException) {
             throw cancel
         } catch (@Suppress("TooGenericExceptionCaught") error: Exception) {
-            Log.w(TAG, "retrieveHistory degraded (${error.javaClass.simpleName})")
+            Log.w(TAG, "retrieveHistory degraded", error)
             emptyList()
         }
     }
@@ -653,9 +653,8 @@ class AppContainer(
     }
 
     /**
-     * Wipe every entry, pattern, tag, and callout-cooldown row plus legacy markdown files.
+     * Wipe every entry, pattern, tag, and callout-cooldown row plus any legacy markdown files.
      * Nothing is sent anywhere; nothing is recoverable. The model artifact is left alone.
-     * Per `ux-copy.md` §"Destructive Confirmations / Delete all data".
      */
     suspend fun wipeAllData() {
         cancelTrackedExtractionsAndResetLifecycle()
@@ -711,8 +710,8 @@ class AppContainer(
     }
 
     /**
-     * Debug/demo backfill hook: re-runs the LLM extraction pipeline for completed entries that
-     * were loaded without lens receipts. Existing entry rows are updated in place.
+     * Backfills lens receipts on COMPLETED entries that were inserted without extraction output
+     * (`make seed-entries -e run_extraction=true`, imported demo corpora, etc.). Single-flight.
      */
     fun launchMissingExtractionBackfill(limit: Int = DEFAULT_MISSING_EXTRACTION_BACKFILL_LIMIT): Job = scope.launch {
         if (!missingExtractionBackfillRunning.compareAndSet(false, true)) {
@@ -720,22 +719,31 @@ class AppContainer(
             return@launch
         }
         try {
-            val processed = backfillMissingExtractionInfo(limit)
-            Log.i(TAG, "Missing extraction backfill processed $processed entries")
+            val outcome = backfillMissingExtractionInfo(limit)
+            Log.i(
+                TAG,
+                "Missing extraction backfill: queued=${outcome.queued} " +
+                    "failed=${outcome.failed} candidates=${outcome.candidates}",
+            )
         } finally {
             missingExtractionBackfillRunning.set(false)
         }
     }
 
-    internal suspend fun backfillMissingExtractionInfo(limit: Int = DEFAULT_MISSING_EXTRACTION_BACKFILL_LIMIT): Int {
+    internal data class MissingExtractionBackfillOutcome(val candidates: Int, val queued: Int, val failed: Int)
+
+    internal suspend fun backfillMissingExtractionInfo(
+        limit: Int = DEFAULT_MISSING_EXTRACTION_BACKFILL_LIMIT,
+    ): MissingExtractionBackfillOutcome {
         if (!mainModelArtifactLooksPresent()) {
             Log.w(TAG, "Missing extraction backfill skipped — main model is not ready")
-            return 0
+            return MissingExtractionBackfillOutcome(candidates = 0, queued = 0, failed = 0)
         }
         val entries = runCatching { entryStore.listCompletedMissingLensReceipts(limit) }
             .onFailure { Log.e(TAG, "Failed to scan entries missing extraction info", it) }
             .getOrDefault(emptyList())
         var queued = 0
+        var failed = 0
         if (entries.isNotEmpty()) {
             ensureBackgroundEngineInitialized()
             entries.forEach { entry ->
@@ -751,10 +759,12 @@ class AppContainer(
                 if (job != null) {
                     job.join()
                     queued += 1
+                } else {
+                    failed += 1
                 }
             }
         }
-        return queued
+        return MissingExtractionBackfillOutcome(candidates = entries.size, queued = queued, failed = failed)
     }
 
     private suspend fun recoverOneEntry(
@@ -983,8 +993,12 @@ class AppContainer(
         val intent = foregroundServiceIntentFactory()
         try {
             foregroundServiceStarter(intent)
+            // Successful dispatch clears the denial latch so the next backgrounded denial is loud
+            // again. Without this, the once-per-process latch silences every subsequent denial.
+            foregroundPromotionDeniedLogged.set(false)
         } catch (@Suppress("TooGenericExceptionCaught") error: Exception) {
-            if (error.isForegroundServiceStartNotAllowed()) {
+            val denied = error.isForegroundServiceStartNotAllowed()
+            if (denied) {
                 if (foregroundPromotionDeniedLogged.compareAndSet(false, true)) {
                     Log.w(TAG, "Foreground service promotion denied while app is backgrounded")
                 }

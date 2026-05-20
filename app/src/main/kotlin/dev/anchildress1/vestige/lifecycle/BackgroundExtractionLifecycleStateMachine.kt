@@ -1,5 +1,6 @@
 package dev.anchildress1.vestige.lifecycle
 
+import android.util.Log
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -11,10 +12,12 @@ import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
 
 /** Pure-Kotlin transition table for the conditional foreground service. */
+@Suppress("TooManyFunctions")
 class BackgroundExtractionLifecycleStateMachine(
     private val scope: CoroutineScope,
     private val keepAlive: Duration = DEFAULT_KEEP_ALIVE,
     private val foregroundStartRetryDelay: Duration = DEFAULT_FOREGROUND_START_RETRY_DELAY,
+    private val backgroundStartRetryDelay: Duration = DEFAULT_BACKGROUND_START_RETRY_DELAY,
     private val onPromoteRequested: () -> Unit = {},
 ) {
 
@@ -25,6 +28,11 @@ class BackgroundExtractionLifecycleStateMachine(
     private var inFlightCount: Int = 0
     private var keepAliveJob: Job? = null
     private var foregroundStartRetryJob: Job? = null
+
+    // Set when Android 12+ refuses a foreground start because the app is backgrounded; an
+    // immediate retry would just re-fail. Cleared on idle, on app resume (via
+    // allowSuppressedPromotion), on a successful confirm, on service-kill recovery, or after the
+    // backgroundStartRetryDelay backoff elapses with work still in flight.
     private var foregroundStartSuppressedUntilIdle: Boolean = false
 
     @Synchronized
@@ -43,6 +51,11 @@ class BackgroundExtractionLifecycleStateMachine(
                     foregroundStartRetryJob?.cancel()
                     foregroundStartRetryJob = null
                     transition(BackgroundExtractionLifecycleState.PROMOTING)
+                } else if (count > 0 && foregroundStartSuppressedUntilIdle) {
+                    // Backgrounded extraction is queued and FGS is denied; without a self-heal a
+                    // user who never returns to the app strands the work until process death.
+                    Log.w(TAG, "FGS promotion suppressed but inFlightCount=$count — scheduling delayed retry")
+                    scheduleBackgroundStartRetry()
                 }
             }
 
@@ -136,6 +149,22 @@ class BackgroundExtractionLifecycleStateMachine(
         }
     }
 
+    private fun scheduleBackgroundStartRetry() {
+        if (foregroundStartRetryJob?.isActive == true) return
+        foregroundStartRetryJob = scope.launch {
+            delay(backgroundStartRetryDelay)
+            synchronized(this@BackgroundExtractionLifecycleStateMachine) {
+                foregroundStartRetryJob = null
+                if (mutableState.value == BackgroundExtractionLifecycleState.NORMAL && inFlightCount > 0) {
+                    // Clear suppression and attempt once — Android may permit the start now that
+                    // backoff has elapsed. If still denied, the catch path re-suppresses.
+                    foregroundStartSuppressedUntilIdle = false
+                    transition(BackgroundExtractionLifecycleState.PROMOTING)
+                }
+            }
+        }
+    }
+
     private fun transition(next: BackgroundExtractionLifecycleState) {
         mutableState.value = next
         if (next == BackgroundExtractionLifecycleState.PROMOTING) {
@@ -146,5 +175,12 @@ class BackgroundExtractionLifecycleStateMachine(
     companion object {
         val DEFAULT_KEEP_ALIVE: Duration = 30.seconds
         val DEFAULT_FOREGROUND_START_RETRY_DELAY: Duration = 5.seconds
+
+        // Android 12+ relaxes some FGS-start restrictions on a delay (e.g. exit-from-doze grace
+        // windows). 60s is a conservative ceiling: long enough to skip the immediate-fail window,
+        // short enough that a backgrounded extraction is not stranded for the rest of the run.
+        val DEFAULT_BACKGROUND_START_RETRY_DELAY: Duration = 60.seconds
+
+        private const val TAG = "VestigeBackgroundExtractionLifecycle"
     }
 }

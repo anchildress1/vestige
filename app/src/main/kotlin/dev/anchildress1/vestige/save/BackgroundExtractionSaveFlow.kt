@@ -385,7 +385,8 @@ class BackgroundExtractionSaveFlow(
         } catch (@Suppress("TooGenericExceptionCaught") compensationError: Exception) {
             Log.e(
                 TAG,
-                "Persistence compensation failed for entryId=$entryId (${compensationError.javaClass.simpleName})",
+                "Persistence compensation failed for entryId=$entryId",
+                compensationError,
             )
         }
         terminalRelay.emitTerminal(

@@ -97,6 +97,10 @@ class MainActivity : ComponentActivity() {
     }
 }
 
+// SharedPreferences load on first access touches disk; doing that work async would push splash
+// → first-frame past one frame and break the cold-start contract. The suppression is scoped to
+// exactly the [block] callback — do not pass anything other than the OnboardingPrefs.from read
+// through here; unrelated disk reads here become invisible to StrictMode for callers' benefit.
 private inline fun <T> allowLaunchPreferenceRead(block: () -> T): T {
     val previousPolicy = StrictMode.allowThreadDiskReads()
     return try {

@@ -19,4 +19,10 @@ class CalloutCooldownEntity(
     var remainingSuppression: Int = 0,
     /** Entry currently holding this pattern's callout slot until append either confirms or fails. */
     var pendingCalloutEntryId: Long? = null,
-)
+) {
+    init {
+        // ObjectBox-hydrated rows always carry the real patternId; this fence catches a
+        // default-constructed row that bypassed snapshotFor's create path.
+        require(patternId.isNotBlank()) { "CalloutCooldownEntity.patternId must be non-blank" }
+    }
+}

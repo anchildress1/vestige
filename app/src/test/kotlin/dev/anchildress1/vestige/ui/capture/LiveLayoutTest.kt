@@ -20,7 +20,9 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [34], manifest = Config.NONE, application = android.app.Application::class)
+// Pinned viewport: the Stop/Discard buttons are bottom-anchored with a navbar inset, so
+// assertIsDisplayed() needs a deterministic device size, not Robolectric's default.
+@Config(sdk = [34], qualifiers = "w360dp-h800dp", manifest = Config.NONE, application = android.app.Application::class)
 class LiveLayoutTest {
 
     @get:Rule
@@ -61,9 +63,8 @@ class LiveLayoutTest {
         composeRule.setContent {
             VestigeTheme { liveLayout(onStopTap = { stopTaps += 1 }) }
         }
-        // Bottom-anchored buttons can fall outside the unit-test viewport; invoke the click
-        // semantic action directly so the assertion does not depend on a physical hit-test.
         composeRule.onNodeWithContentDescription(CaptureCopy.REC_LABEL_RECORDING)
+            .assertIsDisplayed()
             .assertHasClickAction()
             .performSemanticsAction(SemanticsActions.OnClick)
         composeRule.runOnIdle { assertEquals(1, stopTaps) }

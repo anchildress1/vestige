@@ -8,6 +8,7 @@ import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertHasClickAction
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
@@ -93,27 +94,30 @@ class PatternsListScreenTest {
     }
 
     @Test
-    fun `Day-1 empty state renders the stat ribbon, accented header and body`() {
+    fun `Day-1 empty state renders the accented header and body, no stat ribbon`() {
         composeRule.setContent { PatternsListScreen(viewModel = newViewModel(), onOpenPattern = {}) }
-        composeRule.onNodeWithContentDescription("0 vestiges, 0 entries, last 30 days").assertIsDisplayed()
         composeRule.onNodeWithText("NOTHING TO READ YET.").assertIsDisplayed()
-        composeRule.onNodeWithText("Patterns surface after 10 entries. Keep recording.").assertIsDisplayed()
+        composeRule.onNodeWithText("Patterns surface after 3 entries. Keep recording.").assertIsDisplayed()
+        // No-data parity with History's empty surface — the stat ribbon is gated on Loaded.
+        composeRule.onAllNodesWithContentDescription("0 vestiges, 0 entries, last 1 days").assertCountEquals(0)
     }
 
     @Test
-    fun `stat ribbon substitutes the live entry count below the detection threshold`() {
-        // Nine COMPLETED entries — one below PATTERN_SURFACE_MIN_ENTRIES, so still NO_ENTRIES.
-        repeat(9) { seedEntry("entry $it", ExtractionStatus.COMPLETED) }
+    fun `stat ribbon is absent below the detection threshold`() {
+        // Two COMPLETED entries — one below PATTERN_SURFACE_MIN_ENTRIES, so still NO_ENTRIES.
+        repeat(2) { seedEntry("entry $it", ExtractionStatus.COMPLETED) }
         composeRule.setContent { PatternsListScreen(viewModel = newViewModel(), onOpenPattern = {}) }
-        composeRule.onNodeWithContentDescription("0 vestiges, 9 entries, last 30 days").assertIsDisplayed()
+        composeRule.onNodeWithText("NOTHING TO READ YET.").assertIsDisplayed()
+        // Ribbon is gated on Loaded — its merged "$n vestiges, $m entries, last $d days"
+        // description must not exist on Empty surfaces.
+        composeRule.onAllNodesWithContentDescription("0 vestiges, 2 entries, last 1 days").assertCountEquals(0)
     }
 
     @Test
     fun `Day-1 empty state is an announced status band with no click action (a11y)`() {
         composeRule.setContent { PatternsListScreen(viewModel = newViewModel(), onOpenPattern = {}) }
         // AGENTS.md band rule: merged contentDescription + polite liveRegion present, NO click.
-        // The stat ribbon is a separate node — the band is header + body only.
-        val mergedDescription = "Nothing to read yet. Patterns surface after 10 entries. Keep recording."
+        val mergedDescription = "Nothing to read yet. Patterns surface after 3 entries. Keep recording."
         val band = composeRule.onNodeWithContentDescription(mergedDescription)
         band.assertIsDisplayed()
         band.assert(SemanticsMatcher.keyIsDefined(SemanticsProperties.LiveRegion))
@@ -121,18 +125,18 @@ class PatternsListScreenTest {
     }
 
     @Test
-    fun `NO_PATTERNS empty state renders header, body and the stat ribbon`() {
-        repeat(10) { seedEntry("entry $it", ExtractionStatus.COMPLETED) }
+    fun `NO_PATTERNS empty state renders header and body, no stat ribbon`() {
+        repeat(3) { seedEntry("entry $it", ExtractionStatus.COMPLETED) }
         composeRule.setContent { PatternsListScreen(viewModel = newViewModel(), onOpenPattern = {}) }
         composeRule.onNodeWithText("NO REPEATING PATTERN DETECTED.").assertIsDisplayed()
         composeRule.onNodeWithText("The model looked. Nothing came back twice.").assertIsDisplayed()
-        // The stat ribbon is always present now (not gated by reason).
-        composeRule.onNodeWithContentDescription("0 vestiges, 10 entries, last 30 days").assertIsDisplayed()
+        // Stats ribbon is gated on Loaded — an empty pattern surface stays a single status band.
+        composeRule.onAllNodesWithContentDescription("0 vestiges, 3 entries, last 1 days").assertCountEquals(0)
     }
 
     @Test
     fun `NO_PATTERNS empty state is an announced status band with no click action (a11y)`() {
-        repeat(10) { seedEntry("entry $it", ExtractionStatus.COMPLETED) }
+        repeat(3) { seedEntry("entry $it", ExtractionStatus.COMPLETED) }
         composeRule.setContent { PatternsListScreen(viewModel = newViewModel(), onOpenPattern = {}) }
         // AGENTS.md band rule: same requirements as NO_ENTRIES — merged contentDescription +
         // polite liveRegion, no click action.
@@ -171,9 +175,9 @@ class PatternsListScreenTest {
 
         composeRule.setContent { PatternsListScreen(viewModel = newViewModel(), onOpenPattern = {}) }
 
+        composeRule.onNodeWithText("TEMPLATE RECURRENCE").assertIsDisplayed()
         composeRule.onNodeWithText("Tuesday Meetings").assertIsDisplayed()
-        // Category renders as an uppercase tone-colored eyebrow above the name (comp parity).
-        composeRule.onNodeWithText("AFTERMATH").assertIsDisplayed()
+        composeRule.onAllNodesWithText("AFTERMATH").assertCountEquals(0)
         composeRule.onNodeWithText("Fourth entry mentions Tuesday meetings.").assertIsDisplayed()
         // Substring match avoids brittleness on the bullet glyph and trailing date format.
         composeRule.onNodeWithText("1 of 1 entries", substring = true).assertIsDisplayed()

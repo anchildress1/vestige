@@ -159,14 +159,7 @@ class LiteRtLmEngineTest {
     }
 
     @Test
-    fun `BackendChoice Cpu can be constructed`() {
-        assertDoesNotThrow { BackendChoice.Cpu }
-    }
-
-    @Test
     fun `BackendChoice sealed subtypes are distinct`() {
-        assertTrue(BackendChoice.Cpu != BackendChoice.Gpu)
-        assertTrue(BackendChoice.Cpu != BackendChoice.Npu(nativeLibraryDir = "/lib"))
         assertTrue(BackendChoice.Gpu != BackendChoice.Npu(nativeLibraryDir = "/lib"))
     }
 

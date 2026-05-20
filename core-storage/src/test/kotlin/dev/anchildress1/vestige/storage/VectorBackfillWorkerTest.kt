@@ -47,8 +47,10 @@ class VectorBackfillWorkerTest {
 
     @After
     fun tearDown() {
-        boxStore.close()
-        BoxStore.deleteAllFiles(dataDir)
+        // runTest leaves ObjectBox readers owned by coroutine runner threads during @After.
+        // Clean thread locals first, then close the in-memory registry so later JVM tests do not
+        // inherit a stale store handle.
+        boxStore.closeAfterCleaningThreadResources()
     }
 
     @Test

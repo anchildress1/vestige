@@ -67,22 +67,18 @@
     <string name="onboarding_download_try_again">Try again</string>
     <string name="onboarding_download_pause">Pause</string>
 
-<!-- Phase 3 placeholder source-entry surface. Phase 4 replaces this with the real history detail screen. -->
-    <string name="entry_detail_placeholder_title">Entry</string>
-    <string name="entry_detail_placeholder_notice">History detail ships in Phase 4. For now, this proves the source link is live.</string>
-    <string name="entry_detail_placeholder_not_found">Entry not found.</string>
-
     <!-- Patterns list + detail surface. Mirrors poc/screens-patterns.jsx + ux-copy.md §"Pattern List / Detail". -->
     <!-- Empty states per docs/ux-copy.md §"Pattern List / Empty states". The VESTIGES/ENTRIES/
          DAYS counts now render as the shared StatRibbon, not a copy string. -->
     <string name="patterns_empty_day1_header">Nothing to read yet.</string>
-    <string name="patterns_empty_day1_body">Patterns surface after 10 entries. Keep recording.</string>
+    <string name="patterns_empty_day1_body">Patterns surface after 3 entries. Keep recording.</string>
     <string name="patterns_empty_none_header">No repeating pattern detected.</string>
     <string name="patterns_empty_none_body">The model looked. Nothing came back twice.</string>
     <string name="pattern_detail_seen_in">Seen in:</string>
     <string name="pattern_detail_no_sources">No entries logged for this pattern yet.</string>
     <string name="pattern_detail_not_found">Pattern not found.</string>
     <string name="pattern_detail_intensity_eyebrow">INTENSITY · 30 DAYS</string>
+    <string name="pattern_detail_words_used">WORDS YOU USED</string>
     <!-- Action labels per docs/ux-copy.md §"Pattern List / Card actions" + spec-pattern-action-buttons.md.
          ACTIVE patterns: Drop / Skip. Non-active visible states (SKIPPED / CLOSED / DROPPED):
          Restart only. Closure is model-detected (v1.5 `pattern-auto-close`) — no user "Done"
@@ -164,7 +160,7 @@
     <string name="settings_section_model">MODEL</string>
     <string name="settings_section_about">ABOUT</string>
     <string name="settings_export">Export all entries</string>
-    <string name="settings_export_desc">Zip of per-entry markdown</string>
+    <string name="settings_export_desc">Zip of markdown plus stored data snapshot</string>
     <!-- SAF picks the destination, so the copy stays location-agnostic per docs/ux-copy.md
          §System Messages. Failure is surfaced honestly — a silently-broken export is the bug. -->
     <string name="settings_export_success">Entries exported.</string>

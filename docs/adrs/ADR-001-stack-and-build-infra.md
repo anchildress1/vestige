@@ -7,6 +7,7 @@
 
 ---
 
+
 ## Context
 
 Vestige ships in 17 days. Most product-shape decisions are already locked in `concept-locked.md` and `PRD.md`. What is **not** recorded anywhere is the build-infrastructure spine the CLI is about to start hammering on, and a handful of plumbing decisions Phase 1 will collide with the moment a module boundary needs to be drawn.
@@ -234,7 +235,7 @@ STT-A says this must work. The 30s constraint is a runtime cap — `AudioRecord`
 | Inference (32-char prompt → 2-char reply) | 3,261 ms |
 | SHA-256 pinned | `0b2a8980ce155fd97673d8e820b4d29d9c7d99b8fa6806f425d969b145bd52e0` |
 
-**STT-A device-test record (Phase 1, on-device, human-run):** the harness in `:core-inference` (`SttAProbe`) and the instrumented test at `:app/src/androidTest/.../SttAAudioPlumbingTest.kt` exercise three handoffs against Gemma 4 E4B on the S24 Ultra: `Content.AudioBytes(float32-LE bytes)`, `Content.AudioFile(<existing WAV>)`, and `transcribeViaTempWav` (PCM_FLOAT WAV written + handed off + deleted in-call). After running, fill in below. If neither byte-pack works and the file path is the only viable handoff, the temp-WAV lifecycle is the canonical path for v1.
+**STT-A device-test record (Phase 1, on-device, human-run):** the harness in `:core-inference` instrumentation test sources (`core-inference/src/androidTest/.../inference/SttAProbe.kt`) and the instrumented test at `core-inference/src/androidTest/.../inference/SttAAudioPlumbingTest.kt` exercise three handoffs against Gemma 4 E4B on the S24 Ultra: `Content.AudioBytes(float32-LE bytes)`, `Content.AudioFile(<existing WAV>)`, and `transcribeViaTempWav` (PCM_FLOAT WAV written + handed off + deleted in-call). After running, fill in below. If neither byte-pack works and the file path is the only viable handoff, the temp-WAV lifecycle is the canonical path for v1.
 
 | Field | Value |
 |---|---|
@@ -317,6 +318,21 @@ Storage row in §"Locked Stack" now records a ships-in-v1 schema with the HNSW v
 | Q_lateNight | 1/3 | 2/3 | D2 | Win |
 
 The 50% gate is cleared on corrected vectors. Phase 4 is unblocked. The tie on Q_invoice is structurally expected — tag recall is already perfect at 3/3 for that cohort; cosine adds nothing on exact-match queries.
+
+### Addendum (2026-05-19) — STT-E harness corrected to production embedding source
+
+The 2026-05-16 result document claimed corrected vectors, but the instrumentation harness still seeded `EntryEntity.vector` from raw `entryText`. That was the old bug wearing a new hat. The harness now seeds vectors from `buildEmbeddingText(entry)` after tags are attached, matching `VectorBackfillWorker`.
+
+`SttEEmbeddingComparisonTest` re-ran on the reference S24 Ultra with the same 18-entry corpus. Result: hybrid won 3/4 queries; tied 1; lost 0. Verdict unchanged, but the evidence now exercises the production embedding source.
+
+| Query | Baseline relevant in top-5 | Hybrid relevant in top-5 | Novel relevant (hybrid-only) | Outcome |
+|---|---|---|---|---|
+| Q_aftermath | 2/6 | 3/6 | A4 | Win |
+| Q_invoice | 3/3 | 3/3 | — | Tie |
+| Q_decision | 1/3 | 3/3 | C2, C3 | Win |
+| Q_lateNight | 1/3 | 3/3 | D2, D3 | Win |
+
+Evidence: `docs/stt-results/stt-e-2026-05-19.md` and `docs/stt-results/stt-e-2026-05-19.raw.log`.
 
 ### Q7. Privacy / network enforcement (the P0 marketing claim has to be code, not vibes)
 
@@ -480,4 +496,3 @@ The dominant trade-off is **deadline vs. correctness**. Every flag and every mod
 - Post-submission, if v1.5 adds CI → keystore strategy becomes a real ADR of its own.
 
 ---
-

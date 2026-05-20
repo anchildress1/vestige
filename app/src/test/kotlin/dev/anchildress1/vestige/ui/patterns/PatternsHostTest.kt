@@ -11,6 +11,7 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
+import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -25,6 +26,7 @@ import dev.anchildress1.vestige.storage.MarkdownEntryStore
 import dev.anchildress1.vestige.storage.PatternEntity
 import dev.anchildress1.vestige.storage.PatternRepo
 import dev.anchildress1.vestige.storage.PatternStore
+import dev.anchildress1.vestige.storage.closeAfterCleaningThreadResources
 import dev.anchildress1.vestige.testing.cleanupObjectBoxTempRoot
 import dev.anchildress1.vestige.testing.newInMemoryObjectBoxDirectory
 import dev.anchildress1.vestige.testing.newModuleTempRoot
@@ -79,7 +81,11 @@ class PatternsHostTest {
 
     @After
     fun tearDown() {
-        boxStore.close()
+        composeRule.activityRule.scenario.close()
+        // Compose host tests still have ObjectBox readers owned by runner threads during @After.
+        // Clean thread locals first, then close the in-memory registry so later JVM tests do not
+        // inherit the stale store.
+        boxStore.closeAfterCleaningThreadResources()
         cleanupObjectBoxTempRoot(tempRoot, dataDir)
     }
 
@@ -109,8 +115,7 @@ class PatternsHostTest {
         // Detail → entry detail. The rebuilt EntryDetailScreen (poc/entry-full-final.png) dropped
         // the +NEW-ENTRY action and the source-highlight; the time hero is the stable landmark.
         composeRule.onNodeWithText("crashed after standup").performScrollTo().performClick()
-        composeRule.waitForIdle()
-        composeRule.onNodeWithTag("entry_time").assertIsDisplayed()
+        assertEntryTimeDisplayed()
     }
 
     @Test
@@ -191,8 +196,7 @@ class PatternsHostTest {
         composeRule.onNodeWithText("Tuesday Meetings").performClick()
         composeRule.waitForIdle()
         composeRule.onNodeWithText("crashed after standup").performScrollTo().performClick()
-        composeRule.waitForIdle()
-        composeRule.onNodeWithTag("entry_time").assertIsDisplayed()
+        assertEntryTimeDisplayed()
 
         composeRule.onNode(hasText("HISTORY") and hasClickAction()).performClick()
         composeRule.waitForIdle()
@@ -212,6 +216,13 @@ class PatternsHostTest {
         )
         boxStore.boxFor(EntryEntity::class.java).put(entity)
         return entity
+    }
+
+    private fun assertEntryTimeDisplayed() {
+        composeRule.waitUntil(timeoutMillis = 5_000) {
+            composeRule.onAllNodesWithTag("entry_time").fetchSemanticsNodes().isNotEmpty()
+        }
+        composeRule.onNodeWithTag("entry_time").assertIsDisplayed()
     }
 
     private fun seedActivePattern(

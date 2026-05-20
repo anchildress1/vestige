@@ -92,4 +92,31 @@ class PatternSignatureTest {
         assertEquals(plural.patternId, singular.patternId)
         assertEquals(plural.json, "{\"kind\":\"vocab_frequency\",\"token\":\"meeting\"}")
     }
+
+    @Test
+    fun `weekday time-block signature normalizes relation fields`() {
+        val a = PatternSignature.forWeekdayTimeBlock("Tuesday", "After_noon")
+        val b = PatternSignature.forWeekdayTimeBlock("tuesday", "after-noon")
+
+        assertEquals(a.patternId, b.patternId)
+        assertEquals(PatternKind.TEMPORAL_RELATIVE, a.kind)
+        assertEquals(
+            "{\"kind\":\"temporal_relative\",\"relation\":\"weekday_time_block\"," +
+                "\"day_of_week\":\"tuesday\",\"time_block\":\"afternoon\"}",
+            a.json,
+        )
+    }
+
+    @Test(expected = IllegalStateException::class)
+    fun `weekday time-block signature rejects non-canonical blocks that cannot match`() {
+        PatternSignature.forWeekdayTimeBlock("Tuesday", "late-lunch")
+    }
+
+    @Test
+    fun `month-start signature has fixed bytes`() {
+        val sig = PatternSignature.forMonthStart()
+
+        assertEquals(PatternKind.TEMPORAL_RELATIVE, sig.kind)
+        assertEquals("{\"kind\":\"temporal_relative\",\"relation\":\"month_start\",\"day_of_month\":1}", sig.json)
+    }
 }

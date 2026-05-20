@@ -11,8 +11,8 @@ import java.time.temporal.ChronoUnit
 /**
  * Read/write the markdown source-of-truth files at `{baseDir}/entries/{ISO8601}--{slug}.md`.
  * YAML frontmatter holds the structured fields; body is the entry text. Structured Phase-2
- * fields (`stated_commitment`, `entry_observations`, `confidence`) round-trip as JSON blobs.
- * Audio bytes never persist here.
+ * fields (`stated_commitment`, `entry_observations`, `lens_receipts`, `confidence`) round-trip
+ * as JSON blobs. Audio bytes never persist here.
  */
 @Suppress("TooManyFunctions") // 4 read/write surface + 9 YAML helpers on one shape.
 class MarkdownEntryStore(private val baseDir: File) {
@@ -47,6 +47,7 @@ class MarkdownEntryStore(private val baseDir: File) {
             entry.tags.map { it.name }.sorted().forEach { tag -> appendLine("  - $tag") }
             append("confidence: ").append(yamlJsonInline(entry.confidenceJson)).append('\n')
             append("entry_observations: ").append(yamlJsonInline(entry.entryObservationsJson)).append('\n')
+            append("lens_receipts: ").append(yamlJsonInline(entry.lensReceiptsJsonOrEmpty)).append('\n')
             append(FRONTMATTER_FENCE).append('\n')
             append('\n')
             append(entry.entryText)
@@ -109,6 +110,7 @@ class MarkdownEntryStore(private val baseDir: File) {
         val commitment = parsed[KEY_STATED_COMMITMENT]?.takeUnless { it == NULL }
         val confidence = parsed[KEY_CONFIDENCE] ?: "{}"
         val observations = parsed[KEY_ENTRY_OBSERVATIONS] ?: "[]"
+        val lensReceipts = parsed[KEY_LENS_RECEIPTS] ?: "[]"
 
         return EntryEntity(
             markdownFilename = file.name,
@@ -122,6 +124,7 @@ class MarkdownEntryStore(private val baseDir: File) {
             recurrenceLink = recurrence,
             statedCommitmentJson = commitment,
             entryObservationsJson = observations,
+            lensReceiptsJson = lensReceipts,
             confidenceJson = confidence,
             extractionStatus = ExtractionStatus.COMPLETED,
             attemptCount = 0,
@@ -249,5 +252,6 @@ class MarkdownEntryStore(private val baseDir: File) {
         private const val KEY_STATED_COMMITMENT = "stated_commitment"
         private const val KEY_CONFIDENCE = "confidence"
         private const val KEY_ENTRY_OBSERVATIONS = "entry_observations"
+        private const val KEY_LENS_RECEIPTS = "lens_receipts"
     }
 }

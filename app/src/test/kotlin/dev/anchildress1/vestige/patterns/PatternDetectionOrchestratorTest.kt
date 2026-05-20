@@ -645,4 +645,29 @@ class PatternDetectionOrchestratorTest {
         val persisted = patternStore.findByPatternId(original.patternId)!!
         assertEquals(PatternState.SNOOZED, persisted.state)
     }
+
+    @Test
+    fun `temporal pattern without analysisGenerator falls back to deterministic callout`() = runTest {
+        // Three consecutive Tuesday afternoons → weekday_time_block TEMPORAL_RELATIVE
+        val tuesdays = listOf(
+            "2026-04-21T13:00:00Z",
+            "2026-04-28T14:00:00Z",
+            "2026-05-05T15:00:00Z",
+        )
+        tuesdays.forEach { ts ->
+            orchestrator.onEntryCommitted(
+                putEntry(templateLabel = null, text = "tuesday entry", timestamp = Instant.parse(ts)),
+                Persona.WITNESS,
+            )
+        }
+
+        val temporal = patternStore.all().single { it.kind == PatternKind.TEMPORAL_RELATIVE }
+        // No analysisGenerator wired — callout must be the deterministic template, not blank.
+        assertTrue("expected non-blank deterministic callout", temporal.latestCalloutText.isNotBlank())
+        assertTrue(
+            "expected temporal callout text, got: ${temporal.latestCalloutText}",
+            temporal.latestCalloutText.contains("tuesday", ignoreCase = true) ||
+                temporal.latestCalloutText.contains("entries logged"),
+        )
+    }
 }

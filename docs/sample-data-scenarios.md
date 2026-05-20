@@ -49,6 +49,54 @@ Expected evidence:
 - Follow-up style: asks for concrete context or next observable action
 - Forbidden style: "how did that make you feel", diagnosis, motivation theory, pep talk
 
+## Manual Voice Recording Script — Back-to-back capture
+
+Use these when recording entries through the app one after another. These preserve the same pattern pressure as the canonical corpus, but the voice is closer to the actual demo user instead of fixture-file taxidermy.
+
+This sequence is for content patterns, not calendar-relative patterns. Back-to-back recordings share today's timestamp, so they cannot honestly prove "previous two Tuesdays" or "first of the month" behavior. Use harness timestamps for those.
+
+### Meeting crash run
+
+1. "Standup ran long again. I was fine before it, then by eleven my brain had fully left the building. Opened the launch doc and just stared at it like that was a strategy."
+2. "Another Tuesday meeting, same bullshit. Went in normal, came out with concrete in my limbs. Lost the next hour rearranging tabs like a professional idiot."
+3. "Roadmap call ended and I did the little post-meeting corpse routine. Three tabs open, no motion, launch doc still sitting there judging me."
+
+Expected evidence:
+- Group-work event followed by attention / movement collapse
+- Vocabulary drift: `left the building`, `concrete in my limbs`, `corpse routine`
+- Should strengthen a Crashed / post-meeting aftermath pattern once background analysis lands
+
+### Invoice stall run
+
+4. "Invoice email is still sitting there. I opened it twice and performed the sacred ritual of closing it immediately."
+5. "I said I would send the invoice today. Instead I reorganized the desktop. Bold strategy. Absolutely not the work."
+6. "Invoice again. No mystery here. I know what to do. The cursor is just sitting there like it pays rent."
+
+Expected evidence:
+- Repeated stuck task: `invoice`
+- Explicit commitment in entry 5
+- Should strengthen Busy Stalling / commitment recurrence without moralizing or avoidance diagnosis
+
+### Decision loop run
+
+7. "Task app decision is still looping. Same three criteria, new spreadsheet, no decision. Very cool use of a human lifespan."
+8. "I keep changing the weights and pretending that is progress. It is not progress. It is spreadsheet cosplay."
+9. "Made another comparison table. Shockingly, the table did not turn into a decision through exposure therapy."
+
+Expected evidence:
+- Repeated comparison loop: `criteria`, `spreadsheet`, `weights`, `comparison table`
+- Should strengthen Nonstop Spiral without explaining the user's psychology
+
+### Optional keyword traps
+
+10. "The battery died on my keyboard during the meeting."
+11. "I crashed the test app after changing the ObjectBox entity."
+12. "Concrete shoes came up in a song lyric."
+
+Expected evidence:
+- These share keywords with the meeting-crash run but should not support the cognitive-aftereffect pattern.
+- If they do, the resolver is blending keywords instead of source meaning.
+
 ## Core Corpus
 
 Set fixture timestamps manually in the harness. Preserve local hour and weekday when listed.
@@ -186,5 +234,73 @@ Pass condition:
 - Embedding mode places at least 4 relevant A-entries in the top 5.
 - No more than 1 X distractor appears before the fourth relevant A-entry.
 - The difference from baseline is visible without explaining vector math for 90 seconds. If tag-only already looks just as good, cut EmbeddingGemma to v1.5 and enjoy the saved 200 MB.
+
+---
+
+## Demo Set
+
+Story 5.1 / Story 5.4 — seeded into the reference device for recording. Distinct from the STT corpus above; do not mix IDs. Loaded via the dev-only data loader; not present in the release APK.
+
+**Anchor pattern:** post-people-drain Crashed. Six entries across work and personal contexts using different vocabulary for the same crash shape. This is the demo's primary pattern callout moment and the embedding-advantage beat in the technical walkthrough.
+
+**Dates:** Apr 21 – May 15 (one month, realistic cadence).
+
+### DEMO-05
+
+| Field | Value |
+|---|---|
+| ID | DEMO-05 |
+| Timestamp | May 1 (Thu) 11:40 |
+| Text | "After the all-hands I did the hollow routine. Coffee went cold on the desk. Everything I was going to do right after evaporated. Three tabs open. I know what they're for. Still open." |
+| template_label | Crashed |
+| tags | `all-hands`, `meeting`, `work`, `hollow-routine`, `tabs` |
+| energy_descriptor | `hollow` |
+| stated_commitment | null |
+| entry_observations | 1. Post-meeting crash — work context this time. Vocabulary: "hollow routine" implies this is a recurring shape the user has named themselves. 2. Specific evidence: cold coffee, three tabs, zero execution. |
+| pattern contribution | Crashed cluster #3. First work-context entry in the cluster — broadens the pattern beyond personal social events. |
+
+### DEMO-06
+
+| Field | Value |
+|---|---|
+| ID | DEMO-06 |
+| Timestamp | May 3 (Sat) 12:00 |
+| Text | "Said I would drop the package off today. Drive past UPS on my route. Spent twenty minutes googling whether the thing is even worth returning. It is. Label is still on the counter." |
+| template_label | Busy Stalling |
+| tags | `return-label`, `package`, `UPS`, `commitment`, `googling` |
+| energy_descriptor | null |
+| stated_commitment | "drop the return package off today" |
+| entry_observations | 1. Explicit commitment logged: "said I would drop it off today." 2. Avoidance behavior: researched the validity of the task instead of doing it. Commitment connects to DEMO-04. |
+| pattern contribution | Busy Stalling #2. Stated commitment makes this the STT-D B2 analog — stronger signal than DEMO-04. |
+
+### DEMO-07
+
+| Field | Value |
+|---|---|
+| ID | DEMO-07 |
+| Timestamp | May 5 (Mon) 21:00 |
+| Text | "Spent an hour and a half comparing couches. Dimensions, reviews, lead time, return policy. Made a spreadsheet. Did not buy a couch. Twelve rows." |
+| template_label | Nonstop Spiral |
+| tags | `couch`, `spreadsheet`, `comparing`, `decision`, `twelve-rows` |
+| energy_descriptor | null |
+| stated_commitment | null |
+| entry_observations | 1. Decision loop: 90 minutes, spreadsheet, 12 options, no decision. 2. Vocabulary: the user measures their own loop ("twelve rows") without explaining why they can't choose. |
+| pattern contribution | Nonstop Spiral standalone. |
+
+### Demo Set — expected pattern callout
+
+When DEMO-12 saves, the pattern engine should detect the Crashed cluster and fire a pattern callout appended to DEMO-12's per-entry observation. Example Witness callout:
+
+> "Witness also noticed: sixth entry with a post-people energy drop — Apr 21, Apr 26, May 1, May 6, May 10, May 15. Events vary (dinner, lunch, all-hands, crowd, call). Shape doesn't."
+
+The callout must cite dates or counts. It must not say "you might be feeling drained" or offer any motivation theory.
+
+### Demo Set — embedding-advantage beat
+
+For the technical walkthrough's retrieval comparison, query: `"post-social crash, different words each time"`.
+
+Tag-only baseline is expected to miss DEMO-08 ("signal dropped", "couldn't reboot") and possibly DEMO-10 ("sat in the car", "did nothing useful") because keyword overlap with the crash cluster is low.
+
+Hybrid (tag + embedding) is expected to surface both. This is the observable embedding-advantage moment — show the two result lists side by side and point to the entries that moved.
 
 > **No template-label fixture.** A draft STT-F template-label smoke test was removed 2026-05-17: template assignment is structurally always `AUDIT` on realistic input (root cause: `backlog.md` §`archetype-template-labeling`). Any fixture that produces a non-AUDIT label only does so by feeding the exact internal trigger vocabulary — a fake test. The UI yank is **queued** in `docs/stories/phase-4-ux-surface.md` §Story 4.16 and has not landed on this branch yet; a real fixture is gated on the v1.5 redesign.

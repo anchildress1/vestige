@@ -6,8 +6,9 @@ import java.time.Instant
 /**
  * Parses the foreground call's `<transcription>...</transcription><follow_up>...</follow_up>`
  * envelope. Tags must appear in that order, exactly one of each — duplicates surface as
- * `AMBIGUOUS_BLOCKS` (with the lone clean transcription preserved when one parsed). Tag bodies
- * are auto-trimmed; an empty body counts as missing.
+ * `AMBIGUOUS_BLOCKS` (with the lone clean transcription preserved when one parsed). A bounded
+ * `transcription:` / `follow_up:` label fallback covers the common Gemma misshape without
+ * accepting arbitrary prose. Bodies are auto-trimmed; an empty body counts as missing.
  *
  * Known limitation: a transcription containing the literal tag markers will trip the
  * delimiter-collision case. No text-delimiter format dodges this without out-of-band escaping;
@@ -17,6 +18,8 @@ internal object ForegroundResponseParser {
 
     private val TRANSCRIPTION_TAG = Regex("(?s)<transcription>(.*?)</transcription>")
     private val FOLLOW_UP_TAG = Regex("(?s)<follow_up>(.*?)</follow_up>")
+    private val TRANSCRIPTION_LABEL = Regex("(?im)^\\s*transcription\\s*:\\s*")
+    private val FOLLOW_UP_LABEL = Regex("(?im)^\\s*_?follow_up\\s*:\\s*")
 
     fun parse(raw: String, persona: Persona, elapsedMs: Long, completedAt: Instant): ForegroundResult {
         val outcome = extract(raw)
@@ -43,7 +46,7 @@ internal object ForegroundResponseParser {
 
     private fun extract(raw: String): Extracted = when {
         raw.isBlank() -> Extracted.Bad(ForegroundResult.ParseReason.EMPTY_RESPONSE)
-        else -> splitOnTags(raw)
+        else -> splitOnTags(raw).recoverWithLabels(raw)
     }
 
     private fun splitOnTags(raw: String): Extracted {
@@ -70,6 +73,47 @@ internal object ForegroundResponseParser {
         val followUp = orderedFollowUp?.groupValues?.get(1)?.trim().orEmpty()
         // Missing transcription wins over missing follow_up — losing the user's words is the
         // more fundamental failure to surface.
+        return when {
+            transcriptionMatch == null || transcription.isEmpty() ->
+                Extracted.Bad(ForegroundResult.ParseReason.MISSING_TRANSCRIPTION)
+
+            orderedFollowUp == null || followUp.isEmpty() -> Extracted.Bad(
+                reason = ForegroundResult.ParseReason.MISSING_FOLLOW_UP,
+                recoveredTranscription = transcription,
+            )
+
+            else -> Extracted.Ok(transcription, followUp)
+        }
+    }
+
+    private fun Extracted.recoverWithLabels(raw: String): Extracted = when (this) {
+        is Extracted.Ok -> this
+
+        is Extracted.Bad -> {
+            val hasAnyTag = TRANSCRIPTION_TAG.containsMatchIn(raw) || FOLLOW_UP_TAG.containsMatchIn(raw)
+            if (!hasAnyTag) splitOnLabels(raw) else this
+        }
+    }
+
+    private fun splitOnLabels(raw: String): Extracted {
+        val transcriptionMatches = TRANSCRIPTION_LABEL.findAll(raw).toList()
+        val followUpMatches = FOLLOW_UP_LABEL.findAll(raw).toList()
+        if (transcriptionMatches.size > 1 || followUpMatches.size > 1) {
+            return Extracted.Bad(ForegroundResult.ParseReason.AMBIGUOUS_BLOCKS)
+        }
+        val transcriptionMatch = transcriptionMatches.singleOrNull()
+        val followUpMatch = followUpMatches.singleOrNull()
+        val orderedFollowUp = followUpMatch?.takeIf {
+            transcriptionMatch == null ||
+                it.range.first > transcriptionMatch.range.last
+        }
+        val transcription = if (transcriptionMatch == null) {
+            ""
+        } else {
+            val end = orderedFollowUp?.range?.first ?: raw.length
+            raw.substring(transcriptionMatch.range.last + 1, end).trim()
+        }
+        val followUp = orderedFollowUp?.let { raw.substring(it.range.last + 1).trim() }.orEmpty()
         return when {
             transcriptionMatch == null || transcription.isEmpty() ->
                 Extracted.Bad(ForegroundResult.ParseReason.MISSING_TRANSCRIPTION)

@@ -343,4 +343,132 @@ class PatternDetectorTest {
         // UTC detector treats 09:00 UTC as out-of-window — same data, no pattern.
         assertTrue(detector.detect().none { it.kind == PatternKind.TIME_OF_DAY_CLUSTER })
     }
+
+    @Test
+    fun `temporal relative detects same weekday afternoon across distinct weeks`() {
+        val laterClock = Clock.fixed(Instant.parse("2026-05-20T12:00:00Z"), ZoneOffset.UTC)
+        val laterDetector = PatternDetector(boxStore, laterClock, zoneId = ZoneOffset.UTC)
+        putEntry(timestamp = Instant.parse("2026-05-05T14:00:00Z"))
+        putEntry(timestamp = Instant.parse("2026-05-12T15:30:00Z"))
+        putEntry(timestamp = Instant.parse("2026-05-19T12:15:00Z"))
+
+        val pattern = laterDetector.detect().single {
+            it.kind == PatternKind.TEMPORAL_RELATIVE &&
+                it.signatureJson.contains("\"relation\":\"weekday_time_block\"")
+        }
+
+        assertEquals(3, pattern.supportingEntryCount)
+        assertTrue(pattern.signatureJson.contains("\"day_of_week\":\"tuesday\""))
+        assertTrue(pattern.signatureJson.contains("\"time_block\":\"afternoon\""))
+    }
+
+    @Test
+    fun `temporal relative weekday block uses injected zone when local hour differs from UTC`() {
+        val pacific = ZoneId.of("America/Los_Angeles")
+        val laterClock = Clock.fixed(Instant.parse("2026-05-20T12:00:00Z"), ZoneOffset.UTC)
+        val pacificDetector = PatternDetector(boxStore, laterClock, zoneId = pacific)
+        val utcDetector = PatternDetector(boxStore, laterClock, zoneId = ZoneOffset.UTC)
+        putEntry(timestamp = Instant.parse("2026-05-05T21:00:00Z"))
+        putEntry(timestamp = Instant.parse("2026-05-12T21:30:00Z"))
+        putEntry(timestamp = Instant.parse("2026-05-19T22:00:00Z"))
+
+        val pacificPattern = pacificDetector.detect().single {
+            it.kind == PatternKind.TEMPORAL_RELATIVE &&
+                it.signatureJson.contains("\"relation\":\"weekday_time_block\"")
+        }
+
+        assertTrue(pacificPattern.signatureJson.contains("\"day_of_week\":\"tuesday\""))
+        assertTrue(pacificPattern.signatureJson.contains("\"time_block\":\"afternoon\""))
+        assertNull(
+            utcDetector.detect().firstOrNull {
+                it.kind == PatternKind.TEMPORAL_RELATIVE &&
+                    it.signatureJson.contains("\"time_block\":\"afternoon\"")
+            },
+        )
+    }
+
+    @Test
+    fun `temporal relative requires distinct dates for weekday time blocks`() {
+        val laterClock = Clock.fixed(Instant.parse("2026-05-20T12:00:00Z"), ZoneOffset.UTC)
+        val laterDetector = PatternDetector(boxStore, laterClock, zoneId = ZoneOffset.UTC)
+        repeat(3) { putEntry(timestamp = Instant.parse("2026-05-19T14:00:00Z")) }
+
+        assertNull(
+            laterDetector.detect().firstOrNull {
+                it.kind == PatternKind.TEMPORAL_RELATIVE &&
+                    it.signatureJson.contains("\"relation\":\"weekday_time_block\"")
+            },
+        )
+    }
+
+    @Test
+    fun `temporal relative keeps weekday time blocks separate`() {
+        val laterClock = Clock.fixed(Instant.parse("2026-05-20T12:00:00Z"), ZoneOffset.UTC)
+        val laterDetector = PatternDetector(boxStore, laterClock, zoneId = ZoneOffset.UTC)
+        putEntry(timestamp = Instant.parse("2026-05-05T14:00:00Z"))
+        putEntry(timestamp = Instant.parse("2026-05-12T15:30:00Z"))
+        putEntry(timestamp = Instant.parse("2026-05-19T09:15:00Z"))
+
+        assertNull(
+            laterDetector.detect().firstOrNull {
+                it.kind == PatternKind.TEMPORAL_RELATIVE &&
+                    it.signatureJson.contains("\"relation\":\"weekday_time_block\"")
+            },
+        )
+    }
+
+    @Test
+    fun `temporal relative detects first-of-month across distinct months`() {
+        val laterClock = Clock.fixed(Instant.parse("2026-05-20T12:00:00Z"), ZoneOffset.UTC)
+        val laterDetector = PatternDetector(boxStore, laterClock, zoneId = ZoneOffset.UTC)
+        putEntry(timestamp = Instant.parse("2026-03-01T09:00:00Z"))
+        putEntry(timestamp = Instant.parse("2026-04-01T11:00:00Z"))
+        putEntry(timestamp = Instant.parse("2026-05-01T16:00:00Z"))
+
+        val pattern = laterDetector.detect().single {
+            it.kind == PatternKind.TEMPORAL_RELATIVE &&
+                it.signatureJson.contains("\"relation\":\"month_start\"")
+        }
+
+        assertEquals(3, pattern.supportingEntryCount)
+        assertTrue(pattern.signatureJson.contains("\"day_of_month\":1"))
+    }
+
+    @Test
+    fun `temporal relative month-start uses injected zone when local date differs from UTC`() {
+        val pacific = ZoneId.of("America/Los_Angeles")
+        val laterClock = Clock.fixed(Instant.parse("2026-05-20T12:00:00Z"), ZoneOffset.UTC)
+        val pacificDetector = PatternDetector(boxStore, laterClock, zoneId = pacific)
+        val utcDetector = PatternDetector(boxStore, laterClock, zoneId = ZoneOffset.UTC)
+        putEntry(timestamp = Instant.parse("2026-03-01T00:30:00Z"))
+        putEntry(timestamp = Instant.parse("2026-04-01T00:30:00Z"))
+        putEntry(timestamp = Instant.parse("2026-05-01T00:30:00Z"))
+
+        assertNotNull(
+            utcDetector.detect().firstOrNull {
+                it.kind == PatternKind.TEMPORAL_RELATIVE &&
+                    it.signatureJson.contains("\"relation\":\"month_start\"")
+            },
+        )
+        assertNull(
+            pacificDetector.detect().firstOrNull {
+                it.kind == PatternKind.TEMPORAL_RELATIVE &&
+                    it.signatureJson.contains("\"relation\":\"month_start\"")
+            },
+        )
+    }
+
+    @Test
+    fun `temporal relative requires distinct months for first-of-month`() {
+        val laterClock = Clock.fixed(Instant.parse("2026-05-20T12:00:00Z"), ZoneOffset.UTC)
+        val laterDetector = PatternDetector(boxStore, laterClock, zoneId = ZoneOffset.UTC)
+        repeat(3) { putEntry(timestamp = Instant.parse("2026-05-01T09:00:00Z")) }
+
+        assertNull(
+            laterDetector.detect().firstOrNull {
+                it.kind == PatternKind.TEMPORAL_RELATIVE &&
+                    it.signatureJson.contains("\"relation\":\"month_start\"")
+            },
+        )
+    }
 }

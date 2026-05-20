@@ -42,6 +42,7 @@ import dev.anchildress1.vestige.ui.components.VestigeBottomNav
 import dev.anchildress1.vestige.ui.components.VestigeSpinner
 import dev.anchildress1.vestige.ui.components.limeLeftRuleForActive
 import dev.anchildress1.vestige.ui.theme.VestigeTheme
+import java.util.Locale
 
 @Composable
 private fun LensTone.color(): Color {
@@ -51,6 +52,17 @@ private fun LensTone.color(): Color {
         LensTone.CONFLICT -> colors.coral
         LensTone.AMBIGUOUS -> colors.ember
         LensTone.CANDIDATE -> colors.teal
+    }
+}
+
+@Composable
+private fun statusTone(status: String): Color {
+    val colors = VestigeTheme.colors
+    return when (status) {
+        EntryDetailCopy.THREE_LENS_STATUS_CONFLICT -> colors.coral
+        EntryDetailCopy.THREE_LENS_STATUS_CANDIDATE -> colors.teal
+        EntryDetailCopy.THREE_LENS_STATUS_AMBIGUOUS -> colors.ember
+        else -> colors.lime
     }
 }
 
@@ -126,21 +138,24 @@ private fun EntryDetailContent(model: EntryDetailUiModel, onBack: () -> Unit, mo
             FollowUpCard(personaName = model.personaName, body = model.followUp)
         }
 
-        when {
-            model.extractionComplete -> {
-                ThreeLensRead()
-                FieldGrid()
+        when (model.extraction) {
+            ExtractionDisplay.COMPLETE -> {
+                ThreeLensRead(status = model.lensStatus, lenses = model.lenses)
+                FieldGrid(fields = model.fields)
             }
 
-            model.extractionFailed -> ExtractionFailedBand()
+            ExtractionDisplay.FAILED -> ExtractionFailedBand()
 
-            else -> {
+            ExtractionDisplay.NO_READ -> Unit
+
+            ExtractionDisplay.IN_PROGRESS -> {
                 ExtractingBand()
                 LensSkeletonRow()
                 FieldSkeletonGrid()
             }
         }
 
+        ObservationRows(model.observations)
         EntryTagsRow(tags = model.tags)
         // Transcript sits at the very bottom of the scroll, after the tags.
         TranscriptBlock(
@@ -172,7 +187,7 @@ private fun FollowUpCard(personaName: String, body: String) {
 }
 
 @Composable
-private fun ThreeLensRead() {
+private fun ThreeLensRead(status: String, lenses: List<LensRead>) {
     val colors = VestigeTheme.colors
     Column(
         modifier = Modifier.fillMaxWidth().testTag("entry_three_lens"),
@@ -187,19 +202,19 @@ private fun ThreeLensRead() {
             verticalAlignment = Alignment.CenterVertically,
         ) {
             EyebrowE(
-                text = EntryDetailSeed.THREE_LENS_EYEBROW,
+                text = EntryDetailCopy.THREE_LENS_EYEBROW,
                 modifier = Modifier.weight(1f),
                 color = colors.lime,
                 maxLines = 1,
                 softWrap = false,
             )
-            EyebrowE(text = EntryDetailSeed.THREE_LENS_STATUS, color = colors.coral, maxLines = 1)
+            EyebrowE(text = status, color = statusTone(status), maxLines = 1)
         }
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            EntryDetailSeed.lenses.forEach { lens ->
+            lenses.forEach { lens ->
                 Column(
                     modifier = Modifier.weight(1f),
                     verticalArrangement = Arrangement.spacedBy(4.dp),
@@ -213,7 +228,7 @@ private fun ThreeLensRead() {
 }
 
 @Composable
-private fun FieldGrid() {
+private fun FieldGrid(fields: List<FieldRow>) {
     val colors = VestigeTheme.colors
     Column(
         modifier = Modifier
@@ -222,7 +237,7 @@ private fun FieldGrid() {
             .testTag("entry_field_grid"),
         verticalArrangement = Arrangement.spacedBy(0.dp),
     ) {
-        EntryDetailSeed.fields.forEach { field ->
+        fields.forEach { field ->
             Row(
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 12.dp),
                 horizontalArrangement = Arrangement.spacedBy(10.dp),
@@ -247,6 +262,35 @@ private fun FieldGrid() {
 }
 
 @Composable
+private fun ObservationRows(observations: List<ObservationLine>) {
+    if (observations.isEmpty()) return
+    val colors = VestigeTheme.colors
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(colors.s1)
+            .testTag("entry_observations")
+            .semantics(mergeDescendants = true) { liveRegion = LiveRegionMode.Polite },
+        verticalArrangement = Arrangement.spacedBy(0.dp),
+    ) {
+        Column(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 12.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            EyebrowE(text = EntryDetailCopy.OBSERVATIONS_EYEBROW, color = colors.lime)
+            observations.forEach { line ->
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text(text = line.text, style = VestigeTheme.typography.p, color = colors.ink)
+                    observationMeta(line)?.let { meta ->
+                        EyebrowE(text = meta, color = colors.dim)
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
 private fun ExtractingBand() {
     val colors = VestigeTheme.colors
     Row(
@@ -257,7 +301,7 @@ private fun ExtractingBand() {
             .semantics(mergeDescendants = true) {
                 liveRegion = LiveRegionMode.Polite
                 contentDescription =
-                    "${EntryDetailSeed.EXTRACTING_EYEBROW}. ${EntryDetailSeed.EXTRACTING_BODY}"
+                    "${EntryDetailCopy.EXTRACTING_EYEBROW}. ${EntryDetailCopy.EXTRACTING_BODY}"
             }
             .padding(horizontal = 14.dp, vertical = 12.dp),
         horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -265,8 +309,8 @@ private fun ExtractingBand() {
     ) {
         VestigeSpinner()
         Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            EyebrowE(text = EntryDetailSeed.EXTRACTING_EYEBROW, color = colors.lime)
-            Text(text = EntryDetailSeed.EXTRACTING_BODY, style = VestigeTheme.typography.p, color = colors.dim)
+            EyebrowE(text = EntryDetailCopy.EXTRACTING_EYEBROW, color = colors.lime)
+            Text(text = EntryDetailCopy.EXTRACTING_BODY, style = VestigeTheme.typography.p, color = colors.dim)
         }
     }
 }
@@ -281,13 +325,13 @@ private fun ExtractionFailedBand() {
             .testTag("entry_extracting_failed")
             .semantics(mergeDescendants = true) {
                 liveRegion = LiveRegionMode.Polite
-                contentDescription = "${EntryDetailSeed.FAILED_EYEBROW}. ${EntryDetailSeed.FAILED_BODY}"
+                contentDescription = "${EntryDetailCopy.FAILED_EYEBROW}. ${EntryDetailCopy.FAILED_BODY}"
             }
             .padding(horizontal = 14.dp, vertical = 12.dp),
         verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
-        EyebrowE(text = EntryDetailSeed.FAILED_EYEBROW, color = colors.coral)
-        Text(text = EntryDetailSeed.FAILED_BODY, style = VestigeTheme.typography.p, color = colors.dim)
+        EyebrowE(text = EntryDetailCopy.FAILED_EYEBROW, color = colors.coral)
+        Text(text = EntryDetailCopy.FAILED_BODY, style = VestigeTheme.typography.p, color = colors.dim)
     }
 }
 
@@ -378,6 +422,20 @@ private fun TagChip(tag: String, color: Color) {
     ) {
         Text(text = tag, style = VestigeTheme.typography.eyebrow, color = color)
     }
+}
+
+private fun observationMeta(observation: ObservationLine): String? {
+    val evidence = observation.evidence
+        ?.replace('-', ' ')
+        ?.uppercase(Locale.ROOT)
+        ?.takeIf(String::isNotBlank)
+    val fields = observation.fields
+        .map(String::trim)
+        .filter(String::isNotEmpty)
+        .joinToString(", ")
+        .takeIf(String::isNotBlank)
+    val joined = listOfNotNull(evidence, fields).joinToString(" · ")
+    return joined.takeIf(String::isNotBlank)
 }
 
 private const val FIELD_LABEL_WEIGHT = 0.32f

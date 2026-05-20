@@ -11,6 +11,7 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
+import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -18,6 +19,7 @@ import dev.anchildress1.vestige.model.Persona
 import dev.anchildress1.vestige.model.ResolvedExtraction
 import dev.anchildress1.vestige.storage.EntryStore
 import dev.anchildress1.vestige.storage.MarkdownEntryStore
+import dev.anchildress1.vestige.storage.closeAfterCleaningThreadResources
 import dev.anchildress1.vestige.testing.cleanupObjectBoxTempRoot
 import dev.anchildress1.vestige.testing.newInMemoryObjectBoxDirectory
 import dev.anchildress1.vestige.testing.newModuleTempRoot
@@ -65,7 +67,11 @@ class HistoryHostTest {
 
     @After
     fun tearDown() {
-        boxStore.close()
+        composeRule.activityRule.scenario.close()
+        // Compose host tests still have ObjectBox readers owned by runner threads during @After.
+        // Clean thread locals first, then close the in-memory registry so later JVM tests do not
+        // inherit the stale store.
+        boxStore.closeAfterCleaningThreadResources()
         cleanupObjectBoxTempRoot(tempRoot, dataDir)
     }
 
@@ -87,13 +93,13 @@ class HistoryHostTest {
         composeRule.onNodeWithTag("history_row").assertIsDisplayed()
 
         composeRule.onNodeWithTag("history_row").performClick()
-        composeRule.waitForIdle()
+        waitForTag("entry_time")
         composeRule.onNodeWithTag("entry_time").assertIsDisplayed()
 
         composeRule.activity.runOnUiThread {
             composeRule.activity.onBackPressedDispatcher.onBackPressed()
         }
-        composeRule.waitForIdle()
+        waitForTag("history_row")
         composeRule.onNodeWithTag("history_row").assertIsDisplayed()
     }
 
@@ -134,7 +140,7 @@ class HistoryHostTest {
             )
         }
 
-        composeRule.waitForIdle()
+        waitForTag("entry_time")
         composeRule.onNodeWithTag("entry_time").assertIsDisplayed()
         assertTrue("openRequest should be consumed after routing", consumed)
     }
@@ -160,7 +166,7 @@ class HistoryHostTest {
         }
 
         composeRule.onNodeWithTag("history_row").performClick()
-        composeRule.waitForIdle()
+        waitForTag("entry_time")
         composeRule.onNodeWithTag("entry_time").assertIsDisplayed()
 
         composeRule.onNode(hasText("CAPTURE") and hasClickAction()).performClick()
@@ -168,8 +174,14 @@ class HistoryHostTest {
         composeRule.onNodeWithTag("outside_history").assertIsDisplayed()
 
         composeRule.runOnIdle { showingHistory.value = true }
-        composeRule.waitForIdle()
+        waitForTag("history_row")
         composeRule.onNodeWithTag("history_row").assertIsDisplayed()
+    }
+
+    private fun waitForTag(tag: String) {
+        composeRule.waitUntil(timeoutMillis = 5_000) {
+            composeRule.onAllNodesWithTag(tag).fetchSemanticsNodes().isNotEmpty()
+        }
     }
 
     private fun seedCompleted(text: String, timestampEpochMs: Long): Long {

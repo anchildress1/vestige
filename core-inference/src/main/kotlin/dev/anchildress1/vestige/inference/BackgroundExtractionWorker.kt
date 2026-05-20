@@ -88,14 +88,13 @@ class BackgroundExtractionWorker(
                 }
                 completeRun(results, request.entryAttemptCount, request.capturedAt, started, listener)
             }
-        } catch (timeout: TimeoutCancellationException) {
+        } catch (_: TimeoutCancellationException) {
             handleTimeout(
                 completed = completed.toList(),
                 entryAttemptCount = request.entryAttemptCount,
                 startedNanos = started,
                 timeoutMs = request.timeoutMs ?: 0L,
                 listener = listener,
-                cause = timeout,
             )
         }
     }
@@ -153,7 +152,7 @@ class BackgroundExtractionWorker(
 
     private fun recoverFromLensFailure(lens: Lens, attempt: Int, error: Throwable): AttemptOutcome {
         val reason = "engine-error:${error.javaClass.simpleName}"
-        Log.w(TAG, "lens=$lens attempt=$attempt failed (${error.message ?: reason})")
+        Log.w(TAG, "lens=$lens attempt=$attempt failed ($reason)")
         return AttemptOutcome(raw = "", error = reason)
     }
 
@@ -193,7 +192,11 @@ class BackgroundExtractionWorker(
 
             else -> {
                 val terminalError = (resolved as? Resolution.Failure)?.error
-                    ?: requireNotNull(lensLastError)
+                    ?: lensLastError
+                    ?: run {
+                        Log.e(TAG, "extract: all lenses returned null extraction with no recorded error")
+                        "all-lenses-exhausted"
+                    }
                 Log.w(
                     TAG,
                     "extract failed (model_calls=$modelCallCount " +
@@ -216,7 +219,7 @@ class BackgroundExtractionWorker(
         throw cancellation
     } catch (@Suppress("TooGenericExceptionCaught") resolverError: Exception) {
         val terminalError = "resolver-error:${resolverError.javaClass.simpleName}"
-        Log.w(TAG, "resolver failed (${resolverError.message ?: terminalError}); prior last_error=$currentLastError")
+        Log.w(TAG, "resolver failed ($terminalError); prior last_error=$currentLastError")
         Resolution.Failure(terminalError)
     }
 
@@ -232,11 +235,10 @@ class BackgroundExtractionWorker(
         startedNanos: Long,
         timeoutMs: Long,
         listener: ExtractionStatusListener,
-        cause: TimeoutCancellationException,
     ): BackgroundExtractionResult.TimedOut {
         val totalElapsedMs = (System.nanoTime() - startedNanos) / NANOS_PER_MILLI
         val terminalError = "timeout-after-${timeoutMs}ms"
-        Log.w(TAG, "extract timed out (${cause.message ?: terminalError})")
+        Log.w(TAG, "extract timed out ($terminalError)")
         listener.onUpdate(ExtractionStatus.TIMED_OUT, entryAttemptCount, terminalError)
         return BackgroundExtractionResult.TimedOut(
             totalElapsedMs = totalElapsedMs,

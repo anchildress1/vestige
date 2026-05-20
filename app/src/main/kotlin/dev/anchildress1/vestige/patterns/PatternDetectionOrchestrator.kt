@@ -1,11 +1,15 @@
 package dev.anchildress1.vestige.patterns
 
 import android.util.Log
+import dev.anchildress1.vestige.inference.PatternAnalysisGenerator
+import dev.anchildress1.vestige.inference.PatternAnalysisResult
+import dev.anchildress1.vestige.inference.PatternEvidenceEntry
 import dev.anchildress1.vestige.inference.PatternTitleGenerator
 import dev.anchildress1.vestige.model.DetectedPattern
 import dev.anchildress1.vestige.model.EntryObservation
 import dev.anchildress1.vestige.model.ExtractionStatus
 import dev.anchildress1.vestige.model.ObservationEvidence
+import dev.anchildress1.vestige.model.PatternKind
 import dev.anchildress1.vestige.model.PatternState
 import dev.anchildress1.vestige.model.Persona
 import dev.anchildress1.vestige.storage.CalloutCooldownStore
@@ -16,6 +20,7 @@ import dev.anchildress1.vestige.storage.PatternDetector
 import dev.anchildress1.vestige.storage.PatternEntity
 import dev.anchildress1.vestige.storage.PatternMatcher
 import dev.anchildress1.vestige.storage.PatternStore
+import dev.anchildress1.vestige.storage.callClosingThreadResources
 import io.objectbox.BoxStore
 import io.objectbox.query.QueryBuilder
 import kotlinx.coroutines.CancellationException
@@ -26,9 +31,10 @@ import java.time.ZoneId
  * Wiring layer called by `BackgroundExtractionSaveFlow` after `completeEntry` so the new entry
  * is already persisted with its tags + template label. Two side effects:
  *
- * 1. Every 10th entry, run [PatternDetector] + upsert results into [PatternStore]. New patterns
- *    get a model-generated title (one short call via [PatternTitleGenerator]); existing rows
- *    update their supporting set and `lastSeenTimestamp` per ADR-003 step 6.
+ * 1. Every [DETECTION_INTERVAL]th entry, run [PatternDetector] + upsert results into [PatternStore]. New
+ *    temporal patterns get a model-generated title from [PatternAnalysisGenerator], falling back to
+ *    [PatternTitleGenerator], then a deterministic name. Existing rows update their supporting set
+ *    and `lastSeenTimestamp`.
  * 2. Select one matching active pattern for the committed entry (subject to the global 3-entry
  *    callout cooldown). When a callout fires, append a `PATTERN_CALLOUT` observation to the
  *    entry and record the firing.
@@ -42,6 +48,7 @@ class PatternDetectionOrchestrator(
     private val detector: PatternDetector,
     private val patternStore: PatternStore,
     private val titleGenerator: PatternTitleGenerator,
+    private val analysisGenerator: PatternAnalysisGenerator? = null,
     private val cooldownStore: CalloutCooldownStore,
     private val clock: Clock = Clock.systemUTC(),
     private val zoneId: ZoneId = ZoneId.systemDefault(),
@@ -95,24 +102,35 @@ class PatternDetectionOrchestrator(
             return
         }
         val current = promoteSnoozedIfExpired(existing) ?: existing
+        val analysis = analysisGenerator.generatePatternAnalysis(detected, supportingEntries, persona)
         // Wrap the read-modify-write of supportingEntries in a tx so concurrent save calls
         // can't lose-update each other's evidence sets. ObjectBox tx is read-write-isolated.
         boxStore.runInTx {
-            applySupportingAndCallout(current, detected, supportingEntries)
+            applySupportingAndCallout(current, detected, supportingEntries, analysis)
             patternStore.put(current)
         }
     }
 
-    private suspend fun insertNewActive(detected: DetectedPattern, supporting: List<EntryEntity>, persona: Persona) {
-        val title = titleGenerator
+    private suspend fun insertNewActive(
+        detected: DetectedPattern,
+        supporting: List<SupportingEntry>,
+        persona: Persona,
+    ) {
+        val analysis = analysisGenerator.generatePatternAnalysis(detected, supporting, persona)
+        val title = analysis?.title ?: titleGenerator
             .runCatching { generate(persona, detected) }
             .getOrElse {
                 if (it is CancellationException) throw it
-                Log.w(TAG, "title generator threw ${it.javaClass.simpleName}: ${it.message}")
+                Log.w(
+                    TAG,
+                    "title generator failed id=${detected.patternId}" +
+                        " persona=${persona.name}: ${it.javaClass.simpleName}",
+                )
                 null
             }
             ?: deterministicFallbackTitle(detected)
-        val callout = PatternCalloutText.build(detected)
+        logDegradedIfTemporal(detected, analysis)
+        val callout = analysis?.calloutText ?: PatternCalloutText.build(detected)
         val now = clock.millis()
         val entity = PatternEntity(
             patternId = detected.patternId,
@@ -132,7 +150,7 @@ class PatternDetectionOrchestrator(
             patternStore.put(entity)
             val saved = patternStore.findByPatternId(detected.patternId) ?: return@runInTx
             saved.supportingEntries.clear()
-            saved.supportingEntries.addAll(supporting)
+            saved.supportingEntries.addAll(supporting.map { it.entity })
             patternStore.put(saved)
         }
     }
@@ -141,25 +159,27 @@ class PatternDetectionOrchestrator(
         val expired = pattern.state == PatternState.SNOOZED &&
             pattern.snoozedUntil != null &&
             clock.millis() >= pattern.snoozedUntil!!
-        // Route through the validator chokepoint — ADR-003 §"Auto-promotion of snoozed → active"
-        // is an explicit transition and must be auditable via `PatternStore.transitionState`.
+        // Route through the validator chokepoint — transitions must be auditable via
+        // PatternStore.transitionState, not mutated in place.
         return if (expired) patternStore.transitionState(pattern.patternId, PatternState.ACTIVE) else null
     }
 
     private fun applySupportingAndCallout(
         pattern: PatternEntity,
         detected: DetectedPattern,
-        supporting: List<EntryEntity>,
+        supporting: List<SupportingEntry>,
+        analysis: PatternAnalysisResult?,
     ) {
         pattern.lastSeenTimestamp = detected.lastSeenTimestamp
         pattern.supportingEntries.clear()
-        pattern.supportingEntries.addAll(supporting)
-        // ADR-003 step 6: `latestCalloutText` updates on the ACTIVE branch only. The silent-update
-        // branches (snoozed within window, dismissed, resolved) accumulate supporting entries but
-        // freeze the callout the user last saw — re-surfacing in v1.5 must show that string,
-        // not arbitrary drift from later evidence.
+        pattern.supportingEntries.addAll(supporting.map { it.entity })
+        // `latestCalloutText` updates only on the ACTIVE branch. Non-active branches accumulate
+        // supporting entries but freeze the callout string the user last saw — re-surfacing must
+        // show that version, not later drift.
         if (pattern.state == PatternState.ACTIVE) {
-            pattern.latestCalloutText = PatternCalloutText.build(detected)
+            logDegradedIfTemporal(detected, analysis)
+            if (analysis != null) pattern.title = analysis.title
+            pattern.latestCalloutText = analysis?.calloutText ?: PatternCalloutText.build(detected)
         }
     }
 
@@ -191,15 +211,20 @@ class PatternDetectionOrchestrator(
         val candidates = patternStore.findActive()
             .filter { PatternMatcher.matches(entry, it, zoneId) }
         return candidates.sortedWith(
-            compareByDescending<PatternEntity> { it.supportingEntries.size }
+            compareByDescending<PatternEntity> { it.kind == PatternKind.TEMPORAL_RELATIVE }
+                .thenByDescending { it.supportingEntries.size }
                 .thenByDescending { it.lastSeenTimestamp },
         ).firstOrNull()
     }
 
-    private fun loadSupporting(ids: List<Long>): List<EntryEntity> {
+    private fun loadSupporting(ids: List<Long>): List<SupportingEntry> {
         if (ids.isEmpty()) return emptyList()
-        val box = boxStore.boxFor(EntryEntity::class.java)
-        return ids.mapNotNull { box.get(it) }
+        return boxStore.callClosingThreadResources {
+            val box = boxStore.boxFor(EntryEntity::class.java)
+            // Resolve `tags` (a lazy ToMany) here while the reader is open. A detached entity
+            // read later reopens a thread reader the enclosing close was meant to reclaim.
+            ids.mapNotNull { id -> box.get(id)?.let { SupportingEntry(it, it.toPatternEvidence()) } }
+        }
     }
 
     companion object {
@@ -210,14 +235,54 @@ class PatternDetectionOrchestrator(
     }
 }
 
-private fun completedEntryCount(boxStore: BoxStore): Long = boxStore.boxFor(EntryEntity::class.java)
-    .query()
-    .equal(EntryEntity_.extractionStatus, ExtractionStatus.COMPLETED.name, QueryBuilder.StringOrder.CASE_SENSITIVE)
-    .build()
-    .use { it.count() }
+private fun completedEntryCount(boxStore: BoxStore): Long = boxStore.callClosingThreadResources {
+    boxStore.boxFor(EntryEntity::class.java)
+        .query()
+        .equal(EntryEntity_.extractionStatus, ExtractionStatus.COMPLETED.name, QueryBuilder.StringOrder.CASE_SENSITIVE)
+        .build()
+        .use { it.count() }
+}
+
+// A TEMPORAL_RELATIVE pattern that lands on the deterministic callout means model analysis
+// failed or was rejected (the generator already logged the specific reason). Surface the
+// degraded outcome so a canned-looking callout is traceable to a real fallback, not silence.
+private fun logDegradedIfTemporal(detected: DetectedPattern, analysis: PatternAnalysisResult?) {
+    if (detected.kind == PatternKind.TEMPORAL_RELATIVE && analysis == null) {
+        Log.w("VestigePatternOrch", "pattern ${detected.patternId} callout degraded to deterministic fallback")
+    }
+}
 
 private fun deterministicFallbackTitle(detected: DetectedPattern): String {
     val source = detected.templateLabel ?: detected.kind.serial.replace('_', ' ')
     return source.replaceFirstChar { it.titlecase() }
         .take(PatternDetectionOrchestrator.MAX_TITLE_CHARS)
 }
+
+private suspend fun PatternAnalysisGenerator?.generatePatternAnalysis(
+    detected: DetectedPattern,
+    supporting: List<SupportingEntry>,
+    persona: Persona,
+): PatternAnalysisResult? {
+    if (detected.kind != PatternKind.TEMPORAL_RELATIVE) return null
+    return this
+        ?.runCatching { generate(persona, detected, supporting.map { it.evidence }) }
+        ?.getOrElse {
+            if (it is CancellationException) throw it
+            Log.w(
+                "VestigePatternOrch",
+                "pattern analysis failed id=${detected.patternId}" +
+                    " kind=${detected.kind.serial}: ${it.javaClass.simpleName}",
+            )
+            null
+        }
+}
+
+private class SupportingEntry(val entity: EntryEntity, val evidence: PatternEvidenceEntry)
+
+private fun EntryEntity.toPatternEvidence(): PatternEvidenceEntry = PatternEvidenceEntry(
+    id = id,
+    timestampEpochMs = timestampEpochMs,
+    text = entryText,
+    tags = tags.map { it.name },
+    templateLabel = templateLabel?.serial,
+)

@@ -123,7 +123,7 @@ class ConvergenceResolverTest {
     }
 
     @Test
-    fun `all three lenses null on a nullable field resolves to canonical with null value`() {
+    fun `all three lenses null on a nullable field resolves to ambiguous with null value`() {
         val literal = LensExtraction(Lens.LITERAL, fields = mapOf("recurrence_link" to null))
         val inferential = LensExtraction(Lens.INFERENTIAL, fields = mapOf("recurrence_link" to null))
         val skeptical = LensExtraction(Lens.SKEPTICAL, fields = mapOf("recurrence_link" to null))
@@ -131,7 +131,7 @@ class ConvergenceResolverTest {
         val resolved = resolver.resolve(listOf(literal, inferential, skeptical))
 
         assertEquals(
-            ResolvedField(value = null, verdict = ConfidenceVerdict.CANONICAL),
+            ResolvedField(value = null, verdict = ConfidenceVerdict.AMBIGUOUS),
             resolved.fields["recurrence_link"],
         )
     }
@@ -176,6 +176,48 @@ class ConvergenceResolverTest {
         assertEquals(
             ResolvedField(value = null, verdict = ConfidenceVerdict.AMBIGUOUS),
             resolved.fields["template_label"],
+        )
+    }
+
+    @Test
+    fun `skeptical-only contradicted field does not mint a candidate`() {
+        val flag = "state-behavior-mismatch:fine:claims fine but described as stalled"
+        val literal = LensExtraction(Lens.LITERAL, fields = mapOf("energy_descriptor" to null))
+        val inferential = LensExtraction(Lens.INFERENTIAL, fields = mapOf("energy_descriptor" to null))
+        val skeptical = LensExtraction(
+            Lens.SKEPTICAL,
+            fields = mapOf("energy_descriptor" to "fine"),
+            flags = listOf(flag),
+        )
+
+        val resolved = resolver.resolve(listOf(literal, inferential, skeptical))
+        assertEquals(
+            ResolvedField(
+                value = null,
+                verdict = ConfidenceVerdict.AMBIGUOUS,
+                flags = listOf(flag),
+            ),
+            resolved.fields["energy_descriptor"],
+        )
+    }
+
+    @Test
+    fun `tag majority ignores separator drift and keeps first surface form`() {
+        val literal = LensExtraction(
+            Lens.LITERAL,
+            fields = mapOf("tags" to listOf("re-organizing-photo-library")),
+        )
+        val inferential = LensExtraction(
+            Lens.INFERENTIAL,
+            fields = mapOf("tags" to listOf("reorganizing-photo-library")),
+        )
+        val skeptical = LensExtraction(Lens.SKEPTICAL, fields = mapOf("tags" to listOf("other-tag")))
+
+        val resolved = resolver.resolve(listOf(literal, inferential, skeptical))
+
+        assertEquals(
+            ResolvedField(value = listOf("re-organizing-photo-library"), verdict = ConfidenceVerdict.CANONICAL),
+            resolved.fields["tags"],
         )
     }
 
@@ -261,7 +303,7 @@ class ConvergenceResolverTest {
     }
 
     @Test
-    fun `tags all empty resolves to canonical empty list`() {
+    fun `tags all empty resolves to ambiguous null`() {
         val literal = LensExtraction(Lens.LITERAL, fields = mapOf("tags" to emptyList<String>()))
         val inferential = LensExtraction(Lens.INFERENTIAL, fields = mapOf("tags" to emptyList<String>()))
         val skeptical = LensExtraction(Lens.SKEPTICAL, fields = mapOf("tags" to null))
@@ -269,8 +311,44 @@ class ConvergenceResolverTest {
         val resolved = resolver.resolve(listOf(literal, inferential, skeptical))
 
         assertEquals(
-            ResolvedField(value = emptyList<String>(), verdict = ConfidenceVerdict.CANONICAL),
+            ResolvedField(value = null, verdict = ConfidenceVerdict.AMBIGUOUS),
             resolved.fields["tags"],
+        )
+    }
+
+    @Test
+    fun `false booleans and empty lists do not count as corroborating evidence`() {
+        val literal = LensExtraction(
+            Lens.LITERAL,
+            fields = mapOf(
+                "state_shift" to false,
+                "vocabulary_contradictions" to emptyList<String>(),
+            ),
+        )
+        val inferential = LensExtraction(
+            Lens.INFERENTIAL,
+            fields = mapOf(
+                "state_shift" to false,
+                "vocabulary_contradictions" to emptyList<String>(),
+            ),
+        )
+        val skeptical = LensExtraction(
+            Lens.SKEPTICAL,
+            fields = mapOf(
+                "state_shift" to false,
+                "vocabulary_contradictions" to emptyList<String>(),
+            ),
+        )
+
+        val resolved = resolver.resolve(listOf(literal, inferential, skeptical))
+
+        assertEquals(
+            ResolvedField(value = null, verdict = ConfidenceVerdict.AMBIGUOUS),
+            resolved.fields["state_shift"],
+        )
+        assertEquals(
+            ResolvedField(value = null, verdict = ConfidenceVerdict.AMBIGUOUS),
+            resolved.fields["vocabulary_contradictions"],
         )
     }
 
@@ -516,6 +594,42 @@ class ConvergenceResolverTest {
                 value = mapOf(
                     "text" to "do the thing later",
                     "topic_or_person" to null,
+                ),
+                verdict = ConfidenceVerdict.CANONICAL,
+            ),
+            resolved.fields["stated_commitment"],
+        )
+    }
+
+    @Test
+    fun `commitments with one missing topic adopt the agreed non-null topic`() {
+        val literal = LensExtraction(
+            Lens.LITERAL,
+            fields = mapOf(
+                "stated_commitment" to mapOf(
+                    "text" to "drop the package off today",
+                    "topic_or_person" to null,
+                ),
+            ),
+        )
+        val inferential = LensExtraction(
+            Lens.INFERENTIAL,
+            fields = mapOf(
+                "stated_commitment" to mapOf(
+                    "text" to "drop the package off today",
+                    "topic_or_person" to "package",
+                ),
+            ),
+        )
+        val skeptical = LensExtraction(Lens.SKEPTICAL, fields = mapOf("stated_commitment" to null))
+
+        val resolved = resolver.resolve(listOf(literal, inferential, skeptical))
+
+        assertEquals(
+            ResolvedField(
+                value = mapOf(
+                    "text" to "drop the package off today",
+                    "topic_or_person" to "package",
                 ),
                 verdict = ConfidenceVerdict.CANONICAL,
             ),

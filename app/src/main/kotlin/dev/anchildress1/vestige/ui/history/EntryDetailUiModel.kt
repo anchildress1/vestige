@@ -1,9 +1,8 @@
 package dev.anchildress1.vestige.ui.history
 
-import android.util.Log
 import dev.anchildress1.vestige.model.ExtractionStatus
 import dev.anchildress1.vestige.storage.EntryEntity
-import org.json.JSONArray
+import dev.anchildress1.vestige.storage.lensReceiptsJsonOrEmpty
 import java.time.ZoneId
 
 /** Immutable UI projection for a single entry detail. */
@@ -13,60 +12,69 @@ data class EntryDetailUiModel(
     val dateLabel: String,
     val filedTimeLabel: String,
     val entryNumberLabel: String,
-    val templateLabel: String?,
     val audioLabel: String,
     val wordCount: Int,
     val transcription: String,
     val followUp: String?,
     val personaName: String,
     val energyDescriptor: String?,
+    val lensStatus: String,
+    val lenses: List<LensRead>,
+    val fields: List<FieldRow>,
     val observations: List<ObservationLine>,
     val tags: List<String>,
-    /** Until the 3-lens extraction resolves the screen shows the spinner/skeleton state. */
-    val extractionComplete: Boolean = true,
-    val extractionFailed: Boolean = false,
+    /** One closed state — the screen can't render an extraction that is both complete and failed. */
+    val extraction: ExtractionDisplay = ExtractionDisplay.COMPLETE,
 ) {
     companion object {
-        fun from(entity: EntryEntity, zoneId: ZoneId): EntryDetailUiModel = EntryDetailUiModel(
-            id = entity.id,
-            timeOfDayLabel = HistoryDateFormatter.formatClock12(entity.timestampEpochMs, zoneId),
-            dateLabel = HistoryDateFormatter.formatFullDate(entity.timestampEpochMs, zoneId),
-            filedTimeLabel = HistoryDateFormatter.formatTimeOnly(entity.timestampEpochMs, zoneId),
-            entryNumberLabel = "${EntryDetailCopy.ENTRY_NUMBER_PREFIX}${entity.id}",
-            templateLabel = entity.templateLabel?.serial?.uppercase(),
-            audioLabel = HistoryDurationFormatter.format(entity.durationMs),
-            wordCount = entity.entryText.trim().split("\\s+".toRegex()).count { it.isNotEmpty() },
-            transcription = entity.entryText,
-            followUp = entity.followUpText?.takeIf(String::isNotBlank),
-            personaName = entity.persona.name,
-            energyDescriptor = entity.energyDescriptor,
-            observations = parseObservations(entity.entryObservationsJson),
-            tags = entity.tags.map { it.name }.sorted(),
-            extractionComplete = entity.extractionStatus == ExtractionStatus.COMPLETED,
-            extractionFailed = entity.extractionStatus == ExtractionStatus.FAILED ||
-                entity.extractionStatus == ExtractionStatus.TIMED_OUT,
-        )
+        fun from(entity: EntryEntity, zoneId: ZoneId): EntryDetailUiModel {
+            val hasLensReceiptPayload = entity.lensReceiptsJsonOrEmpty != "[]"
+            return EntryDetailUiModel(
+                id = entity.id,
+                timeOfDayLabel = HistoryDateFormatter.formatClock12(entity.timestampEpochMs, zoneId),
+                dateLabel = HistoryDateFormatter.formatFullDate(entity.timestampEpochMs, zoneId),
+                filedTimeLabel = HistoryDateFormatter.formatTimeOnly(entity.timestampEpochMs, zoneId),
+                entryNumberLabel = "${EntryDetailCopy.ENTRY_NUMBER_PREFIX}${entity.id}",
+                audioLabel = HistoryDurationFormatter.format(entity.durationMs),
+                wordCount = entity.entryText.trim().split("\\s+".toRegex()).count { it.isNotEmpty() },
+                transcription = entity.entryText,
+                followUp = entity.followUpText?.takeIf(String::isNotBlank),
+                personaName = entity.persona.name,
+                energyDescriptor = entity.energyDescriptor,
+                lensStatus = lensStatus(entity.confidenceJson),
+                lenses = buildLensReads(entity.lensReceiptsJson),
+                fields = buildFieldRows(entity),
+                observations = parseObservations(entity.entryObservationsJson),
+                tags = entity.tags.map { it.name }.sorted(),
+                extraction = when (entity.extractionStatus) {
+                    // COMPLETED with no receipt payload → NO_READ (no lens section). A row whose
+                    // receipt column predates this schema reads the same; legacy rows are dev-only
+                    // (prerelease, no backward-compat) so they get no distinct state.
+                    ExtractionStatus.COMPLETED ->
+                        if (hasLensReceiptPayload) {
+                            ExtractionDisplay.COMPLETE
+                        } else {
+                            ExtractionDisplay.NO_READ
+                        }
 
-        private fun parseObservations(json: String): List<ObservationLine> {
-            if (json.isBlank() || json.trim() == "[]") return emptyList()
-            return runCatching {
-                val array = JSONArray(json)
-                (0 until array.length()).mapNotNull { i ->
-                    val obj = array.optJSONObject(i)
-                    val text = obj?.optString("text")?.takeIf { it.isNotBlank() }
-                    text?.let { ObservationLine(it) }
-                }
-            }.getOrElse {
-                // Surfaced so an empty reading card is debuggable, but never the payload:
-                // observation text is private journal content (no-telemetry/privacy invariant).
-                Log.w("EntryDetailUiModel", "malformed entryObservationsJson (len=${json.length})")
-                emptyList()
-            }
+                    ExtractionStatus.FAILED, ExtractionStatus.TIMED_OUT -> ExtractionDisplay.FAILED
+
+                    ExtractionStatus.PENDING, ExtractionStatus.RUNNING -> ExtractionDisplay.IN_PROGRESS
+                },
+            )
         }
     }
 }
 
-data class ObservationLine(val text: String)
+enum class ExtractionDisplay { IN_PROGRESS, COMPLETE, FAILED, NO_READ }
+
+enum class LensTone { CANONICAL, CONFLICT, AMBIGUOUS, CANDIDATE }
+
+data class LensRead(val label: String, val value: String, val tone: LensTone)
+
+data class FieldRow(val label: String, val value: String, val tone: LensTone)
+
+data class ObservationLine(val text: String, val evidence: String? = null, val fields: List<String> = emptyList())
 
 sealed interface EntryDetailUiState {
     object Loading : EntryDetailUiState

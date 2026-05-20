@@ -19,42 +19,52 @@ class PatternStore(private val boxStore: BoxStore, private val clock: Clock = Cl
 
     private val box get() = boxStore.boxFor<PatternEntity>()
 
-    fun findByPatternId(patternId: String): PatternEntity? = box.query()
-        .equal(PatternEntity_.patternId, patternId, QueryBuilder.StringOrder.CASE_SENSITIVE)
-        .build()
-        .use { it.findFirst() }
+    fun findByPatternId(patternId: String): PatternEntity? = boxStore.callClosingThreadResources {
+        box.query()
+            .equal(PatternEntity_.patternId, patternId, QueryBuilder.StringOrder.CASE_SENSITIVE)
+            .build()
+            .use { it.findFirst() }
+    }
 
-    fun all(): List<PatternEntity> = box.all
+    fun all(): List<PatternEntity> = boxStore.callClosingThreadResources {
+        box.all
+    }
 
     /**
      * Query only ACTIVE rows — indexed lookup via the stored state serial. Used by the
      * orchestrator's per-entry callout selection, which otherwise paid for a full-table scan
      * on every committed entry.
      */
-    fun findActive(): List<PatternEntity> = box.query()
-        .equal(PatternEntity_.state, PatternState.ACTIVE.serial, QueryBuilder.StringOrder.CASE_SENSITIVE)
-        .build()
-        .use { it.find() }
+    fun findActive(): List<PatternEntity> = boxStore.callClosingThreadResources {
+        box.query()
+            .equal(PatternEntity_.state, PatternState.ACTIVE.serial, QueryBuilder.StringOrder.CASE_SENSITIVE)
+            .build()
+            .use { it.find() }
+    }
 
     /** ACTIVE rows ordered most-recently-seen first — drives the Patterns list card order. */
     fun findActiveSortedByLastSeen(): List<PatternEntity> = findActive().sortedByDescending { it.lastSeenTimestamp }
 
     /** Indexed lookup of `SNOOZED` rows — drives the cold-start skip wake-up sweep. */
-    fun findSnoozed(): List<PatternEntity> = box.query()
-        .equal(PatternEntity_.state, PatternState.SNOOZED.serial, QueryBuilder.StringOrder.CASE_SENSITIVE)
-        .build()
-        .use { it.find() }
+    fun findSnoozed(): List<PatternEntity> = boxStore.callClosingThreadResources {
+        box.query()
+            .equal(PatternEntity_.state, PatternState.SNOOZED.serial, QueryBuilder.StringOrder.CASE_SENSITIVE)
+            .build()
+            .use { it.find() }
+    }
 
     /**
      * All rows the Patterns list surfaces — ACTIVE / SNOOZED / CLOSED / DROPPED, ordered
      * most-recently-seen first. BELOW_THRESHOLD is an internal-only state per ADR-003 and stays
      * hidden. Callers slice by [PatternEntity.state] to render the status sections.
      */
-    fun findVisibleSortedByLastSeen(): List<PatternEntity> = box.all
-        .asSequence()
-        .filter { it.state != PatternState.BELOW_THRESHOLD }
-        .sortedByDescending { it.lastSeenTimestamp }
-        .toList()
+    fun findVisibleSortedByLastSeen(): List<PatternEntity> = boxStore.callClosingThreadResources {
+        box.all
+            .asSequence()
+            .filter { it.state != PatternState.BELOW_THRESHOLD }
+            .sortedByDescending { it.lastSeenTimestamp }
+            .toList()
+    }
 
     fun put(entity: PatternEntity): Long = box.put(entity)
 

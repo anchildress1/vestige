@@ -31,7 +31,7 @@ class PatternTitleGenerator(
         } catch (cancellation: CancellationException) {
             throw cancellation
         } catch (@Suppress("TooGenericExceptionCaught") error: Exception) {
-            Log.w(TAG, "title generation threw ${error.javaClass.simpleName}: ${error.message}")
+            Log.w(TAG, "title generation threw ${error.javaClass.simpleName}")
             return@withContext null
         }
         val cleaned = sanitize(raw) ?: return@withContext null

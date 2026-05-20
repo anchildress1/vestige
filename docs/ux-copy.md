@@ -256,15 +256,19 @@ extracting). Top → bottom: AppTop pill + hamburger; `← BACK`; the filed **ti
 - **Extracting:** `● EXTRACTING · 3 LENSES` with an animated spinner +
   "Convergence resolves in the background. Open the entry later for the full read.", and the
   lens/field areas render as skeletons.
+- **Unreadable receipt:** a stored lens receipt that exists but cannot be parsed reads
+  `unreadable` (coral / CONFLICT tone) instead of `not run` — a corrupt blob must not be
+  misrepresented as "the lens never ran".
+- **No receipt payload:** completed debug / seeded entries with no stored lens receipts omit the
+  three-lens read and field grid entirely. The detail page must not invent static `not run` /
+  empty-field data to make the comp look populated.
 
 Then `YOU · TRANSCRIPT` (dim user transcription), `▸ TAGS` chips, and the shared bottom nav
 (HISTORY active). No +NEW-ENTRY action (Capture tab covers it); no stat ribbon; no reading
 card.
 
-> _Final-polish note (2026-05-18):_ the 3-lens read + field grid + the extracting state have
-> no model backing yet. Their content is a temporary user-approved UI seed in
-> `EntryDetailSeed.kt` (overrides the AGENTS.md no-fiction guardrail for this screen only),
-> isolated so it's obvious and trivial to delete on real extraction wiring.
+> _Final-polish note (2026-05-19):_ the 3-lens read + field grid are wired from persisted
+> parsed lens receipts and resolved fields. Raw model responses are not stored.
 
 ---
 
@@ -374,7 +378,7 @@ Action button (top right) — persona-aware:
 - Hardass: **Run the numbers.**
 - Editor: **Audit my vocabulary.**
 
-Section headers (uppercase, mono eyebrow — one per non-empty section per `poc/screens-patterns.jsx`):
+Section headers (uppercase, mono eyebrow — one per non-empty section per `poc/patterns-final.png`):
 > ACTIVE
 > SKIPPED · ON HOLD
 > CLOSED · DONE
@@ -385,15 +389,16 @@ Filter chips (small, secondary text — Phase 4 polish on top of the section str
 
 Pattern card structure (top → bottom):
 
-> {AGENT-EMITTED LABEL — uppercase mono eyebrow, section-tone colored: lime active / ember skipped / teal closed-dropped}
+> {SEMANTIC LABEL — uppercase mono eyebrow, section-tone colored: lime active / ember skipped / teal closed-dropped}
 > **{Pattern name}**
 > {One-line observation}
 > {30-day TraceBar}
 > {N} of {M} entries · Last seen {date}
 
-> _Final-polish reconciliation (2026-05-18):_ the category label moved **above** the name and
-> renders as an uppercase tone-colored eyebrow per `poc/pattern-lifecycle-final.png`. Tone is
-> the section tone (the comp's per-card colors are sample variety, not a per-category palette).
+> _Data-slot reconciliation (2026-05-19):_ the eyebrow slot stays because it is part of the
+> `poc/pattern-lifecycle-final.png` layout. Current v1 binding is stored `pattern.kind`
+> because `template_label` is untrusted. If a redesigned, trusted `templateLabel` lands,
+> it may replace `pattern.kind` in this same slot. Never use screenshot sample copy.
 > The card is one shared `PatternCard` component so every surface stays identical.
 
 Card actions (per card, in overflow menu):
@@ -427,8 +432,7 @@ Empty states:
 Header:
 > **{Pattern name}**
 
-Subhead (agent-emitted template label):
-> {Crashed / Deep Space / Busy Stalling / Nonstop Spiral / Goblin Hours / Brain Dump}
+No inaccurate agent-emitted template label or archetype eyebrow appears in the UI. A future trusted semantic label may appear only where the POC layout has a label slot.
 
 Summary observation (one line, primary text):
 > {The card's one-line observation, expanded slightly with timing}
@@ -609,7 +613,7 @@ Section: **Persona**
 - Default persona: {Witness / Hardass / Editor}
 
 Section: **Data**
-- Export all entries (zip of markdown)
+- Export all entries (zip of markdown + stored data snapshot)
 - Delete all data
 
 Section: **Model**
@@ -622,7 +626,7 @@ Section: **About**
 - Source code (link to GitHub)
 - License
 
-> _Story 4.9 reconciliation:_ the screen header is `Settings.` (this section named no header string — derived to match the `Model status.` screen-header pattern). The **Model** section is a single **Model status** row that opens the Story 4.4 screen; Re-download / Delete model live there with their canonical confirm dialogs, so they are reached by delegation rather than duplicated here (one destructive-confirm implementation, per KISS / no-duplicate-flows). The **Persona** section lists the three names only (no descriptions — settings is not the onboarding pitch). Export uses the Storage Access Framework `CreateDocument` picker — no `FileProvider`, no storage permission (`AGENTS.md` storage constraint). Delete-all wipes ObjectBox (entry/pattern/tag/callout) + every markdown file + onboarding prefs, then returns to the first-run flow.
+> _Story 4.9 reconciliation:_ the screen header is `Settings.` (this section named no header string — derived to match the `Model status.` screen-header pattern). The **Model** section is a single **Model status** row that opens the Story 4.4 screen; Re-download / Delete model live there with their canonical confirm dialogs, so they are reached by delegation rather than duplicated here (one destructive-confirm implementation, per KISS / no-duplicate-flows). The **Persona** section lists the three names only (no descriptions — settings is not the onboarding pitch). Export uses the Storage Access Framework `CreateDocument` picker — no `FileProvider`, no storage permission (`AGENTS.md` storage constraint). The zip contains readable entry markdown plus `vestige-export.json`, a full stored-data snapshot for later recovery. Delete-all wipes ObjectBox (entry/pattern/tag/callout) + every markdown file + onboarding prefs, then returns to the first-run flow.
 
 > _Final-polish reconciliation (2026-05-18):_ shipped specifics on top of the above —
 > back eyebrow `← BACK · SETTINGS`; section eyebrows `PERSONA` / `DATA` / `MODEL` / `ABOUT`
@@ -689,7 +693,7 @@ Forbidden tooltips:
 |---|---|
 | Initial app load (model loading from disk) | `Loading.` |
 | First-run model download | `Downloading model.` *(see Onboarding 6)* |
-| Mid-session inference (after tap-stop, awaiting call-1 transcription) | *(no copy — a brief borderless spinner; see note below)* |
+| Mid-session inference (after tap-stop, awaiting call-1 transcription) | `Reading the entry.` |
 | Pattern recalculation after entry | *(silent, background — no copy unless it fails)* |
 | Roast generation | `Reading the file.` |
 | Settings save | *(silent — control state changes inline)* |
@@ -726,7 +730,7 @@ A short forbidden-copy list. If any of these end up in a build, it's a regressio
 - Skip duration is fixed at 7 days in v1.
 - Pattern closure is model-detected only. Users cannot manually resolve or close a pattern. Closed is earned by the data, not declared.
 - User-facing lifecycle actions are exactly two: Skip and Drop. No third option.
-- Export format is a zip of per-entry markdown files only. Rolled-up `.md` and PDF are v1.5+.
+- Export format is a zip with per-entry markdown plus `vestige-export.json` for ObjectBox rows, pattern links, vectors, cooldown state, and onboarding settings. Rolled-up `.md` and PDF are v1.5+.
 - No first-time mock data. Empty means empty; demo seed data is a dev/demo setup concern, not user-facing fiction.
-- Loading copy: `Reading the file.` for Roast generation. _(2026-05-18, ADR-014 §Addendum: single-entry capture no longer shows a `Reading the entry.` page — post-stop is a brief borderless spinner, then the app opens the entry's detail in History. The "Reading the entry." quotes in the Capture/Inference walkthroughs above are superseded.)_
+- Loading copy: `Reading the file.` for Roast generation.
 - No user name or handle in onboarding. Anonymity is on-brand and the feature didn't pass the demo-impact test. Handle system deferred to v1.5 (see `backlog.md`).

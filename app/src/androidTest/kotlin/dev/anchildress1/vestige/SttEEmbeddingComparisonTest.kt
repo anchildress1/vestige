@@ -9,6 +9,7 @@ import dev.anchildress1.vestige.storage.EntryEntity
 import dev.anchildress1.vestige.storage.RetrievalRepo
 import dev.anchildress1.vestige.storage.TagEntity
 import dev.anchildress1.vestige.storage.VestigeBoxStore
+import dev.anchildress1.vestige.storage.buildEmbeddingText
 import io.objectbox.BoxStore
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertTrue
@@ -76,10 +77,10 @@ class SttEEmbeddingComparisonTest {
                 entryText = source.entryText,
                 timestampEpochMs = source.capturedAt.toInstant().toEpochMilli(),
                 markdownFilename = "${source.id}.md",
-                vector = embedder(source.entryText),
             )
             entryBox.put(entry)
             entry.tags.addAll(source.tags.map { tagEntities.getValue(it) })
+            entry.vector = embedder(buildEmbeddingText(entry))
             entryBox.put(entry)
         }
     }

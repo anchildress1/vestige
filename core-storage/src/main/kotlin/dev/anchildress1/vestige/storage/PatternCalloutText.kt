@@ -6,13 +6,8 @@ import org.json.JSONObject
 import java.util.Locale
 
 /**
- * Deterministic callout-text builder per ADR-003 §"Pattern primitives (v1)" examples. ADR-003
- * caps pattern-engine work at one short model call per newly-active pattern (title only); the
- * callout text is templated from the signature + supporting count so it stays sourced by
- * construction (AGENTS.md guardrail 12) and never invents interpretive language.
- *
- * Persona-flavored variants live in `:core-inference` if v1.5 brings them in; for v1 the
- * templated string already mirrors the ADR's "Witness tone" examples.
+ * Deterministic callout-text builder. Text is templated from signature fields and supporting-entry
+ * count; it never invents language not derivable from the stored data.
  */
 object PatternCalloutText {
 
@@ -22,8 +17,7 @@ object PatternCalloutText {
         if (signature == null && detected.signatureJson.isNotBlank()) {
             android.util.Log.w(
                 "VestigeCalloutText",
-                "malformed signatureJson for ${detected.kind.serial}: " +
-                    detected.signatureJson.take(LOG_PREVIEW_CHARS),
+                "malformed signatureJson for ${detected.kind.serial} (len=${detected.signatureJson.length})",
             )
         }
         return when (detected.kind) {
@@ -32,6 +26,7 @@ object PatternCalloutText {
             PatternKind.TIME_OF_DAY_CLUSTER -> goblin(count)
             PatternKind.COMMITMENT_RECURRENCE -> commitment(signature, count)
             PatternKind.VOCAB_FREQUENCY -> vocab(signature, count)
+            PatternKind.TEMPORAL_RELATIVE -> temporal(signature, count)
         }
     }
 
@@ -61,10 +56,23 @@ object PatternCalloutText {
         return "'$token' appears across $count entries with multiple framings."
     }
 
+    private fun temporal(signature: JSONObject?, count: Int): String =
+        when (TemporalRelation.fromSerial(signature?.optString("relation"))) {
+            TemporalRelation.WEEKDAY_TIME_BLOCK -> {
+                val day = signature?.optString("day_of_week").orEmpty().humanize()
+                val block = signature?.optString("time_block").orEmpty()
+                "$count $day $block entries logged. Same slot keeps showing up."
+            }
+
+            TemporalRelation.MONTH_START -> {
+                "$count first-of-month entries logged. Same calendar edge keeps showing up."
+            }
+
+            null -> "$count time-relative entries logged. Same calendar slot keeps showing up."
+        }
+
     private fun String.humanize(): String {
         if (isEmpty()) return ""
         return split('-').joinToString(" ") { it.replaceFirstChar { ch -> ch.titlecase(Locale.ROOT) } }
     }
-
-    private const val LOG_PREVIEW_CHARS = 80
 }

@@ -1,6 +1,7 @@
 package dev.anchildress1.vestige.storage
 
 import dev.anchildress1.vestige.model.ConfidenceVerdict
+import dev.anchildress1.vestige.model.EntryLensReceipt
 import dev.anchildress1.vestige.model.EntryObservation
 import dev.anchildress1.vestige.model.ExtractionStatus
 import dev.anchildress1.vestige.model.Lens
@@ -134,7 +135,7 @@ class EntryStoreTest {
         assertEquals(ExtractionStatus.COMPLETED, row.extractionStatus)
         assertEquals(TemplateLabel.AFTERMATH, row.templateLabel)
         assertEquals("crashed", row.energyDescriptor)
-        assertEquals("a3f9c2b8d4e7f1a2", row.recurrenceLink)
+        assertEquals("a3f9c2b8d4e7f1a2b3c4d5e6f7890abc1234567890abcdef1234567890abcdef", row.recurrenceLink)
         assertNull(row.lastError)
 
         val tagNames = row.tags.map { it.name }.sorted()
@@ -151,6 +152,24 @@ class EntryStoreTest {
         val md = mdFile.readText()
         assertTrue("frontmatter should include template_label", md.contains("template_label: aftermath"))
         assertTrue("frontmatter should include tags", md.contains("  - tuesday-meeting"))
+    }
+
+    @Test
+    fun `completeEntry drops invalid recurrence sentinels instead of persisting them`() {
+        val id = entryStore.createPendingEntry(SAMPLE_TEXT, SAMPLE_INSTANT)
+        val resolved = ResolvedExtraction(
+            mapOf(
+                "recurrence_link" to ResolvedField("pattern_id_unavailable", ConfidenceVerdict.CANDIDATE),
+            ),
+        )
+
+        entryStore.completeEntry(id, resolved, TemplateLabel.AUDIT)
+
+        val row = boxStore.boxFor<EntryEntity>().get(id)
+        assertNull(row.recurrenceLink)
+        assertTrue(
+            File(File(markdownDir, "entries"), row.markdownFilename).readText().contains("recurrence_link: null"),
+        )
     }
 
     @Test
@@ -289,9 +308,7 @@ class EntryStoreTest {
         assertEquals(ConfidenceVerdict.AMBIGUOUS.name, confidence.getString("energy_descriptor"))
         assertEquals(ConfidenceVerdict.CANDIDATE.name, confidence.getString("recurrence_link"))
         assertNull(row.energyDescriptor)
-        // CANDIDATE tag values are still persisted as the row's recurrenceLink scalar — the
-        // pattern engine consults the verdict map before promoting them.
-        assertEquals("abc", row.recurrenceLink)
+        assertNull(row.recurrenceLink)
     }
 
     @Test
@@ -348,6 +365,40 @@ class EntryStoreTest {
         assertEquals("vocabulary_contradictions", first.getJSONArray("fields").getString(0))
         val second = array.getJSONObject(1)
         assertEquals("commitment-flag", second.getString("evidence"))
+    }
+
+    @Test
+    fun `completeEntry serializes lens receipts for sourceable entry read`() {
+        val id = entryStore.createPendingEntry(SAMPLE_TEXT, SAMPLE_INSTANT)
+        val receipts = listOf(
+            EntryLensReceipt(
+                lens = Lens.LITERAL,
+                extracted = true,
+                fields = mapOf("tags" to listOf("standup"), "energy_descriptor" to "flattened"),
+                attemptCount = 1,
+                elapsedMs = 900L,
+            ),
+            EntryLensReceipt(
+                lens = Lens.SKEPTICAL,
+                extracted = true,
+                fields = mapOf("energy_descriptor" to "flattened"),
+                flags = listOf("vocabulary-contradiction:fine:flattened"),
+                attemptCount = 1,
+                elapsedMs = 1_100L,
+            ),
+        )
+
+        entryStore.completeEntry(id, resolvedSample(), TemplateLabel.AFTERMATH, lensReceipts = receipts)
+
+        val row = boxStore.boxFor<EntryEntity>().get(id)
+        val decoded = EntryLensReceiptJson.decode(row.lensReceiptsJson)
+        assertEquals(2, decoded.size)
+        assertEquals(Lens.LITERAL, decoded[0].lens)
+        assertEquals("flattened", decoded[0].fields["energy_descriptor"])
+        assertEquals(listOf("vocabulary-contradiction:fine:flattened"), decoded[1].flags)
+
+        val mdFile = File(File(markdownDir, "entries"), row.markdownFilename)
+        assertTrue("markdown should include lens_receipts", mdFile.readText().contains("lens_receipts: ["))
     }
 
     @Test
@@ -433,7 +484,10 @@ class EntryStoreTest {
                 ConfidenceVerdict.CANONICAL,
             ),
             "energy_descriptor" to ResolvedField("crashed", ConfidenceVerdict.CANONICAL),
-            "recurrence_link" to ResolvedField("a3f9c2b8d4e7f1a2", ConfidenceVerdict.CANONICAL),
+            "recurrence_link" to ResolvedField(
+                "a3f9c2b8d4e7f1a2b3c4d5e6f7890abc1234567890abcdef1234567890abcdef",
+                ConfidenceVerdict.CANONICAL,
+            ),
             "stated_commitment" to ResolvedField(
                 mapOf(
                     "text" to "review the doc by Friday",

@@ -113,3 +113,27 @@ Refines the foreground/background boundary; does not supersede it.
 - The single synchronous touchpoint is still the foreground call; background 3-lens extraction stays invisible and unchanged.
 - `completeEntry` / `failEntry` contracts, the convergence resolver, and the pattern cadence are untouched.
 - `follow_up` remains immutable once an entry is terminal.
+
+### Addendum (2026-05-19) — Pattern cadence tightened and temporal wording added
+
+Refines the background-pattern lane; does not supersede the foreground/background split.
+
+**What changed:**
+
+- The pattern pass runs every **3 completed entries** in v1, not every 5. Three keeps temporal
+  recurrence visible as soon as a sourced pattern exists; five is too slow for the demo loop.
+- Temporal-relative patterns now get one best-effort background Gemma wording pass after the
+  deterministic detector has already selected the supporting entries. The model writes the
+  persisted title and latest callout text only; it does not decide whether the pattern exists.
+- Callout selection prefers temporal-relative active patterns over simpler deterministic matches
+  before falling back to supporting-entry count and recency.
+
+**What this does NOT change:**
+
+- The user still waits only for the foreground call.
+- LiteRT-LM still permits only one Gemma call at a time; this is queued background work, not
+  parallel inference.
+- Deterministic signatures, supporting entries, lifecycle states, and cooldown behavior remain
+  owned by ADR-003.
+- The model's role in pattern analysis (title + callout, no existence decision) is documented
+  in ADR-015, which supersedes the implicit scope boundary in this addendum.

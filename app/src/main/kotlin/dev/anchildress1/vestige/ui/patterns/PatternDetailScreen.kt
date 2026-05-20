@@ -3,10 +3,12 @@
 
 package dev.anchildress1.vestige.ui.patterns
 
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -26,6 +28,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.Role
@@ -38,6 +41,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.anchildress1.vestige.R
 import dev.anchildress1.vestige.model.PatternState
+import dev.anchildress1.vestige.ui.components.EyebrowE
 import dev.anchildress1.vestige.ui.components.VestigeListCard
 import dev.anchildress1.vestige.ui.components.VestigeListCardInteraction
 import dev.anchildress1.vestige.ui.components.VestigeScaffold
@@ -143,6 +147,8 @@ private fun LoadedBody(
 
         PatternSourcesCard(sources = loaded.sources, onOpenEntry = onOpenEntry)
 
+        PatternVocabularyCard(words = loaded.vocabulary)
+
         loaded.terminalLabel?.let { terminal ->
             val text = terminal.days
                 ?.let { stringResource(terminal.prefixRes, terminal.dateLabel, it) }
@@ -166,18 +172,45 @@ private fun LoadedBody(
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun PatternVocabularyCard(words: List<String>) {
+    if (words.isEmpty()) return
+    VestigeSurface(contentPadding = PaddingValues(16.dp)) {
+        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Text(
+                text = stringResource(R.string.pattern_detail_words_used),
+                style = MaterialTheme.typography.labelSmall,
+                color = VestigeTheme.colors.dim,
+            )
+            FlowRow(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                words.forEach { word -> VocabularyChip(word) }
+            }
+        }
+    }
+}
+
+@Composable
+private fun VocabularyChip(word: String) {
+    Box(
+        modifier = Modifier
+            .border(width = 1.dp, color = VestigeTheme.colors.faint, shape = RectangleShape)
+            .semantics { contentDescription = "word used: $word" }
+            .padding(horizontal = 10.dp, vertical = 4.dp),
+    ) {
+        Text(text = word, style = VestigeTheme.typography.eyebrow, color = VestigeTheme.colors.ink)
+    }
+}
+
 @Composable
 private fun PatternSummaryCard(loaded: PatternDetailUiState.Loaded) {
     VestigeSurface(contentPadding = PaddingValues(16.dp)) {
         Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Text(text = loaded.title, style = MaterialTheme.typography.headlineSmall)
-            loaded.templateLabel?.let {
-                Text(
-                    text = it,
-                    style = MaterialTheme.typography.labelLarge,
-                    color = VestigeTheme.colors.dim,
-                )
-            }
             Text(text = loaded.observation, style = MaterialTheme.typography.bodyLarge)
             // Count meta renders without a label — "Seen in:" is reserved for the sources card
             // heading below.
@@ -249,16 +282,31 @@ private fun SourceRow(source: PatternSourceUi, onClick: () -> Unit) {
         interaction = VestigeListCardInteraction.Click(onClick = onClick),
     ) {
         Row(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 12.dp, vertical = 10.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                EyebrowE(text = source.dateLabel, maxLines = 1, softWrap = false)
+                Text(
+                    text = source.snippet,
+                    style = MaterialTheme.typography.bodyMedium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
             Text(
-                text = source.dateLabel,
-                style = MaterialTheme.typography.bodyMedium,
+                text = "→",
+                style = MaterialTheme.typography.titleMedium,
                 color = VestigeTheme.colors.dim,
+                maxLines = 1,
+                softWrap = false,
             )
-            Text(text = "—", color = VestigeTheme.colors.dim)
-            Text(text = source.snippet, style = MaterialTheme.typography.bodyMedium)
         }
     }
 }

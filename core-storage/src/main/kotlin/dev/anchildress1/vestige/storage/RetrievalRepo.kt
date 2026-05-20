@@ -44,24 +44,32 @@ class RetrievalRepo(
         if (queryTerms.isEmpty()) return emptyList()
         val queryTokens = queryTerms.toSet()
 
-        val entryBox = boxStore.boxFor<EntryEntity>()
-        val tagBox = boxStore.boxFor<TagEntity>()
-        val storedTagKeys = tagBox.all.mapNotNullTo(linkedSetOf()) { QueryTagMatcher.storedKey(it.name) }
+        val (storedTagKeys, entries) = boxStore.callClosingThreadResources {
+            val entryBox = boxStore.boxFor<EntryEntity>()
+            val tagBox = boxStore.boxFor<TagEntity>()
+            RetrievalSnapshot(
+                storedTagKeys = tagBox.all.mapNotNullTo(linkedSetOf()) { QueryTagMatcher.storedKey(it.name) },
+                entries = entryBox.all.map { entry ->
+                    EntrySnapshot(
+                        entry = entry,
+                        tagKeys = entry.tags.mapNotNullTo(linkedSetOf()) { QueryTagMatcher.storedKey(it.name) },
+                    )
+                },
+            )
+        }
         val queryTagKeys = QueryTagMatcher.queryKeysMatching(queryTerms, storedTagKeys)
 
-        val entries: List<EntryEntity> = entryBox.all
-        // Defer embedding the query string until we know vector scoring will actually fire —
-        // skips the ~880 ms CPU embed cost on empty databases and during the backfill window
-        // when no entry has a stored vector yet.
-        val vectorScoringEnabled = embeddingWeight > 0f && entries.any { it.vector != null }
+        // Defer embedding the query string until we know vector scoring will actually fire:
+        // empty databases and backfill windows have nothing to score against.
+        val vectorScoringEnabled = embeddingWeight > 0f && entries.any { it.entry.vector != null }
         val queryVector: FloatArray? = if (vectorScoringEnabled) embedder(text) else null
 
         val nowMs = clock.millis()
-        val scored = entries.mapNotNull { entry ->
+        val scored = entries.mapNotNull { snapshot ->
+            val entry = snapshot.entry
             val entryTokens = tokenizeToList(entry.entryText).toSet()
             val keywordScore = jaccardishKeyword(queryTokens, entryTokens)
-            val entryTagKeys = entry.tags.mapNotNullTo(linkedSetOf()) { QueryTagMatcher.storedKey(it.name) }
-            val tagScore = jaccard(queryTagKeys, entryTagKeys)
+            val tagScore = jaccard(queryTagKeys, snapshot.tagKeys)
             // Clamp cosine at 0 — negative similarity means "explicitly dissimilar" on COSINE
             // distance, which should not contribute a match signal nor a positive score.
             val cosine: Double = if (queryVector != null && entry.vector != null) {
@@ -119,6 +127,10 @@ class RetrievalRepo(
     }
 
     private data class Scored(val entry: EntryEntity, val score: Double)
+
+    private data class RetrievalSnapshot(val storedTagKeys: Set<String>, val entries: List<EntrySnapshot>)
+
+    private data class EntrySnapshot(val entry: EntryEntity, val tagKeys: Set<String>)
 
     private companion object {
         const val DEFAULT_TOP_N = 3

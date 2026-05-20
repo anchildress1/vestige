@@ -76,16 +76,15 @@ class CaptureScreenTest {
     }
 
     @Test
-    fun `submitting state shows a spinner, not the old reading page`() {
+    fun `submitting state shows spinner plus processing helper copy`() {
         val vm = submittingViewModel()
         vm.startRecording()
         composeRule.setContent { VestigeTheme { captureScreen(vm) } }
-        // Chrome is present, but neither the idle hero nor the recording eyebrow — and the old
-        // "Reading the entry." review page is gone for good.
+        // Chrome is present, but neither the idle hero nor the recording eyebrow.
         composeRule.onNodeWithContentDescription("Gemma 4 local model. Local only.").assertIsDisplayed()
         composeRule.onAllNodesWithText("WHAT HAPPENED?", substring = true).assertCountEquals(0)
         composeRule.onAllNodesWithText(CaptureCopy.LIVE_RECORDING_EYEBROW).assertCountEquals(0)
-        composeRule.onAllNodesWithText("Reading the entry.").assertCountEquals(0)
+        composeRule.onNodeWithText("Reading the entry.").assertIsDisplayed()
     }
 
     @Test
@@ -115,7 +114,13 @@ class CaptureScreenTest {
         }
         vm.startRecording()
         composeRule.waitForIdle()
-        composeRule.runOnIdle { assertEquals(99L, openedEntryId) }
+        composeRule.runOnIdle {
+            assertEquals(99L, openedEntryId)
+            assertEquals(
+                CaptureUiState.Idle(persona = Persona.WITNESS, modelReadiness = ModelReadiness.Ready),
+                vm.state.value,
+            )
+        }
     }
 
     @Composable

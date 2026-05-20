@@ -158,18 +158,27 @@ class VectorBackfillWorker(private val boxStore: BoxStore, private val embedder:
         entryBox.put(entry)
     }
 
-    private fun pendingEmbeddingCount(): Long = pendingEmbeddingQuery().use { it.count() }
+    private fun pendingEmbeddingCount(): Long = boxStore.callClosingThreadResources {
+        pendingEmbeddingQuery().use { it.count() }
+    }
 
-    private fun pendingLegacyCleanupCount(): Long = pendingLegacyCleanupQuery().use { it.count() }
+    private fun pendingLegacyCleanupCount(): Long = boxStore.callClosingThreadResources {
+        pendingLegacyCleanupQuery().use { it.count() }
+    }
 
-    private fun loadEmbeddingBatch(afterIdExclusive: Long, limit: Long): List<EntryEntity> = pendingEmbeddingQuery(
-        afterIdExclusive = afterIdExclusive,
-    ).use { it.find(0, limit) }
+    private fun loadEmbeddingBatch(afterIdExclusive: Long, limit: Long): List<EntryEntity> =
+        boxStore.callClosingThreadResources {
+            pendingEmbeddingQuery(
+                afterIdExclusive = afterIdExclusive,
+            ).use { it.find(0, limit) }
+        }
 
     private fun loadLegacyCleanupBatch(afterIdExclusive: Long, limit: Long): List<EntryEntity> =
-        pendingLegacyCleanupQuery(
-            afterIdExclusive = afterIdExclusive,
-        ).use { it.find(0, limit) }
+        boxStore.callClosingThreadResources {
+            pendingLegacyCleanupQuery(
+                afterIdExclusive = afterIdExclusive,
+            ).use { it.find(0, limit) }
+        }
 
     private fun pendingEmbeddingQuery(afterIdExclusive: Long = 0L): Query<EntryEntity> =
         boxStore.boxFor<EntryEntity>().query()

@@ -258,4 +258,26 @@ class ObservationResponseParserTest {
         assertNotNull(observations)
         assertEquals(listOf("tags"), observations!!.first().fields)
     }
+
+    @Test
+    fun `commitment flag rejects mismatched field attribution`() {
+        val raw = """
+            {"observations":[
+              {"text":"You said you'd do it.","evidence":"commitment-flag","fields":["tags"]}
+            ]}
+        """.trimIndent()
+
+        assertNull(ObservationResponseParser.parse(raw))
+    }
+
+    @Test
+    fun `vocabulary contradiction requires its owning field`() {
+        val raw = """
+            {"observations":[
+              {"text":"You said \"fine\" and \"flat\".","evidence":"vocabulary-contradiction","fields":["tags"]}
+            ]}
+        """.trimIndent()
+
+        assertNull(ObservationResponseParser.parse(raw))
+    }
 }

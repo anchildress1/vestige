@@ -44,7 +44,7 @@ class PersonaToneSmokeTest {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         val engine = LiteRtLmEngine(
             modelPath = modelPath,
-            backend = BackendChoice.Cpu,
+            backend = BackendChoice.Gpu,
             cacheDir = context.cacheDir.absolutePath,
         )
 
@@ -55,6 +55,12 @@ class PersonaToneSmokeTest {
 
             val responses = Persona.entries.associateWith { persona ->
                 val systemPrompt = PersonaPromptComposer.compose(persona)
+                android.util.Log.i(TAG, "=== ${persona.name} prompt ===")
+                systemPrompt.chunked(LOG_CHUNK_SIZE).forEach { chunk ->
+                    android.util.Log.i(TAG, chunk)
+                }
+                android.util.Log.i(TAG, "=== ${persona.name} input ===")
+                android.util.Log.i(TAG, "User entry: $input")
                 it.generateText(systemPrompt, "User entry: $input")
             }
 
@@ -74,5 +80,6 @@ class PersonaToneSmokeTest {
 
     private companion object {
         const val TAG = "VestigeTone"
+        const val LOG_CHUNK_SIZE = 3500
     }
 }

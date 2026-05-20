@@ -122,7 +122,7 @@ class ObservationGenerator(
         // Native LiteRT-LM throws unchecked types we can't enumerate; the rest of the generator
         // treats a thrown attempt as "this attempt produced no usable text" and lets the retry
         // loop decide whether more attempts remain.
-        Log.w(TAG, "model attempt $attempt threw ${engineError.javaClass.simpleName}: ${engineError.message}")
+        Log.w(TAG, "model attempt $attempt threw ${engineError.javaClass.simpleName}")
         null
     }
 

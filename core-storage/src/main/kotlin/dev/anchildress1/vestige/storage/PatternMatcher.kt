@@ -22,8 +22,7 @@ object PatternMatcher {
         if (signature == null) {
             android.util.Log.w(
                 "VestigePatternMatcher",
-                "malformed signatureJson for patternId=${pattern.patternId}: " +
-                    pattern.signatureJson.take(LOG_PREVIEW_CHARS),
+                "malformed signatureJson for patternId=${pattern.patternId} (len=${pattern.signatureJson.length})",
             )
             return false
         }
@@ -33,6 +32,7 @@ object PatternMatcher {
             PatternKind.TIME_OF_DAY_CLUSTER -> matchesGoblin(entry, zoneId)
             PatternKind.COMMITMENT_RECURRENCE -> matchesCommitment(entry, signature)
             PatternKind.VOCAB_FREQUENCY -> matchesVocab(entry, signature)
+            PatternKind.TEMPORAL_RELATIVE -> matchesTemporal(entry, signature, zoneId)
         }
     }
 
@@ -77,7 +77,7 @@ object PatternMatcher {
         if (raw != null && commitment == null) {
             android.util.Log.w(
                 "VestigePatternMatcher",
-                "malformed statedCommitmentJson on entry id=${entry.id}: ${raw.take(LOG_PREVIEW_CHARS)}",
+                "malformed statedCommitmentJson on entry id=${entry.id} (len=${raw.length})",
             )
         }
         val topic = commitment?.optString("topic_or_person")?.trim()?.let(TagNormalize::kebab)
@@ -97,7 +97,24 @@ object PatternMatcher {
         return tagHit || textHit
     }
 
+    private fun matchesTemporal(entry: EntryEntity, signature: JSONObject, zoneId: ZoneId): Boolean {
+        val local = Instant.ofEpochMilli(entry.timestampEpochMs).atZone(zoneId)
+        return when (TemporalRelation.fromSerial(signature.optString("relation"))) {
+            TemporalRelation.WEEKDAY_TIME_BLOCK -> {
+                val dayOfWeek = local.dayOfWeek.name.lowercase(Locale.ROOT)
+                val timeBlock = TemporalPatternRules.timeBlockForHour(local.hour)
+                dayOfWeek == signature.optString("day_of_week") &&
+                    timeBlock == signature.optString("time_block")
+            }
+
+            TemporalRelation.MONTH_START -> {
+                local.dayOfMonth == signature.optInt("day_of_month", 0)
+            }
+
+            null -> false
+        }
+    }
+
     private val VOCAB_SPLIT: Regex = Regex("[^a-z0-9]+")
-    private const val LOG_PREVIEW_CHARS = 80
     private const val TAG_PAIR_SIZE = 2
 }

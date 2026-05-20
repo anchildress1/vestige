@@ -4,14 +4,20 @@ import dev.anchildress1.vestige.inference.BackgroundExtractionRequest
 import dev.anchildress1.vestige.inference.BackgroundExtractionResult
 import dev.anchildress1.vestige.inference.BackgroundExtractionWorker
 import dev.anchildress1.vestige.inference.ExtractionStatusListener
+import dev.anchildress1.vestige.inference.HistoryChunk
+import dev.anchildress1.vestige.inference.LensResult
 import dev.anchildress1.vestige.inference.ObservationGenerator
 import dev.anchildress1.vestige.model.ConfidenceVerdict
 import dev.anchildress1.vestige.model.EntryObservation
 import dev.anchildress1.vestige.model.ExtractionStatus
+import dev.anchildress1.vestige.model.Lens
+import dev.anchildress1.vestige.model.LensExtraction
 import dev.anchildress1.vestige.model.ObservationEvidence
 import dev.anchildress1.vestige.model.ResolvedExtraction
 import dev.anchildress1.vestige.model.ResolvedField
 import dev.anchildress1.vestige.model.TemplateLabel
+import dev.anchildress1.vestige.patterns.PatternDetectionOrchestrator
+import dev.anchildress1.vestige.storage.EntryEntity
 import dev.anchildress1.vestige.storage.EntryStore
 import io.mockk.coEvery
 import io.mockk.coVerify
@@ -31,6 +37,7 @@ import org.junit.jupiter.api.Assertions.fail
 import org.junit.jupiter.api.Test
 import java.time.ZoneId
 import java.time.ZonedDateTime
+import java.util.concurrent.atomic.AtomicInteger
 
 /**
  * The orchestrator's routing logic. The real EntryStore + BoxStore + markdown round-trip is
@@ -138,7 +145,7 @@ class BackgroundExtractionSaveFlowTest {
         // inside the same persistence transaction. With the two-tier refactor, the callout flows
         // through `appendObservation` instead of being returned on the save outcome.
         coVerifyOrder {
-            entryStore.completeEntry(ENTRY_ID, resolved, TemplateLabel.AFTERMATH, emptyList())
+            entryStore.completeEntry(ENTRY_ID, resolved, TemplateLabel.AFTERMATH, emptyList(), emptyList())
             orchestrator.onEntryCommitted(storedEntry, dev.anchildress1.vestige.model.Persona.WITNESS)
             entryStore.appendObservation(ENTRY_ID, callout, any())
             orchestrator.settleReservedCallout(storedEntry, fired = true)
@@ -146,45 +153,34 @@ class BackgroundExtractionSaveFlowTest {
     }
 
     @Test
-    fun `pattern orchestration keeps UI completion early and finalizes only after the append path settles`() = runTest {
+    fun `pattern orchestration detaches after terminal completion and reports callout append`() = runTest {
         val orchestrator = mockk<dev.anchildress1.vestige.patterns.PatternDetectionOrchestrator>()
         val downstream: ExtractionStatusListener = mockk(relaxed = true)
         val lifecycleEvents = mutableListOf<String>()
-        val flowWithOrch = BackgroundExtractionSaveFlow(
-            entryStore = entryStore,
-            worker = worker,
-            observationGenerator = observationGenerator,
+        val orchestrationStarted = CompletableDeferred<Unit>()
+        val releaseOrchestration = CompletableDeferred<Unit>()
+        val calloutAppendReported = CompletableDeferred<Unit>()
+        val flowWithOrch = buildPatternFlow(
+            orchestrator = orchestrator,
             lifecycleCallbacks = BackgroundExtractionLifecycleCallbacks(
                 listenerFactory = { downstream },
                 onEntryFinalized = { lifecycleEvents += "finalized:$it" },
+                onPatternCalloutAppended = {
+                    lifecycleEvents += "pattern:$it"
+                    calloutAppendReported.complete(Unit)
+                },
             ),
-            scope = flowScope,
-            patternOrchestrator = orchestrator,
         )
-        val storedEntry = dev.anchildress1.vestige.storage.EntryEntity(
-            id = ENTRY_ID,
-            extractionStatus = ExtractionStatus.COMPLETED,
-        )
-        val callout = dev.anchildress1.vestige.model.EntryObservation(
-            text = "Worth noting.",
-            evidence = dev.anchildress1.vestige.model.ObservationEvidence.PATTERN_CALLOUT,
-            fields = emptyList(),
-        )
+        val storedEntry = completedEntry()
+        val callout = patternCallout()
         val resolved = canonicalSample()
-        every { entryStore.createPendingEntry(any(), any(), any()) } returns ENTRY_ID
-        every { entryStore.readEntry(ENTRY_ID) } returns storedEntry
-        coEvery { worker.extract(any(), any()) } returns BackgroundExtractionResult.Success(
-            totalElapsedMs = 25_000L,
-            lensResults = emptyList(),
-            modelCallCount = 3,
-            resolved = resolved,
-            templateLabel = TemplateLabel.AFTERMATH,
-        )
-        coEvery { observationGenerator.generate(any(), any(), any()) } returns emptyList()
+        stubSuccessfulPatternExtraction(storedEntry, resolved)
         coEvery {
             orchestrator.onEntryCommitted(storedEntry, dev.anchildress1.vestige.model.Persona.WITNESS)
-        } answers {
+        } coAnswers {
             lifecycleEvents += "orchestrate"
+            orchestrationStarted.complete(Unit)
+            releaseOrchestration.await()
             callout
         }
         coEvery { downstream.onUpdate(ExtractionStatus.COMPLETED, 0, null) } answers {
@@ -200,10 +196,17 @@ class BackgroundExtractionSaveFlowTest {
         }
 
         flowWithOrch.saveAndExtract(SAMPLE_TEXT, SAMPLE_TIMESTAMP)
+        orchestrationStarted.await()
 
         coVerify(exactly = 1) { downstream.onUpdate(ExtractionStatus.COMPLETED, 0, null) }
         assertEquals(
-            listOf("completed", "orchestrate", "append", "settle", "finalized:$ENTRY_ID"),
+            listOf("completed", "finalized:$ENTRY_ID", "orchestrate"),
+            lifecycleEvents,
+        )
+        releaseOrchestration.complete(Unit)
+        calloutAppendReported.await()
+        assertEquals(
+            listOf("completed", "finalized:$ENTRY_ID", "orchestrate", "append", "settle", "pattern:$ENTRY_ID"),
             lifecycleEvents,
         )
     }
@@ -311,9 +314,62 @@ class BackgroundExtractionSaveFlowTest {
             entryStore.createPendingEntry(SAMPLE_TEXT, SAMPLE_TIMESTAMP.toInstant(), 0L)
             worker.extract(any(), any())
             observationGenerator.generate(SAMPLE_TEXT, resolved, SAMPLE_TIMESTAMP)
-            entryStore.completeEntry(ENTRY_ID, resolved, TemplateLabel.AFTERMATH, observations)
+            entryStore.completeEntry(ENTRY_ID, resolved, TemplateLabel.AFTERMATH, observations, emptyList())
         }
         coVerify(exactly = 0) { entryStore.failEntry(any(), any(), any()) }
+    }
+
+    @Test
+    fun `success routes parsed lens receipts to completeEntry without raw responses`() = runTest {
+        every { entryStore.createPendingEntry(any(), any(), any()) } returns ENTRY_ID
+        val resolved = canonicalSample()
+        val lensResults = listOf(
+            LensResult(
+                lens = Lens.LITERAL,
+                extraction = LensExtraction(
+                    lens = Lens.LITERAL,
+                    fields = mapOf("tags" to listOf("standup"), "energy_descriptor" to "flattened"),
+                ),
+                rawResponse = """{"private":"raw response stays out"}""",
+                attemptCount = 1,
+                elapsedMs = 900L,
+                lastError = null,
+            ),
+            LensResult(
+                lens = Lens.SKEPTICAL,
+                extraction = null,
+                rawResponse = "bad json",
+                attemptCount = 2,
+                elapsedMs = 1_400L,
+                lastError = "parse-fail",
+            ),
+        )
+        coEvery { worker.extract(any(), any()) } returns BackgroundExtractionResult.Success(
+            totalElapsedMs = 25_000L,
+            lensResults = lensResults,
+            modelCallCount = 3,
+            resolved = resolved,
+            templateLabel = TemplateLabel.AFTERMATH,
+        )
+        coEvery { observationGenerator.generate(any(), any(), any()) } returns emptyList()
+
+        flow.saveAndExtract(SAMPLE_TEXT, SAMPLE_TIMESTAMP)
+
+        coVerify {
+            entryStore.completeEntry(
+                ENTRY_ID,
+                resolved,
+                TemplateLabel.AFTERMATH,
+                emptyList(),
+                match { receipts ->
+                    receipts.size == 2 &&
+                        receipts[0].lens == Lens.LITERAL &&
+                        receipts[0].fields["energy_descriptor"] == "flattened" &&
+                        receipts[1].extracted.not() &&
+                        receipts[1].lastError == "parse-fail"
+                },
+            )
+        }
     }
 
     @Test
@@ -334,7 +390,7 @@ class BackgroundExtractionSaveFlowTest {
         assertEquals(ENTRY_ID, outcome.entryId)
         // Generator threw → empty observation list persisted instead of aborting the save.
         coVerify(exactly = 1) {
-            entryStore.completeEntry(ENTRY_ID, resolved, TemplateLabel.AFTERMATH, emptyList())
+            entryStore.completeEntry(ENTRY_ID, resolved, TemplateLabel.AFTERMATH, emptyList(), emptyList())
         }
     }
 
@@ -355,7 +411,7 @@ class BackgroundExtractionSaveFlowTest {
             entryStore.failEntry(ENTRY_ID, ExtractionStatus.FAILED, "all-lenses-parse-fail")
         }
         coVerify(exactly = 0) {
-            entryStore.completeEntry(any(), any(), any(), any())
+            entryStore.completeEntry(any(), any(), any(), any(), any())
             observationGenerator.generate(any(), any(), any())
         }
     }
@@ -411,6 +467,91 @@ class BackgroundExtractionSaveFlowTest {
     }
 
     @Test
+    fun `saveAndExtract retrieves history inside the detached path when caller provides none`() = runTest {
+        val history = listOf(HistoryChunk(patternId = null, text = "same loop last Thursday"))
+        val flowWithLookup = BackgroundExtractionSaveFlow(
+            entryStore = entryStore,
+            worker = worker,
+            observationGenerator = observationGenerator,
+            lifecycleCallbacks = BackgroundExtractionLifecycleCallbacks(listenerFactory),
+            scope = flowScope,
+            retrieveHistory = { query ->
+                assertEquals(SAMPLE_TEXT, query)
+                history
+            },
+        )
+        every { entryStore.createPendingEntry(any(), any(), any()) } returns ENTRY_ID
+        coEvery { worker.extract(capture(capturedRequest), any()) } returns BackgroundExtractionResult.Success(
+            totalElapsedMs = 10L,
+            lensResults = emptyList(),
+            modelCallCount = 3,
+            resolved = canonicalSample(),
+            templateLabel = TemplateLabel.AFTERMATH,
+        )
+        coEvery { observationGenerator.generate(any(), any(), any()) } returns emptyList()
+
+        flowWithLookup.saveAndExtract(SAMPLE_TEXT, SAMPLE_TIMESTAMP)
+
+        assertEquals(history, capturedRequest.captured.retrievedHistory)
+    }
+
+    @Test
+    fun `saveAndExtract keeps caller supplied history and skips detached lookup`() = runTest {
+        val history = listOf(HistoryChunk(patternId = null, text = "seeded already"))
+        val lookupCalls = AtomicInteger(0)
+        val flowWithLookup = BackgroundExtractionSaveFlow(
+            entryStore = entryStore,
+            worker = worker,
+            observationGenerator = observationGenerator,
+            lifecycleCallbacks = BackgroundExtractionLifecycleCallbacks(listenerFactory),
+            scope = flowScope,
+            retrieveHistory = {
+                lookupCalls.incrementAndGet()
+                emptyList()
+            },
+        )
+        every { entryStore.createPendingEntry(any(), any(), any()) } returns ENTRY_ID
+        coEvery { worker.extract(capture(capturedRequest), any()) } returns BackgroundExtractionResult.Success(
+            totalElapsedMs = 10L,
+            lensResults = emptyList(),
+            modelCallCount = 3,
+            resolved = canonicalSample(),
+            templateLabel = TemplateLabel.AFTERMATH,
+        )
+        coEvery { observationGenerator.generate(any(), any(), any()) } returns emptyList()
+
+        flowWithLookup.saveAndExtract(SAMPLE_TEXT, SAMPLE_TIMESTAMP, retrievedHistory = history)
+
+        assertEquals(history, capturedRequest.captured.retrievedHistory)
+        assertEquals(0, lookupCalls.get())
+    }
+
+    @Test
+    fun `saveAndExtract degrades to empty history when detached lookup throws`() = runTest {
+        val flowWithLookup = BackgroundExtractionSaveFlow(
+            entryStore = entryStore,
+            worker = worker,
+            observationGenerator = observationGenerator,
+            lifecycleCallbacks = BackgroundExtractionLifecycleCallbacks(listenerFactory),
+            scope = flowScope,
+            retrieveHistory = { error("vector store unavailable") },
+        )
+        every { entryStore.createPendingEntry(any(), any(), any()) } returns ENTRY_ID
+        coEvery { worker.extract(capture(capturedRequest), any()) } returns BackgroundExtractionResult.Success(
+            totalElapsedMs = 10L,
+            lensResults = emptyList(),
+            modelCallCount = 3,
+            resolved = canonicalSample(),
+            templateLabel = TemplateLabel.AFTERMATH,
+        )
+        coEvery { observationGenerator.generate(any(), any(), any()) } returns emptyList()
+
+        flowWithLookup.saveAndExtract(SAMPLE_TEXT, SAMPLE_TIMESTAMP)
+
+        assertTrue(capturedRequest.captured.retrievedHistory.isEmpty())
+    }
+
+    @Test
     fun `terminal completion reaches the lifecycle listener only after completeEntry succeeds`() = runTest {
         val downstream: ExtractionStatusListener = mockk(relaxed = true)
         val flowWithMockListener =
@@ -442,7 +583,7 @@ class BackgroundExtractionSaveFlowTest {
         coVerifyOrder {
             downstream.onUpdate(ExtractionStatus.RUNNING, 0, null)
             observationGenerator.generate(SAMPLE_TEXT, canonicalSample(), SAMPLE_TIMESTAMP)
-            entryStore.completeEntry(ENTRY_ID, canonicalSample(), TemplateLabel.AFTERMATH, emptyList())
+            entryStore.completeEntry(ENTRY_ID, canonicalSample(), TemplateLabel.AFTERMATH, emptyList(), emptyList())
             downstream.onUpdate(ExtractionStatus.COMPLETED, 0, null)
         }
         verify(exactly = 0) { entryStore.failEntry(any(), any(), any()) }
@@ -476,7 +617,7 @@ class BackgroundExtractionSaveFlowTest {
         }
         coEvery { observationGenerator.generate(any(), any(), any()) } returns emptyList()
         every {
-            entryStore.completeEntry(ENTRY_ID, resolved, TemplateLabel.AFTERMATH, emptyList())
+            entryStore.completeEntry(ENTRY_ID, resolved, TemplateLabel.AFTERMATH, emptyList(), emptyList())
         } throws IllegalStateException("disk blew up")
 
         // Persistence failure is caught inside the detached extraction, routed through
@@ -485,7 +626,7 @@ class BackgroundExtractionSaveFlowTest {
 
         coVerifyOrder {
             downstream.onUpdate(ExtractionStatus.RUNNING, 0, null)
-            entryStore.completeEntry(ENTRY_ID, resolved, TemplateLabel.AFTERMATH, emptyList())
+            entryStore.completeEntry(ENTRY_ID, resolved, TemplateLabel.AFTERMATH, emptyList(), emptyList())
             entryStore.failEntry(ENTRY_ID, ExtractionStatus.FAILED, "persistence-error:IllegalStateException")
             downstream.onUpdate(ExtractionStatus.FAILED, 0, "persistence-error:IllegalStateException")
         }
@@ -695,7 +836,7 @@ class BackgroundExtractionSaveFlowTest {
         )
         coEvery { observationGenerator.generate(any(), any(), any()) } returns emptyList()
         every {
-            entryStore.completeEntry(ENTRY_ID, resolved, TemplateLabel.AFTERMATH, emptyList())
+            entryStore.completeEntry(ENTRY_ID, resolved, TemplateLabel.AFTERMATH, emptyList(), emptyList())
         } throws IllegalStateException("primary disk error")
         // Compensation also throws — the failure must not mask the original IllegalStateException.
         every {
@@ -708,7 +849,7 @@ class BackgroundExtractionSaveFlowTest {
         flowWithMockListener.saveAndExtract(SAMPLE_TEXT, SAMPLE_TIMESTAMP)
 
         coVerifyOrder {
-            entryStore.completeEntry(ENTRY_ID, resolved, TemplateLabel.AFTERMATH, emptyList())
+            entryStore.completeEntry(ENTRY_ID, resolved, TemplateLabel.AFTERMATH, emptyList(), emptyList())
             entryStore.failEntry(ENTRY_ID, ExtractionStatus.FAILED, "persistence-error:IllegalStateException")
             downstream.onUpdate(ExtractionStatus.FAILED, 0, "persistence-error:IllegalStateException")
         }
@@ -844,7 +985,7 @@ class BackgroundExtractionSaveFlowTest {
         )
         coEvery { observationGenerator.generate(any(), any(), any()) } returns emptyList()
         every {
-            entryStore.completeEntry(ENTRY_ID, resolved, TemplateLabel.AFTERMATH, emptyList())
+            entryStore.completeEntry(ENTRY_ID, resolved, TemplateLabel.AFTERMATH, emptyList(), emptyList())
         } throws IllegalStateException("disk blew up")
 
         flowWithCallback.saveAndExtract(SAMPLE_TEXT, SAMPLE_TIMESTAMP)
@@ -878,7 +1019,7 @@ class BackgroundExtractionSaveFlowTest {
         flowWithCallback.saveAndExtract(SAMPLE_TEXT, SAMPLE_TIMESTAMP)
 
         coVerify(exactly = 1) {
-            entryStore.completeEntry(ENTRY_ID, resolved, TemplateLabel.AFTERMATH, emptyList())
+            entryStore.completeEntry(ENTRY_ID, resolved, TemplateLabel.AFTERMATH, emptyList(), emptyList())
         }
         coVerify(exactly = 0) { entryStore.failEntry(any(), any(), any()) }
         assertTrue(listenerEvents.contains(ExtractionStatus.COMPLETED))
@@ -904,6 +1045,42 @@ class BackgroundExtractionSaveFlowTest {
         assertEquals(ExtractionStatus.PENDING, listenerEvents.first())
         assertTrue(listenerEvents.contains(ExtractionStatus.COMPLETED))
     }
+
+    private fun buildPatternFlow(
+        orchestrator: PatternDetectionOrchestrator,
+        lifecycleCallbacks: BackgroundExtractionLifecycleCallbacks,
+    ): BackgroundExtractionSaveFlow = BackgroundExtractionSaveFlow(
+        entryStore = entryStore,
+        worker = worker,
+        observationGenerator = observationGenerator,
+        lifecycleCallbacks = lifecycleCallbacks,
+        scope = flowScope,
+        patternOrchestrator = orchestrator,
+    )
+
+    private fun stubSuccessfulPatternExtraction(storedEntry: EntryEntity, resolved: ResolvedExtraction) {
+        every { entryStore.createPendingEntry(any(), any(), any()) } returns ENTRY_ID
+        every { entryStore.readEntry(ENTRY_ID) } returns storedEntry
+        coEvery { worker.extract(any(), any()) } returns BackgroundExtractionResult.Success(
+            totalElapsedMs = 25_000L,
+            lensResults = emptyList(),
+            modelCallCount = 3,
+            resolved = resolved,
+            templateLabel = TemplateLabel.AFTERMATH,
+        )
+        coEvery { observationGenerator.generate(any(), any(), any()) } returns emptyList()
+    }
+
+    private fun completedEntry(): EntryEntity = EntryEntity(
+        id = ENTRY_ID,
+        extractionStatus = ExtractionStatus.COMPLETED,
+    )
+
+    private fun patternCallout(): EntryObservation = EntryObservation(
+        text = "Worth noting.",
+        evidence = ObservationEvidence.PATTERN_CALLOUT,
+        fields = emptyList(),
+    )
 
     private companion object {
         private const val ENTRY_ID: Long = 42L

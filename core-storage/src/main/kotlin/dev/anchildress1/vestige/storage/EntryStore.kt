@@ -1,6 +1,7 @@
 package dev.anchildress1.vestige.storage
 
 import dev.anchildress1.vestige.model.ConfidenceVerdict
+import dev.anchildress1.vestige.model.EntryLensReceipt
 import dev.anchildress1.vestige.model.EntryObservation
 import dev.anchildress1.vestige.model.ExtractionStatus
 import dev.anchildress1.vestige.model.ObservationEvidence
@@ -89,6 +90,7 @@ class EntryStore(private val boxStore: BoxStore, private val markdownStore: Mark
         resolved: ResolvedExtraction,
         templateLabel: TemplateLabel?,
         observations: List<EntryObservation> = emptyList(),
+        lensReceipts: List<EntryLensReceipt> = emptyList(),
     ) {
         boxStore.runInTx {
             val box = boxStore.boxFor<EntryEntity>()
@@ -96,6 +98,7 @@ class EntryStore(private val boxStore: BoxStore, private val markdownStore: Mark
                 ?: throw EntryPersistenceException("No entry row id=$entryId to complete")
             applyResolved(entry, resolved, templateLabel)
             entry.entryObservationsJson = observationsJson(observations)
+            entry.lensReceiptsJson = EntryLensReceiptJson.encode(lensReceipts)
             entry.extractionStatus = ExtractionStatus.COMPLETED
             entry.lastError = null
             attachTags(entry, resolved)
@@ -109,41 +112,79 @@ class EntryStore(private val boxStore: BoxStore, private val markdownStore: Mark
     }
 
     /** Read-only lookup. Returns `null` for missing rows so callers can act without throwing. */
-    fun readEntry(entryId: Long): EntryEntity? = boxStore.boxFor<EntryEntity>().get(entryId)
+    fun readEntry(entryId: Long): EntryEntity? = boxStore.callClosingThreadResources {
+        boxStore.boxFor<EntryEntity>().get(entryId)
+    }
 
     /** Most-recent entry still in-flight, or `null` when no notification deep-link target exists. */
-    fun mostRecentNonTerminalEntryId(): Long? = boxStore.boxFor<EntryEntity>()
-        .query()
-        .`in`(EntryEntity_.extractionStatus, NON_TERMINAL_STATUS_NAMES, QueryBuilder.StringOrder.CASE_SENSITIVE)
-        .orderDesc(EntryEntity_.id)
-        .build()
-        .use { it.findFirst()?.id }
+    fun mostRecentNonTerminalEntryId(): Long? = boxStore.callClosingThreadResources {
+        boxStore.boxFor<EntryEntity>()
+            .query()
+            .`in`(EntryEntity_.extractionStatus, NON_TERMINAL_STATUS_NAMES, QueryBuilder.StringOrder.CASE_SENSITIVE)
+            .orderDesc(EntryEntity_.id)
+            .build()
+            .use { it.findFirst()?.id }
+    }
 
     /** Total persisted rows, regardless of extraction terminality. */
-    fun count(): Long = boxStore.boxFor<EntryEntity>().count()
+    fun count(): Long = boxStore.callClosingThreadResources {
+        boxStore.boxFor<EntryEntity>().count()
+    }
 
     /** Completed entries only — denominator for pattern stats and pattern-empty-state gating. */
-    fun countCompleted(): Long = boxStore.boxFor<EntryEntity>()
-        .query()
-        .equal(EntryEntity_.extractionStatus, ExtractionStatus.COMPLETED.name, QueryBuilder.StringOrder.CASE_SENSITIVE)
-        .build()
-        .use { it.count() }
+    fun countCompleted(): Long = boxStore.callClosingThreadResources {
+        boxStore.boxFor<EntryEntity>()
+            .query()
+            .equal(
+                EntryEntity_.extractionStatus,
+                ExtractionStatus.COMPLETED.name,
+                QueryBuilder.StringOrder.CASE_SENSITIVE,
+            )
+            .build()
+            .use { it.count() }
+    }
 
     /** Most-recent completed entries, newest first. [limit] is a guard, not pagination. */
-    fun listCompleted(limit: Int = 100): List<EntryEntity> = boxStore.boxFor<EntryEntity>()
-        .query()
-        .equal(EntryEntity_.extractionStatus, ExtractionStatus.COMPLETED.name, QueryBuilder.StringOrder.CASE_SENSITIVE)
-        .orderDesc(EntryEntity_.timestampEpochMs)
-        .build()
-        .use { it.find(0, limit.toLong()) }
+    fun listCompleted(limit: Int = 100): List<EntryEntity> = boxStore.callClosingThreadResources {
+        boxStore.boxFor<EntryEntity>()
+            .query()
+            .equal(
+                EntryEntity_.extractionStatus,
+                ExtractionStatus.COMPLETED.name,
+                QueryBuilder.StringOrder.CASE_SENSITIVE,
+            )
+            .orderDesc(EntryEntity_.timestampEpochMs)
+            .build()
+            .use { it.find(0, limit.toLong()) }
+    }
 
     /** Single most-recent completed entry, or `null` when none exist. */
-    fun lastCompleted(): EntryEntity? = boxStore.boxFor<EntryEntity>()
-        .query()
-        .equal(EntryEntity_.extractionStatus, ExtractionStatus.COMPLETED.name, QueryBuilder.StringOrder.CASE_SENSITIVE)
-        .orderDesc(EntryEntity_.timestampEpochMs)
-        .build()
-        .use { it.find(0, 1).firstOrNull() }
+    fun lastCompleted(): EntryEntity? = boxStore.callClosingThreadResources {
+        boxStore.boxFor<EntryEntity>()
+            .query()
+            .equal(
+                EntryEntity_.extractionStatus,
+                ExtractionStatus.COMPLETED.name,
+                QueryBuilder.StringOrder.CASE_SENSITIVE,
+            )
+            .orderDesc(EntryEntity_.timestampEpochMs)
+            .build()
+            .use { it.find(0, 1).firstOrNull() }
+    }
+
+    /** Single earliest completed entry, or `null` when none exist. Feeds the days-since-first stat. */
+    fun firstCompleted(): EntryEntity? = boxStore.callClosingThreadResources {
+        boxStore.boxFor<EntryEntity>()
+            .query()
+            .equal(
+                EntryEntity_.extractionStatus,
+                ExtractionStatus.COMPLETED.name,
+                QueryBuilder.StringOrder.CASE_SENSITIVE,
+            )
+            .order(EntryEntity_.timestampEpochMs)
+            .build()
+            .use { it.find(0, 1).firstOrNull() }
+    }
 
     /**
      * Append one observation to an already-completed entry's persisted list. Used by the
@@ -224,7 +265,7 @@ class EntryStore(private val boxStore: BoxStore, private val markdownStore: Mark
     private fun applyResolved(entry: EntryEntity, resolved: ResolvedExtraction, templateLabel: TemplateLabel?) {
         entry.templateLabel = templateLabel
         entry.energyDescriptor = stringField(resolved, KEY_ENERGY)
-        entry.recurrenceLink = stringField(resolved, KEY_RECURRENCE)
+        entry.recurrenceLink = recurrenceField(resolved)
         entry.statedCommitmentJson = commitmentJson(resolved)
         entry.confidenceJson = confidenceJson(resolved)
     }
@@ -266,6 +307,11 @@ class EntryStore(private val boxStore: BoxStore, private val markdownStore: Mark
         return (field.value as? String)?.takeIf { it.isNotBlank() }
     }
 
+    private fun recurrenceField(resolved: ResolvedExtraction): String? = stringField(resolved, KEY_RECURRENCE)
+        ?.trim()
+        ?.lowercase()
+        ?.takeIf { it.matches(PATTERN_ID_REGEX) }
+
     private fun commitmentJson(resolved: ResolvedExtraction): String? {
         val map = resolved.fields[KEY_COMMITMENT]?.value as? Map<*, *>
         return map?.let {
@@ -290,6 +336,7 @@ class EntryStore(private val boxStore: BoxStore, private val markdownStore: Mark
         private const val KEY_RECURRENCE = "recurrence_link"
         private const val KEY_COMMITMENT = "stated_commitment"
         private const val KEY_TOPIC_OR_PERSON = "topic_or_person"
+        private val PATTERN_ID_REGEX = Regex("[0-9a-f]{64}")
         private val NON_TERMINAL_STATUSES = setOf(ExtractionStatus.PENDING, ExtractionStatus.RUNNING)
         private val NON_TERMINAL_STATUS_NAMES: Array<String> =
             NON_TERMINAL_STATUSES.map(ExtractionStatus::name).toTypedArray()
@@ -317,11 +364,6 @@ private fun observationsJson(observations: List<EntryObservation>): String {
     return array.toString()
 }
 
-// Cap on the malformed-payload preview included in `Log.w` lines so logcat doesn't get
-// flooded by a single corrupt row. 80 chars is enough to identify the shape (object vs
-// array, leading keys) without paying for the long tail.
-private const val LOG_PREVIEW_CHARS = 80
-
 // Used by `appendObservation` only — distinguishes legit empty from malformed-and-fell-back.
 // Throws so the malformed-existing case can't silently overwrite real persisted observations.
 private fun parseObservationsForAppend(json: String, entryId: Long): List<EntryObservation> {
@@ -345,7 +387,7 @@ internal fun decodeObservations(json: String): List<EntryObservation> {
     // empty so the rewrite path can still make progress.
     return when (array) {
         null -> {
-            android.util.Log.w("VestigeEntryStore", "malformed entryObservationsJson: ${raw.take(LOG_PREVIEW_CHARS)}")
+            android.util.Log.w("VestigeEntryStore", "malformed entryObservationsJson (len=${raw.length})")
             emptyList()
         }
 

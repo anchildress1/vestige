@@ -66,6 +66,9 @@ dependencies {
     // Android's android.jar ships org.json at runtime; the mockable test jar stubs it. Pin the
     // upstream artifact on the test classpath only so LensResponseParser hits a real parser.
     testImplementation(libs.json)
+
+    androidTestImplementation(libs.androidx.test.ext.junit)
+    androidTestImplementation(libs.androidx.test.espresso.core)
 }
 
 tasks.withType<Test>().configureEach {

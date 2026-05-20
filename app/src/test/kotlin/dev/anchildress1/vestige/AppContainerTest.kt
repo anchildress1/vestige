@@ -1992,6 +1992,7 @@ class AppContainerTest {
         boxStore.boxFor(PatternEntity::class.java).put(pattern)
         boxStore.boxFor(CalloutCooldownEntity::class.java).put(
             CalloutCooldownEntity(
+                patternId = pattern.patternId,
                 lastCalloutEntryId = entry.id,
                 lastCalloutTimestamp = 999L,
                 remainingSuppression = 2,

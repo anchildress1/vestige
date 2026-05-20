@@ -307,11 +307,10 @@ class EntryStore(private val boxStore: BoxStore, private val markdownStore: Mark
         return (field.value as? String)?.takeIf { it.isNotBlank() }
     }
 
-    private fun recurrenceField(resolved: ResolvedExtraction): String? =
-        stringField(resolved, KEY_RECURRENCE)
-            ?.trim()
-            ?.lowercase()
-            ?.takeIf { it.matches(PATTERN_ID_REGEX) }
+    private fun recurrenceField(resolved: ResolvedExtraction): String? = stringField(resolved, KEY_RECURRENCE)
+        ?.trim()
+        ?.lowercase()
+        ?.takeIf { it.matches(PATTERN_ID_REGEX) }
 
     private fun commitmentJson(resolved: ResolvedExtraction): String? {
         val map = resolved.fields[KEY_COMMITMENT]?.value as? Map<*, *>

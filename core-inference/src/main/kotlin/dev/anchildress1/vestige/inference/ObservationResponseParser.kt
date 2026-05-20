@@ -89,11 +89,14 @@ internal object ObservationResponseParser {
 
     private fun fieldsAreValid(evidence: ObservationEvidence, fields: List<String>): Boolean = when (evidence) {
         ObservationEvidence.COMMITMENT_FLAG -> fields == listOf("stated_commitment")
+
         ObservationEvidence.VOCABULARY_CONTRADICTION ->
             fields.isEmpty() || ("vocabulary_contradictions" in fields && fields.all { it in VOCAB_FIELDS })
+
         ObservationEvidence.VOLUNTEERED_CONTEXT,
         ObservationEvidence.THEME_NOTICING,
         -> fields.all { it in KNOWN_FIELDS }
+
         ObservationEvidence.PATTERN_CALLOUT -> false
     }
 

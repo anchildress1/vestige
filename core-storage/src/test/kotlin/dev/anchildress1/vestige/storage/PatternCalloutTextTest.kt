@@ -81,24 +81,33 @@ class PatternCalloutTextTest {
     }
 
     @Test
-    fun `tag pair callout tolerates missing tag array`() {
+    fun `tag pair callout falls back cleanly when tags array is missing`() {
         val text = PatternCalloutText.build(
             detected(PatternKind.TAG_PAIR_CO_OCCURRENCE, "{\"label\":\"aftermath\"}"),
         )
-        assertEquals("Aftermath entries:  across 3 entries.", text)
+        assertEquals("3 entries share a tag pair.", text)
     }
 
     @Test
-    fun `commitment and vocab callouts tolerate missing signature fields`() {
-        val commitment = PatternCalloutText.build(
-            detected(PatternKind.COMMITMENT_RECURRENCE, "{}"),
+    fun `tag pair callout falls back cleanly when label is blank`() {
+        val text = PatternCalloutText.build(
+            detected(PatternKind.TAG_PAIR_CO_OCCURRENCE, "{\"tags\":[\"crashed\",\"standup\"]}"),
         )
-        val vocab = PatternCalloutText.build(
+        assertEquals("3 entries share a tag pair.", text)
+    }
+
+    @Test
+    fun `commitment callout falls back cleanly when topic is blank`() {
+        val text = PatternCalloutText.build(detected(PatternKind.COMMITMENT_RECURRENCE, "{}"))
+        assertEquals("3 entries reference the same commitment.", text)
+    }
+
+    @Test
+    fun `vocab callout falls back cleanly when token is blank`() {
+        val text = PatternCalloutText.build(
             detected(PatternKind.VOCAB_FREQUENCY, "{}", supporting = listOf(1L, 2L, 3L, 4L)),
         )
-
-        assertEquals("3 entries with a commitment about .", commitment)
-        assertEquals("\"\" spans 4 entries with multiple framings.", vocab)
+        assertEquals("4 entries share a vocab token.", text)
     }
 
     @Test

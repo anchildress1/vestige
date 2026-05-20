@@ -139,7 +139,7 @@ Standup ran long again. I was fine before it, then completely flattened by 11. O
 | `follow_up` | frontmatter | Saved model turn for single-turn voice captures, or `null` when no follow-up exists. |
 | `duration_ms` | frontmatter | Millis of captured audio; `0` for typed entries and rows written before Story 4.6. |
 | `template_label` | frontmatter | Lowercase enum value (one of: aftermath, tunnel-exit, concrete-shoes, decision-spiral, goblin-hours, audit). |
-| `tags` | frontmatter list | Lowercase, kebab-case. Sorted lexicographically on write for diff stability. |
+| `tags` | frontmatter list | Lowercase, kebab-case. Sorted lexicographically on write for diff stability. Empty case serializes as the inline `tags: []` — bare `tags:` parses as `null` under YAML 1.2 and breaks round-trip importers. |
 | `energy_descriptor` | frontmatter | Free string or `null`. |
 | `recurrence_link` | frontmatter | `pattern_id` or `null`. |
 | `stated_commitment` | frontmatter | Object with `text`, `topic_or_person`, `entry_id` keys, or `null`. |

@@ -54,11 +54,12 @@ object EntryMarkdownRenderer {
 
     private fun yamlJsonArrayInline(value: String): String = value.ifBlank { "[]" }
 
-    private fun needsQuoting(value: String): Boolean =
-        value.any { it in YAML_RESERVED_CHARS || it < ' ' } ||
-            value.first() in YAML_LEADING_INDICATORS ||
-            value.first().isWhitespace() ||
-            value.last().isWhitespace()
+    private fun needsQuoting(value: String): Boolean {
+        val hasReserved = value.any { it in YAML_RESERVED_CHARS || it < ' ' }
+        val hasLeadingIndicator = value.first() in YAML_LEADING_INDICATORS
+        val hasBoundaryWhitespace = value.first().isWhitespace() || value.last().isWhitespace()
+        return hasReserved || hasLeadingIndicator || hasBoundaryWhitespace
+    }
 
     private fun quoteYaml(value: String): String = buildString {
         append('"')

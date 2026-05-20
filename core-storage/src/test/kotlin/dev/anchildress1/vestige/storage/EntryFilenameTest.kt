@@ -51,5 +51,4 @@ class EntryFilenameTest {
         val filename = EntryFilename.buildFilename(timestamp, "Quick capture about standup")
         assertEquals("2026-05-09T14-32-15Z--quick-capture-standup.md", filename)
     }
-
 }

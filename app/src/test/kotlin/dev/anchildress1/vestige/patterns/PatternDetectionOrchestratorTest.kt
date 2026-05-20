@@ -292,12 +292,12 @@ class PatternDetectionOrchestratorTest {
         assertEquals(
             "entry holds the pending reservation until append resolves",
             entry.id,
-            cooldownStore.snapshot().pendingCalloutEntryId,
+            cooldownStore.snapshotFor("x".repeat(64)).pendingCalloutEntryId,
         )
         assertEquals(
             "no fire confirmed yet, so suppression window stays at 0",
             0,
-            cooldownStore.snapshot().remainingSuppression,
+            cooldownStore.snapshotFor("x".repeat(64)).remainingSuppression,
         )
     }
 
@@ -319,7 +319,7 @@ class PatternDetectionOrchestratorTest {
         val first = orchestrator.onEntryCommitted(putEntry(templateLabel = TemplateLabel.AFTERMATH), Persona.WITNESS)
         assertNull(first)
         // Reservation was released, so a follow-up entry with valid pattern would fire normally.
-        assertTrue(cooldownStore.isCalloutPermitted())
+        assertTrue(cooldownStore.isCalloutPermitted("x".repeat(64)))
     }
 
     @Test
@@ -345,7 +345,7 @@ class PatternDetectionOrchestratorTest {
 
         assertNotNull(firstCallout)
         assertNull("second entry must block behind the in-flight reservation", secondCallout)
-        assertEquals(firstEntry.id, cooldownStore.snapshot().pendingCalloutEntryId)
+        assertEquals(firstEntry.id, cooldownStore.snapshotFor("x".repeat(64)).pendingCalloutEntryId)
     }
 
     @Test

@@ -71,7 +71,7 @@ class VestigeDataExporterTest {
     }
 
     @Test
-    fun `snapshot carries onboarding settings; complete suppresses current_step`() {
+    fun `snapshot carries onboarding settings and suppresses current_step when complete`() {
         val out = ByteArrayOutputStream()
 
         exporter().writeTo(out)
@@ -80,9 +80,9 @@ class VestigeDataExporterTest {
         assertEquals(true, settings.getBoolean("onboarding_complete"))
         assertEquals("HARDASS", settings.getString("default_persona"))
         assertTrue(
+            settings.isNull("current_step"),
             "current_step must be JSON null once onboarding is complete — the sentinel default " +
                 "from OnboardingPrefs is not real resume state",
-            settings.isNull("current_step"),
         )
     }
 

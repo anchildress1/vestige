@@ -10,6 +10,7 @@ import dev.anchildress1.vestige.model.Persona
 import dev.anchildress1.vestige.model.ResolvedExtraction
 import dev.anchildress1.vestige.model.ResolvedField
 import dev.anchildress1.vestige.storage.EntryEntity
+import dev.anchildress1.vestige.storage.EntryLensReceiptJson
 import dev.anchildress1.vestige.storage.EntryStore
 import dev.anchildress1.vestige.storage.MarkdownEntryStore
 import dev.anchildress1.vestige.testing.cleanupObjectBoxTempRoot
@@ -453,14 +454,14 @@ class EntryDetailViewModelTest {
     }
 
     @Test
-    fun `vocab field does not backfill tag text when receipts contain no vocabulary evidence`() = runTest {
-        val id = entryStore.createPendingEntry("plain transcript", FIXTURE_INSTANT)
+    fun `vocab field falls back to repeated lexical tag terms when contradictions are empty`() = runTest {
+        val id = entryStore.createPendingEntry("tabs stayed open and the tabs are still open", FIXTURE_INSTANT)
         entryStore.completeEntry(
             id,
             ResolvedExtraction(
                 mapOf(
                     "tags" to ResolvedField(
-                        listOf("rosy-pocket", "go-pro"),
+                        listOf("tabs", "desk"),
                         ConfidenceVerdict.CANONICAL,
                     ),
                 ),
@@ -470,7 +471,12 @@ class EntryDetailViewModelTest {
                 EntryLensReceipt(
                     lens = Lens.LITERAL,
                     extracted = true,
-                    fields = mapOf("tags" to listOf("rosy-pocket", "go-pro")),
+                    fields = mapOf("tags" to listOf("tabs", "desk")),
+                ),
+                EntryLensReceipt(
+                    lens = Lens.INFERENTIAL,
+                    extracted = true,
+                    fields = mapOf("tags" to listOf("tabs-open", "desk")),
                 ),
             ),
         )
@@ -479,8 +485,83 @@ class EntryDetailViewModelTest {
         vm.state.test {
             val loaded = awaitItem() as EntryDetailUiState.Loaded
             val vocab = loaded.model.fields.first { it.label == "VOCAB" }
-            assertEquals("—", vocab.value)
-            assertEquals(LensTone.AMBIGUOUS, vocab.tone)
+            assertEquals("tabs", vocab.value)
+            assertEquals(LensTone.CANONICAL, vocab.tone)
+        }
+    }
+
+    @Test
+    fun `promises field falls back to receipt commitment text when legacy convergence dropped the top-level value`() =
+        runTest {
+            val id = createCompleted("drop the package off today")
+            val box = boxStore.boxFor(EntryEntity::class.java)
+            box.get(id).also {
+                it.confidenceJson = """{"stated_commitment":"AMBIGUOUS"}"""
+                it.statedCommitmentJson = null
+                it.lensReceiptsJson = EntryLensReceiptJson.encode(
+                    listOf(
+                        EntryLensReceipt(
+                            lens = Lens.LITERAL,
+                            extracted = true,
+                            fields = mapOf(
+                                "stated_commitment" to mapOf(
+                                    "text" to "drop the package off today",
+                                    "topic_or_person" to null,
+                                ),
+                            ),
+                        ),
+                        EntryLensReceipt(
+                            lens = Lens.SKEPTICAL,
+                            extracted = true,
+                            fields = mapOf(
+                                "stated_commitment" to mapOf(
+                                    "text" to "drop the package off today",
+                                    "topic_or_person" to "package",
+                                ),
+                            ),
+                        ),
+                    ),
+                )
+            }.let(box::put)
+
+            val vm = buildVm(id)
+            vm.state.test {
+                val loaded = awaitItem() as EntryDetailUiState.Loaded
+                val promises = loaded.model.fields.first { it.label == "PROMISES" }
+                assertEquals("drop the package off today", promises.value)
+                assertEquals(LensTone.CANONICAL, promises.tone)
+            }
+        }
+
+    @Test
+    fun `repeat field does not backfill invalid numeric receipt ids`() = runTest {
+        val id = createCompleted("same loop again")
+        val box = boxStore.boxFor(EntryEntity::class.java)
+        box.get(id).also {
+            it.confidenceJson = """{"recurrence_link":"CANONICAL"}"""
+            it.recurrenceLink = null
+            it.lensReceiptsJson = EntryLensReceiptJson.encode(
+                listOf(
+                    EntryLensReceipt(
+                        lens = Lens.LITERAL,
+                        extracted = true,
+                        fields = mapOf("recurrence_link" to "1"),
+                    ),
+                    EntryLensReceipt(
+                        lens = Lens.SKEPTICAL,
+                        extracted = true,
+                        fields = mapOf("recurrence_link" to "1"),
+                    ),
+                ),
+            )
+        }.let(box::put)
+
+        val vm = buildVm(id)
+        vm.state.test {
+            val loaded = awaitItem() as EntryDetailUiState.Loaded
+            val repeat = loaded.model.fields.first { it.label == "REPEAT" }
+            assertEquals("—", repeat.value)
+            assertEquals(LensTone.AMBIGUOUS, repeat.tone)
         }
     }
 

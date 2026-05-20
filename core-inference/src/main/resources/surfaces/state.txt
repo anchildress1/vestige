@@ -5,6 +5,7 @@ Extract attention and energy markers from the entry text.
 What to capture:
 
 - Energy descriptors the user named: "crashed", "wired", "fried", "sharp", "slow", "scattered", "tunnel", "blank".
+- User-coined or idiomatic state phrases when they clearly name the user's side of the moment: "hollow thing", "battery got yanked", "brain slid off", "vaped".
 - Attention shifts: "couldn't focus", "locked in for hours", "kept tabbing away", "blanked".
 - State transitions across the entry: "was sharp this morning, flatlined by 11".
 - Late-night markers between midnight and 5am.
@@ -13,7 +14,8 @@ What to capture:
 What goes in the schema:
 
 - Populate `energy_descriptor` with the dominant state word the user used. Lowercase, exact-as-spoken when possible. Null if the user named no state.
+- When the user names a clear state phrase instead of a single word, keep the shortest exact phrase that still names the user's side of the moment.
 - Populate `state_shift` as `true` when the entry describes a transition between two distinct states; otherwise `false`. The schema requires a boolean, never null and never omitted.
 - Append state-related signals to `tags` (e.g. `crashed`, `tunnel-exit`, `decision-loop`, `late-night`).
-- Do not infer a state the user did not name. "Stressed" is not extractable unless the user said "stressed".
-- When the user names a concrete state word, carry that exact word into `energy_descriptor` rather than paraphrasing it away.
+- Do not infer a state the user did not name. "Stressed" is not extractable unless the user said "stressed" or used a clear equivalent phrase that names the same user-side condition.
+- When the user names a concrete state word or state phrase, carry that exact wording into `energy_descriptor` rather than paraphrasing it away.

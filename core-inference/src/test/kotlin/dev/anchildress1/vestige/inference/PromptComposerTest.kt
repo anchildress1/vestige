@@ -68,9 +68,10 @@ class PromptComposerTest {
     @Test
     fun `composed prompt explicitly forbids anchorless empty reads`() {
         val text = PromptComposer.compose(Lens.LITERAL, entry).systemInstruction
-        assertTrue(text.contains("emit at least one behavioral tag"))
-        assertTrue(text.contains("carry that exact word into `energy_descriptor`"))
-        assertTrue(text.contains("tag that word instead of leaving the vocabulary surface silent"))
+        assertTrue(text.contains("return at least one substantive field"))
+        assertTrue(text.contains("carry that exact wording into `energy_descriptor`"))
+        assertFalse(text.contains("emit at least one behavioral tag"))
+        assertFalse(text.contains("leaving the vocabulary surface silent"))
     }
 
     @Test
@@ -125,9 +126,18 @@ class PromptComposerTest {
     fun `chunks without a pattern id render as context only`() {
         val chunks = listOf(HistoryChunk(patternId = null, text = "ad-hoc historical chunk"))
         val text = PromptComposer.compose(Lens.LITERAL, entry, retrievedHistory = chunks).systemInstruction
-        assertTrue(text.contains("- [1] context-only"))
+        assertTrue(text.contains("- context-only"))
         assertFalse(text.contains("pattern_id=null"))
         assertFalse(text.contains("pattern_id unavailable"))
+    }
+
+    @Test
+    fun `retrieved history does not prefix real pattern ids with numeric ordinals`() {
+        val chunks = listOf(HistoryChunk(patternId = "abc123", text = "similar historical chunk"))
+        val text = PromptComposer.compose(Lens.LITERAL, entry, retrievedHistory = chunks).systemInstruction
+
+        assertTrue(text.contains("- pattern_id=abc123"))
+        assertFalse(text.contains("[1] pattern_id=abc123"))
     }
 
     @Test

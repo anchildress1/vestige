@@ -600,4 +600,40 @@ class ConvergenceResolverTest {
             resolved.fields["stated_commitment"],
         )
     }
+
+    @Test
+    fun `commitments with one missing topic adopt the agreed non-null topic`() {
+        val literal = LensExtraction(
+            Lens.LITERAL,
+            fields = mapOf(
+                "stated_commitment" to mapOf(
+                    "text" to "drop the package off today",
+                    "topic_or_person" to null,
+                ),
+            ),
+        )
+        val inferential = LensExtraction(
+            Lens.INFERENTIAL,
+            fields = mapOf(
+                "stated_commitment" to mapOf(
+                    "text" to "drop the package off today",
+                    "topic_or_person" to "package",
+                ),
+            ),
+        )
+        val skeptical = LensExtraction(Lens.SKEPTICAL, fields = mapOf("stated_commitment" to null))
+
+        val resolved = resolver.resolve(listOf(literal, inferential, skeptical))
+
+        assertEquals(
+            ResolvedField(
+                value = mapOf(
+                    "text" to "drop the package off today",
+                    "topic_or_person" to "package",
+                ),
+                verdict = ConfidenceVerdict.CANONICAL,
+            ),
+            resolved.fields["stated_commitment"],
+        )
+    }
 }

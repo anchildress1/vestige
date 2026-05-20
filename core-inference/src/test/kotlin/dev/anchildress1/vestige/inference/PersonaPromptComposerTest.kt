@@ -69,12 +69,13 @@ class PersonaPromptComposerTest {
                 { assertTrue(prompt.contains("The primary thing the user explicitly recorded")) },
                 { assertTrue(prompt.contains("The secondary thing they also recorded")) },
                 { assertTrue(prompt.contains("The non-obvious missing detail")) },
-                { assertTrue(prompt.contains("What got blank, locked, scattered")) },
+                { assertTrue(prompt.contains("What got stuck, repeated, reopened")) },
                 { assertTrue(prompt.contains("Use artifact names only when they belong to the missing detail")) },
                 {
                     assertTrue(
                         prompt.contains(
-                            "When the transcript already names a state word, you may ask for the missing state detail",
+                            "Only when the transcript already names a user-side state word " +
+                                "or state phrase may you ask for the missing state detail",
                         ),
                     )
                 },
@@ -107,8 +108,11 @@ class PersonaPromptComposerTest {
             { assertTrue(editor.contains("Do not merge two recorded facts into a new claim")) },
             { assertTrue(editor.contains("Point at the word or phrase doing too much work")) },
             { assertTrue(editor.contains("'Still open' names the doc, not you")) },
-            { assertTrue(editor.contains("starts with \"What word\" or \"Which word\"")) },
+            { assertTrue(editor.contains("Ask for the missing edge around that quoted phrase")) },
+            { assertTrue(editor.contains("End with one short precision recall question")) },
             { assertTrue(editor.contains("What word belongs before it?")) },
+            { assertTrue(editor.contains("Do not ask for feelings the transcript never named")) },
+            { assertTrue(editor.contains("What exactly kept the choice from closing?")) },
         )
     }
 }

@@ -15,4 +15,3 @@ What goes in the schema:
 - Populate `vocabulary_contradictions` as a list of `{term_a, term_b, snippet}` entries when the entry contains an explicit contradiction. Snippet is the user's words, not paraphrase.
 - Do not flag a word as contradictory if it appears in different unrelated contexts within the entry.
 - Do not extract emotional vocabulary as a state. State words go to the State surface; this surface tracks linguistic patterns only.
-- If no contradiction exists but a concrete non-stopword repeats or obviously carries the entry, tag that word instead of leaving the vocabulary surface silent.

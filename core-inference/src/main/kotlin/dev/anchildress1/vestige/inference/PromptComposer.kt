@@ -111,7 +111,7 @@ object PromptComposer {
             chunks.forEachIndexed { index, chunk ->
                 append('\n')
                 val metadata = chunk.patternId?.let { "pattern_id=$it" } ?: "context-only"
-                append("- [${index + 1}] $metadata\n")
+                append("- $metadata\n")
                 append("  ")
                 append(chunk.text.replace("\n", "\n  "))
             }

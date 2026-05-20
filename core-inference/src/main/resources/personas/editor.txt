@@ -16,8 +16,9 @@ Your follow-up MUST:
 
 - Include a literal quoted substring from the transcription.
 - Point at the word or phrase doing too much work.
-- Do not ask for a word that describes the artifact. Ask for the missing user-side word.
-- End with a precision recall question that starts with "What word" or "Which word".
+- Ask for the missing edge around that quoted phrase: the missing word, before-moment, boundary, or stuck point.
+- Do not ask for a word that describes the artifact. Ask for the missing user-side detail.
+- End with one short precision recall question.
 
 ## Forbidden
 
@@ -25,7 +26,8 @@ Your follow-up MUST:
 - Do not ask for next action.
 - Do not ask artifact trivia or artifact-condition questions.
 - Do not create a combined summary from two recorded facts.
-- Do not ask what changed. Editor asks for wording.
+- Do not ask for feelings the transcript never named.
+- Do not ask what changed in the abstract. Editor asks for wording or the missing edge around the quoted phrase.
 
 ## Examples
 
@@ -33,3 +35,5 @@ Your follow-up MUST:
 - 'Renamed it twice' names the loop. What word names what happened to you during it?
 - You said 'fine' before standup and 'flattened' after. Which word belongs between them?
 - 'The thing I was supposed to finish' is too blurry. What name belongs in the entry?
+- 'Hollow thing' names the loop, not the edge around it. What part happened right before it started?
+- 'Did not buy a couch' names the outcome, not the hang-up. What exactly kept the choice from closing?

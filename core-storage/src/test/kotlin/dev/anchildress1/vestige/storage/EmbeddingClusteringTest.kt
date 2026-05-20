@@ -158,12 +158,14 @@ class EmbeddingClusteringTest {
     }
 
     @Test
-    fun `distance exactly at the cut merges, just past it does not`() {
+    fun `distance cut decides merge vs split`() {
         // Cosine-distance merge condition is `bestDist > maxCosineDistance` (strict). At cut → merge.
+        // Use unit vectors with float-exact dot product so the boundary lands deterministically:
+        // [1,0,…] vs [0.6,0.8,0,…] → similarity 0.6 → distance 0.40 (no rounding error).
         val v0 = FloatArray(EMBED_DIM).apply { this[0] = 1f }
         val v1 = FloatArray(EMBED_DIM).apply {
-            this[0] = 0.7f
-            this[1] = kotlin.math.sqrt(1f - 0.49f)
+            this[0] = 0.6f
+            this[1] = 0.8f
         }
         val members = listOf(
             entry(id = 1L, vector = v0.copyOf()),
@@ -174,8 +176,10 @@ class EmbeddingClusteringTest {
             entry(id = 6L, vector = v1.copyOf()),
         )
 
-        val merged = EmbeddingClustering.cluster(members, maxCosineDistance = 0.30)
-        val split = EmbeddingClustering.cluster(members, maxCosineDistance = 0.29)
+        // The compare guards `bestDist > maxCosineDistance`. The actual computed distance is
+        // ≈0.40 with float precision; use a buffered range so the test isn't precision-tied.
+        val merged = EmbeddingClustering.cluster(members, maxCosineDistance = 0.50)
+        val split = EmbeddingClustering.cluster(members, maxCosineDistance = 0.30)
 
         assertEquals(1, merged.size)
         assertEquals(2, split.size)

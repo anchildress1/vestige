@@ -12,7 +12,7 @@ import org.robolectric.annotation.Config
 class ForegroundServiceStartRejectionTest {
 
     @Test
-    @Config(sdk = [33])
+    @Config(sdk = [34])
     fun `S+ FGS rejection exception is recognised`() {
         val error = ForegroundServiceStartNotAllowedException("denied")
 
@@ -20,7 +20,7 @@ class ForegroundServiceStartRejectionTest {
     }
 
     @Test
-    @Config(sdk = [33])
+    @Config(sdk = [34])
     fun `S+ non-FGS exceptions are not recognised as FGS rejections`() {
         val error = IllegalStateException("some other thing")
 

@@ -40,12 +40,12 @@ import java.time.Clock
 import java.time.Instant
 import java.time.ZoneOffset
 
+// Single coherent suite: detection cadence, callout selection, cooldown semantics, per-pattern
+// isolation. Splitting would scatter the orchestrator contract without reducing surface area.
+@Suppress("LargeClass")
 @OptIn(ExperimentalCoroutinesApi::class)
 @RunWith(RobolectricTestRunner::class)
 @Config(manifest = Config.NONE, application = android.app.Application::class)
-@Suppress("LargeClass") // Single coherent suite covering detection cadence, callout selection,
-// cooldown semantics, and per-pattern isolation — splitting it would scatter the orchestrator
-// contract across files without reducing the surface area being tested.
 class PatternDetectionOrchestratorTest {
 
     private lateinit var boxStore: BoxStore
@@ -125,11 +125,38 @@ class PatternDetectionOrchestratorTest {
     private suspend fun commitOne(
         templateLabel: TemplateLabel? = TemplateLabel.AFTERMATH,
         persona: Persona = Persona.WITNESS,
+        target: PatternDetectionOrchestrator = orchestrator,
     ): EntryObservation? {
         val entry = putEntry(templateLabel = templateLabel)
-        val callout = orchestrator.onEntryCommitted(entry, persona)
-        if (callout != null) orchestrator.settleReservedCallout(entry, fired = true)
+        val callout = target.onEntryCommitted(entry, persona)
+        if (callout != null) target.settleReservedCallout(entry, fired = true)
         return callout
+    }
+
+    /**
+     * Builds an orchestrator that shares the suite's stores but ignores the detection threshold.
+     * Used by tests whose contract is per-pattern callout selection on PRE-SEEDED patterns — there
+     * the detector inserting a fresh shadow pattern at the entry-count threshold would surface a
+     * second eligible candidate and mask the per-pattern cooldown the test is checking.
+     */
+    private fun orchestratorWithoutDetection(): PatternDetectionOrchestrator {
+        val detector = PatternDetector(boxStore, clock, ZoneOffset.UTC)
+        val titleGenerator = PatternTitleGenerator(
+            engine = engine,
+            personaPromptComposer = { "P" },
+            templateLoader = { "T" },
+            forbiddenPhraseDetector = { false },
+        )
+        return PatternDetectionOrchestrator(
+            boxStore = boxStore,
+            detector = detector,
+            patternStore = patternStore,
+            titleGenerator = titleGenerator,
+            cooldownStore = cooldownStore,
+            clock = clock,
+            zoneId = ZoneOffset.UTC,
+            patternSurfaceMinEntries = Long.MAX_VALUE,
+        )
     }
 
     @Test
@@ -206,6 +233,10 @@ class PatternDetectionOrchestratorTest {
 
     @Test
     fun `cooldown suppresses callouts on the next three entries after firing`() = runTest {
+        // Per-pattern semantic (ADR-016): A's window suppresses A specifically. Detection is
+        // disabled so the detector can't insert an unrelated pattern at the entry-count threshold
+        // and bypass A's window — that path is its own test ("per-pattern isolation").
+        val target = orchestratorWithoutDetection()
         patternStore.put(
             PatternEntity(
                 patternId = PATTERN_A_ID,
@@ -220,14 +251,14 @@ class PatternDetectionOrchestratorTest {
             ),
         )
         // Fire once.
-        commitOne()
+        commitOne(target = target)
         // Next 3 entries: suppressed.
         repeat(3) {
-            val callout = commitOne()
+            val callout = commitOne(target = target)
             assertNull("entry $it must be suppressed during the cooldown window", callout)
         }
         // Fourth eligible entry: callout fires again.
-        val refired = commitOne()
+        val refired = commitOne(target = target)
         assertNotNull(refired)
     }
 
@@ -659,11 +690,14 @@ class PatternDetectionOrchestratorTest {
     fun `per-pattern isolation — A in cooldown but B fires the same entry`() = runTest {
         // Both patterns match the AFTERMATH template; A has higher supporting count → would win
         // the tiebreak if eligible. A is in suppression; B is clear. The selector must skip A.
+        // Both patterns share the AFTERMATH template_label — PatternMatcher matches via the
+        // signature's `label` field, so both rows must encode the same value. The patternIds
+        // (and the per-pattern cooldown rows keyed off them) are what differentiates them here.
         patternStore.put(
             PatternEntity(
                 patternId = PATTERN_A_ID,
                 kind = PatternKind.TEMPLATE_RECURRENCE,
-                signatureJson = "{\"label\":\"aftermath-a\"}",
+                signatureJson = "{\"label\":\"aftermath\"}",
                 title = "Aftermath A",
                 templateLabel = TemplateLabel.AFTERMATH.serial,
                 firstSeenTimestamp = 1L,
@@ -676,7 +710,7 @@ class PatternDetectionOrchestratorTest {
             PatternEntity(
                 patternId = PATTERN_B_ID,
                 kind = PatternKind.TEMPLATE_RECURRENCE,
-                signatureJson = "{\"label\":\"aftermath-b\"}",
+                signatureJson = "{\"label\":\"aftermath\"}",
                 title = "Aftermath B",
                 templateLabel = TemplateLabel.AFTERMATH.serial,
                 firstSeenTimestamp = 1L,
@@ -723,12 +757,15 @@ class PatternDetectionOrchestratorTest {
 
     @Test
     fun `selector picks the eligible weaker candidate when the stronger one is in cooldown`() = runTest {
-        // A has 5 supporting entries (would win the tiebreak); B has 1. A is in suppression.
-        // Per ADR-016 + Phase 3, B should be the one to fire.
+        // A has 5 supporting entries (would win the tiebreak); B has none. A is in suppression.
+        // Per ADR-016 + Phase 3, B should be the one to fire. Detection is disabled here because
+        // the 5 inflate-entries would otherwise cross the threshold and let the detector mint a
+        // shadow pattern — masking the per-pattern selector behavior under test.
+        val target = orchestratorWithoutDetection()
         val aRow = PatternEntity(
             patternId = PATTERN_A_ID,
             kind = PatternKind.TEMPLATE_RECURRENCE,
-            signatureJson = "{\"label\":\"aftermath-a\"}",
+            signatureJson = "{\"label\":\"aftermath\"}",
             title = "Aftermath A",
             templateLabel = TemplateLabel.AFTERMATH.serial,
             firstSeenTimestamp = 1L,
@@ -746,7 +783,7 @@ class PatternDetectionOrchestratorTest {
             PatternEntity(
                 patternId = PATTERN_B_ID,
                 kind = PatternKind.TEMPLATE_RECURRENCE,
-                signatureJson = "{\"label\":\"aftermath-b\"}",
+                signatureJson = "{\"label\":\"aftermath\"}",
                 title = "Aftermath B",
                 templateLabel = TemplateLabel.AFTERMATH.serial,
                 firstSeenTimestamp = 1L,
@@ -757,7 +794,7 @@ class PatternDetectionOrchestratorTest {
         )
         cooldownStore.recordFired(entryId = 999L, patternId = PATTERN_A_ID, timestampMs = 1L)
 
-        val callout = orchestrator.onEntryCommitted(putEntry(templateLabel = TemplateLabel.AFTERMATH), Persona.WITNESS)
+        val callout = target.onEntryCommitted(putEntry(templateLabel = TemplateLabel.AFTERMATH), Persona.WITNESS)
 
         assertEquals("B quiet.", callout?.text)
     }

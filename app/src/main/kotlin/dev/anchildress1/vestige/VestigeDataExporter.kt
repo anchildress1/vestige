@@ -38,8 +38,9 @@ internal class VestigeDataExporter(
             }
         }
         // Catch the common "file missing" case with a clear IOException before the zip opens.
-        // The staged-then-copy below is the broader guarantee — TOCTOU, disk-full on `out`, or
-        // any mid-archive throw still leaves no partial zip at the user's target.
+        // Staging avoids partial archives in our own temp area, but an arbitrary OutputStream
+        // cannot provide an atomic destination guarantee. A mid-copy failure can still leave the
+        // caller's sink truncated; fixing that requires a file/Uri contract, not just this helper.
         verifyMarkdownReadable(content.markdownFiles)
         // POSIX 0600: the staged archive carries the full user-data export — owner-only on any
         // shared filesystem (no-op on Android's per-app sandbox, real protection on shared JVM tmp).

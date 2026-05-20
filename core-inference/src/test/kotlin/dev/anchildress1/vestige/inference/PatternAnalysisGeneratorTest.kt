@@ -78,6 +78,20 @@ class PatternAnalysisGeneratorTest {
     }
 
     @Test
+    fun `skips earlier parseable objects until it finds title and callout`() = runTest {
+        coEvery { engine.generateText(any(), any()) } returns
+            """
+            metadata={"kind":"temporal_relative","relation":"weekday_time_block"}
+            {"title":"Tuesday Drag","callout":"You keep landing here on Tuesday afternoons."}
+            """.trimIndent()
+
+        val out = newGenerator().generate(Persona.WITNESS, temporalPattern(), evidence())
+
+        assertEquals("Tuesday Drag", out?.title)
+        assertEquals("You keep landing here on Tuesday afternoons.", out?.calloutText)
+    }
+
+    @Test
     fun `rejects blank fields`() = runTest {
         coEvery { engine.generateText(any(), any()) } returns
             "{\"title\":\"\",\"callout\":\"You keep landing here.\"}"

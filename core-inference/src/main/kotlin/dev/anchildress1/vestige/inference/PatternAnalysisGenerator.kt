@@ -82,14 +82,27 @@ class PatternAnalysisGenerator(
             Log.w(TAG, "pattern analysis rejected reason=$reason (rawLen=${raw.length})")
             return null
         }
-        val root = findFirstParseableObject(raw) ?: return rejected("no-json")
-        val title = root.optString("title").trim().sanitizeTitle() ?: return rejected("blank-title")
-        val callout = root.optString("callout").trim().sanitizeCallout()
-            ?: return rejected("blank-or-overlong-callout")
-        if (forbiddenPhraseDetector(title) || forbiddenPhraseDetector(callout)) {
-            return rejected("forbidden-phrase")
+        var sawJson = false
+        var firstStructuredReason: String? = null
+        parseableObjects(raw).forEach { root ->
+            sawJson = true
+            val title = root.optString("title").trim().sanitizeTitle()
+            if (title == null) {
+                if (firstStructuredReason == null) firstStructuredReason = "blank-title"
+                return@forEach
+            }
+            val callout = root.optString("callout").trim().sanitizeCallout()
+            if (callout == null) {
+                if (firstStructuredReason == null) firstStructuredReason = "blank-or-overlong-callout"
+                return@forEach
+            }
+            if (forbiddenPhraseDetector(title) || forbiddenPhraseDetector(callout)) {
+                if (firstStructuredReason == null) firstStructuredReason = "forbidden-phrase"
+                return@forEach
+            }
+            return PatternAnalysisResult(title = title, calloutText = callout)
         }
-        return PatternAnalysisResult(title = title, calloutText = callout)
+        return rejected(firstStructuredReason ?: if (sawJson) "no-analysis-object" else "no-json")
     }
 
     private fun String.sanitizeTitle(): String? {
@@ -117,11 +130,11 @@ class PatternAnalysisGenerator(
     }
 
     @Suppress("ReturnCount") // Mirrors the existing tolerant JSON-object scanner shape.
-    private fun findFirstParseableObject(raw: String): JSONObject? {
-        if (raw.isBlank()) return null
+    private fun parseableObjects(raw: String): Sequence<JSONObject> = sequence {
+        if (raw.isBlank()) return@sequence
         var cursor = 0
         while (cursor < raw.length) {
-            val open = raw.indexOf('{', cursor).takeIf { it >= 0 } ?: return null
+            val open = raw.indexOf('{', cursor).takeIf { it >= 0 } ?: return@sequence
             val close = scanBalancedClose(raw, open)
             if (close == null) {
                 cursor = open + 1
@@ -129,10 +142,9 @@ class PatternAnalysisGenerator(
             }
             val candidate = raw.substring(open, close + 1)
             val parsed = runCatching { JSONTokener(candidate).nextValue() as? JSONObject }.getOrNull()
-            if (parsed != null) return parsed
+            if (parsed != null) yield(parsed)
             cursor = open + 1
         }
-        return null
     }
 
     private fun scanBalancedClose(raw: String, open: Int): Int? {

@@ -26,6 +26,7 @@ import dev.anchildress1.vestige.storage.MarkdownEntryStore
 import dev.anchildress1.vestige.storage.PatternEntity
 import dev.anchildress1.vestige.storage.PatternRepo
 import dev.anchildress1.vestige.storage.PatternStore
+import dev.anchildress1.vestige.storage.closeAfterCleaningThreadResources
 import dev.anchildress1.vestige.testing.cleanupObjectBoxTempRoot
 import dev.anchildress1.vestige.testing.newInMemoryObjectBoxDirectory
 import dev.anchildress1.vestige.testing.newModuleTempRoot
@@ -82,8 +83,9 @@ class PatternsHostTest {
     fun tearDown() {
         composeRule.activityRule.scenario.close()
         // Compose host tests still have ObjectBox readers owned by runner threads during @After.
-        // Closing the in-memory store here force-destroys them from the wrong thread.
-        boxStore.closeThreadResources()
+        // Clean thread locals first, then close the in-memory registry so later JVM tests do not
+        // inherit the stale store.
+        boxStore.closeAfterCleaningThreadResources()
         cleanupObjectBoxTempRoot(tempRoot, dataDir)
     }
 

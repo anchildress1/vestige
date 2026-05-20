@@ -131,7 +131,7 @@ class VectorBackfillWorker(private val boxStore: BoxStore, private val embedder:
         // scope unwinds cleanly and partial progress already committed stays intact.
         throw cancel
     } catch (@Suppress("TooGenericExceptionCaught") error: Exception) {
-        Log.w(TAG, "Vector backfill failed for entry ${entry.id}", error)
+        Log.w(TAG, "Vector backfill failed for entry ${entry.id} (${error.javaClass.simpleName})", error)
         BackfillProgress(processed = 0, failed = 1, skipped = 0)
     }
 
@@ -139,13 +139,19 @@ class VectorBackfillWorker(private val boxStore: BoxStore, private val embedder:
         // Non-COMPLETED rows may still resolve later, so clear the stale cosine signal now but
         // leave the stale schema in place. When extraction finally lands, the COMPLETED row will
         // still qualify for the distilled re-embed pass.
-        val current = entryBox.get(entry.id) ?: return
+        val current = entryBox.get(entry.id) ?: run {
+            Log.w(TAG, "Entry id=${entry.id} disappeared before clearVector; cursor advanced")
+            return
+        }
         current.vector = null
         entryBox.put(current)
     }
 
     private fun markVectorSchemaCurrent(entryBox: Box<EntryEntity>, entry: EntryEntity) {
-        val current = entryBox.get(entry.id) ?: return
+        val current = entryBox.get(entry.id) ?: run {
+            Log.w(TAG, "Entry id=${entry.id} disappeared before markVectorSchemaCurrent; cursor advanced")
+            return
+        }
         current.vectorSchemaVersion = EntryEntity.CURRENT_VECTOR_SCHEMA_VERSION
         entryBox.put(current)
     }
@@ -158,7 +164,10 @@ class VectorBackfillWorker(private val boxStore: BoxStore, private val embedder:
         check(vector.size.toLong() == EntryEntity.EMBEDDING_DIMENSIONS) {
             "Embedder returned ${vector.size}-d vector; expected ${EntryEntity.EMBEDDING_DIMENSIONS}"
         }
-        val current = entryBox.get(entry.id) ?: return
+        val current = entryBox.get(entry.id) ?: run {
+            Log.w(TAG, "Entry id=${entry.id} disappeared mid-embed; vector dropped")
+            return
+        }
         current.vector = vector
         current.vectorSchemaVersion = EntryEntity.CURRENT_VECTOR_SCHEMA_VERSION
         entryBox.put(current)

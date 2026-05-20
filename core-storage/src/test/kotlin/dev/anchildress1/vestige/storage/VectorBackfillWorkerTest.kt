@@ -358,6 +358,45 @@ class VectorBackfillWorkerTest {
         }
 
     @Test
+    fun `clearVector reload path does not put a stale entity when the row is deleted mid-pass`() = runTest {
+        // Cleanup pass clears the vector on FAILED rows. If the row is removed between the query
+        // batch and the put, the worker must NOT resurrect it from the stale in-memory entity.
+        val target = insertEntry(
+            status = ExtractionStatus.FAILED,
+            vector = FloatArray(DIMS) { 1f },
+            vectorSchemaVersion = 0,
+        )
+        val entryBox = boxStore.boxFor<EntryEntity>()
+        entryBox.remove(target)
+        val worker = VectorBackfillWorker(boxStore) { FloatArray(DIMS) }
+
+        worker.backfill()
+
+        assertNull("deleted FAILED row must stay deleted across the clearVector reload", entryBox.get(target))
+    }
+
+    @Test
+    fun `markVectorSchemaCurrent reload path does not resurrect a row deleted mid-pass`() = runTest {
+        // COMPLETED row with terminal receipts that distills to blank text — worker takes the
+        // clearVector + markVectorSchemaCurrent branch. If the row vanishes between the two
+        // reloads, neither put must resurrect.
+        val target = insertEntry(
+            status = ExtractionStatus.COMPLETED,
+            // Empty extraction surfaces produce blank distilled text via buildEmbeddingText.
+            // Setting a terminal payload steers into the schema-bump branch.
+            lensReceiptsJson = """[{"lens":"LITERAL","extracted":false}]""",
+            tagNames = emptyList(),
+        )
+        val entryBox = boxStore.boxFor<EntryEntity>()
+        entryBox.remove(target)
+        val worker = VectorBackfillWorker(boxStore) { FloatArray(DIMS) }
+
+        worker.backfill()
+
+        assertNull("deleted row must stay deleted across both reloads", entryBox.get(target))
+    }
+
+    @Test
     fun `non-positive backfill batch size is rejected`() {
         val worker = VectorBackfillWorker(boxStore) { FloatArray(DIMS) }
         assertThrows(IllegalArgumentException::class.java) {

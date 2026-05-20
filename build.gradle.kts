@@ -94,6 +94,12 @@ kover {
                         "dev.anchildress1.vestige.*MainActivityKt*",
                         "dev.anchildress1.vestige.CaptureViewModelFactory",
                         "dev.anchildress1.vestige.CaptureViewModelFactory*",
+                        "dev.anchildress1.vestige.AppContainer",
+                        "dev.anchildress1.vestige.AppContainer*",
+                        "dev.anchildress1.vestige.VestigeDataExporter",
+                        "dev.anchildress1.vestige.VestigeDataExporter*",
+                        "dev.anchildress1.vestige.lifecycle.BackgroundExtractionService",
+                        "dev.anchildress1.vestige.lifecycle.BackgroundExtractionService*",
                         "dev.anchildress1.vestige.VestigeApplication",
                         "dev.anchildress1.vestige.VestigeApplication*",
                         "dev.anchildress1.vestige.ui.theme.*",
@@ -123,7 +129,7 @@ kover {
                     // INSTRUCTION default — bytecode-level coverage. Kept so the historical
                     // gate continues to fire on raw bytecode regressions.
                     bound {
-                        minValue = 72
+                        minValue = 75
                     }
                 }
                 rule {
@@ -131,7 +137,7 @@ kover {
                     // doesn't ship code that fails the cloud gate.
                     bound {
                         coverageUnits = kotlinx.kover.gradle.plugin.dsl.CoverageUnit.LINE
-                        minValue = 72
+                        minValue = 75
                     }
                 }
                 rule {
@@ -180,6 +186,9 @@ sonar {
                     "**/ui/theme/**",
                     "**/VestigeApplication.kt",
                     "**/MainActivity.kt",
+                    "**/AppContainer.kt",
+                    "**/VestigeDataExporter.kt",
+                    "**/BackgroundExtractionService.kt",
                     "**/LiteRtLmEngine.kt",
                     "**/AudioCapture.kt",
                     // Debug-only fixture seeder, FLAG_DEBUGGABLE-gated; never on a release path.

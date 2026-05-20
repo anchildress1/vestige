@@ -4,6 +4,7 @@ import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dev.anchildress1.vestige.model.PatternState
+import dev.anchildress1.vestige.patterns.PatternDetectionOrchestrator
 import dev.anchildress1.vestige.storage.EntryStore
 import dev.anchildress1.vestige.storage.PatternEntity
 import dev.anchildress1.vestige.storage.PatternRepo
@@ -65,7 +66,7 @@ class PatternsListViewModel(
 
             // Below the detection threshold the honest copy is "keep recording", not
             // "nothing repeating" — there has not yet been a detection pass to find anything.
-            totalEntries < PATTERN_SURFACE_MIN_ENTRIES ->
+            totalEntries < PatternDetectionOrchestrator.PATTERN_SURFACE_MIN_ENTRIES ->
                 PatternsListUiState.Empty(PatternsListUiState.EmptyReason.NO_ENTRIES, totalEntries.toInt())
 
             else -> PatternsListUiState.Empty(PatternsListUiState.EmptyReason.NO_PATTERNS, totalEntries.toInt())
@@ -187,9 +188,5 @@ class PatternsListViewModel(
 
     private companion object {
         const val TAG = "PatternsListVM"
-
-        // The pattern detector runs once every 10 committed entries; below that there is
-        // nothing for it to have surfaced yet.
-        const val PATTERN_SURFACE_MIN_ENTRIES = 10L
     }
 }

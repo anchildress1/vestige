@@ -26,10 +26,11 @@ import java.time.ZoneId
  * Wiring layer called by `BackgroundExtractionSaveFlow` after `completeEntry` so the new entry
  * is already persisted with its tags + template label. Two side effects:
  *
- * 1. Every [DETECTION_INTERVAL]th entry, run [PatternDetector] + upsert results into
- *    [PatternStore]. New patterns get a model-generated title (one short call via
- *    [PatternTitleGenerator]); existing rows update their supporting set and `lastSeenTimestamp`
- *    per ADR-003 step 6.
+ * 1. Once the database has at least [PATTERN_SURFACE_MIN_ENTRIES] completed entries, run
+ *    [PatternDetector] + upsert results into [PatternStore] on **every** committed entry
+ *    (Phase 3 §"end of session" semantics — each capture is its own session). New patterns get
+ *    a model-generated title (one short call via [PatternTitleGenerator]); existing rows update
+ *    their supporting set and `lastSeenTimestamp` per ADR-003 step 6.
  * 2. Select one matching active pattern for the committed entry, filtered by **per-pattern**
  *    callout cooldown (3 entries since that pattern last fired, per ADR-016). When a callout
  *    fires, append a `PATTERN_CALLOUT` observation to the entry and record the firing on that
@@ -67,7 +68,7 @@ class PatternDetectionOrchestrator(
     @Suppress("ReturnCount")
     suspend fun onEntryCommitted(entry: EntryEntity, persona: Persona): EntryObservation? {
         val entryCount = completedEntryCount(boxStore)
-        if (entryCount > 0 && entryCount % DETECTION_INTERVAL == 0L) {
+        if (entryCount >= PATTERN_SURFACE_MIN_ENTRIES) {
             runDetection(persona)
         }
         val matched = chooseMatchingPattern(entry)
@@ -230,7 +231,9 @@ class PatternDetectionOrchestrator(
     }
 
     companion object {
-        const val DETECTION_INTERVAL: Long = 3
+        /** Phase 3 threshold: detection attempts once the database holds at least this many
+         * COMPLETED entries. Below this the pattern engine has no quorum to surface anything. */
+        const val PATTERN_SURFACE_MIN_ENTRIES: Long = 10
         const val MAX_TITLE_CHARS: Int = 24
 
         private const val TAG = "VestigePatternOrch"

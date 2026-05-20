@@ -5,7 +5,6 @@ import androidx.test.platform.app.InstrumentationRegistry
 import dev.anchildress1.vestige.model.ExtractionStatus
 import dev.anchildress1.vestige.storage.CalloutCooldownEntity
 import dev.anchildress1.vestige.storage.EntryEntity
-import dev.anchildress1.vestige.storage.EntryMarkdownRenderer
 import dev.anchildress1.vestige.storage.PatternEntity
 import dev.anchildress1.vestige.storage.TagEntity
 import dev.anchildress1.vestige.ui.onboarding.OnboardingPrefs
@@ -169,10 +168,11 @@ class PartialExportPostBackfillSmokeTest {
                 anticipated.any { expected -> produced.any { it == expected || it.contains(expected) } },
             )
 
-            // Fix #1: markdown shape matches tag cardinality.
+            // Markdown shape must match tag cardinality — read the archived body, not a
+            // re-render through EntryMarkdownRenderer (the exporter uses the same renderer, so
+            // re-rendering would be a tautology).
             val markdown = archive["${VestigeDataExporter.MARKDOWN_EXPORT_DIR}/$filename"]
                 ?: error("export archive missing markdown body for $filename")
-            // EntryMarkdownRenderer is the authority; re-derive against the row we exported.
             val row = rowsById[filename] ?: error("BoxStore lost row for $filename")
             val expectedTagBlock = if (row.tags.isEmpty()) "\ntags: []\n" else "\ntags:\n"
             assertTrue(
@@ -188,12 +188,6 @@ class PartialExportPostBackfillSmokeTest {
                     markdown.indexOf("\ntags:\n"),
                 )
             }
-            // Sanity: rendered markdown is exactly what the live renderer would emit for the row.
-            assertEquals(
-                "row ${sample.id}: archived markdown diverged from EntryMarkdownRenderer output",
-                EntryMarkdownRenderer.render(row),
-                markdown,
-            )
         }
     }
 

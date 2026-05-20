@@ -108,13 +108,28 @@ class MissingExtractionBackfillSmokeTest {
 
     private suspend fun awaitSeedPatternsAreChallengeUsable() {
         withTimeout(PATTERN_SETTLE_TIMEOUT_MS) {
-            while (!seedPatternsAreChallengeUsable()) {
+            // Poll only on the tired vocab-drift pattern — that's the one that requires extraction
+            // to land. Hard assertions (AUDIT-as-pattern leak, weak filler callouts) move OUTSIDE
+            // the polling loop so they fail on the first probe instead of being re-raised every
+            // POLL_INTERVAL_MS and burning the timeout window.
+            while (!tiredVocabDriftPatternIsReady()) {
                 delay(POLL_INTERVAL_MS)
             }
         }
+        assertSeedPatternsAreChallengeUsable()
     }
 
-    private fun seedPatternsAreChallengeUsable(): Boolean {
+    private fun tiredVocabDriftPatternIsReady(): Boolean {
+        val patterns = container.boxStore.boxFor(PatternEntity::class.java).all
+        val tired = patterns.firstOrNull {
+            it.kind == PatternKind.VOCAB_FREQUENCY && it.signatureJson.contains(""""token":"tired"""")
+        } ?: return false
+        if (tired.supportingEntries.size < EXPECTED_VOCAB_ENTRY_COUNT) return false
+        val clusters = VocabClustersCodec.decode(tired.vocabClustersJson)
+        return clusters.size >= EXPECTED_VOCAB_CLUSTER_COUNT
+    }
+
+    private fun assertSeedPatternsAreChallengeUsable() {
         val patterns = container.boxStore.boxFor(PatternEntity::class.java).all
         val auditCatchAll = patterns.filter {
             it.kind == PatternKind.TEMPLATE_RECURRENCE && it.templateLabel == "audit"
@@ -122,21 +137,6 @@ class MissingExtractionBackfillSmokeTest {
         assertTrue(
             "audit is fallback extraction metadata, not a demo pattern: ${auditCatchAll.map { it.title }}",
             auditCatchAll.isEmpty(),
-        )
-
-        val tired = patterns.firstOrNull {
-            it.kind == PatternKind.VOCAB_FREQUENCY && it.signatureJson.contains(""""token":"tired"""")
-        }
-        if (tired == null) return false
-        assertTrue(
-            "tired vocab-drift pattern should carry the full 23-entry seed story; " +
-                "got ${tired.supportingEntries.size}",
-            tired.supportingEntries.size >= EXPECTED_VOCAB_ENTRY_COUNT,
-        )
-        val clusters = VocabClustersCodec.decode(tired.vocabClustersJson)
-        assertTrue(
-            "tired vocab-drift pattern should have at least 3 clustered framings; got $clusters",
-            clusters.size >= EXPECTED_VOCAB_CLUSTER_COUNT,
         )
 
         val weakCallouts = patterns.filter {
@@ -148,7 +148,6 @@ class MissingExtractionBackfillSmokeTest {
                 weakCallouts.map { "${it.title}: ${it.latestCalloutText}" },
             weakCallouts.isEmpty(),
         )
-        return true
     }
 
     private fun mainModelArtifactPresent(): Boolean {

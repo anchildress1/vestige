@@ -183,6 +183,7 @@ class PatternDetailViewModel(
         isTerminal = isTerminalState(state),
         terminalLabel = terminalLabelFor(state, stateChangedTimestamp, lastSeenTimestamp),
         availableActions = availableActionsFor(state),
+        hasVocabClusters = vocabClustersJson.isNotBlank(),
     )
 
     private fun vocabularyFrom(entries: List<EntryEntity>): List<String> {

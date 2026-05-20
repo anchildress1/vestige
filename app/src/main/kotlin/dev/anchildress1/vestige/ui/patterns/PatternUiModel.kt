@@ -97,6 +97,8 @@ sealed interface PatternDetailUiState {
         val isTerminal: Boolean,
         val terminalLabel: TerminalLabel?,
         val availableActions: Set<PatternAction>,
+        /** True when this pattern carries persisted vocab-drift clusters worth a dedicated screen. */
+        val hasVocabClusters: Boolean = false,
     ) : PatternDetailUiState
 }
 

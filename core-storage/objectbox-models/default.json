@@ -121,7 +121,7 @@
     },
     {
       "id": "2:4677060229249736497",
-      "lastPropertyId": "17:1617683440192912261",
+      "lastPropertyId": "18:3650663393935892680",
       "name": "PatternEntity",
       "properties": [
         {
@@ -187,6 +187,11 @@
         {
           "id": "17:1617683440192912261",
           "name": "latestCalloutText",
+          "type": 9
+        },
+        {
+          "id": "18:3650663393935892680",
+          "name": "vocabClustersJson",
           "type": 9
         }
       ],

@@ -55,6 +55,7 @@ fun PatternDetailScreen(
     viewModel: PatternDetailViewModel,
     onBack: () -> Unit,
     onOpenEntry: (Long) -> Unit = {},
+    onOpenVocabDrift: (String) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -85,6 +86,7 @@ fun PatternDetailScreen(
             state = state,
             padding = padding,
             onOpenEntry = onOpenEntry,
+            onOpenVocabDrift = onOpenVocabDrift,
             actions = PatternActionCallbacks(
                 onDrop = { viewModel.drop() },
                 onSkip = { viewModel.skip() },
@@ -99,6 +101,7 @@ private fun PatternDetailBody(
     state: PatternDetailUiState,
     padding: PaddingValues,
     onOpenEntry: (Long) -> Unit,
+    onOpenVocabDrift: (String) -> Unit,
     actions: PatternActionCallbacks<Unit>,
 ) {
     when (state) {
@@ -120,6 +123,7 @@ private fun PatternDetailBody(
             loaded = state,
             padding = padding,
             onOpenEntry = onOpenEntry,
+            onOpenVocabDrift = onOpenVocabDrift,
             actions = actions,
         )
     }
@@ -130,6 +134,7 @@ private fun LoadedBody(
     loaded: PatternDetailUiState.Loaded,
     padding: PaddingValues,
     onOpenEntry: (Long) -> Unit,
+    onOpenVocabDrift: (String) -> Unit,
     actions: PatternActionCallbacks<Unit>,
 ) {
     Column(
@@ -148,6 +153,10 @@ private fun LoadedBody(
         PatternSourcesCard(sources = loaded.sources, onOpenEntry = onOpenEntry)
 
         PatternVocabularyCard(words = loaded.vocabulary)
+
+        if (loaded.hasVocabClusters) {
+            VocabDriftAffordance(onClick = { onOpenVocabDrift(loaded.patternId) })
+        }
 
         loaded.terminalLabel?.let { terminal ->
             val text = terminal.days
@@ -361,4 +370,16 @@ private fun ActionButtonLabel(text: String) {
         softWrap = false,
         overflow = TextOverflow.Ellipsis,
     )
+}
+
+@Composable
+private fun VocabDriftAffordance(onClick: () -> Unit) {
+    OutlinedButton(
+        onClick = onClick,
+        modifier = Modifier
+            .fillMaxWidth()
+            .semantics { role = Role.Button },
+    ) {
+        Text(text = stringResource(R.string.pattern_detail_open_vocab_drift))
+    }
 }

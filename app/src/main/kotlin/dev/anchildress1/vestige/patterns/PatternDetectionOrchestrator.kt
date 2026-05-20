@@ -74,6 +74,7 @@ class PatternDetectionOrchestrator(
         val entryCount = completedEntryCount(boxStore)
         if (entryCount >= patternSurfaceMinEntries) {
             runDetection(persona)
+            vocabClusterUpdater.stampAll()
         }
         val matched = chooseMatchingPattern(entry)
         if (matched == null) {
@@ -126,6 +127,8 @@ class PatternDetectionOrchestrator(
             upsert(pattern, persona)
         }
     }
+
+    private val vocabClusterUpdater = PatternVocabClusterUpdater(boxStore, patternStore)
 
     private suspend fun upsert(detected: DetectedPattern, persona: Persona) {
         val existing = patternStore.findByPatternId(detected.patternId)

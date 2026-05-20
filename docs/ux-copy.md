@@ -469,6 +469,46 @@ If model-detected Closed (read-only state — no action row shown):
 
 ---
 
+## Vocab Drift 🧩
+
+Surfaces from Pattern Detail → "View vocab drift →" when a VOCAB_FREQUENCY pattern has 6+ supporting entries clustered by EmbeddingGemma. Proves the embedding payoff: same underlying state, distinct vocabulary framings that tag matching never connects.
+
+### Affordance (PatternDetail)
+> View vocab drift →
+
+### Eyebrow (top of screen)
+> VOCAB DRIFT
+
+### Headline format
+> "{root_token}" × {total_entries}
+
+Example: `"tired" × 23`. The root token wraps in straight double quotes; total is the sum across clusters.
+
+### Subtitle
+> {K} distinct framings of the same underlying state.
+
+If K = 1:
+> One framing across these entries — vocabulary stayed consistent.
+
+### Distribution bar (a11y)
+Merged content description, no click action:
+> Vocabulary distribution: {label1}: {pct1}%, {label2}: {pct2}%, {label3}: {pct3}%.
+
+### Cluster card
+- **Title** — comma-joined top distinctive tokens (≤24 chars, ellipsized if longer)
+- **Subline** — `{N} entries · framings: a, b, c`
+- **Example snippet** — first 140 chars of the centroid-nearest member, in straight quotes
+
+### Empty / absent states
+
+NotYetClustered (right pattern, no clusters yet):
+> Not enough evidence yet. Vocab drift surfaces after the model finds at least six related entries.
+
+NotFound (wrong pattern id / wrong kind / data invariant break):
+> Vocab drift isn't available for this pattern.
+
+---
+
 ## The Roast (modal bottom sheet)
 
 P1 conditional. Do not implement before the normal Pattern List and Pattern Detail are working with sourced evidence.

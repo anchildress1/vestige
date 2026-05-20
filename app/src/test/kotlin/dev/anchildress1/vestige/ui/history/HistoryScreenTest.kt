@@ -177,7 +177,7 @@ class HistoryScreenTest {
 
         composeRule.setContent { HistoryScreen(viewModel = newViewModel(), persona = Persona.WITNESS) }
         composeRule.onNodeWithContentDescription(
-            "12:16 AM JAN 1 · something happened today · 0 seconds · 3 words",
+            "12:16 AM JAN 1 · something happened today · 0s · 3 words",
         ).assertIsDisplayed()
     }
 

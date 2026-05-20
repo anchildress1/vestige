@@ -12,6 +12,7 @@ internal enum class TemporalRelation(val serial: String) {
 }
 
 internal object TemporalPatternRules {
+    private val CANONICAL_TIME_BLOCKS = setOf("morning", "afternoon", "evening", "night")
     const val MONTH_START_DAY: Int = 1
     private const val MORNING_START_HOUR: Int = 5
     private const val MORNING_END_HOUR: Int = 11
@@ -25,5 +26,11 @@ internal object TemporalPatternRules {
         in AFTERNOON_START_HOUR..AFTERNOON_END_HOUR -> "afternoon"
         in EVENING_START_HOUR..EVENING_END_HOUR -> "evening"
         else -> "night"
+    }
+
+    fun canonicalTimeBlock(raw: String): String {
+        val normalized = TagNormalize.kebab(raw).replace("-", "")
+        return CANONICAL_TIME_BLOCKS.firstOrNull { it == normalized }
+            ?: error("unknown time block '$raw'")
     }
 }

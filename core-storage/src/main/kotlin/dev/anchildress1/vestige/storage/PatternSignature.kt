@@ -63,7 +63,7 @@ internal object PatternSignature {
 
     fun forWeekdayTimeBlock(dayOfWeek: String, timeBlock: String): Signature {
         val canonicalDay = TagNormalize.kebab(dayOfWeek)
-        val canonicalBlock = TagNormalize.kebab(timeBlock)
+        val canonicalBlock = TemporalPatternRules.canonicalTimeBlock(timeBlock)
         val kind = PatternKind.TEMPORAL_RELATIVE.serial
         val relation = TemporalRelation.WEEKDAY_TIME_BLOCK.serial
         val json = "{\"kind\":\"$kind\",\"relation\":\"$relation\"," +

@@ -330,7 +330,12 @@ class CaptureViewModel(
             .mapNotNull { event ->
                 when (event) {
                     is ForegroundStreamEvent.Transcription -> event.text
-                    is ForegroundStreamEvent.Terminal -> (event.result as? ForegroundResult.Success)?.transcription
+
+                    is ForegroundStreamEvent.Terminal -> when (val result = event.result) {
+                        is ForegroundResult.Success -> result.transcription
+                        is ForegroundResult.ParseFailure -> result.recoveredTranscription
+                    }
+
                     is ForegroundStreamEvent.FollowUpDelta -> null
                 }
             }

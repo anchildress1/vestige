@@ -210,6 +210,32 @@ class CaptureViewModelTest {
         }
 
     @Test
+    fun `parse failure with recovered transcription still persists the entry`() = runTest(dispatcher) {
+        val audio = AudioChunk(FloatArray(16), 16_000, isFinal = true)
+        val voice = FakeVoiceCapture(result = audio)
+        val save = RecordingSaveAndExtract(entryId = 4L)
+        val vm = newViewModel(
+            voice = voice,
+            inference = ForegroundInferenceCall { _, _ ->
+                flowOf(ForegroundStreamEvent.Terminal(parseFailure(recoveredTranscription = "recovered words")))
+            },
+            textInference = ForegroundTextInferenceCall { _, _, _ ->
+                flowOf(ForegroundStreamEvent.Terminal(successResult("recovered words", "what did you leave out?")))
+            },
+            save = save,
+            initialReadiness = ModelReadiness.Ready,
+        )
+
+        vm.startRecording()
+        voice.completeWithResult()
+        advanceUntilIdle()
+
+        assertEquals("recovered words", save.lastText)
+        assertEquals(1, save.invocations.get())
+        assertTrue(vm.state.value is CaptureUiState.Submitting)
+    }
+
+    @Test
     fun `inference engine failure on call-1 surfaces ENGINE_FAILED`() = runTest(dispatcher) {
         val audio = AudioChunk(FloatArray(16), 16_000, isFinal = true)
         val voice = FakeVoiceCapture(result = audio)

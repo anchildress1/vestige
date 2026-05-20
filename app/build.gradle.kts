@@ -189,6 +189,7 @@ val objectBoxBackedAppTests = setOf(
     "dev.anchildress1.vestige.AppContainerTest",
     "dev.anchildress1.vestige.VestigeDataExporterTest",
     "dev.anchildress1.vestige.debug.DebugPatternSeederTest",
+    "dev.anchildress1.vestige.lifecycle.BackgroundExtractionServiceIntegrationTest",
     "dev.anchildress1.vestige.patterns.PatternDetectionOrchestratorAnalysisTest",
     "dev.anchildress1.vestige.patterns.PatternDetectionOrchestratorTest",
     "dev.anchildress1.vestige.ui.history.EntryDetailScreenTest",

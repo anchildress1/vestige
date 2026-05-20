@@ -102,9 +102,14 @@ class PatternSignatureTest {
         assertEquals(PatternKind.TEMPORAL_RELATIVE, a.kind)
         assertEquals(
             "{\"kind\":\"temporal_relative\",\"relation\":\"weekday_time_block\"," +
-                "\"day_of_week\":\"tuesday\",\"time_block\":\"after-noon\"}",
+                "\"day_of_week\":\"tuesday\",\"time_block\":\"afternoon\"}",
             a.json,
         )
+    }
+
+    @Test(expected = IllegalStateException::class)
+    fun `weekday time-block signature rejects non-canonical blocks that cannot match`() {
+        PatternSignature.forWeekdayTimeBlock("Tuesday", "late-lunch")
     }
 
     @Test

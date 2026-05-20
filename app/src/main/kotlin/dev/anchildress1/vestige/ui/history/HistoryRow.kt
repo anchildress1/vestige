@@ -21,19 +21,16 @@ import dev.anchildress1.vestige.ui.components.VestigeListCard
 import dev.anchildress1.vestige.ui.components.VestigeListCardInteraction
 import dev.anchildress1.vestige.ui.theme.VestigeTheme
 
-private const val MS_PER_SECOND = 1_000L
-
 @Composable
 fun HistoryRow(summary: HistorySummary, onClick: (() -> Unit)?, modifier: Modifier = Modifier) {
     val colors = VestigeTheme.colors
-    val seconds = summary.durationMs / MS_PER_SECOND
     val durationLabel = summary.durationMs
         .takeIf { it > 0L }
         ?.let(HistoryDurationFormatter::format)
         ?: "0s"
     val meta = "$durationLabel · ${summary.wordCount} WORDS"
     val a11yDesc = "${summary.timeLabel} ${summary.dateLabel} · ${summary.snippet} · " +
-        "$seconds seconds · ${summary.wordCount} words"
+        "$durationLabel · ${summary.wordCount} words"
 
     VestigeListCard(
         modifier = modifier

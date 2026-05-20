@@ -35,6 +35,7 @@ fun PatternsHost( // NOSONAR kotlin:S107
 ) {
     var openPatternId by rememberSaveable { mutableStateOf<String?>(null) }
     var openEntryId by rememberSaveable { mutableStateOf<Long?>(null) }
+    var openVocabDriftPatternId by rememberSaveable { mutableStateOf<String?>(null) }
     var highlightEntryOnOpen by rememberSaveable { mutableStateOf(false) }
     val revision by dataRevision.collectAsStateWithLifecycle()
     val listViewModel = remember(patternStore, patternRepo, entryStore) {
@@ -43,12 +44,25 @@ fun PatternsHost( // NOSONAR kotlin:S107
     val detailViewModel = remember(openPatternId, patternStore, patternRepo, entryStore) {
         openPatternId?.let { PatternDetailViewModel(it, patternStore, patternRepo, entryStore) }
     }
-    LaunchedEffect(revision, detailViewModel) {
+    val vocabDriftViewModel = remember(openVocabDriftPatternId, patternStore, entryStore) {
+        openVocabDriftPatternId?.let { VocabDriftViewModel(it, patternStore, entryStore) }
+    }
+    LaunchedEffect(revision, detailViewModel, vocabDriftViewModel) {
         listViewModel.refresh()
         detailViewModel?.refresh()
+        vocabDriftViewModel?.refresh()
     }
 
     when {
+        vocabDriftViewModel != null -> {
+            BackHandler { openVocabDriftPatternId = null }
+            VocabDriftScreen(
+                viewModel = vocabDriftViewModel,
+                onBack = { openVocabDriftPatternId = null },
+                modifier = modifier,
+            )
+        }
+
         openEntryId != null -> PatternEntryDetailRoute(
             entryId = openEntryId!!,
             entryStore = entryStore,
@@ -105,6 +119,7 @@ fun PatternsHost( // NOSONAR kotlin:S107
                     openEntryId = it
                     highlightEntryOnOpen = true
                 },
+                onOpenVocabDrift = { openVocabDriftPatternId = it },
                 modifier = modifier,
             )
         }

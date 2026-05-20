@@ -4,11 +4,14 @@ import dev.anchildress1.vestige.model.ExtractionStatus
 import dev.anchildress1.vestige.model.PatternKind
 import dev.anchildress1.vestige.model.PatternState
 import dev.anchildress1.vestige.storage.CalloutCooldownEntity
+import dev.anchildress1.vestige.storage.EmbeddingClustering
 import dev.anchildress1.vestige.storage.EntryEntity
 import dev.anchildress1.vestige.storage.MarkdownEntryStore
 import dev.anchildress1.vestige.storage.PatternEntity
 import dev.anchildress1.vestige.storage.PatternStore
 import dev.anchildress1.vestige.storage.TagEntity
+import dev.anchildress1.vestige.storage.VocabClusterLabeler
+import dev.anchildress1.vestige.storage.VocabClustersCodec
 import io.objectbox.BoxStore
 import java.io.File
 import java.security.MessageDigest
@@ -29,6 +32,23 @@ object DebugPatternSeeder {
         val supporting: List<EntryEntity>,
     )
 
+    private data class SeedEntryFixture(val text: String, val durationMs: Long)
+
+    private val NARRATIVE_SEED_ENTRIES: List<SeedEntryFixture> = listOf(
+        SeedEntryFixture("crashed after standup, wired until 2am", 18_000L),
+        SeedEntryFixture("tuesday meeting again, same concrete shoes", 22_000L),
+        SeedEntryFixture("wrote that doc in one sitting, surprising", 15_000L),
+        SeedEntryFixture("wired until 2am, can't tell if good or bad", 27_000L),
+        SeedEntryFixture("another tuesday, another aftermath", 12_000L),
+        SeedEntryFixture("shipped the thing, immediate crash", 20_000L),
+        SeedEntryFixture("decided to rewrite the migration, third time this week", 28_000L),
+        SeedEntryFixture("rewrote it again, this version is the one", 19_000L),
+        SeedEntryFixture("tuesday standup landed harder than expected", 24_000L),
+        SeedEntryFixture("audit cycle hit; reviewed everything twice", 16_000L),
+        SeedEntryFixture("concrete shoes on the morning standup", 11_000L),
+        SeedEntryFixture("crashed at 3pm, no warning, just gone", 25_000L),
+    )
+
     @Suppress("MagicNumber") // Fixture timestamps + corpus shape are deliberately concrete.
     fun seed(filesDir: File, boxStore: BoxStore, patternStore: PatternStore) {
         val markdownStore = MarkdownEntryStore(filesDir)
@@ -39,23 +59,8 @@ object DebugPatternSeeder {
             boxStore.boxFor(TagEntity::class.java).removeAll()
             boxStore.boxFor(CalloutCooldownEntity::class.java).removeAll()
 
-            data class SeedEntry(val text: String, val durationMs: Long)
-            val seedEntries = listOf(
-                SeedEntry("crashed after standup, wired until 2am", 18_000L),
-                SeedEntry("tuesday meeting again, same concrete shoes", 22_000L),
-                SeedEntry("wrote that doc in one sitting, surprising", 15_000L),
-                SeedEntry("wired until 2am, can't tell if good or bad", 27_000L),
-                SeedEntry("another tuesday, another aftermath", 12_000L),
-                SeedEntry("shipped the thing, immediate crash", 20_000L),
-                SeedEntry("decided to rewrite the migration, third time this week", 28_000L),
-                SeedEntry("rewrote it again, this version is the one", 19_000L),
-                SeedEntry("tuesday standup landed harder than expected", 24_000L),
-                SeedEntry("audit cycle hit; reviewed everything twice", 16_000L),
-                SeedEntry("concrete shoes on the morning standup", 11_000L),
-                SeedEntry("crashed at 3pm, no warning, just gone", 25_000L),
-            )
             val baseMs = System.currentTimeMillis() - DAY_MS * ENTRY_COUNT
-            val entries = seedEntries.mapIndexed { idx, seed ->
+            val entries = NARRATIVE_SEED_ENTRIES.mapIndexed { idx, seed ->
                 EntryEntity(
                     markdownFilename = "debug-seed-$idx.md",
                     entryText = seed.text,
@@ -93,7 +98,100 @@ object DebugPatternSeeder {
                     supporting = listOf(entries[6], entries[7], entries[2]),
                 ),
             )
+
+            seedVocabDrift(boxStore, patternStore, markdownStore, baseMs)
         }
+    }
+
+    /**
+     * 23 entries describing the same underlying state ("tired") across three vocabulary
+     * clusters. Synthetic embeddings put each cluster on its own axis so the on-device clustering
+     * pipeline produces three groups deterministically. The pattern row is pre-stamped with the
+     * encoded clusters so the Vocab Drift screen renders before the next save runs the
+     * orchestrator's second pass.
+     */
+    @Suppress("MagicNumber") // Fixture cluster sizes + vector centroids are deliberately fixed.
+    private fun seedVocabDrift(
+        boxStore: BoxStore,
+        patternStore: PatternStore,
+        markdownStore: MarkdownEntryStore,
+        baseMs: Long,
+    ) {
+        val tiredEntries = persistVocabEntries(
+            boxStore = boxStore,
+            markdownStore = markdownStore,
+            baseMs = baseMs,
+            cluster0 = VOCAB_DRIFT_EXHAUSTION,
+            cluster1 = VOCAB_DRIFT_FOG,
+            cluster2 = VOCAB_DRIFT_WIRED_TIRED,
+        )
+
+        val pattern = PatternEntity(
+            patternId = sha256Hex("vocab-frequency-tired"),
+            kind = PatternKind.VOCAB_FREQUENCY,
+            signatureJson = """{"kind":"vocab_frequency","token":"tired"}""",
+            title = "Tired",
+            templateLabel = null,
+            firstSeenTimestamp = tiredEntries.minOf { it.timestampEpochMs },
+            lastSeenTimestamp = tiredEntries.maxOf { it.timestampEpochMs },
+            state = PatternState.ACTIVE,
+            stateChangedTimestamp = System.currentTimeMillis(),
+            latestCalloutText = "'tired' shows up across ${tiredEntries.size} entries in three distinct framings.",
+        )
+        patternStore.put(pattern)
+        val saved = patternStore.findByPatternId(pattern.patternId)
+            ?: error("debug seed: vocab-drift pattern did not persist")
+        saved.supportingEntries.addAll(tiredEntries)
+        // Run the same clustering pipeline production would so the screen has data immediately,
+        // independent of whether the orchestrator's second pass has run yet.
+        val clusters = EmbeddingClustering.cluster(tiredEntries)
+        if (clusters.isNotEmpty()) {
+            saved.vocabClustersJson = VocabClustersCodec.encode(
+                clusters.map { VocabClusterLabeler.label(it, rootToken = "tired") },
+            )
+        }
+        patternStore.put(saved)
+    }
+
+    @Suppress("LongParameterList")
+    private fun persistVocabEntries(
+        boxStore: BoxStore,
+        markdownStore: MarkdownEntryStore,
+        baseMs: Long,
+        cluster0: List<String>,
+        cluster1: List<String>,
+        cluster2: List<String>,
+    ): List<EntryEntity> {
+        val box = boxStore.boxFor(EntryEntity::class.java)
+        val results = mutableListOf<EntryEntity>()
+        var indexWithinDay = 0
+        val triplets = listOf(cluster0 to 0, cluster1 to 1, cluster2 to 2)
+        triplets.forEach { (texts, axis) ->
+            texts.forEach { text ->
+                val entry = EntryEntity(
+                    markdownFilename = "debug-vocab-${results.size}.md",
+                    entryText = text,
+                    timestampEpochMs = baseMs + indexWithinDay * VOCAB_ENTRY_STEP_MS,
+                    durationMs = VOCAB_ENTRY_DURATION_MS,
+                    extractionStatus = ExtractionStatus.COMPLETED,
+                )
+                entry.vector = syntheticVector(axis)
+                box.put(entry)
+                markdownStore.write(entry)
+                results.add(entry)
+                indexWithinDay += 1
+            }
+        }
+        return results
+    }
+
+    private fun syntheticVector(axis: Int): FloatArray {
+        val v = FloatArray(VECTOR_DIMENSIONS)
+        // One-hot on the cluster's axis with a tiny perturbation on a non-axis index — that
+        // lets the cosine metric separate the three groups cleanly without bit-identical members.
+        v[axis * VECTOR_AXIS_STRIDE] = VECTOR_AXIS_PRIMARY
+        v[(axis * VECTOR_AXIS_STRIDE + 1) % VECTOR_DIMENSIONS] = VECTOR_AXIS_PERTURB
+        return v
     }
 
     private fun seedPattern(patternStore: PatternStore, fixture: SeedPattern) {
@@ -131,4 +229,47 @@ object DebugPatternSeeder {
         }
 
     private const val DAY_MS: Long = 24L * 60 * 60 * 1000
+
+    /** Matches [dev.anchildress1.vestige.storage.EntryEntity.EMBEDDING_DIMENSIONS]. */
+    private const val VECTOR_DIMENSIONS: Int = 768
+
+    /** Spacing between cluster centroids so each axis lands distinctly in 768-d space. */
+    private const val VECTOR_AXIS_STRIDE: Int = 200
+
+    private const val VOCAB_ENTRY_STEP_MS: Long = 6L * 60 * 60 * 1000 // 6 hrs between entries
+    private const val VOCAB_ENTRY_DURATION_MS: Long = 14_000L
+    private const val VECTOR_AXIS_PRIMARY: Float = 1.0f
+    private const val VECTOR_AXIS_PERTURB: Float = 0.01f
+
+    private val VOCAB_DRIFT_EXHAUSTION: List<String> = listOf(
+        "exhausted again, every limb gave up at once",
+        "drained to the bone, eyes won't focus",
+        "wiped out, no energy left for anything",
+        "running on empty, fumes only",
+        "depleted, body feels heavier than yesterday",
+        "drained, drained, drained, can't write it any other way",
+        "exhausted by 10am, that's a new floor",
+        "wiped, the kind that ignores caffeine",
+    )
+
+    private val VOCAB_DRIFT_FOG: List<String> = listOf(
+        "sluggish, the brain fog is back",
+        "foggy, can't string two sentences together",
+        "burnt out, attention skating across everything",
+        "brain fog, the cursor blinks faster than I think",
+        "sluggish, every task takes twice as long",
+        "foggy and slow, mind moving through molasses",
+        "burnt out, the screen looks blurry from inside out",
+        "brain fog, started three sentences, finished none",
+    )
+
+    private val VOCAB_DRIFT_WIRED_TIRED: List<String> = listOf(
+        "wired-tired, body wants sleep, brain refuses",
+        "anxious-tired, lying down doesn't count as rest",
+        "can't sleep, exhausted but the static won't quit",
+        "amped but exhausted, my body and brain disagree",
+        "wired-tired again, third night in a row",
+        "anxious-tired, eyes closed, chest racing",
+        "can't sleep, can't focus, both tanks empty",
+    )
 }

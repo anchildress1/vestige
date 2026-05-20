@@ -77,6 +77,7 @@
     <string name="pattern_detail_seen_in">Seen in:</string>
     <string name="pattern_detail_no_sources">No entries logged for this pattern yet.</string>
     <string name="pattern_detail_not_found">Pattern not found.</string>
+    <string name="pattern_detail_open_vocab_drift">View vocab drift →</string>
     <string name="pattern_detail_intensity_eyebrow">INTENSITY · 30 DAYS</string>
     <string name="pattern_detail_words_used">WORDS YOU USED</string>
     <!-- Action labels per docs/ux-copy.md §"Pattern List / Card actions" + spec-pattern-action-buttons.md.

@@ -659,7 +659,8 @@ class AppContainer(
             boxStore.boxFor(PatternEntity::class.java).removeAll()
             boxStore.boxFor(TagEntity::class.java).removeAll()
             boxStore.boxFor(CalloutCooldownEntity::class.java).removeAll()
-            if (!File(applicationContext.filesDir, "entries").deleteRecursively()) {
+            val legacyEntriesDir = File(applicationContext.filesDir, "entries")
+            if (legacyEntriesDir.exists() && !legacyEntriesDir.deleteRecursively()) {
                 Log.w(TAG, "Failed to delete legacy markdown directory")
             }
             Log.i(TAG, "All user data wiped on explicit request")

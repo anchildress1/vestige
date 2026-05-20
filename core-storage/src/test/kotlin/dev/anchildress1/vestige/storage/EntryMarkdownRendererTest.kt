@@ -83,7 +83,7 @@ class EntryMarkdownRendererTest {
         assertTrue(markdown.contains("recurrence_link: null"))
         assertTrue(markdown.contains("stated_commitment: null"))
         assertTrue(markdown.contains("confidence: {}"))
-        assertTrue(markdown.contains("entry_observations: {}"))
+        assertTrue(markdown.contains("entry_observations: []"))
         assertTrue(markdown.contains("lens_receipts: []"))
         assertTrue(markdown.endsWith("\nalready newline\n"))
     }

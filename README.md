@@ -205,7 +205,7 @@ make reinstall  # reinstall APK, push models, seed debug fixtures, tail logcat
 make reinstall EXTRACT=1
 ```
 
-Use `EXTRACT=1` when the demo corpus must look like real captured data: after seeding, the debug receiver queues the same LiteRT-LM background extraction path used by saved entries and backfills missing lens receipts in place. Fixture entry timestamps are explicit UTC demo timestamps from 2026-05-05 through 2026-05-20, so history/pattern logic evaluates them as if they were actually created at those times. The seeded corpus is idempotent; rerunning the command wipes and reloads the debug entries.
+Use `EXTRACT=1` when the demo corpus must look like real captured data: after seeding, the debug receiver queues the same LiteRT-LM background extraction path used by saved entries and backfills missing lens receipts in place. Fixture entry timestamps are explicit UTC demo timestamps from 2026-05-01 through 2026-05-20, so history/pattern logic evaluates them as if they were actually created at those times. The seeded corpus is idempotent; rerunning the command wipes and reloads the debug entries.
 
 Required local artifact filenames match [`core-model/src/main/resources/model/manifest.properties`](core-model/src/main/resources/model/manifest.properties):
 

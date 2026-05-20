@@ -230,9 +230,20 @@ class EntryStore(private val boxStore: BoxStore) {
 
     private fun uniqueMarkdownFilename(box: io.objectbox.Box<EntryEntity>, entry: EntryEntity): String {
         val baseName = EntryFilename.buildFilename(entry.timestampEpochMs, entry.entryText)
-        val existing = box.all.map { it.markdownFilename }.filter(String::isNotBlank).toSet()
-        return EntryFilename.resolveUnique(baseName, existing)
+        if (!markdownFilenameExists(box, baseName)) return baseName
+        val stem = baseName.removeSuffix(".md")
+        var suffix = 2
+        while (true) {
+            val candidate = "$stem-$suffix.md"
+            if (!markdownFilenameExists(box, candidate)) return candidate
+            suffix++
+        }
     }
+
+    private fun markdownFilenameExists(box: io.objectbox.Box<EntryEntity>, filename: String): Boolean = box.query()
+        .equal(EntryEntity_.markdownFilename, filename, QueryBuilder.StringOrder.CASE_SENSITIVE)
+        .build()
+        .use { it.count() > 0 }
 
     private fun applyResolved(entry: EntryEntity, resolved: ResolvedExtraction, templateLabel: TemplateLabel?) {
         entry.templateLabel = templateLabel

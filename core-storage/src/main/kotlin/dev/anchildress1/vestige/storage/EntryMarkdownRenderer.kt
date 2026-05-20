@@ -24,7 +24,7 @@ object EntryMarkdownRenderer {
         append("tags:").append('\n')
         tagNames(entry).forEach { tag -> appendLine("  - $tag") }
         append("confidence: ").append(yamlJsonInline(entry.confidenceJson)).append('\n')
-        append("entry_observations: ").append(yamlJsonInline(entry.entryObservationsJson)).append('\n')
+        append("entry_observations: ").append(yamlJsonArrayInline(entry.entryObservationsJson)).append('\n')
         append("lens_receipts: ").append(yamlJsonInline(entry.lensReceiptsJsonOrEmpty)).append('\n')
         append(FRONTMATTER_FENCE).append('\n')
         append('\n')
@@ -42,6 +42,8 @@ object EntryMarkdownRenderer {
     private fun yamlJsonBlob(value: String?): String = if (value == null) NULL else value
 
     private fun yamlJsonInline(value: String): String = value.ifBlank { "{}" }
+
+    private fun yamlJsonArrayInline(value: String): String = value.ifBlank { "[]" }
 
     private fun tagNames(entry: EntryEntity): List<String> = runCatching { entry.tags.map { it.name }.sorted() }
         .getOrDefault(emptyList())

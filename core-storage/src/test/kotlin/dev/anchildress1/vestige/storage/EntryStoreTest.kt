@@ -426,6 +426,18 @@ class EntryStoreTest {
         assertNotEquals("", firstName)
     }
 
+    @Test
+    fun `createPendingEntry appends suffix when export filename collides`() {
+        val firstId = entryStore.createPendingEntry(SAMPLE_TEXT, SAMPLE_INSTANT)
+        val secondId = entryStore.createPendingEntry(SAMPLE_TEXT, SAMPLE_INSTANT)
+
+        val firstName = boxStore.boxFor<EntryEntity>().get(firstId).markdownFilename
+        val secondName = boxStore.boxFor<EntryEntity>().get(secondId).markdownFilename
+
+        assertEquals("2026-05-15T07-21-24Z--standup-ran-long-fine-then-compl.md", firstName)
+        assertEquals("2026-05-15T07-21-24Z--standup-ran-long-fine-then-compl-2.md", secondName)
+    }
+
     private fun resolvedSample() = ResolvedExtraction(
         mapOf(
             "tags" to ResolvedField(

@@ -81,7 +81,7 @@ class PatternDetectionOrchestratorTest {
             clock = clock,
             zoneId = ZoneOffset.UTC,
             // Tests verify the cadence semantic; production threshold lives in the companion.
-            patternSurfaceMinEntries = TEST_DETECTION_THRESHOLD,
+            patternDetectionCadence = TEST_DETECTION_THRESHOLD,
         )
     }
 
@@ -156,7 +156,7 @@ class PatternDetectionOrchestratorTest {
             cooldownStore = cooldownStore,
             clock = clock,
             zoneId = ZoneOffset.UTC,
-            patternSurfaceMinEntries = Long.MAX_VALUE,
+            patternDetectionCadence = Long.MAX_VALUE,
         )
     }
 
@@ -521,7 +521,7 @@ class PatternDetectionOrchestratorTest {
             cooldownStore = cooldownStore,
             clock = laterClock,
             zoneId = ZoneOffset.UTC,
-            patternSurfaceMinEntries = TEST_DETECTION_THRESHOLD,
+            patternDetectionCadence = TEST_DETECTION_THRESHOLD,
         )
         // Three more matching entries → detection upserts and promotes the row to ACTIVE.
         repeat(3) {
@@ -591,7 +591,7 @@ class PatternDetectionOrchestratorTest {
             cooldownStore = cooldownStore,
             clock = clock,
             zoneId = ZoneOffset.UTC,
-            patternSurfaceMinEntries = TEST_DETECTION_THRESHOLD,
+            patternDetectionCadence = TEST_DETECTION_THRESHOLD,
         )
 
         fallbackOrchestrator.onEntryCommitted(putEntry(templateLabel = TemplateLabel.AFTERMATH), Persona.WITNESS)
@@ -645,7 +645,7 @@ class PatternDetectionOrchestratorTest {
             cooldownStore = cooldownStore,
             clock = clock,
             zoneId = ZoneOffset.UTC,
-            patternSurfaceMinEntries = 4L,
+            patternDetectionCadence = 4L,
         )
 
         raceOrchestrator.onEntryCommitted(putEntry(templateLabel = TemplateLabel.AFTERMATH), Persona.WITNESS)
@@ -692,7 +692,7 @@ class PatternDetectionOrchestratorTest {
             cooldownStore = cooldownStore,
             clock = clock,
             zoneId = ZoneOffset.UTC,
-            patternSurfaceMinEntries = TEST_DETECTION_THRESHOLD,
+            patternDetectionCadence = TEST_DETECTION_THRESHOLD,
         )
 
         freshOrchestrator.onEntryCommitted(
@@ -735,7 +735,7 @@ class PatternDetectionOrchestratorTest {
             cooldownStore = cooldownStore,
             clock = clock,
             zoneId = ZoneOffset.UTC,
-            patternSurfaceMinEntries = TEST_DETECTION_THRESHOLD,
+            patternDetectionCadence = TEST_DETECTION_THRESHOLD,
         )
 
         cancelOrchestrator.onEntryCommitted(putEntry(templateLabel = TemplateLabel.AFTERMATH), Persona.WITNESS)

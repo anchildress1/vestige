@@ -36,7 +36,7 @@ import java.time.ZoneId
  * doesn't muzzle anyone else. Entry 3 fires nothing (both patterns are in cooldown). Entry 4
  * fires nothing. Entry 5 — first-fired pattern's window has counted down to 0 — fires again.
  *
- * Detection itself is gated off via `patternSurfaceMinEntries = Long.MAX_VALUE` so the
+ * Detection itself is gated off via `patternDetectionCadence = Long.MAX_VALUE` so the
  * pre-seeded patterns are the only ones the orchestrator considers.
  *
  *   ./gradlew :app:connectedDebugAndroidTest \
@@ -69,7 +69,7 @@ class PatternCooldownSmokeTest {
                 clock = clock,
                 zoneId = zone,
                 // Detection disabled — the test verifies cooldown behavior on pre-seeded patterns.
-                patternSurfaceMinEntries = Long.MAX_VALUE,
+                patternDetectionCadence = Long.MAX_VALUE,
             )
 
             patternStore.put(seedPattern(PATTERN_A_ID, "A loud.", lastSeen = 9L))

@@ -79,7 +79,7 @@ class PatternDetectionOrchestratorAnalysisTest {
             // Production threshold (companion default) is 10. These tests assert temporal-analysis
             // wiring on a handful of seeded entries; pin a small threshold so detection actually
             // runs at the cadence the test authors designed around.
-            patternSurfaceMinEntries = 3L,
+            patternDetectionCadence = 3L,
         )
     }
 

@@ -99,7 +99,7 @@ class PatternsListScreenTest {
 
     @Test
     fun `stat ribbon is absent below the detection threshold`() {
-        // Two COMPLETED entries — one below PATTERN_SURFACE_MIN_ENTRIES, so still NO_ENTRIES.
+        // Two COMPLETED entries — one below PATTERN_DETECTION_CADENCE, so still NO_ENTRIES.
         repeat(2) { seedEntry("entry $it", ExtractionStatus.COMPLETED) }
         composeRule.setContent { PatternsListScreen(viewModel = newViewModel(), onOpenPattern = {}) }
         composeRule.onNodeWithText("NOTHING TO READ YET.").assertIsDisplayed()

@@ -45,7 +45,7 @@
 
 ## About
 
-Vestige observes behavioral traces and surfaces patterns without therapy framing, mood scoring, or wellness vocabulary. It runs Gemma 4 E4B locally via LiteRT-LM — your voice never leaves the device, the audio bytes are discarded after inference, and entries are stored as plain markdown you can export at any time.
+Vestige observes behavioral traces and surfaces patterns without therapy framing, mood scoring, or wellness vocabulary. It runs Gemma 4 E4B locally via LiteRT-LM — your voice never leaves the device, the audio bytes are discarded after inference, and entries can be exported as readable markdown at any time.
 
 The positioning is deliberate: cognition tracker, not journal app. Patterns are sourced — every claim cites the entries it counted. Full product spec: [`docs/concept-locked.md`](docs/concept-locked.md).
 
@@ -67,7 +67,7 @@ The active `feat/onboarding-final-polish` branch brings every surface to pixel p
 | Multi-lens extraction | Each entry runs through 3 lenses × 5 surfaces; convergence determines per-field confidence. See [ADR-002](docs/adrs/ADR-002-multi-lens-extraction-pattern.md). |
 | Three personas | Witness / Hardass / Editor — tone-only variants. They do not fork extraction logic. |
 | Pattern detection | Five primitives counted over the last 90 days; sourced (counts, dates, snippets), no feelings or motivation interpretation. See [ADR-003](docs/adrs/ADR-003-pattern-detection-and-persistence.md). |
-| Markdown source-of-truth | One file per entry, exportable, schema-versioned. ObjectBox is a structured cache, not the source. |
+| Storage | ObjectBox is the internal source of truth. Export renders readable markdown from rows on demand. |
 | Pattern lifecycle | Skip (returns in 7 days) / Drop (noise, archived) / Restart, with Undo. Closure is model-detected only — v1.5. |
 | Export | System-picker (SAF) zip of per-entry markdown. No storage permission; failures surface, never silent. |
 | Hybrid retrieval | Keyword + tags + recency. Vector layer (EmbeddingGemma 300M) ships only if STT-E passes. |
@@ -80,7 +80,7 @@ The active `feat/onboarding-final-polish` branch brings every surface to pixel p
 - Kotlin `2.3.21` + Jetpack Compose (BOM `2026.05.00`), AGP `9.2.1`
 - Gradle KTS + version catalog ([`gradle/libs.versions.toml`](gradle/libs.versions.toml))
 - Gemma 4 E4B via LiteRT-LM (`com.google.ai.edge.litertlm:litertlm-android:0.11.0`), on-device only
-- ObjectBox `5.4.2` (structured tags + pattern store) + markdown (entry source-of-truth)
+- ObjectBox `5.4.2` (entries, tags, patterns, vectors) + generated markdown export
 - Android `minSdk 31` / `targetSdk 35` / `compileSdk 36`, JVM toolchain 25 (Java source/target compat 17)
 
 ---
@@ -99,17 +99,17 @@ flowchart TB
       Coord["InferenceCoordinator<br/>foreground call → background 3-lens"]
       Gemma[("Gemma 4 E4B<br/>via LiteRT-LM")]
       Resolver["Convergence Resolver<br/>canonical · candidate · ambiguous"]
-      Markdown[("markdown<br/>source-of-truth")]
-      ObjectBox[("ObjectBox<br/>tags + patterns")]
+      ObjectBox[("ObjectBox<br/>entries · tags · patterns")]
+      Export[("Export renderer<br/>markdown + JSON snapshot")]
       Patterns["Pattern Detection<br/>5 primitives · every 10 entries"]
 
       Audio --> Coord
       Coord -- "prompt + audio" --> Gemma
       Gemma -- "transcription + lens output" --> Coord
       Coord --> Resolver
-      Resolver --> Markdown
       Resolver --> ObjectBox
-      Markdown --> Patterns
+      ObjectBox --> Patterns
+      ObjectBox --> Export
       ObjectBox --> Patterns
       Patterns --> ObjectBox
     end
@@ -126,7 +126,7 @@ Module boundaries: `:app` (UI), `:core-inference` (LiteRT-LM + lens composition)
 ├── app/                       # :app — Compose UI, navigation, AppContainer (manual DI)
 ├── core-model/                # :core-model — domain types, manifests, no Android deps
 ├── core-inference/            # :core-inference — LiteRT-LM engine + 3-lens composition
-├── core-storage/              # :core-storage — ObjectBox + markdown source-of-truth
+├── core-storage/              # :core-storage — ObjectBox rows + export markdown renderer
 ├── docs/                      # canonical product/architecture/UX spec
 │   ├── README.md              # reading order + file inventory
 │   ├── PRD.md                 # P0/P1/P2 requirements + phase schedule
@@ -195,6 +195,32 @@ Reference device: Galaxy S24 Ultra. External devices are best-effort; submission
 ```bash
 make install    # assemble + adb install debug APK without wiping app data
 make reinstall  # reinstall APK, push models, seed debug fixtures, tail logcat
+```
+
+**Demo data**
+
+`make reinstall` runs the dev path by default: clean debug install, push the local model artifacts from `~/Downloads`, seed deterministic fixture entries + pattern cards, launch, then tail logcat.
+
+```bash
+make reinstall EXTRACT=1
+```
+
+- `EXTRACT=1` runs the LiteRT-LM background extraction over the seeded corpus so cards land with real lens receipts (matches saved-entry shape).
+- Seed timestamps span `2026-05-01` → `2026-05-20` (UTC); pattern / history logic evaluates them at those dates.
+- Idempotent — re-running the command wipes and reloads the debug entries.
+
+Required local artifact filenames match [`core-model/src/main/resources/model/manifest.properties`](core-model/src/main/resources/model/manifest.properties):
+
+```text
+~/Downloads/gemma-4-E4B-it.litertlm
+~/Downloads/embeddinggemma-300M_seq512_mixed-precision.tflite
+~/Downloads/sentencepiece.model
+```
+
+For a production first-run check with no pushed model and no fixtures:
+
+```bash
+make reinstall ENV=prod
 ```
 
 **One-time phone setup**

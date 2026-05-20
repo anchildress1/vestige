@@ -21,6 +21,7 @@ import dev.anchildress1.vestige.inference.PatternTitleGenerator
 import dev.anchildress1.vestige.lifecycle.BackgroundExtractionLifecycleStateMachine
 import dev.anchildress1.vestige.lifecycle.BackgroundExtractionService
 import dev.anchildress1.vestige.lifecycle.BackgroundExtractionStatusBus
+import dev.anchildress1.vestige.lifecycle.isForegroundServiceStartNotAllowed
 import dev.anchildress1.vestige.model.ArtifactHttpClient
 import dev.anchildress1.vestige.model.DefaultModelArtifactStore
 import dev.anchildress1.vestige.model.DefaultNetworkGate
@@ -39,7 +40,6 @@ import dev.anchildress1.vestige.storage.CalloutCooldownEntity
 import dev.anchildress1.vestige.storage.CalloutCooldownStore
 import dev.anchildress1.vestige.storage.EntryEntity
 import dev.anchildress1.vestige.storage.EntryStore
-import dev.anchildress1.vestige.storage.MarkdownEntryStore
 import dev.anchildress1.vestige.storage.PatternDetector
 import dev.anchildress1.vestige.storage.PatternEntity
 import dev.anchildress1.vestige.storage.PatternRepo
@@ -90,7 +90,6 @@ import java.util.concurrent.atomic.AtomicBoolean
 class AppContainer(
     private val applicationContext: Context,
     boxStoreFactory: (Context) -> BoxStore = { ctx -> VestigeBoxStore.open(ctx) },
-    markdownStoreFactory: (Context) -> MarkdownEntryStore = { ctx -> MarkdownEntryStore(ctx.filesDir) },
     private val modelPathLoader: (Context) -> String = { ctx ->
         val manifest = ModelManifest.loadDefault()
         File(File(ctx.filesDir, MODEL_ARTIFACTS_SUBDIR), manifest.filename).absolutePath
@@ -204,9 +203,7 @@ class AppContainer(
     /** Shared ObjectBox handle. Closed when the process dies; tests use [close]. */
     val boxStore: BoxStore = boxStoreFactory(applicationContext)
 
-    private val markdownStore: MarkdownEntryStore = markdownStoreFactory(applicationContext)
-
-    val entryStore: EntryStore = EntryStore(boxStore, markdownStore)
+    val entryStore: EntryStore = EntryStore(boxStore)
     private val backgroundEngineInitMutex = Mutex()
     private val embedderInitMutex = Mutex()
     private val modelMutationMutex = Mutex()
@@ -215,6 +212,8 @@ class AppContainer(
     private val vectorBackfillMutex = Mutex()
     private val vectorBackfillRunning = AtomicBoolean(false)
     private val vectorBackfillRequested = AtomicBoolean(false)
+    private val missingExtractionBackfillRunning = AtomicBoolean(false)
+    private val foregroundPromotionDeniedLogged = AtomicBoolean(false)
     private val trackedExtractionJobs: MutableSet<Job> = linkedSetOf()
 
     @Volatile
@@ -313,7 +312,7 @@ class AppContainer(
         } catch (cancel: CancellationException) {
             throw cancel
         } catch (@Suppress("TooGenericExceptionCaught") error: Exception) {
-            Log.w(TAG, "retrieveHistory degraded (${error.javaClass.simpleName})")
+            Log.w(TAG, "retrieveHistory degraded", error)
             emptyList()
         }
     }
@@ -440,6 +439,11 @@ class AppContainer(
         }
         statusBus.report(entryId, status)
         lifecycleStateMachine.onInFlightCountChange(statusBus.inFlightCount.value)
+    }
+
+    fun retryForegroundPromotionIfWorkActive() {
+        foregroundPromotionDeniedLogged.set(false)
+        lifecycleStateMachine.onInFlightCountChange(statusBus.inFlightCount.value, allowSuppressedPromotion = true)
     }
 
     fun extractionStatusListener(entryId: Long): ExtractionStatusListener = ExtractionStatusListener { status, _, _ ->
@@ -649,9 +653,8 @@ class AppContainer(
     }
 
     /**
-     * Wipe every entry, pattern, tag, and callout-cooldown row plus every markdown file.
+     * Wipe every entry, pattern, tag, and callout-cooldown row plus any legacy markdown files.
      * Nothing is sent anywhere; nothing is recoverable. The model artifact is left alone.
-     * Per `ux-copy.md` §"Destructive Confirmations / Delete all data".
      */
     suspend fun wipeAllData() {
         cancelTrackedExtractionsAndResetLifecycle()
@@ -660,18 +663,20 @@ class AppContainer(
             boxStore.boxFor(PatternEntity::class.java).removeAll()
             boxStore.boxFor(TagEntity::class.java).removeAll()
             boxStore.boxFor(CalloutCooldownEntity::class.java).removeAll()
-            markdownStore.listAll().forEach { if (!it.delete()) Log.w(TAG, "Failed to delete markdown file") }
+            val legacyEntriesDir = File(applicationContext.filesDir, "entries")
+            if (legacyEntriesDir.exists() && !legacyEntriesDir.deleteRecursively()) {
+                Log.w(TAG, "Failed to delete legacy markdown directory")
+            }
             Log.i(TAG, "All user data wiped on explicit request")
         }
         _dataRevision.value += 1
     }
 
-    /** Stream a zip of every user-data row plus readable entry markdown into [out]. */
+    /** Stream a zip of every user-data row plus generated readable entry markdown into [out]. */
     suspend fun zipAllEntriesTo(out: OutputStream) {
         withContext(ioDispatcher) {
             VestigeDataExporter(
                 boxStore = boxStore,
-                markdownStore = markdownStore,
                 onboardingPrefs = OnboardingPrefs.from(applicationContext),
             ).writeTo(out)
         }
@@ -704,17 +709,81 @@ class AppContainer(
         }
     }
 
-    private suspend fun recoverOneEntry(entryId: Long, entryText: String, capturedAt: ZonedDateTime) {
-        runCatching {
-            val job = backgroundExtractionSaveFlow.recoverEntry(
-                entryId = entryId,
-                entryText = entryText,
-                capturedAt = capturedAt,
-                persona = Persona.WITNESS,
+    /**
+     * Backfills lens receipts on COMPLETED entries that were inserted without extraction output
+     * (`make seed-entries -e run_extraction=true`, imported demo corpora, etc.). Single-flight.
+     */
+    fun launchMissingExtractionBackfill(limit: Int = DEFAULT_MISSING_EXTRACTION_BACKFILL_LIMIT): Job = scope.launch {
+        if (!missingExtractionBackfillRunning.compareAndSet(false, true)) {
+            Log.i(TAG, "Missing extraction backfill already running")
+            return@launch
+        }
+        try {
+            val outcome = backfillMissingExtractionInfo(limit)
+            Log.i(
+                TAG,
+                "Missing extraction backfill: queued=${outcome.queued} " +
+                    "failed=${outcome.failed} candidates=${outcome.candidates}",
             )
-            trackExtractionJob(job)
-        }.onFailure { Log.e(TAG, "Recovery extraction failed for entry $entryId", it) }
+        } finally {
+            missingExtractionBackfillRunning.set(false)
+        }
     }
+
+    internal data class MissingExtractionBackfillOutcome(val candidates: Int, val queued: Int, val failed: Int)
+
+    internal suspend fun backfillMissingExtractionInfo(
+        limit: Int = DEFAULT_MISSING_EXTRACTION_BACKFILL_LIMIT,
+    ): MissingExtractionBackfillOutcome {
+        if (!mainModelArtifactLooksPresent()) {
+            Log.w(TAG, "Missing extraction backfill skipped — main model is not ready")
+            return MissingExtractionBackfillOutcome(candidates = 0, queued = 0, failed = 0)
+        }
+        val entries = runCatching { entryStore.listCompletedMissingLensReceipts(limit) }
+            .onFailure { Log.e(TAG, "Failed to scan entries missing extraction info", it) }
+            .getOrDefault(emptyList())
+        var queued = 0
+        var failed = 0
+        if (entries.isNotEmpty()) {
+            ensureBackgroundEngineInitialized()
+            entries.forEach { entry ->
+                val job = recoverOneEntry(
+                    entryId = entry.id,
+                    entryText = entry.entryText,
+                    capturedAt = ZonedDateTime.ofInstant(
+                        Instant.ofEpochMilli(entry.timestampEpochMs),
+                        ZoneId.systemDefault(),
+                    ),
+                    persona = entry.persona,
+                )
+                if (job != null) {
+                    job.join()
+                    queued += 1
+                } else {
+                    failed += 1
+                }
+            }
+        }
+        return MissingExtractionBackfillOutcome(candidates = entries.size, queued = queued, failed = failed)
+    }
+
+    private suspend fun recoverOneEntry(
+        entryId: Long,
+        entryText: String,
+        capturedAt: ZonedDateTime,
+        persona: Persona = Persona.WITNESS,
+    ): Job? = runCatching {
+        val job = backgroundExtractionSaveFlow.recoverEntry(
+            entryId = entryId,
+            entryText = entryText,
+            capturedAt = capturedAt,
+            persona = persona,
+            timeoutMs = MISSING_EXTRACTION_BACKFILL_TIMEOUT_MS,
+        )
+        trackExtractionJob(job)
+        job
+    }.onFailure { Log.e(TAG, "Recovery extraction failed for entry $entryId", it) }
+        .getOrNull()
 
     private suspend fun mainModelArtifactLooksPresent(): Boolean =
         verifiedMainModelState() is ModelArtifactState.Complete
@@ -924,18 +993,28 @@ class AppContainer(
         val intent = foregroundServiceIntentFactory()
         try {
             foregroundServiceStarter(intent)
+            // Successful dispatch clears the denial latch so the next backgrounded denial is loud
+            // again. Without this, the once-per-process latch silences every subsequent denial.
+            foregroundPromotionDeniedLogged.set(false)
         } catch (@Suppress("TooGenericExceptionCaught") error: Exception) {
-            // Background-launch restrictions (Android 12+), battery-saver, or app-standby buckets
-            // can refuse the start. Reset the machine so its bounded retry path can re-attempt
-            // promotion while the current extraction is still in flight.
-            Log.e(TAG, "startForegroundService rejected", error)
-            lifecycleStateMachine.onForegroundStartFailed()
+            val denied = error.isForegroundServiceStartNotAllowed()
+            if (denied) {
+                if (foregroundPromotionDeniedLogged.compareAndSet(false, true)) {
+                    Log.w(TAG, "Foreground service promotion denied while app is backgrounded")
+                }
+                lifecycleStateMachine.onForegroundStartFailed(retry = false)
+            } else {
+                Log.e(TAG, "startForegroundService rejected", error)
+                lifecycleStateMachine.onForegroundStartFailed()
+            }
         }
     }
 
     private companion object {
         const val TAG = "VestigeAppContainer"
         const val MODEL_ARTIFACTS_SUBDIR = "models"
+        const val DEFAULT_MISSING_EXTRACTION_BACKFILL_LIMIT = 100
+        const val MISSING_EXTRACTION_BACKFILL_TIMEOUT_MS = 90_000L
         const val VECTOR_BACKFILL_RETRY_DELAY_MS = 5_000L
         const val VECTOR_BACKFILL_MAX_RETRIES = 12
         const val PCT_MAX = 100

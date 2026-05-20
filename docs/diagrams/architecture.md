@@ -16,7 +16,7 @@ flowchart TD
 
     App[":app<br/>Compose UI · navigation · AppContainer · permissions"]
     Inf[":core-inference<br/>LiteRT-LM wrapper · audio norm · prompt composition · convergence resolver"]
-    Sto[":core-storage<br/>ObjectBox · markdown SOT · keyword/tag/recency retrieval"]
+    Sto[":core-storage<br/>ObjectBox SOT · export markdown renderer · keyword/tag/recency retrieval"]
     Mod[":core-model<br/>domain types · manifests · status enums · no Android deps"]
 
     App --> Inf
@@ -46,7 +46,7 @@ flowchart TB
       MH["ModelHandle<br/>lazy after artifact verified · one engine/process"]
       EMB["Embedder<br/>lazy · STT-E-contingent"]
       NG["NetworkGate<br/>OPEN only during download"]
-      ES["EntryStore<br/>markdown-first, ObjectBox-second"]
+      ES["EntryStore<br/>ObjectBox entry source of truth"]
       PS["PatternStore<br/>persistence · lifecycle SM · detection algo"]
       RR["RetrievalRepo<br/>keyword + tag + recency (+ vector if STT-E)"]
       IC["InferenceCoordinator<br/>fg call · bg sequential lenses · resolver"]
@@ -85,20 +85,18 @@ stateDiagram-v2
 
 ## 4. Capture → inference → resolver → storage → patterns
 
-The end-to-end dataflow. `EntryStore` writes **markdown first, ObjectBox second** as one
-transactional unit — markdown is the source of truth; a missing ObjectBox row rebuilds from
-markdown on next cold start, never the reverse.
+The end-to-end dataflow. `EntryStore` writes ObjectBox only; export renders markdown from those rows.
 
 ```mermaid
 flowchart TB
     accTitle: End-to-end capture and extraction dataflow
-    accDescr: User records or types. Voice goes through AudioRecord then audio normalization to mono 16kHz float32 max 30s, then a foreground Gemma call returns transcription and follow-up. EntryStore persists markdown first then ObjectBox. A background pass runs three sequential lens calls, the convergence resolver writes canonical, candidate, or ambiguous fields plus entry observations, then pattern detection runs when the threshold is met.
+    accDescr: User records or types. Voice goes through AudioRecord then audio normalization to mono 16kHz float32 max 30s, then a foreground Gemma call returns transcription and follow-up. EntryStore persists ObjectBox rows only. A background pass runs three sequential lens calls, the convergence resolver writes canonical, candidate, or ambiguous fields plus entry observations, then pattern detection runs when the threshold is met.
 
     U(["User"]) -- voice --> AR["AudioRecord capture"]
     U -- type --> FG
     AR --> NORM["audio normalize<br/>mono 16 kHz f32 · ≤30 s"]
     NORM --> FG["Foreground Gemma call<br/>→ transcription + follow-up"]
-    FG --> ES["EntryStore.persist<br/>markdown FIRST → ObjectBox SECOND"]
+    FG --> ES["EntryStore.persist<br/>ObjectBox row only"]
     ES --> BG["Background pass<br/>3 sequential lens calls (Literal→Inferential→Skeptical)"]
     BG --> CR["Convergence Resolver<br/>canonical · candidate · ambiguous · canonical_with_conflict"]
     CR --> OBS["entry_observations<br/>generated from transcript + resolved fields"]

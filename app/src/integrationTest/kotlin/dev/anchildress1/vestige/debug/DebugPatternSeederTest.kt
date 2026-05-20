@@ -2,8 +2,8 @@ package dev.anchildress1.vestige.debug
 
 import dev.anchildress1.vestige.storage.CalloutCooldownEntity
 import dev.anchildress1.vestige.storage.EntryStore
-import dev.anchildress1.vestige.storage.MarkdownEntryStore
 import dev.anchildress1.vestige.storage.PatternStore
+import dev.anchildress1.vestige.storage.closeAfterCleaningThreadResources
 import dev.anchildress1.vestige.testing.cleanupObjectBoxTempRoot
 import dev.anchildress1.vestige.testing.newInMemoryObjectBoxDirectory
 import dev.anchildress1.vestige.testing.newModuleTempRoot
@@ -17,6 +17,7 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import java.io.File
+import java.time.Instant
 
 @RunWith(RobolectricTestRunner::class)
 // VestigeApplication.onCreate builds a real AppContainer — we don't need that here since the
@@ -29,33 +30,55 @@ class DebugPatternSeederTest {
     private lateinit var boxStore: BoxStore
     private lateinit var entryStore: EntryStore
     private lateinit var patternStore: PatternStore
-    private lateinit var markdownStore: MarkdownEntryStore
 
     @Before
     fun setUp() {
         filesDir = newModuleTempRoot("debug-seed-")
         dataDir = newInMemoryObjectBoxDirectory("debug-seed-objectbox-")
         boxStore = openInMemoryBoxStore(dataDir)
-        markdownStore = MarkdownEntryStore(filesDir)
-        entryStore = EntryStore(boxStore, markdownStore)
+        entryStore = EntryStore(boxStore)
         patternStore = PatternStore(boxStore)
     }
 
     @After
     fun tearDown() {
-        boxStore.close()
+        boxStore.closeAfterCleaningThreadResources()
         cleanupObjectBoxTempRoot(filesDir, dataDir)
     }
 
     @Test
-    fun `seed writes completed entries and markdown fixtures`() {
+    fun `seed writes completed entries and pattern fixtures`() {
         // 12 narrative entries + 23 vocab-drift entries (8 exhaustion + 8 cognitive-fog + 7
         // wired-tired) = 35 total. The vocab pattern joins the 2 narrative patterns ⇒ 3.
         DebugPatternSeeder.seed(filesDir, boxStore, patternStore)
 
         assertEquals(35L, entryStore.count())
         assertEquals(35L, entryStore.countCompleted())
-        assertEquals(35, markdownStore.listAll().size)
+        assertEquals(3, patternStore.findVisibleSortedByLastSeen().size)
+    }
+
+    @Test
+    fun `seed writes explicit demo timestamps into objectbox`() {
+        DebugPatternSeeder.seed(filesDir, boxStore, patternStore)
+
+        val entries = entryStore.listCompleted()
+        assertEquals(
+            Instant.parse("2026-05-05T14:10:00Z").toEpochMilli(),
+            entries.single { it.markdownFilename == "debug-seed-1.md" }.timestampEpochMs,
+        )
+        assertEquals(
+            Instant.parse("2026-05-19T13:55:00Z").toEpochMilli(),
+            entries.single { it.markdownFilename == "debug-seed-8.md" }.timestampEpochMs,
+        )
+    }
+
+    @Test
+    fun `seed is idempotent — re-running produces the same row counts`() {
+        DebugPatternSeeder.seed(filesDir, boxStore, patternStore)
+        DebugPatternSeeder.seed(filesDir, boxStore, patternStore)
+
+        assertEquals(35L, entryStore.count())
+        assertEquals(35L, entryStore.countCompleted())
         assertEquals(3, patternStore.findVisibleSortedByLastSeen().size)
     }
 

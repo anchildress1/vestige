@@ -30,4 +30,4 @@ pre-push:
       run: make build
     test:
       priority: 2
-      run: make test
+      run: make test-full

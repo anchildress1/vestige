@@ -18,11 +18,11 @@ import dev.anchildress1.vestige.model.PatternKind
 import dev.anchildress1.vestige.model.PatternState
 import dev.anchildress1.vestige.storage.EntryEntity
 import dev.anchildress1.vestige.storage.EntryStore
-import dev.anchildress1.vestige.storage.MarkdownEntryStore
 import dev.anchildress1.vestige.storage.PatternEntity
 import dev.anchildress1.vestige.storage.PatternRepo
 import dev.anchildress1.vestige.storage.PatternStore
 import dev.anchildress1.vestige.storage.TagEntity
+import dev.anchildress1.vestige.storage.closeAfterCleaningThreadResources
 import dev.anchildress1.vestige.testing.cleanupObjectBoxTempRoot
 import dev.anchildress1.vestige.testing.newInMemoryObjectBoxDirectory
 import dev.anchildress1.vestige.testing.newModuleTempRoot
@@ -61,7 +61,6 @@ class PatternDetailScreenTest {
 
     private lateinit var tempRoot: File
     private lateinit var dataDir: File
-    private lateinit var markdownDir: File
     private lateinit var boxStore: BoxStore
     private lateinit var entryStore: EntryStore
     private lateinit var patternStore: PatternStore
@@ -73,12 +72,8 @@ class PatternDetailScreenTest {
         Dispatchers.setMain(testDispatcher)
         tempRoot = newModuleTempRoot("vestige-pattern-detail-screen-")
         dataDir = newInMemoryObjectBoxDirectory("ob-detail-screen-")
-        markdownDir = File(tempRoot, "md-${System.nanoTime()}").apply { mkdirs() }
         boxStore = openInMemoryBoxStore(dataDir)
-        entryStore = EntryStore(
-            boxStore,
-            MarkdownEntryStore(markdownDir),
-        )
+        entryStore = EntryStore(boxStore)
         patternStore = PatternStore(boxStore)
         patternRepo = PatternRepo(patternStore)
     }
@@ -86,7 +81,7 @@ class PatternDetailScreenTest {
     @After
     fun tearDown() {
         Dispatchers.resetMain()
-        boxStore.close()
+        boxStore.closeAfterCleaningThreadResources()
         cleanupObjectBoxTempRoot(tempRoot, dataDir)
     }
 

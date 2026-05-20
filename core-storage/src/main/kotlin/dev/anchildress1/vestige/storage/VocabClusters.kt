@@ -37,6 +37,7 @@ data class VocabPatternIdentity(val patternId: String, val signatureJson: String
  * same underlying state. Construct via [of]; the constructor is private so [clusterId] always
  * matches the canonical hash of the sorted member list.
  */
+@ConsistentCopyVisibility
 @Suppress("DataClassPrivateConstructor")
 data class VocabCluster private constructor(
     val clusterId: String,

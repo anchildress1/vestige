@@ -9,6 +9,7 @@ fun <T> BoxStore.callClosingThreadResources(block: () -> T): T = try {
 }
 
 fun BoxStore.closeAfterCleaningThreadResources() {
+    if (isClosed) return
     closeThreadResources()
     runCatching { cleanStaleReadTransactions() }
     close()

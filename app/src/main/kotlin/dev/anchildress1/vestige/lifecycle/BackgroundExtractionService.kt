@@ -56,9 +56,19 @@ class BackgroundExtractionService : LifecycleService() {
         try {
             startForegroundCompat()
         } catch (@Suppress("TooGenericExceptionCaught") error: Exception) {
-            Log.e(TAG, "startForeground rejected", error)
+            val denied = error.isForegroundServiceStartNotAllowed()
+            if (denied) {
+                Log.w(TAG, "Foreground promotion denied while app is backgrounded")
+            } else {
+                Log.e(TAG, "startForeground rejected", error)
+            }
             if (initialState == BackgroundExtractionLifecycleState.PROMOTING) {
-                machine.onForegroundStartFailed()
+                machine.onForegroundStartFailed(retry = !denied)
+            } else {
+                // A non-PROMOTING start failure means the OS will kill the service shortly for
+                // the missed startForeground() contract. Tell the machine so a queued extraction
+                // can re-promote instead of stranding on this process.
+                machine.onServiceKilled()
             }
             shutdownHandled = true
             stopSelf(startId)

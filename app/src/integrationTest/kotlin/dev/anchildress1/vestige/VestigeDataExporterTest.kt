@@ -2,9 +2,9 @@ package dev.anchildress1.vestige
 
 import dev.anchildress1.vestige.model.Persona
 import dev.anchildress1.vestige.storage.EntryEntity
-import dev.anchildress1.vestige.storage.MarkdownEntryStore
 import dev.anchildress1.vestige.storage.PatternEntity
 import dev.anchildress1.vestige.storage.TagEntity
+import dev.anchildress1.vestige.storage.closeAfterCleaningThreadResources
 import dev.anchildress1.vestige.testing.cleanupObjectBoxTempRoot
 import dev.anchildress1.vestige.testing.newInMemoryObjectBoxDirectory
 import dev.anchildress1.vestige.testing.newModuleTempRoot
@@ -17,7 +17,6 @@ import io.objectbox.BoxStore
 import org.json.JSONObject
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.assertEquals
-import org.junit.jupiter.api.Assertions.assertThrows
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
@@ -30,8 +29,6 @@ class VestigeDataExporterTest {
     private lateinit var tempRoot: File
     private lateinit var dataDir: File
     private lateinit var boxStore: BoxStore
-    private lateinit var markdownDir: File
-    private lateinit var markdownStore: MarkdownEntryStore
 
     private val onboardingPrefs: OnboardingPrefs = mockk {
         every { isComplete } returns true
@@ -44,18 +41,15 @@ class VestigeDataExporterTest {
         tempRoot = newModuleTempRoot("vestige-exporter-")
         dataDir = newInMemoryObjectBoxDirectory("ob-exporter-")
         boxStore = openInMemoryBoxStore(dataDir)
-        markdownDir = File(tempRoot, "md").apply { mkdirs() }
-        markdownStore = MarkdownEntryStore(markdownDir)
     }
 
     @AfterEach
     fun tearDown() {
-        boxStore.close()
+        boxStore.closeAfterCleaningThreadResources()
         cleanupObjectBoxTempRoot(tempRoot, dataDir)
     }
 
-    private fun exporter(md: MarkdownEntryStore = markdownStore): VestigeDataExporter =
-        VestigeDataExporter(boxStore, md, onboardingPrefs)
+    private fun exporter(): VestigeDataExporter = VestigeDataExporter(boxStore, onboardingPrefs)
 
     private fun snapshotOf(out: ByteArrayOutputStream): JSONObject =
         JSONObject(unzip(out).getValue(VestigeDataExporter.SNAPSHOT_ENTRY))
@@ -164,6 +158,20 @@ class VestigeDataExporterTest {
     }
 
     @Test
+    fun `blank legacy markdownFilename exports resolved filename in entry snapshot`() {
+        putEntry(
+            EntryEntity(markdownFilename = "", entryText = "legacy row", timestampEpochMs = 0L),
+        )
+        val out = ByteArrayOutputStream()
+
+        exporter().writeTo(out)
+
+        val entry = snapshotOf(out).getJSONArray("entries").getJSONObject(0)
+        assertEquals("1970-01-01T00-00-00Z--legacy-row", entry.getString("entry_id"))
+        assertEquals("1970-01-01T00-00-00Z--legacy-row.md", entry.getString("markdown_filename"))
+    }
+
+    @Test
     fun `populated lensReceiptsJson is exported verbatim`() {
         val receipts = """[{"lens":"LITERAL","extracted":true}]"""
         val entity = putEntry(
@@ -227,35 +235,20 @@ class VestigeDataExporterTest {
     }
 
     @Test
-    fun `markdown manifest matches the files actually archived`() {
-        val entriesDir = File(markdownDir, "entries").apply { mkdirs() }
-        File(entriesDir, "one.md").writeText("first")
-        File(entriesDir, "two.md").writeText("second")
+    fun `markdown manifest matches generated entry files in archive`() {
+        putEntry(EntryEntity(markdownFilename = "one.md", entryText = "first", timestampEpochMs = 1L))
+        putEntry(EntryEntity(markdownFilename = "two.md", entryText = "second", timestampEpochMs = 2L))
         val out = ByteArrayOutputStream()
 
         exporter().writeTo(out)
 
         val zip = unzip(out)
-        assertEquals("first", zip["entries/one.md"])
-        assertEquals("second", zip["entries/two.md"])
+        assertTrue(zip.getValue("entries/one.md").endsWith("first\n"))
+        assertTrue(zip.getValue("entries/two.md").endsWith("second\n"))
         val manifest = snapshotOf(out).getJSONArray("markdown_files")
         assertEquals(
             listOf("one.md", "two.md"),
             List(manifest.length()) { manifest.getString(it) }.sorted(),
         )
-    }
-
-    @Test
-    fun `a mid-archive file failure writes no partial archive to the target`() {
-        val good = File(markdownDir, "good.md").apply { writeText("kept") }
-        val missing = File(markdownDir, "missing.md") // never created
-        val failingMarkdown = mockk<MarkdownEntryStore> {
-            every { listAll() } returns listOf(good, missing)
-        }
-        val out = ByteArrayOutputStream()
-
-        assertThrows(Exception::class.java) { exporter(failingMarkdown).writeTo(out) }
-
-        assertEquals(0, out.size())
     }
 }

@@ -1,12 +1,12 @@
 package dev.anchildress1.vestige.debug
 
+import android.util.Log
 import dev.anchildress1.vestige.model.ExtractionStatus
 import dev.anchildress1.vestige.model.PatternKind
 import dev.anchildress1.vestige.model.PatternState
 import dev.anchildress1.vestige.storage.CalloutCooldownEntity
 import dev.anchildress1.vestige.storage.EmbeddingClustering
 import dev.anchildress1.vestige.storage.EntryEntity
-import dev.anchildress1.vestige.storage.MarkdownEntryStore
 import dev.anchildress1.vestige.storage.PatternEntity
 import dev.anchildress1.vestige.storage.PatternStore
 import dev.anchildress1.vestige.storage.TagEntity
@@ -16,6 +16,7 @@ import dev.anchildress1.vestige.storage.vocabPatternIdentity
 import io.objectbox.BoxStore
 import java.io.File
 import java.security.MessageDigest
+import java.time.Instant
 
 /**
  * Debug-only fixture seeder. Lets the dev verify the pattern UI with real cards on a device.
@@ -23,7 +24,7 @@ import java.security.MessageDigest
  */
 object DebugPatternSeeder {
 
-    private const val ENTRY_COUNT = 12
+    private data class SeedEntry(val text: String, val timestamp: Instant, val durationMs: Long)
 
     private data class SeedPattern(
         val signature: String,
@@ -33,47 +34,26 @@ object DebugPatternSeeder {
         val supporting: List<EntryEntity>,
     )
 
-    private data class SeedEntryFixture(val text: String, val durationMs: Long)
-
-    private val NARRATIVE_SEED_ENTRIES: List<SeedEntryFixture> = listOf(
-        SeedEntryFixture("crashed after standup, wired until 2am", 18_000L),
-        SeedEntryFixture("tuesday meeting again, same concrete shoes", 22_000L),
-        SeedEntryFixture("wrote that doc in one sitting, surprising", 15_000L),
-        SeedEntryFixture("wired until 2am, can't tell if good or bad", 27_000L),
-        SeedEntryFixture("another tuesday, another aftermath", 12_000L),
-        SeedEntryFixture("shipped the thing, immediate crash", 20_000L),
-        SeedEntryFixture("decided to rewrite the migration, third time this week", 28_000L),
-        SeedEntryFixture("rewrote it again, this version is the one", 19_000L),
-        SeedEntryFixture("tuesday standup landed harder than expected", 24_000L),
-        SeedEntryFixture("audit cycle hit; reviewed everything twice", 16_000L),
-        SeedEntryFixture("concrete shoes on the morning standup", 11_000L),
-        SeedEntryFixture("crashed at 3pm, no warning, just gone", 25_000L),
-    )
-
     @Suppress("MagicNumber") // Fixture timestamps + corpus shape are deliberately concrete.
     fun seed(filesDir: File, boxStore: BoxStore, patternStore: PatternStore) {
-        val markdownStore = MarkdownEntryStore(filesDir)
+        val legacyEntriesDir = File(filesDir, "entries")
+        if (legacyEntriesDir.exists() && !legacyEntriesDir.deleteRecursively()) {
+            Log.w(TAG, "Failed to clear legacy entries dir before seed — leftover markdown may confuse demo state")
+        }
         boxStore.runInTx {
-            markdownStore.listAll().forEach(File::delete)
             boxStore.boxFor(EntryEntity::class.java).removeAll()
             boxStore.boxFor(PatternEntity::class.java).removeAll()
             boxStore.boxFor(TagEntity::class.java).removeAll()
             boxStore.boxFor(CalloutCooldownEntity::class.java).removeAll()
 
-            val baseMs = System.currentTimeMillis() - DAY_MS * ENTRY_COUNT
-            val entries = NARRATIVE_SEED_ENTRIES.mapIndexed { idx, seed ->
+            val entries = seedEntries().mapIndexed { idx, seed ->
                 EntryEntity(
                     markdownFilename = "debug-seed-$idx.md",
                     entryText = seed.text,
-                    timestampEpochMs = baseMs + idx * DAY_MS,
+                    timestampEpochMs = seed.timestamp.toEpochMilli(),
                     durationMs = seed.durationMs,
                     extractionStatus = ExtractionStatus.COMPLETED,
-                ).also {
-                    // put first so ObjectBox initializes the lateinit ToMany<TagEntity> field
-                    // before MarkdownEntryStore.write() iterates entry.tags
-                    boxStore.boxFor(EntryEntity::class.java).put(it)
-                    markdownStore.write(it)
-                }
+                ).also { boxStore.boxFor(EntryEntity::class.java).put(it) }
             }
 
             // Two ACTIVE patterns wired to disjoint entry slices so the list has multiple cards
@@ -100,9 +80,29 @@ object DebugPatternSeeder {
                 ),
             )
 
-            seedVocabDrift(boxStore, patternStore, markdownStore, baseMs)
+            seedVocabDrift(boxStore, patternStore, VOCAB_BASE_TIMESTAMP.toEpochMilli())
         }
     }
+
+    @Suppress("MagicNumber") // Fixture timestamps + durations are deliberately concrete.
+    private fun seedEntries() = listOf(
+        SeedEntry("crashed after standup, wired until 2am", Instant.parse("2026-05-07T18:42:00Z"), 18_000L),
+        SeedEntry("tuesday meeting again, same concrete shoes", Instant.parse("2026-05-05T14:10:00Z"), 22_000L),
+        SeedEntry("wrote that doc in one sitting, surprising", Instant.parse("2026-05-08T10:24:00Z"), 15_000L),
+        SeedEntry("wired until 2am, can't tell if good or bad", Instant.parse("2026-05-09T06:13:00Z"), 27_000L),
+        SeedEntry("another tuesday, another aftermath", Instant.parse("2026-05-12T15:30:00Z"), 12_000L),
+        SeedEntry("shipped the thing, immediate crash", Instant.parse("2026-05-13T21:08:00Z"), 20_000L),
+        SeedEntry(
+            "decided to rewrite the migration, third time this week",
+            Instant.parse("2026-05-14T16:45:00Z"),
+            28_000L,
+        ),
+        SeedEntry("rewrote it again, this version is the one", Instant.parse("2026-05-16T11:05:00Z"), 19_000L),
+        SeedEntry("tuesday standup landed harder than expected", Instant.parse("2026-05-19T13:55:00Z"), 24_000L),
+        SeedEntry("audit cycle hit; reviewed everything twice", Instant.parse("2026-05-18T19:22:00Z"), 16_000L),
+        SeedEntry("concrete shoes on the morning standup", Instant.parse("2026-05-19T08:40:00Z"), 11_000L),
+        SeedEntry("crashed at 3pm, no warning, just gone", Instant.parse("2026-05-20T19:00:00Z"), 25_000L),
+    )
 
     /**
      * 23 entries describing the same underlying state ("tired") across three vocabulary
@@ -115,12 +115,10 @@ object DebugPatternSeeder {
     private fun seedVocabDrift(
         boxStore: BoxStore,
         patternStore: PatternStore,
-        markdownStore: MarkdownEntryStore,
         baseMs: Long,
     ) {
         val tiredEntries = persistVocabEntries(
             boxStore = boxStore,
-            markdownStore = markdownStore,
             baseMs = baseMs,
             cluster0 = VOCAB_DRIFT_EXHAUSTION,
             cluster1 = VOCAB_DRIFT_FOG,
@@ -161,7 +159,6 @@ object DebugPatternSeeder {
     @Suppress("LongParameterList")
     private fun persistVocabEntries(
         boxStore: BoxStore,
-        markdownStore: MarkdownEntryStore,
         baseMs: Long,
         cluster0: List<String>,
         cluster1: List<String>,
@@ -182,7 +179,6 @@ object DebugPatternSeeder {
                 )
                 entry.vector = syntheticVector(axis)
                 box.put(entry)
-                markdownStore.write(entry)
                 results.add(entry)
                 indexWithinDay += 1
             }
@@ -236,7 +232,9 @@ object DebugPatternSeeder {
             "%02x".format(it.toInt() and BYTE_MASK)
         }
 
-    private const val DAY_MS: Long = 24L * 60 * 60 * 1000
+    private const val TAG = "VestigeDebugPatternSeeder"
+
+    private val VOCAB_BASE_TIMESTAMP: Instant = Instant.parse("2026-05-01T12:00:00Z")
 
     /** Unsigned-byte mask for sign-safe `byte.toInt() and BYTE_MASK` hex formatting. */
     private const val BYTE_MASK: Int = 0xff

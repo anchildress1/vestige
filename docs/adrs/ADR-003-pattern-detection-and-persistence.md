@@ -551,3 +551,7 @@ Rationale:
 - A month-start cohort covers the recurring calendar-edge case directly.
 - Requiring distinct dates/months prevents three entries dumped on one afternoon or one
   first-of-month from pretending to be recurrence.
+
+### Addendum (2026-05-20) — Storage SOT inverted (see ADR-017)
+
+The §"Why content-addressable" bullet about "if we restored from markdown, the ObjectBox cache would rebuild with the same IDs" is now historical. **ADR-017** inverts the storage SOT: ObjectBox is authoritative; markdown is generated at export only. The content-addressable guarantee still holds because `pattern_id` is deterministically derived from the signature — the determinism does not depend on the storage direction.

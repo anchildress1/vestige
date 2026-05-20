@@ -12,7 +12,7 @@ import dev.anchildress1.vestige.model.ResolvedField
 import dev.anchildress1.vestige.storage.EntryEntity
 import dev.anchildress1.vestige.storage.EntryLensReceiptJson
 import dev.anchildress1.vestige.storage.EntryStore
-import dev.anchildress1.vestige.storage.MarkdownEntryStore
+import dev.anchildress1.vestige.storage.closeAfterCleaningThreadResources
 import dev.anchildress1.vestige.testing.cleanupObjectBoxTempRoot
 import dev.anchildress1.vestige.testing.newInMemoryObjectBoxDirectory
 import dev.anchildress1.vestige.testing.newModuleTempRoot
@@ -56,16 +56,13 @@ class EntryDetailViewModelTest {
         tempRoot = newModuleTempRoot("vestige-entry-detail-vm-")
         dataDir = newInMemoryObjectBoxDirectory("ob-entry-detail-vm-")
         boxStore = openInMemoryBoxStore(dataDir)
-        entryStore = EntryStore(
-            boxStore,
-            MarkdownEntryStore(File(tempRoot, "md-${System.nanoTime()}").apply { mkdirs() }),
-        )
+        entryStore = EntryStore(boxStore)
     }
 
     @After
     fun tearDown() {
         Dispatchers.resetMain()
-        boxStore.close()
+        boxStore.closeAfterCleaningThreadResources()
         cleanupObjectBoxTempRoot(tempRoot, dataDir)
     }
 
@@ -109,7 +106,7 @@ class EntryDetailViewModelTest {
     @Test
     fun `state is NotFound when readEntry throws`() = runTest {
         val id = createCompleted("store closes before read")
-        boxStore.close()
+        boxStore.closeAfterCleaningThreadResources()
 
         val vm = buildVm(id)
         vm.state.test {

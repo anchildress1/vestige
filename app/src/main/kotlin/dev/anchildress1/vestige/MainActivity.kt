@@ -7,6 +7,7 @@ package dev.anchildress1.vestige
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
+import android.os.StrictMode
 import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -70,7 +71,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         val container = (application as VestigeApplication).appContainer
-        val onboardingPrefs = OnboardingPrefs.from(this)
+        val onboardingPrefs = allowLaunchPreferenceRead { OnboardingPrefs.from(this) }
         val clock = Clock.systemDefaultZone()
         val zoneId: ZoneId = ZoneId.systemDefault()
         pendingLaunchTarget = consumePostOnboardingLaunchTarget(intent, container.entryStore, nextLaunchToken++)
@@ -93,6 +94,19 @@ class MainActivity : ComponentActivity() {
         setIntent(intent)
         val container = (application as VestigeApplication).appContainer
         pendingLaunchTarget = consumePostOnboardingLaunchTarget(intent, container.entryStore, nextLaunchToken++)
+    }
+}
+
+// SharedPreferences load on first access touches disk; doing that work async would push splash
+// → first-frame past one frame and break the cold-start contract. The suppression is scoped to
+// exactly the [block] callback — do not pass anything other than the OnboardingPrefs.from read
+// through here; unrelated disk reads here become invisible to StrictMode for callers' benefit.
+private inline fun <T> allowLaunchPreferenceRead(block: () -> T): T {
+    val previousPolicy = StrictMode.allowThreadDiskReads()
+    return try {
+        block()
+    } finally {
+        StrictMode.setThreadPolicy(previousPolicy)
     }
 }
 
@@ -164,6 +178,7 @@ private fun PostOnboardingResumeEffects(container: AppContainer) {
         // Skip windows that elapse off-screen must wake up no matter which post-onboarding
         // surface the user returns to, not just Capture.
         container.sweepExpiredSkips()
+        container.retryForegroundPromotionIfWorkActive()
     }
 }
 

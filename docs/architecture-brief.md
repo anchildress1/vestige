@@ -35,7 +35,7 @@ No extra modules in v1 unless they remove a real compile or ownership problem. D
 | `ModelHandle` | process-scoped, lazy after artifact verified. Backgrounding/lifecycle behavior per `adrs/ADR-004-app-backgrounding-and-model-handle-lifecycle.md` (conditional foreground service in v1, Option 1 always-on as documented fallback). | Loaded LiteRT-LM engine and conversation factory. One handle per process. ADR-008's "Engine wrapper" framing stands — the Engine creates contexts via `Engine.createSession`/`createConversation` (the shipping code already uses `createConversation`). The interim ADR-009 rollback was a mis-scoped-probe mistake and was deleted; see `adrs/ADR-008-parallel-lens-execution.md` §Correction (2026-05-16). |
 | `Embedder` | process-scoped, lazy after embedding artifacts verified. STT-E-contingent — instantiated only if `embedding_artifact_*` + `embedding_tokenizer_*` manifest entries resolve and Story 3.3 passes. | EmbeddingGemma 300M loader via `GemmaEmbeddingModel` from `com.google.ai.edge.localagents:localagents-rag` (LiteRT TFLite + SentencePiece bundled in `libgemma_embedding_model_jni.so`). Distinct native runtime from `ModelHandle`'s LiteRT-LM — they share no `.so`. SDK pick rationale: `adrs/ADR-010-embeddinggemma-runtime-switch-to-litert.md`. |
 | `NetworkGate` | process-scoped | sole HTTP/download path; `OPEN` only during model download, `SEALED` otherwise |
-| `EntryStore` | process-scoped | ObjectBox entry/tag writes plus markdown source-of-truth |
+| `EntryStore` | process-scoped | ObjectBox entry/tag writes; export filename stability |
 | `PatternStore` | process-scoped | ObjectBox pattern persistence, lifecycle state machine, and pattern detection algorithm per `adrs/ADR-003-pattern-detection-and-persistence.md` |
 | `RetrievalRepo` | process-scoped | keyword + tag + recency retrieval; vector only if STT-E passes |
 | `InferenceCoordinator` | process-scoped | Foreground call, background extraction scheduling, prompt composition, resolver. **Single-session, sequential — concurrent multi-context is SDK-impossible on `litertlm-android:0.11.0` (measured on-device 2026-05-17, STT-F `stt-results/stt-f-2026-05-17.md`; `adrs/ADR-008-parallel-lens-execution.md` §Addendum 2026-05-17 reverses §Correction).** `LiteRtLmEngine.callMutex` holds the createConversation→close lifetime exclusively: at most one live session ever (`stateMutex`/`drainGate` close-drain is orthogonal). The three background lenses run sequentially (`LENSES.map { runLens }`). A foreground record-tap during an in-flight background lens **waits** for that lens (≤ ~15 s on E4B GPU) — Story 2.19's non-blocking goal is withdrawn (SDK-gated, not a Kotlin lock we can remove). Two Engines is out (2× weight load). The v1 inference lifecycle (foreground = only user-blocking call; analytics + periodic pattern analysis async) is locked by `adrs/ADR-014-foreground-background-split-and-periodic-pattern-analysis.md`. |
@@ -79,23 +79,23 @@ Operational fields:
 
 If EmbeddingGemma ships, include vector fields/entities before the submitted APK schema is cut. Do not make vector schema conditional at runtime.
 
-## Markdown Entry Shape
+## Generated Entry Markdown
 
-Markdown files are the source of truth per `concept-locked.md` §"Memory architecture." ObjectBox is a structured cache of what the markdown already contains. If ObjectBox is wiped, the app rebuilds from markdown. If markdown is missing, the entry never existed — there is no ObjectBox-only entry.
+ObjectBox is the internal source of truth. Markdown is generated only during Settings → Export by rendering the current `EntryEntity` rows. There are no durable per-entry markdown sidecars in app storage.
 
 ### Filename
 
 ```
-{filesDir}/entries/{ISO8601-utc-second}--{slug}.md
+entries/{ISO8601-utc-second}--{slug}.md
 ```
 
 - `ISO8601-utc-second` — `2026-05-08T14-32-15Z`. Colons replaced with hyphens for cross-FS safety.
 - `slug` — kebab-case, ≤32 chars, derived from the first 5–6 content words of `entry_text` after stop-word strip; collisions get a `-2` / `-3` suffix.
-- Filename is stable for the life of the entry. Renaming requires a write of the new file + delete of the old, never an in-place move (re-export safety).
+- Filename is stable for the life of the entry and stored on the row so pattern/export references stay readable.
 
 ### File format
 
-YAML frontmatter, then plain markdown body. Frontmatter holds the structured fields for the saved exchange; body holds `entry_text` exactly as captured.
+YAML frontmatter, then plain markdown body. Frontmatter is rendered from ObjectBox fields; body holds `entry_text` exactly as captured.
 
 ```yaml
 ---
@@ -145,18 +145,17 @@ Standup ran long again. I was fine before it, then completely flattened by 11. O
 | `stated_commitment` | frontmatter | Object with `text`, `topic_or_person`, `entry_id` keys, or `null`. |
 | `entry_observations` | frontmatter list | 1–2 objects with `text`, `evidence`, `fields[]`. Generated per ADR-002. |
 | `confidence` | frontmatter object | Per-field convergence verdict. Mirrors the resolved confidence. |
-| `extraction_status` / `attempt_count` / `last_error` | **not persisted to markdown** | Operational lifecycle state per ADR-001 Q3. Storage-layer-only; if rebuilt from markdown, status is `COMPLETED` by definition. |
+| `extraction_status` / `attempt_count` / `last_error` | `vestige-export.json` only | Operational lifecycle state per ADR-001 Q3. Not rendered into per-entry markdown. |
 
-### Sync direction & conflict policy
+### Export policy
 
-- **ObjectBox is downstream of markdown.** All writes go through `EntryStore`, which writes the markdown file first and the ObjectBox row second, in that order, in a single transactional unit. If the markdown write succeeds and ObjectBox fails, the next cold start rebuilds the row from the markdown. If the markdown write fails, no ObjectBox row exists.
-- **External markdown edits are out of scope for v1.** The user can read or back up the files, but in-place external edits are not detected and may be overwritten by a later re-eval. v1 ships with markdown as a debugging/export surface only. External-edit support is a v1.5 entry in `backlog.md` if it ever earns one.
-- **Re-eval rewrites the file.** Re-eval (P1) updates `tags`, `entry_observations`, etc. The resolver writes the new markdown atomically (write to `.tmp`, fsync, rename). Old content is not preserved unless the user explicitly rejects the new shape.
-- **Export is a copy, not a move.** Settings → Export zips readable markdown files under `entries/` plus `vestige-export.json`, a structured snapshot of ObjectBox rows, pattern evidence links, vectors, callout cooldown state, and onboarding settings. The originals remain in-place.
+- **No internal markdown sidecars.** `EntryStore` writes ObjectBox only.
+- **Export is generated.** Settings → Export zips rendered markdown under `entries/` plus `vestige-export.json`, a structured snapshot of ObjectBox rows, pattern evidence links, vectors, callout cooldown state, and onboarding settings.
+- **No import/edit contract in v1.** External markdown edits are impossible because markdown exists only in the exported archive.
 
 ### `schema_version`
 
-Top-level integer. v1 is `schema_version: 1`. Bump on any breaking frontmatter change. The reader must reject a markdown file with a schema_version it does not understand rather than silently downgrading fields. Migration paths are v1.5+ work.
+Top-level integer in generated markdown. v1 is `schema_version: 1`. Bump on any breaking frontmatter change.
 
 ## Embedding Strategy (Addendum 2026-05-16)
 

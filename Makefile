@@ -1,9 +1,14 @@
 .PHONY: setup install bootstrap-wrapper doctor build assemble reinstall reinstall-prod _reinstall_base push-model seed-entries logcat test test-full lint format ktlint-format ktlint-check detekt android-lint secret-scan commitlint verify-no-telemetry verify ci clean
 
-GRADLE := ./gradlew
+GRADLE_FLAGS ?= --console=plain --quiet
+GRADLE := ./gradlew $(GRADLE_FLAGS)
+GRADLE_TEST_FLAGS ?= --no-parallel
+GRADLE_TEST := bash -o pipefail -c '$(GRADLE) $(GRADLE_TEST_FLAGS) "$$@" 2>&1 | { grep -v "\[ERROR\] Destroying inactive transaction" || true; }' --
 KTLINT := $(or $(shell command -v ktlint 2>/dev/null), $(HOME)/.local/bin/ktlint)
+KTLINT_FLAGS ?= --log-level=error
 DETEKT := $(or $(shell command -v detekt 2>/dev/null), $(HOME)/.local/bin/detekt)
-DETEKT_INPUTS := app/src,core-model/src,core-inference/src,core-storage/src
+DETEKT_JAR := $(shell if [ -f "$(DETEKT)" ]; then sed -n 's/.*-jar "\([^"]*detekt-cli[^"]*\.jar\)".*/\1/p' "$(DETEKT)" 2>/dev/null; fi)
+DETEKT_INPUTS := app/src/main,app/src/debug,core-model/src,core-inference/src,core-storage/src
 
 # One-time dev environment bootstrap — installs git hooks via lefthook.
 setup:
@@ -16,8 +21,8 @@ setup:
 install:
 	@command -v adb >/dev/null 2>&1 || { echo "❌ adb not found. Install Android platform-tools."; exit 1; }
 	@adb get-state >/dev/null 2>&1 || { echo "❌ no device connected. Run 'adb devices' to check."; exit 1; }
-	$(GRADLE) :app:assembleDebug
-	adb install -r -d app/build/outputs/apk/debug/app-debug.apk
+	@$(GRADLE) :app:assembleDebug
+	@adb install -r -d app/build/outputs/apk/debug/app-debug.apk
 
 doctor:
 	./scripts/doctor.sh
@@ -33,7 +38,7 @@ bootstrap-wrapper:
 		gradle wrapper --gradle-version "$$version" --distribution-type bin
 
 build:
-	$(GRADLE) :app:assembleDebug
+	@$(GRADLE) :app:assembleDebug
 
 # ── Reinstall workflow ────────────────────────────────────────────────────────
 # `make reinstall` is the single device-iteration target. It uninstalls, installs the debug
@@ -46,9 +51,11 @@ build:
 # empty by design so a flipped ENV always reflects the real first-run experience.
 ENV ?= dev
 VESTIGE_PACKAGE := dev.anchildress1.vestige
+EXTRACT ?= 0
+SEED_EXTRACT_FLAGS := $(if $(filter 1 true yes,$(EXTRACT)),--ez run_extraction true,)
 
 # App tags + inference/GPU runtime tags. AndroidRuntime ensures crash stacktraces are never swallowed.
-LOGCAT_TAGS := Vestige|CaptureVM|PatternDetailVM|PatternsListVM|OnboardingPrefs|HistoryViewModel|MarkdownEntryStore|DebugSeedReceiver|litertlm|LiteRt|tflite|TfLite|GpuDelegate|Adreno|Mali|AndroidRuntime|System\.err
+LOGCAT_TAGS := Vestige|CaptureVM|PatternDetailVM|PatternsListVM|OnboardingPrefs|HistoryViewModel|DebugSeedReceiver|litertlm|LiteRt|tflite|TfLite|GpuDelegate|Adreno|Mali|AndroidRuntime|System\.err
 
 # Filenames must match `core-model/src/main/resources/model/manifest.properties` exactly so
 # the artifact store accepts the pushed files without re-downloading. Local source paths
@@ -76,9 +83,13 @@ _reinstall_base:
 	@if [ "$(ENV)" != "dev" ] && [ "$(ENV)" != "prod" ]; then \
 		echo "❌ Unknown ENV='$(ENV)'. Set ENV=dev (default) or ENV=prod."; exit 1; \
 	fi
-	@echo "→ ENV=$(ENV); reinstall steps: _reinstall_base $(DEV_SETUP_STEPS) logcat"
-	$(GRADLE) :app:assembleDebug
-	adb uninstall $(VESTIGE_PACKAGE); adb install -r -d app/build/outputs/apk/debug/app-debug.apk
+	@echo "→ ENV=$(ENV); reinstalling debug APK"
+	@$(GRADLE) :app:assembleDebug
+	@if adb shell "pm list packages $(VESTIGE_PACKAGE)" | grep -q "$(VESTIGE_PACKAGE)"; then \
+		adb shell am force-stop $(VESTIGE_PACKAGE) >/dev/null 2>&1 || true; \
+		adb uninstall $(VESTIGE_PACKAGE) >/dev/null || { echo "❌ uninstall failed"; exit 1; }; \
+	fi
+	@adb install -r -d app/build/outputs/apk/debug/app-debug.apk >/dev/null
 
 # Stream the on-device artifacts into the freshly-installed app's data dir via `run-as`.
 # `adb uninstall` wipes filesDir on every iteration; this skips the 3.66 GB onboarding
@@ -94,8 +105,8 @@ push-model:
 	@./scripts/push-vestige-artifact.sh "$(VESTIGE_PACKAGE)" "$(VESTIGE_MAIN_MODEL_FILE)" "$(VESTIGE_MAIN_MODEL_FILENAME)" required
 	@./scripts/push-vestige-artifact.sh "$(VESTIGE_PACKAGE)" "$(VESTIGE_EMBEDDING_MODEL_FILE)" "$(VESTIGE_EMBEDDING_MODEL_FILENAME)" optional
 	@./scripts/push-vestige-artifact.sh "$(VESTIGE_PACKAGE)" "$(VESTIGE_EMBEDDING_TOKENIZER_FILE)" "$(VESTIGE_EMBEDDING_TOKENIZER_FILENAME)" optional
-# Seed fixture entries + patterns via DebugSeedReceiver (debug builds only).
-# Uses explicit component targeting (-n); works even with android:exported="false".
+# Seed fixture entries + patterns via DebugSeedReceiver (debug builds only). The stopped-package
+# flag is required immediately after reinstall, before the first launcher start clears that state.
 seed-entries:
 	@command -v adb >/dev/null 2>&1 || { echo "❌ adb not found. Install Android platform-tools."; exit 1; }
 	@adb get-state >/dev/null 2>&1 || { echo "❌ no device connected. Run 'adb devices' to check."; exit 1; }
@@ -103,8 +114,9 @@ seed-entries:
 		echo "❌ $(VESTIGE_PACKAGE) is not installed. Run 'make reinstall' first."; \
 		exit 1; \
 	}
-	@echo "→ seeding debug fixtures…"
-	@adb shell am broadcast -n "$(VESTIGE_PACKAGE)/$(VESTIGE_PACKAGE).debug.DebugSeedReceiver" \
+	@echo "→ seeding debug fixtures$(if $(SEED_EXTRACT_FLAGS), + extraction backfill)…"
+	@adb shell am broadcast --receiver-foreground -f 0x20 $(SEED_EXTRACT_FLAGS) -n "$(VESTIGE_PACKAGE)/$(VESTIGE_PACKAGE).debug.DebugSeedReceiver" \
+		>/dev/null \
 		|| { echo "❌ broadcast failed — is this a debug build?"; exit 1; }
 	@echo "✓ seed complete"
 # ───────────────────────────────────────────────────────────────────────────────
@@ -126,7 +138,7 @@ logcat:
 	fi
 
 assemble:
-	$(GRADLE) :app:assembleRelease
+	@$(GRADLE) :app:assembleRelease
 
 # Incremental: only tests modules with files changed vs origin/main.
 # koverXmlReport + koverVerify are skipped on partial runs — root-level kover
@@ -138,12 +150,12 @@ test:
 		echo "→ no module sources changed; skipping unit tests"; \
 	else \
 		echo "→ changed modules: $$tasks"; \
-		$(GRADLE) $$tasks; \
+		$(GRADLE_TEST) $$tasks; \
 	fi
 
 # Full run: all modules + coverage verification. Used by ci and verify targets.
 test-full:
-	$(GRADLE) :core-model:test :core-inference:testDebugUnitTest :core-storage:testDebugUnitTest :app:testDebugUnitTest koverXmlReport koverVerify
+	@$(GRADLE_TEST) :core-model:test :core-inference:testDebugUnitTest :core-storage:testDebugUnitTest :app:testDebugUnitTest :app:testDebugIntegrationTest koverXmlReport koverVerify
 
 lint: ktlint-check detekt android-lint
 
@@ -152,18 +164,22 @@ format: ktlint-format
 # Format only files passed via FILES= (used by lefthook pre-commit). Empty FILES is a no-op.
 ktlint-format:
 	@command -v $(KTLINT) >/dev/null 2>&1 || { echo "❌ ktlint not found. Install: brew install ktlint"; exit 1; }
-	@if [ -n "$(FILES)" ]; then $(KTLINT) -F $(FILES); fi
+	@if [ -n "$(FILES)" ]; then $(KTLINT) $(KTLINT_FLAGS) -F $(FILES); fi
 
 ktlint-check:
 	@command -v $(KTLINT) >/dev/null 2>&1 || { echo "❌ ktlint not found. Install: brew install ktlint"; exit 1; }
-	$(KTLINT)
+	@$(KTLINT) $(KTLINT_FLAGS)
 
 detekt:
 	@command -v $(DETEKT) >/dev/null 2>&1 || { echo "❌ detekt not found. Install: brew install detekt"; exit 1; }
-	$(DETEKT) --build-upon-default-config --config detekt.yml --input $(DETEKT_INPUTS)
+	@if [ -n "$(DETEKT_JAR)" ]; then \
+		java --sun-misc-unsafe-memory-access=allow -jar "$(DETEKT_JAR)" --build-upon-default-config --config detekt.yml --input $(DETEKT_INPUTS); \
+	else \
+		$(DETEKT) --build-upon-default-config --config detekt.yml --input $(DETEKT_INPUTS); \
+	fi
 
 android-lint:
-	$(GRADLE) :app:lintDebug
+	@$(GRADLE) :app:lintDebug
 
 secret-scan:
 	@if command -v gitleaks >/dev/null 2>&1; then \
@@ -177,7 +193,7 @@ commitlint:
 	./scripts/check-commit-msg.sh $(COMMIT_MSG_FILE)
 
 verify-no-telemetry:
-	$(GRADLE) verifyNoTelemetry
+	@$(GRADLE) verifyNoTelemetry
 
 verify: lint test-full build secret-scan verify-no-telemetry
 

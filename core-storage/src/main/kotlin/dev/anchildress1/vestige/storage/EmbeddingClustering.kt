@@ -140,6 +140,7 @@ object EmbeddingClustering {
      * hash of the sorted member ids — the content-addressable invariant the orchestrator's
      * dirty-bit gate relies on.
      */
+    @ConsistentCopyVisibility
     @Suppress("DataClassPrivateConstructor")
     data class Cluster private constructor(val clusterId: String, val members: List<EntryEntity>) {
         internal companion object {

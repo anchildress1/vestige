@@ -171,3 +171,7 @@ When this ADR's status flips to **Accepted** and the implementing story lands, t
 - `core-inference/src/main/resources/patterns/` — new prompt resource for the identifier schema.
 - `app/.../patterns/PatternDetectionOrchestrator.kt` — `DETECTION_INTERVAL` removed; `onEntryCommitted` calls the identifier directly. `chooseMatchingPattern` reads identifier-produced patterns the same way as deterministic-produced ones.
 - `docs/architecture-brief.md` — refresh the "pattern engine" section to reflect the model-primary, deterministic-fallback topology.
+
+### Addendum (2026-05-20) — Storage SOT inverted (see ADR-017)
+
+The "markdown is source of truth" cell in the §"Lifecycle Contract" table above is now historical. **ADR-017** inverts the storage SOT: ObjectBox is authoritative; markdown is generated at export only. The persist-before-scheduling invariant still holds.

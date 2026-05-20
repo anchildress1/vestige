@@ -463,6 +463,10 @@ Corrects two cited facts in the 2026-05-16 addendum above (additive — that add
 
 **Consequence.** The authoritative reference for SDK conformance is the version-matched Google source at tag `v0.11.0` (or the AAR itself), not the getting-started page. Do not "fix" code to match that page — it under-documents the artifact.
 
+### Addendum (2026-05-20) — Storage SOT inverted (ObjectBox is the SOT)
+
+The §"Locked Stack" row above is the historical record of v1's storage assumption (markdown source-of-truth, ObjectBox as structured cache). It is superseded by **ADR-017**: ObjectBox is the entry source of truth; markdown is generated at export only. The HNSW vector index on `EntryEntity.vector` is unchanged.
+
 ---
 
 ## Trade-off Analysis

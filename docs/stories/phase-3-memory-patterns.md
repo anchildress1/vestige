@@ -224,7 +224,7 @@ Query-side tag extraction goes beyond exact-substring match: a free-form query b
 - [x] Unit test: `VectorBackfillWorkerTest` verifies `embedder` is called with the synthesized string (not `entryText`) for a fixture with populated tags + observations; verifies incomplete entries are skipped; verifies already-current `vectorSchemaVersion` entries are skipped on re-run.
 - [x] On-device: after re-backfill, run STT-E corpus (same 4 cohort queries, same 18-entry set) against the corrected vectors and record new hybrid vs tag-only numbers in ADR-001 §"Addendum (2026-05-12)". (Verified 2026-05-19 with corrected harness source: hybrid won 3/4, tied 1, lost 0; evidence in `docs/stt-results/stt-e-2026-05-19.md`.)
 
-**Notes / risks:** `vectorSchemaVersion` is an operational field — does not appear in markdown source-of-truth. If ObjectBox is rebuilt from markdown, it defaults to `0` and the re-backfill runs, which is correct.
+**Notes / risks:** `vectorSchemaVersion` is an operational field — it appears in the structured export snapshot, not per-entry markdown. Export/import is not a v1 runtime recovery path.
 
 ---
 

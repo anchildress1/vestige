@@ -2,6 +2,7 @@ package dev.anchildress1.vestige
 
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
+import dev.anchildress1.vestige.inference.LiteRtLmEngine
 import dev.anchildress1.vestige.inference.PatternTitleGenerator
 import dev.anchildress1.vestige.model.PatternKind
 import dev.anchildress1.vestige.model.PatternState
@@ -11,12 +12,10 @@ import dev.anchildress1.vestige.model.TemplateLabel
 import dev.anchildress1.vestige.patterns.PatternDetectionOrchestrator
 import dev.anchildress1.vestige.storage.CalloutCooldownStore
 import dev.anchildress1.vestige.storage.EntryStore
-import dev.anchildress1.vestige.storage.MarkdownEntryStore
 import dev.anchildress1.vestige.storage.PatternDetector
 import dev.anchildress1.vestige.storage.PatternEntity
 import dev.anchildress1.vestige.storage.PatternStore
 import dev.anchildress1.vestige.storage.VestigeBoxStore
-import io.mockk.mockk
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
@@ -38,8 +37,7 @@ import java.time.ZoneId
  * fires nothing. Entry 5 — first-fired pattern's window has counted down to 0 — fires again.
  *
  * Detection itself is gated off via `patternSurfaceMinEntries = Long.MAX_VALUE` so the
- * pre-seeded patterns are the only ones the orchestrator considers. Title generation is
- * mocked because no new pattern inserts during the test.
+ * pre-seeded patterns are the only ones the orchestrator considers.
  *
  *   ./gradlew :app:connectedDebugAndroidTest \
  *     -Pandroid.testInstrumentationRunnerArguments.class=dev.anchildress1.vestige.PatternCooldownSmokeTest
@@ -55,20 +53,18 @@ class PatternCooldownSmokeTest {
         val boxStoreDir = File(context.cacheDir, "pattern-cooldown-smoke-${System.currentTimeMillis()}")
         require(boxStoreDir.mkdirs()) { "Could not create $boxStoreDir" }
         val boxStore = VestigeBoxStore.openAt(boxStoreDir)
-        val markdownDir = File(context.cacheDir, "pattern-cooldown-md-${System.currentTimeMillis()}").apply { mkdirs() }
         try {
             val clock = Clock.systemUTC()
             val zone = ZoneId.systemDefault()
-            val entryStore = EntryStore(boxStore, MarkdownEntryStore(markdownDir))
+            val entryStore = EntryStore(boxStore)
             val patternStore = PatternStore(boxStore, clock)
             val cooldownStore = CalloutCooldownStore(boxStore)
             val detector = PatternDetector(boxStore, clock, zone)
-            val titleGenerator = mockk<PatternTitleGenerator>(relaxed = true)
             val orchestrator = PatternDetectionOrchestrator(
                 boxStore = boxStore,
                 detector = detector,
                 patternStore = patternStore,
-                titleGenerator = titleGenerator,
+                titleGenerator = PatternTitleGenerator(LiteRtLmEngine(modelPath = "unused")),
                 cooldownStore = cooldownStore,
                 clock = clock,
                 zoneId = zone,
@@ -99,7 +95,6 @@ class PatternCooldownSmokeTest {
         } finally {
             boxStore.close()
             boxStoreDir.deleteRecursively()
-            markdownDir.deleteRecursively()
         }
     }
 

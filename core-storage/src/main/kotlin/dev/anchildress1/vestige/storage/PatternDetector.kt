@@ -63,6 +63,9 @@ class PatternDetector(
         }
     }
 
+    // AUDIT is the labeler's fallback bucket (everything that didn't match an archetype),
+    // not a pattern shape. Detection grouping by AUDIT would surface a meaningless cluster
+    // of "everything that didn't fit elsewhere." See `docs/backlog.md` §`labeler-prompt-tightening`.
     private fun detectTemplateRecurrence(entries: List<EntryEntity>): List<DetectedPattern> = entries
         .filter { it.templateLabel != null }
         .filterNot { it.templateLabel == TemplateLabel.AUDIT }

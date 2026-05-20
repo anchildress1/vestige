@@ -79,6 +79,10 @@ class TemplateLabeler {
         // `tunnel` is the energy descriptor list, not a tag — it lands in `energy_descriptor`.
         val TUNNEL_EXIT_TAGS = setOf("tunnel-exit")
 
+        // Demo-time widening — see `docs/backlog.md` §`labeler-prompt-tightening`. Pre-STT-C
+        // tag stability the prompts emit imprecise tags; this list compensates so the demo
+        // labels land. STT-C measurements will replace this with narrower, evidence-driven
+        // sets — do not expand without an STT result.
         val DECISION_SPIRAL_TAGS = setOf(
             "comparing",
             "decision-loop",
@@ -91,6 +95,8 @@ class TemplateLabeler {
 
         val STANDALONE_AFTERMATH_ENERGIES = setOf("hollow")
 
+        // Demo-time widening — see `docs/backlog.md` §`labeler-prompt-tightening`. Same caveat
+        // as DECISION_SPIRAL_TAGS above.
         val AFTERMATH_TAGS = setOf("aftermath", "all-hands", "crash", "crashed", "hollow", "hollow-thing")
 
         // Resistance / paralysis vocabulary — kept narrow on purpose. STT-C tag stability will

@@ -20,10 +20,10 @@ class CalloutCooldownStore(private val boxStore: BoxStore) {
      * caller's tx starts after the first's commit and finds the row.
      */
     fun snapshotFor(patternId: String): CalloutCooldownEntity = boxStore.callInTx<CalloutCooldownEntity> {
-        findByPatternIdInTx(patternId) ?: CalloutCooldownEntity(patternId = patternId).also { box.put(it) }
+        findByPatternId(patternId) ?: CalloutCooldownEntity(patternId = patternId).also { box.put(it) }
     }
 
-    private fun findByPatternIdInTx(patternId: String): CalloutCooldownEntity? = box
+    private fun findByPatternId(patternId: String): CalloutCooldownEntity? = box
         .query()
         .equal(CalloutCooldownEntity_.patternId, patternId, QueryBuilder.StringOrder.CASE_SENSITIVE)
         .build()
@@ -47,9 +47,15 @@ class CalloutCooldownStore(private val boxStore: BoxStore) {
         }
     }
 
-    /** True when [patternId] is callout-eligible on the next entry (no suppression, no pending). */
-    fun isCalloutPermitted(patternId: String): Boolean = snapshotFor(patternId).let { row ->
-        row.remainingSuppression == 0 && row.pendingCalloutEntryId == null
+    /**
+     * Read-only eligibility check for [patternId]. Returns `true` when no row exists for the
+     * pattern (never fired ⇒ eligible) or when the row's window is clear. Does NOT lazily create
+     * a row — the orchestrator's pre-reserve selector relies on this purity so picking a pattern
+     * doesn't itself populate the cooldown table.
+     */
+    fun isCalloutPermitted(patternId: String): Boolean {
+        val row = findByPatternId(patternId) ?: return true
+        return row.remainingSuppression == 0 && row.pendingCalloutEntryId == null
     }
 
     /**
@@ -103,11 +109,7 @@ class CalloutCooldownStore(private val boxStore: BoxStore) {
      * holds [entryId] as its pending reservation. Returns the confirmed `patternId` so the caller
      * can pass it as `except` to [decrementAllActive] without re-scanning.
      */
-    fun confirmReservedCallout(
-        entryId: Long,
-        timestampMs: Long,
-        windowEntries: Int = DEFAULT_WINDOW,
-    ): String {
+    fun confirmReservedCallout(entryId: Long, timestampMs: Long, windowEntries: Int = DEFAULT_WINDOW): String {
         require(windowEntries >= 0) { "windowEntries >= 0 required (got $windowEntries)" }
         return boxStore.callInTx<String> {
             val row = findByPendingEntryIdInTx(entryId)

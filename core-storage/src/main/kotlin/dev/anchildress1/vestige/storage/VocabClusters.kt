@@ -5,6 +5,7 @@ import org.json.JSONArray
 import org.json.JSONException
 import org.json.JSONObject
 import java.security.MessageDigest
+import java.util.HexFormat
 
 /**
  * Read the root token out of a `VOCAB_FREQUENCY` pattern's `signatureJson`. Returns `null` when
@@ -15,6 +16,20 @@ import java.security.MessageDigest
 fun vocabRootTokenOrNull(signatureJson: String): String? = runCatching {
     JSONObject(signatureJson).optString("token", "").takeIf { it.isNotBlank() }
 }.getOrNull()
+
+/**
+ * Canonical (signatureJson, patternId) for a `VOCAB_FREQUENCY` pattern with root [token].
+ * Mirrors the detector's own signature serialization (including the token stemmer) — debug
+ * fixtures and tests that pre-insert vocab patterns must use both fields so the next detection
+ * pass updates the seeded row instead of inserting a duplicate.
+ */
+fun vocabPatternIdentity(token: String): VocabPatternIdentity {
+    val sig = PatternSignature.forVocabToken(token)
+    return VocabPatternIdentity(patternId = sig.patternId, signatureJson = sig.json)
+}
+
+/** Result of [vocabPatternIdentity]. */
+data class VocabPatternIdentity(val patternId: String, val signatureJson: String)
 
 /**
  * A single vocabulary cluster surfaced under a `VOCAB_FREQUENCY` pattern. Members share the
@@ -72,7 +87,10 @@ data class VocabCluster private constructor(
         internal fun sha256Hex(sortedMemberIds: List<Long>): String {
             val canonical = sortedMemberIds.joinToString(",")
             val bytes = MessageDigest.getInstance("SHA-256").digest(canonical.toByteArray())
-            return bytes.joinToString("") { byte -> "%02x".format(byte) }
+            // `HexFormat.formatHex` produces exactly 64 lowercase hex chars per 32-byte digest.
+            // The `"%02x".format(byte)` shorthand sign-extends negative bytes to 8 hex chars,
+            // breaking the 64-hex invariant non-deterministically.
+            return HexFormat.of().formatHex(bytes)
         }
     }
 }
@@ -133,10 +151,18 @@ object VocabClustersCodec {
                     val members = buildList(memberArr.length()) {
                         for (m in 0 until memberArr.length()) add(memberArr.getLong(m))
                     }
+                    val label = obj.getString("label")
+                    val id = obj.getString("id")
+                    // Drop structurally-bad clusters — empty members or blank label would crash
+                    // `VocabDistributionSegment.init` downstream. Log + skip beats compose throw.
+                    if (members.isEmpty() || label.isBlank()) {
+                        Log.w(TAG, "vocab clusters decode: skipping invalid persisted cluster id=$id")
+                        continue
+                    }
                     add(
                         VocabCluster.fromTrustedJson(
-                            clusterId = obj.getString("id"),
-                            label = obj.getString("label"),
+                            clusterId = id,
+                            label = label,
                             description = obj.getString("description"),
                             exampleEntryId = obj.getLong("example_entry_id"),
                             memberEntryIds = members,

@@ -108,11 +108,11 @@ class VocabClusterLabelerTest {
     }
 
     @Test
-    fun `member entry ids preserve cluster input order`() {
-        // The clustering layer outputs members sorted by id ascending. The labeler must not
-        // re-sort or shuffle — the clusterId hash assumes the input order.
+    fun `member entry ids are sorted ascending`() {
+        // VocabCluster.of sorts ids before hashing; the labeler must respect that invariant so
+        // the persisted clusterId matches a re-derivation from the same evidence.
         val cluster = clusterOf(
-            members = listOf("a" to 5L, "b" to 7L, "c" to 11L),
+            members = listOf("a" to 11L, "b" to 5L, "c" to 7L),
         )
 
         val result = VocabClusterLabeler.label(cluster, rootToken = "tired")

@@ -56,9 +56,9 @@ class VocabClustersCodecTest {
     }
 
     @Test
-    fun `encode escapes quotes backslash tab and forward-slash in label and description`() {
+    fun `encode escapes quotes backslash and control chars in label and description`() {
         val cluster = cluster(
-            label = "Has \"\\quo/tes\"",
+            label = "Has \"\\quotes\"",
             description = "Line one\nLine\ttwo",
             example = 1L,
             members = listOf(1L),

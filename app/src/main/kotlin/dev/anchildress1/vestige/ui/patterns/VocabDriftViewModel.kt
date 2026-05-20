@@ -41,9 +41,14 @@ class VocabDriftViewModel(
     private suspend fun loadState(): VocabDriftUiState = withContext(ioDispatcher) {
         val pattern = patternStore.findByPatternId(patternId) ?: return@withContext VocabDriftUiState.NotFound
         if (pattern.kind != PatternKind.VOCAB_FREQUENCY) return@withContext VocabDriftUiState.NotFound
+        // Disambiguate "evidence not ready" from "stored data is unreadable": blank → optimistic
+        // NotYetClustered; non-blank that decodes to empty → corruption → NotFound + log.
+        if (pattern.vocabClustersJson.isBlank()) return@withContext VocabDriftUiState.NotYetClustered
         val clusters = VocabClustersCodec.decode(pattern.vocabClustersJson)
-        if (clusters.isEmpty()) return@withContext VocabDriftUiState.NotYetClustered
-
+        if (clusters.isEmpty()) {
+            Log.w(TAG, "vocab pattern has non-blank but unreadable JSON pid=${pattern.patternId}")
+            return@withContext VocabDriftUiState.NotFound
+        }
         val rootToken = vocabRootTokenOrNull(pattern.signatureJson) ?: run {
             Log.e(TAG, "vocab-frequency pattern missing token pid=${pattern.patternId}")
             return@withContext VocabDriftUiState.NotFound

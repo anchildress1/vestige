@@ -7,66 +7,92 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import dev.anchildress1.vestige.ui.components.AppTop
-import dev.anchildress1.vestige.ui.components.AppTopStatuses
+import dev.anchildress1.vestige.R
 import dev.anchildress1.vestige.ui.components.EyebrowE
+import dev.anchildress1.vestige.ui.components.VestigeScaffold
 import dev.anchildress1.vestige.ui.theme.VestigeTheme
 
 /** Vocab Drift surface — renders persisted clusters for a single VOCAB_FREQUENCY pattern. */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun VocabDriftScreen(viewModel: VocabDriftViewModel, onBack: () -> Unit, modifier: Modifier = Modifier) {
     val state by viewModel.state.collectAsStateWithLifecycle()
+    val backDescription = stringResource(R.string.pattern_back_description)
+    VestigeScaffold(
+        modifier = modifier,
+        topBar = {
+            TopAppBar(
+                title = { Text("") },
+                navigationIcon = {
+                    IconButton(
+                        onClick = onBack,
+                        modifier = Modifier.semantics { contentDescription = backDescription },
+                    ) {
+                        Text(
+                            text = stringResource(R.string.pattern_back_glyph),
+                            style = MaterialTheme.typography.titleLarge,
+                        )
+                    }
+                },
+            )
+        },
+    ) { padding ->
+        VocabDriftBodyRouter(state = state, padding = padding)
+    }
+}
+
+@Composable
+private fun VocabDriftBodyRouter(state: VocabDriftUiState, padding: PaddingValues) {
     val colors = VestigeTheme.colors
-    Column(modifier = modifier.fillMaxSize().background(colors.floor)) {
-        AppTop(persona = "", status = AppTopStatuses.Ready, onMenuTap = onBack)
-        when (val s = state) {
-            VocabDriftUiState.Loading -> Spacer(Modifier.weight(1f))
+    Column(modifier = Modifier.fillMaxSize().padding(padding).background(colors.floor)) {
+        when (state) {
+            VocabDriftUiState.Loading -> Unit
 
             VocabDriftUiState.NotFound -> StatusBandBody(
                 text = VocabDriftCopy.NOT_FOUND,
                 testTag = VocabDriftTestTags.NOT_FOUND_BAND,
-                modifier = Modifier.weight(1f),
             )
 
             VocabDriftUiState.NotYetClustered -> StatusBandBody(
                 text = VocabDriftCopy.NOT_YET_CLUSTERED,
                 testTag = VocabDriftTestTags.NOT_YET_CLUSTERED_BAND,
-                modifier = Modifier.weight(1f),
             )
 
-            is VocabDriftUiState.Loaded -> VocabDriftBody(
-                state = s,
-                modifier = Modifier.weight(1f),
-            )
+            is VocabDriftUiState.Loaded -> VocabDriftBody(state = state)
         }
     }
 }
 
 @Composable
-private fun StatusBandBody(text: String, testTag: String, modifier: Modifier = Modifier) {
+private fun StatusBandBody(text: String, testTag: String) {
     Box(
-        modifier = modifier
+        modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 20.dp, vertical = 24.dp)
             .semantics(mergeDescendants = true) {
@@ -81,10 +107,10 @@ private fun StatusBandBody(text: String, testTag: String, modifier: Modifier = M
 }
 
 @Composable
-private fun VocabDriftBody(state: VocabDriftUiState.Loaded, modifier: Modifier = Modifier) {
+private fun VocabDriftBody(state: VocabDriftUiState.Loaded) {
     val colors = VestigeTheme.colors
     Column(
-        modifier = modifier
+        modifier = Modifier
             .fillMaxWidth()
             .verticalScroll(rememberScrollState())
             .padding(horizontal = 20.dp, vertical = 16.dp),

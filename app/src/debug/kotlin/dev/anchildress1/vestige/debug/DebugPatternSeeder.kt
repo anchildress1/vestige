@@ -12,9 +12,11 @@ import dev.anchildress1.vestige.storage.PatternStore
 import dev.anchildress1.vestige.storage.TagEntity
 import dev.anchildress1.vestige.storage.VocabClusterLabeler
 import dev.anchildress1.vestige.storage.VocabClustersCodec
+import dev.anchildress1.vestige.storage.vocabPatternIdentity
 import io.objectbox.BoxStore
 import java.io.File
 import java.security.MessageDigest
+import java.util.HexFormat
 
 /**
  * Debug-only fixture seeder. Lets the dev verify the pattern UI with real cards on a device.
@@ -126,10 +128,13 @@ object DebugPatternSeeder {
             cluster2 = VOCAB_DRIFT_WIRED_TIRED,
         )
 
+        // Use the detector's canonical signature so a real detection pass updates the seeded row
+        // instead of inserting a duplicate with a content-addressable mismatch.
+        val identity = vocabPatternIdentity("tired")
         val pattern = PatternEntity(
-            patternId = sha256Hex("vocab-frequency-tired"),
+            patternId = identity.patternId,
             kind = PatternKind.VOCAB_FREQUENCY,
-            signatureJson = """{"kind":"vocab_frequency","token":"tired"}""",
+            signatureJson = identity.signatureJson,
             title = "Tired",
             templateLabel = null,
             firstSeenTimestamp = tiredEntries.minOf { it.timestampEpochMs },
@@ -224,10 +229,8 @@ object DebugPatternSeeder {
         patternStore.put(saved)
     }
 
-    private fun sha256Hex(text: String): String =
-        MessageDigest.getInstance("SHA-256").digest(text.toByteArray()).joinToString("") {
-            "%02x".format(it)
-        }
+    private fun sha256Hex(text: String): String = HexFormat.of()
+        .formatHex(MessageDigest.getInstance("SHA-256").digest(text.toByteArray()))
 
     private const val DAY_MS: Long = 24L * 60 * 60 * 1000
 

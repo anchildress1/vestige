@@ -19,6 +19,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import dev.anchildress1.vestige.ui.theme.VestigeColors
 import dev.anchildress1.vestige.ui.theme.VestigeTheme
+import kotlin.math.roundToInt
 
 /**
  * Stacked horizontal proportion bar — one weighted segment per vocab cluster. The whole row
@@ -65,10 +66,13 @@ internal fun vocabAccentForIndex(index: Int, colors: VestigeColors): Color {
 }
 
 private fun composeDescription(segments: List<VocabDistributionSegment>, totalWeight: Float): String {
-    val parts = segments.map { segment ->
-        val pct = ((segment.weight / totalWeight) * PERCENT_SCALE).toInt()
-        "${segment.label}: $pct%"
-    }
+    // Round to nearest, then absorb any rounding drift into the last segment so the announced
+    // percentages always sum to 100. Floor-on-each (the previous behavior) under-reports and
+    // can leave the user hearing "33%, 33%, 33%" for an even split.
+    val rounded = segments.map { (it.weight / totalWeight * PERCENT_SCALE).roundToInt() }.toMutableList()
+    val drift = PERCENT_SCALE.toInt() - rounded.sum()
+    if (rounded.isNotEmpty()) rounded[rounded.lastIndex] += drift
+    val parts = segments.zip(rounded) { segment, pct -> "${segment.label}: $pct%" }
     return "Vocabulary distribution: ${parts.joinToString(", ")}."
 }
 

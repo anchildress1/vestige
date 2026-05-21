@@ -37,11 +37,7 @@ class DebugSeedReceiver : BroadcastReceiver() {
                 }
                 val container = app.appContainer
                 Log.d(TAG, "seeding debug fixtures…")
-                DebugPatternSeeder.seed(
-                    filesDir = appContext.filesDir,
-                    boxStore = container.boxStore,
-                    patternStore = container.patternStore,
-                )
+                DebugPatternSeeder.seed(boxStore = container.boxStore)
                 OnboardingPrefs.from(appContext).markComplete()
                 if (runExtraction) {
                     container.launchMissingExtractionBackfill()

@@ -40,11 +40,7 @@ class MissingExtractionBackfillSmokeTest {
 
     @Before
     fun seedFreshCorpus() {
-        DebugPatternSeeder.seed(
-            filesDir = app.filesDir,
-            boxStore = container.boxStore,
-            patternStore = container.patternStore,
-        )
+        DebugPatternSeeder.seed(boxStore = container.boxStore)
     }
 
     @After
@@ -167,7 +163,6 @@ class MissingExtractionBackfillSmokeTest {
     }
 
     private fun vocabEntriesMissingVectors(entries: List<EntryEntity>): List<String> = entries
-        .filter { it.markdownFilename.startsWith("debug-vocab-") }
         .filter { it.vector == null || it.vectorSchemaVersion < EntryEntity.CURRENT_VECTOR_SCHEMA_VERSION }
         .map { it.markdownFilename }
 

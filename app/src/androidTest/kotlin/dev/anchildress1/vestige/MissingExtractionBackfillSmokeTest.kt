@@ -65,8 +65,18 @@ class MissingExtractionBackfillSmokeTest {
             )
         }
 
+        container.recoverPendingExtractions()
         withTimeout(BACKFILL_TIMEOUT_MS) {
-            container.recoverPendingExtractions()
+            // recoverPendingExtractions only *schedules* per-entry recovery jobs and returns; poll
+            // until every row leaves the in-flight states (PENDING/RUNNING) so the COMPLETED
+            // assertion below sees settled rows, not work still draining.
+            while (box.all.any {
+                    it.extractionStatus == ExtractionStatus.PENDING ||
+                        it.extractionStatus == ExtractionStatus.RUNNING
+                }
+            ) {
+                delay(POLL_INTERVAL_MS)
+            }
         }
 
         val after = box.all.associateBy { it.id }

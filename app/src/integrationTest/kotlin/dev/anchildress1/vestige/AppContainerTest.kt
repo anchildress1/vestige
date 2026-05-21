@@ -610,6 +610,71 @@ class AppContainerTest {
         }
 
     @Test
+    fun `foreground capture cancels active extraction and requeues it before later work`(@TempDir tempRoot: File) =
+        runTest {
+            val capturedAt = ZonedDateTime.of(2026, 5, 20, 22, 5, 0, 0, ZoneId.of("America/New_York"))
+            val firstWork = pendingExtractionWork(
+                entryId = 1L,
+                entryText = "already extracting",
+                capturedAt = capturedAt,
+            )
+            val secondWork = pendingExtractionWork(
+                entryId = 2L,
+                entryText = "queued behind it",
+                capturedAt = capturedAt,
+            )
+            val firstRun = kotlinx.coroutines.Job()
+            val launches = mutableListOf<Long>()
+            val saveFlow = mockk<BackgroundExtractionSaveFlow>()
+            var prepared = 0
+            coEvery { saveFlow.prepareSaveAndExtract(any(), any(), any(), any(), any(), any(), any()) } answers {
+                if (prepared++ == 0) firstWork else secondWork
+            }
+            every { saveFlow.launchExtraction(any()) } answers {
+                val work = firstArg<PendingExtractionWork>()
+                launches += work.entryId
+                if (launches.size == 1) firstRun else kotlinx.coroutines.Job().also { it.complete() }
+            }
+            val context = mockk<Context>(relaxed = true) {
+                every { filesDir } returns tempRoot
+                every { cacheDir } returns File(tempRoot, "cache").apply { mkdirs() }
+            }
+            val container = AppContainer(
+                applicationContext = context,
+                boxStoreFactory = { mockk<BoxStore>(relaxed = true) },
+                modelPathLoader = { File(tempRoot, "m").absolutePath },
+                backgroundEngineFactory = { _, _ -> mockk<LiteRtLmEngine>(relaxed = true) },
+                backgroundExtractionSaveFlowFactory = { _, _, _, _, _, _, _ -> saveFlow },
+                recoveredEntryIdsLoader = { emptyList() },
+                foregroundServiceIntentFactory = { Intent("dev.anchildress1.vestige.TEST_START") },
+                foregroundServiceStarter = {},
+                scope = backgroundScope,
+            )
+
+            val firstCompletion = container.saveAndExtract("already extracting", capturedAt).extractionJob
+            runCurrent()
+            val secondCompletion = container.saveAndExtract("queued behind it", capturedAt).extractionJob
+            runCurrent()
+
+            assertEquals(listOf(1L), launches)
+            assertFalse(firstCompletion.isCompleted)
+            assertFalse(secondCompletion.isCompleted)
+
+            container.beginForegroundInference()
+            runCurrent()
+
+            assertTrue(firstRun.isCancelled)
+
+            container.endForegroundInference()
+            runCurrent()
+            advanceUntilIdle()
+
+            assertEquals(listOf(1L, 1L, 2L), launches)
+            assertTrue(firstCompletion.isCompleted)
+            assertTrue(secondCompletion.isCompleted)
+        }
+
+    @Test
     fun `retrieveHistory uses the injected dispatcher and maps entries to context-only chunks`(
         @TempDir tempRoot: File,
     ) = runTest {

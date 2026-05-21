@@ -10,6 +10,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertThrows
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -43,12 +44,18 @@ class PatternStoreTest {
         BoxStore.deleteAllFiles(dataDir)
     }
 
-    private fun seed(state: PatternState = PatternState.ACTIVE, patternId: String = "p".repeat(64)): PatternEntity {
+    private fun seed(
+        state: PatternState = PatternState.ACTIVE,
+        patternId: String = "p".repeat(64),
+        templateLabel: String? = null,
+        kind: PatternKind = PatternKind.TEMPLATE_RECURRENCE,
+    ): PatternEntity {
         val entity = PatternEntity(
             patternId = patternId,
-            kind = PatternKind.TEMPLATE_RECURRENCE,
+            kind = kind,
             signatureJson = "{}",
             title = "Aftermath Loop",
+            templateLabel = templateLabel,
             firstSeenTimestamp = now.toEpochMilli() - 1_000_000,
             lastSeenTimestamp = now.toEpochMilli(),
             state = state,
@@ -372,5 +379,51 @@ class PatternStoreTest {
         store = PatternStore(boxStore, clock)
         val readBack = store.findByPatternId(seeded.patternId)!!
         assertEquals(PatternState.SNOOZED, readBack.state)
+    }
+
+    @Test
+    fun `retireLegacyAuditPatterns drops every non-terminal AUDIT template row`() {
+        val active = seed(
+            state = PatternState.ACTIVE,
+            patternId = "a".repeat(64),
+            templateLabel = "audit",
+        )
+        val snoozed = seed(
+            state = PatternState.SNOOZED,
+            patternId = "b".repeat(64),
+            templateLabel = "audit",
+        )
+        // Terminal rows are left alone — the validator forbids transitions away from DROPPED
+        // and the retirement sweep must not re-touch them.
+        val alreadyDropped = seed(
+            state = PatternState.DROPPED,
+            patternId = "c".repeat(64),
+            templateLabel = "audit",
+        )
+        // Non-AUDIT patterns must stay active.
+        val keeper = seed(
+            state = PatternState.ACTIVE,
+            patternId = "d".repeat(64),
+            templateLabel = "aftermath",
+        )
+
+        val retired = store.retireLegacyAuditPatterns()
+
+        assertEquals(setOf(active.patternId, snoozed.patternId), retired.toSet())
+        assertEquals(PatternState.DROPPED, store.findByPatternId(active.patternId)!!.state)
+        assertEquals(PatternState.DROPPED, store.findByPatternId(snoozed.patternId)!!.state)
+        assertEquals(PatternState.DROPPED, store.findByPatternId(alreadyDropped.patternId)!!.state)
+        assertEquals(PatternState.ACTIVE, store.findByPatternId(keeper.patternId)!!.state)
+    }
+
+    @Test
+    fun `retireLegacyAuditPatterns is idempotent`() {
+        seed(state = PatternState.ACTIVE, templateLabel = "audit")
+
+        val first = store.retireLegacyAuditPatterns()
+        val second = store.retireLegacyAuditPatterns()
+
+        assertEquals(1, first.size)
+        assertTrue("subsequent retirement passes must be no-ops", second.isEmpty())
     }
 }

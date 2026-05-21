@@ -395,6 +395,9 @@ class AppContainer(
         // Cold-start skip wake-up runs before any Pattern surface composes, so an expired
         // skip never flashes under SKIPPED on the first frame (spec §"Open Questions" Q2).
         sweepExpiredSkips()
+        // One-time sweep: drop AUDIT template patterns persisted by pre-filter builds so they
+        // stop surfacing for upgraded users. Idempotent after the first successful run.
+        retireLegacyAuditPatterns()
     }
 
     /**
@@ -414,6 +417,23 @@ class AppContainer(
             // Self-healing: the next ON_RESUME re-runs the sweep, so a transient failure here
             // is a warning, not an error — keeping it error-tier would devalue real alerts.
             .onFailure { Log.w(TAG, "Skip wake-up sweep failed", it) }
+    }
+
+    /**
+     * One-time retirement of AUDIT template patterns persisted by builds before the AUDIT
+     * filter landed in `PatternDetector`. AUDIT is the labeler's fallback bucket, not a
+     * pattern shape; leaving legacy rows ACTIVE means the orchestrator keeps surfacing them.
+     * Idempotent — once dropped, subsequent runs find nothing to retire.
+     */
+    fun retireLegacyAuditPatterns() {
+        runCatching { patternStore.retireLegacyAuditPatterns() }
+            .onSuccess { retired ->
+                if (retired.isNotEmpty()) {
+                    _dataRevision.value += 1
+                    Log.i(TAG, "Retired ${retired.size} legacy AUDIT pattern(s)")
+                }
+            }
+            .onFailure { Log.w(TAG, "Legacy AUDIT pattern retirement failed", it) }
     }
 
     fun reportExtractionStatus(entryId: Long, status: ExtractionStatus) {

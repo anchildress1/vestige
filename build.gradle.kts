@@ -192,6 +192,14 @@ sonar {
                     "**/BackgroundExtractionService.kt",
                     "**/LiteRtLmEngine.kt",
                     "**/AudioCapture.kt",
+                    // Wiring layer; behavior measured by :app:testDebugIntegrationTest
+                    // (PatternDetectionOrchestratorTest + AnalysisTest), which kover instrumentation
+                    // intentionally does not cover. Unit-tier coverage on this surface would mock
+                    // out PatternDetector + PatternStore — tautological. ADR-014 contract.
+                    "**/patterns/PatternDetectionOrchestrator.kt",
+                    // Compose-bound ViewModel; behavior measured by :app:testDebugIntegrationTest
+                    // (PatternsListScreenTest). Unit-tier coverage would re-stub the StateFlow plumbing.
+                    "**/ui/patterns/PatternsListViewModel.kt",
                     // Debug-only fixture seeder, FLAG_DEBUGGABLE-gated; never on a release path.
                     "**/debug/**",
                 ) +

@@ -87,14 +87,10 @@ object PatternMatcher {
     private fun matchesVocab(entry: EntryEntity, signature: JSONObject): Boolean {
         val token = signature.optString("token").lowercase(Locale.ROOT)
         if (token.isEmpty()) return false
-        // Apply the same stemmer the detector used to mint the signature so a `tireds` /
-        // `Tired` entry text matches a `tired` signature without an extra prefix-startsWith
-        // heuristic the detector would not have produced.
-        val tagHit = entry.tags.any { TokenStemmer.stem(it.name) == token }
-        val textHit = entry.entryText.lowercase(Locale.ROOT)
-            .split(VOCAB_SPLIT)
-            .any { TokenStemmer.stem(it.trim()) == token }
-        return tagHit || textHit
+        // Detection and matching MUST extract the same tokens. Delegate to the shared helper
+        // so a `drained` entry (alias-folded to `tired` at detection) keeps matching the
+        // `tired` pattern it minted, and energy-descriptor tokens behave symmetrically.
+        return token in VocabTokens.forEntry(entry)
     }
 
     private fun matchesTemporal(entry: EntryEntity, signature: JSONObject, zoneId: ZoneId): Boolean {
@@ -115,6 +111,5 @@ object PatternMatcher {
         }
     }
 
-    private val VOCAB_SPLIT: Regex = Regex("[^a-z0-9]+")
     private const val TAG_PAIR_SIZE = 2
 }

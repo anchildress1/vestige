@@ -183,6 +183,8 @@ This is the model's own distillation of what happened. The vector then represent
 
 ## Concurrent Inference Architecture (Addendum 2026-05-16)
 
+**Superseded by ADR-008 addendums 2026-05-17 and 2026-05-20.** This section records the measured fork in reasoning: the 2026-05-16 bytecode probe exposed methods that looked viable, STT-F proved concurrent sessions fail at runtime, and the 2026-05-20 implementation uses cancellation + FIFO rerun instead of concurrent contexts.
+
 v1 runs foreground and background inference sequentially through a single `LiteRtLmEngine` behind a `Mutex`. A recording attempt while a background extraction is running blocks on the mutex until the current lens call finishes. This is the documented v1 **scope position** (ADR-002 sequential rule), not an SDK limitation.
 
 **SDK reality (2026-05-16 bytecode probe of pinned 0.11.0):** one Engine → many **independent** contexts via `Engine.createSession(SessionConfig)` / `Engine.createConversation(ConversationConfig)`. Contexts share the loaded model weights (no 2× weight RAM) but each holds **its own** KV state — there is **no** parent-Session Copy-on-Write prefix sharing (`Session.clone()` does not exist; the earlier ADR-009 claim to the contrary was a mis-scoped-probe mistake and was deleted — see ADR-008 §Correction 2026-05-16).
@@ -207,7 +209,7 @@ The consequence is deliberate: entry creation is no longer stalled on query embe
 
 **Correct behavior:** foreground owns the immediate transcript + follow-up / open-entry handoff; retrieval history feeds detached background analysis after transcription lands.
 
-**Corrected 2026-05-20.** Both voice and typed capture skip retrieval on the critical path. `CaptureViewModel` saves the pending entry as soon as it has authoritative foreground text and opens History detail immediately. `BackgroundExtractionSaveFlow` performs its own retrieval when the caller supplied none, so structured extraction keeps prior-entry context without making the user wait. `LiteRtLmEngine` still serializes Gemma calls on the GPU, so detached extraction queues behind the foreground call rather than running in parallel.
+**Corrected 2026-05-20.** Both voice and typed capture skip retrieval on the critical path. `CaptureViewModel` saves the pending entry as soon as it has authoritative foreground text and opens History detail immediately. `BackgroundExtractionSaveFlow` performs its own retrieval when the caller supplied none, so structured extraction keeps prior-entry context without making the user wait. `LiteRtLmEngine` still serializes Gemma calls on the GPU; foreground cancels active background extraction, then queued extraction reruns FIFO after foreground releases the slot.
 
 ---
 

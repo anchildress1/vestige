@@ -8,10 +8,11 @@
     xmlns:tools="http://schemas.android.com/tools">
 
     <application>
-        <!-- Exported only in debug so adb shell can trigger deterministic reinstall fixtures. -->
+        <!-- Exported only in debug; DUMP keeps fixture seeding limited to adb/system callers. -->
         <receiver
             android:name=".debug.DebugSeedReceiver"
             android:exported="true"
+            android:permission="android.permission.DUMP"
             tools:ignore="ExportedReceiver" />
     </application>
 

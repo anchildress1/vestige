@@ -192,12 +192,18 @@ class BackgroundExtractionWorker(
             }
 
             else -> {
-                val terminalError = (resolved as? Resolution.Failure)?.error
-                    ?: lensLastError
-                    ?: run {
-                        Log.e(TAG, "extract: all lenses returned null extraction with no recorded error")
-                        "all-lenses-exhausted"
+                val terminalError = when (resolved) {
+                    is Resolution.Failure -> resolved.error
+
+                    else -> {
+                        if (lensLastError != null) {
+                            lensLastError
+                        } else {
+                            Log.e(TAG, "extract: all lenses returned null extraction with no recorded error")
+                            "all-lenses-exhausted"
+                        }
                     }
+                }
                 Log.w(
                     TAG,
                     "extract failed (model_calls=$modelCallCount " +

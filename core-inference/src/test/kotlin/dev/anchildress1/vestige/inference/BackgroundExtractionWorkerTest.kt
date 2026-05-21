@@ -543,6 +543,36 @@ class BackgroundExtractionWorkerTest {
     }
 
     @Test
+    fun `chunk reference in recurrence_link is resolved to actual pattern id after convergence`() = runTest {
+        val engine = mockk<LiteRtLmEngine>()
+        coEvery { engine.generateText(any(), any()) } returns "raw"
+        val history = listOf(HistoryChunk(patternId = "real-pattern-id-abc", text = "prior entry"))
+        val resolvedWithChunkRef = ResolvedExtraction(
+            fields = mapOf(
+                "recurrence_link" to ResolvedField("chunk-1", ConfidenceVerdict.CANONICAL),
+                "recurrence_kind" to ResolvedField("partial", ConfidenceVerdict.CANONICAL),
+            ),
+        )
+
+        val result = BackgroundExtractionWorker(
+            engine = engine,
+            resolver = RecordingResolver(resolvedWithChunkRef),
+            parser = { lens, _ -> extraction(lens) },
+            composer = fakeComposer(),
+        ).extract(
+            request = BackgroundExtractionRequest(
+                entryText = "user words",
+                capturedAt = capturedAt,
+                retrievedHistory = history,
+            ),
+        )
+
+        val success = assertInstanceOf(BackgroundExtractionResult.Success::class.java, result)
+        val link = success.resolved.fields["recurrence_link"]?.value as? String
+        assertEquals("real-pattern-id-abc", link)
+    }
+
+    @Test
     fun `timeout produces TimedOut with whatever lens results completed before the cap`() = runTest {
         val engine = mockk<LiteRtLmEngine>()
         // Sequential run: LITERAL completes; INFERENTIAL hangs past the cap, so only LITERAL lands

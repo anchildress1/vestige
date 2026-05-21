@@ -222,9 +222,9 @@ class DemoExamplesSmokeTest {
         const val KEY_RECURRENCE = "recurrence_link"
         const val KEY_TAGS = "tags"
         const val PACKAGE_PATTERN_ID =
-            "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            "3f8a1c9e2b7d4f05a6e8c3b2d9f1a4e7c0b5d8f2a9e3c6b1d4f7a0e2c5b8d3f"
         const val COUCH_PATTERN_ID =
-            "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+            "7b2e5f0a3c8d1e4b9f6a2c7d0e5b8f3a6c1e4b7d2f9a5c0e3b8f1a4d7c2e9b6"
         val CASES = listOf(
             DemoExample(
                 id = "editor-hollow-thing",

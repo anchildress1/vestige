@@ -90,12 +90,12 @@ class PromptComposerTest {
         val chunks = (1..6).map { HistoryChunk(patternId = "p$it", text = "chunk $it text") }
         val text = PromptComposer.compose(Lens.LITERAL, entry, retrievedHistory = chunks).systemInstruction
 
-        assertTrue(text.contains("pattern_id=p1"))
-        assertTrue(text.contains("pattern_id=p2"))
-        assertTrue(text.contains("pattern_id=p3"))
-        assertFalse(text.contains("pattern_id=p4"))
-        assertFalse(text.contains("pattern_id=p5"))
-        assertFalse(text.contains("pattern_id=p6"))
+        assertTrue(text.contains("- chunk-1"))
+        assertTrue(text.contains("- chunk-2"))
+        assertTrue(text.contains("- chunk-3"))
+        assertFalse(text.contains("- chunk-4"))
+        assertFalse(text.contains("- chunk-5"))
+        assertFalse(text.contains("- chunk-6"))
     }
 
     @Test
@@ -127,17 +127,17 @@ class PromptComposerTest {
         val chunks = listOf(HistoryChunk(patternId = null, text = "ad-hoc historical chunk"))
         val text = PromptComposer.compose(Lens.LITERAL, entry, retrievedHistory = chunks).systemInstruction
         assertTrue(text.contains("- context-only"))
-        assertFalse(text.contains("pattern_id=null"))
+        assertFalse(text.contains("- chunk-"))
         assertFalse(text.contains("pattern_id unavailable"))
     }
 
     @Test
-    fun `retrieved history does not prefix real pattern ids with numeric ordinals`() {
+    fun `retrieved history with pattern id renders as chunk-1`() {
         val chunks = listOf(HistoryChunk(patternId = "abc123", text = "similar historical chunk"))
         val text = PromptComposer.compose(Lens.LITERAL, entry, retrievedHistory = chunks).systemInstruction
 
-        assertTrue(text.contains("- pattern_id=abc123"))
-        assertFalse(text.contains("[1] pattern_id=abc123"))
+        assertTrue(text.contains("- chunk-1"))
+        assertFalse(text.contains("abc123"))
     }
 
     @Test

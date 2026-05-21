@@ -84,7 +84,14 @@ class BackgroundExtractionWorker(
                     runLens(lens, request.entryText, request.retrievedHistory)
                         .also { completed += it }
                 }
-                completeRun(results, request.entryAttemptCount, request.capturedAt, started, listener)
+                completeRun(
+                    results = results,
+                    entryAttemptCount = request.entryAttemptCount,
+                    capturedAt = request.capturedAt,
+                    startedNanos = started,
+                    listener = listener,
+                    retrievedHistory = request.retrievedHistory,
+                )
             }
         } catch (_: TimeoutCancellationException) {
             handleTimeout(
@@ -157,12 +164,14 @@ class BackgroundExtractionWorker(
         return AttemptOutcome(raw = "", error = reason)
     }
 
+    @Suppress("LongParameterList") // Resolution context: lens results + diagnostics + history for chunk-ref resolution.
     private suspend fun completeRun(
         results: List<LensResult>,
         entryAttemptCount: Int,
         capturedAt: ZonedDateTime,
         startedNanos: Long,
         listener: ExtractionStatusListener,
+        retrievedHistory: List<HistoryChunk> = emptyList(),
     ): BackgroundExtractionResult {
         val modelCallCount = results.sumOf { it.attemptCount }
         val lensLastError = results.firstNotNullOfOrNull { it.lastError }
@@ -170,7 +179,10 @@ class BackgroundExtractionWorker(
         val resolved = if (parsedExtractions.isEmpty()) {
             null
         } else {
-            tryResolve(parsedExtractions, lensLastError)
+            val resolution = tryResolve(parsedExtractions, lensLastError)
+            if (resolution is Resolution.Ok) {
+                Resolution.Ok(resolveChunkReferences(resolution.value, retrievedHistory))
+            } else resolution
         }
         val totalElapsedMs = (System.nanoTime() - startedNanos) / NANOS_PER_MILLI
         return when {
@@ -220,6 +232,23 @@ class BackgroundExtractionWorker(
         }
     }
 
+    private fun resolveChunkReferences(
+        resolved: dev.anchildress1.vestige.model.ResolvedExtraction,
+        history: List<HistoryChunk>,
+    ): dev.anchildress1.vestige.model.ResolvedExtraction {
+        val field = resolved.fields[RECURRENCE_LINK_KEY]
+        val patternId = (field?.value as? String)?.trim()
+            ?.let { CHUNK_REF_REGEX.matchEntire(it) }
+            ?.groupValues?.get(1)
+            ?.toIntOrNull()
+            ?.let { history.getOrNull(it - 1)?.patternId }
+        return if (field != null && patternId != null) {
+            resolved.copy(fields = resolved.fields + (RECURRENCE_LINK_KEY to field.copy(value = patternId)))
+        } else {
+            resolved
+        }
+    }
+
     private fun tryResolve(parsed: List<LensExtraction>, currentLastError: String?): Resolution = try {
         Resolution.Ok(resolver.resolve(parsed))
     } catch (cancellation: CancellationException) {
@@ -264,5 +293,7 @@ class BackgroundExtractionWorker(
         private val NO_OP_LISTENER = ExtractionStatusListener { _, _, _ -> }
         private const val TAG = "VestigeBackgroundExtraction"
         private const val NANOS_PER_MILLI = 1_000_000L
+        private const val RECURRENCE_LINK_KEY = "recurrence_link"
+        private val CHUNK_REF_REGEX = Regex("chunk-(\\d+)", RegexOption.IGNORE_CASE)
     }
 }

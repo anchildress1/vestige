@@ -9,7 +9,7 @@ Required keys:
 - `state_shift`: boolean.
 - `vocabulary_contradictions`: array of `{term_a, term_b, snippet}` or `[]`.
 - `stated_commitment`: object `{text, topic_or_person}` or `null`.
-- `recurrence_link`: string `pattern_id` or null.
+- `recurrence_link`: chunk reference string (`chunk-1`, `chunk-2`, `chunk-3`) or null.
 - `recurrence_kind`: `"exact"`, `"partial"`, or null.
 - `flags`: array of `{kind, snippet, note}` or `[]` — only the Skeptical lens populates this; the other two return `[]`.
 

@@ -718,7 +718,7 @@ class AppContainer(
 
     /**
      * Backfills lens receipts on COMPLETED entries that were inserted without extraction output
-     * (`make seed-entries -e run_extraction=true`, imported demo corpora, etc.). Single-flight.
+     * (imported demo corpora, partial export smoke fixtures, etc.). Single-flight.
      */
     fun launchMissingExtractionBackfill(limit: Int = DEFAULT_MISSING_EXTRACTION_BACKFILL_LIMIT): Job = scope.launch {
         if (!missingExtractionBackfillRunning.compareAndSet(false, true)) {

@@ -103,7 +103,7 @@ class SinglePassExtractionTuningTest {
                 ),
             )
         if (result is BackgroundExtractionResult.Success) {
-            out.put("templateLabel", result.templateLabel?.name ?: JSONObject.NULL)
+            out.put("templateLabel", result.templateLabel.name)
             out.put(
                 "resolved",
                 jsonValue(

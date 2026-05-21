@@ -84,12 +84,15 @@ class LiteRtLmEngine(
     suspend fun initialize() = withContext(ioDispatcher) {
         check(engine == null) { "LiteRtLmEngine already initialized; close() before re-init." }
         // Process-global SDK flag — must be set before any Engine is constructed.
-        ExperimentalFlags.enableSpeculativeDecoding = true
+        // Disabled when an audio backend is active: speculative decoding + multimodal audio
+        // triggers a SIGSEGV in liblitertlm_jni.so (null deref in the speculative path).
+        val speculativeDecoding = audioBackend == null
+        ExperimentalFlags.enableSpeculativeDecoding = speculativeDecoding
         Log.d(
             TAG,
             "Loading $modelPath backend=${backend.label} " +
                 "audio=${audioBackend?.label ?: "off"} vision=${visionBackend?.label ?: "off"} " +
-                "maxTokens=$maxNumTokens speculativeDecoding=on sampler=topK=${samplerConfig.topK}," +
+                "maxTokens=$maxNumTokens speculativeDecoding=$speculativeDecoding sampler=topK=${samplerConfig.topK}," +
                 "topP=${samplerConfig.topP},temp=${samplerConfig.temperature},seed=${samplerConfig.seed}",
         )
         Engine.setNativeMinLogSeverity(LogSeverity.INFO)

@@ -20,9 +20,8 @@ import org.junit.runner.RunWith
 import java.io.File
 
 /**
- * End-to-end on-device check that `launchMissingExtractionBackfill()` actually fills in
- * the lens receipts on every seeded row that ships under the COMPLETED-with-empty-receipts
- * seed contract.
+ * End-to-end on-device check that seeded PENDING rows actually run through the background worker
+ * via pending-entry recovery.
  *
  * Requires the main model artifact already pushed (the typical `make reinstall` posture).
  * If the model is missing this test self-skips via `assumeTrue` — no spurious red.
@@ -50,7 +49,7 @@ class MissingExtractionBackfillSmokeTest {
     }
 
     @Test
-    fun backfill_lands_receipts_patterns_and_vectors_for_the_seed_corpus() = runBlocking {
+    fun pending_recovery_lands_receipts_patterns_and_vectors_for_the_seed_corpus() = runBlocking {
         assumeTrue(
             "main model artifact missing — push via `make push-model` before running this smoke",
             mainModelArtifactPresent(),
@@ -67,7 +66,7 @@ class MissingExtractionBackfillSmokeTest {
         }
 
         withTimeout(BACKFILL_TIMEOUT_MS) {
-            container.launchMissingExtractionBackfill(limit = before.size).join()
+            container.recoverPendingExtractions()
         }
 
         val after = box.all.associateBy { it.id }

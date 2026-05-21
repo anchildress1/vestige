@@ -165,7 +165,7 @@ class BackgroundExtractionWorkerTest {
 
     @Test
     fun `single inferential lens config runs one model call and resolves it`() = runTest {
-        // Production config (AppContainer): one Inferential pass, no cross-lens convergence.
+        // Tuning-harness config: one Inferential pass, no cross-lens convergence.
         val engine = mockk<LiteRtLmEngine>()
         every { engine.streamText("prompt-for-INFERENTIAL", any()) } returns flowOf("raw-inferential")
         val resolver = RecordingResolver(resolved)

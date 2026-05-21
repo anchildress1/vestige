@@ -280,8 +280,8 @@ class AppContainer(
 
     /** Voice-path adapter: initializes the shared Engine before delegating to the stream. */
     fun runForegroundCall(audio: AudioChunk, persona: Persona): Flow<ForegroundStreamEvent> = flow {
-        beginForegroundInference()
         try {
+            beginForegroundInference()
             ensureBackgroundEngineInitialized()
             emitAll(foregroundInference.runForegroundCall(audio, persona))
         } finally {

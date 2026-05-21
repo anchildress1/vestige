@@ -32,13 +32,17 @@ internal class BackgroundExtractionQueue(
     suspend fun beginForeground() {
         val (active, drain) = mutex.withLock {
             foregroundDepth += 1
-            val active = activeExtraction?.also {
+            val active = activeExtraction?.takeUnless { it.job.isCompleted }?.also {
                 it.preemptedByForeground = true
                 requeueActiveLocked(it)
             }
-            activeExtraction = null
-            val drain = drainJob
-            drainJob = null
+            if (active != null) {
+                activeExtraction = null
+            }
+            val drain = if (activeExtraction?.job?.isCompleted == true) null else drainJob
+            if (drain != null) {
+                drainJob = null
+            }
             active to drain
         }
         drain?.cancel()
@@ -81,26 +85,13 @@ internal class BackgroundExtractionQueue(
 
     private suspend fun drain() {
         while (true) {
-            val queued = mutex.withLock {
-                if (foregroundDepth > 0 || pending.isEmpty()) {
-                    drainJob = null
-                    return
-                }
-                pending.removeFirst()
-            }
-            if (queued.completion.isCancelled) {
-                queued.completion.complete()
-                continue
-            }
-            val extractionJob = createExtractionJob(queued.work)
-            val active = ActiveExtraction(queued = queued, job = extractionJob)
-            mutex.withLock { activeExtraction = active }
-            extractionJob.start()
-            extractionJob.join()
+            val active = nextActiveExtraction() ?: return
+            active.job.start()
+            active.job.join()
             val shouldRequeue = mutex.withLock {
                 val preempted = active.preemptedByForeground
                 if (activeExtraction === active) activeExtraction = null
-                preempted && !queued.completion.isCancelled
+                preempted && !active.queued.completion.isCancelled
             }
             if (shouldRequeue) {
                 mutex.withLock {
@@ -111,9 +102,29 @@ internal class BackgroundExtractionQueue(
                     }
                 }
             } else {
-                queued.completion.complete()
+                active.queued.completion.complete()
             }
         }
+    }
+
+    private suspend fun nextActiveExtraction(): ActiveExtraction? = mutex.withLock {
+        var active: ActiveExtraction? = null
+        while (active == null) {
+            if (foregroundDepth > 0 || pending.isEmpty()) {
+                drainJob = null
+                return@withLock null
+            }
+            val queued = pending.removeFirst()
+            if (queued.completion.isCancelled) {
+                queued.completion.complete()
+                continue
+            }
+            active = ActiveExtraction(
+                queued = queued,
+                job = createExtractionJob(queued.work),
+            ).also { activeExtraction = it }
+        }
+        active
     }
 
     private fun requeueActiveLocked(active: ActiveExtraction) {

@@ -160,6 +160,29 @@ class BackgroundExtractionQueueTest {
     }
 
     @Test
+    fun `foreground does not requeue active work that already completed`() = runTest {
+        lateinit var queue: BackgroundExtractionQueue
+        val launches = mutableListOf<Long>()
+        queue = BackgroundExtractionQueue(backgroundScope) { work ->
+            launches += work.entryId
+            backgroundScope.launch(start = CoroutineStart.LAZY) {
+                backgroundScope.launch { queue.beginForeground() }
+            }
+        }
+
+        val completion = queue.enqueue(work(entryId = 1L))
+        runCurrent()
+
+        assertEquals(listOf(1L), launches)
+        assertTrue(completion.isCompleted)
+
+        queue.endForeground()
+        runCurrent()
+
+        assertEquals(listOf(1L), launches)
+    }
+
+    @Test
     fun `cancelAll cancels active and queued logical work`() = runTest {
         val activeRun = Job()
         val launches = mutableListOf<Long>()

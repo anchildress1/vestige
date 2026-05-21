@@ -7,9 +7,11 @@ import dev.anchildress1.vestige.model.LensExtraction
 import dev.anchildress1.vestige.model.ResolvedExtraction
 import dev.anchildress1.vestige.model.ResolvedField
 import dev.anchildress1.vestige.model.TemplateLabel
-import io.mockk.coEvery
+import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Assertions.assertAll
 import org.junit.jupiter.api.Assertions.assertEquals
@@ -99,11 +101,11 @@ class BackgroundExtractionWorkerTest {
     }
 
     @Test
-    fun `runs three lenses concurrently and resolves on first-attempt success`() = runTest {
+    fun `runs three lenses sequentially and resolves on first-attempt success`() = runTest {
         val engine = mockk<LiteRtLmEngine>()
-        coEvery { engine.generateText("prompt-for-LITERAL", any()) } returns "raw-literal"
-        coEvery { engine.generateText("prompt-for-INFERENTIAL", any()) } returns "raw-inferential"
-        coEvery { engine.generateText("prompt-for-SKEPTICAL", any()) } returns "raw-skeptical"
+        every { engine.streamText("prompt-for-LITERAL", any()) } returns flowOf("raw-literal")
+        every { engine.streamText("prompt-for-INFERENTIAL", any()) } returns flowOf("raw-inferential")
+        every { engine.streamText("prompt-for-SKEPTICAL", any()) } returns flowOf("raw-skeptical")
         val resolver = RecordingResolver(resolved)
         val seenRaws = mutableMapOf<Lens, String>()
         val parser: (Lens, String) -> LensExtraction? = { lens, raw ->
@@ -167,12 +169,14 @@ class BackgroundExtractionWorkerTest {
         val inFlight = AtomicInteger(0)
         var maxInFlight = 0
         val callOrder = mutableListOf<String>()
-        coEvery { engine.generateText(any(), any()) } coAnswers {
-            callOrder += firstArg<String>()
-            inFlight.incrementAndGet().also { if (it > maxInFlight) maxInFlight = it }
-            delay(10)
-            inFlight.decrementAndGet()
-            "raw"
+        every { engine.streamText(any(), any()) } answers {
+            flow {
+                callOrder += firstArg<String>()
+                inFlight.incrementAndGet().also { if (it > maxInFlight) maxInFlight = it }
+                delay(10)
+                inFlight.decrementAndGet()
+                emit("raw")
+            }
         }
 
         BackgroundExtractionWorker(
@@ -199,9 +203,10 @@ class BackgroundExtractionWorkerTest {
     @Test
     fun `worker parses malformed skeptical near-json without burning retries`() = runTest {
         val engine = mockk<LiteRtLmEngine>()
-        coEvery { engine.generateText("prompt-for-LITERAL", any()) } returns compactSuccessJson(stateShift = true)
-        coEvery { engine.generateText("prompt-for-INFERENTIAL", any()) } returns compactSuccessJson(stateShift = false)
-        coEvery { engine.generateText("prompt-for-SKEPTICAL", any()) } returns malformedSkepticalJson()
+        every { engine.streamText("prompt-for-LITERAL", any()) } returns flowOf(compactSuccessJson(stateShift = true))
+        every { engine.streamText("prompt-for-INFERENTIAL", any()) } returns
+            flowOf(compactSuccessJson(stateShift = false))
+        every { engine.streamText("prompt-for-SKEPTICAL", any()) } returns flowOf(malformedSkepticalJson())
         val listener = RecordingListener()
 
         val result = BackgroundExtractionWorker(
@@ -236,9 +241,10 @@ class BackgroundExtractionWorkerTest {
     @Test
     fun `retries a lens once on parse failure and counts both attempts`() = runTest {
         val engine = mockk<LiteRtLmEngine>()
-        coEvery { engine.generateText("prompt-for-LITERAL", any()) } returnsMany listOf("garbage-1", "raw-literal")
-        coEvery { engine.generateText("prompt-for-INFERENTIAL", any()) } returns "raw-inferential"
-        coEvery { engine.generateText("prompt-for-SKEPTICAL", any()) } returns "raw-skeptical"
+        every { engine.streamText("prompt-for-LITERAL", any()) } returnsMany
+            listOf(flowOf("garbage-1"), flowOf("raw-literal"))
+        every { engine.streamText("prompt-for-INFERENTIAL", any()) } returns flowOf("raw-inferential")
+        every { engine.streamText("prompt-for-SKEPTICAL", any()) } returns flowOf("raw-skeptical")
         val parser: (Lens, String) -> LensExtraction? = { lens, raw ->
             if (raw == "garbage-1") null else extraction(lens)
         }
@@ -256,9 +262,8 @@ class BackgroundExtractionWorkerTest {
         val success = assertInstanceOf(BackgroundExtractionResult.Success::class.java, result)
         assertEquals(4, success.modelCallCount, "1 retry on LITERAL + 1 each on INFERENTIAL/SKEPTICAL = 4")
         assertEquals(2, success.lensResults.first { it.lens == Lens.LITERAL }.attemptCount)
-        // Single RUNNING at fan-out (ADR-008 §Correction): per-lens retries no longer emit their
-        // own status — interleaved per-lens transitions are meaningless once the three lenses run
-        // concurrently. The retry is still observable on the lens result's attemptCount above.
+        // Single RUNNING for the whole worker: per-lens retries no longer emit their own status.
+        // The retry is still observable on the lens result's attemptCount above.
         assertEquals(
             listOf(
                 RecordingListener.Update(ExtractionStatus.RUNNING, 0, null),
@@ -271,9 +276,10 @@ class BackgroundExtractionWorkerTest {
     @Test
     fun `lens that exhausts retry budget contributes null extraction and convergence still runs`() = runTest {
         val engine = mockk<LiteRtLmEngine>()
-        coEvery { engine.generateText("prompt-for-LITERAL", any()) } returns "raw-literal"
-        coEvery { engine.generateText("prompt-for-INFERENTIAL", any()) } returnsMany listOf("garbage-1", "garbage-2")
-        coEvery { engine.generateText("prompt-for-SKEPTICAL", any()) } returns "raw-skeptical"
+        every { engine.streamText("prompt-for-LITERAL", any()) } returns flowOf("raw-literal")
+        every { engine.streamText("prompt-for-INFERENTIAL", any()) } returnsMany
+            listOf(flowOf("garbage-1"), flowOf("garbage-2"))
+        every { engine.streamText("prompt-for-SKEPTICAL", any()) } returns flowOf("raw-skeptical")
         val parser: (Lens, String) -> LensExtraction? = { lens, raw ->
             if (raw.startsWith("garbage")) null else extraction(lens)
         }
@@ -306,7 +312,7 @@ class BackgroundExtractionWorkerTest {
     @Test
     fun `every lens failing causes Failed result without invoking the resolver`() = runTest {
         val engine = mockk<LiteRtLmEngine>()
-        coEvery { engine.generateText(any(), any()) } returns "garbage-always"
+        every { engine.streamText(any(), any()) } returns flowOf("garbage-always")
         val resolver = RecordingResolver(resolved)
         val parser: (Lens, String) -> LensExtraction? = { _, _ -> null }
         val listener = RecordingListener()
@@ -339,9 +345,9 @@ class BackgroundExtractionWorkerTest {
     @Test
     fun `engine error on a lens is treated as a parse failure for retry accounting`() = runTest {
         val engine = mockk<LiteRtLmEngine>()
-        coEvery { engine.generateText("prompt-for-LITERAL", any()) } throws IllegalStateException("OOM-like")
-        coEvery { engine.generateText("prompt-for-INFERENTIAL", any()) } returns "raw-inferential"
-        coEvery { engine.generateText("prompt-for-SKEPTICAL", any()) } returns "raw-skeptical"
+        every { engine.streamText("prompt-for-LITERAL", any()) } throws IllegalStateException("OOM-like")
+        every { engine.streamText("prompt-for-INFERENTIAL", any()) } returns flowOf("raw-inferential")
+        every { engine.streamText("prompt-for-SKEPTICAL", any()) } returns flowOf("raw-skeptical")
         val parser: (Lens, String) -> LensExtraction? = { lens, raw ->
             if (raw.isEmpty()) null else extraction(lens)
         }
@@ -370,7 +376,7 @@ class BackgroundExtractionWorkerTest {
     @Test
     fun `worker labels using the capture timestamp's zone, not the JVM default`() = runTest {
         val engine = mockk<LiteRtLmEngine>()
-        coEvery { engine.generateText(any(), any()) } returns "raw-ok"
+        every { engine.streamText(any(), any()) } returns flowOf("raw-ok")
         val lateNightResolved = ResolvedExtraction(
             fields = mapOf("tags" to ResolvedField(listOf("late-night"), ConfidenceVerdict.CANONICAL)),
         )
@@ -442,9 +448,10 @@ class BackgroundExtractionWorkerTest {
     @Test
     fun `terminal listener events carry the caller-supplied entry attempt count`() = runTest {
         val engine = mockk<LiteRtLmEngine>()
-        coEvery { engine.generateText("prompt-for-LITERAL", any()) } returnsMany listOf("garbage-1", "raw-literal")
-        coEvery { engine.generateText("prompt-for-INFERENTIAL", any()) } returns "raw-inferential"
-        coEvery { engine.generateText("prompt-for-SKEPTICAL", any()) } returns "raw-skeptical"
+        every { engine.streamText("prompt-for-LITERAL", any()) } returnsMany
+            listOf(flowOf("garbage-1"), flowOf("raw-literal"))
+        every { engine.streamText("prompt-for-INFERENTIAL", any()) } returns flowOf("raw-inferential")
+        every { engine.streamText("prompt-for-SKEPTICAL", any()) } returns flowOf("raw-skeptical")
         val parser: (Lens, String) -> LensExtraction? = { lens, raw ->
             if (raw == "garbage-1") null else extraction(lens)
         }
@@ -465,7 +472,7 @@ class BackgroundExtractionWorkerTest {
         )
 
         // Even with a LITERAL retry, the caller's entryAttemptCount=2 rides every emitted event;
-        // per-lens retries no longer emit their own status under concurrent fan-out.
+        // Per-lens retries no longer emit their own status.
         assertEquals(
             listOf(
                 RecordingListener.Update(ExtractionStatus.RUNNING, 2, null),
@@ -514,7 +521,7 @@ class BackgroundExtractionWorkerTest {
     @Test
     fun `resolver throwing emits terminal FAILED instead of leaving status RUNNING`() = runTest {
         val engine = mockk<LiteRtLmEngine>()
-        coEvery { engine.generateText(any(), any()) } returns "raw-ok"
+        every { engine.streamText(any(), any()) } returns flowOf("raw-ok")
         val parser: (Lens, String) -> LensExtraction? = { lens, _ -> extraction(lens) }
         val throwingResolver = object : ConvergenceResolver {
             override fun resolve(extractions: List<LensExtraction>): ResolvedExtraction = error("resolver-explosion")
@@ -538,16 +545,16 @@ class BackgroundExtractionWorkerTest {
     @Test
     fun `timeout produces TimedOut with whatever lens results completed before the cap`() = runTest {
         val engine = mockk<LiteRtLmEngine>()
-        // Concurrent fan-out: LITERAL completes; INFERENTIAL and SKEPTICAL both hang past the cap,
-        // so only LITERAL lands in the completed accumulator before timeout cancellation wins.
-        coEvery { engine.generateText("prompt-for-LITERAL", any()) } returns "raw-literal"
-        coEvery { engine.generateText("prompt-for-INFERENTIAL", any()) } coAnswers {
-            kotlinx.coroutines.delay(Long.MAX_VALUE / 2)
-            "never"
+        // Sequential run: LITERAL completes; INFERENTIAL hangs past the cap, so only LITERAL lands
+        // in the completed accumulator before timeout cancellation wins.
+        every { engine.streamText("prompt-for-LITERAL", any()) } returns flowOf("raw-literal")
+        every { engine.streamText("prompt-for-INFERENTIAL", any()) } returns flow {
+            delay(Long.MAX_VALUE / 2)
+            emit("never")
         }
-        coEvery { engine.generateText("prompt-for-SKEPTICAL", any()) } coAnswers {
-            kotlinx.coroutines.delay(Long.MAX_VALUE / 2)
-            "never"
+        every { engine.streamText("prompt-for-SKEPTICAL", any()) } returns flow {
+            delay(Long.MAX_VALUE / 2)
+            emit("never")
         }
         val parser: (Lens, String) -> LensExtraction? = { lens, raw ->
             if (raw == "raw-literal") extraction(lens) else null
@@ -566,8 +573,8 @@ class BackgroundExtractionWorkerTest {
 
         val timedOut = assertInstanceOf(BackgroundExtractionResult.TimedOut::class.java, result)
         assertEquals(50L, timedOut.timeoutMs)
-        // LITERAL completed before the cap; INFERENTIAL + SKEPTICAL were still in-flight when the
-        // timeout cancelled the fan-out, so only LITERAL is in the accumulator.
+        // LITERAL completed before the cap; INFERENTIAL was in-flight when the timeout cancelled
+        // the run, so only LITERAL is in the accumulator.
         assertEquals(listOf(Lens.LITERAL), timedOut.lensResults.map { it.lens })
         val terminal = listener.updates.last()
         assertEquals(ExtractionStatus.TIMED_OUT, terminal.status)

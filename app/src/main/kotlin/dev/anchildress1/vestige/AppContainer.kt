@@ -215,7 +215,9 @@ class AppContainer(
     private val vectorBackfillRequested = AtomicBoolean(false)
     private val missingExtractionBackfillRunning = AtomicBoolean(false)
     private val foregroundPromotionDeniedLogged = AtomicBoolean(false)
-    private val trackedExtractionJobs: MutableSet<Job> = linkedSetOf()
+    private val trackedExtractionJobs: MutableMap<Long, Job> = linkedMapOf()
+    private val trackedExtractionSpecs: MutableMap<Long, DeferredExtractionSpec> = linkedMapOf()
+    private val deferredExtractionJobs: MutableMap<Long, Job> = linkedMapOf()
 
     @Volatile
     private var backgroundEngineInitialized = false
@@ -282,6 +284,7 @@ class AppContainer(
 
     /** Voice-path adapter: initializes the shared Engine before delegating to the stream. */
     fun runForegroundCall(audio: AudioChunk, persona: Persona): Flow<ForegroundStreamEvent> = flow {
+        deferBackgroundExtractionForForeground()
         ensureBackgroundEngineInitialized()
         emitAll(foregroundInference.runForegroundCall(audio, persona))
     }
@@ -457,7 +460,16 @@ class AppContainer(
             durationMs = durationMs,
             followUpText = followUpText,
         )
-        trackExtractionJob(outcome.extractionJob)
+        trackExtractionJob(
+            spec = DeferredExtractionSpec(
+                entryId = outcome.entryId,
+                entryText = entryText,
+                capturedAt = capturedAt,
+                persona = persona,
+                timeoutMs = timeoutMs,
+            ),
+            job = outcome.extractionJob,
+        )
         launchVectorBackfillIfReady()
         return outcome
     }
@@ -751,15 +763,25 @@ class AppContainer(
         entryText: String,
         capturedAt: ZonedDateTime,
         persona: Persona = Persona.WITNESS,
+        timeoutMs: Long? = MISSING_EXTRACTION_BACKFILL_TIMEOUT_MS,
     ): Job? = runCatching {
         val job = backgroundExtractionSaveFlow.recoverEntry(
             entryId = entryId,
             entryText = entryText,
             capturedAt = capturedAt,
             persona = persona,
-            timeoutMs = MISSING_EXTRACTION_BACKFILL_TIMEOUT_MS,
+            timeoutMs = timeoutMs,
         )
-        trackExtractionJob(job)
+        trackExtractionJob(
+            spec = DeferredExtractionSpec(
+                entryId = entryId,
+                entryText = entryText,
+                capturedAt = capturedAt,
+                persona = persona,
+                timeoutMs = timeoutMs,
+            ),
+            job = job,
+        )
         job
     }.onFailure { Log.e(TAG, "Recovery extraction failed for entry $entryId", it) }
         .getOrNull()
@@ -798,19 +820,77 @@ class AppContainer(
         }
     }
 
-    private suspend fun trackExtractionJob(job: Job) {
-        trackedExtractionJobsMutex.withLock { trackedExtractionJobs.add(job) }
+    private suspend fun trackExtractionJob(spec: DeferredExtractionSpec, job: Job) {
+        trackedExtractionJobsMutex.withLock {
+            trackedExtractionJobs[spec.entryId] = job
+            trackedExtractionSpecs[spec.entryId] = spec
+        }
         job.invokeOnCompletion {
             scope.launch {
-                trackedExtractionJobsMutex.withLock { trackedExtractionJobs.remove(job) }
+                trackedExtractionJobsMutex.withLock {
+                    trackedExtractionJobs.remove(spec.entryId)
+                    if (it == null) {
+                        trackedExtractionSpecs.remove(spec.entryId)
+                        deferredExtractionJobs.remove(spec.entryId)?.cancel()
+                    }
+                }
             }
         }
     }
 
     private suspend fun cancelTrackedExtractionJobs() {
-        val jobs = trackedExtractionJobsMutex.withLock { trackedExtractionJobs.toList() }
+        val jobs = trackedExtractionJobsMutex.withLock {
+            val allJobs = trackedExtractionJobs.values.toList() + deferredExtractionJobs.values.toList()
+            trackedExtractionJobs.clear()
+            trackedExtractionSpecs.clear()
+            deferredExtractionJobs.clear()
+            allJobs
+        }
         jobs.forEach(Job::cancel)
         jobs.joinAll()
+    }
+
+    internal suspend fun deferBackgroundExtractionForForeground() {
+        val jobsToCancel = trackedExtractionJobsMutex.withLock {
+            val running = trackedExtractionJobs.values.toList()
+            deferredExtractionJobs.values.forEach(Job::cancel)
+            deferredExtractionJobs.clear()
+            trackedExtractionSpecs.values.forEach { spec ->
+                deferredExtractionJobs[spec.entryId] = launchDeferredExtraction(spec)
+            }
+            running
+        }
+        jobsToCancel.forEach(Job::cancel)
+    }
+
+    private fun launchDeferredExtraction(spec: DeferredExtractionSpec): Job = scope.launch {
+        delay(BACKGROUND_EXTRACTION_FOREGROUND_DEFER_MS)
+        trackedExtractionJobsMutex.withLock {
+            deferredExtractionJobs.remove(spec.entryId)
+        }
+        recoverDeferredExtraction(spec)
+    }
+
+    private suspend fun recoverDeferredExtraction(spec: DeferredExtractionSpec) {
+        val entry = entryStore.readEntry(spec.entryId)
+        if (entry == null || entry.extractionStatus.isTerminal()) {
+            trackedExtractionJobsMutex.withLock {
+                trackedExtractionSpecs.remove(spec.entryId)
+            }
+            return
+        }
+        val recoveryJob = recoverOneEntry(
+            entryId = spec.entryId,
+            entryText = spec.entryText,
+            capturedAt = spec.capturedAt,
+            persona = spec.persona,
+            timeoutMs = spec.timeoutMs,
+        )
+        if (recoveryJob == null) {
+            trackedExtractionJobsMutex.withLock {
+                trackedExtractionSpecs.remove(spec.entryId)
+            }
+        }
     }
 
     private suspend fun cancelTrackedExtractionsAndResetLifecycle() {
@@ -1000,6 +1080,7 @@ class AppContainer(
         const val MISSING_EXTRACTION_BACKFILL_TIMEOUT_MS = 180_000L
         const val VECTOR_BACKFILL_RETRY_DELAY_MS = 5_000L
         const val VECTOR_BACKFILL_MAX_RETRIES = 12
+        const val BACKGROUND_EXTRACTION_FOREGROUND_DEFER_MS = 15_000L
         const val PCT_MAX = 100
         const val FOREGROUND_HISTORY_TOP_N = 3
 
@@ -1021,4 +1102,12 @@ class AppContainer(
         COMPLETE,
         RETRY_LATER,
     }
+
+    private data class DeferredExtractionSpec(
+        val entryId: Long,
+        val entryText: String,
+        val capturedAt: ZonedDateTime,
+        val persona: Persona,
+        val timeoutMs: Long?,
+    )
 }

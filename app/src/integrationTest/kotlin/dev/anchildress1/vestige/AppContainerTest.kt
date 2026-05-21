@@ -40,6 +40,7 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.advanceUntilIdle
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.json.JSONObject
 import org.junit.jupiter.api.Assertions.assertEquals
@@ -53,6 +54,8 @@ import java.io.File
 import java.time.ZoneId
 import java.time.ZonedDateTime
 import java.util.zip.ZipInputStream
+
+private const val BACKGROUND_EXTRACTION_FOREGROUND_DEFER_MS = 15_000L
 
 @OptIn(ExperimentalCoroutinesApi::class)
 @Suppress("LargeClass") // Wiring + lifecycle + save + recovery scenarios share one container fixture.
@@ -509,6 +512,79 @@ class AppContainerTest {
         assertEquals(expected, actual)
         assertEquals(1, scheduled)
     }
+
+    @Test
+    fun `foreground capture cancels active extraction and recovers it after quiet delay`(@TempDir tempRoot: File) =
+        runTest {
+            val boxDir = newInMemoryObjectBoxDirectory("foreground-defer")
+            val box = openInMemoryBoxStore(boxDir)
+            try {
+                val capturedAt = ZonedDateTime.of(2026, 5, 20, 21, 50, 0, 0, ZoneId.of("America/New_York"))
+                val entryId = box.boxFor(EntryEntity::class.java).put(
+                    EntryEntity(
+                        entryText = "foreground should win",
+                        timestampEpochMs = capturedAt.toInstant().toEpochMilli(),
+                        extractionStatus = ExtractionStatus.PENDING,
+                    ),
+                )
+                val extractionJob = kotlinx.coroutines.Job()
+                val saveFlow = mockk<BackgroundExtractionSaveFlow>()
+                coEvery {
+                    saveFlow.saveAndExtract(any(), any(), any(), any(), any(), any(), any())
+                } returns SaveOutcome.Pending(entryId = entryId, extractionJob = extractionJob)
+                coEvery {
+                    saveFlow.recoverEntry(
+                        entryId = entryId,
+                        entryText = "foreground should win",
+                        capturedAt = capturedAt,
+                        persona = dev.anchildress1.vestige.model.Persona.WITNESS,
+                        timeoutMs = null,
+                    )
+                } returns kotlinx.coroutines.Job().also { it.complete() }
+                val context = mockk<Context>(relaxed = true) {
+                    every { filesDir } returns tempRoot
+                    every { cacheDir } returns File(tempRoot, "cache").apply { mkdirs() }
+                }
+                val container = AppContainer(
+                    applicationContext = context,
+                    boxStoreFactory = { box },
+                    modelPathLoader = { File(tempRoot, "m").absolutePath },
+                    backgroundEngineFactory = { _, _ -> mockk<LiteRtLmEngine>(relaxed = true) },
+                    backgroundExtractionSaveFlowFactory = { _, _, _, _, _, _, _ -> saveFlow },
+                    recoveredEntryIdsLoader = { emptyList() },
+                    foregroundServiceIntentFactory = { Intent("dev.anchildress1.vestige.TEST_START") },
+                    foregroundServiceStarter = {},
+                    scope = backgroundScope,
+                )
+
+                container.saveAndExtract("foreground should win", capturedAt)
+                container.deferBackgroundExtractionForForeground()
+
+                assertTrue(extractionJob.isCancelled)
+                runCurrent()
+                advanceTimeBy(BACKGROUND_EXTRACTION_FOREGROUND_DEFER_MS - 1)
+                coVerify(exactly = 0) {
+                    saveFlow.recoverEntry(any(), any(), any(), any(), any())
+                }
+
+                advanceTimeBy(1)
+                runCurrent()
+                advanceUntilIdle()
+
+                coVerify(exactly = 1) {
+                    saveFlow.recoverEntry(
+                        entryId = entryId,
+                        entryText = "foreground should win",
+                        capturedAt = capturedAt,
+                        persona = dev.anchildress1.vestige.model.Persona.WITNESS,
+                        timeoutMs = null,
+                    )
+                }
+            } finally {
+                box.closeAfterCleaningThreadResources()
+                cleanupObjectBoxTempRoot(tempRoot, boxDir)
+            }
+        }
 
     @Test
     fun `retrieveHistory uses the injected dispatcher and maps entries to context-only chunks`(

@@ -8,6 +8,7 @@ import dev.anchildress1.vestige.model.TemplateLabel
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.withContext
 import java.time.ZonedDateTime
 
@@ -115,7 +116,9 @@ class ObservationGenerator(
     }
 
     private suspend fun attemptModelCall(systemInstruction: String, userText: String, attempt: Int): String? = try {
-        engine.generateText(systemInstruction, userText)
+        buildString {
+            engine.streamText(systemInstruction, userText).collect { append(it) }
+        }
     } catch (cancellation: CancellationException) {
         throw cancellation
     } catch (@Suppress("TooGenericExceptionCaught") engineError: Exception) {

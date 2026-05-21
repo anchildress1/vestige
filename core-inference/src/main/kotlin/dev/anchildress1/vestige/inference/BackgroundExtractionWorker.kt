@@ -8,6 +8,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.TimeoutCancellationException
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
 import java.time.ZonedDateTime
@@ -26,13 +27,10 @@ data class BackgroundExtractionRequest(
 )
 
 /**
- * Runs the three lenses **concurrently** (ADR-008 §Correction 2026-05-16 — one Engine, three
- * independent SDK contexts; the single GPU still serializes at its command queue, so this is
- * non-blocking structure, not a literal 3× speedup) against an already-persisted entry, retries
- * each lens up to [maxAttemptsPerLens] times, and reduces the parsed lens outputs through
- * [resolver]. A lens that exhausts its budget contributes a null extraction (convergence treats
- * that as "no opinion"). `RUNNING` is emitted once at fan-out; the per-lens retry no longer
- * emits its own status (interleaved per-lens transitions would be meaningless under fan-out).
+ * Runs the three lenses sequentially against an already-persisted entry, retries each lens up to
+ * [maxAttemptsPerLens] times, and reduces the parsed lens outputs through [resolver]. A lens that
+ * exhausts its budget contributes a null extraction (convergence treats that as "no opinion").
+ * `RUNNING` is emitted once for the whole worker run; per-lens retries do not emit status churn.
  *
  * The caller threads the entry's persisted retry count in via `entryAttemptCount`; the worker
  * echoes it on every [ExtractionStatusListener] event. Lens-call volume is reported separately
@@ -141,7 +139,10 @@ class BackgroundExtractionWorker(
     }
 
     private suspend fun attemptOnce(lens: Lens, composed: ComposedPrompt, attempt: Int): AttemptOutcome = try {
-        AttemptOutcome(raw = engine.generateText(composed.systemInstruction, composed.userText), error = null)
+        val raw = buildString {
+            engine.streamText(composed.systemInstruction, composed.userText).collect { append(it) }
+        }
+        AttemptOutcome(raw = raw, error = null)
     } catch (cancellation: CancellationException) {
         throw cancellation
     } catch (@Suppress("TooGenericExceptionCaught") engineError: Exception) {

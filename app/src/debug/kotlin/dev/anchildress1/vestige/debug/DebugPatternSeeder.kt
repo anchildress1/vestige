@@ -39,7 +39,7 @@ object DebugPatternSeeder {
     }
 
     // Fixture corpus: timestamps + prose are deliberately concrete.
-    @Suppress("MagicNumber", "LongMethod", "MaxLineLength", "ktlint:standard:max-line-length")
+    @Suppress("MagicNumber", "LongMethod")
     private fun seedEntries() = listOf(
         SeedEntry(
             "I was completely fine going into the standup but crashed hard within about twenty minutes. " +
@@ -154,14 +154,16 @@ object DebugPatternSeeder {
             14_000L,
         ),
         SeedEntry(
-            "Completely depleted today. My body feels heavier than it did yesterday and yesterday already felt heavy. " +
+            "Completely depleted today. My body feels heavier than it did yesterday and " +
+                "yesterday already felt heavy. " +
                 "I sat down to start and stared at it for twenty minutes before giving up.",
             Instant.parse("2026-05-02T12:00:00Z"),
             14_000L,
         ),
         SeedEntry(
             "Drained. Just drained. Not tired, not sleepy, not worn out — drained. " +
-                "Like something pulled the plug around noon and I spent the rest of the day waiting for it to come back.",
+                "Like something pulled the plug around noon and I spent the rest of the day " +
+                "waiting for it to come back.",
             Instant.parse("2026-05-02T18:00:00Z"),
             14_000L,
         ),
@@ -172,7 +174,8 @@ object DebugPatternSeeder {
             14_000L,
         ),
         SeedEntry(
-            "Wiped and it's the kind that ignores caffeine. Had two coffees before noon and felt nothing from either. " +
+            "Wiped and it's the kind that ignores caffeine. Had two coffees before noon " +
+                "and felt nothing from either. " +
                 "Body decided to stop being functional before I had any say in it.",
             Instant.parse("2026-05-03T06:00:00Z"),
             14_000L,
@@ -191,7 +194,8 @@ object DebugPatternSeeder {
         ),
         SeedEntry(
             "Burnt out and my attention just skating across everything without landing anywhere. " +
-                "I'd start reading something and be three paragraphs in with zero retention. Tried resetting four times.",
+                "I'd start reading something and be three paragraphs in with zero retention. " +
+                "Tried resetting four times.",
             Instant.parse("2026-05-04T00:00:00Z"),
             14_000L,
         ),
@@ -209,7 +213,8 @@ object DebugPatternSeeder {
         ),
         SeedEntry(
             "Foggy and slow all day, mind moving through something that felt like molasses. " +
-                "Not in a dramatic way. Just everything requiring more effort than it should. I got through it but barely.",
+                "Not in a dramatic way. Just everything requiring more effort than it should. " +
+                "I got through it but barely.",
             Instant.parse("2026-05-04T18:00:00Z"),
             14_000L,
         ),

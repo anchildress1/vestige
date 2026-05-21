@@ -1,5 +1,7 @@
 package dev.anchildress1.vestige
 
+import android.app.Instrumentation
+import android.os.Bundle
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import dev.anchildress1.vestige.inference.AudioBackendChoice
@@ -82,19 +84,26 @@ class ForegroundSpinnerTimingSmokeTest {
                 chunk = chunk,
             )
             val deltaMs = cold.spinnerMs - warm.spinnerMs
-
-            android.util.Log.i(
-                TAG,
-                "perceived_spinner cold_no_prewarm_ms=${cold.spinnerMs} " +
-                    "warm_prewarmed_ms=${warm.spinnerMs} delta_ms=$deltaMs " +
-                    "cold_model_ms=${cold.modelElapsedMs} warm_model_ms=${warm.modelElapsedMs}",
-            )
+            val summary = "perceived_spinner cold_no_prewarm_ms=${cold.spinnerMs} " +
+                "warm_prewarmed_ms=${warm.spinnerMs} delta_ms=$deltaMs " +
+                "cold_model_ms=${cold.modelElapsedMs} warm_model_ms=${warm.modelElapsedMs}"
+            android.util.Log.i(TAG, summary)
+            reportInstrumentationResult(summary)
 
             assertTrue("cold spinner time must be positive", cold.spinnerMs > 0L)
             assertTrue("prewarmed spinner time must be positive", warm.spinnerMs > 0L)
             assertTrue("cold transcription must be non-blank", cold.transcription.isNotBlank())
             assertTrue("prewarmed transcription must be non-blank", warm.transcription.isNotBlank())
         }
+    }
+
+    private fun reportInstrumentationResult(summary: String) {
+        InstrumentationRegistry.getInstrumentation().sendStatus(
+            0,
+            Bundle().apply {
+                putString(Instrumentation.REPORT_KEY_STREAMRESULT, "\n$summary\n")
+            },
+        )
     }
 
     private suspend fun runTimedCapture(

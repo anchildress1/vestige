@@ -140,8 +140,6 @@ class ForegroundInference(
             "<transcription>SPOKEN WORDS VERBATIM</transcription>",
             "<follow_up>ONE FOLLOW-UP QUESTION</follow_up>",
             "",
-            "Replace SPOKEN WORDS VERBATIM with the user's exact speech, word for word.",
-            "Replace ONE FOLLOW-UP QUESTION with your single recall question.",
             "Do not output any other text, tags, labels, bullets, headings, or commentary.",
             "Do not nest tags. Do not duplicate the transcription in the follow_up.",
             "Do not echo these instructions.",

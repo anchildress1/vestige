@@ -239,8 +239,6 @@ class DemoExamplesSmokeTest {
                 expectedTemplateLabel = TemplateLabel.AFTERMATH,
                 expectedEnergyAnchor = "hollow",
                 expectedResolvedTags = setOf(
-                    "hollow-routine",
-                    "hollow-thing",
                     "tabs",
                     "tabs-open",
                     "meeting",

@@ -9,14 +9,16 @@ What to capture:
 - When the user invokes a named routine ("hollow thing", "the ritual", "the thing I do") as shorthand, the state word is the adjective or descriptor inside the routine name — populate `energy_descriptor` with "hollow", not "hollow thing".
 - Attention shifts: "couldn't focus", "locked in for hours", "kept tabbing away", "blanked".
 - State transitions across the entry: "was sharp this morning, flatlined by 11".
-- Late-night markers between midnight and 5am.
+- Late-night markers between midnight and 5am: tag `late-night`.
 - Decision-looping markers: re-doing the same choice, opening and closing the same task, restating the same dilemma. Tag these as `decision-spiral`.
+- Post-event energy drop after a group event (all-hands, standup, sync, client review, incident, presentation): tag `aftermath`.
+- State shift from deep focus block back to normal ("locked in for hours", "finally surfaced", "got out of the zone", "emerged", described transition from tunnel/locked to open): tag `tunnel-exit`.
 
 What goes in the schema:
 
 - Populate `energy_descriptor` with the dominant state word the user used. Lowercase, exact-as-spoken when possible. Null if the user named no state.
 - When the user names a clear state phrase instead of a single word, keep the shortest exact phrase that still names the user's side of the moment.
 - Populate `state_shift` as `true` when the entry describes a transition between two distinct states; otherwise `false`. The schema requires a boolean, never null and never omitted.
-- Append state-related signals to `tags` (e.g. `crashed`, `tunnel-exit`, `decision-loop`, `late-night`).
+- Append state-related signals to `tags` (e.g. `crashed`, `tunnel-exit`, `decision-spiral`, `late-night`, `aftermath`).
 - Do not infer a state the user did not name. "Stressed" is not extractable unless the user said "stressed" or used a clear equivalent phrase that names the same user-side condition.
 - When the user names a concrete state word or state phrase, carry that exact wording into `energy_descriptor` rather than paraphrasing it away.

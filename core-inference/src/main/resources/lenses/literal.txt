@@ -1,11 +1,11 @@
 ## Lens: Literal
 
-Apply each surface in the strictest possible reading.
+Keyword extraction — pull the 3-5 highest-signal words the user actually chose, not every noun in the entry.
 
 Rules:
 
 - Extract only what is explicitly present in the entry text.
-- Do not infer activities, states, contexts, or commitments that the user did not name.
+- Do not infer activities, states, contexts, or commitments the user did not name.
 - When a field would require contextual reasoning to populate, return null for that field.
 - "She was upset" is extractable; "she was probably upset" is not — the user used "probably" so the user was inferring, not observing.
 - Quotes used as evidence must be exact substrings of the entry text.

@@ -75,7 +75,7 @@ Expected evidence:
 Expected evidence:
 - Repeated stuck task: `invoice`
 - Explicit commitment in entry 5
-- Should strengthen Busy Stalling / commitment recurrence without moralizing or avoidance diagnosis
+- Should strengthen Concrete shoes / commitment recurrence without moralizing or avoidance diagnosis
 
 ### Decision loop run
 
@@ -85,7 +85,7 @@ Expected evidence:
 
 Expected evidence:
 - Repeated comparison loop: `criteria`, `spreadsheet`, `weights`, `comparison table`
-- Should strengthen Nonstop Spiral without explaining the user's psychology
+- Should strengthen Decision spiral without explaining the user's psychology
 
 ### Optional keyword traps
 
@@ -123,7 +123,7 @@ Expected evidence:
 - Vocabulary drift: `flattened`, `concrete`, `corpse routine`, `battery got yanked`, `hollow`, `static`
 - Likely labels: Crashed for A1-A6 unless the model has a better sourced reason
 
-### Scenario B — Invoice Busy Stalling
+### Scenario B — Invoice Concrete Shoes
 
 Purpose: task paralysis label, commitment tracking, STT-D literal vs inferential split.
 
@@ -136,10 +136,10 @@ B3. "Invoice again. No mystery. I know what to do. The cursor just sits there li
 Expected evidence:
 - Stuck task: `invoice email`
 - Repeated commitment around sending invoice, especially B2
-- Likely label: Busy Stalling
+- Likely label: Concrete shoes
 - Forbidden output: avoidance diagnosis, moralizing, mood score
 
-### Scenario C — Nonstop Spiral
+### Scenario C — Decision Spiral
 
 Purpose: loop detection without motivation interpretation.
 
@@ -151,7 +151,7 @@ C3. "Made another comparison table. It did not become a decision through exposur
 
 Expected evidence:
 - Repeated comparison language: `criteria`, `spreadsheet`, `weights`, `comparison table`
-- Likely label: Nonstop Spiral
+- Likely label: Decision spiral
 - Observation can mention loop mechanics; it must not explain the user's psychology
 
 ### Scenario D — Goblin Hours
@@ -200,7 +200,7 @@ Expected pressure points:
 - A4: `Not tired exactly` vs `battery got yanked` should pressure `energy_descriptor`; Skeptical should avoid saving `tired` as canonical without a conflict marker.
 - B1: Literal sees invoice/email/opened/closed; Inferential may identify task paralysis; Skeptical should note no explicit commitment yet.
 - B2: Commitment should be stronger than B1 because `Said I would send` is explicit.
-- C2: Inferential can label Nonstop Spiral; Skeptical should note the actual options are missing.
+- C2: Inferential can label Decision spiral; Skeptical should note the actual options are missing.
 - D1: Literal has 3:12am and notes app; Inferential can label Goblin Hours; Skeptical should not invent a sleep-cause explanation.
 
 Pass condition:
@@ -266,12 +266,12 @@ Story 5.1 / Story 5.4 — seeded into the reference device for recording. Distin
 | ID | DEMO-06 |
 | Timestamp | May 3 (Sat) 12:00 |
 | Text | "Said I would drop the package off today. Drive past UPS on my route. Spent twenty minutes googling whether the thing is even worth returning. It is. Label is still on the counter." |
-| template_label | Busy Stalling |
+| template_label | Concrete shoes |
 | tags | `return-label`, `package`, `UPS`, `commitment`, `googling` |
 | energy_descriptor | null |
 | stated_commitment | "drop the return package off today" |
 | entry_observations | 1. Explicit commitment logged: "said I would drop it off today." 2. Avoidance behavior: researched the validity of the task instead of doing it. Commitment connects to DEMO-04. |
-| pattern contribution | Busy Stalling #2. Stated commitment makes this the STT-D B2 analog — stronger signal than DEMO-04. |
+| pattern contribution | Concrete shoes #2. Stated commitment makes this the STT-D B2 analog — stronger signal than DEMO-04. |
 
 ### DEMO-07
 
@@ -280,12 +280,12 @@ Story 5.1 / Story 5.4 — seeded into the reference device for recording. Distin
 | ID | DEMO-07 |
 | Timestamp | May 5 (Mon) 21:00 |
 | Text | "Spent an hour and a half comparing couches. Dimensions, reviews, lead time, return policy. Made a spreadsheet. Did not buy a couch. Twelve rows." |
-| template_label | Nonstop Spiral |
+| template_label | Decision spiral |
 | tags | `couch`, `spreadsheet`, `comparing`, `decision`, `twelve-rows` |
 | energy_descriptor | null |
 | stated_commitment | null |
 | entry_observations | 1. Decision loop: 90 minutes, spreadsheet, 12 options, no decision. 2. Vocabulary: the user measures their own loop ("twelve rows") without explaining why they can't choose. |
-| pattern contribution | Nonstop Spiral standalone. |
+| pattern contribution | Decision spiral standalone. |
 
 ### Demo Set — expected pattern callout
 
@@ -303,4 +303,4 @@ Tag-only baseline is expected to miss DEMO-08 ("signal dropped", "couldn't reboo
 
 Hybrid (tag + embedding) is expected to surface both. This is the observable embedding-advantage moment — show the two result lists side by side and point to the entries that moved.
 
-> **No template-label fixture.** A draft STT-F template-label smoke test was removed 2026-05-17: template assignment is structurally always `AUDIT` on realistic input (root cause: `backlog.md` §`archetype-template-labeling`). Any fixture that produces a non-AUDIT label only does so by feeding the exact internal trigger vocabulary — a fake test. The UI yank is **queued** in `docs/stories/phase-4-ux-surface.md` §Story 4.16 and has not landed on this branch yet; a real fixture is gated on the v1.5 redesign.
+> **No template-label fixture.** A draft STT-F template-label smoke test was removed 2026-05-17: template assignment is structurally always `AUDIT` on realistic input (root cause: `backlog.md` §`archetype-template-labeling`). Any fixture that produces a non-AUDIT label only does so by feeding the exact internal trigger vocabulary — a fake test. Story 4.16 shipped the UI yank (2026-05-19); a real fixture is gated on the v1.5 redesign or confirmed prompt-tightening results on `fix/prompt-tightening-smoke-tests`.

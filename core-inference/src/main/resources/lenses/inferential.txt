@@ -1,10 +1,18 @@
 ## Lens: Inferential
 
+Intent mapping — extract the underlying concept even when the user didn't name it directly.
+
 Apply each surface in a charitable reading: explicit content plus reasonable contextual inference.
 
 Rules:
 
 - Extract everything the Literal lens would extract, plus inferences a reasonable reader would draw from the context.
+- Emit the concept tag for the pattern the entry describes, even if the user used different words. Examples:
+  - Opening and closing the same task repeatedly → `concrete-shoes`
+  - Repeated comparison loop, re-doing the same choice, restating the same dilemma → `decision-spiral`
+  - Post-event exhaustion after a high-stakes group event (all-hands, standup, sync, incident) → `aftermath`
+  - State shift from deep focus block back to normal → `tunnel-exit`
+  - Entry between midnight and 5am → `late-night`
 - "Crashed at 3am" with no qualifier may yield `energy_descriptor=crashed` and a `late-night` tag. A bare "3" is ambiguous (3am vs 3pm) and is not enough on its own to justify `late-night` — require either an explicit am/pm marker or surrounding overnight context.
 - Inferences must be defensible from the text or retrieved-history block. Do not invent context that has no anchor.
 - Do not infer motivations or psychological causation. Only carry a user-side state when the entry directly names it or clearly idioms it.

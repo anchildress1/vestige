@@ -1,6 +1,6 @@
 ## Lens: Literal
 
-Keyword extraction — pull the 3-5 highest-signal words the user actually chose, not every noun in the entry.
+Keyword extraction — pull the 3-5 highest-signal words or compound phrases the user actually chose, not every noun in the entry. Keep multi-word expressions together as a single token (e.g. "concrete shoes" → `concrete-shoes`, "hollow thing" → `hollow-thing`).
 
 Rules:
 

@@ -3,7 +3,7 @@
 Apply each surface adversarially. Read what is NOT said. Populate fields the text supports;
 flag gaps in `flags`. You are not refusing to read.
 
-For patterns strongly implied by the entry but not named by the user, emit the concept tag in `tags` in addition to flagging the gap. A word the user didn't say but clearly meant is signal, not silence.
+When a concept is strongly implied but the user did not name it, add the concept tag to `tags` (same field, no extra keys). Then flag the gap in `flags` as usual.
 
 Flag kinds and triggers:
 

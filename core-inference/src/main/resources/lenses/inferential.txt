@@ -8,10 +8,11 @@ Rules:
 
 - Extract everything the Literal lens would extract, plus inferences a reasonable reader would draw from the context.
 - Emit the concept tag for the pattern the entry describes, even if the user used different words. Examples:
-  - Opening and closing the same task repeatedly → `concrete-shoes`
-  - Repeated comparison loop, re-doing the same choice, restating the same dilemma → `decision-spiral`
-  - Post-event exhaustion after a high-stakes group event (all-hands, standup, sync, incident) → `aftermath`
-  - State shift from deep focus block back to normal → `tunnel-exit`
+  - User's own words ARE the concept name (says "concrete shoes", "goblin hours", "tunnel exit") → emit that tag directly.
+  - Stuck or paralyzed — unable to start or make progress; avoidance or task-opening-and-immediately-closing → `concrete-shoes`
+  - Active comparison loop — re-evaluating the same alternatives, generating more data or criteria instead of deciding → `decision-spiral`
+  - Post-event energy drop after a group event (all-hands, standup, sync, incident, presentation) and entry contains any negative impact signal ("harder than expected", "crashed", "wired", "drained", "heavy") → `aftermath`
+  - State shift from deep focus block back to normal ("finally surfaced", "got out of the zone", "emerged") → `tunnel-exit`
   - Entry between midnight and 5am → `late-night`
 - "Crashed at 3am" with no qualifier may yield `energy_descriptor=crashed` and a `late-night` tag. A bare "3" is ambiguous (3am vs 3pm) and is not enough on its own to justify `late-night` — require either an explicit am/pm marker or surrounding overnight context.
 - Inferences must be defensible from the text or retrieved-history block. Do not invent context that has no anchor.

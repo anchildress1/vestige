@@ -44,6 +44,40 @@ class BackgroundExtractionWorkerRecurrenceTest {
     }
 
     @Test
+    fun `chunk ref resolves against matchable chunks, skipping context-only entries`() = runTest {
+        val engine = mockk<LiteRtLmEngine>()
+        every { engine.streamText(any(), any()) } returns flowOf("raw")
+        // chunk-1 is the FIRST matchable chunk, not history[0] — the leading context-only entry is
+        // skipped on both render and resolve, so the ref maps to the pattern-id-bearing row.
+        val history = listOf(
+            HistoryChunk(patternId = null, text = "context-only entry"),
+            HistoryChunk(patternId = "real-pattern-id-xyz", text = "matchable entry"),
+        )
+        val resolvedWithChunkRef = ResolvedExtraction(
+            fields = mapOf(
+                "recurrence_link" to ResolvedField("chunk-1", ConfidenceVerdict.CANONICAL),
+            ),
+        )
+
+        val result = BackgroundExtractionWorker(
+            engine = engine,
+            resolver = RecordingResolver(resolvedWithChunkRef),
+            parser = { lens, _ -> extraction(lens) },
+            composer = fakeComposer(),
+        ).extract(
+            request = BackgroundExtractionRequest(
+                entryText = "user words",
+                capturedAt = capturedAt,
+                retrievedHistory = history,
+            ),
+        )
+
+        val success = assertInstanceOf(BackgroundExtractionResult.Success::class.java, result)
+        val link = success.resolved.fields["recurrence_link"]?.value as? String
+        assertEquals("real-pattern-id-xyz", link)
+    }
+
+    @Test
     fun `out-of-range chunk ref leaves recurrence_link as raw ref`() = runTest {
         val engine = mockk<LiteRtLmEngine>()
         every { engine.streamText(any(), any()) } returns flowOf("raw")

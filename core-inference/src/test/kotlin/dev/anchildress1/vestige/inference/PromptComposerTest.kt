@@ -114,6 +114,21 @@ class PromptComposerTest {
     }
 
     @Test
+    fun `mixed history numbers only pattern-id chunks contiguously`() {
+        // A context-only entry ahead of a matchable one must not consume the chunk-1 slot — the
+        // first pattern-id chunk is always chunk-1 so the model never sees a gap and invents a ref.
+        val chunks = listOf(
+            HistoryChunk(patternId = null, text = "context-only entry"),
+            HistoryChunk(patternId = "abc123", text = "matchable entry"),
+        )
+        val text = PromptComposer.compose(Lens.LITERAL, entry, retrievedHistory = chunks).systemInstruction
+
+        assertTrue(text.contains("- context-only"))
+        assertTrue(text.contains("- chunk-1"))
+        assertFalse(text.contains("- chunk-2"))
+    }
+
+    @Test
     fun `retrieved history with pattern id renders as chunk-1`() {
         val chunks = listOf(HistoryChunk(patternId = "abc123", text = "similar historical chunk"))
         val text = PromptComposer.compose(Lens.LITERAL, entry, retrievedHistory = chunks).systemInstruction

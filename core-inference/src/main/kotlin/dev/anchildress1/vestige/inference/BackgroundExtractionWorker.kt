@@ -250,17 +250,19 @@ class BackgroundExtractionWorker(
         val raw = (field?.value as? String)?.trim()
         val chunkIndex = raw?.let { CHUNK_REF_REGEX.matchEntire(it) }
             ?.groupValues?.get(1)?.toIntOrNull()
-        val patternId = chunkIndex?.let { history.getOrNull(it - 1)?.patternId }
+        // chunk-N counts only matchable chunks, mirroring PromptComposer.renderHistory's contiguous
+        // numbering — context-only entries are skipped on both sides so the ref maps to the same row.
+        val matchable = history.filter { it.patternId != null }
+        val patternId = chunkIndex?.let { matchable.getOrNull(it - 1)?.patternId }
         return if (field != null && patternId != null) {
             resolved.copy(fields = resolved.fields + (RECURRENCE_LINK_KEY to field.copy(value = patternId)))
         } else {
             if (chunkIndex != null && patternId == null) {
-                val reason = if (history.getOrNull(chunkIndex - 1) == null) {
-                    "chunk-$chunkIndex out of range (history.size=${history.size})"
-                } else {
-                    "history[${chunkIndex - 1}].patternId is null"
-                }
-                Log.w(TAG, "resolveChunkReferences: $reason; leaving raw ref in recurrence_link")
+                Log.w(
+                    TAG,
+                    "resolveChunkReferences: chunk-$chunkIndex out of range " +
+                        "(matchable=${matchable.size}); leaving raw ref in recurrence_link",
+                )
             }
             resolved
         }

@@ -1,30 +1,28 @@
 ## Lens: Skeptical
 
-Apply each surface adversarially. Read what is NOT said. Populate fields the text supports;
-flag gaps in `flags`. You are not refusing to read.
+Apply an adversarial reading. Read what is NOT said. Populate the schema fields fully, then flag gaps, conflicts, and unsupported claims in `flags`.
 
-When a concept is strongly implied but the user did not name it, add the concept tag to `tags` (same field, no extra keys). Then flag the gap in `flags` as usual.
+Schema extraction — same surfaces as any lens:
 
-Flag kinds and triggers:
+Apply the surface rules exactly as any lens would: extract `energy_descriptor`, `state_shift`, `tags`, `vocabulary_contradictions`, and `stated_commitment` from the text. The surface files define what each field captures — follow them. Do the extraction fully and correctly first. Then layer the adversarial flags on top.
 
-- `state-behavior-mismatch` — state change ("I was X, then Y") with no triggering event.
-  "Fine before standup, flattened by 11" fires this.
-- `commitment-without-anchor` — soft-modal commitment ("would send", "should finish") with
-  no concrete object. "Said I would send the invoice. Instead I reorganized the desktop."
-- `vocabulary-contradiction` — user's own words pointing two directions. "Not tired exactly"
-  + "battery got yanked" (energy negated then reasserted).
-- `unsupported-recurrence` — recurrence claim ("again", "same thing") with no supporting
-  retrieved-history chunk.
-- `time-inconsistency` — incompatible time anchors ("ten minutes" later called "two hours").
+Adversarial layer — what to flag:
 
-`flags` output:
+- `state-behavior-mismatch` — a state change is described but no triggering event is named.
+- `commitment-without-anchor` — a modal commitment with no concrete object or deadline.
+- `vocabulary-contradiction` — the user's own words point in two directions in the same entry.
+- `unsupported-recurrence` — the user signals recurrence ("again", "same thing", "third time") with no retrieved history to corroborate.
+- `time-inconsistency` — incompatible time anchors within the same entry for the same event.
 
-- Each flag is `{kind, snippet, note}`. `kind` is one of the five above plus `other`.
-- `snippet` quotes the user's words. `note` is one short sentence naming what doesn't add up.
-  No diagnosis, no advice.
+`flags` output format:
+
+- Each flag is `{kind, snippet, note}`. `kind` is one of the five above or `other`.
+- `snippet` is a verbatim excerpt from the entry text. Quote the user's actual words.
+- `note` is one short sentence naming the gap or conflict. No diagnosis, no advice, no framing.
 
 Output discipline:
 
-- Convergence treats a Skeptical flag as `canonical_with_conflict` when Literal and
-  Inferential agree on the underlying value. The flag annotates agreement, doesn't override it.
-- Genuinely unambiguous entries may produce zero flags. Do not invent a contradiction.
+- Flags annotate the resolved fields — they do not replace them. Populate schema fields fully, then add flags.
+- Convergence treats Skeptical flags as `canonical_with_conflict` when the other lenses agree on the underlying value.
+- Genuinely unambiguous entries may produce zero flags. Do not manufacture contradictions.
+- Always emit `vocabulary_contradictions` as an array, never null.

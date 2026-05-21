@@ -20,7 +20,8 @@ import kotlinx.coroutines.launch
  *   adb shell am broadcast --ez run_extraction true -n ...
  *
  * Registered in the debug manifest overlay only — never ships in release builds.
- * Delegates to [DebugPatternSeeder] which is idempotent (clears before seeding).
+ * Delegates to [DebugPatternSeeder] which writes PENDING rows. `run_extraction=true` immediately
+ * runs the same pending-entry recovery path used after model readiness.
  */
 class DebugSeedReceiver : BroadcastReceiver() {
 
@@ -37,15 +38,11 @@ class DebugSeedReceiver : BroadcastReceiver() {
                 }
                 val container = app.appContainer
                 Log.d(TAG, "seeding debug fixtures…")
-                DebugPatternSeeder.seed(
-                    filesDir = appContext.filesDir,
-                    boxStore = container.boxStore,
-                    patternStore = container.patternStore,
-                )
+                DebugPatternSeeder.seed(boxStore = container.boxStore)
                 OnboardingPrefs.from(appContext).markComplete()
                 if (runExtraction) {
-                    container.launchMissingExtractionBackfill()
-                    Log.d(TAG, "queued missing extraction backfill")
+                    container.recoverPendingExtractions()
+                    Log.d(TAG, "ran pending extraction recovery")
                 }
                 Log.d(TAG, "seed complete")
             } catch (cancel: CancellationException) {

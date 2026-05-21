@@ -1,26 +1,30 @@
 ## Lens: Inferential
 
-Intent mapping — extract the underlying concept even when the user didn't name it directly.
-
-Apply each surface in a charitable reading: explicit content plus reasonable contextual inference.
+Apply a charitable reading. Go beyond explicit words to what the text most plausibly means for this person's cognitive and behavioral state.
 
 Rules:
 
-- Extract everything the Literal lens would extract, plus inferences a reasonable reader would draw from the context.
-- Emit the concept tag for the pattern the entry describes, even if the user used different words. Examples:
-  - User's own words ARE the concept name (says "concrete shoes", "goblin hours", "tunnel exit") → emit that tag directly.
-  - Stuck or paralyzed — unable to start or make progress; avoidance or task-opening-and-immediately-closing → `concrete-shoes`
-  - Active comparison loop — re-evaluating the same alternatives, generating more data or criteria instead of deciding → `decision-spiral`
-  - Post-event energy drop after a group event (all-hands, standup, sync, incident, presentation) and entry contains any negative impact signal ("harder than expected", "crashed", "wired", "drained", "heavy") → `aftermath`
-  - State shift from deep focus block back to normal ("finally surfaced", "got out of the zone", "emerged") → `tunnel-exit`
-  - Entry between midnight and 5am → `late-night`
-- "Crashed at 3am" with no qualifier may yield `energy_descriptor=crashed` and a `late-night` tag. A bare "3" is ambiguous (3am vs 3pm) and is not enough on its own to justify `late-night` — require either an explicit am/pm marker or surrounding overnight context.
-- Inferences must be defensible from the text or retrieved-history block. Do not invent context that has no anchor.
-- Do not infer motivations or psychological causation. Only carry a user-side state when the entry directly names it or clearly idioms it.
-- Inferred fields are still concrete: "user was at home" is allowed when "kitchen", "couch", or "bed" appears; "user was avoiding work" is not — that's motivation.
+- Read for pattern and meaning, not just surface vocabulary. What is this person experiencing?
+- `energy_descriptor`: the one or two words that most plausibly name the user's cognitive or energy state — stated directly or implied by what they describe. If they said it, use their exact words. If they described behavior that makes their state semantically obvious, name the state their behavior implies.
+- State shift: when the entry contains a detectable before/after contrast in energy or cognitive state across any boundary—event, time, task, or transition—set `state_shift=true` and add a tag reflecting the direction and boundary type. Explicit contrast language is not required; implied contrast qualifies when the state change is the entry's primary subject rather than incidental background.
+- Decision loops: when the user describes returning to the same choice with new framing and no resolution, capture it as a tag. Spreading, weighing, comparing, and not deciding is a decision loop.
+- Avoidance sequences: when the user approaches a task and retreats, or states an intention then does something else, tag both the avoidance and the specific task.
+- Late-night context: explicit timestamps between midnight and 5am warrant a late-night tag.
+- User-coined idioms carry their meaning: tag the user's own phrasing verbatim and let it stand for the state it names.
+- Sequence anchors are behavioral context — add as tags.
+- Time anchors and named activities both become tags.
+
+Inference limits:
+
+- Do not infer causes or motivations.
+- Do not infer emotional states the user did not name.
+- One layer only: if the text gives no anchor for a claim, do not make it.
+- Retrieved history can corroborate inferences but cannot supply content that isn't anchored in the current entry.
 
 Output discipline:
 
-- Inferential is the field most likely to populate where Literal is null. The convergence resolver treats Inferential-only output as `candidate`, not `canonical`, until a re-eval or later corroboration agrees.
-- Do not pad. If neither the text nor history supports an inference, leave the field null.
-- Always emit `flags` as `[]` (empty array). Conflict-flagging belongs to the Skeptical lens, but the schema requires the key on every response — omitting it breaks strict parsing.
+- Produce a complete schema object covering all surfaces for this entry.
+- Populate more fields than a strict surface-words reading would. Inferential output is expected to be richer.
+- Do not pad: genuinely sparse entries stay sparse even with a charitable read.
+- Always emit `flags` as `[]` (empty array).
+- Always emit `vocabulary_contradictions` as an array, never null — use `[]` when there are none.

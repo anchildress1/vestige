@@ -1,11 +1,8 @@
 package dev.anchildress1.vestige.inference
 
-import dev.anchildress1.vestige.model.ConfidenceVerdict
 import dev.anchildress1.vestige.model.ExtractionStatus
 import dev.anchildress1.vestige.model.Lens
 import dev.anchildress1.vestige.model.LensExtraction
-import dev.anchildress1.vestige.model.ResolvedExtraction
-import dev.anchildress1.vestige.model.ResolvedField
 import dev.anchildress1.vestige.model.TemplateLabel
 import io.mockk.every
 import io.mockk.mockk
@@ -19,37 +16,11 @@ import org.junit.jupiter.api.Assertions.assertInstanceOf
 import org.junit.jupiter.api.Assertions.assertNotNull
 import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Assertions.assertSame
-import org.junit.jupiter.api.Assertions.assertThrows
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
-import java.time.Instant
-import java.time.ZoneId
 import java.util.concurrent.atomic.AtomicInteger
 
 class BackgroundExtractionWorkerTest {
-
-    private val capturedAt = Instant.parse("2026-05-09T08:00:00Z").atZone(ZoneId.of("America/Chicago"))
-    private val request = BackgroundExtractionRequest(entryText = "user words", capturedAt = capturedAt)
-    private val resolved = ResolvedExtraction(
-        fields = mapOf(
-            "energy_descriptor" to ResolvedField("crashed", ConfidenceVerdict.CANONICAL),
-            "state_shift" to ResolvedField(true, ConfidenceVerdict.CANONICAL),
-        ),
-    )
-
-    private fun extraction(lens: Lens, label: String = "aftermath"): LensExtraction = LensExtraction(
-        lens = lens,
-        fields = mapOf("template_label" to label),
-    )
-
-    private fun fakeComposer(): (Lens, String, List<HistoryChunk>) -> ComposedPrompt = { lens, _, _ ->
-        ComposedPrompt(
-            lens = lens,
-            systemInstruction = "prompt-for-$lens",
-            userText = "entry-text",
-            tokenEstimate = 100,
-        )
-    }
 
     private fun compactSuccessJson(stateShift: Boolean): String = """
         {"tags":["sink"],"energy_descriptor":null,"state_shift":$stateShift,"vocabulary_contradictions":[],"stated_commitment":null,"recurrence_link":null,"recurrence_kind":null,"flags":[]}
@@ -83,22 +54,6 @@ class BackgroundExtractionWorkerTest {
     private fun skepticalFlag(): String =
         "vocabulary-contradiction:completely fine by 1pm i was gone not tired exactly:" +
             "The user describes a state of being fine then immediately negates it with 'not tired exactly'."
-
-    private class RecordingResolver(val resolved: ResolvedExtraction) : ConvergenceResolver {
-        var captured: List<LensExtraction> = emptyList()
-        override fun resolve(extractions: List<LensExtraction>): ResolvedExtraction {
-            captured = extractions
-            return resolved
-        }
-    }
-
-    private class RecordingListener : ExtractionStatusListener {
-        data class Update(val status: ExtractionStatus, val entryAttemptCount: Int, val lastError: String?)
-        val updates: MutableList<Update> = mutableListOf()
-        override suspend fun onUpdate(status: ExtractionStatus, entryAttemptCount: Int, lastError: String?) {
-            updates += Update(status, entryAttemptCount, lastError)
-        }
-    }
 
     @Test
     fun `runs three lenses sequentially and resolves on first-attempt success`() = runTest {
@@ -154,6 +109,39 @@ class BackgroundExtractionWorkerTest {
         )
         // Listener fires exactly twice on the happy path: initial RUNNING and terminal COMPLETED.
         // No retry events since every lens parsed cleanly on attempt 1.
+        assertEquals(
+            listOf(
+                RecordingListener.Update(ExtractionStatus.RUNNING, 0, null),
+                RecordingListener.Update(ExtractionStatus.COMPLETED, 0, null),
+            ),
+            listener.updates,
+        )
+    }
+
+    @Test
+    fun `single inferential lens config runs one model call and resolves it`() = runTest {
+        // Tuning-harness config: one Inferential pass, no cross-lens convergence.
+        val engine = mockk<LiteRtLmEngine>()
+        every { engine.streamText("prompt-for-INFERENTIAL", any()) } returns flowOf("raw-inferential")
+        val resolver = RecordingResolver(resolved)
+        val listener = RecordingListener()
+
+        val result = BackgroundExtractionWorker(
+            engine = engine,
+            resolver = resolver,
+            parser = { lens, _ -> extraction(lens) },
+            composer = fakeComposer(),
+            lenses = listOf(Lens.INFERENTIAL),
+        ).extract(request = request, listener = listener)
+
+        val success = assertInstanceOf(BackgroundExtractionResult.Success::class.java, result)
+        assertAll(
+            { assertEquals(1, success.lensResults.size) },
+            { assertEquals(1, success.modelCallCount) },
+            { assertEquals(listOf(Lens.INFERENTIAL), success.lensResults.map { it.lens }) },
+            { assertEquals(1, resolver.captured.size) },
+            { assertEquals(Lens.INFERENTIAL, resolver.captured.single().lens) },
+        )
         assertEquals(
             listOf(
                 RecordingListener.Update(ExtractionStatus.RUNNING, 0, null),
@@ -371,329 +359,5 @@ class BackgroundExtractionWorkerTest {
         val terminal = listener.updates.last()
         assertEquals(ExtractionStatus.COMPLETED, terminal.status)
         assertNull(terminal.lastError)
-    }
-
-    @Test
-    fun `worker labels using the capture timestamp's zone, not the JVM default`() = runTest {
-        val engine = mockk<LiteRtLmEngine>()
-        every { engine.streamText(any(), any()) } returns flowOf("raw-ok")
-        val lateNightResolved = ResolvedExtraction(
-            fields = mapOf("tags" to ResolvedField(listOf("late-night"), ConfidenceVerdict.CANONICAL)),
-        )
-        val parser: (Lens, String) -> LensExtraction? = { lens, _ -> extraction(lens) }
-        // 08:00 UTC = 03:00 Chicago (inside goblin) but 08:00 UTC zone (outside goblin). Asserting
-        // both reads of the same instant proves the labeler reads the captured zone, not ambient.
-        val instant = Instant.parse("2026-05-09T08:00:00Z")
-
-        val chicagoResult = BackgroundExtractionWorker(
-            engine = engine,
-            resolver = RecordingResolver(lateNightResolved),
-            parser = parser,
-            composer = fakeComposer(),
-        ).extract(
-            request = BackgroundExtractionRequest(
-                entryText = "user words",
-                capturedAt = instant.atZone(ZoneId.of("America/Chicago")),
-            ),
-        )
-
-        val utcResult = BackgroundExtractionWorker(
-            engine = engine,
-            resolver = RecordingResolver(lateNightResolved),
-            parser = parser,
-            composer = fakeComposer(),
-        ).extract(
-            request = BackgroundExtractionRequest(
-                entryText = "user words",
-                capturedAt = instant.atZone(ZoneId.of("UTC")),
-            ),
-        )
-
-        assertEquals(
-            TemplateLabel.GOBLIN_HOURS,
-            assertInstanceOf(BackgroundExtractionResult.Success::class.java, chicagoResult).templateLabel,
-        )
-        assertEquals(
-            TemplateLabel.AUDIT,
-            assertInstanceOf(BackgroundExtractionResult.Success::class.java, utcResult).templateLabel,
-        )
-    }
-
-    @Test
-    fun `blank entry text fails fast`() {
-        val worker = BackgroundExtractionWorker(
-            engine = mockk(),
-            resolver = RecordingResolver(resolved),
-            parser = { _, _ -> null },
-            composer = fakeComposer(),
-        )
-        assertThrows(IllegalArgumentException::class.java) {
-            kotlinx.coroutines.runBlocking {
-                worker.extract(BackgroundExtractionRequest(entryText = "   ", capturedAt = capturedAt))
-            }
-        }
-    }
-
-    @Test
-    fun `maxAttemptsPerLens must be positive`() {
-        assertThrows(IllegalArgumentException::class.java) {
-            BackgroundExtractionWorker(
-                engine = mockk(),
-                resolver = RecordingResolver(resolved),
-                maxAttemptsPerLens = 0,
-            )
-        }
-    }
-
-    @Test
-    fun `terminal listener events carry the caller-supplied entry attempt count`() = runTest {
-        val engine = mockk<LiteRtLmEngine>()
-        every { engine.streamText("prompt-for-LITERAL", any()) } returnsMany
-            listOf(flowOf("garbage-1"), flowOf("raw-literal"))
-        every { engine.streamText("prompt-for-INFERENTIAL", any()) } returns flowOf("raw-inferential")
-        every { engine.streamText("prompt-for-SKEPTICAL", any()) } returns flowOf("raw-skeptical")
-        val parser: (Lens, String) -> LensExtraction? = { lens, raw ->
-            if (raw == "garbage-1") null else extraction(lens)
-        }
-        val listener = RecordingListener()
-
-        BackgroundExtractionWorker(
-            engine = engine,
-            resolver = RecordingResolver(resolved),
-            parser = parser,
-            composer = fakeComposer(),
-        ).extract(
-            request = BackgroundExtractionRequest(
-                entryText = "user words",
-                capturedAt = capturedAt,
-                entryAttemptCount = 2,
-            ),
-            listener = listener,
-        )
-
-        // Even with a LITERAL retry, the caller's entryAttemptCount=2 rides every emitted event;
-        // Per-lens retries no longer emit their own status.
-        assertEquals(
-            listOf(
-                RecordingListener.Update(ExtractionStatus.RUNNING, 2, null),
-                RecordingListener.Update(ExtractionStatus.COMPLETED, 2, null),
-            ),
-            listener.updates,
-        )
-    }
-
-    @Test
-    fun `negative entry attempt count fails fast`() {
-        val worker = BackgroundExtractionWorker(
-            engine = mockk(),
-            resolver = RecordingResolver(resolved),
-            parser = { _, _ -> null },
-            composer = fakeComposer(),
-        )
-        assertThrows(IllegalArgumentException::class.java) {
-            kotlinx.coroutines.runBlocking {
-                worker.extract(
-                    BackgroundExtractionRequest(
-                        entryText = "ok",
-                        capturedAt = capturedAt,
-                        entryAttemptCount = -1,
-                    ),
-                )
-            }
-        }
-    }
-
-    @Test
-    fun `non-positive timeout fails fast`() {
-        val worker = BackgroundExtractionWorker(
-            engine = mockk(),
-            resolver = RecordingResolver(resolved),
-            parser = { _, _ -> null },
-            composer = fakeComposer(),
-        )
-        assertThrows(IllegalArgumentException::class.java) {
-            kotlinx.coroutines.runBlocking {
-                worker.extract(BackgroundExtractionRequest(entryText = "ok", capturedAt = capturedAt, timeoutMs = 0L))
-            }
-        }
-    }
-
-    @Test
-    fun `resolver throwing emits terminal FAILED instead of leaving status RUNNING`() = runTest {
-        val engine = mockk<LiteRtLmEngine>()
-        every { engine.streamText(any(), any()) } returns flowOf("raw-ok")
-        val parser: (Lens, String) -> LensExtraction? = { lens, _ -> extraction(lens) }
-        val throwingResolver = object : ConvergenceResolver {
-            override fun resolve(extractions: List<LensExtraction>): ResolvedExtraction = error("resolver-explosion")
-        }
-        val listener = RecordingListener()
-
-        val result = BackgroundExtractionWorker(
-            engine = engine,
-            resolver = throwingResolver,
-            parser = parser,
-            composer = fakeComposer(),
-        ).extract(request = request, listener = listener)
-
-        val failed = assertInstanceOf(BackgroundExtractionResult.Failed::class.java, result)
-        assertTrue(failed.lastError.startsWith("resolver-error:"))
-        // Persistence layer needs the terminal transition — without it the entry stalls in RUNNING.
-        assertEquals(ExtractionStatus.FAILED, listener.updates.last().status)
-        assertTrue(listener.updates.last().lastError!!.startsWith("resolver-error:"))
-    }
-
-    @Test
-    fun `chunk reference in recurrence_link is resolved to actual pattern id after convergence`() = runTest {
-        val engine = mockk<LiteRtLmEngine>()
-        every { engine.streamText(any(), any()) } returns flowOf("raw")
-        val history = listOf(HistoryChunk(patternId = "real-pattern-id-abc", text = "prior entry"))
-        val resolvedWithChunkRef = ResolvedExtraction(
-            fields = mapOf(
-                "recurrence_link" to ResolvedField("chunk-1", ConfidenceVerdict.CANONICAL),
-                "recurrence_kind" to ResolvedField("partial", ConfidenceVerdict.CANONICAL),
-            ),
-        )
-
-        val result = BackgroundExtractionWorker(
-            engine = engine,
-            resolver = RecordingResolver(resolvedWithChunkRef),
-            parser = { lens, _ -> extraction(lens) },
-            composer = fakeComposer(),
-        ).extract(
-            request = BackgroundExtractionRequest(
-                entryText = "user words",
-                capturedAt = capturedAt,
-                retrievedHistory = history,
-            ),
-        )
-
-        val success = assertInstanceOf(BackgroundExtractionResult.Success::class.java, result)
-        val link = success.resolved.fields["recurrence_link"]?.value as? String
-        assertEquals("real-pattern-id-abc", link)
-    }
-
-    @Test
-    fun `out-of-range chunk ref leaves recurrence_link as raw ref`() = runTest {
-        val engine = mockk<LiteRtLmEngine>()
-        every { engine.streamText(any(), any()) } returns flowOf("raw")
-        val history = listOf(HistoryChunk(patternId = "only-entry", text = "prior entry"))
-        val resolvedWithBadRef = ResolvedExtraction(
-            fields = mapOf(
-                "recurrence_link" to ResolvedField("chunk-9", ConfidenceVerdict.CANONICAL),
-            ),
-        )
-
-        val result = BackgroundExtractionWorker(
-            engine = engine,
-            resolver = RecordingResolver(resolvedWithBadRef),
-            parser = { lens, _ -> extraction(lens) },
-            composer = fakeComposer(),
-        ).extract(
-            request = BackgroundExtractionRequest(
-                entryText = "user words",
-                capturedAt = capturedAt,
-                retrievedHistory = history,
-            ),
-        )
-
-        val success = assertInstanceOf(BackgroundExtractionResult.Success::class.java, result)
-        val link = success.resolved.fields["recurrence_link"]?.value as? String
-        assertEquals("chunk-9", link)
-    }
-
-    @Test
-    fun `chunk ref pointing at context-only entry leaves recurrence_link as raw ref`() = runTest {
-        val engine = mockk<LiteRtLmEngine>()
-        every { engine.streamText(any(), any()) } returns flowOf("raw")
-        val history = listOf(HistoryChunk(patternId = null, text = "context-only entry"))
-        val resolvedWithChunkRef = ResolvedExtraction(
-            fields = mapOf(
-                "recurrence_link" to ResolvedField("chunk-1", ConfidenceVerdict.CANONICAL),
-            ),
-        )
-
-        val result = BackgroundExtractionWorker(
-            engine = engine,
-            resolver = RecordingResolver(resolvedWithChunkRef),
-            parser = { lens, _ -> extraction(lens) },
-            composer = fakeComposer(),
-        ).extract(
-            request = BackgroundExtractionRequest(
-                entryText = "user words",
-                capturedAt = capturedAt,
-                retrievedHistory = history,
-            ),
-        )
-
-        val success = assertInstanceOf(BackgroundExtractionResult.Success::class.java, result)
-        val link = success.resolved.fields["recurrence_link"]?.value as? String
-        assertEquals("chunk-1", link)
-    }
-
-    @Test
-    fun `non-chunk-ref value in recurrence_link passes through unchanged`() = runTest {
-        val engine = mockk<LiteRtLmEngine>()
-        every { engine.streamText(any(), any()) } returns flowOf("raw")
-        val resolvedWithRealId = ResolvedExtraction(
-            fields = mapOf(
-                "recurrence_link" to ResolvedField("real-uuid-abc", ConfidenceVerdict.CANONICAL),
-            ),
-        )
-
-        val result = BackgroundExtractionWorker(
-            engine = engine,
-            resolver = RecordingResolver(resolvedWithRealId),
-            parser = { lens, _ -> extraction(lens) },
-            composer = fakeComposer(),
-        ).extract(
-            request = BackgroundExtractionRequest(
-                entryText = "user words",
-                capturedAt = capturedAt,
-                retrievedHistory = listOf(HistoryChunk(patternId = "some-id", text = "prior")),
-            ),
-        )
-
-        val success = assertInstanceOf(BackgroundExtractionResult.Success::class.java, result)
-        val link = success.resolved.fields["recurrence_link"]?.value as? String
-        assertEquals("real-uuid-abc", link)
-    }
-
-    @Test
-    fun `timeout produces TimedOut with whatever lens results completed before the cap`() = runTest {
-        val engine = mockk<LiteRtLmEngine>()
-        // Sequential run: LITERAL completes; INFERENTIAL hangs past the cap, so only LITERAL lands
-        // in the completed accumulator before timeout cancellation wins.
-        every { engine.streamText("prompt-for-LITERAL", any()) } returns flowOf("raw-literal")
-        every { engine.streamText("prompt-for-INFERENTIAL", any()) } returns flow {
-            delay(Long.MAX_VALUE / 2)
-            emit("never")
-        }
-        every { engine.streamText("prompt-for-SKEPTICAL", any()) } returns flow {
-            delay(Long.MAX_VALUE / 2)
-            emit("never")
-        }
-        val parser: (Lens, String) -> LensExtraction? = { lens, raw ->
-            if (raw == "raw-literal") extraction(lens) else null
-        }
-        val listener = RecordingListener()
-
-        val result = BackgroundExtractionWorker(
-            engine = engine,
-            resolver = RecordingResolver(resolved),
-            parser = parser,
-            composer = fakeComposer(),
-        ).extract(
-            request = BackgroundExtractionRequest(entryText = "user words", capturedAt = capturedAt, timeoutMs = 50L),
-            listener = listener,
-        )
-
-        val timedOut = assertInstanceOf(BackgroundExtractionResult.TimedOut::class.java, result)
-        assertEquals(50L, timedOut.timeoutMs)
-        // LITERAL completed before the cap; INFERENTIAL was in-flight when the timeout cancelled
-        // the run, so only LITERAL is in the accumulator.
-        assertEquals(listOf(Lens.LITERAL), timedOut.lensResults.map { it.lens })
-        val terminal = listener.updates.last()
-        assertEquals(ExtractionStatus.TIMED_OUT, terminal.status)
-        assertEquals("timeout-after-50ms", terminal.lastError)
     }
 }

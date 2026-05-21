@@ -703,8 +703,13 @@ class AppContainer(
         ensureBackgroundEngineInitialized()
         ids.forEach { entryId ->
             val entry = entryStore.readEntry(entryId)
-            if (entry != null && entry.extractionStatus == ExtractionStatus.PENDING) {
-                recoverOneEntry(
+            when {
+                entry == null -> Log.w(TAG, "recoverPendingExtractions: entry $entryId vanished from store")
+
+                entry.extractionStatus != ExtractionStatus.PENDING ->
+                    Log.d(TAG, "recoverPendingExtractions: skip entry $entryId status=${entry.extractionStatus}")
+
+                else -> recoverOneEntry(
                     entryId = entry.id,
                     entryText = entry.entryText,
                     capturedAt = ZonedDateTime.ofInstant(
@@ -718,7 +723,7 @@ class AppContainer(
 
     /**
      * Backfills lens receipts on COMPLETED entries that were inserted without extraction output
-     * (`make seed-entries -e run_extraction=true`, imported demo corpora, etc.). Single-flight.
+     * (imported demo corpora, partial export smoke fixtures, etc.). Single-flight.
      */
     fun launchMissingExtractionBackfill(limit: Int = DEFAULT_MISSING_EXTRACTION_BACKFILL_LIMIT): Job = scope.launch {
         if (!missingExtractionBackfillRunning.compareAndSet(false, true)) {

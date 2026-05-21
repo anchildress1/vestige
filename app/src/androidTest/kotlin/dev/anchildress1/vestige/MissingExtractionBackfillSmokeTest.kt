@@ -20,9 +20,8 @@ import org.junit.runner.RunWith
 import java.io.File
 
 /**
- * End-to-end on-device check that `launchMissingExtractionBackfill()` actually fills in
- * the lens receipts on every seeded row that ships under the COMPLETED-with-empty-receipts
- * seed contract.
+ * End-to-end on-device check that seeded PENDING rows actually run through the background worker
+ * via pending-entry recovery.
  *
  * Requires the main model artifact already pushed (the typical `make reinstall` posture).
  * If the model is missing this test self-skips via `assumeTrue` — no spurious red.
@@ -40,11 +39,7 @@ class MissingExtractionBackfillSmokeTest {
 
     @Before
     fun seedFreshCorpus() {
-        DebugPatternSeeder.seed(
-            filesDir = app.filesDir,
-            boxStore = container.boxStore,
-            patternStore = container.patternStore,
-        )
+        DebugPatternSeeder.seed(boxStore = container.boxStore)
     }
 
     @After
@@ -54,7 +49,7 @@ class MissingExtractionBackfillSmokeTest {
     }
 
     @Test
-    fun backfill_lands_receipts_patterns_and_vectors_for_the_seed_corpus() = runBlocking {
+    fun pending_recovery_lands_receipts_patterns_and_vectors_for_the_seed_corpus() = runBlocking {
         assumeTrue(
             "main model artifact missing — push via `make push-model` before running this smoke",
             mainModelArtifactPresent(),
@@ -70,8 +65,18 @@ class MissingExtractionBackfillSmokeTest {
             )
         }
 
+        container.recoverPendingExtractions()
         withTimeout(BACKFILL_TIMEOUT_MS) {
-            container.launchMissingExtractionBackfill(limit = before.size).join()
+            // recoverPendingExtractions only *schedules* per-entry recovery jobs and returns; poll
+            // until every row leaves the in-flight states (PENDING/RUNNING) so the COMPLETED
+            // assertion below sees settled rows, not work still draining.
+            while (box.all.any {
+                    it.extractionStatus == ExtractionStatus.PENDING ||
+                        it.extractionStatus == ExtractionStatus.RUNNING
+                }
+            ) {
+                delay(POLL_INTERVAL_MS)
+            }
         }
 
         val after = box.all.associateBy { it.id }
@@ -167,7 +172,6 @@ class MissingExtractionBackfillSmokeTest {
     }
 
     private fun vocabEntriesMissingVectors(entries: List<EntryEntity>): List<String> = entries
-        .filter { it.markdownFilename.startsWith("debug-vocab-") }
         .filter { it.vector == null || it.vectorSchemaVersion < EntryEntity.CURRENT_VECTOR_SCHEMA_VERSION }
         .map { it.markdownFilename }
 

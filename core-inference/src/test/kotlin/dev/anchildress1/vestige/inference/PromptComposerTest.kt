@@ -33,14 +33,13 @@ class PromptComposerTest {
     }
 
     @Test
-    fun `composed prompt contains all five surfaces in canonical order`() {
+    fun `composed prompt contains all four surfaces in canonical order`() {
         val text = PromptComposer.compose(Lens.LITERAL, entry).systemInstruction
         val ordered = listOf(
             "## Surface: Behavioral",
             "## Surface: State",
             "## Surface: Vocabulary",
             "## Surface: Commitment",
-            "## Surface: Recurrence",
         )
         var cursor = 0
         ordered.forEach { marker ->
@@ -55,23 +54,6 @@ class PromptComposerTest {
         val composed = PromptComposer.compose(Lens.INFERENTIAL, entry)
         assertTrue(composed.systemInstruction.contains("## Output schema"))
         assertEquals(entry, composed.userText)
-        assertTrue(
-            composed.systemInstruction.contains("`stated_commitment`: object `{text, topic_or_person}` or `null`."),
-        )
-        assertTrue(
-            composed.systemInstruction.contains(
-                "When the entry contains concrete anchors, return at least one substantive field.",
-            ),
-        )
-    }
-
-    @Test
-    fun `composed prompt explicitly forbids anchorless empty reads`() {
-        val text = PromptComposer.compose(Lens.LITERAL, entry).systemInstruction
-        assertTrue(text.contains("return at least one substantive field"))
-        assertTrue(text.contains("carry that exact wording into `energy_descriptor`"))
-        assertFalse(text.contains("emit at least one behavioral tag"))
-        assertFalse(text.contains("leaving the vocabulary surface silent"))
     }
 
     @Test

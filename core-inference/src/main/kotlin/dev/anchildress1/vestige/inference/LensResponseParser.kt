@@ -26,6 +26,7 @@ internal object LensResponseParser {
 
     private val SCHEMA_KEYS: Set<String> = setOf(
         "tags",
+        "template_label",
         "energy_descriptor",
         "state_shift",
         "vocabulary_contradictions",
@@ -46,10 +47,15 @@ internal object LensResponseParser {
         return LensExtraction(lens = lens, fields = fields, flags = flags)
     }
 
-    /** Per-field normalization. Tags get trimmed + lowercased; everything else passes through. */
+    /** Per-field normalization. Tags trimmed+lowercased; vocabulary_contradictions null→[]; others pass through. */
     private fun normalizeField(key: String, value: Any?): Any? {
         val normalized = normalize(value)
-        return if (key == "tags") (normalized as? List<*>)?.mapNotNull(::normalizeTag) else normalized
+        return when (key) {
+            "tags" -> (normalized as? List<*>)?.mapNotNull(::normalizeTag)
+            "vocabulary_contradictions" -> normalized ?: emptyList<Any?>()
+            "template_label" -> (normalized as? String)?.lowercase()?.takeIf { it.isNotEmpty() }
+            else -> normalized
+        }
     }
 
     private fun normalizeTag(entry: Any?): String? = (entry as? String)?.trim()?.lowercase()?.takeIf { it.isNotEmpty() }

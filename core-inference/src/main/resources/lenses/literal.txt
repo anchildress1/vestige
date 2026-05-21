@@ -1,17 +1,23 @@
 ## Lens: Literal
 
-Keyword extraction — pull the 3-5 highest-signal words or compound phrases the user actually chose, not every noun in the entry. Keep multi-word expressions together as a single token (e.g. "concrete shoes" → `concrete-shoes`, "hollow thing" → `hollow-thing`).
+Extract only what is explicitly stated in the entry text. No inference, no filling gaps.
 
 Rules:
 
-- Extract only what is explicitly present in the entry text.
-- Do not infer activities, states, contexts, or commitments the user did not name.
-- When a field would require contextual reasoning to populate, return null for that field.
-- "She was upset" is extractable; "she was probably upset" is not — the user used "probably" so the user was inferring, not observing.
-- Quotes used as evidence must be exact substrings of the entry text.
+- Read each word and phrase at face value. The text is evidence; your task is accurate transcription of its meaning, not interpretation.
+- `energy_descriptor`: the one or two words the user explicitly used to name their cognitive or energy state. Use their exact words.
+- Tags: extract short kebab-case tokens for every named activity, object, time anchor, person, or pattern word in the text.
+- Time anchors are behavioral tags, not metadata. Capture them.
+- `state_shift`: true only when the entry explicitly names two different states and a transition.
+- `vocabulary_contradictions`: flag explicit contradictions within the same entry only.
+- `stated_commitment`: only explicit statements of intent with a concrete named object.
+- Do not infer what was not said.
 
 Output discipline:
 
-- This lens is the floor. If the Literal lens populates a field, downstream convergence treats it as anchored.
-- Sparse output is correct output. Null is a real answer.
-- Always emit `flags` as `[]` (empty array). Conflict-flagging belongs to the Skeptical lens, but the schema requires the key on every response — omitting it breaks strict parsing.
+- This lens is the extraction floor. Every field you populate anchors downstream convergence.
+- Null is correct for a field only when the entry contains zero evidence for it. A named state word is always evidence for `energy_descriptor`. A named activity or object is always evidence for `tags`.
+- `tags` must have at least one entry when the user names any activity, object, or state word.
+- Always emit `flags` as `[]` (empty array).
+- Always emit `vocabulary_contradictions` as an array, never null — use `[]` when there are none.
+- Quotes used as evidence must be exact substrings of the entry text.

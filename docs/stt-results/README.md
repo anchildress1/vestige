@@ -1,5 +1,35 @@
 # STT evidence archive
 
+## STT-H — single-pass prompt rebuild + 3-lens convergence
+
+Captures of `SinglePassExtractionTuningTest` over a 12-entry diagnostic corpus (inlined in the
+test). Pure observation — no assertions. Records the rebuilt 3-lens × surfaces extraction after
+the prompt rebuild: examples stripped from every lens + shared surface, `energy_descriptor` capped
+to a one/two-word state (A/B/C rules), single-word tag rule, and the Literal-corroboration gate on
+`energy_descriptor` / `state_shift`. Set the test's `lenses` list to one lens to tune it in
+isolation, or all three to capture convergence.
+
+### Filename format
+
+`stt-h-<YYYY-MM-DD>.md` (GPU text backend; multiple same-day runs get a `-N` suffix)
+
+### Contents
+
+1. **Setup** — date, device, model, backend, harness, branch, question
+2. **Verdict** — parse rate, determinism, gate behaviour, collateral
+3. **Measured numbers** — model calls, parse-fails/retries, mean + range per-entry latency, prompt size, wall clock, reproducibility
+4. **Per-entry table** — latency, resolved energy + verdict, state_shift + verdict, deterministic template label
+5. **Notable** — Skeptical flags, recurrence-without-history, the template-label catch-all
+6. **Pipeline** — exact command + raw-log capture
+
+### Log tag
+
+`VestigeTuning` — one `TUNING_PROMPT` line (composed prompt size) + one `TUNING {…}` line per entry
+with `elapsedMs`, `modelCalls`, per-lens `lensMs` (latency/attempts), per-lens energy/state_shift,
+the resolved fields with verdicts + flags, and the deterministic template label.
+
+---
+
 ## STT-F — concurrent-inference viability
 
 One-off feasibility capture of `RamWallClockProbeTest` against the on-device Engine. Answered

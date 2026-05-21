@@ -17,4 +17,3 @@ What goes in the schema:
 - Add to `tags` as short lowercase kebab-case tokens. One token per discrete signal.
 - Examples: `standup`, `client-review`, `invoice`, `late-night`, `decision-loop`, `task-stall`, `tab-switching`, `avoidance`, `comparing`, `spreadsheet`.
 - A meeting name and a state-crash that follows are two separate tags (e.g., `standup` + `meeting-aftermath`).
-- Do not add tags for activities the user did not name. Implicit context belongs to the lens inference step.

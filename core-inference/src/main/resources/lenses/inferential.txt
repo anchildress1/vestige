@@ -5,8 +5,8 @@ Apply a charitable reading. Go beyond explicit words to what the text most plaus
 Rules:
 
 - Read for pattern and meaning, not just surface vocabulary. What is this person experiencing?
-- State words: if the user uses an energy or state word — "crashed", "hollow", "depleted", "wired", "exhausted", "flatlined", "drained" — populate `energy_descriptor` with it exactly as said.
-- Post-event crashes: when the user says they were fine before X and crashed/hollow/flatlined after X, set `state_shift=true` and add `meeting-aftermath` or a relevant tag.
+- `energy_descriptor`: the word or phrase that most plausibly names the user's cognitive or energy state — stated directly or implied by what they describe. If they said it, use their exact words. If they described behavior that makes their state semantically obvious ("couldn't start anything", "opened it and closed it three times"), name the state their behavior implies.
+- Post-event crashes: when the user says they were fine before X and in a depleted or stalled state after X, set `state_shift=true` and add a relevant tag.
 - Decision loops: when the user describes returning to the same choice with new framing and no resolution, add `decision-loop` to tags. Spreading, weighing, comparing, and not deciding is a decision loop.
 - Avoidance sequences: "opened it and closed it", "said I would X, then did Y instead" — add `avoidance` and the specific task tag.
 - Late-night context: explicit timestamps between midnight and 5am warrant `late-night` tag.

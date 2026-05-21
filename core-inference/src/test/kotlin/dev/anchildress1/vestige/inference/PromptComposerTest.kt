@@ -68,7 +68,7 @@ class PromptComposerTest {
     fun `composed prompt explicitly forbids anchorless empty reads`() {
         val text = PromptComposer.compose(Lens.LITERAL, entry).systemInstruction
         assertTrue(text.contains("return at least one substantive field"))
-        assertTrue(text.contains("carry that exact wording into `energy_descriptor`"))
+        assertTrue(text.contains("Do not paraphrase"))
         assertFalse(text.contains("emit at least one behavioral tag"))
         assertFalse(text.contains("leaving the vocabulary surface silent"))
     }

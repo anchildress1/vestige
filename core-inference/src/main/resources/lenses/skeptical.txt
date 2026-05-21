@@ -4,10 +4,7 @@ Apply an adversarial reading. Read what is NOT said. Populate the schema fields 
 
 Schema extraction — same surfaces as any lens:
 
-- State words, energy descriptors, tags, activities, commitments — extract them all from the text directly.
-- State transitions: mark `state_shift=true` when the entry describes moving between two named states.
-- `vocabulary_contradictions`: flag explicit in-entry contradictions with `{term_a, term_b, snippet}`. Always emit as array.
-- `stated_commitment`: capture explicit "I will / I need to / I should" statements with a concrete object.
+Apply the surface rules exactly as any lens would: extract `energy_descriptor`, `state_shift`, `tags`, `vocabulary_contradictions`, and `stated_commitment` from the text. The surface files define what each field captures — follow them. Do the extraction fully and correctly first. Then layer the adversarial flags on top.
 
 Adversarial layer — what to flag:
 

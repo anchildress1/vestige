@@ -5,8 +5,11 @@ import dev.anchildress1.vestige.inference.ExtractionStatusListener
 import dev.anchildress1.vestige.model.Persona
 import dev.anchildress1.vestige.save.BackgroundExtractionSaveFlow
 import dev.anchildress1.vestige.save.PendingExtractionWork
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Assertions.assertEquals
@@ -120,6 +123,40 @@ class BackgroundExtractionQueueTest {
         assertEquals(listOf(1L, 1L, 2L), launches)
         assertTrue(firstCompletion.isCompleted)
         assertTrue(secondCompletion.isCompleted)
+    }
+
+    @Test
+    fun `foreground preempts lazily created extraction after it is published`() = runTest {
+        val activeRun = backgroundScope.launch(start = CoroutineStart.LAZY) {
+            awaitCancellation()
+        }
+        val jobs = ArrayDeque<Job>().apply {
+            add(activeRun)
+            add(completedJob())
+        }
+        val launches = mutableListOf<Long>()
+        val queue = BackgroundExtractionQueue(backgroundScope) { work ->
+            launches += work.entryId
+            jobs.removeFirst()
+        }
+
+        val completion = queue.enqueue(work(entryId = 1L))
+        runCurrent()
+
+        assertEquals(listOf(1L), launches)
+        assertFalse(completion.isCompleted)
+
+        queue.beginForeground()
+        runCurrent()
+
+        assertTrue(activeRun.isCancelled)
+        assertFalse(completion.isCompleted)
+
+        queue.endForeground()
+        runCurrent()
+
+        assertEquals(listOf(1L, 1L), launches)
+        assertTrue(completion.isCompleted)
     }
 
     @Test

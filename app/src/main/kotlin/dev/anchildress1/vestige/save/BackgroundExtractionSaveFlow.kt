@@ -16,6 +16,7 @@ import dev.anchildress1.vestige.patterns.PatternDetectionOrchestrator
 import dev.anchildress1.vestige.storage.EntryStore
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import java.time.ZonedDateTime
@@ -168,16 +169,19 @@ class BackgroundExtractionSaveFlow(
         )
     }
 
-    internal fun launchExtraction(work: PendingExtractionWork): Job = scope.launch {
-        runDetachedExtraction(
-            entryId = work.entryId,
-            entryText = work.entryText,
-            capturedAt = work.capturedAt,
-            request = work.request,
-            terminalRelay = work.terminalRelay,
-            persona = work.persona,
-        )
-    }
+    internal fun launchExtraction(work: PendingExtractionWork, start: CoroutineStart = CoroutineStart.DEFAULT): Job =
+        scope.launch(
+            start = start,
+        ) {
+            runDetachedExtraction(
+                entryId = work.entryId,
+                entryText = work.entryText,
+                capturedAt = work.capturedAt,
+                request = work.request,
+                terminalRelay = work.terminalRelay,
+                persona = work.persona,
+            )
+        }
 
     @Suppress("LongParameterList") // Carries the saveAndExtract call's full context.
     private suspend fun runDetachedExtraction(

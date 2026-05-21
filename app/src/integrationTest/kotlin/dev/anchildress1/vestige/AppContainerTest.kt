@@ -39,6 +39,7 @@ import io.mockk.mockk
 import io.mockk.verify
 import io.objectbox.BoxStore
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceTimeBy
@@ -95,7 +96,7 @@ class AppContainerTest {
                 timeoutMs = arg(4),
             )
         }
-        every { saveFlow.launchExtraction(any()) } answers { kotlinx.coroutines.Job().also { it.complete() } }
+        every { saveFlow.launchExtraction(any(), any()) } answers { kotlinx.coroutines.Job().also { it.complete() } }
     }
 
     @Test
@@ -426,7 +427,7 @@ class AppContainerTest {
                 followUpText = null,
             )
         } returns work
-        every { saveFlow.launchExtraction(work) } returns kotlinx.coroutines.Job().also { it.complete() }
+        every { saveFlow.launchExtraction(work, any()) } returns kotlinx.coroutines.Job().also { it.complete() }
         val container = AppContainer(
             applicationContext = mockk<Context>(relaxed = true),
             boxStoreFactory = { mockk<BoxStore>(relaxed = true) },
@@ -471,7 +472,7 @@ class AppContainerTest {
                 followUpText = any(),
             )
         } answers { pendingExtractionWork(entryId = 7L, entryText = firstArg(), capturedAt = capturedAt) }
-        every { saveFlow.launchExtraction(any()) } returns kotlinx.coroutines.Job().also { it.complete() }
+        every { saveFlow.launchExtraction(any(), any()) } returns kotlinx.coroutines.Job().also { it.complete() }
         val container = AppContainer(
             applicationContext = mockk<Context>(relaxed = true),
             boxStoreFactory = { mockk<BoxStore>(relaxed = true) },
@@ -498,7 +499,7 @@ class AppContainerTest {
         coEvery { saveFlow.prepareSaveAndExtract(any(), any(), any(), any(), any(), any(), any()) } answers {
             pendingExtractionWork(entryId = 1L, entryText = firstArg(), capturedAt = secondArg())
         }
-        every { saveFlow.launchExtraction(any()) } returns kotlinx.coroutines.Job().also { it.complete() }
+        every { saveFlow.launchExtraction(any(), any()) } returns kotlinx.coroutines.Job().also { it.complete() }
         val container = AppContainer(
             applicationContext = mockk<Context>(relaxed = true),
             boxStoreFactory = { mockk<BoxStore>(relaxed = true) },
@@ -533,7 +534,7 @@ class AppContainerTest {
         val work = pendingExtractionWork(entryId = 42L, entryText = "persist me", capturedAt = capturedAt)
         var scheduled = 0
         coEvery { saveFlow.prepareSaveAndExtract(any(), any(), any(), any(), any(), any(), any()) } returns work
-        every { saveFlow.launchExtraction(work) } returns kotlinx.coroutines.Job().also { it.complete() }
+        every { saveFlow.launchExtraction(work, any()) } returns kotlinx.coroutines.Job().also { it.complete() }
 
         val container = AppContainer(
             applicationContext = mockk<Context>(relaxed = true),
@@ -575,7 +576,7 @@ class AppContainerTest {
                     capturedAt = capturedAt,
                 )
                 coEvery { saveFlow.prepareSaveAndExtract(any(), any(), any(), any(), any(), any(), any()) } returns work
-                every { saveFlow.launchExtraction(work) } returns kotlinx.coroutines.Job().also { it.complete() }
+                every { saveFlow.launchExtraction(work, any()) } returns kotlinx.coroutines.Job().also { it.complete() }
                 val context = mockk<Context>(relaxed = true) {
                     every { filesDir } returns tempRoot
                     every { cacheDir } returns File(tempRoot, "cache").apply { mkdirs() }
@@ -596,13 +597,13 @@ class AppContainerTest {
                 container.saveAndExtract("foreground should win", capturedAt)
                 runCurrent()
 
-                verify(exactly = 0) { saveFlow.launchExtraction(any()) }
+                verify(exactly = 0) { saveFlow.launchExtraction(any(), any()) }
 
                 container.endForegroundInference()
                 runCurrent()
                 advanceUntilIdle()
 
-                verify(exactly = 1) { saveFlow.launchExtraction(work) }
+                verify(exactly = 1) { saveFlow.launchExtraction(work, CoroutineStart.LAZY) }
             } finally {
                 box.closeAfterCleaningThreadResources()
                 cleanupObjectBoxTempRoot(tempRoot, boxDir)
@@ -630,7 +631,7 @@ class AppContainerTest {
             coEvery { saveFlow.prepareSaveAndExtract(any(), any(), any(), any(), any(), any(), any()) } answers {
                 if (prepared++ == 0) firstWork else secondWork
             }
-            every { saveFlow.launchExtraction(any()) } answers {
+            every { saveFlow.launchExtraction(any(), any()) } answers {
                 val work = firstArg<PendingExtractionWork>()
                 launches += work.entryId
                 if (launches.size == 1) firstRun else kotlinx.coroutines.Job().also { it.complete() }
@@ -727,7 +728,7 @@ class AppContainerTest {
         val saveFlow = mockk<BackgroundExtractionSaveFlow>()
         val work = pendingExtractionWork(entryId = 7L, entryText = "still running", capturedAt = CAPTURED_AT)
         coEvery { saveFlow.prepareSaveAndExtract(any(), any(), any(), any(), any(), any(), any()) } returns work
-        every { saveFlow.launchExtraction(work) } returns extractionJob
+        every { saveFlow.launchExtraction(work, any()) } returns extractionJob
         var stopRequests = 0
         val container = AppContainer(
             applicationContext = context,
@@ -822,7 +823,7 @@ class AppContainerTest {
         val saveFlow = mockk<BackgroundExtractionSaveFlow>()
         val work = pendingExtractionWork(entryId = 9L, entryText = "still running", capturedAt = CAPTURED_AT)
         coEvery { saveFlow.prepareSaveAndExtract(any(), any(), any(), any(), any(), any(), any()) } returns work
-        every { saveFlow.launchExtraction(work) } returns extractionJob
+        every { saveFlow.launchExtraction(work, any()) } returns extractionJob
         var stopRequests = 0
         val container = AppContainer(
             applicationContext = context,
@@ -1258,7 +1259,7 @@ class AppContainerTest {
             val saveFlow = mockk<BackgroundExtractionSaveFlow>()
             val work = pendingExtractionWork(entryId = 7L, entryText = "wipe me", capturedAt = CAPTURED_AT)
             coEvery { saveFlow.prepareSaveAndExtract(any(), any(), any(), any(), any(), any(), any()) } returns work
-            every { saveFlow.launchExtraction(work) } returns extractionJob
+            every { saveFlow.launchExtraction(work, any()) } returns extractionJob
             val context = mockk<Context>(relaxed = true) {
                 every { filesDir } returns tempRoot
                 every { cacheDir } returns File(tempRoot, "cache").apply { mkdirs() }
@@ -1913,7 +1914,11 @@ class AppContainerTest {
                     timeoutMs = arg(4),
                 )
             }
-            every { saveFlow.launchExtraction(any()) } answers { kotlinx.coroutines.Job().also { it.complete() } }
+            every {
+                saveFlow.launchExtraction(any(), any())
+            } answers {
+                kotlinx.coroutines.Job().also { it.complete() }
+            }
             val modelFile = File(tempRoot, "ready-model.litertlm").apply { writeText("x") }
             val artifactStore = fakeArtifactStore(artifactFile = modelFile, expectedByteSize = 1L)
             val context = mockk<Context>(relaxed = true) {

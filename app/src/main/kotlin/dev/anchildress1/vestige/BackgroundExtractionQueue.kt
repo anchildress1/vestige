@@ -12,7 +12,7 @@ import java.util.ArrayDeque
 
 internal class BackgroundExtractionQueue(
     private val scope: CoroutineScope,
-    private val launchExtraction: (PendingExtractionWork) -> Job,
+    private val createExtractionJob: (PendingExtractionWork) -> Job,
 ) {
     private val mutex = Mutex()
     private val pending: ArrayDeque<QueuedExtraction> = ArrayDeque()
@@ -92,9 +92,10 @@ internal class BackgroundExtractionQueue(
                 queued.completion.complete()
                 continue
             }
-            val extractionJob = launchExtraction(queued.work)
+            val extractionJob = createExtractionJob(queued.work)
             val active = ActiveExtraction(queued = queued, job = extractionJob)
             mutex.withLock { activeExtraction = active }
+            extractionJob.start()
             extractionJob.join()
             val shouldRequeue = mutex.withLock {
                 val preempted = active.preemptedByForeground

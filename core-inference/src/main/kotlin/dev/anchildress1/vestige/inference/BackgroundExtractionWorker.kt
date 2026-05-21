@@ -27,10 +27,13 @@ data class BackgroundExtractionRequest(
 )
 
 /**
- * Runs the three lenses sequentially against an already-persisted entry, retries each lens up to
- * [maxAttemptsPerLens] times, and reduces the parsed lens outputs through [resolver]. A lens that
- * exhausts its budget contributes a null extraction (convergence treats that as "no opinion").
+ * Runs the configured [lenses] sequentially against an already-persisted entry, retries each lens
+ * up to [maxAttemptsPerLens] times, and reduces the parsed lens outputs through [resolver]. A lens
+ * that exhausts its budget contributes a null extraction (convergence treats that as "no opinion").
  * `RUNNING` is emitted once for the whole worker run; per-lens retries do not emit status churn.
+ *
+ * [lenses] defaults to the full three-lens pipeline; production narrows it to a single Inferential
+ * pass (see `AppContainer`). The resolver authoritatively passes a single lens through as CANONICAL.
  *
  * The caller threads the entry's persisted retry count in via `entryAttemptCount`; the worker
  * echoes it on every [ExtractionStatusListener] event. Lens-call volume is reported separately
@@ -41,6 +44,8 @@ data class BackgroundExtractionRequest(
  * call through resolver completion. Lenses are not launched concurrently; on timeout the active
  * lens is cancelled and discarded, while already-finished sequential lens results are reported.
  */
+// Every constructor param is an injection seam, hence the long list.
+@Suppress("LongParameterList")
 class BackgroundExtractionWorker(
     private val engine: LiteRtLmEngine,
     private val resolver: ConvergenceResolver,
@@ -48,6 +53,7 @@ class BackgroundExtractionWorker(
     private val composer: (Lens, String, List<HistoryChunk>) -> ComposedPrompt = PromptComposer::compose,
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
     val maxAttemptsPerLens: Int = DEFAULT_MAX_ATTEMPTS_PER_LENS,
+    private val lenses: List<Lens> = DEFAULT_LENSES,
 ) {
     private val templateLabeler = TemplateLabeler()
 
@@ -55,6 +61,7 @@ class BackgroundExtractionWorker(
         require(maxAttemptsPerLens >= 1) {
             "maxAttemptsPerLens must be ≥1 (got $maxAttemptsPerLens) — every lens needs at least one attempt."
         }
+        require(lenses.isNotEmpty()) { "BackgroundExtractionWorker requires at least one lens." }
     }
 
     suspend fun extract(
@@ -80,7 +87,7 @@ class BackgroundExtractionWorker(
 
         try {
             withTimeoutOrNoCap(request.timeoutMs) {
-                val results = LENSES.map { lens ->
+                val results = lenses.map { lens ->
                     runLens(lens, request.entryText, request.retrievedHistory)
                         .also { completed += it }
                 }
@@ -178,7 +185,7 @@ class BackgroundExtractionWorker(
                 val templateLabel = templateLabeler.label(resolved.value, capturedAt)
                 Log.d(
                     TAG,
-                    "extract completed: lenses=${parsedExtractions.size}/${LENSES.size} " +
+                    "extract completed: lenses=${parsedExtractions.size}/${lenses.size} " +
                         "model_calls=$modelCallCount elapsed=${totalElapsedMs}ms",
                 )
                 listener.onUpdate(ExtractionStatus.COMPLETED, entryAttemptCount, null)
@@ -260,7 +267,7 @@ class BackgroundExtractionWorker(
     companion object {
         const val DEFAULT_MAX_ATTEMPTS_PER_LENS = 2
 
-        private val LENSES: List<Lens> = listOf(Lens.LITERAL, Lens.INFERENTIAL, Lens.SKEPTICAL)
+        val DEFAULT_LENSES: List<Lens> = listOf(Lens.LITERAL, Lens.INFERENTIAL, Lens.SKEPTICAL)
         private val NO_OP_LISTENER = ExtractionStatusListener { _, _, _ -> }
         private const val TAG = "VestigeBackgroundExtraction"
         private const val NANOS_PER_MILLI = 1_000_000L

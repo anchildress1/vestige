@@ -164,6 +164,39 @@ class BackgroundExtractionWorkerTest {
     }
 
     @Test
+    fun `single inferential lens config runs one model call and resolves it`() = runTest {
+        // Production config (AppContainer): one Inferential pass, no cross-lens convergence.
+        val engine = mockk<LiteRtLmEngine>()
+        every { engine.streamText("prompt-for-INFERENTIAL", any()) } returns flowOf("raw-inferential")
+        val resolver = RecordingResolver(resolved)
+        val listener = RecordingListener()
+
+        val result = BackgroundExtractionWorker(
+            engine = engine,
+            resolver = resolver,
+            parser = { lens, _ -> extraction(lens) },
+            composer = fakeComposer(),
+            lenses = listOf(Lens.INFERENTIAL),
+        ).extract(request = request, listener = listener)
+
+        val success = assertInstanceOf(BackgroundExtractionResult.Success::class.java, result)
+        assertAll(
+            { assertEquals(1, success.lensResults.size) },
+            { assertEquals(1, success.modelCallCount) },
+            { assertEquals(listOf(Lens.INFERENTIAL), success.lensResults.map { it.lens }) },
+            { assertEquals(1, resolver.captured.size) },
+            { assertEquals(Lens.INFERENTIAL, resolver.captured.single().lens) },
+        )
+        assertEquals(
+            listOf(
+                RecordingListener.Update(ExtractionStatus.RUNNING, 0, null),
+                RecordingListener.Update(ExtractionStatus.COMPLETED, 0, null),
+            ),
+            listener.updates,
+        )
+    }
+
+    @Test
     fun `lenses run sequentially, never concurrently — SDK is single-session`() = runTest {
         val engine = mockk<LiteRtLmEngine>()
         val inFlight = AtomicInteger(0)

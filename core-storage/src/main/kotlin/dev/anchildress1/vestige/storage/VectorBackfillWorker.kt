@@ -156,8 +156,7 @@ class VectorBackfillWorker(private val boxStore: BoxStore, private val embedder:
         entryBox.put(current)
     }
 
-    private fun EntryEntity.hasTerminalExtractionPayload(): Boolean =
-        !lensReceiptsJson.isNullOrBlank() && lensReceiptsJson != "[]"
+    private fun EntryEntity.hasTerminalExtractionPayload(): Boolean = lensReceiptsJsonOrEmpty != "[]"
 
     private suspend fun embedAndPersist(entryBox: Box<EntryEntity>, entry: EntryEntity, text: String) {
         val vector = embedder(text)

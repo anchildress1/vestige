@@ -138,9 +138,15 @@ class DefaultConvergenceResolver : ConvergenceResolver {
         )
         val majority = groups.entries.firstOrNull { it.value.size >= MAJORITY_THRESHOLD }
         return if (majority != null) {
+            val majorityValue = majority.value.first()
+            if (key in LITERAL_GATED_FIELDS && !literalCorroborates(key, populated, majorityValue)) {
+                // Inferential + Skeptical agreed, but the strict Literal floor did not back the value.
+                // Suppress rather than promote an uncorroborated interpretive read.
+                return ambiguousField(matchingFlags)
+            }
             val verdict =
                 if (matchingFlags.isEmpty()) ConfidenceVerdict.CANONICAL else ConfidenceVerdict.CANONICAL_WITH_CONFLICT
-            ResolvedField(value = majority.value.first(), verdict = verdict, flags = matchingFlags)
+            ResolvedField(value = majorityValue, verdict = verdict, flags = matchingFlags)
         } else {
             ResolvedField(
                 value = null,
@@ -148,6 +154,23 @@ class DefaultConvergenceResolver : ConvergenceResolver {
                 flags = listOf(LENS_DISAGREEMENT_FLAG) + matchingFlags,
             )
         }
+    }
+
+    // Literal corroborates the majority when it contributed a matching value. Energy uses a
+    // substring match so "crashed hard" still backs "crashed"; everything else is exact equality.
+    private fun literalCorroborates(key: String, populated: List<Pair<Lens, Any>>, majorityValue: Any): Boolean {
+        val literalValue = populated.firstOrNull { it.first == Lens.LITERAL }?.second ?: return false
+        return when (key) {
+            ENERGY_DESCRIPTOR_KEY -> energyCorroborates(literalValue, majorityValue)
+            else -> literalValue == majorityValue
+        }
+    }
+
+    private fun energyCorroborates(literalValue: Any, majorityValue: Any): Boolean {
+        val literal = (literalValue as? String)?.trim()?.lowercase()
+        val majority = (majorityValue as? String)?.trim()?.lowercase()
+        return literal != null && majority != null &&
+            (literal == majority || literal.contains(majority) || majority.contains(literal))
     }
 
     private fun disagreementField(matchingFlags: List<String>) = ResolvedField(
@@ -321,12 +344,19 @@ class DefaultConvergenceResolver : ConvergenceResolver {
     private companion object {
         const val TAGS_KEY = "tags"
         const val ENERGY_DESCRIPTOR_KEY = "energy_descriptor"
+        const val STATE_SHIFT_KEY = "state_shift"
         const val STATED_COMMITMENT_KEY = "stated_commitment"
         const val TOPIC_OR_PERSON_KEY = "topic_or_person"
         const val ENTRY_ID_KEY = "entry_id"
         const val LENS_DISAGREEMENT_FLAG = "lens-disagreement"
         const val MAJORITY_THRESHOLD = 2
         const val MIN_SURVIVING_LENSES_FOR_AMBIGUOUS = 1
+
+        // Energy/state are interpretive: a majority of Inferential + Skeptical can share the same
+        // over-reach (a behavior clause, an inferred shift) while Literal — the strict floor —
+        // correctly abstains or dissents. For these fields a majority is only authoritative when
+        // Literal corroborates it; otherwise the value is suppressed to AMBIGUOUS.
+        val LITERAL_GATED_FIELDS: Set<String> = setOf(ENERGY_DESCRIPTOR_KEY, STATE_SHIFT_KEY)
         const val MIN_STEM_LENGTH = 3
         const val IES_SUFFIX = "ies"
 

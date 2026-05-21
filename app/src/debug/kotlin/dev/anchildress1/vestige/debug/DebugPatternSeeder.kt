@@ -10,9 +10,8 @@ import java.time.Instant
 
 object DebugPatternSeeder {
 
-    // Seed only the first N of the full corpus so single-pass extraction finishes fast during
-    // iteration. Raise toward seedEntries().size as the pipeline firms up; the rest stay on hand.
-    private const val ACTIVE_SEED_COUNT = 3
+    // Full corpus by default; lower only for limited local testing. A full refresh reloads all.
+    internal const val ACTIVE_SEED_COUNT = 35
 
     private data class SeedEntry(val text: String, val timestamp: Instant, val durationMs: Long)
 

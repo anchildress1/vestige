@@ -143,8 +143,8 @@ class SinglePassExtractionTuningTest {
         const val TAG = "VestigeTuning"
         private val ZONE = ZoneId.of("America/New_York")
 
-        // The active seed slice (DebugPatternSeeder.ACTIVE_SEED_COUNT). Inlined because the seeder
-        // lives in the debug source set and is not visible from androidTest.
+        // A fixed diagnostic slice, inlined because the seeder lives in the debug source set and is
+        // not visible from androidTest.
         val ENTRIES = listOf(
             TuningEntry(
                 id = "standup-crash-cycle",

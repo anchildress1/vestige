@@ -573,6 +573,92 @@ class BackgroundExtractionWorkerTest {
     }
 
     @Test
+    fun `out-of-range chunk ref leaves recurrence_link as raw ref`() = runTest {
+        val engine = mockk<LiteRtLmEngine>()
+        coEvery { engine.generateText(any(), any()) } returns "raw"
+        val history = listOf(HistoryChunk(patternId = "only-entry", text = "prior entry"))
+        val resolvedWithBadRef = ResolvedExtraction(
+            fields = mapOf(
+                "recurrence_link" to ResolvedField("chunk-9", ConfidenceVerdict.CANONICAL),
+            ),
+        )
+
+        val result = BackgroundExtractionWorker(
+            engine = engine,
+            resolver = RecordingResolver(resolvedWithBadRef),
+            parser = { lens, _ -> extraction(lens) },
+            composer = fakeComposer(),
+        ).extract(
+            request = BackgroundExtractionRequest(
+                entryText = "user words",
+                capturedAt = capturedAt,
+                retrievedHistory = history,
+            ),
+        )
+
+        val success = assertInstanceOf(BackgroundExtractionResult.Success::class.java, result)
+        val link = success.resolved.fields["recurrence_link"]?.value as? String
+        assertEquals("chunk-9", link)
+    }
+
+    @Test
+    fun `chunk ref pointing at context-only entry leaves recurrence_link as raw ref`() = runTest {
+        val engine = mockk<LiteRtLmEngine>()
+        coEvery { engine.generateText(any(), any()) } returns "raw"
+        val history = listOf(HistoryChunk(patternId = null, text = "context-only entry"))
+        val resolvedWithChunkRef = ResolvedExtraction(
+            fields = mapOf(
+                "recurrence_link" to ResolvedField("chunk-1", ConfidenceVerdict.CANONICAL),
+            ),
+        )
+
+        val result = BackgroundExtractionWorker(
+            engine = engine,
+            resolver = RecordingResolver(resolvedWithChunkRef),
+            parser = { lens, _ -> extraction(lens) },
+            composer = fakeComposer(),
+        ).extract(
+            request = BackgroundExtractionRequest(
+                entryText = "user words",
+                capturedAt = capturedAt,
+                retrievedHistory = history,
+            ),
+        )
+
+        val success = assertInstanceOf(BackgroundExtractionResult.Success::class.java, result)
+        val link = success.resolved.fields["recurrence_link"]?.value as? String
+        assertEquals("chunk-1", link)
+    }
+
+    @Test
+    fun `non-chunk-ref value in recurrence_link passes through unchanged`() = runTest {
+        val engine = mockk<LiteRtLmEngine>()
+        coEvery { engine.generateText(any(), any()) } returns "raw"
+        val resolvedWithRealId = ResolvedExtraction(
+            fields = mapOf(
+                "recurrence_link" to ResolvedField("real-uuid-abc", ConfidenceVerdict.CANONICAL),
+            ),
+        )
+
+        val result = BackgroundExtractionWorker(
+            engine = engine,
+            resolver = RecordingResolver(resolvedWithRealId),
+            parser = { lens, _ -> extraction(lens) },
+            composer = fakeComposer(),
+        ).extract(
+            request = BackgroundExtractionRequest(
+                entryText = "user words",
+                capturedAt = capturedAt,
+                retrievedHistory = listOf(HistoryChunk(patternId = "some-id", text = "prior")),
+            ),
+        )
+
+        val success = assertInstanceOf(BackgroundExtractionResult.Success::class.java, result)
+        val link = success.resolved.fields["recurrence_link"]?.value as? String
+        assertEquals("real-uuid-abc", link)
+    }
+
+    @Test
     fun `timeout produces TimedOut with whatever lens results completed before the cap`() = runTest {
         val engine = mockk<LiteRtLmEngine>()
         // Sequential run: LITERAL completes; INFERENTIAL hangs past the cap, so only LITERAL lands

@@ -27,10 +27,12 @@ data class BackgroundExtractionRequest(
 )
 
 /**
- * Runs the three lenses sequentially against an already-persisted entry, retries each lens up to
- * [maxAttemptsPerLens] times, and reduces the parsed lens outputs through [resolver]. A lens that
- * exhausts its budget contributes a null extraction (convergence treats that as "no opinion").
- * `RUNNING` is emitted once for the whole worker run; per-lens retries do not emit status churn.
+ * Runs the three lenses **sequentially** (LiteRT-LM 0.11.0 enforces one live session per Engine;
+ * a concurrent call throws FAILED_PRECONDITION) against an already-persisted entry, retries each
+ * lens up to [maxAttemptsPerLens] times, and reduces the parsed lens outputs through [resolver].
+ * A lens that exhausts its budget contributes a null extraction (convergence treats that as "no
+ * opinion"). `RUNNING` is emitted once before the first lens call; per-lens retries emit no
+ * status (in-progress lens transitions are meaningless to callers).
  *
  * The caller threads the entry's persisted retry count in via `entryAttemptCount`; the worker
  * echoes it on every [ExtractionStatusListener] event. Lens-call volume is reported separately
@@ -179,12 +181,7 @@ class BackgroundExtractionWorker(
         val resolved = if (parsedExtractions.isEmpty()) {
             null
         } else {
-            val resolution = tryResolve(parsedExtractions, lensLastError)
-            if (resolution is Resolution.Ok) {
-                Resolution.Ok(resolveChunkReferences(resolution.value, retrievedHistory))
-            } else {
-                resolution
-            }
+            tryResolve(parsedExtractions, lensLastError, retrievedHistory)
         }
         val totalElapsedMs = (System.nanoTime() - startedNanos) / NANOS_PER_MILLI
         return when {
@@ -239,20 +236,31 @@ class BackgroundExtractionWorker(
         history: List<HistoryChunk>,
     ): dev.anchildress1.vestige.model.ResolvedExtraction {
         val field = resolved.fields[RECURRENCE_LINK_KEY]
-        val patternId = (field?.value as? String)?.trim()
-            ?.let { CHUNK_REF_REGEX.matchEntire(it) }
-            ?.groupValues?.get(1)
-            ?.toIntOrNull()
-            ?.let { history.getOrNull(it - 1)?.patternId }
+        val raw = (field?.value as? String)?.trim()
+        val chunkIndex = raw?.let { CHUNK_REF_REGEX.matchEntire(it) }
+            ?.groupValues?.get(1)?.toIntOrNull()
+        val patternId = chunkIndex?.let { history.getOrNull(it - 1)?.patternId }
         return if (field != null && patternId != null) {
             resolved.copy(fields = resolved.fields + (RECURRENCE_LINK_KEY to field.copy(value = patternId)))
         } else {
+            if (chunkIndex != null && patternId == null) {
+                val reason = if (history.getOrNull(chunkIndex - 1) == null) {
+                    "chunk-$chunkIndex out of range (history.size=${history.size})"
+                } else {
+                    "history[${chunkIndex - 1}].patternId is null"
+                }
+                Log.w(TAG, "resolveChunkReferences: $reason; leaving raw ref in recurrence_link")
+            }
             resolved
         }
     }
 
-    private fun tryResolve(parsed: List<LensExtraction>, currentLastError: String?): Resolution = try {
-        Resolution.Ok(resolver.resolve(parsed))
+    private fun tryResolve(
+        parsed: List<LensExtraction>,
+        currentLastError: String?,
+        history: List<HistoryChunk> = emptyList(),
+    ): Resolution = try {
+        Resolution.Ok(resolveChunkReferences(resolver.resolve(parsed), history))
     } catch (cancellation: CancellationException) {
         throw cancellation
     } catch (@Suppress("TooGenericExceptionCaught") resolverError: Exception) {

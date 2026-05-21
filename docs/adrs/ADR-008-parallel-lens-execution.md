@@ -180,6 +180,14 @@ In the concurrent run only the lens that won the session race completed (1/3 par
 
 ---
 
+## Addendum (2026-05-20) — Foreground preempts queued background
+
+The 2026-05-17 single-session finding still stands: concurrent foreground + background sessions are impossible on `litertlm-android:0.11.0`.
+
+Foreground capture no longer waits for an active background extraction to finish. `AppContainer` cancels active background extraction, requeues that entry, and drains background extraction FIFO after foreground releases the slot. This is cancellation + rerun, not session suspend/resume or concurrent execution.
+
+---
+
 ## Action Items
 
 _Items 1–5 below were written for the concurrent design that §Addendum (2026-05-17) reversed. They are obsolete; the live state is sequential per §Addendum._

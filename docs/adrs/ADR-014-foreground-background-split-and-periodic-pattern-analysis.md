@@ -145,8 +145,8 @@ The "markdown is source of truth" cell in the §"Lifecycle Contract" table above
 ### Addendum (2026-05-20) — Foreground-priority background deferral
 
 Foreground capture owns the inference slot. When a foreground voice call starts, active detached
-background extraction is cancelled and the row remains non-terminal for recovery. The cancelled
-entry is retried after a 15-second quiet window, and each new foreground call resets that window.
+background extraction is cancelled and the row remains non-terminal for recovery. Cancelled and
+queued background extraction work drains in FIFO order after the foreground call releases the slot.
 
 Background extraction model calls use the streaming text path so coroutine cancellation can close
 the active conversation during unwind. This is not KV-cache suspend/resume; it is discard-and-rerun

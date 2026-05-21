@@ -437,7 +437,9 @@ Phase 2 has no capture screen to attach a placeholder to — Story 4.5 builds th
 
 **v1 reality.** `LiteRtLmEngine.callMutex` serializes every call (Story 2.6.6 resolution). A foreground record-tap that lands during an in-flight background lens call **waits** for that lens call to finish (≤ one lens ≈ ~15 s on E4B GPU), then runs. This is the accepted v1 behavior; reducing it is a Phase 4/5 latency concern (smaller background prompts / max-tokens / a future multi-session SDK), tracked separately — not a Phase 2 blocker. The cut-down of background scope to shrink this window is new-branch work. **The v1 inference lifecycle this falls out of is locked by [ADR-014](../adrs/ADR-014-foreground-background-split-and-periodic-pattern-analysis.md)** — foreground is the only user-blocking call; 3-lens analytics + periodic (every-5-entries) pattern analysis run async — validated by STT-F.
 
-**Path B — priority queue:** _**MOOT.** Single-session SDK: there is nothing to prioritize between — only one session can exist, so all calls already serialize at the SDK boundary. A Kotlin priority queue cannot preempt a native session mid-generation._
+**Update 2026-05-20.** Concurrent sessions remain impossible, but foreground no longer waits for background to finish. Foreground cancels active background extraction; background work requeues FIFO and reruns after foreground releases the single session.
+
+**Path B — priority queue:** _**REOPENED AS CANCELLATION QUEUE 2026-05-20.** The queue does not create concurrency; it cancels active background work, lets foreground take the single session, then reruns background FIFO._
 
 **Path C — detached background context:** _**MOOT — premise false (STT-F).** `createConversation` exists as a method but a second concurrent call is rejected by the engine. "Independent contexts on one Engine" is not supported on 0.11.0._
 

@@ -545,7 +545,7 @@ class BackgroundExtractionWorkerTest {
     @Test
     fun `chunk reference in recurrence_link is resolved to actual pattern id after convergence`() = runTest {
         val engine = mockk<LiteRtLmEngine>()
-        coEvery { engine.generateText(any(), any()) } returns "raw"
+        every { engine.streamText(any(), any()) } returns flowOf("raw")
         val history = listOf(HistoryChunk(patternId = "real-pattern-id-abc", text = "prior entry"))
         val resolvedWithChunkRef = ResolvedExtraction(
             fields = mapOf(
@@ -575,7 +575,7 @@ class BackgroundExtractionWorkerTest {
     @Test
     fun `out-of-range chunk ref leaves recurrence_link as raw ref`() = runTest {
         val engine = mockk<LiteRtLmEngine>()
-        coEvery { engine.generateText(any(), any()) } returns "raw"
+        every { engine.streamText(any(), any()) } returns flowOf("raw")
         val history = listOf(HistoryChunk(patternId = "only-entry", text = "prior entry"))
         val resolvedWithBadRef = ResolvedExtraction(
             fields = mapOf(
@@ -604,7 +604,7 @@ class BackgroundExtractionWorkerTest {
     @Test
     fun `chunk ref pointing at context-only entry leaves recurrence_link as raw ref`() = runTest {
         val engine = mockk<LiteRtLmEngine>()
-        coEvery { engine.generateText(any(), any()) } returns "raw"
+        every { engine.streamText(any(), any()) } returns flowOf("raw")
         val history = listOf(HistoryChunk(patternId = null, text = "context-only entry"))
         val resolvedWithChunkRef = ResolvedExtraction(
             fields = mapOf(
@@ -633,7 +633,7 @@ class BackgroundExtractionWorkerTest {
     @Test
     fun `non-chunk-ref value in recurrence_link passes through unchanged`() = runTest {
         val engine = mockk<LiteRtLmEngine>()
-        coEvery { engine.generateText(any(), any()) } returns "raw"
+        every { engine.streamText(any(), any()) } returns flowOf("raw")
         val resolvedWithRealId = ResolvedExtraction(
             fields = mapOf(
                 "recurrence_link" to ResolvedField("real-uuid-abc", ConfidenceVerdict.CANONICAL),

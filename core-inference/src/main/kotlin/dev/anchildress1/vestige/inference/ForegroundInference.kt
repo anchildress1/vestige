@@ -113,13 +113,44 @@ class ForegroundInference(
             }
     }
 
-    private fun composeSystemPrompt(persona: Persona): String {
+    /** Text path → progressive [ForegroundStreamEvent]s. No WAV written or deleted. */
+    fun runForegroundTextCall(
+        text: String,
+        persona: Persona,
+        retrievedHistory: List<HistoryChunk> = emptyList(),
+    ): Flow<ForegroundStreamEvent> {
+        require(text.isNotBlank()) { "runForegroundTextCall requires non-blank text." }
+        return flow {
+            emitEnvelope(
+                persona = persona,
+                label = "runForegroundTextCall",
+                systemInstruction = composeSystemPromptWithHistory(persona, retrievedHistory),
+                parts = listOf(Content.Text(text)),
+            )
+        }.flowOn(ioDispatcher)
+    }
+
+    private fun composeSystemPrompt(persona: Persona): String = composeSystemPromptWithHistory(persona, emptyList())
+
+    private fun composeSystemPromptWithHistory(persona: Persona, history: List<HistoryChunk>): String {
         val personaPrompt = PersonaPromptComposer.compose(persona).trimEnd()
         return buildString {
             append(personaPrompt)
             append("\n\n")
             append(OUTPUT_SCHEMA_REMINDER)
             append('\n')
+            if (history.isNotEmpty()) {
+                append('\n')
+                append("## PRIOR ENTRIES\n")
+                history.take(MAX_HISTORY_CHUNKS).forEachIndexed { i, chunk ->
+                    val text = if (chunk.text.length > MAX_HISTORY_CHARS_PER_CHUNK) {
+                        chunk.text.take(MAX_HISTORY_CHARS_PER_CHUNK) + HISTORY_ELLIPSIS
+                    } else {
+                        chunk.text
+                    }
+                    append("chunk-${i + 1}: $text\n")
+                }
+            }
         }
     }
 
@@ -132,7 +163,6 @@ class ForegroundInference(
         private const val MAX_HISTORY_CHUNKS = 3
         private const val MAX_HISTORY_CHARS_PER_CHUNK = 600
         private const val HISTORY_ELLIPSIS = "…"
-
 
         internal val OUTPUT_SCHEMA_REMINDER = listOf(
             "## OUTPUT FORMAT",

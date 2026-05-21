@@ -1,6 +1,7 @@
 package dev.anchildress1.vestige.inference
 
 import android.util.Log
+import dev.anchildress1.vestige.model.ConfidenceVerdict
 import dev.anchildress1.vestige.model.ExtractionStatus
 import dev.anchildress1.vestige.model.Lens
 import dev.anchildress1.vestige.model.LensExtraction
@@ -230,11 +231,22 @@ class BackgroundExtractionWorker(
         }
     }
 
-    // Model-emitted template label wins; the deterministic labeler is the validator + fallback for
-    // when the lenses didn't converge on a serial (or emitted an unknown one).
+    // Model-emitted template label wins only when load-bearing (CANONICAL / CANONICAL_WITH_CONFLICT).
+    // CANDIDATE means a single lens emitted it — not enough convergence to override the deterministic
+    // labeler. Unknown serials (fromSerial returns null) also fall back to the labeler.
     private fun resolveTemplateLabel(resolved: ResolvedExtraction, capturedAt: ZonedDateTime): TemplateLabel {
         val labelerPick = templateLabeler.label(resolved, capturedAt)
-        val modelPick = (resolved.fields[TEMPLATE_LABEL_KEY]?.value as? String)?.let(TemplateLabel::fromSerial)
+        val field = resolved.fields[TEMPLATE_LABEL_KEY]
+        val modelPick = if (field != null &&
+            (field.verdict == ConfidenceVerdict.CANONICAL || field.verdict == ConfidenceVerdict.CANONICAL_WITH_CONFLICT)
+        ) {
+            val serial = field.value as? String
+            if (serial != null) {
+                val parsed = TemplateLabel.fromSerial(serial)
+                if (parsed == null) Log.w(TAG, "template_label unknown serial=$serial; labeler wins")
+                parsed
+            } else null
+        } else null
         if (modelPick != null && modelPick != labelerPick) {
             Log.d(TAG, "template_label model=$modelPick labeler=$labelerPick (model wins)")
         }
@@ -247,7 +259,7 @@ class BackgroundExtractionWorker(
         throw cancellation
     } catch (@Suppress("TooGenericExceptionCaught") resolverError: Exception) {
         val terminalError = "resolver-error:${resolverError.javaClass.simpleName}"
-        Log.w(TAG, "resolver failed ($terminalError); prior last_error=$currentLastError")
+        Log.w(TAG, "resolver failed ($terminalError); prior last_error=$currentLastError", resolverError)
         Resolution.Failure(terminalError)
     }
 

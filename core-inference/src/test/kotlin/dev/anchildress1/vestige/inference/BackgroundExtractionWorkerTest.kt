@@ -543,6 +543,17 @@ class BackgroundExtractionWorkerTest {
     }
 
     @Test
+    fun `lenses list must not be empty`() {
+        assertThrows(IllegalArgumentException::class.java) {
+            BackgroundExtractionWorker(
+                engine = mockk(),
+                resolver = RecordingResolver(resolved),
+                lenses = emptyList(),
+            )
+        }
+    }
+
+    @Test
     fun `terminal listener events carry the caller-supplied entry attempt count`() = runTest {
         val engine = mockk<LiteRtLmEngine>()
         every { engine.streamText("prompt-for-LITERAL", any()) } returnsMany

@@ -230,6 +230,23 @@ class ConvergenceResolverTest {
     }
 
     @Test
+    fun `energy majority suppressed when Literal lens parse-fails entirely`() {
+        // Literal absent from the list (parse-fail, not null-valued). Inferential + Skeptical agree
+        // but have no corroboration floor — same suppression as null-valued Literal.
+        val inferential =
+            LensExtraction(Lens.INFERENTIAL, fields = mapOf("energy_descriptor" to "slows everything down"))
+        val skeptical =
+            LensExtraction(Lens.SKEPTICAL, fields = mapOf("energy_descriptor" to "slows everything down"))
+
+        val resolved = resolver.resolve(listOf(inferential, skeptical))
+
+        assertEquals(
+            ResolvedField(value = null, verdict = ConfidenceVerdict.AMBIGUOUS),
+            resolved.fields["energy_descriptor"],
+        )
+    }
+
+    @Test
     fun `skeptical-only contradicted field does not mint a candidate`() {
         val flag = "state-behavior-mismatch:fine:claims fine but described as stalled"
         val literal = LensExtraction(Lens.LITERAL, fields = mapOf("energy_descriptor" to null))

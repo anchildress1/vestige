@@ -137,6 +137,21 @@ class LiteRtLmEngineTest {
         }
     }
 
+    @OptIn(ExperimentalApi::class)
+    @Test
+    fun `initialize disables MTP speculative decoding when audio backend is active`() {
+        val original = ExperimentalFlags.enableSpeculativeDecoding
+        try {
+            ExperimentalFlags.enableSpeculativeDecoding = true
+            val engine = LiteRtLmEngine(modelPath = NOT_USED_PATH, audioBackend = AudioBackendChoice.Cpu)
+            runCatching { runTest { engine.initialize() } }
+            assertEquals(false, ExperimentalFlags.enableSpeculativeDecoding)
+            engine.close()
+        } finally {
+            ExperimentalFlags.enableSpeculativeDecoding = original
+        }
+    }
+
     @Test
     fun `close before initialize does not leave the wrapper permanently closing`() {
         val engine = LiteRtLmEngine(modelPath = NOT_USED_PATH)

@@ -15,6 +15,7 @@ import java.time.Clock
  * Read paths are public; write paths funnel through [transitionState] so detection / repo /
  * re-eval share one validator.
  */
+@Suppress("TooManyFunctions") // Read paths + lifecycle writes + one-time migrations live here together.
 class PatternStore(private val boxStore: BoxStore, private val clock: Clock = Clock.systemUTC()) {
 
     private val box get() = boxStore.boxFor<PatternEntity>()
@@ -67,6 +68,31 @@ class PatternStore(private val boxStore: BoxStore, private val clock: Clock = Cl
     }
 
     fun put(entity: PatternEntity): Long = box.put(entity)
+
+    /**
+     * One-time cleanup for AUDIT patterns persisted by builds before the AUDIT filter landed
+     * in [PatternDetector]. AUDIT is the labeler's fallback bucket (everything that didn't
+     * match an archetype), not a meaningful pattern shape — leaving legacy rows ACTIVE means
+     * the orchestrator keeps surfacing them. Drops every non-terminal AUDIT template pattern
+     * via the bypass write (validator would refuse the DROPPED transition for SNOOZED rows
+     * the normal way around). Returns the patternIds that were retired for logging / tests.
+     */
+    fun retireLegacyAuditPatterns(): List<String> = boxStore.callClosingThreadResources {
+        val nowMs = clock.millis()
+        val legacy = box.all.filter { row ->
+            row.kind == dev.anchildress1.vestige.model.PatternKind.TEMPLATE_RECURRENCE &&
+                row.templateLabel == AUDIT_TEMPLATE_LABEL &&
+                row.state != PatternState.DROPPED &&
+                row.state != PatternState.CLOSED
+        }
+        legacy.forEach { row ->
+            row.state = PatternState.DROPPED
+            row.snoozedUntil = null
+            row.stateChangedTimestamp = nowMs
+            box.put(row)
+        }
+        legacy.map { it.patternId }
+    }
 
     /**
      * Cold-start skip wake-up per `spec-pattern-action-buttons.md` §P0.5 / ADR-003 Addendum
@@ -128,6 +154,7 @@ class PatternStore(private val boxStore: BoxStore, private val clock: Clock = Cl
 
     private companion object {
         const val TAG = "PatternStore"
+        private const val AUDIT_TEMPLATE_LABEL = "audit"
 
         // CLOSED has no inbound path through the validator — pattern-auto-close writes it directly via the bypass.
         val ACTIVE_OUT = setOf(

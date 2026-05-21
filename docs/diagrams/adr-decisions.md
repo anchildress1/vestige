@@ -78,8 +78,9 @@ multi-context; mechanism corrected 2026-05-16 — `createSession`/`createConvers
 `Session.clone()`). v1 ships sequential pending Story 2.6.6 / 2.19 measurement.
 **Decision:** 3 independent lens calls (Literal / Inferential / Skeptical), each composing all 5
 surfaces (Behavioral / State / Vocabulary / Commitment / Recurrence); a **deterministic Kotlin**
-convergence resolver (not a 4th model call). Two-tier: foreground returns
-`{transcription}`; background runs the 3 lenses + resolver in 30–90 s. **Agreement
+convergence resolver (not a 4th model call). Two-tier: voice foreground returns
+`{transcription, follow_up}`; typed entries persist text only; background runs the 3 lenses +
+resolver in 30–90 s. **Agreement
 predicate is written against the storage enum** (`template_label` ∈ {Aftermath, Tunnel exit,
 Concrete shoes, Decision spiral, Goblin hours, Audit} — positional 1:1 with the
 `concept-locked` product names). Full sequence + resolver decision:

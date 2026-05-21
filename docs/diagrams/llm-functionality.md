@@ -64,7 +64,7 @@ sequenceDiagram
     participant PD as Pattern Detection
 
     U->>Cap: STOP · FILE IT
-    Cap->>FG: audio
+    Cap->>FG: audio + persona prompt
     FG-->>Cap: { transcription, follow_up }
     Cap->>ES: persist ObjectBox row, status = PENDING
     Note over FG,Cap: audio bytes discarded now

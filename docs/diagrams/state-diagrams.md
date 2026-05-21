@@ -11,8 +11,9 @@ The finite-state machines in the system, as written. Source: `CaptureViewModel.C
 
 The live single-capture FSM, owned by `CaptureViewModel` over the `ForegroundStreamEvent`
 stream (it superseded the retired `CaptureSession`; ADR-005 §Addendum 2026-05-17). v1
-capture stores one USER transcript turn and no MODEL follow-up. Discard during `Recording` is a
-synchronous return to `Idle` — no Gemma call, no entry, no rehydration (ADR-001 §Q8). Errors
+voice capture stores one USER transcript turn plus one MODEL follow-up; typed capture stores
+text only and no MODEL follow-up. Discard during `Recording` is a synchronous return to `Idle` —
+no Gemma call, no entry, no rehydration (ADR-001 §Q8). Errors
 surface as a `CaptureError` on `Idle`, not a terminal state. `Idle` is the only resting state;
 `Reviewing` self-transitions when the terminal stream event clears the streaming gate, after
 which Done (acknowledge) is allowed.

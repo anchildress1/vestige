@@ -4,6 +4,7 @@ import android.util.Log
 import dev.anchildress1.vestige.model.ExtractionStatus
 import dev.anchildress1.vestige.model.PatternKind
 import dev.anchildress1.vestige.model.PatternState
+import dev.anchildress1.vestige.model.TemplateLabel
 import dev.anchildress1.vestige.storage.CalloutCooldownEntity
 import dev.anchildress1.vestige.storage.EmbeddingClustering
 import dev.anchildress1.vestige.storage.EntryEntity
@@ -63,7 +64,7 @@ object DebugPatternSeeder {
                 SeedPattern(
                     signature = "tuesday-meeting-aftermath",
                     title = "Tuesday Meetings",
-                    templateLabel = "Crashed",
+                    templateLabel = TemplateLabel.AFTERMATH.serial,
                     callout = "Fourth entry mentions Tuesday meetings. State before: cruising. After: crashed.",
                     supporting = listOf(entries[1], entries[4], entries[8], entries[10]),
                 ),
@@ -73,7 +74,7 @@ object DebugPatternSeeder {
                 SeedPattern(
                     signature = "decision-spiral-migrations",
                     title = "Migration Rewrites",
-                    templateLabel = "Nonstop Spiral",
+                    templateLabel = TemplateLabel.DECISION_SPIRAL.serial,
                     callout = "Three decisions to rewrite the migration in one week. " +
                         "Pattern: rewriting beats committing.",
                     supporting = listOf(entries[6], entries[7], entries[2]),
@@ -138,7 +139,7 @@ object DebugPatternSeeder {
             lastSeenTimestamp = tiredEntries.maxOf { it.timestampEpochMs },
             state = PatternState.ACTIVE,
             stateChangedTimestamp = System.currentTimeMillis(),
-            latestCalloutText = "'tired' shows up across ${tiredEntries.size} entries in three distinct framings.",
+            latestCalloutText = "\"tired\" spans ${tiredEntries.size} entries in three distinct framings.",
         )
         patternStore.put(pattern)
         val saved = patternStore.findByPatternId(pattern.patternId)

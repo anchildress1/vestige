@@ -22,8 +22,13 @@ object EntryMarkdownRenderer {
         append("energy_descriptor: ").append(yamlScalar(entry.energyDescriptor)).append('\n')
         append("recurrence_link: ").append(yamlScalar(entry.recurrenceLink)).append('\n')
         append("stated_commitment: ").append(yamlJsonBlob(entry.statedCommitmentJson)).append('\n')
-        append("tags:").append('\n')
-        tagNames(entry).forEach { tag -> appendLine("  - ${yamlScalar(tag)}") }
+        val tags = tagNames(entry)
+        if (tags.isEmpty()) {
+            append("tags: []").append('\n')
+        } else {
+            append("tags:").append('\n')
+            tags.forEach { tag -> appendLine("  - ${yamlScalar(tag)}") }
+        }
         append("confidence: ").append(yamlJsonInline(entry.confidenceJson)).append('\n')
         append("entry_observations: ").append(yamlJsonArrayInline(entry.entryObservationsJson)).append('\n')
         append("lens_receipts: ").append(yamlJsonInline(entry.lensReceiptsJsonOrEmpty)).append('\n')

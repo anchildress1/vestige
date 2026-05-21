@@ -32,7 +32,11 @@ object PatternCalloutText {
 
     private fun templateRecurrence(signature: JSONObject?, count: Int): String {
         val label = signature?.optString("label").orEmpty().humanize()
-        return "$count $label entries logged. Worth noting."
+        return if (label.isBlank()) {
+            "$count entries share the same resolved shape."
+        } else {
+            "$count $label entries share the same resolved shape."
+        }
     }
 
     private fun tagPair(signature: JSONObject?, count: Int): String {
@@ -40,20 +44,41 @@ object PatternCalloutText {
         val tags = signature?.optJSONArray("tags")?.let { arr ->
             (0 until arr.length()).mapNotNull { arr.optString(it).takeIf { s -> s.isNotEmpty() } }
         } ?: emptyList()
-        val joined = tags.joinToString(" + ")
-        return "$label entries: $joined across $count entries."
+        if (label.isBlank() || tags.isEmpty()) {
+            warnBlankSignatureField("tagPair", "label/tags", signature)
+            return "$count entries share a tag pair."
+        }
+        return "$label entries: ${tags.joinToString(" + ")} across $count entries."
     }
 
-    private fun goblin(count: Int): String = "$count entries between midnight and 5am. Same admin loop."
+    private fun goblin(count: Int): String = "$count entries landed between midnight and 5am."
 
     private fun commitment(signature: JSONObject?, count: Int): String {
         val topic = signature?.optString("topic_or_person").orEmpty().humanize()
+        if (topic.isBlank()) {
+            warnBlankSignatureField("commitment", "topic_or_person", signature)
+            return "$count entries reference the same commitment."
+        }
         return "$count entries with a commitment about $topic."
     }
 
     private fun vocab(signature: JSONObject?, count: Int): String {
         val token = signature?.optString("token").orEmpty().humanize()
-        return "'$token' appears across $count entries with multiple framings."
+        if (token.isBlank()) {
+            warnBlankSignatureField("vocab", "token", signature)
+            return "$count entries share a vocab token."
+        }
+        return "\"$token\" spans $count entries with multiple framings."
+    }
+
+    private fun warnBlankSignatureField(kind: String, field: String, signature: JSONObject?) {
+        // Detector contract says every emitted signature carries the fields the callout reads.
+        // A blank field at this point is upstream corruption — log id + kind + missing field so
+        // the detector regression surfaces. No raw content; AGENTS.md user-data rule.
+        android.util.Log.w(
+            "VestigeCalloutText",
+            "blank $field in $kind signature (sigKeys=${signature?.keys()?.asSequence()?.toList() ?: "null"})",
+        )
     }
 
     private fun temporal(signature: JSONObject?, count: Int): String =

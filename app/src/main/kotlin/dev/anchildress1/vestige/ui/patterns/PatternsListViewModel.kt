@@ -69,7 +69,7 @@ class PatternsListViewModel(
 
             // Below the detection threshold the honest copy is "keep recording", not
             // "nothing repeating" — there has not yet been a detection pass to find anything.
-            totalEntries < PatternDetectionOrchestrator.PATTERN_SURFACE_MIN_ENTRIES ->
+            totalEntries < PatternDetectionOrchestrator.PATTERN_DETECTION_CADENCE ->
                 PatternsListUiState.Empty(PatternsListUiState.EmptyReason.NO_ENTRIES, totalEntries.toInt())
 
             else -> PatternsListUiState.Empty(PatternsListUiState.EmptyReason.NO_PATTERNS, totalEntries.toInt())

@@ -31,13 +31,31 @@ class TemplateLabelerTest {
     }
 
     @Test
-    fun `crashed without state shift falls through to audit`() {
+    fun `crashed without state shift falls through to audit when tags do not carry aftermath`() {
         val resolved = resolved(
             "energy_descriptor" to "crashed".canonical(),
             "state_shift" to false.canonical(),
         )
 
         assertEquals(TemplateLabel.AUDIT, labeler.label(resolved, capturedAt = noon))
+    }
+
+    @Test
+    fun `aftermath tags drive aftermath even when state shift is absent`() {
+        val resolved = resolved(
+            "energy_descriptor" to "crashed".canonical(),
+            "state_shift" to false.canonical(),
+            "tags" to listOf("aftermath").canonical(),
+        )
+
+        assertEquals(TemplateLabel.AFTERMATH, labeler.label(resolved, capturedAt = noon))
+    }
+
+    @Test
+    fun `hollow energy drives aftermath for post-meeting demo entries`() {
+        val resolved = resolved("energy_descriptor" to "hollow".canonical())
+
+        assertEquals(TemplateLabel.AFTERMATH, labeler.label(resolved, capturedAt = noon))
     }
 
     @Test
@@ -60,6 +78,13 @@ class TemplateLabelerTest {
     @Test
     fun `decision-loop tag yields decision spiral label`() {
         val resolved = resolved("tags" to listOf("decision-loop").canonical())
+
+        assertEquals(TemplateLabel.DECISION_SPIRAL, labeler.label(resolved, capturedAt = noon))
+    }
+
+    @Test
+    fun `spreadsheet comparison tags yield decision spiral label`() {
+        val resolved = resolved("tags" to listOf("spreadsheet", "comparing").canonical())
 
         assertEquals(TemplateLabel.DECISION_SPIRAL, labeler.label(resolved, capturedAt = noon))
     }

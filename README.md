@@ -53,9 +53,7 @@ The positioning is deliberate: cognition tracker, not journal app. Patterns are 
 
 ## Status
 
-Phase-4 P0 shipped. The capture loop, history, pattern list + detail, settings, model-status, and the onboarding model-download UX are implemented against the canonical spec under [`docs/`](docs). Pattern lifecycle actions are Skip / Drop / Restart — closure is model-detected only (v1.5, see [`backlog.md`](docs/backlog.md) §`pattern-auto-close`). On-device verification (fresh install on the Galaxy S24 Ultra, STT no-regression round-trip) is the remaining gate before the v1 cut; risk through phases 1–3 was managed via five stop-and-test points (STT-A–E). Full README pass + demo video land in Phase 6 — see [`docs/PRD.md`](docs/PRD.md) §Timeline.
-
-The active `feat/onboarding-final-polish` branch brings every surface to pixel parity with the final scoreboard comps (`poc/*-final.png`): the rebuilt Model Status screen (status band · on-device stack · sealed network-gate · actual-on-disk size), the shared destructive-confirm card, the redesigned Settings/Capture/History/Patterns/Entry-detail screens, and Lucide bottom-nav icons. It also corrects a readiness bug — model readiness now gates on real engine warmup, not just artifact presence (see [ADR-013 §Addendum](docs/adrs/ADR-013-typed-entry-requires-foreground-model.md)) — and makes active recording modal (no menu/nav while the mic is live). Screen-flow diagrams: [`docs/diagrams/user-flows.md`](docs/diagrams/user-flows.md).
+Phase-4 P0 shipped. The capture loop, history, pattern list + detail, settings, model-status, and the onboarding model-download UX are implemented against the canonical spec under [`docs/`](docs). Pattern lifecycle actions are Skip / Drop / Restart — closure is model-detected only (v1.5, see [`backlog.md`](docs/backlog.md) §`pattern-auto-close`). On-device verification (fresh install on the Galaxy S24 Ultra, STT no-regression round-trip) is the remaining gate before the v1 cut; risk through phases 1–3 was managed via five stop-and-test points (STT-A–E). Full README pass + demo video land in Phase 6 — see [`docs/PRD.md`](docs/PRD.md) §Timeline. Screen-flow diagrams: [`docs/diagrams/user-flows.md`](docs/diagrams/user-flows.md).
 
 ---
 
@@ -131,7 +129,7 @@ Module boundaries: `:app` (UI), `:core-inference` (LiteRT-LM + lens composition)
 │   ├── README.md              # reading order + file inventory
 │   ├── PRD.md                 # P0/P1/P2 requirements + phase schedule
 │   ├── concept-locked.md      # full product spec
-│   ├── adrs/                  # ADR-001..013 (stack, lenses, patterns, lifecycle, …)
+│   ├── adrs/                  # ADR-001..017 (stack, lenses, patterns, lifecycle, runtime, design, …)
 │   ├── architecture-brief.md
 │   ├── design-guidelines.md
 │   ├── ux-copy.md             # locked microcopy authority

@@ -52,6 +52,7 @@ class PatternDetectorTest {
         templateLabel: TemplateLabel? = null,
         timestamp: Instant = now,
         tagNames: List<String> = emptyList(),
+        energyDescriptor: String? = null,
         commitmentTopic: String? = null,
         extractionStatus: ExtractionStatus = ExtractionStatus.COMPLETED,
     ): EntryEntity {
@@ -60,6 +61,7 @@ class PatternDetectorTest {
             entryText = text,
             timestampEpochMs = timestamp.toEpochMilli(),
             templateLabel = templateLabel,
+            energyDescriptor = energyDescriptor,
             statedCommitmentJson = commitmentTopic?.let { """{"topic_or_person":"$it","text":"do it"}""" },
             extractionStatus = extractionStatus,
         )
@@ -97,6 +99,18 @@ class PatternDetectorTest {
         assertEquals(1, patterns.size)
         assertEquals(3, patterns.first().supportingEntryCount)
         assertEquals("aftermath", patterns.first().templateLabel)
+    }
+
+    @Test
+    fun `audit fallback labels do not surface as template recurrence patterns`() {
+        repeat(4) { putEntry(templateLabel = TemplateLabel.AUDIT) }
+
+        assertTrue(
+            "audit is fallback metadata and should not become a user-visible pattern",
+            detector.detect().none {
+                it.kind == PatternKind.TEMPLATE_RECURRENCE && it.templateLabel == TemplateLabel.AUDIT.serial
+            },
+        )
     }
 
     @Test
@@ -234,6 +248,44 @@ class PatternDetectorTest {
         repeat(4) { putEntry(text = "I am tired again", templateLabel = null) }
         val patterns = detector.detect().filter { it.kind == PatternKind.VOCAB_FREQUENCY }
         assertTrue(patterns.any { it.signatureJson.contains("\"token\":\"tired\"") })
+    }
+
+    @Test
+    fun `vocab pattern folds true-synonym variants into the tired root`() {
+        // One entry per kept alias — covers every key in VOCAB_ROOT_ALIASES so a typo regression
+        // (e.g. "drained" → "draind") would drop the count below 6.
+        putEntry(text = "exhausted again, every limb gave up at once", energyDescriptor = "exhausted")
+        putEntry(text = "drained to the bone, eyes won't focus", energyDescriptor = "drained")
+        putEntry(text = "sluggish, the brain fog is back", tagNames = listOf("sluggish"))
+        putEntry(text = "wiped from another all-day", tagNames = listOf("wiped"))
+        putEntry(text = "depleted, body feels heavier today", energyDescriptor = "depleted")
+        putEntry(text = "burnt out, screen looks blurry from inside out", tagNames = listOf("burnt-out"))
+
+        val pattern = detector.detect().single {
+            it.kind == PatternKind.VOCAB_FREQUENCY && it.signatureJson.contains("\"token\":\"tired\"")
+        }
+
+        assertEquals(6, pattern.supportingEntryCount)
+    }
+
+    @Test
+    fun `vocab pattern does not fold arousal-up vocabulary onto tired`() {
+        // Regression guard: prior alias map collapsed "wired", "amped", "anxious", "static",
+        // "caffeine", "empty" onto "tired" — that lies about user vocabulary because the
+        // underlying state (arousal-up vs arousal-down) is different. Make sure these stay
+        // distinct from "tired".
+        putEntry(text = "wired-tired, body wants sleep, brain refuses", tagNames = listOf("wired"))
+        putEntry(text = "amped but somehow still spent", energyDescriptor = "amped")
+        putEntry(text = "anxious-tired, lying down doesn't count as rest", tagNames = listOf("anxious"))
+        putEntry(text = "running on caffeine and adrenaline", energyDescriptor = "caffeine")
+
+        val tiredPattern = detector.detect().firstOrNull {
+            it.kind == PatternKind.VOCAB_FREQUENCY && it.signatureJson.contains("\"token\":\"tired\"")
+        }
+        // None of these entries contain the literal "tired" token outside of compound words
+        // (`wired-tired`, `anxious-tired`). The compound splits via WORD_SPLIT, so "tired"
+        // appears in 2 of 4 entries — below VOCAB_THRESHOLD (4). No false-positive pattern.
+        assertEquals(null, tiredPattern)
     }
 
     @Test

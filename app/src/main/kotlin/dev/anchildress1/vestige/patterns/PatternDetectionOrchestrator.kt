@@ -30,10 +30,11 @@ import java.time.ZoneId
 /**
  * Wiring layer called by `BackgroundExtractionSaveFlow` after `completeEntry`. Two side effects:
  *
- * 1. Once the database has at least [PATTERN_SURFACE_MIN_ENTRIES] completed entries, run
- *    [PatternDetector] + upsert results into [PatternStore] on every committed entry. New
- *    temporal patterns get a model-generated title from [PatternAnalysisGenerator], falling back
- *    to [PatternTitleGenerator], then a deterministic name.
+ * 1. Detection runs when the completed-entry count is a non-zero multiple of
+ *    [PATTERN_DETECTION_CADENCE] — i.e. at counts N, 2N, 3N, … Entries between cadence
+ *    boundaries do not retrigger detection. Pattern upserts feed [PatternStore]; new temporal
+ *    patterns get a model-generated title from [PatternAnalysisGenerator], falling back to
+ *    [PatternTitleGenerator], then a deterministic name.
  * 2. Select one matching active pattern for the committed entry, filtered by per-pattern callout
  *    cooldown. When a callout fires, append a `PATTERN_CALLOUT` observation and record the firing
  *    on that pattern's cooldown row. Every committed entry decrements every other pattern's
@@ -52,8 +53,17 @@ class PatternDetectionOrchestrator(
     private val cooldownStore: CalloutCooldownStore,
     private val clock: Clock = Clock.systemUTC(),
     private val zoneId: ZoneId = ZoneId.systemDefault(),
-    private val patternSurfaceMinEntries: Long = PATTERN_SURFACE_MIN_ENTRIES,
+    private val patternDetectionCadence: Long = PATTERN_DETECTION_CADENCE,
 ) {
+
+    init {
+        // Modular gate at L75 (`entryCount % patternDetectionCadence == 0L`) divides by this
+        // value; zero would crash on every committed entry. Long.MAX_VALUE is the test
+        // sentinel for "never run detection" and stays valid.
+        require(patternDetectionCadence > 0L) {
+            "patternDetectionCadence must be > 0, got $patternDetectionCadence"
+        }
+    }
 
     /**
      * Compute the optional callout for [entry] under the given [persona]. A returned observation
@@ -72,9 +82,15 @@ class PatternDetectionOrchestrator(
     @Suppress("ReturnCount")
     suspend fun onEntryCommitted(entry: EntryEntity, persona: Persona): EntryObservation? {
         val entryCount = completedEntryCount(boxStore)
-        if (entryCount >= patternSurfaceMinEntries) {
+        if (entryCount >= patternDetectionCadence && entryCount % patternDetectionCadence == 0L) {
             runDetection(persona)
             vocabClusterUpdater.stampAll()
+        } else if (entryCount > 0L) {
+            Log.d(
+                TAG,
+                "Detection skipped at count=$entryCount; next at " +
+                    "${((entryCount / patternDetectionCadence) + 1) * patternDetectionCadence}",
+            )
         }
         val matched = chooseMatchingPattern(entry)
         if (matched == null) {
@@ -184,11 +200,17 @@ class PatternDetectionOrchestrator(
         // Tx wraps insert + supporting-relation attach so a concurrent save can't see the row
         // mid-state (insert visible but evidence set still empty).
         boxStore.runInTx {
-            patternStore.put(entity)
-            val saved = patternStore.findByPatternId(detected.patternId) ?: return@runInTx
-            saved.supportingEntries.clear()
-            saved.supportingEntries.addAll(supporting.map { it.entity })
-            patternStore.put(saved)
+            val current = patternStore.findByPatternId(detected.patternId)
+            if (current == null) {
+                patternStore.put(entity)
+                val saved = patternStore.findByPatternId(detected.patternId) ?: return@runInTx
+                saved.supportingEntries.clear()
+                saved.supportingEntries.addAll(supporting.map { it.entity })
+                patternStore.put(saved)
+            } else {
+                applySupportingAndCallout(current, detected, supporting, analysis)
+                patternStore.put(current)
+            }
         }
     }
 
@@ -269,9 +291,8 @@ class PatternDetectionOrchestrator(
     }
 
     companion object {
-        /** Phase 3 threshold: detection attempts once the database holds at least this many
-         * COMPLETED entries. Below this the pattern engine has no quorum to surface anything. */
-        const val PATTERN_SURFACE_MIN_ENTRIES: Long = 10
+        /** Phase 3 cadence: detection attempts every N completed entries. */
+        const val PATTERN_DETECTION_CADENCE: Long = 3
         const val MAX_TITLE_CHARS: Int = 24
 
         private const val TAG = "VestigePatternOrch"

@@ -81,7 +81,7 @@ class PatternDetectionOrchestratorTest {
             clock = clock,
             zoneId = ZoneOffset.UTC,
             // Tests verify the cadence semantic; production threshold lives in the companion.
-            patternSurfaceMinEntries = TEST_DETECTION_THRESHOLD,
+            patternDetectionCadence = TEST_DETECTION_THRESHOLD,
         )
     }
 
@@ -156,7 +156,7 @@ class PatternDetectionOrchestratorTest {
             cooldownStore = cooldownStore,
             clock = clock,
             zoneId = ZoneOffset.UTC,
-            patternSurfaceMinEntries = Long.MAX_VALUE,
+            patternDetectionCadence = Long.MAX_VALUE,
         )
     }
 
@@ -166,6 +166,19 @@ class PatternDetectionOrchestratorTest {
         assertTrue("no detection until 3 entries committed", patternStore.all().isEmpty())
         commitOne() // 3rd — detection runs
         assertTrue(patternStore.all().any { it.kind == PatternKind.TEMPLATE_RECURRENCE })
+    }
+
+    @Test
+    fun `completed entries between cadence boundaries do not rerun detection`() = runTest {
+        repeat(3) { commitOne() }
+        val patternId = patternStore.all().single { it.kind == PatternKind.TEMPLATE_RECURRENCE }.patternId
+        assertEquals(3, patternStore.findByPatternId(patternId)!!.supportingEntries.size)
+
+        commitOne()
+        assertEquals(3, patternStore.findByPatternId(patternId)!!.supportingEntries.size)
+
+        repeat(2) { commitOne() }
+        assertEquals(6, patternStore.findByPatternId(patternId)!!.supportingEntries.size)
     }
 
     @Test
@@ -508,7 +521,7 @@ class PatternDetectionOrchestratorTest {
             cooldownStore = cooldownStore,
             clock = laterClock,
             zoneId = ZoneOffset.UTC,
-            patternSurfaceMinEntries = TEST_DETECTION_THRESHOLD,
+            patternDetectionCadence = TEST_DETECTION_THRESHOLD,
         )
         // Three more matching entries → detection upserts and promotes the row to ACTIVE.
         repeat(3) {
@@ -578,7 +591,7 @@ class PatternDetectionOrchestratorTest {
             cooldownStore = cooldownStore,
             clock = clock,
             zoneId = ZoneOffset.UTC,
-            patternSurfaceMinEntries = TEST_DETECTION_THRESHOLD,
+            patternDetectionCadence = TEST_DETECTION_THRESHOLD,
         )
 
         fallbackOrchestrator.onEntryCommitted(putEntry(templateLabel = TemplateLabel.AFTERMATH), Persona.WITNESS)
@@ -587,6 +600,60 @@ class PatternDetectionOrchestratorTest {
         assertEquals("Commitment recurrence", pattern.title)
         assertEquals(1, pattern.supportingEntries.size)
         assertEquals(supporting.id, pattern.supportingEntries.single().id)
+    }
+
+    @Test
+    fun `new pattern insert rechecks inside the write transaction when another writer wins the race`() = runTest {
+        val supporting = (1..3).map { putEntry(templateLabel = TemplateLabel.AFTERMATH) }
+        val detector: PatternDetector = mockk()
+        val detected = DetectedPattern(
+            patternId = PATTERN_A_ID,
+            kind = PatternKind.TEMPLATE_RECURRENCE,
+            signatureJson = "{\"kind\":\"template_recurrence\",\"label\":\"aftermath\"}",
+            templateLabel = TemplateLabel.AFTERMATH.serial,
+            supportingEntryIds = supporting.map { it.id },
+            firstSeenTimestamp = now.minusSeconds(60).toEpochMilli(),
+            lastSeenTimestamp = now.toEpochMilli(),
+        )
+        every { detector.detect() } returns listOf(detected)
+        coEvery { engine.generateText(any(), any()) } coAnswers {
+            patternStore.put(
+                PatternEntity(
+                    patternId = PATTERN_A_ID,
+                    kind = PatternKind.TEMPLATE_RECURRENCE,
+                    signatureJson = detected.signatureJson,
+                    title = "Concurrent Winner",
+                    templateLabel = TemplateLabel.AFTERMATH.serial,
+                    firstSeenTimestamp = 1L,
+                    lastSeenTimestamp = 2L,
+                    state = PatternState.ACTIVE,
+                    latestCalloutText = "winner callout",
+                ),
+            )
+            "Late Writer"
+        }
+        val raceOrchestrator = PatternDetectionOrchestrator(
+            boxStore = boxStore,
+            detector = detector,
+            patternStore = patternStore,
+            titleGenerator = PatternTitleGenerator(
+                engine = engine,
+                personaPromptComposer = { "P" },
+                templateLoader = { "T" },
+                forbiddenPhraseDetector = { false },
+            ),
+            cooldownStore = cooldownStore,
+            clock = clock,
+            zoneId = ZoneOffset.UTC,
+            patternDetectionCadence = 4L,
+        )
+
+        raceOrchestrator.onEntryCommitted(putEntry(templateLabel = TemplateLabel.AFTERMATH), Persona.WITNESS)
+
+        val patterns = patternStore.all().filter { it.patternId == PATTERN_A_ID }
+        assertEquals("unique patternId must stay a single row", 1, patterns.size)
+        assertEquals("Concurrent Winner", patterns.single().title)
+        assertEquals(supporting.map { it.id }.toSet(), patterns.single().supportingEntries.map { it.id }.toSet())
     }
 
     @Test
@@ -625,7 +692,7 @@ class PatternDetectionOrchestratorTest {
             cooldownStore = cooldownStore,
             clock = clock,
             zoneId = ZoneOffset.UTC,
-            patternSurfaceMinEntries = TEST_DETECTION_THRESHOLD,
+            patternDetectionCadence = TEST_DETECTION_THRESHOLD,
         )
 
         freshOrchestrator.onEntryCommitted(
@@ -668,7 +735,7 @@ class PatternDetectionOrchestratorTest {
             cooldownStore = cooldownStore,
             clock = clock,
             zoneId = ZoneOffset.UTC,
-            patternSurfaceMinEntries = TEST_DETECTION_THRESHOLD,
+            patternDetectionCadence = TEST_DETECTION_THRESHOLD,
         )
 
         cancelOrchestrator.onEntryCommitted(putEntry(templateLabel = TemplateLabel.AFTERMATH), Persona.WITNESS)

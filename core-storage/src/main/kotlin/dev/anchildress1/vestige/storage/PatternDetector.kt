@@ -11,7 +11,6 @@ import org.json.JSONObject
 import java.time.Clock
 import java.time.Instant
 import java.time.ZoneId
-import java.util.Locale
 
 /**
  * Deterministic counting pass per ADR-003 §"Detection algorithm". Runs over a 90-day window
@@ -63,8 +62,12 @@ class PatternDetector(
         }
     }
 
+    // AUDIT is the labeler's fallback bucket (everything that didn't match an archetype),
+    // not a pattern shape. Detection grouping by AUDIT would surface a meaningless cluster
+    // of "everything that didn't fit elsewhere." See `docs/backlog.md` §`labeler-prompt-tightening`.
     private fun detectTemplateRecurrence(entries: List<EntryEntity>): List<DetectedPattern> = entries
         .filter { it.templateLabel != null }
+        .filterNot { it.templateLabel == TemplateLabel.AUDIT }
         .groupBy { it.templateLabel!! }
         .filterValues { it.size >= SUPPORTING_THRESHOLD }
         .map { (label, supporting) ->
@@ -74,6 +77,7 @@ class PatternDetector(
 
     private fun detectTagPair(entries: List<EntryEntity>): List<DetectedPattern> = entries
         .filter { it.templateLabel != null }
+        .filterNot { it.templateLabel == TemplateLabel.AUDIT }
         .groupBy { it.templateLabel!! }
         .flatMap { (label, group) ->
             pairsWithinGroup(group)
@@ -155,17 +159,7 @@ class PatternDetector(
             }
     }
 
-    private fun vocabTokensFor(entry: EntryEntity): Set<String> {
-        val fromTags = entry.tags.map { TokenStemmer.stem(it.name) }
-        val fromText = entry.entryText
-            .lowercase(Locale.ROOT)
-            .split(WORD_SPLIT)
-            .asSequence()
-            .map { it.trim() }
-            .filter { it.length >= MIN_VOCAB_LENGTH }
-            .map { TokenStemmer.stem(it) }
-        return (fromTags.asSequence() + fromText).toSet()
-    }
+    private fun vocabTokensFor(entry: EntryEntity): Set<String> = VocabTokens.forEntry(entry)
 
     private fun detected(signature: Signature, supporting: List<EntryEntity>): DetectedPattern {
         val ids = supporting.map { it.id }.sorted()
@@ -186,9 +180,6 @@ class PatternDetector(
         const val TAG_PAIR_SIZE = 2
         const val WINDOW_90D_MS: Long = 90L * 24 * 60 * 60 * 1000
         const val WINDOW_30D_MS: Long = 30L * 24 * 60 * 60 * 1000
-
-        internal const val MIN_VOCAB_LENGTH = 4
-        internal val WORD_SPLIT: Regex = Regex("[^a-z0-9]+")
     }
 }
 

@@ -53,7 +53,7 @@ class EntryMarkdownRendererTest {
         assertTrue(markdown.contains("energy_descriptor: wired"))
         assertTrue(markdown.contains("recurrence_link: pattern-1"))
         assertTrue(markdown.contains("""stated_commitment: {"text":"send invoice"}"""))
-        assertTrue(markdown.contains("tags:\n"))
+        assertTrue(markdown.contains("tags: []"))
         assertTrue(markdown.contains("""confidence: {"tags":"CANONICAL"}"""))
         assertTrue(markdown.contains("""entry_observations: [{"text":"invoice repeated"}]"""))
         assertTrue(markdown.contains("""lens_receipts: [{"lens":"LITERAL","extracted":true}]"""))
@@ -82,10 +82,27 @@ class EntryMarkdownRendererTest {
         assertTrue(markdown.contains("energy_descriptor: null"))
         assertTrue(markdown.contains("recurrence_link: null"))
         assertTrue(markdown.contains("stated_commitment: null"))
+        assertTrue(markdown.contains("tags: []"))
         assertTrue(markdown.contains("confidence: {}"))
         assertTrue(markdown.contains("entry_observations: []"))
         assertTrue(markdown.contains("lens_receipts: []"))
         assertTrue(markdown.endsWith("\nalready newline\n"))
+    }
+
+    @Test
+    fun `render emits tags as inline empty array when entry has no tags`() {
+        // Regression: bare `tags:` parses as null in YAML 1.2, breaking round-trip importers that
+        // expect the field to always carry a sequence type. Empty rows must emit `tags: []`.
+        val entry = EntryEntity(markdownFilename = "x.md", entryText = "body", timestampEpochMs = 0L)
+
+        val markdown = EntryMarkdownRenderer.render(entry)
+
+        assertTrue("tags must serialize as inline empty array", markdown.contains("\ntags: []\n"))
+        assertEquals(
+            "tags line must be the canonical inline form, never the bare-key form",
+            -1,
+            markdown.indexOf("\ntags:\n"),
+        )
     }
 
     @Test

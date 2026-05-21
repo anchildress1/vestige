@@ -71,7 +71,7 @@ class VestigeDataExporterTest {
     }
 
     @Test
-    fun `snapshot carries onboarding settings`() {
+    fun `snapshot carries onboarding settings and suppresses current_step when complete`() {
         val out = ByteArrayOutputStream()
 
         exporter().writeTo(out)
@@ -79,6 +79,26 @@ class VestigeDataExporterTest {
         val settings = snapshotOf(out).getJSONObject("settings")
         assertEquals(true, settings.getBoolean("onboarding_complete"))
         assertEquals("HARDASS", settings.getString("default_persona"))
+        assertTrue(
+            settings.isNull("current_step"),
+            "current_step must be JSON null once onboarding is complete — the sentinel default " +
+                "from OnboardingPrefs is not real resume state",
+        )
+    }
+
+    @Test
+    fun `snapshot exports current_step verbatim while onboarding is still in progress`() {
+        val incomplete: OnboardingPrefs = mockk {
+            every { isComplete } returns false
+            every { defaultPersona } returns Persona.WITNESS
+            every { currentStep } returns OnboardingStep.Wiring
+        }
+        val out = ByteArrayOutputStream()
+
+        VestigeDataExporter(boxStore, incomplete).writeTo(out)
+
+        val settings = snapshotOf(out).getJSONObject("settings")
+        assertEquals(false, settings.getBoolean("onboarding_complete"))
         assertEquals("Wiring", settings.getString("current_step"))
     }
 
@@ -102,7 +122,7 @@ class VestigeDataExporterTest {
         exporter().writeTo(out)
 
         val snapshot = snapshotOf(out)
-        assertEquals(2, snapshot.getInt("schema_version"))
+        assertEquals(3, snapshot.getInt("schema_version"))
         assertTrue(snapshot.has("tags"))
         assertEquals(0, snapshot.getJSONArray("tags").length())
         assertTrue(snapshot.has("callout_cooldowns"))

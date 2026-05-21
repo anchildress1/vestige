@@ -16,6 +16,7 @@ import dev.anchildress1.vestige.patterns.PatternDetectionOrchestrator
 import dev.anchildress1.vestige.storage.EntryStore
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import java.time.ZonedDateTime
@@ -77,6 +78,29 @@ class BackgroundExtractionSaveFlow(
         durationMs: Long = 0L,
         followUpText: String? = null,
     ): SaveOutcome.Pending {
+        val work = prepareSaveAndExtract(
+            entryText = entryText,
+            capturedAt = capturedAt,
+            retrievedHistory = retrievedHistory,
+            timeoutMs = timeoutMs,
+            persona = persona,
+            durationMs = durationMs,
+            followUpText = followUpText,
+        )
+        val extractionJob = launchExtraction(work)
+        return SaveOutcome.Pending(work.entryId, extractionJob)
+    }
+
+    @Suppress("LongParameterList") // Same persisted-entry contract as saveAndExtract, without launching work.
+    internal suspend fun prepareSaveAndExtract(
+        entryText: String,
+        capturedAt: ZonedDateTime,
+        retrievedHistory: List<HistoryChunk> = emptyList(),
+        timeoutMs: Long? = null,
+        persona: Persona = Persona.WITNESS,
+        durationMs: Long = 0L,
+        followUpText: String? = null,
+    ): PendingExtractionWork {
         val entryId = entryStore.createPendingEntry(
             entryText = entryText,
             timestamp = capturedAt.toInstant(),
@@ -96,11 +120,14 @@ class BackgroundExtractionSaveFlow(
             entryAttemptCount = 0,
             timeoutMs = timeoutMs,
         )
-
-        val extractionJob = scope.launch {
-            runDetachedExtraction(entryId, entryText, capturedAt, request, terminalRelay, persona)
-        }
-        return SaveOutcome.Pending(entryId, extractionJob)
+        return PendingExtractionWork(
+            entryId = entryId,
+            entryText = entryText,
+            capturedAt = capturedAt,
+            request = request,
+            terminalRelay = terminalRelay,
+            persona = persona,
+        )
     }
 
     /**
@@ -114,7 +141,15 @@ class BackgroundExtractionSaveFlow(
         capturedAt: ZonedDateTime,
         persona: Persona = Persona.WITNESS,
         timeoutMs: Long? = null,
-    ): Job {
+    ): Job = launchExtraction(prepareRecovery(entryId, entryText, capturedAt, persona, timeoutMs))
+
+    internal suspend fun prepareRecovery(
+        entryId: Long,
+        entryText: String,
+        capturedAt: ZonedDateTime,
+        persona: Persona = Persona.WITNESS,
+        timeoutMs: Long? = null,
+    ): PendingExtractionWork {
         val terminalRelay = DeferredTerminalRelay(lifecycleCallbacks.listenerFactory(entryId))
         terminalRelay.workerListener.onUpdate(ExtractionStatus.PENDING, 0, null)
         val request = BackgroundExtractionRequest(
@@ -124,10 +159,29 @@ class BackgroundExtractionSaveFlow(
             entryAttemptCount = 0,
             timeoutMs = timeoutMs,
         )
-        return scope.launch {
-            runDetachedExtraction(entryId, entryText, capturedAt, request, terminalRelay, persona)
-        }
+        return PendingExtractionWork(
+            entryId = entryId,
+            entryText = entryText,
+            capturedAt = capturedAt,
+            request = request,
+            terminalRelay = terminalRelay,
+            persona = persona,
+        )
     }
+
+    internal fun launchExtraction(work: PendingExtractionWork, start: CoroutineStart = CoroutineStart.DEFAULT): Job =
+        scope.launch(
+            start = start,
+        ) {
+            runDetachedExtraction(
+                entryId = work.entryId,
+                entryText = work.entryText,
+                capturedAt = work.capturedAt,
+                request = work.request,
+                terminalRelay = work.terminalRelay,
+                persona = work.persona,
+            )
+        }
 
     @Suppress("LongParameterList") // Carries the saveAndExtract call's full context.
     private suspend fun runDetachedExtraction(
@@ -396,7 +450,7 @@ class BackgroundExtractionSaveFlow(
         )
     }
 
-    private class DeferredTerminalRelay(private val downstream: ExtractionStatusListener) {
+    internal class DeferredTerminalRelay(private val downstream: ExtractionStatusListener) {
         val workerListener: ExtractionStatusListener =
             ExtractionStatusListener { status, entryAttemptCount, lastError ->
                 if (!isTerminal(status)) {
@@ -442,6 +496,15 @@ class BackgroundExtractionSaveFlow(
         private const val TAG = "VestigeSaveFlow"
     }
 }
+
+internal data class PendingExtractionWork(
+    val entryId: Long,
+    val entryText: String,
+    val capturedAt: ZonedDateTime,
+    val request: BackgroundExtractionRequest,
+    val terminalRelay: BackgroundExtractionSaveFlow.DeferredTerminalRelay,
+    val persona: Persona,
+)
 
 private fun List<LensResult>.toReceipts(): List<EntryLensReceipt> = map { result ->
     EntryLensReceipt(

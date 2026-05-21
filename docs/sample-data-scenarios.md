@@ -8,7 +8,7 @@ Use the same IDs in logs, screenshots, and result tables. Paste as typed entries
 
 - Keep expected outputs as evidence targets, not exact model prose.
 - Preserve the wording. The weird phrasing is the point; vocabulary drift is not a typo farm.
-- Personas affect foreground follow-up tone only. Background extraction must use the same lens prompts regardless of Witness / Hardass / Editor.
+- Personas affect foreground follow-up wording only. Background extraction must use the same lens prompts regardless of Witness / Hardass / Editor.
 - Pattern claims must cite counts, dates, snippets, tags, or field evidence.
 - No therapy, wellness, mood scoring, diagnosis, gratitude, streaks, badges, or mascot nonsense. The bar is low and somehow still useful.
 
@@ -17,7 +17,7 @@ Use the same IDs in logs, screenshots, and result tables. Paste as typed entries
 | Stop-and-test | Fixture use | Pass signal |
 |---|---|---|
 | **STT-A** (Phase 1) — Audio chunking | Read the chunk-boundary script as one >30s capture. Force the marked split. | Final transcript preserves the crossed sentence, no duplicated or dropped meaning. |
-| **STT-B** (Phase 2) — Multi-turn foreground | Run the 4-turn smoke script under each persona. | Structured `{transcription, follow_up}` survives 4 turns; follow-ups reference prior turns without feelings prompts. |
+| **STT-B** (Phase 2) — Multi-turn foreground | Historical only; current foreground is single-turn per ADR-018. | Transcript and one follow-up return cleanly. |
 | **STT-C** (Phase 2) — Tag extraction | Run corpus entries A1-D3 plus X1-X3. | 10+ varied entries parse cleanly; recurring tags are stable enough for retrieval and pattern counting. |
 | **STT-D** (Phase 2) — Multi-lens divergence | Run A1, A4, B1, B2, C2, D1 through three independent background lens calls. | At least 30% of tested entries show meaningful field-level divergence, not just wording garnish. |
 | **STT-E** (Phase 3) — EmbeddingGemma drift | Compare tag-only retrieval vs tag+embedding in the STT-E section. | Embeddings rank semantic aftermath entries above literal keyword distractors in a way a judge can see. |

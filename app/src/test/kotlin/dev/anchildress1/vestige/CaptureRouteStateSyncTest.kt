@@ -7,7 +7,6 @@ import dev.anchildress1.vestige.inference.ForegroundStreamEvent
 import dev.anchildress1.vestige.model.Persona
 import dev.anchildress1.vestige.ui.capture.CaptureViewModel
 import dev.anchildress1.vestige.ui.capture.ForegroundInferenceCall
-import dev.anchildress1.vestige.ui.capture.ForegroundTextInferenceCall
 import dev.anchildress1.vestige.ui.capture.ModelReadiness
 import dev.anchildress1.vestige.ui.capture.SaveAndExtract
 import dev.anchildress1.vestige.ui.capture.VoiceCapture
@@ -35,7 +34,6 @@ class CaptureRouteStateSyncTest {
             recordVoice = VoiceCapture { _, _ -> null },
             foregroundInference = ForegroundInferenceCall { _, _ -> parseFailure() },
             saveAndExtract = SaveAndExtract { _, _, _, _, _, _ -> 1L },
-            foregroundTextInference = ForegroundTextInferenceCall { _, _, _ -> parseFailure() },
             initialReadiness = ModelReadiness.Loading,
         )
         val persona = mutableStateOf(Persona.WITNESS)

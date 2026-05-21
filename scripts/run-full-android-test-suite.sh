@@ -58,6 +58,11 @@ run_test() {
   if /usr/bin/grep -q "AssumptionViolatedException" "$log" 2>/dev/null; then
     notes="${notes}assumeTrue-violated;"
   fi
+  local spinner
+  spinner=$(/usr/bin/grep -oE "perceived_spinner .*" "$logcat" 2>/dev/null | tail -1)
+  if [[ -n "$spinner" ]]; then
+    notes="${notes}${spinner};"
+  fi
   printf "%s\t%s\t%ds\t%s\n" "$label" "$verdict" "$wall" "$notes" | tee -a "$SUMMARY"
 }
 
@@ -75,6 +80,10 @@ run_test PersonaToneSmokeTest PersonaToneSmokeTest \
   -PmodelPath=$MODEL
 
 run_test PerCapturePersonaSmokeTest PerCapturePersonaSmokeTest \
+  -PmodelPath=$MODEL \
+  -PaudioPath=$AUDIO
+
+run_test ForegroundSpinnerTimingSmokeTest ForegroundSpinnerTimingSmokeTest \
   -PmodelPath=$MODEL \
   -PaudioPath=$AUDIO
 

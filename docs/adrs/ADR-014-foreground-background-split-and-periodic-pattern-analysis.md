@@ -141,3 +141,15 @@ Refines the background-pattern lane; does not supersede the foreground/backgroun
 ### Addendum (2026-05-20) — Storage SOT inverted (see ADR-017)
 
 The "markdown is source of truth" cell in the §"Lifecycle Contract" table above is now historical. **ADR-017** inverts the storage SOT: ObjectBox is authoritative; markdown is generated at export only. The persist-before-background-scheduled invariant still holds — only the SOT direction changes.
+
+### Addendum (2026-05-20) — Foreground-priority background queue
+
+This is an addendum because ADR-014's foreground/background split still stands: the foreground call
+is the only user-blocking path, and extraction/pattern work remains detached. The implementation
+choice changed inside that split: foreground now owns the inference slot by cancelling active
+detached extraction, leaving the row non-terminal, and requeuing the work. Cancelled and queued
+background extraction drains in FIFO order after the foreground call releases the slot.
+
+Background extraction model calls use the streaming text path so coroutine cancellation can close
+the active conversation during unwind. This is not KV-cache suspend/resume; it is discard-and-rerun
+at the background unit-of-work boundary so the user does not wait behind detached extraction.

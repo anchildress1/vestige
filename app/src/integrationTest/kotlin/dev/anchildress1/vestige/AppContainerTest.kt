@@ -3,10 +3,10 @@ package dev.anchildress1.vestige
 import android.content.Context
 import android.content.Intent
 import android.content.SharedPreferences
+import dev.anchildress1.vestige.inference.BackgroundExtractionRequest
 import dev.anchildress1.vestige.inference.BackgroundExtractionResult
 import dev.anchildress1.vestige.inference.Embedder
-import dev.anchildress1.vestige.inference.ForegroundResult
-import dev.anchildress1.vestige.inference.ForegroundStreamEvent
+import dev.anchildress1.vestige.inference.ExtractionStatusListener
 import dev.anchildress1.vestige.inference.HistoryChunk
 import dev.anchildress1.vestige.inference.LiteRtLmEngine
 import dev.anchildress1.vestige.lifecycle.BackgroundExtractionLifecycleState
@@ -17,9 +17,10 @@ import dev.anchildress1.vestige.model.ModelArtifactStore
 import dev.anchildress1.vestige.model.ModelManifest
 import dev.anchildress1.vestige.model.PatternKind
 import dev.anchildress1.vestige.model.PatternState
+import dev.anchildress1.vestige.model.Persona
 import dev.anchildress1.vestige.model.ResolvedExtraction
 import dev.anchildress1.vestige.save.BackgroundExtractionSaveFlow
-import dev.anchildress1.vestige.save.SaveOutcome
+import dev.anchildress1.vestige.save.PendingExtractionWork
 import dev.anchildress1.vestige.storage.CalloutCooldownEntity
 import dev.anchildress1.vestige.storage.EntryEntity
 import dev.anchildress1.vestige.storage.PatternEntity
@@ -38,11 +39,12 @@ import io.mockk.mockk
 import io.mockk.verify
 import io.objectbox.BoxStore
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.advanceUntilIdle
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.json.JSONObject
 import org.junit.jupiter.api.Assertions.assertEquals
@@ -60,6 +62,42 @@ import java.util.zip.ZipInputStream
 @OptIn(ExperimentalCoroutinesApi::class)
 @Suppress("LargeClass") // Wiring + lifecycle + save + recovery scenarios share one container fixture.
 class AppContainerTest {
+
+    private fun pendingExtractionWork(
+        entryId: Long,
+        entryText: String,
+        capturedAt: ZonedDateTime,
+        persona: Persona = Persona.WITNESS,
+        timeoutMs: Long? = null,
+    ): PendingExtractionWork = PendingExtractionWork(
+        entryId = entryId,
+        entryText = entryText,
+        capturedAt = capturedAt,
+        request = BackgroundExtractionRequest(
+            entryText = entryText,
+            capturedAt = capturedAt,
+            retrievedHistory = emptyList(),
+            entryAttemptCount = 0,
+            timeoutMs = timeoutMs,
+        ),
+        terminalRelay = BackgroundExtractionSaveFlow.DeferredTerminalRelay(
+            ExtractionStatusListener { _, _, _ -> },
+        ),
+        persona = persona,
+    )
+
+    private fun stubQueuedRecovery(saveFlow: BackgroundExtractionSaveFlow) {
+        coEvery { saveFlow.prepareRecovery(any(), any(), any(), any(), any()) } answers {
+            pendingExtractionWork(
+                entryId = firstArg(),
+                entryText = secondArg(),
+                capturedAt = thirdArg(),
+                persona = arg(3),
+                timeoutMs = arg(4),
+            )
+        }
+        every { saveFlow.launchExtraction(any(), any()) } answers { kotlinx.coroutines.Job().also { it.complete() } }
+    }
 
     @Test
     fun `cold-start recovery seeds recovered entries before service promotion`() = runTest {
@@ -376,10 +414,10 @@ class AppContainerTest {
     fun `saveAndExtract initializes the engine before delegating to the save flow`() = runTest {
         val engine = mockk<LiteRtLmEngine>(relaxed = true)
         val saveFlow = mockk<BackgroundExtractionSaveFlow>()
-        val expected = SaveOutcome.Pending(entryId = 42L, extractionJob = kotlinx.coroutines.Job())
         val capturedAt = ZonedDateTime.of(2026, 5, 11, 7, 21, 24, 0, ZoneId.of("America/New_York"))
+        val work = pendingExtractionWork(entryId = 42L, entryText = "persist me", capturedAt = capturedAt)
         coEvery {
-            saveFlow.saveAndExtract(
+            saveFlow.prepareSaveAndExtract(
                 entryText = "persist me",
                 capturedAt = capturedAt,
                 retrievedHistory = emptyList(),
@@ -388,7 +426,8 @@ class AppContainerTest {
                 durationMs = 0L,
                 followUpText = null,
             )
-        } returns expected
+        } returns work
+        every { saveFlow.launchExtraction(work, any()) } returns kotlinx.coroutines.Job().also { it.complete() }
         val container = AppContainer(
             applicationContext = mockk<Context>(relaxed = true),
             boxStoreFactory = { mockk<BoxStore>(relaxed = true) },
@@ -402,10 +441,10 @@ class AppContainerTest {
 
         val actual = container.saveAndExtract("persist me", capturedAt)
 
-        assertEquals(expected, actual)
+        assertEquals(42L, actual.entryId)
         coVerifyOrder {
             engine.initialize()
-            saveFlow.saveAndExtract(
+            saveFlow.prepareSaveAndExtract(
                 entryText = "persist me",
                 capturedAt = capturedAt,
                 retrievedHistory = emptyList(),
@@ -423,7 +462,7 @@ class AppContainerTest {
         val saveFlow = mockk<BackgroundExtractionSaveFlow>()
         val capturedAt = ZonedDateTime.of(2026, 5, 11, 7, 21, 24, 0, ZoneId.of("America/New_York"))
         coEvery {
-            saveFlow.saveAndExtract(
+            saveFlow.prepareSaveAndExtract(
                 entryText = any(),
                 capturedAt = capturedAt,
                 retrievedHistory = any<List<HistoryChunk>>(),
@@ -432,7 +471,8 @@ class AppContainerTest {
                 durationMs = any(),
                 followUpText = any(),
             )
-        } answers { SaveOutcome.Pending(entryId = 7L, extractionJob = kotlinx.coroutines.Job()) }
+        } answers { pendingExtractionWork(entryId = 7L, entryText = firstArg(), capturedAt = capturedAt) }
+        every { saveFlow.launchExtraction(any(), any()) } returns kotlinx.coroutines.Job().also { it.complete() }
         val container = AppContainer(
             applicationContext = mockk<Context>(relaxed = true),
             boxStoreFactory = { mockk<BoxStore>(relaxed = true) },
@@ -448,7 +488,7 @@ class AppContainerTest {
         container.saveAndExtract("second", capturedAt, timeoutMs = 90_000L)
 
         coVerify(exactly = 1) { engine.initialize() }
-        coVerify(exactly = 2) { saveFlow.saveAndExtract(any(), capturedAt, any(), any(), any(), any(), any()) }
+        coVerify(exactly = 2) { saveFlow.prepareSaveAndExtract(any(), capturedAt, any(), any(), any(), any(), any()) }
     }
 
     @Test
@@ -456,9 +496,10 @@ class AppContainerTest {
         val engine = mockk<LiteRtLmEngine>(relaxed = true)
         val saveFlow = mockk<BackgroundExtractionSaveFlow>()
         val capturedAt = ZonedDateTime.of(2026, 5, 11, 7, 21, 24, 0, ZoneId.of("America/New_York"))
-        coEvery { saveFlow.saveAndExtract(any(), any(), any(), any(), any(), any(), any()) } answers {
-            SaveOutcome.Pending(entryId = 1L, extractionJob = kotlinx.coroutines.Job())
+        coEvery { saveFlow.prepareSaveAndExtract(any(), any(), any(), any(), any(), any(), any()) } answers {
+            pendingExtractionWork(entryId = 1L, entryText = firstArg(), capturedAt = secondArg())
         }
+        every { saveFlow.launchExtraction(any(), any()) } returns kotlinx.coroutines.Job().also { it.complete() }
         val container = AppContainer(
             applicationContext = mockk<Context>(relaxed = true),
             boxStoreFactory = { mockk<BoxStore>(relaxed = true) },
@@ -473,7 +514,7 @@ class AppContainerTest {
         container.saveAndExtract("voice entry", capturedAt, durationMs = 90_000L)
 
         coVerify(exactly = 1) {
-            saveFlow.saveAndExtract(
+            saveFlow.prepareSaveAndExtract(
                 entryText = "voice entry",
                 capturedAt = capturedAt,
                 retrievedHistory = emptyList(),
@@ -490,9 +531,10 @@ class AppContainerTest {
         val saveFlow = mockk<BackgroundExtractionSaveFlow>()
         val engine = mockk<LiteRtLmEngine>(relaxed = true)
         val capturedAt = ZonedDateTime.of(2026, 5, 12, 8, 15, 0, 0, ZoneId.of("America/New_York"))
-        val expected = SaveOutcome.Pending(entryId = 42L, extractionJob = kotlinx.coroutines.Job())
+        val work = pendingExtractionWork(entryId = 42L, entryText = "persist me", capturedAt = capturedAt)
         var scheduled = 0
-        coEvery { saveFlow.saveAndExtract(any(), any(), any(), any(), any(), any(), any()) } returns expected
+        coEvery { saveFlow.prepareSaveAndExtract(any(), any(), any(), any(), any(), any(), any()) } returns work
+        every { saveFlow.launchExtraction(work, any()) } returns kotlinx.coroutines.Job().also { it.complete() }
 
         val container = AppContainer(
             applicationContext = mockk<Context>(relaxed = true),
@@ -509,48 +551,129 @@ class AppContainerTest {
 
         val actual = container.saveAndExtract("persist me", capturedAt)
 
-        assertEquals(expected, actual)
+        assertEquals(42L, actual.entryId)
         assertEquals(1, scheduled)
     }
 
     @Test
-    fun `runForegroundTextCall initializes the engine then delegates to the foreground text path`(
-        @TempDir tempRoot: File,
-    ) = runTest {
-        // Relaxed mock: streamMessageContents returns an empty Flow, so the terminal parse
-        // yields a ParseFailure — enough to prove the wiring (engine init + delegation to the
-        // streaming text path). The stub is intentionally NOT spelled out here: referencing
-        // streamMessageContents pulls litertlm's Content param type onto :app's test classpath,
-        // which it lacks. Response parsing is covered at the core-inference tier
-        // (ForegroundInferenceTest), where Content is on the classpath.
-        val engine = mockk<LiteRtLmEngine>(relaxed = true)
-        val modelFile = File(tempRoot, "ready-model.litertlm").apply { writeText("x") }
-        val artifactStore = fakeArtifactStore(artifactFile = modelFile, expectedByteSize = 1L)
-        val context = mockk<Context>(relaxed = true) {
-            every { filesDir } returns tempRoot
-            every { cacheDir } returns File(tempRoot, "cache").apply { mkdirs() }
+    fun `foreground capture holds queued background work and resumes it without delay`(@TempDir tempRoot: File) =
+        runTest {
+            val boxDir = newInMemoryObjectBoxDirectory("foreground-defer")
+            val box = openInMemoryBoxStore(boxDir)
+            try {
+                val capturedAt = ZonedDateTime.of(2026, 5, 20, 21, 50, 0, 0, ZoneId.of("America/New_York"))
+                val entryId = box.boxFor(EntryEntity::class.java).put(
+                    EntryEntity(
+                        entryText = "foreground should win",
+                        timestampEpochMs = capturedAt.toInstant().toEpochMilli(),
+                        extractionStatus = ExtractionStatus.PENDING,
+                    ),
+                )
+                val saveFlow = mockk<BackgroundExtractionSaveFlow>()
+                val work = pendingExtractionWork(
+                    entryId = entryId,
+                    entryText = "foreground should win",
+                    capturedAt = capturedAt,
+                )
+                coEvery { saveFlow.prepareSaveAndExtract(any(), any(), any(), any(), any(), any(), any()) } returns work
+                every { saveFlow.launchExtraction(work, any()) } returns kotlinx.coroutines.Job().also { it.complete() }
+                val context = mockk<Context>(relaxed = true) {
+                    every { filesDir } returns tempRoot
+                    every { cacheDir } returns File(tempRoot, "cache").apply { mkdirs() }
+                }
+                val container = AppContainer(
+                    applicationContext = context,
+                    boxStoreFactory = { box },
+                    modelPathLoader = { File(tempRoot, "m").absolutePath },
+                    backgroundEngineFactory = { _, _ -> mockk<LiteRtLmEngine>(relaxed = true) },
+                    backgroundExtractionSaveFlowFactory = { _, _, _, _, _, _, _ -> saveFlow },
+                    recoveredEntryIdsLoader = { emptyList() },
+                    foregroundServiceIntentFactory = { Intent("dev.anchildress1.vestige.TEST_START") },
+                    foregroundServiceStarter = {},
+                    scope = backgroundScope,
+                )
+
+                container.beginForegroundInference()
+                container.saveAndExtract("foreground should win", capturedAt)
+                runCurrent()
+
+                verify(exactly = 0) { saveFlow.launchExtraction(any(), any()) }
+
+                container.endForegroundInference()
+                runCurrent()
+                advanceUntilIdle()
+
+                verify(exactly = 1) { saveFlow.launchExtraction(work, CoroutineStart.LAZY) }
+            } finally {
+                box.closeAfterCleaningThreadResources()
+                cleanupObjectBoxTempRoot(tempRoot, boxDir)
+            }
         }
-        val container = AppContainer(
-            applicationContext = context,
-            boxStoreFactory = { mockk<BoxStore>(relaxed = true) },
-            modelPathLoader = { modelFile.absolutePath },
-            backgroundEngineFactory = { _, _ -> engine },
-            mainModelArtifactStoreFactory = { _, _, _ -> artifactStore },
-            recoveredEntryIdsLoader = { emptyList() },
-            foregroundServiceIntentFactory = { Intent("dev.anchildress1.vestige.TEST_START") },
-            foregroundServiceStarter = {},
-            scope = backgroundScope,
-        )
 
-        val events = container.runForegroundTextCall(
-            text = "typed it",
-            persona = dev.anchildress1.vestige.model.Persona.EDITOR,
-        ).toList()
+    @Test
+    fun `foreground capture cancels active extraction and requeues it before later work`(@TempDir tempRoot: File) =
+        runTest {
+            val capturedAt = ZonedDateTime.of(2026, 5, 20, 22, 5, 0, 0, ZoneId.of("America/New_York"))
+            val firstWork = pendingExtractionWork(
+                entryId = 1L,
+                entryText = "already extracting",
+                capturedAt = capturedAt,
+            )
+            val secondWork = pendingExtractionWork(
+                entryId = 2L,
+                entryText = "queued behind it",
+                capturedAt = capturedAt,
+            )
+            val firstRun = kotlinx.coroutines.Job()
+            val launches = mutableListOf<Long>()
+            val saveFlow = mockk<BackgroundExtractionSaveFlow>()
+            var prepared = 0
+            coEvery { saveFlow.prepareSaveAndExtract(any(), any(), any(), any(), any(), any(), any()) } answers {
+                if (prepared++ == 0) firstWork else secondWork
+            }
+            every { saveFlow.launchExtraction(any(), any()) } answers {
+                val work = firstArg<PendingExtractionWork>()
+                launches += work.entryId
+                if (launches.size == 1) firstRun else kotlinx.coroutines.Job().also { it.complete() }
+            }
+            val context = mockk<Context>(relaxed = true) {
+                every { filesDir } returns tempRoot
+                every { cacheDir } returns File(tempRoot, "cache").apply { mkdirs() }
+            }
+            val container = AppContainer(
+                applicationContext = context,
+                boxStoreFactory = { mockk<BoxStore>(relaxed = true) },
+                modelPathLoader = { File(tempRoot, "m").absolutePath },
+                backgroundEngineFactory = { _, _ -> mockk<LiteRtLmEngine>(relaxed = true) },
+                backgroundExtractionSaveFlowFactory = { _, _, _, _, _, _, _ -> saveFlow },
+                recoveredEntryIdsLoader = { emptyList() },
+                foregroundServiceIntentFactory = { Intent("dev.anchildress1.vestige.TEST_START") },
+                foregroundServiceStarter = {},
+                scope = backgroundScope,
+            )
 
-        val terminal = events.filterIsInstance<ForegroundStreamEvent.Terminal>().single()
-        assertTrue(terminal.result is ForegroundResult.ParseFailure)
-        coVerify { engine.initialize() }
-    }
+            val firstCompletion = container.saveAndExtract("already extracting", capturedAt).extractionJob
+            runCurrent()
+            val secondCompletion = container.saveAndExtract("queued behind it", capturedAt).extractionJob
+            runCurrent()
+
+            assertEquals(listOf(1L), launches)
+            assertFalse(firstCompletion.isCompleted)
+            assertFalse(secondCompletion.isCompleted)
+
+            container.beginForegroundInference()
+            runCurrent()
+
+            assertTrue(firstRun.isCancelled)
+
+            container.endForegroundInference()
+            runCurrent()
+            advanceUntilIdle()
+
+            assertEquals(listOf(1L, 1L, 2L), launches)
+            assertTrue(firstCompletion.isCompleted)
+            assertTrue(secondCompletion.isCompleted)
+        }
 
     @Test
     fun `retrieveHistory uses the injected dispatcher and maps entries to context-only chunks`(
@@ -603,8 +726,9 @@ class AppContainerTest {
         }
         val engineMock = mockk<LiteRtLmEngine>(relaxed = true)
         val saveFlow = mockk<BackgroundExtractionSaveFlow>()
-        coEvery { saveFlow.saveAndExtract(any(), any(), any(), any(), any(), any(), any()) } returns
-            SaveOutcome.Pending(entryId = 7L, extractionJob = extractionJob)
+        val work = pendingExtractionWork(entryId = 7L, entryText = "still running", capturedAt = CAPTURED_AT)
+        coEvery { saveFlow.prepareSaveAndExtract(any(), any(), any(), any(), any(), any(), any()) } returns work
+        every { saveFlow.launchExtraction(work, any()) } returns extractionJob
         var stopRequests = 0
         val container = AppContainer(
             applicationContext = context,
@@ -624,6 +748,7 @@ class AppContainerTest {
         assertEquals(ModelReadiness.Ready, container.modelReadinessFlow.value)
         container.ensureBackgroundEngineInitialized()
         container.saveAndExtract("still running", CAPTURED_AT)
+        runCurrent()
         container.lifecycleStateMachine.onInFlightCountChange(1)
         assertEquals(BackgroundExtractionLifecycleState.PROMOTING, container.lifecycleStateMachine.state.value)
 
@@ -696,8 +821,9 @@ class AppContainerTest {
         }
         val engineMock = mockk<LiteRtLmEngine>(relaxed = true)
         val saveFlow = mockk<BackgroundExtractionSaveFlow>()
-        coEvery { saveFlow.saveAndExtract(any(), any(), any(), any(), any(), any(), any()) } returns
-            SaveOutcome.Pending(entryId = 9L, extractionJob = extractionJob)
+        val work = pendingExtractionWork(entryId = 9L, entryText = "still running", capturedAt = CAPTURED_AT)
+        coEvery { saveFlow.prepareSaveAndExtract(any(), any(), any(), any(), any(), any(), any()) } returns work
+        every { saveFlow.launchExtraction(work, any()) } returns extractionJob
         var stopRequests = 0
         val container = AppContainer(
             applicationContext = context,
@@ -714,6 +840,7 @@ class AppContainerTest {
         )
         container.ensureBackgroundEngineInitialized()
         container.saveAndExtract("still running", CAPTURED_AT)
+        runCurrent()
         container.lifecycleStateMachine.onInFlightCountChange(1)
         assertEquals(BackgroundExtractionLifecycleState.PROMOTING, container.lifecycleStateMachine.state.value)
 
@@ -1130,8 +1257,9 @@ class AppContainerTest {
                 }
             }
             val saveFlow = mockk<BackgroundExtractionSaveFlow>()
-            coEvery { saveFlow.saveAndExtract(any(), any(), any(), any(), any(), any(), any()) } returns
-                SaveOutcome.Pending(entryId = 7L, extractionJob = extractionJob)
+            val work = pendingExtractionWork(entryId = 7L, entryText = "wipe me", capturedAt = CAPTURED_AT)
+            coEvery { saveFlow.prepareSaveAndExtract(any(), any(), any(), any(), any(), any(), any()) } returns work
+            every { saveFlow.launchExtraction(work, any()) } returns extractionJob
             val context = mockk<Context>(relaxed = true) {
                 every { filesDir } returns tempRoot
                 every { cacheDir } returns File(tempRoot, "cache").apply { mkdirs() }
@@ -1151,6 +1279,7 @@ class AppContainerTest {
             )
 
             container.saveAndExtract("wipe me", CAPTURED_AT)
+            runCurrent()
             container.wipeAllData()
             advanceUntilIdle()
 
@@ -1678,7 +1807,7 @@ class AppContainerTest {
 
         container.recoverPendingExtractions()
 
-        coVerify(exactly = 0) { saveFlow.recoverEntry(any(), any(), any(), any(), any()) }
+        coVerify(exactly = 0) { saveFlow.prepareRecovery(any(), any(), any(), any(), any()) }
     }
 
     @Test
@@ -1687,6 +1816,7 @@ class AppContainerTest {
         val boxStore = openInMemoryBoxStore(dataDir)
         val engine = mockk<LiteRtLmEngine>(relaxed = true)
         val saveFlow = mockk<BackgroundExtractionSaveFlow>(relaxed = true)
+        stubQueuedRecovery(saveFlow)
         val modelFile = File(tempRoot, "ready-model.litertlm").apply { writeText("x") }
         val artifactStore = fakeArtifactStore(artifactFile = modelFile, expectedByteSize = 1L)
         val context = mockk<Context>(relaxed = true) {
@@ -1722,8 +1852,8 @@ class AppContainerTest {
 
             container.recoverPendingExtractions()
 
-            coVerify(exactly = 1) { saveFlow.recoverEntry(pendingId, "typed-pending", any(), any(), any()) }
-            coVerify(exactly = 0) { saveFlow.recoverEntry(runningId, any(), any(), any(), any()) }
+            coVerify(exactly = 1) { saveFlow.prepareRecovery(pendingId, "typed-pending", any(), any(), any()) }
+            coVerify(exactly = 0) { saveFlow.prepareRecovery(runningId, any(), any(), any(), any()) }
         } finally {
             container.close()
             cleanupObjectBoxTempRoot(tempRoot, dataDir)
@@ -1760,7 +1890,7 @@ class AppContainerTest {
 
             container.recoverPendingExtractions()
 
-            coVerify(exactly = 0) { saveFlow.recoverEntry(any(), any(), any(), any(), any()) }
+            coVerify(exactly = 0) { saveFlow.prepareRecovery(any(), any(), any(), any(), any()) }
         }
 
     @Test
@@ -1771,9 +1901,24 @@ class AppContainerTest {
             val engine = mockk<LiteRtLmEngine>(relaxed = true)
             val saveFlow = mockk<BackgroundExtractionSaveFlow>()
             // First call throws, second succeeds — recovery loop must not bail on the first failure.
-            coEvery { saveFlow.recoverEntry(any(), any(), any(), any(), any()) } throws
-                RuntimeException("simulated recovery failure") andThen
-                mockk<kotlinx.coroutines.Job>(relaxed = true)
+            var recoveryCalls = 0
+            coEvery { saveFlow.prepareRecovery(any(), any(), any(), any(), any()) } answers {
+                if (recoveryCalls++ == 0) {
+                    throw RuntimeException("simulated recovery failure")
+                }
+                pendingExtractionWork(
+                    entryId = firstArg(),
+                    entryText = secondArg(),
+                    capturedAt = thirdArg(),
+                    persona = arg(3),
+                    timeoutMs = arg(4),
+                )
+            }
+            every {
+                saveFlow.launchExtraction(any(), any())
+            } answers {
+                kotlinx.coroutines.Job().also { it.complete() }
+            }
             val modelFile = File(tempRoot, "ready-model.litertlm").apply { writeText("x") }
             val artifactStore = fakeArtifactStore(artifactFile = modelFile, expectedByteSize = 1L)
             val context = mockk<Context>(relaxed = true) {
@@ -1799,8 +1944,8 @@ class AppContainerTest {
 
                 container.recoverPendingExtractions()
 
-                coVerify(exactly = 1) { saveFlow.recoverEntry(firstId, "first", any(), any(), any()) }
-                coVerify(exactly = 1) { saveFlow.recoverEntry(secondId, "second", any(), any(), any()) }
+                coVerify(exactly = 1) { saveFlow.prepareRecovery(firstId, "first", any(), any(), any()) }
+                coVerify(exactly = 1) { saveFlow.prepareRecovery(secondId, "second", any(), any(), any()) }
             } finally {
                 container.close()
                 cleanupObjectBoxTempRoot(tempRoot, dataDir)
@@ -1813,6 +1958,7 @@ class AppContainerTest {
         val boxStore = openInMemoryBoxStore(dataDir)
         val engine = mockk<LiteRtLmEngine>(relaxed = true)
         val saveFlow = mockk<BackgroundExtractionSaveFlow>(relaxed = true)
+        stubQueuedRecovery(saveFlow)
         val modelFile = File(tempRoot, "ready-model.litertlm").apply { writeText("x") }
         val artifactStore = fakeArtifactStore(artifactFile = modelFile, expectedByteSize = 1L)
         val context = mockk<Context>(relaxed = true) {
@@ -1839,8 +1985,8 @@ class AppContainerTest {
 
             container.recoverPendingExtractions()
 
-            coVerify(exactly = 1) { saveFlow.recoverEntry(firstId, "typed-1", any(), any(), any()) }
-            coVerify(exactly = 1) { saveFlow.recoverEntry(secondId, "typed-2", any(), any(), any()) }
+            coVerify(exactly = 1) { saveFlow.prepareRecovery(firstId, "typed-1", any(), any(), any()) }
+            coVerify(exactly = 1) { saveFlow.prepareRecovery(secondId, "typed-2", any(), any(), any()) }
             assertEquals(0L, container.dataRevision.value)
         } finally {
             container.close()
@@ -1856,6 +2002,7 @@ class AppContainerTest {
         val boxStore = openInMemoryBoxStore(dataDir)
         val engine = mockk<LiteRtLmEngine>(relaxed = true)
         val saveFlow = mockk<BackgroundExtractionSaveFlow>(relaxed = true)
+        stubQueuedRecovery(saveFlow)
         val modelFile = File(tempRoot, "ready-model.litertlm").apply { writeText("x") }
         val artifactStore = fakeArtifactStore(artifactFile = modelFile, expectedByteSize = 1L)
         val context = mockk<Context>(relaxed = true) {
@@ -1886,8 +2033,8 @@ class AppContainerTest {
             assertEquals(2, outcome.candidates)
             assertEquals(2, outcome.queued)
             assertEquals(0, outcome.failed)
-            coVerify(exactly = 1) { saveFlow.recoverEntry(firstId, "loaded first", any(), any(), any()) }
-            coVerify(exactly = 1) { saveFlow.recoverEntry(secondId, "loaded second", any(), any(), any()) }
+            coVerify(exactly = 1) { saveFlow.prepareRecovery(firstId, "loaded first", any(), any(), any()) }
+            coVerify(exactly = 1) { saveFlow.prepareRecovery(secondId, "loaded second", any(), any(), any()) }
         } finally {
             container.close()
             cleanupObjectBoxTempRoot(tempRoot, dataDir)

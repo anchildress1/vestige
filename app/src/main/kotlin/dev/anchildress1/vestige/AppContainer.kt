@@ -36,6 +36,7 @@ import dev.anchildress1.vestige.patterns.PatternDetectionOrchestrator
 import dev.anchildress1.vestige.patterns.PatternVocabClusterUpdater
 import dev.anchildress1.vestige.save.BackgroundExtractionLifecycleCallbacks
 import dev.anchildress1.vestige.save.BackgroundExtractionSaveFlow
+import dev.anchildress1.vestige.save.PendingExtractionWork
 import dev.anchildress1.vestige.save.SaveOutcome
 import dev.anchildress1.vestige.storage.CalloutCooldownEntity
 import dev.anchildress1.vestige.storage.CalloutCooldownStore
@@ -59,18 +60,17 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancelAndJoin
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.flow
-import kotlinx.coroutines.joinAll
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -209,13 +209,11 @@ class AppContainer(
     private val embedderInitMutex = Mutex()
     private val modelMutationMutex = Mutex()
     private val readinessRefreshMutex = Mutex()
-    private val trackedExtractionJobsMutex = Mutex()
     private val vectorBackfillMutex = Mutex()
     private val vectorBackfillRunning = AtomicBoolean(false)
     private val vectorBackfillRequested = AtomicBoolean(false)
     private val missingExtractionBackfillRunning = AtomicBoolean(false)
     private val foregroundPromotionDeniedLogged = AtomicBoolean(false)
-    private val trackedExtractionJobs: MutableSet<Job> = linkedSetOf()
 
     @Volatile
     private var backgroundEngineInitialized = false
@@ -269,9 +267,9 @@ class AppContainer(
     }
 
     /**
-     * Single-turn foreground inference path consumed by the capture screen. Shares the same
-     * process Engine as background extraction, but each call opens its own independent SDK
-     * conversation, so foreground no longer blocks on a shared Kotlin call mutex.
+     * Foreground transcription path consumed by the capture screen. Shares the same process
+     * Engine as background extraction; LiteRT-LM still permits only one live session, so the
+     * engine wrapper serializes calls.
      */
     val foregroundInference: ForegroundInference by lazy {
         ForegroundInference(
@@ -282,18 +280,13 @@ class AppContainer(
 
     /** Voice-path adapter: initializes the shared Engine before delegating to the stream. */
     fun runForegroundCall(audio: AudioChunk, persona: Persona): Flow<ForegroundStreamEvent> = flow {
-        ensureBackgroundEngineInitialized()
-        emitAll(foregroundInference.runForegroundCall(audio, persona))
-    }
-
-    /** Typed-entry foreground call — same engine + parser as voice, same init guard. */
-    fun runForegroundTextCall(
-        text: String,
-        persona: Persona,
-        retrievedHistory: List<HistoryChunk> = emptyList(),
-    ): Flow<ForegroundStreamEvent> = flow {
-        ensureBackgroundEngineInitialized()
-        emitAll(foregroundInference.runForegroundTextCall(text, persona, retrievedHistory))
+        try {
+            beginForegroundInference()
+            ensureBackgroundEngineInitialized()
+            emitAll(foregroundInference.runForegroundCall(audio, persona))
+        } finally {
+            endForegroundInference()
+        }
     }
 
     private val retrievalRepo: RetrievalRepo by lazy {
@@ -301,10 +294,9 @@ class AppContainer(
     }
 
     /**
-     * Off-thread prior-entry lookup feeding detached follow-up generation + background extraction.
-     * Degrades to empty on any failure (embeddings not backfilled yet, store error) so a bad
-     * retrieval never blocks entry creation. Maps the top entries to context-only [HistoryChunk]s
-     * — no `patternId`, since follow-up generation needs textual context, not recurrence linkage.
+     * Off-thread prior-entry lookup feeding background extraction. Degrades to empty on any failure
+     * (embeddings not backfilled yet, store error) so a bad retrieval never blocks entry creation.
+     * Maps the top entries to context-only [HistoryChunk]s.
      */
     suspend fun retrieveHistory(query: String): List<HistoryChunk> = withContext(computeDispatcher) {
         try {
@@ -359,6 +351,11 @@ class AppContainer(
             ::retrieveHistory,
             patternDetectionOrchestrator,
         )
+    }
+    private val backgroundExtractionQueue: BackgroundExtractionQueue by lazy {
+        BackgroundExtractionQueue(scope) { work ->
+            backgroundExtractionSaveFlow.launchExtraction(work, start = CoroutineStart.LAZY)
+        }
     }
 
     private val statusBus: BackgroundExtractionStatusBus = BackgroundExtractionStatusBus()
@@ -442,17 +439,6 @@ class AppContainer(
             .onFailure { Log.w(TAG, "Legacy AUDIT pattern retirement failed", it) }
     }
 
-    /**
-     * Land call-2's persona follow-up on the still-in-flight entry and nudge [dataRevision] so an
-     * open detail screen reloads now — not later when background extraction terminal happens to
-     * bump it. Without the nudge the follow-up sits on disk, invisible, until convergence
-     * finishes (~15 s+); the user expects it moments after the transcript.
-     */
-    suspend fun attachFollowUp(entryId: Long, followUpText: String) {
-        withContext(ioDispatcher) { entryStore.attachFollowUp(entryId, followUpText) }
-        _dataRevision.value += 1
-    }
-
     fun reportExtractionStatus(entryId: Long, status: ExtractionStatus) {
         if (!status.isTerminal() && entryStore.readEntry(entryId) == null) {
             Log.w(TAG, "Ignoring stale in-flight extraction status for missing entryId=$entryId")
@@ -490,7 +476,7 @@ class AppContainer(
         followUpText: String? = null,
     ): SaveOutcome.Pending {
         ensureBackgroundEngineInitialized()
-        val outcome = backgroundExtractionSaveFlow.saveAndExtract(
+        val work = backgroundExtractionSaveFlow.prepareSaveAndExtract(
             entryText = entryText,
             capturedAt = capturedAt,
             retrievedHistory = retrievedHistory,
@@ -499,9 +485,9 @@ class AppContainer(
             durationMs = durationMs,
             followUpText = followUpText,
         )
-        trackExtractionJob(outcome.extractionJob)
+        val extractionJob = enqueueBackgroundExtraction(work)
         launchVectorBackfillIfReady()
-        return outcome
+        return SaveOutcome.Pending(work.entryId, extractionJob)
     }
 
     /**
@@ -793,16 +779,16 @@ class AppContainer(
         entryText: String,
         capturedAt: ZonedDateTime,
         persona: Persona = Persona.WITNESS,
+        timeoutMs: Long? = MISSING_EXTRACTION_BACKFILL_TIMEOUT_MS,
     ): Job? = runCatching {
-        val job = backgroundExtractionSaveFlow.recoverEntry(
+        val work = backgroundExtractionSaveFlow.prepareRecovery(
             entryId = entryId,
             entryText = entryText,
             capturedAt = capturedAt,
             persona = persona,
-            timeoutMs = MISSING_EXTRACTION_BACKFILL_TIMEOUT_MS,
+            timeoutMs = timeoutMs,
         )
-        trackExtractionJob(job)
-        job
+        enqueueBackgroundExtraction(work)
     }.onFailure { Log.e(TAG, "Recovery extraction failed for entry $entryId", it) }
         .getOrNull()
 
@@ -840,19 +826,19 @@ class AppContainer(
         }
     }
 
-    private suspend fun trackExtractionJob(job: Job) {
-        trackedExtractionJobsMutex.withLock { trackedExtractionJobs.add(job) }
-        job.invokeOnCompletion {
-            scope.launch {
-                trackedExtractionJobsMutex.withLock { trackedExtractionJobs.remove(job) }
-            }
-        }
+    private suspend fun enqueueBackgroundExtraction(work: PendingExtractionWork): Job =
+        backgroundExtractionQueue.enqueue(work)
+
+    internal suspend fun beginForegroundInference() {
+        backgroundExtractionQueue.beginForeground()
+    }
+
+    internal suspend fun endForegroundInference() {
+        backgroundExtractionQueue.endForeground()
     }
 
     private suspend fun cancelTrackedExtractionJobs() {
-        val jobs = trackedExtractionJobsMutex.withLock { trackedExtractionJobs.toList() }
-        jobs.forEach(Job::cancel)
-        jobs.joinAll()
+        backgroundExtractionQueue.cancelAll()
     }
 
     private suspend fun cancelTrackedExtractionsAndResetLifecycle() {
@@ -952,7 +938,7 @@ class AppContainer(
                         return
                     }
                     retryCount += 1
-                    delay(vectorBackfillRetryDelayMs)
+                    kotlinx.coroutines.delay(vectorBackfillRetryDelayMs)
                     vectorBackfillRequested.set(true)
                 }
             }

@@ -91,7 +91,7 @@ jobs:
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: ./gradlew :core-model:test :core-inference:testDebugUnitTest :core-storage:testDebugUnitTest :app:testDebugUnitTest koverXmlReport koverVerify sonar -Dsonar.token="$SONAR_TOKEN"
+        run: ./gradlew :core-model:test :core-inference:testDebugUnitTest :core-storage:testDebugUnitTest :app:testDebugUnitTest :app:testDebugIntegrationTest koverXmlReport koverVerify sonar -Dsonar.token="$SONAR_TOKEN"
 
       - name: Upload app HTML test report
         uses: actions/upload-artifact@v7
@@ -107,6 +107,14 @@ jobs:
         with:
           name: app-junit-results
           path: app/build/test-results/testDebugUnitTest/
+          retention-days: 14
+
+      - name: Upload app integration JUnit test results
+        uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: app-integration-junit-results
+          path: app/build/test-results/testDebugIntegrationTest/
           retention-days: 14
 
       - name: Upload core-inference JUnit test results

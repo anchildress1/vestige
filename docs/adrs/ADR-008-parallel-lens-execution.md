@@ -174,9 +174,19 @@ In the concurrent run only the lens that won the session race completed (1/3 par
 
 - `LiteRtLmEngine.callMutex` — one exclusive lock held for the whole `createConversation`→`close` lifetime of every call. At most one live session, ever. (`stateMutex`/`closing`/`drainGate` close-drain machinery is unchanged and orthogonal.)
 - `BackgroundExtractionWorker` — sequential `LENSES.map { runLens(...) }`; no `coroutineScope`/`async`/`awaitAll`; plain `mutableListOf` accumulator. 2-of-3 fallback, per-lens retry, `RUNNING`-once unchanged.
-- Story 2.19 (foreground non-blocking on background) is **withdrawn** — SDK-impossible. Foreground serializes behind an in-flight background lens (≤ ~15 s on E4B GPU); accepted for v1.
+- Story 2.19's **concurrent-session** path is **withdrawn** — SDK-impossible. The historical v1 fallback serialized foreground behind an in-flight background lens (≤ ~15 s on E4B GPU); the 2026-05-20 addendum below supersedes that fallback with cancellation + FIFO rerun.
 
 **Performance.** Sequential 3-lens ≈ 3 × single-lens ≈ ~44 s/entry on E4B GPU (single-lens measured 14.7 s in STT-F) — within the documented 25–55 s band. ADR-002's sequential sequencing is restored; this ADR no longer supersedes it. Re-open only if a future SDK lifts single-session — and then verify **on-device**, never from bytecode-method-presence.
+
+---
+
+## Addendum (2026-05-20) — Foreground preempts queued background
+
+This is an addendum because the 2026-05-17 single-session finding still stands and must not be rewritten away: concurrent foreground + background sessions are impossible on `litertlm-android:0.11.0`.
+
+The change is narrower: foreground capture no longer waits for an active background extraction to finish. `AppContainer` cancels active background extraction, requeues that entry, and drains background extraction FIFO after foreground releases the slot. This is cancellation + rerun, not session suspend/resume or concurrent execution.
+
+Numbers stay scoped to the work they measured. The STT-F background number still holds for an uninterrupted 3-lens run: single lens ≈ 14.7 s, full sequential extraction ≈ 44 s, inside the 25–55 s band. The old foreground-wait number (≤ ~15 s) is now only historical: current foreground preemption waits for cancellation/close unwind, not for a whole background lens to finish.
 
 ---
 

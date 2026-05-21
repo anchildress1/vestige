@@ -33,13 +33,13 @@ flowchart TD
 ```mermaid
 flowchart TD
     accTitle: Voice capture flow
-    accDescr: Tap record to enter RECORDING. Discard during recording ends silently with no entry. Stop and file it triggers the foreground Gemma call returning transcription and follow-up, persists an ObjectBox row, then runs the background three-lens extraction, convergence, observations, and pattern detection.
+    accDescr: Tap record to enter RECORDING. Discard during recording ends silently with no entry. Stop and file it triggers the foreground Gemma call returning transcription and one follow-up, persists an ObjectBox row, then runs the background three-lens extraction, convergence, observations, and pattern detection.
 
     IDLE(["IDLE"]) -- "tap Record" --> REC["RECORDING"]
     REC -- "DISCARD · NO SAVE<br/>(single tap, no confirm, silent)" --> IDLE
     REC -- "STOP · FILE IT" --> FG["Foreground Gemma call<br/>→ transcription + follow-up"]
     FG --> PERSIST["EntryStore: ObjectBox row<br/>(audio discarded now)"]
-    PERSIST --> SHOW["show exchange<br/>(transcription dimmed · follow-up primary)"]
+    PERSIST --> SHOW["show transcript<br/>(transcription dimmed)"]
     PERSIST --> BG["background: 3 sequential lenses → resolver →<br/>entry_observations → pattern detection if threshold"]
     SHOW --> IDLE
 ```
@@ -54,11 +54,11 @@ is not `Ready`, `submitTyped` is a silent no-op (parity with a disabled REC butt
 ```mermaid
 flowchart TD
     accTitle: Typed capture flow requires foreground model
-    accDescr: The user taps Type and enters text. If the model readiness is Ready, Log entry runs the same foreground call and background pipeline as voice with follow-up null for typed. If the model is not Ready, submit is a silent no-op matching the disabled record button.
+    accDescr: The user taps Type and enters text. If the model readiness is Ready, Log entry persists the typed transcript and runs the background pipeline. If the model is not Ready, submit is a silent no-op matching the disabled record button.
 
     T(["tap Type → 'What just happened.'"]) --> RDY{"ModelReadiness == Ready?"}
     RDY -- no --> NOOP["silent no-op<br/>(parity with disabled REC)"]
-    RDY -- yes --> LOG["Log entry → same foreground call<br/>(Content.Text · follow_up = null for typed)"]
+    RDY -- yes --> LOG["Log entry<br/>(typed text · follow_up = null)"]
     LOG --> BG["same background pipeline as voice"]
 ```
 

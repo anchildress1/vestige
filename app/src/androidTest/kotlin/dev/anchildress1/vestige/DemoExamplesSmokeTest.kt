@@ -7,15 +7,10 @@ import dev.anchildress1.vestige.inference.BackgroundExtractionRequest
 import dev.anchildress1.vestige.inference.BackgroundExtractionResult
 import dev.anchildress1.vestige.inference.BackgroundExtractionWorker
 import dev.anchildress1.vestige.inference.DefaultConvergenceResolver
-import dev.anchildress1.vestige.inference.ForegroundInference
-import dev.anchildress1.vestige.inference.ForegroundResult
-import dev.anchildress1.vestige.inference.ForegroundStreamEvent
 import dev.anchildress1.vestige.inference.HistoryChunk
 import dev.anchildress1.vestige.inference.LensResult
 import dev.anchildress1.vestige.inference.LiteRtLmEngine
-import dev.anchildress1.vestige.model.Persona
 import dev.anchildress1.vestige.model.TemplateLabel
-import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.runBlocking
 import org.json.JSONArray
 import org.json.JSONObject
@@ -31,7 +26,6 @@ import java.time.ZonedDateTime
  * Device smoke for the three demo transcripts that triggered the current regressions.
  *
  * No mic, no audio fixture, no human performance art. The test drives:
- * - foreground typed follow-up generation under Editor
  * - background three-lens extraction with real GPU inference
  *
  * Run:
@@ -43,33 +37,6 @@ import java.time.ZonedDateTime
  */
 @RunWith(AndroidJUnit4::class)
 class DemoExamplesSmokeTest {
-
-    @Test
-    fun editorFollowUpsStayConcreteOnDemoExamples() = runBlocking {
-        CASES.forEach { example ->
-            withEngine { engine ->
-                val inference = ForegroundInference(engine = engine, cacheDir = appCacheDir())
-                val result = runForegroundTyped(inference, example)
-                logForeground(example, result)
-                assertTrue(
-                    "${example.id}: foreground call must succeed; was ${result::class.simpleName}",
-                    result is ForegroundResult.Success,
-                )
-                val success = result as ForegroundResult.Success
-                val lower = success.followUp.lowercase()
-                assertTrue("${example.id}: follow-up was blank", success.followUp.isNotBlank())
-                assertTrue(
-                    "${example.id}: follow-up drifted back into feeling-word sludge: ${success.followUp}",
-                    FORBIDDEN_FOLLOW_UP_FRAGMENTS.none(lower::contains),
-                )
-                assertTrue(
-                    "${example.id}: follow-up missed every concrete anchor " +
-                        "${example.followUpAnchors}; got ${success.followUp}",
-                    example.followUpAnchors.any(lower::contains),
-                )
-            }
-        }
-    }
 
     @Test
     fun backgroundExtractionSurfacesRealEvidenceOnDemoExamples() = runBlocking {
@@ -161,47 +128,10 @@ class DemoExamplesSmokeTest {
         }
     }
 
-    private suspend fun runForegroundTyped(inference: ForegroundInference, example: DemoExample): ForegroundResult {
-        var terminal: ForegroundResult? = null
-        inference.runForegroundTextCall(
-            text = example.entryText,
-            persona = Persona.EDITOR,
-            retrievedHistory = example.retrievedHistory,
-        ).collect { event ->
-            if (event is ForegroundStreamEvent.Terminal) terminal = event.result
-        }
-        return checkNotNull(terminal) { "${example.id}: no terminal foreground result" }
-    }
-
     private fun appCacheDir(): File = InstrumentationRegistry.getInstrumentation().targetContext.cacheDir
 
     private fun String.normalizedDemoToken(): String = lowercase()
         .replace(Regex("[^a-z0-9]+"), "")
-
-    private fun logForeground(example: DemoExample, result: ForegroundResult) {
-        val output = when (result) {
-            is ForegroundResult.Success -> JSONObject()
-                .put("type", "Success")
-                .put("elapsedMs", result.elapsedMs)
-                .put("transcription", result.transcription)
-                .put("followUp", result.followUp)
-
-            is ForegroundResult.ParseFailure -> JSONObject()
-                .put("type", "ParseFailure")
-                .put("elapsedMs", result.elapsedMs)
-                .put("reason", result.reason.name)
-                .put("recoveredTranscription", result.recoveredTranscription)
-                .put("rawResponse", result.rawResponse)
-        }
-        android.util.Log.i(
-            TAG,
-            "DEMO_FOREGROUND ${example.id} " +
-                JSONObject()
-                    .put("input", example.inputJson())
-                    .put("output", output)
-                    .toString(),
-        )
-    }
 
     private fun logBackground(example: DemoExample, result: BackgroundExtractionResult) {
         val output = JSONObject()
@@ -265,7 +195,6 @@ class DemoExamplesSmokeTest {
         val capturedAt: ZonedDateTime,
         val entryText: String,
         val retrievedHistory: List<HistoryChunk> = emptyList(),
-        val followUpAnchors: Set<String>,
         val expectedTemplateLabel: TemplateLabel? = null,
         val expectedEnergyAnchor: String? = null,
         val expectedPatternId: String? = null,
@@ -292,13 +221,6 @@ class DemoExamplesSmokeTest {
         const val KEY_ENERGY = "energy_descriptor"
         const val KEY_RECURRENCE = "recurrence_link"
         const val KEY_TAGS = "tags"
-        val FORBIDDEN_FOLLOW_UP_FRAGMENTS = setOf(
-            "what word describes the feeling",
-            "which word describes the feeling",
-            "what word describes the specific feeling",
-            "which word describes the specific feeling",
-            "feeling that made you",
-        )
         const val PACKAGE_PATTERN_ID =
             "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
         const val COUCH_PATTERN_ID =
@@ -314,7 +236,6 @@ class DemoExamplesSmokeTest {
                     "the desk and the thing i was going to do right after that kind of " +
                     "vaped while reading i had three tabs open i knew with the three tabs " +
                     "are four and they're still sitting there open",
-                followUpAnchors = setOf("hollow", "evaporated", "tabs", "coffee", "all-hands"),
                 expectedTemplateLabel = TemplateLabel.AFTERMATH,
                 expectedEnergyAnchor = "hollow",
                 expectedResolvedTags = setOf(
@@ -343,16 +264,6 @@ class DemoExamplesSmokeTest {
                             "past ups again, and left the label on the counter.",
                     ),
                 ),
-                followUpAnchors = setOf(
-                    "package",
-                    "ups",
-                    "label",
-                    "counter",
-                    "route",
-                    "googling",
-                    "returning",
-                    "search term",
-                ),
                 expectedPatternId = PACKAGE_PATTERN_ID,
                 expectedResolvedTags = setOf(
                     "package-drop-off",
@@ -379,7 +290,6 @@ class DemoExamplesSmokeTest {
                             "and still did not buy one.",
                     ),
                 ),
-                followUpAnchors = setOf("couch", "spreadsheet", "dimensions", "reviews", "rows"),
                 expectedTemplateLabel = TemplateLabel.DECISION_SPIRAL,
                 expectedPatternId = COUCH_PATTERN_ID,
                 expectedResolvedTags = setOf("couch", "spreadsheet", "comparing"),

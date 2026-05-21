@@ -5,10 +5,11 @@ import dev.anchildress1.vestige.model.EntryObservation
 import dev.anchildress1.vestige.model.ObservationEvidence
 import dev.anchildress1.vestige.model.ResolvedExtraction
 import dev.anchildress1.vestige.model.ResolvedField
-import io.mockk.coEvery
-import io.mockk.coVerify
+import io.mockk.every
 import io.mockk.mockk
+import io.mockk.verify
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Assertions.assertEquals
@@ -51,7 +52,7 @@ class ObservationGeneratorTest {
         assertTrue(obs.text.contains("talk to Nora before Friday"))
         assertTrue(obs.text.contains("Nora"))
         assertEquals(listOf("stated_commitment"), obs.fields)
-        coVerify(exactly = 0) { engine.generateText(any(), any()) }
+        verify(exactly = 0) { engine.streamText(any(), any()) }
     }
 
     @Test
@@ -74,7 +75,7 @@ class ObservationGeneratorTest {
         assertEquals(ObservationEvidence.VOCABULARY_CONTRADICTION, obs.evidence)
         assertTrue(obs.text.contains("fine"))
         assertTrue(obs.text.contains("flattened"))
-        coVerify(exactly = 0) { engine.generateText(any(), any()) }
+        verify(exactly = 0) { engine.streamText(any(), any()) }
     }
 
     @Test
@@ -87,27 +88,29 @@ class ObservationGeneratorTest {
         assertEquals(1, observations.size)
         assertEquals(ObservationEvidence.VOLUNTEERED_CONTEXT, observations.first().evidence)
         assertTrue(observations.first().text.contains("goblin hours"))
-        coVerify(exactly = 0) { engine.generateText(any(), any()) }
+        verify(exactly = 0) { engine.streamText(any(), any()) }
     }
 
     @Test
     fun `5am capture is outside goblin hours and falls through to the model`() = runTest {
         val resolved = ResolvedExtraction(emptyMap())
         val capturedAt = ZonedDateTime.of(2026, 5, 11, 5, 0, 0, 0, ZoneId.of("America/New_York"))
-        coEvery { engine.generateText(any(), any()) } returns
-            """{"observations":[{"text":"Three boss mentions.","evidence":"theme-noticing","fields":["tags"]}]}"""
+        every { engine.streamText(any(), any()) } returns flowOf(
+            """{"observations":[{"text":"Three boss mentions.","evidence":"theme-noticing","fields":["tags"]}]}""",
+        )
 
         val observations = newGenerator().generate(SAMPLE_TEXT, resolved, capturedAt)
 
         assertEquals(1, observations.size)
         assertEquals(ObservationEvidence.THEME_NOTICING, observations.first().evidence)
-        coVerify(exactly = 1) { engine.generateText(any(), any()) }
+        verify(exactly = 1) { engine.streamText(any(), any()) }
     }
 
     @Test
     fun `falls back to model when no deterministic signal is present`() = runTest {
         val resolved = ResolvedExtraction(emptyMap())
-        coEvery { engine.generateText(any(), any()) } returns themeNoticingPayload("You logged three boss mentions.")
+        every { engine.streamText(any(), any()) } returns
+            flowOf(themeNoticingPayload("You logged three boss mentions."))
 
         val observations = newGenerator().generate(SAMPLE_TEXT, resolved, SAMPLE_DAY)
 
@@ -118,39 +121,44 @@ class ObservationGeneratorTest {
     @Test
     fun `retries the model once when the first response contains a forbidden phrase`() = runTest {
         val resolved = ResolvedExtraction(emptyMap())
-        coEvery { engine.generateText(any(), any()) } returnsMany listOf(
-            """{"observations":[{"text":"You might be feeling worn out.","evidence":"theme-noticing","fields":[]}]}""",
-            """{"observations":[{"text":"Three boss mentions.","evidence":"theme-noticing","fields":["tags"]}]}""",
+        every { engine.streamText(any(), any()) } returnsMany listOf(
+            flowOf(
+                """{"observations":[{"text":"You might feel stuck.","evidence":"theme-noticing","fields":[]}]}""",
+            ),
+            flowOf(
+                """{"observations":[{"text":"Three boss mentions.","evidence":"theme-noticing","fields":["tags"]}]}""",
+            ),
         )
 
         val observations = newGenerator().generate(SAMPLE_TEXT, resolved, SAMPLE_DAY)
 
         assertEquals(1, observations.size)
         assertEquals("Three boss mentions.", observations.first().text)
-        coVerify(exactly = 2) { engine.generateText(any(), any()) }
+        verify(exactly = 2) { engine.streamText(any(), any()) }
     }
 
     @Test
     fun `returns empty list when both model attempts violate the voice rules`() = runTest {
         val resolved = ResolvedExtraction(emptyMap())
-        coEvery { engine.generateText(any(), any()) } returns
-            """{"observations":[{"text":"It seems you're avoiding things.","evidence":"theme-noticing","fields":[]}]}"""
+        every { engine.streamText(any(), any()) } returns flowOf(
+            """{"observations":[{"text":"It seems you're stuck.","evidence":"theme-noticing","fields":[]}]}""",
+        )
 
         val observations = newGenerator().generate(SAMPLE_TEXT, resolved, SAMPLE_DAY)
 
         assertTrue(observations.isEmpty())
-        coVerify(exactly = 2) { engine.generateText(any(), any()) }
+        verify(exactly = 2) { engine.streamText(any(), any()) }
     }
 
     @Test
     fun `returns empty list when model throws on both attempts`() = runTest {
         val resolved = ResolvedExtraction(emptyMap())
-        coEvery { engine.generateText(any(), any()) } throws RuntimeException("native crash")
+        every { engine.streamText(any(), any()) } throws RuntimeException("native crash")
 
         val observations = newGenerator().generate(SAMPLE_TEXT, resolved, SAMPLE_DAY)
 
         assertTrue(observations.isEmpty())
-        coVerify(exactly = 2) { engine.generateText(any(), any()) }
+        verify(exactly = 2) { engine.streamText(any(), any()) }
     }
 
     @Test
@@ -173,7 +181,7 @@ class ObservationGeneratorTest {
         assertEquals(2, observations.size)
         assertEquals(ObservationEvidence.COMMITMENT_FLAG, observations[0].evidence)
         assertEquals(ObservationEvidence.VOCABULARY_CONTRADICTION, observations[1].evidence)
-        coVerify(exactly = 0) { engine.generateText(any(), any()) }
+        verify(exactly = 0) { engine.streamText(any(), any()) }
     }
 
     @Test
@@ -185,7 +193,7 @@ class ObservationGeneratorTest {
         } catch (expected: IllegalArgumentException) {
             assertTrue(expected.message!!.contains("non-blank"))
         }
-        coVerify(exactly = 0) { engine.generateText(any(), any()) }
+        verify(exactly = 0) { engine.streamText(any(), any()) }
     }
 
     @Test
@@ -204,7 +212,7 @@ class ObservationGeneratorTest {
         assertEquals(1, observations.size)
         assertTrue(observations.first().text.contains("ship the doc"))
         assertEquals(false, observations.first().text.contains("re:"))
-        coVerify(exactly = 0) { engine.generateText(any(), any()) }
+        verify(exactly = 0) { engine.streamText(any(), any()) }
     }
 
     @Test
@@ -218,13 +226,13 @@ class ObservationGeneratorTest {
             ),
         )
         // No vocab, no goblin — model fallback should fire.
-        coEvery { engine.generateText(any(), any()) } returns themeNoticingPayload("Theme noted.")
+        every { engine.streamText(any(), any()) } returns flowOf(themeNoticingPayload("Theme noted."))
 
         val observations = newGenerator().generate(SAMPLE_TEXT, resolved, SAMPLE_DAY)
 
         assertEquals(1, observations.size)
         assertEquals(ObservationEvidence.THEME_NOTICING, observations.first().evidence)
-        coVerify(exactly = 1) { engine.generateText(any(), any()) }
+        verify(exactly = 1) { engine.streamText(any(), any()) }
     }
 
     @Test
@@ -237,13 +245,13 @@ class ObservationGeneratorTest {
                 ),
             ),
         )
-        coEvery { engine.generateText(any(), any()) } returns themeNoticingPayload("Theme noted.")
+        every { engine.streamText(any(), any()) } returns flowOf(themeNoticingPayload("Theme noted."))
 
         val observations = newGenerator().generate(SAMPLE_TEXT, resolved, SAMPLE_DAY)
 
         assertEquals(1, observations.size)
         assertEquals(ObservationEvidence.THEME_NOTICING, observations.first().evidence)
-        coVerify(exactly = 1) { engine.generateText(any(), any()) }
+        verify(exactly = 1) { engine.streamText(any(), any()) }
     }
 
     @Test
@@ -256,12 +264,12 @@ class ObservationGeneratorTest {
                 ),
             ),
         )
-        coEvery { engine.generateText(any(), any()) } returns themeNoticingPayload("Theme noted.")
+        every { engine.streamText(any(), any()) } returns flowOf(themeNoticingPayload("Theme noted."))
 
         val observations = newGenerator().generate(SAMPLE_TEXT, resolved, SAMPLE_DAY)
 
         assertEquals(1, observations.size)
-        coVerify(exactly = 1) { engine.generateText(any(), any()) }
+        verify(exactly = 1) { engine.streamText(any(), any()) }
     }
 
     @Test
@@ -276,8 +284,8 @@ class ObservationGeneratorTest {
             ),
         )
         val capturedPrompt = io.mockk.slot<String>()
-        coEvery { engine.generateText(capture(capturedPrompt), any()) } returns
-            themeNoticingPayload("Theme noted.")
+        every { engine.streamText(capture(capturedPrompt), any()) } returns
+            flowOf(themeNoticingPayload("Theme noted."))
 
         newGenerator().generate(SAMPLE_TEXT, resolved, SAMPLE_DAY)
 
@@ -294,8 +302,8 @@ class ObservationGeneratorTest {
     fun `model fallback with empty resolved fields renders the no-fields sentinel`() = runTest {
         val resolved = ResolvedExtraction(emptyMap())
         val capturedPrompt = io.mockk.slot<String>()
-        coEvery { engine.generateText(capture(capturedPrompt), any()) } returns
-            themeNoticingPayload("Empty entry observation.")
+        every { engine.streamText(capture(capturedPrompt), any()) } returns
+            flowOf(themeNoticingPayload("Empty entry observation."))
 
         newGenerator().generate(SAMPLE_TEXT, resolved, SAMPLE_DAY)
 

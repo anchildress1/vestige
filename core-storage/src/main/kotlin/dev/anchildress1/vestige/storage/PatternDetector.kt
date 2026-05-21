@@ -11,7 +11,6 @@ import org.json.JSONObject
 import java.time.Clock
 import java.time.Instant
 import java.time.ZoneId
-import java.util.Locale
 
 /**
  * Deterministic counting pass per ADR-003 §"Detection algorithm". Runs over a 90-day window
@@ -160,26 +159,7 @@ class PatternDetector(
             }
     }
 
-    private fun vocabTokensFor(entry: EntryEntity): Set<String> {
-        val fromTags = entry.tags.map { it.name.toVocabToken() }
-        val fromEnergy = entry.energyDescriptor
-            ?.split(WORD_SPLIT)
-            ?.mapNotNull { it.toVocabToken().takeIf(String::isNotEmpty) }
-            .orEmpty()
-        val fromText = entry.entryText
-            .lowercase(Locale.ROOT)
-            .split(WORD_SPLIT)
-            .asSequence()
-            .map { it.trim() }
-            .filter { it.length >= MIN_VOCAB_LENGTH }
-            .map { it.toVocabToken() }
-        return (fromTags.asSequence() + fromEnergy + fromText).toSet()
-    }
-
-    private fun String.toVocabToken(): String {
-        val token = TokenStemmer.stem(this.lowercase(Locale.ROOT).trim())
-        return VOCAB_ROOT_ALIASES[token] ?: token
-    }
+    private fun vocabTokensFor(entry: EntryEntity): Set<String> = VocabTokens.forEntry(entry)
 
     private fun detected(signature: Signature, supporting: List<EntryEntity>): DetectedPattern {
         val ids = supporting.map { it.id }.sorted()
@@ -200,23 +180,6 @@ class PatternDetector(
         const val TAG_PAIR_SIZE = 2
         const val WINDOW_90D_MS: Long = 90L * 24 * 60 * 60 * 1000
         const val WINDOW_30D_MS: Long = 30L * 24 * 60 * 60 * 1000
-
-        internal const val MIN_VOCAB_LENGTH = 4
-        internal val WORD_SPLIT: Regex = Regex("[^a-z0-9]+")
-
-        // True-synonym fold for "tired" — thesaurus equivalents only. Lexical near-misses
-        // (different inflections, plurals) are handled by [TokenStemmer.stem] upstream.
-        // Semantic rewrites that change product claims (e.g., "wired" → "tired" inverts
-        // arousal direction) do NOT belong here. Pattern callouts source counts; aliasing
-        // arousal-up onto arousal-down silently lies about the user's vocabulary.
-        internal val VOCAB_ROOT_ALIASES: Map<String, String> = mapOf(
-            "burnt" to "tired",
-            "depleted" to "tired",
-            "drained" to "tired",
-            "exhausted" to "tired",
-            "sluggish" to "tired",
-            "wiped" to "tired",
-        )
     }
 }
 

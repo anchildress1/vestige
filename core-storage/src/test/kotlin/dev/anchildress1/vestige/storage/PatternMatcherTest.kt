@@ -37,16 +37,19 @@ class PatternMatcherTest {
         BoxStore.deleteAllFiles(dataDir)
     }
 
+    @Suppress("LongParameterList") // Test seam mirrors the fields PatternMatcher reads.
     private fun putEntry(
         templateLabel: TemplateLabel? = null,
         tags: List<String> = emptyList(),
         text: String = "",
         commitmentTopic: String? = null,
+        energyDescriptor: String? = null,
         timestamp: Instant = Instant.parse("2026-05-11T12:00:00Z"),
     ): EntryEntity {
         val entry = EntryEntity(
             entryText = text,
             templateLabel = templateLabel,
+            energyDescriptor = energyDescriptor,
             statedCommitmentJson = commitmentTopic?.let { """{"topic_or_person":"$it","text":"do it"}""" },
             timestampEpochMs = timestamp.toEpochMilli(),
         )
@@ -220,6 +223,34 @@ class PatternMatcherTest {
         val entry = putEntry(text = "I had three meetings", tags = emptyList())
         val p = pattern(PatternKind.VOCAB_FREQUENCY, "{\"token\":\"meeting\"}")
         assertTrue(PatternMatcher.matches(entry, p, ZoneOffset.UTC))
+    }
+
+    @Test
+    fun `vocab matches via alias fold so detection and matching stay aligned`() {
+        // Detection alias-folds "drained" → "tired" when minting the pattern signature. The
+        // matcher MUST do the same — otherwise the pattern that created itself from drained
+        // entries can never match a subsequent drained entry, and callouts silently stop.
+        val entry = putEntry(text = "drained again, every limb gave up at once", tags = emptyList())
+        val p = pattern(PatternKind.VOCAB_FREQUENCY, "{\"token\":\"tired\"}")
+        assertTrue(PatternMatcher.matches(entry, p, ZoneOffset.UTC))
+    }
+
+    @Test
+    fun `vocab matches via energy descriptor path`() {
+        // Detection includes energy descriptor tokens. Matcher must too, otherwise an
+        // energy-only signal that created the pattern can't sustain callouts.
+        val entry = putEntry(text = "yet another tuesday", energyDescriptor = "exhausted", tags = emptyList())
+        val p = pattern(PatternKind.VOCAB_FREQUENCY, "{\"token\":\"tired\"}")
+        assertTrue(PatternMatcher.matches(entry, p, ZoneOffset.UTC))
+    }
+
+    @Test
+    fun `vocab does not match below the MIN_VOCAB_LENGTH floor`() {
+        // 3-letter energy descriptor must not satisfy a vocab signature even if it stems exactly.
+        // Same floor as text path — Codex P2 finding.
+        val entry = putEntry(text = "neutral body of text", energyDescriptor = "low", tags = emptyList())
+        val p = pattern(PatternKind.VOCAB_FREQUENCY, "{\"token\":\"low\"}")
+        assertFalse(PatternMatcher.matches(entry, p, ZoneOffset.UTC))
     }
 
     @Test

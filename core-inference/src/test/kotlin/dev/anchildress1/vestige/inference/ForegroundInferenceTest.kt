@@ -161,117 +161,7 @@ class ForegroundInferenceTest {
     }
 
     @Test
-    fun `runForegroundTextCall terminal is Success on a clean stream`(@TempDir cacheDir: File) = runTest {
-        val engine = engineEmitting(
-            rawSuccess(transcription = "just got off the call again", followUp = "what did they actually want"),
-        )
-
-        val result = ForegroundInference(engine, cacheDir, clock = fixedClock)
-            .runForegroundTextCall(text = "just got off the call again", persona = Persona.EDITOR)
-            .terminal()
-
-        val success = assertInstanceOf(ForegroundResult.Success::class.java, result)
-        assertAll(
-            { assertEquals("just got off the call again", success.transcription) },
-            { assertEquals("what did they actually want", success.followUp) },
-            { assertEquals(Persona.EDITOR, success.persona) },
-            { assertEquals(completedAt, success.completedAt) },
-        )
-    }
-
-    @Test
-    fun `runForegroundTextCall surfaces ParseFailure terminal without throwing`(@TempDir cacheDir: File) = runTest {
-        val engine = engineEmitting("")
-
-        val result = ForegroundInference(engine, cacheDir, clock = fixedClock)
-            .runForegroundTextCall(text = "typed it", persona = Persona.WITNESS)
-            .terminal()
-
-        val failure = assertInstanceOf(ForegroundResult.ParseFailure::class.java, result)
-        assertEquals(ForegroundResult.ParseReason.EMPTY_RESPONSE, failure.reason)
-    }
-
-    @Test
-    fun `runForegroundTextCall hands the typed text off as Content_Text, never an audio file`(
-        @TempDir cacheDir: File,
-    ) = runTest {
-        val captured = slot<List<Content>>()
-        val engine = mockk<LiteRtLmEngine> {
-            every { streamMessageContents(any(), capture(captured)) } returns flowOf(rawSuccess("a", "b"))
-        }
-
-        ForegroundInference(engine, cacheDir, clock = fixedClock)
-            .runForegroundTextCall(text = "the literal typed words", persona = Persona.WITNESS)
-            .terminal()
-
-        val parts = captured.captured
-        assertAll(
-            { assertEquals(1, parts.size, "system prompt now rides systemInstruction, not the message body") },
-            { assertInstanceOf(Content.Text::class.java, parts[0]) },
-            { assertEquals("the literal typed words", (parts[0] as Content.Text).text) },
-            { assertTrue(parts.none { it is Content.AudioFile }, "Typed path must not hand off audio") },
-            { assertEquals(0, cacheDir.listFiles().orEmpty().size, "Typed path writes no temp WAV") },
-        )
-    }
-
-    @Test
-    fun `runForegroundTextCall renders the history block into the system prompt`(@TempDir cacheDir: File) = runTest {
-        val captured = slot<String>()
-        val engine = mockk<LiteRtLmEngine> {
-            every { streamMessageContents(capture(captured), any()) } returns flowOf(rawSuccess("a", "b"))
-        }
-
-        ForegroundInference(engine, cacheDir, clock = fixedClock)
-            .runForegroundTextCall(
-                text = "the new entry",
-                persona = Persona.WITNESS,
-                retrievedHistory = listOf(
-                    HistoryChunk(patternId = null, text = "an earlier entry about the same loop"),
-                ),
-            )
-            .terminal()
-
-        val systemPrompt = captured.captured
-        assertAll(
-            { assertTrue(systemPrompt.contains("## PRIOR ENTRIES")) },
-            { assertTrue(systemPrompt.contains("an earlier entry about the same loop")) },
-            // History sits after the schema reminder so the envelope framing stays first.
-            {
-                assertTrue(
-                    systemPrompt.indexOf("## PRIOR ENTRIES") > systemPrompt.indexOf("## OUTPUT FORMAT"),
-                    "history block must follow the output-schema reminder",
-                )
-            },
-        )
-    }
-
-    @Test
-    fun `runForegroundTextCall with empty history emits no prior-entries block`(@TempDir cacheDir: File) = runTest {
-        val captured = slot<String>()
-        val engine = mockk<LiteRtLmEngine> {
-            every { streamMessageContents(capture(captured), any()) } returns flowOf(rawSuccess("a", "b"))
-        }
-
-        ForegroundInference(engine, cacheDir, clock = fixedClock)
-            .runForegroundTextCall(text = "no history here", persona = Persona.WITNESS)
-            .terminal()
-
-        val systemPrompt = captured.captured
-        assertFalse(systemPrompt.contains("## PRIOR ENTRIES"))
-    }
-
-    @Test
-    fun `runForegroundTextCall rejects blank text`(@TempDir cacheDir: File) = runTest {
-        val engine = mockk<LiteRtLmEngine>()
-        val inference = ForegroundInference(engine, cacheDir, clock = fixedClock)
-
-        val caught = runCatching { inference.runForegroundTextCall("   ", Persona.WITNESS) }.exceptionOrNull()
-
-        assertInstanceOf(IllegalArgumentException::class.java, caught)
-    }
-
-    @Test
-    fun `parse failure is a ParseFailure terminal, never a throw or retry`(@TempDir cacheDir: File) = runTest {
+    fun `plain prose response remains a missing-transcription parse failure`(@TempDir cacheDir: File) = runTest {
         val engine = engineEmitting("no headers, just prose")
 
         val result = ForegroundInference(engine, cacheDir, clock = fixedClock)
@@ -323,15 +213,15 @@ class ForegroundInferenceTest {
             { assertTrue(systemPrompt.contains("Persona: Editor")) },
             { assertTrue(systemPrompt.contains("cognition tracker")) },
             { assertFalse(systemPrompt.contains("RECENT TURNS")) },
-            { assertTrue(systemPrompt.contains("<transcription>")) },
-            { assertTrue(systemPrompt.contains("<follow_up>")) },
-            { assertTrue(systemPrompt.contains("Do not output any other text")) },
-            { assertTrue(systemPrompt.contains("Do not duplicate the transcription in the follow_up")) },
-            { assertTrue(systemPrompt.contains("today/this time with always/ever/again")) },
-            { assertTrue(systemPrompt.contains("Do not ask the user to decide")) },
-            { assertTrue(systemPrompt.contains("Transcribe audible speech even through music")) },
-            { assertTrue(systemPrompt.contains("must contain spoken words only")) },
+            { assertTrue(systemPrompt.contains("follow_up tags")) },
+            { assertTrue(systemPrompt.contains("Do not duplicate the transcription text in the follow-up")) },
+            { assertTrue(systemPrompt.contains("analysis notes")) },
+            { assertTrue(systemPrompt.contains("Transcribe audible speech even when music")) },
+            { assertTrue(systemPrompt.contains("summaries, ambience descriptions")) },
+            { assertTrue(systemPrompt.contains("repeated placeholder rows for speech")) },
             { assertTrue(!systemPrompt.contains("[music]")) },
+            { assertFalse(systemPrompt.contains("<follow_up>")) },
+            { assertFalse(systemPrompt.contains("<transcription>")) },
         )
     }
 

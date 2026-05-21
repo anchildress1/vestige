@@ -3,7 +3,7 @@ pre-commit:
   commands:
     ktlint-format:
       glob: '**/*.{kt,kts}'
-      run: ktlint --log-level=error -F {staged_files}
+      run: make ktlint-format FILES="{staged_files}"
       stage_fixed: true
     detekt:
       glob: '**/*.{kt,kts}'

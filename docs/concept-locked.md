@@ -28,12 +28,12 @@
 Templates are no longer user-picked. Capture screen has no template grid. The user just records or types. The agent labels each entry post-extraction based on which surfaces dominate.
 
 Six labels:
-- **Aftermath** — energy crash (State surface: `energy_descriptor` = "crashed" + state shift evidence)
-- **Tunnel exit** — hyperfocus debrief (Behavioral surface: focus subject + extended duration + things-ignored mentions)
-- **Concrete shoes** — task paralysis (Behavioral surface: stuck task + resistance markers)
-- **Decision spiral** — rumination loop (State surface: decision-looping + iteration markers)
-- **Goblin hours** — 3am spiral (Time-of-day context between midnight–5am + State surface late-night markers)
-- **Audit** — catch-all when no archetype dominates
+- **Crashed** — energy crash (State surface signals: `state_descriptor` = "crashed" + state shift evidence)
+- **Deep Space** — hyperfocus debrief (Behavioral surface: focus subject + extended duration + things-ignored mentions)
+- **Busy Stalling** — task paralysis (Behavioral surface: stuck task + resistance markers)
+- **Nonstop Spiral** — rumination loop (State surface: decision-looping + iteration markers)
+- **Goblin Hours** — 3am spiral (Time-of-day context between midnight–5am + State surface late-night markers; **shorter follow-up cadence applied automatically by context-aware prompting**, not template selection)
+- **Brain Dump** — catch-all when no archetype dominates
 
 Echoes is not a template — recurrence is pattern-engine output across entries.
 
@@ -73,7 +73,7 @@ Eleven content fields total. Extracted fields are convergence-driven; `entry_obs
 - `follow_up` — foreground persona follow-up for voice captures; `null` for typed entries
 - `persona` — recorded selected persona for row provenance
 - `timestamp` — auto
-- `template_label` — agent-emitted (Aftermath / Tunnel exit / Concrete shoes / Decision spiral / Goblin hours / Audit)
+- `template_label` — agent-emitted (Crashed / Deep Space / Busy Stalling / Nonstop Spiral / Goblin Hours / Brain Dump)
 - `tags` — free-form, model-extracted (people, topics, activities, places)
 - `energy_descriptor` — nullable; captured if user mentioned a state
 - `recurrence_link` — nullable; pattern_id if entry matches a known pattern

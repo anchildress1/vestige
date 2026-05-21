@@ -113,44 +113,13 @@ class ForegroundInference(
             }
     }
 
-    /** Text path → progressive [ForegroundStreamEvent]s. No WAV written or deleted. */
-    fun runForegroundTextCall(
-        text: String,
-        persona: Persona,
-        retrievedHistory: List<HistoryChunk> = emptyList(),
-    ): Flow<ForegroundStreamEvent> {
-        require(text.isNotBlank()) { "runForegroundTextCall requires non-blank text." }
-        return flow {
-            emitEnvelope(
-                persona = persona,
-                label = "runForegroundTextCall",
-                systemInstruction = composeSystemPromptWithHistory(persona, retrievedHistory),
-                parts = listOf(Content.Text(text)),
-            )
-        }.flowOn(ioDispatcher)
-    }
-
-    private fun composeSystemPrompt(persona: Persona): String = composeSystemPromptWithHistory(persona, emptyList())
-
-    private fun composeSystemPromptWithHistory(persona: Persona, history: List<HistoryChunk>): String {
+    private fun composeSystemPrompt(persona: Persona): String {
         val personaPrompt = PersonaPromptComposer.compose(persona).trimEnd()
         return buildString {
             append(personaPrompt)
             append("\n\n")
             append(OUTPUT_SCHEMA_REMINDER)
             append('\n')
-            if (history.isNotEmpty()) {
-                append('\n')
-                append("## PRIOR ENTRIES\n")
-                history.take(MAX_HISTORY_CHUNKS).forEachIndexed { i, chunk ->
-                    val text = if (chunk.text.length > MAX_HISTORY_CHARS_PER_CHUNK) {
-                        chunk.text.take(MAX_HISTORY_CHARS_PER_CHUNK) + HISTORY_ELLIPSIS
-                    } else {
-                        chunk.text
-                    }
-                    append("chunk-${i + 1}: $text\n")
-                }
-            }
         }
     }
 
@@ -158,23 +127,22 @@ class ForegroundInference(
         internal const val TEMP_PREFIX = "vestige-fg-"
         internal const val TEMP_SUFFIX = ".wav"
 
-        // Match PromptComposer's background-history budget so the foreground follow-up and the
-        // lens pass reason over the same context window.
-        private const val MAX_HISTORY_CHUNKS = 3
-        private const val MAX_HISTORY_CHARS_PER_CHUNK = 600
-        private const val HISTORY_ELLIPSIS = "…"
-
+        // Prose-only — naming the tag literals here would collide with the parser if the model
+        // echoes the reminder back.
         internal val OUTPUT_SCHEMA_REMINDER = listOf(
             "## OUTPUT FORMAT",
-            "Your entire response must be exactly these two blocks, nothing before or after:",
-            "<transcription>SPOKEN WORDS VERBATIM</transcription>",
-            "<follow_up>ONE FOLLOW-UP QUESTION</follow_up>",
-            "",
-            "Do not output any other text, tags, labels, bullets, headings, or commentary.",
-            "Do not nest tags. Do not duplicate the transcription in the follow_up.",
-            "Do not echo these instructions.",
-            "Transcribe audible speech even through music or background noise.",
-            "Transcription must contain spoken words only — no labels, summaries, or silence descriptions.",
+            "Wrap the user's spoken words verbatim in lowercase transcription tags " +
+                "(an opening tag named transcription, the verbatim text, then a matching " +
+                "closing tag). Then wrap your follow-up in lowercase follow_up tags the same " +
+                "way (use an underscore between follow and up). Emit exactly one transcription " +
+                "block and exactly one follow_up block, in that order, and nothing else. Do not " +
+                "echo this format description. Do not nest tags. Do not produce additional " +
+                "tagged blocks. Do not output analysis notes, labels, bullets, or headings. " +
+                "Do not duplicate the transcription text in the follow-up. The transcription " +
+                "must be exact and unaltered. Transcribe audible speech even when music or " +
+                "background noise is present. The transcription must contain spoken words " +
+                "only; do not substitute labels, summaries, ambience descriptions, or repeated " +
+                "placeholder rows for speech.",
         ).joinToString(separator = "\n")
 
         private const val TAG = "VestigeForegroundInference"

@@ -245,8 +245,12 @@ class BackgroundExtractionWorker(
                 val parsed = TemplateLabel.fromSerial(serial)
                 if (parsed == null) Log.w(TAG, "template_label unknown serial=$serial; labeler wins")
                 parsed
-            } else null
-        } else null
+            } else {
+                null
+            }
+        } else {
+            null
+        }
         if (modelPick != null && modelPick != labelerPick) {
             Log.d(TAG, "template_label model=$modelPick labeler=$labelerPick (model wins)")
         }

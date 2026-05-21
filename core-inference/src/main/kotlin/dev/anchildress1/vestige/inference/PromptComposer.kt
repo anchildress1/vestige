@@ -31,7 +31,6 @@ object PromptComposer {
         "state",
         "vocabulary",
         "commitment",
-        "recurrence",
     )
 
     fun compose(lens: Lens, entryText: String, retrievedHistory: List<HistoryChunk> = emptyList()): ComposedPrompt {

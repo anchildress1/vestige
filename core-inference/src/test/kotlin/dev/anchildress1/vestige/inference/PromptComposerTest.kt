@@ -33,14 +33,13 @@ class PromptComposerTest {
     }
 
     @Test
-    fun `composed prompt contains all five surfaces in canonical order`() {
+    fun `composed prompt contains all four surfaces in canonical order`() {
         val text = PromptComposer.compose(Lens.LITERAL, entry).systemInstruction
         val ordered = listOf(
             "## Surface: Behavioral",
             "## Surface: State",
             "## Surface: Vocabulary",
             "## Surface: Commitment",
-            "## Surface: Recurrence",
         )
         var cursor = 0
         ordered.forEach { marker ->

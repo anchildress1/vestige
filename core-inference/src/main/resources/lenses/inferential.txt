@@ -1,17 +1,34 @@
 ## Lens: Inferential
 
-Apply each surface in a charitable reading: explicit content plus reasonable contextual inference.
+Apply a charitable reading. Go beyond explicit words to what the text most plausibly means for this person's cognitive and behavioral state.
 
 Rules:
 
-- Extract everything the Literal lens would extract, plus inferences a reasonable reader would draw from the context.
-- "Crashed at 3am" with no qualifier may yield `energy_descriptor=crashed` and a `late-night` tag. A bare "3" is ambiguous (3am vs 3pm) and is not enough on its own to justify `late-night` — require either an explicit am/pm marker or surrounding overnight context.
-- Inferences must be defensible from the text or retrieved-history block. Do not invent context that has no anchor.
-- Do not infer motivations or psychological causation. Only carry a user-side state when the entry directly names it or clearly idioms it.
-- Inferred fields are still concrete: "user was at home" is allowed when "kitchen", "couch", or "bed" appears; "user was avoiding work" is not — that's motivation.
+- Read for pattern and meaning, not just surface vocabulary. What is this person experiencing?
+- State words: if the user uses an energy or state word — "crashed", "hollow", "depleted", "wired", "exhausted", "flatlined", "drained" — populate `energy_descriptor` with it exactly as said.
+- Post-event crashes: when the user says they were fine before X and crashed/hollow/flatlined after X, set `state_shift=true` and add `meeting-aftermath` or a relevant tag.
+- Decision loops: when the user describes returning to the same choice with new framing and no resolution, add `decision-loop` to tags. Spreading, weighing, comparing, and not deciding is a decision loop.
+- Avoidance sequences: "opened it and closed it", "said I would X, then did Y instead" — add `avoidance` and the specific task tag.
+- Late-night context: explicit timestamps between midnight and 5am warrant `late-night` tag.
+- User-coined idioms carry their meaning: "concrete in my limbs" = depleted; "battery got yanked" = sudden energy drop; "hollow thing" = hollow state; "wired-tired" = co-occurring exhaustion and alertness.
+- Sequence anchors: "after the call", "before standup", "by 11" are behavioral context — add as tags.
+- Time anchors and named activities both become tags.
+
+Inference limits:
+
+- Do not infer causes or motivations. "User was anxious about the meeting" is motivation, not inference.
+- Do not infer emotional states the user did not name. "Stressed" requires the word "stress" or a clear equivalent idiom.
+- One layer only: if the text gives no anchor for a claim, do not make it.
+- Retrieved history can corroborate inferences but cannot supply content that isn't anchored in the current entry.
 
 Output discipline:
 
-- Inferential is the field most likely to populate where Literal is null. The convergence resolver treats Inferential-only output as `candidate`, not `canonical`, until a re-eval or later corroboration agrees.
-- Do not pad. If neither the text nor history supports an inference, leave the field null.
-- Always emit `flags` as `[]` (empty array). Conflict-flagging belongs to the Skeptical lens, but the schema requires the key on every response — omitting it breaks strict parsing.
+- Produce a complete schema object covering all surfaces for this entry.
+- Populate more fields than a strict surface-words reading would. Inferential output is expected to be richer.
+- Do not pad: genuinely sparse entries stay sparse even with a charitable read.
+- Always emit `flags` as `[]` (empty array).
+- Always emit `vocabulary_contradictions` as an array, never null — use `[]` when there are none.
+
+Example:
+Entry: "After the client review I went hollow. Couldn't start the next thing."
+Output: {"tags":["client-review","meeting-aftermath","hollow","task-stall"],"energy_descriptor":"hollow","state_shift":true,"vocabulary_contradictions":[],"stated_commitment":null,"flags":[]}

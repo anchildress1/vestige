@@ -4,18 +4,19 @@ Extract attention and energy markers from the entry text.
 
 What to capture:
 
-- Energy descriptors the user named: "crashed", "wired", "fried", "sharp", "slow", "scattered", "tunnel", "blank".
-- User-coined or idiomatic state phrases when they clearly name the user's side of the moment: "hollow thing", "battery got yanked", "brain slid off", "vaped".
-- Attention shifts: "couldn't focus", "locked in for hours", "kept tabbing away", "blanked".
-- State transitions across the entry: "was sharp this morning, flatlined by 11".
-- Late-night markers between midnight and 5am.
-- Decision-looping markers: re-doing the same choice, opening and closing the same task, restating the same dilemma.
+- Energy descriptors the user named: "crashed", "wired", "fried", "sharp", "slow", "scattered", "hollow", "depleted", "exhausted", "flatlined", "drained", "wiped out", "sluggish", "foggy".
+- User-coined or idiomatic state phrases when they clearly name the user's own side of the moment: "battery got yanked", "brain slid off", "concrete in my limbs", "went hollow", "hollow thing", "vaped", "technically awake, operationally not", "wired-tired".
+- Attention shifts: "couldn't focus", "locked in for hours", "kept tabbing away", "blanked on it", "stared at the doc", "couldn't start anything".
+- State transitions across the entry: "was fine before, flatlined by 11", "sharp this morning, flatlined by 11", "fine until the call, then hollow after".
+- Late-night markers: any explicit mention of midnight through 5am — "3am", "2:48am", "4:07am", "couldn't sleep", "still awake at".
+- Decision-looping markers: returning to the same choice without resolution ("same three criteria, new spreadsheet", "changed the weights again", "third comparison table").
+- Avoidance energy: "cursor just sits there", "opened it and closed it", "reorganized instead", "sacred ritual of closing it immediately".
+- Wired-tired: explicit co-occurrence of exhaustion and alertness/anxiety. "Body wants sleep, brain refuses." "Can't sleep, can't focus."
 
 What goes in the schema:
 
-- Populate `energy_descriptor` with the dominant state word the user used. Lowercase, exact-as-spoken when possible. Null if the user named no state.
-- When the user names a clear state phrase instead of a single word, keep the shortest exact phrase that still names the user's side of the moment.
-- Populate `state_shift` as `true` when the entry describes a transition between two distinct states; otherwise `false`. The schema requires a boolean, never null and never omitted.
-- Append state-related signals to `tags` (e.g. `crashed`, `tunnel-exit`, `decision-loop`, `late-night`).
-- Do not infer a state the user did not name. "Stressed" is not extractable unless the user said "stressed" or used a clear equivalent phrase that names the same user-side condition.
-- When the user names a concrete state word or state phrase, carry that exact wording into `energy_descriptor` rather than paraphrasing it away.
+- `energy_descriptor`: the dominant state word or shortest idiom phrase the user used. Lowercase, exact-as-spoken when possible. If the user said "hollow", use "hollow" not "crashed". Null if no state word appears.
+- `state_shift`: true when the entry describes a before/after transition between two distinct named states. Requires both states to be present.
+- Add state-related tags: `crashed`, `hollow`, `tunnel-exit`, `decision-loop`, `late-night`, `wired-tired`, `exhausted`, `depleted`, `foggy`.
+- Do not infer a state the user did not name or idiom. "Stressed" is not extractable unless the user said "stressed" or used a clear equivalent.
+- When the user names a concrete state word or phrase, carry that exact wording into `energy_descriptor` rather than paraphrasing.

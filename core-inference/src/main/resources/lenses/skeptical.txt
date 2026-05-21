@@ -1,28 +1,38 @@
 ## Lens: Skeptical
 
-Apply each surface adversarially. Read what is NOT said. Populate fields the text supports;
-flag gaps in `flags`. You are not refusing to read.
+Apply an adversarial reading. Read what is NOT said. Populate the schema fields fully, then flag gaps, conflicts, and unsupported claims in `flags`.
 
-Flag kinds and triggers:
+Schema extraction — same surfaces as any lens:
 
-- `state-behavior-mismatch` — state change ("I was X, then Y") with no triggering event.
-  "Fine before standup, flattened by 11" fires this.
-- `commitment-without-anchor` — soft-modal commitment ("would send", "should finish") with
-  no concrete object. "Said I would send the invoice. Instead I reorganized the desktop."
-- `vocabulary-contradiction` — user's own words pointing two directions. "Not tired exactly"
-  + "battery got yanked" (energy negated then reasserted).
-- `unsupported-recurrence` — recurrence claim ("again", "same thing") with no supporting
-  retrieved-history chunk.
-- `time-inconsistency` — incompatible time anchors ("ten minutes" later called "two hours").
+- State words, energy descriptors, tags, activities, commitments — extract them all from the text directly.
+- State transitions: mark `state_shift=true` when the entry describes moving between two named states.
+- `vocabulary_contradictions`: flag explicit in-entry contradictions with `{term_a, term_b, snippet}`. Always emit as array.
+- `stated_commitment`: capture explicit "I will / I need to / I should" statements with a concrete object.
 
-`flags` output:
+Adversarial layer — what to flag:
 
-- Each flag is `{kind, snippet, note}`. `kind` is one of the five above plus `other`.
-- `snippet` quotes the user's words. `note` is one short sentence naming what doesn't add up.
-  No diagnosis, no advice.
+- `state-behavior-mismatch` — a state change is described ("I was fine before, then flatlined") but no triggering event is named.
+  "Fine before standup, flattened by 11" — what happened in the standup? Not said. Flag it.
+  "Went hollow. Couldn't start anything." — state described, cause absent.
+- `commitment-without-anchor` — a modal commitment ("I should", "said I would") with no concrete object or deadline.
+  "Said I would send the invoice" followed only by describing avoidance, no rescheduled date.
+- `vocabulary-contradiction` — the user's own words point in two directions in the same entry.
+  "Not tired exactly" + "battery got yanked" = negation then reassertion.
+  "Technically awake, operationally not" = explicit self-contradiction.
+  "Fine" in one sentence, "couldn't move" in the next.
+- `unsupported-recurrence` — user says "again", "same thing", "third time" with no retrieved history to corroborate.
+  "Crashed after standup again" when the history block shows no prior standup crashes.
+- `time-inconsistency` — incompatible time anchors within the same entry for the same event.
+
+`flags` output format:
+
+- Each flag is `{kind, snippet, note}`. `kind` is one of the five above or `other`.
+- `snippet` is a verbatim excerpt from the entry text. Quote the user's actual words.
+- `note` is one short sentence naming the gap or conflict. No diagnosis, no advice, no framing.
 
 Output discipline:
 
-- Convergence treats a Skeptical flag as `canonical_with_conflict` when Literal and
-  Inferential agree on the underlying value. The flag annotates agreement, doesn't override it.
-- Genuinely unambiguous entries may produce zero flags. Do not invent a contradiction.
+- Flags annotate the resolved fields — they do not replace them. Populate schema fields fully, then add flags.
+- Convergence treats Skeptical flags as `canonical_with_conflict` when the other lenses agree on the underlying value.
+- Genuinely unambiguous entries may produce zero flags. Do not manufacture contradictions.
+- Always emit `vocabulary_contradictions` as an array, never null.

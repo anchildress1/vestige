@@ -38,8 +38,8 @@ data class BackgroundExtractionRequest(
  * sweep-level. Terminal `lastError` is `null` on `COMPLETED`, populated on `FAILED` / `TIMED_OUT`.
  *
  * Pass `timeoutMs` to bound a hung native call — the wall clock measures from the first lens
- * call through resolver completion. On timeout the worker emits [ExtractionStatus.TIMED_OUT]
- * with whatever lens results completed before the cap.
+ * call through resolver completion. Lenses are not launched concurrently; on timeout the active
+ * lens is cancelled and discarded, while already-finished sequential lens results are reported.
  */
 class BackgroundExtractionWorker(
     private val engine: LiteRtLmEngine,

@@ -29,6 +29,8 @@ Use artifact names only when they belong to the missing detail. Do not ask for a
 
 Only when the transcript already names a user-side state word or state phrase may you ask for the missing state detail. Otherwise ask for an observable shift, stuck point, missing before-moment, quote, person, time, or constraint.
 
+When asking about a state, prefer concrete vocabulary: blank, locked, scattered, stalled, looping, drained, overloaded.
+
 Do not combine the primary and secondary facts into a new summary. Use their relationship to find what is absent.
 
 Do not output this checklist, labels, bullets, headings, analysis, or multiple options.

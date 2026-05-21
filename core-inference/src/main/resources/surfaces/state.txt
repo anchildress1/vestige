@@ -1,21 +1,11 @@
 ## Surface: State
 
-Extract attention and energy markers from the entry text.
+Captures the user's cognitive and energy state.
 
-What to capture:
+Schema fields:
 
-- Energy descriptors the user named: "crashed", "wired", "fried", "sharp", "slow", "scattered", "tunnel", "blank".
-- User-coined or idiomatic state phrases when they clearly name the user's side of the moment: "hollow thing", "battery got yanked", "brain slid off", "vaped".
-- Attention shifts: "couldn't focus", "locked in for hours", "kept tabbing away", "blanked".
-- State transitions across the entry: "was sharp this morning, flatlined by 11".
-- Late-night markers between midnight and 5am.
-- Decision-looping markers: re-doing the same choice, opening and closing the same task, restating the same dilemma.
-
-What goes in the schema:
-
-- Populate `energy_descriptor` with the dominant state word the user used. Lowercase, exact-as-spoken when possible. Null if the user named no state.
-- When the user names a clear state phrase instead of a single word, keep the shortest exact phrase that still names the user's side of the moment.
-- Populate `state_shift` as `true` when the entry describes a transition between two distinct states; otherwise `false`. The schema requires a boolean, never null and never omitted.
-- Append state-related signals to `tags` (e.g. `crashed`, `tunnel-exit`, `decision-loop`, `late-night`).
-- Do not infer a state the user did not name. "Stressed" is not extractable unless the user said "stressed" or used a clear equivalent phrase that names the same user-side condition.
-- When the user names a concrete state word or state phrase, carry that exact wording into `energy_descriptor` rather than paraphrasing it away.
+- `energy_descriptor`: a word or short noun phrase naming the person's physical or cognitive condition (drained, crashed, foggy, wired). Use the user's exact words; do not paraphrase to clinical language. Null when the entry names no such condition.
+  - It must describe the person, not the event. A span that says how something happened (completely out of nowhere) or what it caused (slows everything down) is a manner qualifier or effect — discard it.
+  - If the best candidate is a verb phrase or clause describing what the energy did, return null.
+  - If the candidate is longer than three words, reduce it to the root state word; if none survives, return null. Never return a clause.
+- `state_shift`: true when the entry describes a before/after transition between two distinct states. Both states must be present. False for a single static state.

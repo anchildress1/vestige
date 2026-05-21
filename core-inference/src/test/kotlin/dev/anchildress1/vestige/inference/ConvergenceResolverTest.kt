@@ -161,7 +161,8 @@ class ConvergenceResolverTest {
 
     @Test
     fun `single surviving lens leaves populated fields ambiguous`() {
-        // Two lenses parsed-failed at the worker; only Literal reaches the resolver.
+        // Two lenses parse-failed at the worker; only Literal reaches the resolver. A lone witness
+        // is under-evidenced, so every field resolves AMBIGUOUS rather than minting a value.
         val literal = LensExtraction(
             Lens.LITERAL,
             fields = mapOf("energy_descriptor" to "flattened", "template_label" to "aftermath"),
@@ -176,6 +177,88 @@ class ConvergenceResolverTest {
         assertEquals(
             ResolvedField(value = null, verdict = ConfidenceVerdict.AMBIGUOUS),
             resolved.fields["template_label"],
+        )
+    }
+
+    @Test
+    fun `energy majority without Literal corroboration resolves ambiguous`() {
+        // Inferential + Skeptical agree on a behavior-clause energy; Literal abstains (null). The
+        // strict floor did not back the value, so it is suppressed rather than promoted.
+        val literal = LensExtraction(Lens.LITERAL, fields = mapOf("energy_descriptor" to null))
+        val inferential =
+            LensExtraction(Lens.INFERENTIAL, fields = mapOf("energy_descriptor" to "slows everything down"))
+        val skeptical = LensExtraction(Lens.SKEPTICAL, fields = mapOf("energy_descriptor" to "slows everything down"))
+
+        val resolved = resolver.resolve(listOf(literal, inferential, skeptical))
+
+        assertEquals(
+            ResolvedField(value = null, verdict = ConfidenceVerdict.AMBIGUOUS),
+            resolved.fields["energy_descriptor"],
+        )
+    }
+
+    @Test
+    fun `energy majority with Literal substring corroboration stays canonical`() {
+        // Literal's "crashed hard" backs the majority "crashed" via substring match — no collateral
+        // suppression of a genuinely corroborated state.
+        val literal = LensExtraction(Lens.LITERAL, fields = mapOf("energy_descriptor" to "crashed hard"))
+        val inferential = LensExtraction(Lens.INFERENTIAL, fields = mapOf("energy_descriptor" to "crashed"))
+        val skeptical = LensExtraction(Lens.SKEPTICAL, fields = mapOf("energy_descriptor" to "crashed"))
+
+        val resolved = resolver.resolve(listOf(literal, inferential, skeptical))
+
+        assertEquals(
+            ResolvedField(value = "crashed", verdict = ConfidenceVerdict.CANONICAL),
+            resolved.fields["energy_descriptor"],
+        )
+    }
+
+    @Test
+    fun `energy majority with negated Literal stays ambiguous`() {
+        // "not crashed" shares the "crashed" substring but flips polarity — the negated Literal is a
+        // dissent, not corroboration, so the majority must be suppressed rather than promoted.
+        val literal = LensExtraction(Lens.LITERAL, fields = mapOf("energy_descriptor" to "not crashed"))
+        val inferential = LensExtraction(Lens.INFERENTIAL, fields = mapOf("energy_descriptor" to "crashed"))
+        val skeptical = LensExtraction(Lens.SKEPTICAL, fields = mapOf("energy_descriptor" to "crashed"))
+
+        val resolved = resolver.resolve(listOf(literal, inferential, skeptical))
+
+        assertEquals(
+            ResolvedField(value = null, verdict = ConfidenceVerdict.AMBIGUOUS),
+            resolved.fields["energy_descriptor"],
+        )
+    }
+
+    @Test
+    fun `state_shift majority without Literal resolves ambiguous`() {
+        // Inferential + Skeptical infer a transition; Literal read co-occurrence (false, filtered as
+        // a no-op). With no Literal backing, the inferred shift is suppressed.
+        val literal = LensExtraction(Lens.LITERAL, fields = mapOf("state_shift" to false))
+        val inferential = LensExtraction(Lens.INFERENTIAL, fields = mapOf("state_shift" to true))
+        val skeptical = LensExtraction(Lens.SKEPTICAL, fields = mapOf("state_shift" to true))
+
+        val resolved = resolver.resolve(listOf(literal, inferential, skeptical))
+
+        assertEquals(
+            ResolvedField(value = null, verdict = ConfidenceVerdict.AMBIGUOUS),
+            resolved.fields["state_shift"],
+        )
+    }
+
+    @Test
+    fun `energy majority suppressed when Literal lens parse-fails entirely`() {
+        // Literal absent from the list (parse-fail, not null-valued). Inferential + Skeptical agree
+        // but have no corroboration floor — same suppression as null-valued Literal.
+        val inferential =
+            LensExtraction(Lens.INFERENTIAL, fields = mapOf("energy_descriptor" to "slows everything down"))
+        val skeptical =
+            LensExtraction(Lens.SKEPTICAL, fields = mapOf("energy_descriptor" to "slows everything down"))
+
+        val resolved = resolver.resolve(listOf(inferential, skeptical))
+
+        assertEquals(
+            ResolvedField(value = null, verdict = ConfidenceVerdict.AMBIGUOUS),
+            resolved.fields["energy_descriptor"],
         )
     }
 

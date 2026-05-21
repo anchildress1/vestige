@@ -48,6 +48,26 @@ class LensResponseParserTest {
     }
 
     @Test
+    fun `parses template_label and lowercases the serial`() {
+        val raw = """
+            {
+              "tags": ["migration"],
+              "template_label": "Decision-Spiral",
+              "energy_descriptor": null,
+              "state_shift": false,
+              "vocabulary_contradictions": [],
+              "stated_commitment": null,
+              "flags": []
+            }
+        """.trimIndent()
+
+        val extraction = LensResponseParser.parse(Lens.LITERAL, raw)
+
+        assertNotNull(extraction)
+        assertEquals("decision-spiral", extraction!!.fields["template_label"])
+    }
+
+    @Test
     fun `routes Skeptical flags off the fields map and onto the flags list`() {
         // `flags` are emitted by the model as `{kind, snippet, note}` objects per
         // `core-inference/src/main/resources/lenses/output-schema.txt`. The parser encodes each

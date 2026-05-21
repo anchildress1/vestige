@@ -164,6 +164,39 @@ class BackgroundExtractionWorkerTest {
     }
 
     @Test
+    fun `single inferential lens config runs one model call and resolves it`() = runTest {
+        // Tuning-harness config: one Inferential pass, no cross-lens convergence.
+        val engine = mockk<LiteRtLmEngine>()
+        every { engine.streamText("prompt-for-INFERENTIAL", any()) } returns flowOf("raw-inferential")
+        val resolver = RecordingResolver(resolved)
+        val listener = RecordingListener()
+
+        val result = BackgroundExtractionWorker(
+            engine = engine,
+            resolver = resolver,
+            parser = { lens, _ -> extraction(lens) },
+            composer = fakeComposer(),
+            lenses = listOf(Lens.INFERENTIAL),
+        ).extract(request = request, listener = listener)
+
+        val success = assertInstanceOf(BackgroundExtractionResult.Success::class.java, result)
+        assertAll(
+            { assertEquals(1, success.lensResults.size) },
+            { assertEquals(1, success.modelCallCount) },
+            { assertEquals(listOf(Lens.INFERENTIAL), success.lensResults.map { it.lens }) },
+            { assertEquals(1, resolver.captured.size) },
+            { assertEquals(Lens.INFERENTIAL, resolver.captured.single().lens) },
+        )
+        assertEquals(
+            listOf(
+                RecordingListener.Update(ExtractionStatus.RUNNING, 0, null),
+                RecordingListener.Update(ExtractionStatus.COMPLETED, 0, null),
+            ),
+            listener.updates,
+        )
+    }
+
+    @Test
     fun `lenses run sequentially, never concurrently — SDK is single-session`() = runTest {
         val engine = mockk<LiteRtLmEngine>()
         val inFlight = AtomicInteger(0)
@@ -374,6 +407,70 @@ class BackgroundExtractionWorkerTest {
     }
 
     @Test
+    fun `model-emitted template_label wins over the deterministic labeler`() = runTest {
+        val engine = mockk<LiteRtLmEngine>()
+        every { engine.streamText(any(), any()) } returns flowOf("raw-ok")
+        // Energy "crashed" + state_shift true would make the labeler pick AFTERMATH; the model's
+        // converged template_label overrides it.
+        val modelLabeled = ResolvedExtraction(
+            fields = mapOf(
+                "energy_descriptor" to ResolvedField("crashed", ConfidenceVerdict.CANONICAL),
+                "state_shift" to ResolvedField(true, ConfidenceVerdict.CANONICAL),
+                "template_label" to ResolvedField("decision-spiral", ConfidenceVerdict.CANONICAL),
+            ),
+        )
+
+        val result = BackgroundExtractionWorker(
+            engine = engine,
+            resolver = RecordingResolver(modelLabeled),
+            parser = { lens, _ -> extraction(lens) },
+            composer = fakeComposer(),
+        ).extract(request = request)
+
+        val success = assertInstanceOf(BackgroundExtractionResult.Success::class.java, result)
+        assertEquals(TemplateLabel.DECISION_SPIRAL, success.templateLabel)
+    }
+
+    @Test
+    fun `template_label falls back to the labeler when the model pick is absent`() = runTest {
+        val engine = mockk<LiteRtLmEngine>()
+        every { engine.streamText(any(), any()) } returns flowOf("raw-ok")
+        // No template_label resolved -> labeler computes it (energy "crashed" + shift -> AFTERMATH).
+        val result = BackgroundExtractionWorker(
+            engine = engine,
+            resolver = RecordingResolver(resolved),
+            parser = { lens, _ -> extraction(lens) },
+            composer = fakeComposer(),
+        ).extract(request = request)
+
+        val success = assertInstanceOf(BackgroundExtractionResult.Success::class.java, result)
+        assertEquals(TemplateLabel.AFTERMATH, success.templateLabel)
+    }
+
+    @Test
+    fun `unknown template_label serial falls back to the labeler`() = runTest {
+        val engine = mockk<LiteRtLmEngine>()
+        every { engine.streamText(any(), any()) } returns flowOf("raw-ok")
+        val badLabel = ResolvedExtraction(
+            fields = mapOf(
+                "energy_descriptor" to ResolvedField("crashed", ConfidenceVerdict.CANONICAL),
+                "state_shift" to ResolvedField(true, ConfidenceVerdict.CANONICAL),
+                "template_label" to ResolvedField("not-a-real-archetype", ConfidenceVerdict.CANONICAL),
+            ),
+        )
+
+        val result = BackgroundExtractionWorker(
+            engine = engine,
+            resolver = RecordingResolver(badLabel),
+            parser = { lens, _ -> extraction(lens) },
+            composer = fakeComposer(),
+        ).extract(request = request)
+
+        val success = assertInstanceOf(BackgroundExtractionResult.Success::class.java, result)
+        assertEquals(TemplateLabel.AFTERMATH, success.templateLabel)
+    }
+
+    @Test
     fun `worker labels using the capture timestamp's zone, not the JVM default`() = runTest {
         val engine = mockk<LiteRtLmEngine>()
         every { engine.streamText(any(), any()) } returns flowOf("raw-ok")
@@ -441,6 +538,17 @@ class BackgroundExtractionWorkerTest {
                 engine = mockk(),
                 resolver = RecordingResolver(resolved),
                 maxAttemptsPerLens = 0,
+            )
+        }
+    }
+
+    @Test
+    fun `lenses list must not be empty`() {
+        assertThrows(IllegalArgumentException::class.java) {
+            BackgroundExtractionWorker(
+                engine = mockk(),
+                resolver = RecordingResolver(resolved),
+                lenses = emptyList(),
             )
         }
     }

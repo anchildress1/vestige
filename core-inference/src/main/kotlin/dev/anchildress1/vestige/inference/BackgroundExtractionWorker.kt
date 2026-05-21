@@ -1,9 +1,12 @@
 package dev.anchildress1.vestige.inference
 
 import android.util.Log
+import dev.anchildress1.vestige.model.ConfidenceVerdict
 import dev.anchildress1.vestige.model.ExtractionStatus
 import dev.anchildress1.vestige.model.Lens
 import dev.anchildress1.vestige.model.LensExtraction
+import dev.anchildress1.vestige.model.ResolvedExtraction
+import dev.anchildress1.vestige.model.TemplateLabel
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
@@ -27,10 +30,14 @@ data class BackgroundExtractionRequest(
 )
 
 /**
- * Runs the three lenses sequentially against an already-persisted entry, retries each lens up to
- * [maxAttemptsPerLens] times, and reduces the parsed lens outputs through [resolver]. A lens that
- * exhausts its budget contributes a null extraction (convergence treats that as "no opinion").
+ * Runs the configured [lenses] sequentially against an already-persisted entry, retries each lens
+ * up to [maxAttemptsPerLens] times, and reduces the parsed lens outputs through [resolver]. A lens
+ * that exhausts its budget contributes a null extraction (convergence treats that as "no opinion").
  * `RUNNING` is emitted once for the whole worker run; per-lens retries do not emit status churn.
+ *
+ * [lenses] defaults to the full three-lens pipeline, and that default is what production runs —
+ * `AppContainer` constructs the worker without overriding it. A narrower list is a tuning-harness
+ * affordance for exercising one lens in isolation.
  *
  * The caller threads the entry's persisted retry count in via `entryAttemptCount`; the worker
  * echoes it on every [ExtractionStatusListener] event. Lens-call volume is reported separately
@@ -41,6 +48,8 @@ data class BackgroundExtractionRequest(
  * call through resolver completion. Lenses are not launched concurrently; on timeout the active
  * lens is cancelled and discarded, while already-finished sequential lens results are reported.
  */
+// Every constructor param is an injection seam, hence the long list.
+@Suppress("LongParameterList")
 class BackgroundExtractionWorker(
     private val engine: LiteRtLmEngine,
     private val resolver: ConvergenceResolver,
@@ -48,6 +57,7 @@ class BackgroundExtractionWorker(
     private val composer: (Lens, String, List<HistoryChunk>) -> ComposedPrompt = PromptComposer::compose,
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
     val maxAttemptsPerLens: Int = DEFAULT_MAX_ATTEMPTS_PER_LENS,
+    private val lenses: List<Lens> = DEFAULT_LENSES,
 ) {
     private val templateLabeler = TemplateLabeler()
 
@@ -55,6 +65,7 @@ class BackgroundExtractionWorker(
         require(maxAttemptsPerLens >= 1) {
             "maxAttemptsPerLens must be ≥1 (got $maxAttemptsPerLens) — every lens needs at least one attempt."
         }
+        require(lenses.isNotEmpty()) { "BackgroundExtractionWorker requires at least one lens." }
     }
 
     suspend fun extract(
@@ -80,7 +91,7 @@ class BackgroundExtractionWorker(
 
         try {
             withTimeoutOrNoCap(request.timeoutMs) {
-                val results = LENSES.map { lens ->
+                val results = lenses.map { lens ->
                     runLens(lens, request.entryText, request.retrievedHistory)
                         .also { completed += it }
                 }
@@ -175,10 +186,10 @@ class BackgroundExtractionWorker(
         val totalElapsedMs = (System.nanoTime() - startedNanos) / NANOS_PER_MILLI
         return when {
             resolved is Resolution.Ok -> {
-                val templateLabel = templateLabeler.label(resolved.value, capturedAt)
+                val templateLabel = resolveTemplateLabel(resolved.value, capturedAt)
                 Log.d(
                     TAG,
-                    "extract completed: lenses=${parsedExtractions.size}/${LENSES.size} " +
+                    "extract completed: lenses=${parsedExtractions.size}/${lenses.size} " +
                         "model_calls=$modelCallCount elapsed=${totalElapsedMs}ms",
                 )
                 listener.onUpdate(ExtractionStatus.COMPLETED, entryAttemptCount, null)
@@ -220,13 +231,39 @@ class BackgroundExtractionWorker(
         }
     }
 
+    // Model-emitted template label wins only when load-bearing (CANONICAL / CANONICAL_WITH_CONFLICT).
+    // CANDIDATE means a single lens emitted it — not enough convergence to override the deterministic
+    // labeler. Unknown serials (fromSerial returns null) also fall back to the labeler.
+    private fun resolveTemplateLabel(resolved: ResolvedExtraction, capturedAt: ZonedDateTime): TemplateLabel {
+        val labelerPick = templateLabeler.label(resolved, capturedAt)
+        val field = resolved.fields[TEMPLATE_LABEL_KEY]
+        val modelPick = if (field != null &&
+            (field.verdict == ConfidenceVerdict.CANONICAL || field.verdict == ConfidenceVerdict.CANONICAL_WITH_CONFLICT)
+        ) {
+            val serial = field.value as? String
+            if (serial != null) {
+                val parsed = TemplateLabel.fromSerial(serial)
+                if (parsed == null) Log.w(TAG, "template_label unknown serial=$serial; labeler wins")
+                parsed
+            } else {
+                null
+            }
+        } else {
+            null
+        }
+        if (modelPick != null && modelPick != labelerPick) {
+            Log.d(TAG, "template_label model=$modelPick labeler=$labelerPick (model wins)")
+        }
+        return modelPick ?: labelerPick
+    }
+
     private fun tryResolve(parsed: List<LensExtraction>, currentLastError: String?): Resolution = try {
         Resolution.Ok(resolver.resolve(parsed))
     } catch (cancellation: CancellationException) {
         throw cancellation
     } catch (@Suppress("TooGenericExceptionCaught") resolverError: Exception) {
         val terminalError = "resolver-error:${resolverError.javaClass.simpleName}"
-        Log.w(TAG, "resolver failed ($terminalError); prior last_error=$currentLastError")
+        Log.w(TAG, "resolver failed ($terminalError); prior last_error=$currentLastError", resolverError)
         Resolution.Failure(terminalError)
     }
 
@@ -260,9 +297,10 @@ class BackgroundExtractionWorker(
     companion object {
         const val DEFAULT_MAX_ATTEMPTS_PER_LENS = 2
 
-        private val LENSES: List<Lens> = listOf(Lens.LITERAL, Lens.INFERENTIAL, Lens.SKEPTICAL)
+        val DEFAULT_LENSES: List<Lens> = listOf(Lens.LITERAL, Lens.INFERENTIAL, Lens.SKEPTICAL)
         private val NO_OP_LISTENER = ExtractionStatusListener { _, _, _ -> }
         private const val TAG = "VestigeBackgroundExtraction"
         private const val NANOS_PER_MILLI = 1_000_000L
+        private const val TEMPLATE_LABEL_KEY = "template_label"
     }
 }

@@ -11,7 +11,7 @@ androidx-activity-compose = "1.13.0"
 androidx-lifecycle = "2.10.0"
 
 # Compose
-compose-bom = "2026.05.00"
+compose-bom = "2026.05.01"
 
 # Persistence
 objectbox = "5.4.2"
@@ -21,7 +21,7 @@ objectbox = "5.4.2"
 # (https://dl.google.com/dl/android/maven2). The lower-level com.google.ai.edge.litert:litert
 # coord exists at 2.1.4 but is intentionally NOT a direct dependency — adding it would collide
 # on libLiteRt.so at :app:mergeDebugNativeLibs.
-litert-lm = "0.11.0"
+litert-lm = "0.12.0"
 
 # Embedding — EmbeddingGemma 300M via Google AI Edge LocalAgents RAG. The bundled
 # libgemma_embedding_model_jni.so statically links LiteRT TFLite + SentencePiece, so it
@@ -29,7 +29,7 @@ litert-lm = "0.11.0"
 localagents-rag = "0.3.0"
 # Runtime dep of localagents-rag's GemmaEmbeddingModel — pulled directly because the SDK's
 # only protobuf provider sits behind its optional `tasks-genai` dependency.
-protobuf-javalite = "4.34.1"
+protobuf-javalite = "4.35.0"
 
 # Quality
 kover = "0.9.8"
@@ -41,8 +41,8 @@ kotlinx-coroutines = "1.11.0"
 
 # Testing
 junit = "4.13.2"
-junit-jupiter = "6.0.3"
-junit-platform = "6.0.3"
+junit-jupiter = "6.1.0"
+junit-platform = "6.1.0"
 mockk = "1.14.9"
 turbine = "1.2.1"
 # Android's android.jar ships org.json at runtime, but the AGP mockable jar stubs every method.

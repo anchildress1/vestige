@@ -10,6 +10,10 @@ import java.time.Instant
 
 object DebugPatternSeeder {
 
+    // Seed only the first N of the full corpus so single-pass extraction finishes fast during
+    // iteration. Raise toward seedEntries().size as the pipeline firms up; the rest stay on hand.
+    private const val ACTIVE_SEED_COUNT = 3
+
     private data class SeedEntry(val text: String, val timestamp: Instant, val durationMs: Long)
 
     @Suppress("MagicNumber", "LongMethod") // Fixture timestamps + corpus shape are deliberately concrete.
@@ -20,7 +24,7 @@ object DebugPatternSeeder {
             boxStore.boxFor(PatternEntity::class.java).removeAll()
             boxStore.boxFor(CalloutCooldownEntity::class.java).removeAll()
 
-            seedEntries().forEachIndexed { idx, seed ->
+            seedEntries().take(ACTIVE_SEED_COUNT).forEachIndexed { idx, seed ->
                 boxStore.boxFor(EntryEntity::class.java).put(
                     EntryEntity(
                         markdownFilename = "debug-seed-$idx.md",
@@ -34,7 +38,8 @@ object DebugPatternSeeder {
         }
     }
 
-    @Suppress("MagicNumber", "LongMethod", "MaxLineLength") // Fixture corpus: timestamps + prose are deliberately concrete.
+    // Fixture corpus: timestamps + prose are deliberately concrete.
+    @Suppress("MagicNumber", "LongMethod", "MaxLineLength", "ktlint:standard:max-line-length")
     private fun seedEntries() = listOf(
         SeedEntry(
             "I was completely fine going into the standup but crashed hard within about twenty minutes. " +
@@ -263,5 +268,4 @@ object DebugPatternSeeder {
             14_000L,
         ),
     )
-
 }

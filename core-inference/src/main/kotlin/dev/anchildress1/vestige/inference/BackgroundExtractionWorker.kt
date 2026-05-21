@@ -182,7 +182,9 @@ class BackgroundExtractionWorker(
             val resolution = tryResolve(parsedExtractions, lensLastError)
             if (resolution is Resolution.Ok) {
                 Resolution.Ok(resolveChunkReferences(resolution.value, retrievedHistory))
-            } else resolution
+            } else {
+                resolution
+            }
         }
         val totalElapsedMs = (System.nanoTime() - startedNanos) / NANOS_PER_MILLI
         return when {

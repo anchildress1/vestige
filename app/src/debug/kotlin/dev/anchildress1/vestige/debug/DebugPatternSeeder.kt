@@ -13,9 +13,11 @@ object DebugPatternSeeder {
     // Full corpus by default; lower only for limited local testing. A full refresh reloads all.
     internal const val ACTIVE_SEED_COUNT = 35
 
+    // Vocab-drift fixtures share one duration; the prose carries the variation, not the timing.
+    private const val VOCAB_DRIFT_DURATION_MS = 14_000L
+
     private data class SeedEntry(val text: String, val timestamp: Instant, val durationMs: Long)
 
-    @Suppress("MagicNumber", "LongMethod") // Fixture timestamps + corpus shape are deliberately concrete.
     fun seed(boxStore: BoxStore) {
         val entries = seedEntries()
         check(ACTIVE_SEED_COUNT <= entries.size) {
@@ -41,9 +43,11 @@ object DebugPatternSeeder {
         }
     }
 
-    // Fixture corpus: timestamps + prose are deliberately concrete.
+    private fun seedEntries(): List<SeedEntry> = narrativeEntries() + vocabDriftEntries()
+
+    // Narrative corpus: varied durations, deliberately concrete timestamps + prose.
     @Suppress("MagicNumber", "LongMethod")
-    private fun seedEntries() = listOf(
+    private fun narrativeEntries() = listOf(
         SeedEntry(
             "I was completely fine going into the standup but crashed hard within about twenty minutes. " +
                 "Couldn't get back to the doc for the rest of the day. Then somehow wired until 2am. " +
@@ -132,148 +136,131 @@ object DebugPatternSeeder {
             Instant.parse("2026-05-20T19:00:00Z"),
             25_000L,
         ),
-        SeedEntry(
+    )
+
+    // Vocab-drift corpus: uniform duration, stored as dense (prose, timestamp) pairs so the
+    // repeated SeedEntry/Instant.parse boilerplate collapses into a single mapping.
+    @Suppress("LongMethod")
+    private fun vocabDriftEntries(): List<SeedEntry> = listOf(
+        Pair(
             "I hit the wall hard today — exhausted again in a way that felt different from just being tired. " +
                 "Every limb gave up at once somewhere around 2pm. Not dramatic, just suddenly nothing left.",
-            Instant.parse("2026-05-01T12:00:00Z"),
-            14_000L,
+            "2026-05-01T12:00:00Z",
         ),
-        SeedEntry(
+        Pair(
             "Drained to the bone by mid-morning and I don't even know why. Eyes won't focus on anything. " +
                 "I tried to push through it and just made everything worse. Had to stop completely.",
-            Instant.parse("2026-05-01T18:00:00Z"),
-            14_000L,
+            "2026-05-01T18:00:00Z",
         ),
-        SeedEntry(
+        Pair(
             "Wiped out before noon. There was no energy left for anything, not even the stuff I wanted to do. " +
                 "I kept telling myself five more minutes and nothing happened.",
-            Instant.parse("2026-05-02T00:00:00Z"),
-            14_000L,
+            "2026-05-02T00:00:00Z",
         ),
-        SeedEntry(
+        Pair(
             "Running on empty and I've been running on empty for days. Fumes only at this point. " +
                 "I got the basics done but barely. There was nothing left at the end of it.",
-            Instant.parse("2026-05-02T06:00:00Z"),
-            14_000L,
+            "2026-05-02T06:00:00Z",
         ),
-        SeedEntry(
+        Pair(
             "Completely depleted today. My body feels heavier than it did yesterday and " +
                 "yesterday already felt heavy. " +
                 "I sat down to start and stared at it for twenty minutes before giving up.",
-            Instant.parse("2026-05-02T12:00:00Z"),
-            14_000L,
+            "2026-05-02T12:00:00Z",
         ),
-        SeedEntry(
+        Pair(
             "Drained. Just drained. Not tired, not sleepy, not worn out — drained. " +
                 "Like something pulled the plug around noon and I spent the rest of the day " +
                 "waiting for it to come back.",
-            Instant.parse("2026-05-02T18:00:00Z"),
-            14_000L,
+            "2026-05-02T18:00:00Z",
         ),
-        SeedEntry(
+        Pair(
             "Exhausted by 10am and that's a new floor for me. I've been running behind my own capacity for weeks " +
                 "but this is the first time I ran out before lunch. That felt like a line being crossed.",
-            Instant.parse("2026-05-03T00:00:00Z"),
-            14_000L,
+            "2026-05-03T00:00:00Z",
         ),
-        SeedEntry(
+        Pair(
             "Wiped and it's the kind that ignores caffeine. Had two coffees before noon " +
                 "and felt nothing from either. " +
                 "Body decided to stop being functional before I had any say in it.",
-            Instant.parse("2026-05-03T06:00:00Z"),
-            14_000L,
+            "2026-05-03T06:00:00Z",
         ),
-        SeedEntry(
+        Pair(
             "Sluggish all day with that brain fog that makes everything take three times longer than it should. " +
                 "I kept losing my place in the middle of sentences. It was back, same as before.",
-            Instant.parse("2026-05-03T12:00:00Z"),
-            14_000L,
+            "2026-05-03T12:00:00Z",
         ),
-        SeedEntry(
+        Pair(
             "Foggy in a way I can't push through. Couldn't string two sentences together without losing the thread. " +
                 "Sat with the document open for an hour and wrote maybe thirty usable words.",
-            Instant.parse("2026-05-03T18:00:00Z"),
-            14_000L,
+            "2026-05-03T18:00:00Z",
         ),
-        SeedEntry(
+        Pair(
             "Burnt out and my attention just skating across everything without landing anywhere. " +
                 "I'd start reading something and be three paragraphs in with zero retention. " +
                 "Tried resetting four times.",
-            Instant.parse("2026-05-04T00:00:00Z"),
-            14_000L,
+            "2026-05-04T00:00:00Z",
         ),
-        SeedEntry(
+        Pair(
             "Brain fog today. The cursor was blinking faster than I could think, which is how I know it's bad. " +
                 "I'm slower than the default blink rate. Ended up closing everything and going for a walk.",
-            Instant.parse("2026-05-04T06:00:00Z"),
-            14_000L,
+            "2026-05-04T06:00:00Z",
         ),
-        SeedEntry(
+        Pair(
             "Sluggish in a way that made every task take twice as long. Simple things felt hard. " +
                 "I kept re-reading the same paragraph to figure out what I was supposed to do next.",
-            Instant.parse("2026-05-04T12:00:00Z"),
-            14_000L,
+            "2026-05-04T12:00:00Z",
         ),
-        SeedEntry(
+        Pair(
             "Foggy and slow all day, mind moving through something that felt like molasses. " +
                 "Not in a dramatic way. Just everything requiring more effort than it should. " +
                 "I got through it but barely.",
-            Instant.parse("2026-05-04T18:00:00Z"),
-            14_000L,
+            "2026-05-04T18:00:00Z",
         ),
-        SeedEntry(
+        Pair(
             "Burnt out and the screen looked blurry even though my eyes were fine. It was coming from inside. " +
                 "That's my signal that I need to stop but I kept going anyway. Bad call.",
-            Instant.parse("2026-05-05T00:00:00Z"),
-            14_000L,
+            "2026-05-05T00:00:00Z",
         ),
-        SeedEntry(
+        Pair(
             "Brain fog. Started three separate sentences and finished none of them. I know what I'm trying to say " +
                 "but the path from that to words just isn't there right now. Closing the doc.",
-            Instant.parse("2026-05-05T06:00:00Z"),
-            14_000L,
+            "2026-05-05T06:00:00Z",
         ),
-        SeedEntry(
+        Pair(
             "Wired-tired again tonight and I don't know which is worse. Body wants sleep, brain just refuses. " +
                 "Lying down doesn't help. Not anxious about anything specific, just running at the wrong frequency.",
-            Instant.parse("2026-05-05T12:00:00Z"),
-            14_000L,
+            "2026-05-05T12:00:00Z",
         ),
-        SeedEntry(
+        Pair(
             "Anxious-tired is the only way I can describe what this is. Lying down doesn't count as rest " +
                 "when my brain is still processing everything. Slept but woke up like I hadn't slept at all.",
-            Instant.parse("2026-05-05T18:00:00Z"),
-            14_000L,
+            "2026-05-05T18:00:00Z",
         ),
-        SeedEntry(
+        Pair(
             "Can't sleep but I'm genuinely exhausted. The static won't quit even when I'm completely flat. " +
                 "I've been horizontal for an hour and nothing is happening. Brain won't stop, body gave up.",
-            Instant.parse("2026-05-06T00:00:00Z"),
-            14_000L,
+            "2026-05-06T00:00:00Z",
         ),
-        SeedEntry(
+        Pair(
             "Amped but exhausted and my body and brain are completely disagreeing about what state I'm in. " +
                 "Body says stop, brain says go. They've been sending opposite signals since about 8pm.",
-            Instant.parse("2026-05-06T06:00:00Z"),
-            14_000L,
+            "2026-05-06T06:00:00Z",
         ),
-        SeedEntry(
+        Pair(
             "Wired-tired again and it's the third night in a row. I keep expecting it to flip into actual sleep " +
                 "but it doesn't. I just lie there staring at the ceiling processing nothing useful.",
-            Instant.parse("2026-05-06T12:00:00Z"),
-            14_000L,
+            "2026-05-06T12:00:00Z",
         ),
-        SeedEntry(
+        Pair(
             "Anxious-tired with eyes closed and chest racing even though nothing is happening. " +
                 "No reason for it. I just can't get below a certain level of activation no matter how tired I am.",
-            Instant.parse("2026-05-06T18:00:00Z"),
-            14_000L,
+            "2026-05-06T18:00:00Z",
         ),
-        SeedEntry(
+        Pair(
             "Can't sleep, can't focus, both tanks empty at the same time. I don't know how that works " +
                 "but here I am at 1am, fully depleted and fully awake. Completely contradictory.",
-            Instant.parse("2026-05-07T00:00:00Z"),
-            14_000L,
+            "2026-05-07T00:00:00Z",
         ),
-    )
+    ).map { (text, timestamp) -> SeedEntry(text, Instant.parse(timestamp), VOCAB_DRIFT_DURATION_MS) }
 }

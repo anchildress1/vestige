@@ -12,7 +12,7 @@ Every live ADR as written, assuming the full v1 feature set is complete. (ADR-00
 ```mermaid
 flowchart TD
     accTitle: ADR supersession and amendment relationships
-    accDescr: ADR-006 and ADR-007 amend ADR-004. ADR-005 amends ADR-002. ADR-008 supersedes ADR-002's sequencing with concurrent multi-context; its mechanism was corrected 2026-05-16 (Engine.createSession/createConversation, not Session.clone); v1 ships sequential pending measurement. The interim ADR-009 was deleted as a mistake and is not in the graph. ADR-010 supersedes ADR-001's embeddings section. ADR-011 supersedes the design-guidelines visual layer only. ADR-013 supersedes the model-free typed-fallback premise.
+    accDescr: ADR-006 and ADR-007 amend ADR-004. ADR-005 amends ADR-002. ADR-008 supersedes ADR-002's sequencing with concurrent multi-context; its mechanism was corrected 2026-05-16 (Engine.createSession/createConversation, not Session.clone); v1 ships sequential pending measurement. The interim ADR-009 was deleted as a mistake and is not in the graph. ADR-010 supersedes ADR-001's embeddings section. ADR-011 supersedes the design-guidelines visual layer only. ADR-013 supersedes the model-free typed-fallback premise. ADR-018 keeps voice follow-up inline with the foreground transcription call.
 
     A001["ADR-001<br/>stack & infra"]
     A002["ADR-002<br/>3-lens × 5-surface"]
@@ -26,6 +26,7 @@ flowchart TD
     A011["ADR-011<br/>Scoreboard design pivot"]
     A012["ADR-012<br/>GPU perf + pre-warm"]
     A013["ADR-013<br/>typed requires fg model"]
+    A018["ADR-018<br/>inline foreground follow-up"]
 
     A005 -- amends --> A002
     A006 -- amends --> A004
@@ -35,6 +36,8 @@ flowchart TD
     A010 -- supersedes §Embeddings of --> A001
     A011 -- supersedes visual layer of --> Design["design-guidelines.md"]
     A013 -- supersedes typed-fallback premise --> A005
+    A018 -- supersedes foreground shape --> A014["ADR-014<br/>fg/bg split"]
+    A018 -- supersedes typed model call --> A013
 ```
 
 ---
@@ -48,13 +51,12 @@ flowchart TD
 `NetworkGate`, `extraction_status`, and CaptureSession-discard are in
 [state-diagrams.md](state-diagrams.md); module graph + DI in [architecture.md](architecture.md).
 
-**Q4 — audio chunking (>30 s):** ≤30 s is one call; >30 s is N sequential 30 s chunks,
-transcription-only for 1…N−1, follow-up on the final chunk.
+**Q4 — audio chunking (>30 s):** ≤30 s is one foreground call; >30 s is deferred.
 
 ```mermaid
 sequenceDiagram
     accTitle: ADR-001 Q4 over-30-second audio chunking
-    accDescr: For audio longer than 30 seconds, chunks 1 through N minus 1 are transcription-only calls. The final chunk receives the concatenated transcript and produces the follow-up. Final-chunk detection is the explicit Stop.
+    accDescr: For audio longer than 30 seconds, chunks 1 through N minus 1 are transcription-only calls. The deferred final chunk returns transcription and one follow-up.
 
     participant Cap as CaptureSession
     participant G as Gemma
@@ -63,8 +65,8 @@ sequenceDiagram
     Cap->>G: chunk 2 (transcription only)
     G-->>Cap: transcript₂
     Note over Cap,G: … chunks 3 … N-1 …
-    Cap->>G: chunk N + concatenated transcript (explicit Stop)
-    G-->>Cap: { transcription, follow_up }
+    Cap->>G: chunk N + concatenated transcript (deferred)
+    G-->>Cap: transcript_N
 ```
 
 ---
@@ -77,7 +79,7 @@ multi-context; mechanism corrected 2026-05-16 — `createSession`/`createConvers
 **Decision:** 3 independent lens calls (Literal / Inferential / Skeptical), each composing all 5
 surfaces (Behavioral / State / Vocabulary / Commitment / Recurrence); a **deterministic Kotlin**
 convergence resolver (not a 4th model call). Two-tier: foreground returns
-`{transcription, follow_up}`; background runs the 3 lenses + resolver in 30–90 s. **Agreement
+`{transcription}`; background runs the 3 lenses + resolver in 30–90 s. **Agreement
 predicate is written against the storage enum** (`template_label` ∈ {Aftermath, Tunnel exit,
 Concrete shoes, Decision spiral, Goblin hours, Audit} — positional 1:1 with the
 `concept-locked` product names). Full sequence + resolver decision:
@@ -246,9 +248,8 @@ sequenceDiagram
 ## ADR-013 — Typed Entry Requires the Foreground Model
 
 **Status:** Accepted. Supersedes the ADR-005-era model-free typed-fallback premise.
-**Decision:** Typed runs the **same** foreground call as voice
-(`runForegroundTextCall(text, persona)`, `Content.Text`, shared `CaptureViewModel.runForeground`,
-same `{transcription, follow_up}` parser). The model is **required**: when
+**Decision:** Typed persists the typed text as the transcript substrate and does not generate a
+model follow-up. The model is still **required** for parity with the voice capture gate: when
 `ModelReadiness != Ready`, `submitTyped` is a silent no-op (parity with a disabled REC). The
 old `saveTypedEntry` / typed-`PENDING` branch is **deleted** — no compatibility shim. Flow in
 [user-flows.md](user-flows.md).

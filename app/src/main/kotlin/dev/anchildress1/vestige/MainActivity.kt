@@ -32,12 +32,9 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import dev.anchildress1.vestige.model.Persona
 import dev.anchildress1.vestige.storage.EntryStore
-import dev.anchildress1.vestige.ui.capture.AttachFollowUp
 import dev.anchildress1.vestige.ui.capture.CaptureScreen
 import dev.anchildress1.vestige.ui.capture.CaptureViewModel
 import dev.anchildress1.vestige.ui.capture.ForegroundInferenceCall
-import dev.anchildress1.vestige.ui.capture.ForegroundTextInferenceCall
-import dev.anchildress1.vestige.ui.capture.HistoryRetrieval
 import dev.anchildress1.vestige.ui.capture.IdleChromeCallbacks
 import dev.anchildress1.vestige.ui.capture.ModelReadiness
 import dev.anchildress1.vestige.ui.capture.RealVoiceCapture
@@ -526,13 +523,6 @@ private fun CaptureRoute(
                     followUpText = followUpText,
                 ).entryId
             },
-            foregroundTextInference = ForegroundTextInferenceCall { text, personaSel, history ->
-                container.runForegroundTextCall(text = text, persona = personaSel, retrievedHistory = history)
-            },
-            retrieveHistory = HistoryRetrieval { query -> container.retrieveHistory(query) },
-            attachFollowUp = AttachFollowUp { entryId, followUpText ->
-                container.attachFollowUp(entryId, followUpText)
-            },
             clock = clock,
             zoneId = zoneId,
             initialReadiness = container.modelReadinessFlow.value,
@@ -580,9 +570,6 @@ private class CaptureViewModelFactory(
     private val recordVoice: RealVoiceCapture,
     private val foregroundInference: ForegroundInferenceCall,
     private val saveAndExtract: SaveAndExtract,
-    private val foregroundTextInference: ForegroundTextInferenceCall,
-    private val retrieveHistory: HistoryRetrieval,
-    private val attachFollowUp: AttachFollowUp,
     private val clock: Clock,
     private val zoneId: ZoneId,
     private val initialReadiness: ModelReadiness,
@@ -598,9 +585,6 @@ private class CaptureViewModelFactory(
             recordVoice = recordVoice,
             foregroundInference = foregroundInference,
             saveAndExtract = saveAndExtract,
-            foregroundTextInference = foregroundTextInference,
-            retrieveHistory = retrieveHistory,
-            attachFollowUp = attachFollowUp,
             clock = clock,
             zoneId = zoneId,
             initialReadiness = initialReadiness,

@@ -90,7 +90,7 @@ The end-to-end dataflow. `EntryStore` writes ObjectBox only; export renders mark
 ```mermaid
 flowchart TB
     accTitle: End-to-end capture and extraction dataflow
-    accDescr: User records or types. Voice goes through AudioRecord then audio normalization to mono 16kHz float32 max 30s, then a foreground Gemma call returns transcription and follow-up. EntryStore persists ObjectBox rows only. A background pass runs three sequential lens calls, the convergence resolver writes canonical, candidate, or ambiguous fields plus entry observations, then pattern detection runs when the threshold is met.
+    accDescr: User records or types. Voice goes through AudioRecord then audio normalization to mono 16kHz float32 max 30s, then a foreground Gemma call returns transcription and one follow-up. EntryStore persists ObjectBox rows only. A background pass runs three sequential lens calls, the convergence resolver writes canonical, candidate, or ambiguous fields plus entry observations, then pattern detection runs when the threshold is met.
 
     U(["User"]) -- voice --> AR["AudioRecord capture"]
     U -- type --> FG

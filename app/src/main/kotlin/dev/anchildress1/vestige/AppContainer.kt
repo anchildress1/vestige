@@ -269,9 +269,9 @@ class AppContainer(
     }
 
     /**
-     * Single-turn foreground inference path consumed by the capture screen. Shares the same
-     * process Engine as background extraction, but each call opens its own independent SDK
-     * conversation, so foreground no longer blocks on a shared Kotlin call mutex.
+     * Foreground transcription path consumed by the capture screen. Shares the same process
+     * Engine as background extraction; LiteRT-LM still permits only one live session, so the
+     * engine wrapper serializes calls.
      */
     val foregroundInference: ForegroundInference by lazy {
         ForegroundInference(
@@ -286,25 +286,14 @@ class AppContainer(
         emitAll(foregroundInference.runForegroundCall(audio, persona))
     }
 
-    /** Typed-entry foreground call — same engine + parser as voice, same init guard. */
-    fun runForegroundTextCall(
-        text: String,
-        persona: Persona,
-        retrievedHistory: List<HistoryChunk> = emptyList(),
-    ): Flow<ForegroundStreamEvent> = flow {
-        ensureBackgroundEngineInitialized()
-        emitAll(foregroundInference.runForegroundTextCall(text, persona, retrievedHistory))
-    }
-
     private val retrievalRepo: RetrievalRepo by lazy {
         RetrievalRepo(boxStore = boxStore, embedder = { text -> requireEmbedder().embed(text) })
     }
 
     /**
-     * Off-thread prior-entry lookup feeding detached follow-up generation + background extraction.
-     * Degrades to empty on any failure (embeddings not backfilled yet, store error) so a bad
-     * retrieval never blocks entry creation. Maps the top entries to context-only [HistoryChunk]s
-     * — no `patternId`, since follow-up generation needs textual context, not recurrence linkage.
+     * Off-thread prior-entry lookup feeding background extraction. Degrades to empty on any failure
+     * (embeddings not backfilled yet, store error) so a bad retrieval never blocks entry creation.
+     * Maps the top entries to context-only [HistoryChunk]s.
      */
     suspend fun retrieveHistory(query: String): List<HistoryChunk> = withContext(computeDispatcher) {
         try {
@@ -420,17 +409,6 @@ class AppContainer(
             // Self-healing: the next ON_RESUME re-runs the sweep, so a transient failure here
             // is a warning, not an error — keeping it error-tier would devalue real alerts.
             .onFailure { Log.w(TAG, "Skip wake-up sweep failed", it) }
-    }
-
-    /**
-     * Land call-2's persona follow-up on the still-in-flight entry and nudge [dataRevision] so an
-     * open detail screen reloads now — not later when background extraction terminal happens to
-     * bump it. Without the nudge the follow-up sits on disk, invisible, until convergence
-     * finishes (~15 s+); the user expects it moments after the transcript.
-     */
-    suspend fun attachFollowUp(entryId: Long, followUpText: String) {
-        withContext(ioDispatcher) { entryStore.attachFollowUp(entryId, followUpText) }
-        _dataRevision.value += 1
     }
 
     fun reportExtractionStatus(entryId: Long, status: ExtractionStatus) {

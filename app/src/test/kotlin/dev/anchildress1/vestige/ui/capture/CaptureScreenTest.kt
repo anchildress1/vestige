@@ -133,7 +133,6 @@ class CaptureScreenTest {
         recordVoice = VoiceCapture { _, _ -> null },
         foregroundInference = ForegroundInferenceCall { _, _ -> error("unreached") },
         saveAndExtract = SaveAndExtract { _, _, _, _, _, _ -> 1L },
-        foregroundTextInference = ForegroundTextInferenceCall { _, _, _ -> error("unused") },
         clock = clock,
         zoneId = ZoneOffset.UTC,
         initialReadiness = readiness,
@@ -144,7 +143,6 @@ class CaptureScreenTest {
         recordVoice = VoiceCapture { _, _ -> kotlinx.coroutines.suspendCancellableCoroutine { } },
         foregroundInference = ForegroundInferenceCall { _, _ -> error("unreached") },
         saveAndExtract = SaveAndExtract { _, _, _, _, _, _ -> 1L },
-        foregroundTextInference = ForegroundTextInferenceCall { _, _, _ -> error("unused") },
         clock = clock,
         zoneId = ZoneOffset.UTC,
         initialReadiness = ModelReadiness.Ready,
@@ -158,7 +156,6 @@ class CaptureScreenTest {
             flow { kotlinx.coroutines.awaitCancellation() }
         },
         saveAndExtract = SaveAndExtract { _, _, _, _, _, _ -> 1L },
-        foregroundTextInference = ForegroundTextInferenceCall { _, _, _ -> error("unused") },
         clock = clock,
         zoneId = ZoneOffset.UTC,
         initialReadiness = ModelReadiness.Ready,
@@ -171,9 +168,6 @@ class CaptureScreenTest {
             flowOf(ForegroundStreamEvent.Transcription("something happened"))
         },
         saveAndExtract = SaveAndExtract { _, _, _, _, _, _ -> entryId },
-        foregroundTextInference = ForegroundTextInferenceCall { _, _, _ ->
-            flowOf(ForegroundStreamEvent.Transcription("something happened"))
-        },
         clock = clock,
         zoneId = ZoneOffset.UTC,
         initialReadiness = ModelReadiness.Ready,

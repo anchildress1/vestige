@@ -38,7 +38,7 @@ No extra modules in v1 unless they remove a real compile or ownership problem. D
 | `EntryStore` | process-scoped | ObjectBox entry/tag writes; export filename stability |
 | `PatternStore` | process-scoped | ObjectBox pattern persistence, lifecycle state machine, and pattern detection algorithm per `adrs/ADR-003-pattern-detection-and-persistence.md` |
 | `RetrievalRepo` | process-scoped | keyword + tag + recency retrieval; vector only if STT-E passes |
-| `InferenceCoordinator` | process-scoped | Foreground call, background extraction scheduling, prompt composition, resolver. **Single-session, sequential — concurrent multi-context is SDK-impossible on `litertlm-android:0.11.0` (measured on-device 2026-05-17, STT-F `stt-results/stt-f-2026-05-17.md`; `adrs/ADR-008-parallel-lens-execution.md` §Addendum 2026-05-17 reverses §Correction).** `LiteRtLmEngine.callMutex` holds the createConversation→close lifetime exclusively: at most one live session ever (`stateMutex`/`drainGate` close-drain is orthogonal). The three background lenses run sequentially (`LENSES.map { runLens }`). A foreground record-tap during an in-flight background lens **waits** for that lens (≤ ~15 s on E4B GPU) — Story 2.19's non-blocking goal is withdrawn (SDK-gated, not a Kotlin lock we can remove). Two Engines is out (2× weight load). The v1 inference lifecycle (foreground = only user-blocking call; analytics + periodic pattern analysis async) is locked by `adrs/ADR-014-foreground-background-split-and-periodic-pattern-analysis.md`. |
+| `InferenceCoordinator` | process-scoped | Foreground call, background extraction scheduling, prompt composition, resolver. **Single-session, sequential — concurrent multi-context is SDK-impossible on `litertlm-android:0.11.0` (measured on-device 2026-05-17, STT-F `stt-results/stt-f-2026-05-17.md`; `adrs/ADR-008-parallel-lens-execution.md` §Addendum 2026-05-17 reverses §Correction).** `LiteRtLmEngine.callMutex` holds the createConversation→close lifetime exclusively: at most one live session ever (`stateMutex`/`drainGate` close-drain is orthogonal). The three background lenses run sequentially (`LENSES.map { runLens }`). A foreground record-tap during an in-flight background lens **waits** for that lens (≤ ~15 s on E4B GPU) — Story 2.19's non-blocking goal is withdrawn (SDK-gated, not a Kotlin lock we can remove). Two Engines is out (2× weight load). The v1 inference lifecycle is locked by `adrs/ADR-014-foreground-background-split-and-periodic-pattern-analysis.md`; `adrs/ADR-018-inline-foreground-follow-up.md` keeps the follow-up inline with the transcription call. |
 | `SessionState` | per-capture (single-use, terminates with the capture) | active persona for this capture + the live capture state, owned by `CaptureViewModel.CaptureUiState` (Idle / Recording / Inferring / Reviewing) over the `ForegroundStreamEvent` stream, persisted via `saveAndExtract` / `EntryStore`. v1 single-turn lifecycle per `adrs/ADR-005-stt-b-scope-and-v1-single-turn.md` (amends `adrs/ADR-002-multi-lens-extraction-pattern.md` §"Multi-turn behavior"); non-recoverable discard during RECORDING per `adrs/ADR-001-stack-and-build-infra.md` §Q8 (no rehydration, no Undo). The earlier `CaptureSession` / `Transcript` types that realized this were retired post-streaming as an orphaned duplicate — see `adrs/ADR-005…` §Addendum (2026-05-17). |
 
 Use manual constructor injection. No Hilt in v1.
@@ -50,7 +50,7 @@ Use manual constructor injection. No Hilt in v1.
 3. `:core-inference` downmixes/resamples/normalizes audio to Gemma's model-level target: mono 16 kHz float32 samples in `[-1, 1]`, max 30 seconds per clip.
 4. STT-A (Phase 1 audio plumbing) locks the exact LiteRT-LM Android handoff: `Content.AudioBytes(...)` packing or temp `Content.AudioFile(...)`.
 5. Foreground Gemma call returns transcription + follow-up.
-6. `EntryStore` persists the foreground exchange before background extraction starts: transcription as `entry_text`, saved model turn as `follow_up` when present, and the recorded `persona` that authored it.
+6. `EntryStore` persists the transcript before background extraction starts: transcription as `entry_text`, foreground `follow_up`, and the selected `persona` for row provenance.
 7. Background extraction runs three sequential lens calls.
 8. Convergence resolver writes canonical/candidate/ambiguous fields plus `entry_observations`.
 9. Pattern detection runs after the configured threshold and persists sourced patterns.
@@ -136,7 +136,7 @@ Standup ran long again. I was fine before it, then completely flattened by 11. O
 | `entry_text` | body | Exactly as captured. No transformation. Trailing newline only. |
 | `timestamp` | frontmatter | UTC, ISO-8601 with seconds, no fractional. |
 | `persona` | frontmatter | Lowercase enum value for the saved model turn's author (`witness`, `hardass`, `editor`). |
-| `follow_up` | frontmatter | Saved model turn for single-turn voice captures, or `null` when no follow-up exists. |
+| `follow_up` | frontmatter | Foreground persona follow-up for voice captures; `null` for typed entries. |
 | `duration_ms` | frontmatter | Millis of captured audio; `0` for typed entries and rows written before Story 4.6. |
 | `template_label` | frontmatter | Lowercase enum value (one of: aftermath, tunnel-exit, concrete-shoes, decision-spiral, goblin-hours, audit). |
 | `tags` | frontmatter list | Lowercase, kebab-case. Sorted lexicographically on write for diff stability. Empty case serializes as the inline `tags: []` — bare `tags:` parses as `null` under YAML 1.2 and breaks round-trip importers. |
@@ -201,13 +201,13 @@ Story 2.19 carries the implementation decision and wiring once Story 2.14 confir
 
 ## Retrieval History Gap (Addendum 2026-05-16)
 
-`CaptureViewModel` now persists the entry first and leaves `retrievedHistory` empty on that foreground save. Retrieval runs only after the entry is already open to the user: detached follow-up generation queries history on the saved text, and `BackgroundExtractionSaveFlow` does the same before it calls `BackgroundExtractionWorker`.
+`CaptureViewModel` persists the entry as soon as the foreground terminal result lands and leaves `retrievedHistory` empty on that foreground save. `BackgroundExtractionSaveFlow` performs retrieval before it calls `BackgroundExtractionWorker`.
 
-The consequence is deliberate: the foreground response and entry creation are no longer stalled on query embedding + vector lookup. The user gets the transcript-backed entry first; history-conditioned follow-up and history-conditioned lens extraction land afterward.
+The consequence is deliberate: entry creation is no longer stalled on query embedding + vector lookup. The user gets the transcript-backed entry first; history-conditioned lens extraction lands afterward.
 
-**Correct behavior:** foreground owns the immediate transcript / open-entry handoff; retrieval history feeds detached follow-up generation and detached background analysis after transcription lands.
+**Correct behavior:** foreground owns the immediate transcript + follow-up / open-entry handoff; retrieval history feeds detached background analysis after transcription lands.
 
-**Corrected 2026-05-19.** Both voice and typed capture now skip retrieval on the critical path. `CaptureViewModel` saves the pending entry as soon as it has authoritative text, opens History detail immediately, and then launches follow-up retrieval/generation on `viewModelScope`. `BackgroundExtractionSaveFlow` performs its own retrieval when the caller supplied none, so structured extraction keeps prior-entry context without making the user wait. `LiteRtLmEngine` still serializes Gemma calls on the GPU, so the detached work queues behind the foreground stream rather than running in parallel.
+**Corrected 2026-05-20.** Both voice and typed capture skip retrieval on the critical path. `CaptureViewModel` saves the pending entry as soon as it has authoritative foreground text and opens History detail immediately. `BackgroundExtractionSaveFlow` performs its own retrieval when the caller supplied none, so structured extraction keeps prior-entry context without making the user wait. `LiteRtLmEngine` still serializes Gemma calls on the GPU, so detached extraction queues behind the foreground call rather than running in parallel.
 
 ---
 

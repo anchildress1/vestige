@@ -46,13 +46,13 @@ flowchart LR
 
 ## 2. Two-tier processing (sequence)
 
-Foreground is fast (transcription + follow-up only, single-turn per ADR-005). Background does the
+Foreground is fast (transcription + one follow-up). Background does the
 3-lens convergence over 30–90 s. Audio bytes are discarded immediately after the foreground call.
 
 ```mermaid
 sequenceDiagram
     accTitle: Two-tier foreground and background inference sequence
-    accDescr: User stops recording. The foreground Gemma call returns transcription and follow-up. EntryStore persists an ObjectBox row and marks extraction PENDING. The background pass runs three sequential lens calls, the resolver writes fields, entry observations are generated, then pattern detection runs if the threshold is met.
+    accDescr: User stops recording. The foreground Gemma call returns transcription and one follow-up. EntryStore persists an ObjectBox row and marks extraction PENDING. The background pass runs three sequential lens calls, the resolver writes fields, entry observations are generated, then pattern detection runs if the threshold is met.
 
     actor U as User
     participant Cap as CaptureViewModel
@@ -64,7 +64,7 @@ sequenceDiagram
     participant PD as Pattern Detection
 
     U->>Cap: STOP · FILE IT
-    Cap->>FG: audio/text + persona (single-turn)
+    Cap->>FG: audio
     FG-->>Cap: { transcription, follow_up }
     Cap->>ES: persist ObjectBox row, status = PENDING
     Note over FG,Cap: audio bytes discarded now

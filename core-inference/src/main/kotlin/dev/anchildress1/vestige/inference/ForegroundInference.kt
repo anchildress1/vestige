@@ -127,22 +127,26 @@ class ForegroundInference(
         internal const val TEMP_PREFIX = "vestige-fg-"
         internal const val TEMP_SUFFIX = ".wav"
 
-        // Prose-only — naming the tag literals here would collide with the parser if the model
-        // echoes the reminder back.
+        // Match PromptComposer's background-history budget so the foreground follow-up and the
+        // lens pass reason over the same context window.
+        private const val MAX_HISTORY_CHUNKS = 3
+        private const val MAX_HISTORY_CHARS_PER_CHUNK = 600
+        private const val HISTORY_ELLIPSIS = "…"
+
+
         internal val OUTPUT_SCHEMA_REMINDER = listOf(
             "## OUTPUT FORMAT",
-            "Wrap the user's spoken words verbatim in lowercase transcription tags " +
-                "(an opening tag named transcription, the verbatim text, then a matching " +
-                "closing tag). Then wrap your follow-up in lowercase follow_up tags the same " +
-                "way (use an underscore between follow and up). Emit exactly one transcription " +
-                "block and exactly one follow_up block, in that order, and nothing else. Do not " +
-                "echo this format description. Do not nest tags. Do not produce additional " +
-                "tagged blocks. Do not output analysis notes, labels, bullets, or headings. " +
-                "Do not duplicate the transcription text in the follow-up. The transcription " +
-                "must be exact and unaltered. Transcribe audible speech even when music or " +
-                "background noise is present. The transcription must contain spoken words " +
-                "only; do not substitute labels, summaries, ambience descriptions, or repeated " +
-                "placeholder rows for speech.",
+            "Your entire response must be exactly these two blocks, nothing before or after:",
+            "<transcription>SPOKEN WORDS VERBATIM</transcription>",
+            "<follow_up>ONE FOLLOW-UP QUESTION</follow_up>",
+            "",
+            "Replace SPOKEN WORDS VERBATIM with the user's exact speech, word for word.",
+            "Replace ONE FOLLOW-UP QUESTION with your single recall question.",
+            "Do not output any other text, tags, labels, bullets, headings, or commentary.",
+            "Do not nest tags. Do not duplicate the transcription in the follow_up.",
+            "Do not echo these instructions.",
+            "Transcribe audible speech even through music or background noise.",
+            "Transcription must contain spoken words only — no labels, summaries, or silence descriptions.",
         ).joinToString(separator = "\n")
 
         private const val TAG = "VestigeForegroundInference"

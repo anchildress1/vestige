@@ -5,11 +5,12 @@ Extract attention and energy markers from the entry text.
 What to capture:
 
 - Energy descriptors the user named: "crashed", "wired", "fried", "sharp", "slow", "scattered", "tunnel", "blank".
-- User-coined or idiomatic state phrases when they clearly name the user's side of the moment: "hollow thing", "battery got yanked", "brain slid off", "vaped".
+- User-coined or idiomatic state phrases when they clearly name the user's side of the moment: "battery got yanked", "brain slid off", "vaped".
+- When the user invokes a named routine ("hollow thing", "the ritual", "the thing I do") as shorthand, the state word is the adjective or descriptor inside the routine name — populate `energy_descriptor` with "hollow", not "hollow thing".
 - Attention shifts: "couldn't focus", "locked in for hours", "kept tabbing away", "blanked".
 - State transitions across the entry: "was sharp this morning, flatlined by 11".
 - Late-night markers between midnight and 5am.
-- Decision-looping markers: re-doing the same choice, opening and closing the same task, restating the same dilemma.
+- Decision-looping markers: re-doing the same choice, opening and closing the same task, restating the same dilemma. Tag these as `decision-spiral`.
 
 What goes in the schema:
 

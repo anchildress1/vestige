@@ -30,10 +30,12 @@ data class BackgroundExtractionRequest(
 )
 
 /**
- * Runs the configured [lenses] sequentially against an already-persisted entry, retries each lens
- * up to [maxAttemptsPerLens] times, and reduces the parsed lens outputs through [resolver]. A lens
- * that exhausts its budget contributes a null extraction (convergence treats that as "no opinion").
- * `RUNNING` is emitted once for the whole worker run; per-lens retries do not emit status churn.
+ * Runs the three lenses **sequentially** (LiteRT-LM 0.11.0 enforces one live session per Engine;
+ * a concurrent call throws FAILED_PRECONDITION) against an already-persisted entry, retries each
+ * lens up to [maxAttemptsPerLens] times, and reduces the parsed lens outputs through [resolver].
+ * A lens that exhausts its budget contributes a null extraction (convergence treats that as "no
+ * opinion"). `RUNNING` is emitted once before the first lens call; per-lens retries emit no
+ * status (in-progress lens transitions are meaningless to callers).
  *
  * [lenses] defaults to the full three-lens pipeline, and that default is what production runs —
  * `AppContainer` constructs the worker without overriding it. A narrower list is a tuning-harness
@@ -95,7 +97,14 @@ class BackgroundExtractionWorker(
                     runLens(lens, request.entryText, request.retrievedHistory)
                         .also { completed += it }
                 }
-                completeRun(results, request.entryAttemptCount, request.capturedAt, started, listener)
+                completeRun(
+                    results = results,
+                    entryAttemptCount = request.entryAttemptCount,
+                    capturedAt = request.capturedAt,
+                    startedNanos = started,
+                    listener = listener,
+                    retrievedHistory = request.retrievedHistory,
+                )
             }
         } catch (_: TimeoutCancellationException) {
             handleTimeout(
@@ -168,12 +177,14 @@ class BackgroundExtractionWorker(
         return AttemptOutcome(raw = "", error = reason)
     }
 
+    @Suppress("LongParameterList") // Resolution context: lens results + diagnostics + history for chunk-ref resolution.
     private suspend fun completeRun(
         results: List<LensResult>,
         entryAttemptCount: Int,
         capturedAt: ZonedDateTime,
         startedNanos: Long,
         listener: ExtractionStatusListener,
+        retrievedHistory: List<HistoryChunk> = emptyList(),
     ): BackgroundExtractionResult {
         val modelCallCount = results.sumOf { it.attemptCount }
         val lensLastError = results.firstNotNullOfOrNull { it.lastError }
@@ -181,7 +192,7 @@ class BackgroundExtractionWorker(
         val resolved = if (parsedExtractions.isEmpty()) {
             null
         } else {
-            tryResolve(parsedExtractions, lensLastError)
+            tryResolve(parsedExtractions, lensLastError, retrievedHistory)
         }
         val totalElapsedMs = (System.nanoTime() - startedNanos) / NANOS_PER_MILLI
         return when {
@@ -231,6 +242,32 @@ class BackgroundExtractionWorker(
         }
     }
 
+    private fun resolveChunkReferences(
+        resolved: dev.anchildress1.vestige.model.ResolvedExtraction,
+        history: List<HistoryChunk>,
+    ): dev.anchildress1.vestige.model.ResolvedExtraction {
+        val field = resolved.fields[RECURRENCE_LINK_KEY]
+        val raw = (field?.value as? String)?.trim()
+        val chunkIndex = raw?.let { CHUNK_REF_REGEX.matchEntire(it) }
+            ?.groupValues?.get(1)?.toIntOrNull()
+        // chunk-N counts only matchable chunks, mirroring PromptComposer.renderHistory's contiguous
+        // numbering — context-only entries are skipped on both sides so the ref maps to the same row.
+        val matchable = history.filter { it.patternId != null }
+        val patternId = chunkIndex?.let { matchable.getOrNull(it - 1)?.patternId }
+        return if (field != null && patternId != null) {
+            resolved.copy(fields = resolved.fields + (RECURRENCE_LINK_KEY to field.copy(value = patternId)))
+        } else {
+            if (chunkIndex != null && patternId == null) {
+                Log.w(
+                    TAG,
+                    "resolveChunkReferences: chunk-$chunkIndex out of range " +
+                        "(matchable=${matchable.size}); leaving raw ref in recurrence_link",
+                )
+            }
+            resolved
+        }
+    }
+
     // Model-emitted template label wins only when load-bearing (CANONICAL / CANONICAL_WITH_CONFLICT).
     // CANDIDATE means a single lens emitted it — not enough convergence to override the deterministic
     // labeler. Unknown serials (fromSerial returns null) also fall back to the labeler.
@@ -257,8 +294,12 @@ class BackgroundExtractionWorker(
         return modelPick ?: labelerPick
     }
 
-    private fun tryResolve(parsed: List<LensExtraction>, currentLastError: String?): Resolution = try {
-        Resolution.Ok(resolver.resolve(parsed))
+    private fun tryResolve(
+        parsed: List<LensExtraction>,
+        currentLastError: String?,
+        history: List<HistoryChunk> = emptyList(),
+    ): Resolution = try {
+        Resolution.Ok(resolveChunkReferences(resolver.resolve(parsed), history))
     } catch (cancellation: CancellationException) {
         throw cancellation
     } catch (@Suppress("TooGenericExceptionCaught") resolverError: Exception) {
@@ -301,6 +342,8 @@ class BackgroundExtractionWorker(
         private val NO_OP_LISTENER = ExtractionStatusListener { _, _, _ -> }
         private const val TAG = "VestigeBackgroundExtraction"
         private const val NANOS_PER_MILLI = 1_000_000L
+        private const val RECURRENCE_LINK_KEY = "recurrence_link"
+        private val CHUNK_REF_REGEX = Regex("chunk-(\\d+)", RegexOption.IGNORE_CASE)
         private const val TEMPLATE_LABEL_KEY = "template_label"
     }
 }

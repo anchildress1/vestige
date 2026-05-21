@@ -107,10 +107,19 @@ object PromptComposer {
         }
         return buildString {
             append("## RETRIEVED HISTORY")
+            // Number only matchable (pattern-id-bearing) chunks so the labels stay contiguous —
+            // a context-only entry must not consume a chunk-N slot, or the model sees chunk-2 with
+            // no chunk-1 and invents a ref that resolves against the wrong (context-only) entry.
+            var matchableCount = 0
             chunks.forEach { chunk ->
                 append('\n')
-                val metadata = chunk.patternId?.let { "pattern_id=$it" } ?: "context-only"
-                append("- $metadata\n")
+                val ref = if (chunk.patternId != null) {
+                    matchableCount += 1
+                    "chunk-$matchableCount"
+                } else {
+                    "context-only"
+                }
+                append("- $ref\n")
                 append("  ")
                 append(chunk.text.replace("\n", "\n  "))
             }

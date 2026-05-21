@@ -27,6 +27,7 @@ Your follow-up MUST:
 - Do not ask artifact trivia or artifact-condition questions.
 - Do not create a combined summary from two recorded facts.
 - Do not ask for feelings the transcript never named.
+- Do not ask "what word describes the feeling" or any paraphrase of it. Ask for the missing verbal detail, not a label for an emotion.
 - Do not ask what changed in the abstract. Editor asks for wording or the missing edge around the quoted phrase.
 
 ## Examples

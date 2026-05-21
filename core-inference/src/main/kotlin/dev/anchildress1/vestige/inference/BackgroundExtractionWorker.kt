@@ -4,6 +4,8 @@ import android.util.Log
 import dev.anchildress1.vestige.model.ExtractionStatus
 import dev.anchildress1.vestige.model.Lens
 import dev.anchildress1.vestige.model.LensExtraction
+import dev.anchildress1.vestige.model.ResolvedExtraction
+import dev.anchildress1.vestige.model.TemplateLabel
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
@@ -182,7 +184,7 @@ class BackgroundExtractionWorker(
         val totalElapsedMs = (System.nanoTime() - startedNanos) / NANOS_PER_MILLI
         return when {
             resolved is Resolution.Ok -> {
-                val templateLabel = templateLabeler.label(resolved.value, capturedAt)
+                val templateLabel = resolveTemplateLabel(resolved.value, capturedAt)
                 Log.d(
                     TAG,
                     "extract completed: lenses=${parsedExtractions.size}/${lenses.size} " +
@@ -225,6 +227,17 @@ class BackgroundExtractionWorker(
                 )
             }
         }
+    }
+
+    // Model-emitted template label wins; the deterministic labeler is the validator + fallback for
+    // when the lenses didn't converge on a serial (or emitted an unknown one).
+    private fun resolveTemplateLabel(resolved: ResolvedExtraction, capturedAt: ZonedDateTime): TemplateLabel {
+        val labelerPick = templateLabeler.label(resolved, capturedAt)
+        val modelPick = (resolved.fields[TEMPLATE_LABEL_KEY]?.value as? String)?.let(TemplateLabel::fromSerial)
+        if (modelPick != null && modelPick != labelerPick) {
+            Log.d(TAG, "template_label model=$modelPick labeler=$labelerPick (model wins)")
+        }
+        return modelPick ?: labelerPick
     }
 
     private fun tryResolve(parsed: List<LensExtraction>, currentLastError: String?): Resolution = try {
@@ -271,5 +284,6 @@ class BackgroundExtractionWorker(
         private val NO_OP_LISTENER = ExtractionStatusListener { _, _, _ -> }
         private const val TAG = "VestigeBackgroundExtraction"
         private const val NANOS_PER_MILLI = 1_000_000L
+        private const val TEMPLATE_LABEL_KEY = "template_label"
     }
 }

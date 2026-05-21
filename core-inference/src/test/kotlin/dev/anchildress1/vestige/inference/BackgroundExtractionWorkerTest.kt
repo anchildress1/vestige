@@ -407,6 +407,70 @@ class BackgroundExtractionWorkerTest {
     }
 
     @Test
+    fun `model-emitted template_label wins over the deterministic labeler`() = runTest {
+        val engine = mockk<LiteRtLmEngine>()
+        every { engine.streamText(any(), any()) } returns flowOf("raw-ok")
+        // Energy "crashed" + state_shift true would make the labeler pick AFTERMATH; the model's
+        // converged template_label overrides it.
+        val modelLabeled = ResolvedExtraction(
+            fields = mapOf(
+                "energy_descriptor" to ResolvedField("crashed", ConfidenceVerdict.CANONICAL),
+                "state_shift" to ResolvedField(true, ConfidenceVerdict.CANONICAL),
+                "template_label" to ResolvedField("decision-spiral", ConfidenceVerdict.CANONICAL),
+            ),
+        )
+
+        val result = BackgroundExtractionWorker(
+            engine = engine,
+            resolver = RecordingResolver(modelLabeled),
+            parser = { lens, _ -> extraction(lens) },
+            composer = fakeComposer(),
+        ).extract(request = request)
+
+        val success = assertInstanceOf(BackgroundExtractionResult.Success::class.java, result)
+        assertEquals(TemplateLabel.DECISION_SPIRAL, success.templateLabel)
+    }
+
+    @Test
+    fun `template_label falls back to the labeler when the model pick is absent`() = runTest {
+        val engine = mockk<LiteRtLmEngine>()
+        every { engine.streamText(any(), any()) } returns flowOf("raw-ok")
+        // No template_label resolved -> labeler computes it (energy "crashed" + shift -> AFTERMATH).
+        val result = BackgroundExtractionWorker(
+            engine = engine,
+            resolver = RecordingResolver(resolved),
+            parser = { lens, _ -> extraction(lens) },
+            composer = fakeComposer(),
+        ).extract(request = request)
+
+        val success = assertInstanceOf(BackgroundExtractionResult.Success::class.java, result)
+        assertEquals(TemplateLabel.AFTERMATH, success.templateLabel)
+    }
+
+    @Test
+    fun `unknown template_label serial falls back to the labeler`() = runTest {
+        val engine = mockk<LiteRtLmEngine>()
+        every { engine.streamText(any(), any()) } returns flowOf("raw-ok")
+        val badLabel = ResolvedExtraction(
+            fields = mapOf(
+                "energy_descriptor" to ResolvedField("crashed", ConfidenceVerdict.CANONICAL),
+                "state_shift" to ResolvedField(true, ConfidenceVerdict.CANONICAL),
+                "template_label" to ResolvedField("not-a-real-archetype", ConfidenceVerdict.CANONICAL),
+            ),
+        )
+
+        val result = BackgroundExtractionWorker(
+            engine = engine,
+            resolver = RecordingResolver(badLabel),
+            parser = { lens, _ -> extraction(lens) },
+            composer = fakeComposer(),
+        ).extract(request = request)
+
+        val success = assertInstanceOf(BackgroundExtractionResult.Success::class.java, result)
+        assertEquals(TemplateLabel.AFTERMATH, success.templateLabel)
+    }
+
+    @Test
     fun `worker labels using the capture timestamp's zone, not the JVM default`() = runTest {
         val engine = mockk<LiteRtLmEngine>()
         every { engine.streamText(any(), any()) } returns flowOf("raw-ok")

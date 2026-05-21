@@ -26,6 +26,7 @@ internal object LensResponseParser {
 
     private val SCHEMA_KEYS: Set<String> = setOf(
         "tags",
+        "template_label",
         "energy_descriptor",
         "state_shift",
         "vocabulary_contradictions",
@@ -52,6 +53,7 @@ internal object LensResponseParser {
         return when (key) {
             "tags" -> (normalized as? List<*>)?.mapNotNull(::normalizeTag)
             "vocabulary_contradictions" -> normalized ?: emptyList<Any?>()
+            "template_label" -> (normalized as? String)?.lowercase()?.takeIf { it.isNotEmpty() }
             else -> normalized
         }
     }

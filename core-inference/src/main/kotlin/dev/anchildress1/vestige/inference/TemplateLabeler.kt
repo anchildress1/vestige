@@ -7,10 +7,12 @@ import dev.anchildress1.vestige.model.TemplateLabel
 import java.time.ZonedDateTime
 
 /**
- * Deterministic post-convergence labeler. Reads the resolved schema fields plus the entry's local
- * capture time and assigns one of six [TemplateLabel]s per `concept-locked.md` §"Templates". Never
- * calls the model — reaching for inference here re-introduces user-facing template selection
- * through the back door.
+ * Deterministic labeler — now the validator and fallback for the model-emitted `template_label`.
+ * The lenses pick one of six [TemplateLabel] serials per the output schema;
+ * [BackgroundExtractionWorker] uses the model's converged pick when present and falls back to this
+ * labeler when the lenses didn't agree on a serial, logging any divergence between the two. Reads
+ * the resolved schema fields plus the entry's local capture time and assigns one of six
+ * [TemplateLabel]s per `concept-locked.md` §"Templates" (AGENTS.md: templates are model-emitted).
  *
  * Only CANONICAL / CANONICAL_WITH_CONFLICT fields drive label selection: CANDIDATE values are
  * single-lens witnesses ("lower confidence, not used by pattern engine until promoted" per

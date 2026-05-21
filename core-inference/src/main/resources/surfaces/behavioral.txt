@@ -4,16 +4,15 @@ Extract named activities, event sequences, time anchors, and environmental conte
 
 What to capture:
 
-- Named activities: meetings (standup, roadmap call, client review, all-hands), tasks (doc, invoice, comparison table, migration), diversions (reorganizing, opening tabs, making tea, switching apps).
-- Sequence anchors: "before standup", "after the call", "by 11", "since 3am", "then spent an hour". These are event anchors, not just timestamps.
-- Time-of-day windows: explicit clock times (3am, 2:48am, 10am, 3pm), named windows (morning, afternoon, late, overnight), durations ("40 minutes", "an hour and a half", "three passes").
+- Named activities the user mentions: meetings, tasks, and diversions.
+- Sequence anchors: phrases that place an event in a sequence, not just timestamps.
+- Time-of-day windows: explicit clock times, named windows, and durations.
 - Environmental context: location, device, posture, person present — when the user named them.
-- Abandoned or deferred actions: "opened it and closed it immediately", "said I would X, then did Y instead", "tried to start and just stood there".
-- Avoidance loops: repeated approach-and-retreat on the same object across the entry (same invoice, same doc, same task app decision).
-- Loop count: when the user quantifies repetition ("third time", "same three criteria", "twelve rows"), capture the pattern as a behavioral tag.
+- Abandoned or deferred actions: actions the user started and dropped, or intended and replaced.
+- Avoidance loops: repeated approach-and-retreat on the same object across the entry.
+- Loop count: when the user quantifies repetition, capture the pattern as a tag.
 
 What goes in the schema:
 
 - Add to `tags` as short lowercase kebab-case tokens. One token per discrete signal.
-- Examples: `standup`, `client-review`, `invoice`, `late-night`, `decision-loop`, `task-stall`, `tab-switching`, `avoidance`, `comparing`, `spreadsheet`.
-- A meeting name and a state-crash that follows are two separate tags (e.g., `standup` + `meeting-aftermath`).
+- A meeting name and a state-crash that follows are two separate tags.

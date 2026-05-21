@@ -5,12 +5,12 @@ Extract linguistic patterns: recurring words, in-entry contradictions, hedging, 
 What to capture:
 
 - Words the user repeated more than once within the same entry (excluding stop words). Repetition signals salience.
-- Explicit contradictions within the same entry: "fine" then "couldn't move"; "not tired exactly" then "battery got yanked"; "technically awake, operationally not". Both terms must appear in the same entry.
-- Hedging or imprecision used to avoid naming something directly: "the thing", "stuff", "whatever", "kind of", "I guess", "I don't know". These often signal the user is circling something unresolved.
+- Explicit contradictions within the same entry: two terms that contradict each other, both present in the same entry.
+- Hedging or imprecision used to avoid naming something directly. These often signal the user is circling something unresolved.
 - Circling patterns: user restates the same problem or decision in different words across multiple sentences without resolving it. Tag the topic being circled.
-- Avoidance vocabulary: user names a task repeatedly then always adds a hedge or deflection ("said I would", "should", "keep meaning to", "one of these days").
-- Self-aware measurement: when the user quantifies their own loop ("twelve rows", "third time", "same three criteria"). These are vocabulary signals of pattern-recognition.
-- User-coined idioms: "administrative haunting", "goblin hours", "sacred ritual of closing it", "post-meeting corpse routine". Tag these verbatim when they appear.
+- Avoidance vocabulary: user names a task repeatedly then always adds a hedge or deflection.
+- Self-aware measurement: when the user quantifies their own loop. These are vocabulary signals of pattern-recognition.
+- User-coined idioms: tag the user's coined phrasing verbatim when it appears.
 
 What goes in the schema:
 

@@ -5,19 +5,19 @@ Apply a charitable reading. Go beyond explicit words to what the text most plaus
 Rules:
 
 - Read for pattern and meaning, not just surface vocabulary. What is this person experiencing?
-- `energy_descriptor`: the word or phrase that most plausibly names the user's cognitive or energy state — stated directly or implied by what they describe. If they said it, use their exact words. If they described behavior that makes their state semantically obvious ("couldn't start anything", "opened it and closed it three times"), name the state their behavior implies.
-- Post-event crashes: when the user says they were fine before X and in a depleted or stalled state after X, set `state_shift=true` and add a relevant tag.
-- Decision loops: when the user describes returning to the same choice with new framing and no resolution, add `decision-loop` to tags. Spreading, weighing, comparing, and not deciding is a decision loop.
-- Avoidance sequences: "opened it and closed it", "said I would X, then did Y instead" — add `avoidance` and the specific task tag.
-- Late-night context: explicit timestamps between midnight and 5am warrant `late-night` tag.
-- User-coined idioms carry their meaning: "concrete in my limbs" = depleted; "battery got yanked" = sudden energy drop; "hollow thing" = hollow state; "wired-tired" = co-occurring exhaustion and alertness.
-- Sequence anchors: "after the call", "before standup", "by 11" are behavioral context — add as tags.
+- `energy_descriptor`: the one or two words that most plausibly name the user's cognitive or energy state — stated directly or implied by what they describe. If they said it, use their exact words. If they described behavior that makes their state semantically obvious, name the state their behavior implies.
+- Post-event crashes: when the user says they were fine before something and in a depleted or stalled state after it, set `state_shift=true` and add a relevant tag.
+- Decision loops: when the user describes returning to the same choice with new framing and no resolution, capture it as a tag. Spreading, weighing, comparing, and not deciding is a decision loop.
+- Avoidance sequences: when the user approaches a task and retreats, or states an intention then does something else, tag both the avoidance and the specific task.
+- Late-night context: explicit timestamps between midnight and 5am warrant a late-night tag.
+- User-coined idioms carry their meaning: tag the user's own phrasing verbatim and let it stand for the state it names.
+- Sequence anchors are behavioral context — add as tags.
 - Time anchors and named activities both become tags.
 
 Inference limits:
 
-- Do not infer causes or motivations. "User was anxious about the meeting" is motivation, not inference.
-- Do not infer emotional states the user did not name. "Stressed" requires the word "stress" or a clear equivalent idiom.
+- Do not infer causes or motivations.
+- Do not infer emotional states the user did not name.
 - One layer only: if the text gives no anchor for a claim, do not make it.
 - Retrieved history can corroborate inferences but cannot supply content that isn't anchored in the current entry.
 
@@ -28,7 +28,3 @@ Output discipline:
 - Do not pad: genuinely sparse entries stay sparse even with a charitable read.
 - Always emit `flags` as `[]` (empty array).
 - Always emit `vocabulary_contradictions` as an array, never null — use `[]` when there are none.
-
-Example:
-Entry: "After the client review I went hollow. Couldn't start the next thing."
-Output: {"tags":["client-review","meeting-aftermath","hollow","task-stall"],"energy_descriptor":"hollow","state_shift":true,"vocabulary_contradictions":[],"stated_commitment":null,"flags":[]}

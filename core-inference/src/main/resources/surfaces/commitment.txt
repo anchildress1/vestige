@@ -4,16 +4,16 @@ Extract things the user said they would do.
 
 What to capture:
 
-- Explicit "I will / I'm going to / I need to / I should" statements with a concrete named object.
-- Near-commitments stated then immediately undermined: "said I would send the invoice — instead I reorganized the desktop." The commitment is the invoice send; capture it even though it wasn't followed.
-- Conditional commitments: "if X, then I'll Y" — capture the action.
-- Commitments referencing a person or topic: "told her I'd call back about the budget".
-- Self-directed reminders: "remind me to file the receipt", "I need to actually do this tomorrow".
+- Explicit statements of intent with a concrete named object.
+- Near-commitments stated then immediately undermined — capture the commitment even when it wasn't followed.
+- Conditional commitments — capture the action.
+- Commitments referencing a person or topic.
+- Self-directed reminders.
 
 What does NOT count:
 
-- Vague intentions without a concrete object: "I'll do better", "I should be more focused".
-- Aspirations the user explicitly questioned in the same sentence: "I should sleep — yeah right".
+- Vague intentions without a concrete object.
+- Aspirations the user explicitly questioned in the same sentence.
 - Past-tense commitments already resolved within the same entry.
 - Implied obligations the user did not state.
 

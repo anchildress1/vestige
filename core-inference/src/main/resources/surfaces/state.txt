@@ -4,13 +4,8 @@ Captures the user's cognitive and energy state.
 
 Schema fields:
 
-- `energy_descriptor`: the word or phrase that names what the user's cognitive or energy state IS or WAS. Use the user's exact words. Do not paraphrase or translate to clinical language. Null when the entry carries no signal about their state.
+- `energy_descriptor`: a word or short noun phrase naming the person's physical or cognitive condition (drained, crashed, foggy, wired). Use the user's exact words; do not paraphrase to clinical language. Null when the entry names no such condition.
+  - It must describe the person, not the event. A span that says how something happened (completely out of nowhere) or what it caused (slows everything down) is a manner qualifier or effect — discard it.
+  - If the best candidate is a verb phrase or clause describing what the energy did, return null.
+  - If the candidate is longer than three words, reduce it to the root state word; if none survives, return null. Never return a clause.
 - `state_shift`: true when the entry describes a before/after transition between two distinct states. Both states must be present. False for a single static state.
-
-Tags to add when the condition is met — these are not lens-specific, they apply whenever the evidence is there:
-
-- `late-night` — any explicit midnight–5am timestamp or "couldn't sleep".
-- `decision-loop` — returning to the same choice with new framing and no resolution.
-- `wired-tired` — exhaustion and alertness co-occurring; body and brain in disagreement.
-- `avoidance` — opening a task and closing it without acting; doing something else instead.
-- `meeting-aftermath` — described state follows directly from a named meeting or call.

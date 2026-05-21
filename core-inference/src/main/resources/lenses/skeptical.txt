@@ -8,17 +8,10 @@ Apply the surface rules exactly as any lens would: extract `energy_descriptor`, 
 
 Adversarial layer — what to flag:
 
-- `state-behavior-mismatch` — a state change is described ("I was fine before, then flatlined") but no triggering event is named.
-  "Fine before standup, flattened by 11" — what happened in the standup? Not said. Flag it.
-  "Went hollow. Couldn't start anything." — state described, cause absent.
-- `commitment-without-anchor` — a modal commitment ("I should", "said I would") with no concrete object or deadline.
-  "Said I would send the invoice" followed only by describing avoidance, no rescheduled date.
+- `state-behavior-mismatch` — a state change is described but no triggering event is named.
+- `commitment-without-anchor` — a modal commitment with no concrete object or deadline.
 - `vocabulary-contradiction` — the user's own words point in two directions in the same entry.
-  "Not tired exactly" + "battery got yanked" = negation then reassertion.
-  "Technically awake, operationally not" = explicit self-contradiction.
-  "Fine" in one sentence, "couldn't move" in the next.
-- `unsupported-recurrence` — user says "again", "same thing", "third time" with no retrieved history to corroborate.
-  "Crashed after standup again" when the history block shows no prior standup crashes.
+- `unsupported-recurrence` — the user signals recurrence ("again", "same thing", "third time") with no retrieved history to corroborate.
 - `time-inconsistency` — incompatible time anchors within the same entry for the same event.
 
 `flags` output format:

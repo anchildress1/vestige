@@ -144,9 +144,10 @@ kover {
                     // BRANCH — Kover's bytecode branch count is noisy for Android/Compose
                     // generated paths and contains little direct business logic signal. Keep the
                     // gate close to the current suite without pretending 80% is meaningful here.
+                    // CI and lefthook both run `koverVerify`, so this is the shared branch gate.
                     bound {
                         coverageUnits = kotlinx.kover.gradle.plugin.dsl.CoverageUnit.BRANCH
-                        minValue = 66
+                        minValue = 75
                     }
                 }
             }

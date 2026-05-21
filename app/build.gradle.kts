@@ -232,11 +232,3 @@ tasks.register<Test>("testDebugIntegrationTest") {
 
     objectBoxBackedAppTests.forEach { filter.includeTestsMatching(it) }
 }
-
-kover {
-    currentProject {
-        instrumentation {
-            disabledForTestTasks.add("testDebugIntegrationTest")
-        }
-    }
-}

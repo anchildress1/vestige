@@ -34,8 +34,9 @@ data class BackgroundExtractionRequest(
  * that exhausts its budget contributes a null extraction (convergence treats that as "no opinion").
  * `RUNNING` is emitted once for the whole worker run; per-lens retries do not emit status churn.
  *
- * [lenses] defaults to the full three-lens pipeline; production narrows it to a single Inferential
- * pass (see `AppContainer`). The resolver authoritatively passes a single lens through as CANONICAL.
+ * [lenses] defaults to the full three-lens pipeline, and that default is what production runs —
+ * `AppContainer` constructs the worker without overriding it. A narrower list is a tuning-harness
+ * affordance for exercising one lens in isolation.
  *
  * The caller threads the entry's persisted retry count in via `entryAttemptCount`; the worker
  * echoes it on every [ExtractionStatusListener] event. Lens-call volume is reported separately

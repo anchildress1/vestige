@@ -214,6 +214,22 @@ class ConvergenceResolverTest {
     }
 
     @Test
+    fun `energy majority with negated Literal stays ambiguous`() {
+        // "not crashed" shares the "crashed" substring but flips polarity — the negated Literal is a
+        // dissent, not corroboration, so the majority must be suppressed rather than promoted.
+        val literal = LensExtraction(Lens.LITERAL, fields = mapOf("energy_descriptor" to "not crashed"))
+        val inferential = LensExtraction(Lens.INFERENTIAL, fields = mapOf("energy_descriptor" to "crashed"))
+        val skeptical = LensExtraction(Lens.SKEPTICAL, fields = mapOf("energy_descriptor" to "crashed"))
+
+        val resolved = resolver.resolve(listOf(literal, inferential, skeptical))
+
+        assertEquals(
+            ResolvedField(value = null, verdict = ConfidenceVerdict.AMBIGUOUS),
+            resolved.fields["energy_descriptor"],
+        )
+    }
+
+    @Test
     fun `state_shift majority without Literal resolves ambiguous`() {
         // Inferential + Skeptical infer a transition; Literal read co-occurrence (false, filtered as
         // a no-op). With no Literal backing, the inferred shift is suppressed.

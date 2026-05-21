@@ -166,12 +166,19 @@ class DefaultConvergenceResolver : ConvergenceResolver {
         }
     }
 
+    // Literal backs the majority on an exact match, or on substring overlap ("crashed hard" ⊇
+    // "crashed") — but only when both share negation polarity, so "not crashed" dissents from
+    // "crashed" rather than corroborating it.
     private fun energyCorroborates(literalValue: Any, majorityValue: Any): Boolean {
         val literal = (literalValue as? String)?.trim()?.lowercase()
         val majority = (majorityValue as? String)?.trim()?.lowercase()
-        return literal != null && majority != null &&
-            (literal == majority || literal.contains(majority) || majority.contains(literal))
+        if (literal == null || majority == null) return false
+        val polarityAgrees = isNegated(literal) == isNegated(majority)
+        return literal == majority ||
+            (polarityAgrees && (literal.contains(majority) || majority.contains(literal)))
     }
+
+    private fun isNegated(value: String): Boolean = value.split(' ').any { it in NEGATION_TOKENS }
 
     private fun disagreementField(matchingFlags: List<String>) = ResolvedField(
         value = null,
@@ -349,6 +356,7 @@ class DefaultConvergenceResolver : ConvergenceResolver {
         const val TOPIC_OR_PERSON_KEY = "topic_or_person"
         const val ENTRY_ID_KEY = "entry_id"
         const val LENS_DISAGREEMENT_FLAG = "lens-disagreement"
+        val NEGATION_TOKENS: Set<String> = setOf("not", "no", "never", "without")
         const val MAJORITY_THRESHOLD = 2
         const val MIN_SURVIVING_LENSES_FOR_AMBIGUOUS = 1
 

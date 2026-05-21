@@ -17,13 +17,17 @@ object DebugPatternSeeder {
 
     @Suppress("MagicNumber", "LongMethod") // Fixture timestamps + corpus shape are deliberately concrete.
     fun seed(boxStore: BoxStore) {
+        val entries = seedEntries()
+        check(ACTIVE_SEED_COUNT <= entries.size) {
+            "ACTIVE_SEED_COUNT=$ACTIVE_SEED_COUNT exceeds seed corpus size=${entries.size}"
+        }
         boxStore.runInTx {
             boxStore.boxFor(EntryEntity::class.java).removeAll()
             boxStore.boxFor(TagEntity::class.java).removeAll()
             boxStore.boxFor(PatternEntity::class.java).removeAll()
             boxStore.boxFor(CalloutCooldownEntity::class.java).removeAll()
 
-            seedEntries().take(ACTIVE_SEED_COUNT).forEachIndexed { idx, seed ->
+            entries.take(ACTIVE_SEED_COUNT).forEachIndexed { idx, seed ->
                 boxStore.boxFor(EntryEntity::class.java).put(
                     EntryEntity(
                         markdownFilename = "debug-seed-$idx.md",

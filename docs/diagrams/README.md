@@ -23,7 +23,12 @@ Authority order if anything here disagrees with prose: the ADRs and `concept-loc
 
 ## Two things to know before reading
 
-**Template names.** The product spec (`concept-locked.md`) and the storage enum use the same names: Aftermath / Tunnel exit / Concrete shoes / Decision spiral / Goblin hours / Audit.
+**Dual template vocabulary.** The product spec (`concept-locked.md`, authoritative) uses
+`Crashed / Deep Space / Busy Stalling / Nonstop Spiral / Goblin Hours / Brain Dump`. ADR-002's
+agreement predicate and the storage enum are written with the older positional names
+(`Aftermath / Tunnel exit / Concrete shoes / Decision spiral / Goblin hours / Audit`). They map
+1:1. **User-facing diagrams use the `concept-locked` names; the ADR-002 page quotes the enum form
+as written.**
 
 **`CLOSED` is model-only.** The pattern lifecycle includes `CLOSED · DONE`, but no *user* action
 reaches it — closure is model-detected (v1.5 `pattern-auto-close`). User actions are

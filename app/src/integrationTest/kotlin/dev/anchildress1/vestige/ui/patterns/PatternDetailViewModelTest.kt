@@ -425,7 +425,7 @@ class PatternDetailViewModelTest {
 
     private companion object {
         const val OBSERVATION_SLEPT_THROUGH_DINNER =
-            """[{"text":"slept through dinner","evidence":"theme-noticing","fields":["energy_descriptor"]}]"""
+            """[{"text":"slept through dinner","evidence":"theme-noticing","fields":["tags"]}]"""
         const val OBSERVATION_REPLAYED_MEETING =
             """[{"text":"replayed meeting","evidence":"theme-noticing","fields":["recurrence_link"]}]"""
     }

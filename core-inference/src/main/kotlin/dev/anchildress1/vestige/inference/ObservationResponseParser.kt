@@ -45,12 +45,9 @@ internal object ObservationResponseParser {
     private const val MAX_OBSERVATIONS = 2
     private val KNOWN_FIELDS = setOf(
         "tags",
-        "energy_descriptor",
         "recurrence_link",
         "stated_commitment",
-        "vocabulary_contradictions",
     )
-    private val VOCAB_FIELDS = setOf("vocabulary_contradictions", "tags")
 
     fun parse(raw: String): List<EntryObservation>? {
         val root = findFirstParseableObject(raw) ?: return null
@@ -89,9 +86,6 @@ internal object ObservationResponseParser {
 
     private fun fieldsAreValid(evidence: ObservationEvidence, fields: List<String>): Boolean = when (evidence) {
         ObservationEvidence.COMMITMENT_FLAG -> fields == listOf("stated_commitment")
-
-        ObservationEvidence.VOCABULARY_CONTRADICTION ->
-            fields.isEmpty() || ("vocabulary_contradictions" in fields && fields.all { it in VOCAB_FIELDS })
 
         ObservationEvidence.VOLUNTEERED_CONTEXT,
         ObservationEvidence.THEME_NOTICING,

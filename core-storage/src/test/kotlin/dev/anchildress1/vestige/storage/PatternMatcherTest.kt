@@ -43,13 +43,11 @@ class PatternMatcherTest {
         tags: List<String> = emptyList(),
         text: String = "",
         commitmentTopic: String? = null,
-        energyDescriptor: String? = null,
         timestamp: Instant = Instant.parse("2026-05-11T12:00:00Z"),
     ): EntryEntity {
         val entry = EntryEntity(
             entryText = text,
             templateLabel = templateLabel,
-            energyDescriptor = energyDescriptor,
             statedCommitmentJson = commitmentTopic?.let { """{"topic_or_person":"$it","text":"do it"}""" },
             timestampEpochMs = timestamp.toEpochMilli(),
         )
@@ -236,19 +234,10 @@ class PatternMatcherTest {
     }
 
     @Test
-    fun `vocab matches via energy descriptor path`() {
-        // Detection includes energy descriptor tokens. Matcher must too, otherwise an
-        // energy-only signal that created the pattern can't sustain callouts.
-        val entry = putEntry(text = "yet another tuesday", energyDescriptor = "exhausted", tags = emptyList())
-        val p = pattern(PatternKind.VOCAB_FREQUENCY, "{\"token\":\"tired\"}")
-        assertTrue(PatternMatcher.matches(entry, p, ZoneOffset.UTC))
-    }
-
-    @Test
     fun `vocab does not match below the MIN_VOCAB_LENGTH floor`() {
-        // 3-letter energy descriptor must not satisfy a vocab signature even if it stems exactly.
-        // Same floor as text path — Codex P2 finding.
-        val entry = putEntry(text = "neutral body of text", energyDescriptor = "low", tags = emptyList())
+        // A 3-letter token must not satisfy a vocab signature even if it stems exactly.
+        // Same floor as the text path — Codex P2 finding.
+        val entry = putEntry(text = "low low low", tags = emptyList())
         val p = pattern(PatternKind.VOCAB_FREQUENCY, "{\"token\":\"low\"}")
         assertFalse(PatternMatcher.matches(entry, p, ZoneOffset.UTC))
     }

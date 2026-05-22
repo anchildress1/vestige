@@ -73,13 +73,13 @@ class VocabDriftScreenTest {
     fun `loaded screen renders root token total entries and every cluster label`() {
         val supporting = seedSupportingEntries(8, "exhausted") +
             seedSupportingEntries(7, "foggy") +
-            seedSupportingEntries(6, "wired-tired")
+            seedSupportingEntries(6, "wired")
         seedPattern(
             supporting,
             clusters = listOf(
                 fakeCluster("exhausted, drained", 1, 8),
                 fakeCluster("sluggish, foggy", 9, 15),
-                fakeCluster("wired-tired", 16, 21),
+                fakeCluster("wired", 16, 21),
             ),
         )
 
@@ -96,7 +96,7 @@ class VocabDriftScreenTest {
         // fold under the default Robolectric screen size, but it's in the semantics tree.
         composeRule.onNodeWithText("exhausted, drained").assertExists()
         composeRule.onNodeWithText("sluggish, foggy").assertExists()
-        composeRule.onNodeWithText("wired-tired").assertExists()
+        composeRule.onNodeWithText("wired").assertExists()
     }
 
     @Test

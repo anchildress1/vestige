@@ -5,7 +5,6 @@ Apply a charitable reading. Go beyond explicit words to what the text most plaus
 Rules:
 
 - Read for pattern and meaning, not just surface vocabulary. What is this person experiencing?
-- `energy_descriptor`: the one or two words that most plausibly name the user's cognitive or energy state — stated directly or implied by what they describe. If they said it, use their exact words. If they described behavior that makes their state semantically obvious, name the state their behavior implies.
 - State shift: when the entry contains a detectable before/after contrast in energy or cognitive state across any boundary—event, time, task, or transition—set `state_shift=true` and add a tag reflecting the direction and boundary type. Explicit contrast language is not required; implied contrast qualifies when the state change is the entry's primary subject rather than incidental background.
 - Decision loops: when the user describes returning to the same choice with new framing and no resolution, capture it as a tag. Spreading, weighing, comparing, and not deciding is a decision loop.
 - Avoidance sequences: when the user approaches a task and retreats, or states an intention then does something else, tag both the avoidance and the specific task.
@@ -27,4 +26,3 @@ Output discipline:
 - Populate more fields than a strict surface-words reading would. Inferential output is expected to be richer.
 - Do not pad: genuinely sparse entries stay sparse even with a charitable read.
 - Always emit `flags` as `[]` (empty array).
-- Always emit `vocabulary_contradictions` as an array, never null — use `[]` when there are none.

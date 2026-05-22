@@ -328,7 +328,7 @@ class BackgroundExtractionSaveFlowTest {
                 lens = Lens.LITERAL,
                 extraction = LensExtraction(
                     lens = Lens.LITERAL,
-                    fields = mapOf("tags" to listOf("standup"), "energy_descriptor" to "flattened"),
+                    fields = mapOf("tags" to listOf("standup"), "state_shift" to true),
                 ),
                 rawResponse = """{"private":"raw response stays out"}""",
                 attemptCount = 1,
@@ -364,7 +364,7 @@ class BackgroundExtractionSaveFlowTest {
                 match { receipts ->
                     receipts.size == 2 &&
                         receipts[0].lens == Lens.LITERAL &&
-                        receipts[0].fields["energy_descriptor"] == "flattened" &&
+                        receipts[0].fields["state_shift"] == true &&
                         receipts[1].extracted.not() &&
                         receipts[1].lastError == "parse-fail"
                 },
@@ -904,8 +904,8 @@ class BackgroundExtractionSaveFlowTest {
 
     private fun canonicalSample() = ResolvedExtraction(
         mapOf(
-            "tags" to ResolvedField(listOf("standup", "flattened"), ConfidenceVerdict.CANONICAL),
-            "energy_descriptor" to ResolvedField("crashed", ConfidenceVerdict.CANONICAL),
+            "tags" to ResolvedField(listOf("standup", "flattened", "crashed"), ConfidenceVerdict.CANONICAL),
+            "state_shift" to ResolvedField(true, ConfidenceVerdict.CANONICAL),
         ),
     )
 
@@ -1097,8 +1097,8 @@ class BackgroundExtractionSaveFlowTest {
         private const val SAMPLE_TEXT = "Standup ran long again, then completely flattened."
         private val SAMPLE_OBSERVATION = EntryObservation(
             text = "You said \"fine\" and \"flattened\" in the same entry.",
-            evidence = ObservationEvidence.VOCABULARY_CONTRADICTION,
-            fields = listOf("vocabulary_contradictions"),
+            evidence = ObservationEvidence.THEME_NOTICING,
+            fields = listOf("tags"),
         )
     }
 }

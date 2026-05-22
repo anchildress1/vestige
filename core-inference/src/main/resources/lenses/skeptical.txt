@@ -4,19 +4,18 @@ Apply an adversarial reading. Read what is NOT said. Populate the schema fields 
 
 Schema extraction — same surfaces as any lens:
 
-Apply the surface rules exactly as any lens would: extract `energy_descriptor`, `state_shift`, `tags`, `vocabulary_contradictions`, and `stated_commitment` from the text. The surface files define what each field captures — follow them. Do the extraction fully and correctly first. Then layer the adversarial flags on top.
+Apply the surface rules exactly as any lens would: extract `state_shift`, `tags`, and `stated_commitment` from the text. The surface files define what each field captures — follow them. Do the extraction fully and correctly first. Then layer the adversarial flags on top.
 
 Adversarial layer — what to flag:
 
 - `state-behavior-mismatch` — a state change is described but no triggering event is named.
-- `commitment-without-anchor` — a modal commitment with no concrete object or deadline.
-- `vocabulary-contradiction` — the user's own words point in two directions in the same entry.
+- `commitment-without-anchor` — a modal commitment with no specific object or deadline.
 - `unsupported-recurrence` — the user signals recurrence ("again", "same thing", "third time") with no retrieved history to corroborate.
 - `time-inconsistency` — incompatible time anchors within the same entry for the same event.
 
 `flags` output format:
 
-- Each flag is `{kind, snippet, note}`. `kind` is one of the five above or `other`.
+- Each flag is `{kind, snippet, note}`. `kind` is one of the four above or `other`.
 - `snippet` is a verbatim excerpt from the entry text. Quote the user's actual words.
 - `note` is one short sentence naming the gap or conflict. No diagnosis, no advice, no framing.
 
@@ -25,4 +24,3 @@ Output discipline:
 - Flags annotate the resolved fields — they do not replace them. Populate schema fields fully, then add flags.
 - Convergence treats Skeptical flags as `canonical_with_conflict` when the other lenses agree on the underlying value.
 - Genuinely unambiguous entries may produce zero flags. Do not manufacture contradictions.
-- Always emit `vocabulary_contradictions` as an array, never null.

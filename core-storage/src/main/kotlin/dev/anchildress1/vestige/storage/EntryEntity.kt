@@ -38,8 +38,6 @@ class EntryEntity(
     @Convert(converter = TemplateLabelConverter::class, dbType = String::class)
     var templateLabel: TemplateLabel? = null,
 
-    var energyDescriptor: String? = null,
-
     /** `pattern_id` when the entry matches a known pattern. */
     var recurrenceLink: String? = null,
 

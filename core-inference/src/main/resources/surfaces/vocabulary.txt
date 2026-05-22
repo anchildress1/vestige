@@ -5,7 +5,6 @@ Extract linguistic patterns: recurring words, in-entry contradictions, hedging, 
 What to capture:
 
 - Words the user repeated more than once within the same entry (excluding stop words). Repetition signals salience.
-- Explicit contradictions within the same entry: two terms that contradict each other, both present in the same entry.
 - Hedging or imprecision used to avoid naming something directly. These often signal the user is circling something unresolved.
 - Circling patterns: user restates the same problem or decision in different words across multiple sentences without resolving it. Tag the topic being circled.
 - Avoidance vocabulary: user names a task repeatedly then always adds a hedge or deflection.
@@ -15,6 +14,4 @@ What to capture:
 What goes in the schema:
 
 - Append vocabulary signals to `tags` as short lowercase kebab-case tokens.
-- `vocabulary_contradictions`: list `{term_a, term_b, snippet}` entries for explicit in-entry contradictions. `snippet` is the user's verbatim words, not paraphrase. Must be an array, never null — use `[]` when there are none.
-- Do not flag a word as contradictory across sentences that address different topics.
 - Do not extract emotional vocabulary as a state — state words belong to the State surface.

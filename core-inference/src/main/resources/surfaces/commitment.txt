@@ -4,7 +4,7 @@ Extract things the user said they would do.
 
 What to capture:
 
-- Explicit statements of intent with a concrete named object.
+- Explicit statements of intent with a specific named object.
 - Near-commitments stated then immediately undermined — capture the commitment even when it wasn't followed.
 - Conditional commitments — capture the action.
 - Commitments referencing a person or topic.
@@ -12,7 +12,7 @@ What to capture:
 
 What does NOT count:
 
-- Vague intentions without a concrete object.
+- Vague intentions without a specific object.
 - Aspirations the user explicitly questioned in the same sentence.
 - Past-tense commitments already resolved within the same entry.
 - Implied obligations the user did not state.

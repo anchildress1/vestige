@@ -56,29 +56,6 @@ class ObservationGeneratorTest {
     }
 
     @Test
-    fun `vocabulary contradiction routes to deterministic observation without model call`() = runTest {
-        val resolved = ResolvedExtraction(
-            mapOf(
-                "vocabulary_contradictions" to ResolvedField(
-                    listOf(
-                        mapOf("term_a" to "fine", "term_b" to "flattened", "snippet" to "ran long again"),
-                    ),
-                    ConfidenceVerdict.CANONICAL,
-                ),
-            ),
-        )
-
-        val observations = newGenerator().generate(SAMPLE_TEXT, resolved, SAMPLE_DAY)
-
-        assertEquals(1, observations.size)
-        val obs = observations.first()
-        assertEquals(ObservationEvidence.VOCABULARY_CONTRADICTION, obs.evidence)
-        assertTrue(obs.text.contains("fine"))
-        assertTrue(obs.text.contains("flattened"))
-        verify(exactly = 0) { engine.streamText(any(), any()) }
-    }
-
-    @Test
     fun `goblin hours capture produces a volunteered-context observation when no other signal exists`() = runTest {
         val resolved = ResolvedExtraction(emptyMap())
         val capturedAt = ZonedDateTime.of(2026, 5, 11, 3, 14, 0, 0, ZoneId.of("America/New_York"))
@@ -162,15 +139,11 @@ class ObservationGeneratorTest {
     }
 
     @Test
-    fun `deterministic commitment plus vocabulary-contradiction both land, capped at two`() = runTest {
+    fun `deterministic commitment wins and skips the model call`() = runTest {
         val resolved = ResolvedExtraction(
             mapOf(
                 "stated_commitment" to ResolvedField(
                     mapOf("text" to "send the doc"),
-                    ConfidenceVerdict.CANONICAL,
-                ),
-                "vocabulary_contradictions" to ResolvedField(
-                    listOf(mapOf("term_a" to "fine", "term_b" to "stuck")),
                     ConfidenceVerdict.CANONICAL,
                 ),
             ),
@@ -178,9 +151,8 @@ class ObservationGeneratorTest {
 
         val observations = newGenerator().generate(SAMPLE_TEXT, resolved, SAMPLE_DAY)
 
-        assertEquals(2, observations.size)
+        assertEquals(1, observations.size)
         assertEquals(ObservationEvidence.COMMITMENT_FLAG, observations[0].evidence)
-        assertEquals(ObservationEvidence.VOCABULARY_CONTRADICTION, observations[1].evidence)
         verify(exactly = 0) { engine.streamText(any(), any()) }
     }
 
@@ -236,48 +208,11 @@ class ObservationGeneratorTest {
     }
 
     @Test
-    fun `vocabulary contradiction with missing term skips to next deterministic or model`() = runTest {
-        val resolved = ResolvedExtraction(
-            mapOf(
-                "vocabulary_contradictions" to ResolvedField(
-                    listOf(mapOf("term_a" to "fine")),
-                    ConfidenceVerdict.CANONICAL,
-                ),
-            ),
-        )
-        every { engine.streamText(any(), any()) } returns flowOf(themeNoticingPayload("Theme noted."))
-
-        val observations = newGenerator().generate(SAMPLE_TEXT, resolved, SAMPLE_DAY)
-
-        assertEquals(1, observations.size)
-        assertEquals(ObservationEvidence.THEME_NOTICING, observations.first().evidence)
-        verify(exactly = 1) { engine.streamText(any(), any()) }
-    }
-
-    @Test
-    fun `vocabulary contradictions value with wrong shape is ignored`() = runTest {
-        val resolved = ResolvedExtraction(
-            mapOf(
-                "vocabulary_contradictions" to ResolvedField(
-                    listOf("not-a-map"),
-                    ConfidenceVerdict.CANONICAL,
-                ),
-            ),
-        )
-        every { engine.streamText(any(), any()) } returns flowOf(themeNoticingPayload("Theme noted."))
-
-        val observations = newGenerator().generate(SAMPLE_TEXT, resolved, SAMPLE_DAY)
-
-        assertEquals(1, observations.size)
-        verify(exactly = 1) { engine.streamText(any(), any()) }
-    }
-
-    @Test
     fun `model fallback renders all resolved field value shapes into the prompt`() = runTest {
         val resolved = ResolvedExtraction(
             mapOf(
                 "tags" to ResolvedField(listOf("focus", "long-stretch"), ConfidenceVerdict.CANONICAL),
-                "energy_descriptor" to ResolvedField("locked-in", ConfidenceVerdict.CANONICAL_WITH_CONFLICT),
+                "template_label" to ResolvedField("locked-in", ConfidenceVerdict.CANONICAL_WITH_CONFLICT),
                 "recurrence_link" to ResolvedField(null, ConfidenceVerdict.AMBIGUOUS),
                 "state_shift" to ResolvedField(true, ConfidenceVerdict.CANONICAL),
                 "nested" to ResolvedField(mapOf("a" to 1, "b" to listOf(2, 3)), ConfidenceVerdict.CANDIDATE),

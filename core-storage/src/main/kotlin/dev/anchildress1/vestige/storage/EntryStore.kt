@@ -268,7 +268,6 @@ class EntryStore(private val boxStore: BoxStore) {
 
     private fun applyResolved(entry: EntryEntity, resolved: ResolvedExtraction, templateLabel: TemplateLabel?) {
         entry.templateLabel = templateLabel
-        entry.energyDescriptor = stringField(resolved, KEY_ENERGY)
         entry.recurrenceLink = recurrenceField(resolved)
         entry.statedCommitmentJson = commitmentJson(resolved)
         entry.confidenceJson = confidenceJson(resolved)
@@ -337,7 +336,6 @@ class EntryStore(private val boxStore: BoxStore) {
     private companion object {
         private const val MAX_FILENAME_SUFFIX = 1000
         private const val KEY_TAGS = "tags"
-        private const val KEY_ENERGY = "energy_descriptor"
         private const val KEY_RECURRENCE = "recurrence_link"
         private const val KEY_COMMITMENT = "stated_commitment"
         private const val KEY_TOPIC_OR_PERSON = "topic_or_person"

@@ -345,7 +345,7 @@ class RetrievalRepoTest {
         // The aftermath entry shares only stop-words with the query but its stored vector is far
         // closer than the literal-keyword distractor's. Hybrid query() should rank it first.
         val aftermath = insertEntry(
-            text = "battery got yanked after the sync",
+            text = "battery died after the sync",
             daysAgo = 3,
             vector = floatArrayOf(0.95f, 0.1f, 0f),
         )

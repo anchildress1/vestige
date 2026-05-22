@@ -25,35 +25,22 @@ import java.time.ZonedDateTime
 class TemplateLabeler {
 
     fun label(resolved: ResolvedExtraction, capturedAt: ZonedDateTime): TemplateLabel {
-        val energy = resolved.stringFieldOrNull(ENERGY_DESCRIPTOR_KEY)
-        val stateShift = resolved.booleanFieldOrNull(STATE_SHIFT_KEY) == true
         val tags = resolved.tagSet()
 
         return when {
-            isAftermath(energy, stateShift, tags) -> TemplateLabel.AFTERMATH
+            tags.containsAny(AFTERMATH_TAGS) -> TemplateLabel.AFTERMATH
             tags.containsAny(DECISION_SPIRAL_TAGS) -> TemplateLabel.DECISION_SPIRAL
             tags.containsAny(TUNNEL_EXIT_TAGS) -> TemplateLabel.TUNNEL_EXIT
-            tags.containsAny(CONCRETE_SHOES_TAGS) -> TemplateLabel.CONCRETE_SHOES
+            tags.containsAny(STALLED_TAGS) -> TemplateLabel.STALLED
             isGoblinHours(capturedAt, tags) -> TemplateLabel.GOBLIN_HOURS
             else -> TemplateLabel.AUDIT
         }
     }
 
-    private fun isAftermath(energy: String?, stateShift: Boolean, tags: Set<String>): Boolean =
-        energy?.trim()?.lowercase() in STANDALONE_AFTERMATH_ENERGIES ||
-            (stateShift && energy?.trim()?.lowercase() == CRASHED) ||
-            tags.containsAny(AFTERMATH_TAGS)
-
     private fun isGoblinHours(capturedAt: ZonedDateTime, tags: Set<String>): Boolean =
         capturedAt.hour in GOBLIN_HOURS_RANGE && tags.containsAny(LATE_NIGHT_TAGS)
 
     private fun Set<String>.containsAny(candidates: Set<String>): Boolean = candidates.any { it in this }
-
-    private fun ResolvedExtraction.stringFieldOrNull(key: String): String? =
-        fields[key]?.takeIf { it.isLoadBearing() }?.value as? String
-
-    private fun ResolvedExtraction.booleanFieldOrNull(key: String): Boolean? =
-        fields[key]?.takeIf { it.isLoadBearing() }?.value as? Boolean
 
     private fun ResolvedExtraction.tagSet(): Set<String> {
         val raw = fields[TAGS_KEY]?.takeIf { it.isLoadBearing() }?.value as? List<*>
@@ -66,10 +53,6 @@ class TemplateLabeler {
 
     private companion object {
         const val TAGS_KEY = "tags"
-        const val ENERGY_DESCRIPTOR_KEY = "energy_descriptor"
-        const val STATE_SHIFT_KEY = "state_shift"
-
-        const val CRASHED = "crashed"
 
         val GOBLIN_HOURS_RANGE: IntRange = TemplateLabel.GOBLIN_HOURS_LOCAL_HOUR_RANGE
 
@@ -77,8 +60,7 @@ class TemplateLabeler {
         // behavioral signal listed in `surfaces/behavioral.txt`.
         val LATE_NIGHT_TAGS = setOf("late-night", "overnight")
 
-        // `tunnel-exit` is the state surface's archetype tag (`surfaces/state.txt:17`). The bare
-        // `tunnel` is the energy descriptor list, not a tag — it lands in `energy_descriptor`.
+        // `tunnel-exit` is the state surface's archetype tag (`surfaces/state.txt:17`).
         val TUNNEL_EXIT_TAGS = setOf("tunnel-exit")
 
         // Demo-time widening — see `docs/backlog.md` §`labeler-prompt-tightening`. Pre-STT-C
@@ -95,8 +77,6 @@ class TemplateLabeler {
             "spreadsheet",
         )
 
-        val STANDALONE_AFTERMATH_ENERGIES = setOf("hollow")
-
         // Demo-time widening — see `docs/backlog.md` §`labeler-prompt-tightening`. Same caveat
         // as DECISION_SPIRAL_TAGS above.
         val AFTERMATH_TAGS = setOf("aftermath", "all-hands", "crash", "crashed", "hollow", "hollow-thing")
@@ -104,13 +84,12 @@ class TemplateLabeler {
         // Resistance / paralysis vocabulary — kept narrow on purpose. STT-C tag stability will
         // expand or trim this list with measured evidence; widening it before then risks
         // false-positive labels.
-        val CONCRETE_SHOES_TAGS = setOf(
+        val STALLED_TAGS = setOf(
             "stuck",
             "stalled",
             "paralyzed",
             "blocked",
             "resistance",
-            "concrete-shoes",
             "task-paralysis",
         )
     }

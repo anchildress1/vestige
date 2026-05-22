@@ -14,9 +14,7 @@ class LensResponseParserTest {
         val raw = """
             {
               "tags": ["standup", "launch-doc"],
-              "energy_descriptor": "flattened",
               "state_shift": true,
-              "vocabulary_contradictions": [{"term_a":"fine","term_b":"flatlined","snippet":"fine but flatlined"}],
               "stated_commitment": {"text":"will draft tonight","topic_or_person":"Nora"},
               "recurrence_link": "p_aftermath_001",
               "recurrence_kind": "exact",
@@ -29,7 +27,6 @@ class LensResponseParserTest {
         assertNotNull(extraction)
         assertEquals(Lens.LITERAL, extraction!!.lens)
         assertEquals(listOf("standup", "launch-doc"), extraction.fields["tags"])
-        assertEquals("flattened", extraction.fields["energy_descriptor"])
         assertEquals(true, extraction.fields["state_shift"])
         assertEquals("p_aftermath_001", extraction.fields["recurrence_link"])
         assertEquals("exact", extraction.fields["recurrence_kind"])
@@ -38,11 +35,6 @@ class LensResponseParserTest {
         val commitment = extraction.fields["stated_commitment"] as Map<String, Any?>
         assertEquals("will draft tonight", commitment["text"])
         assertEquals("Nora", commitment["topic_or_person"])
-
-        @Suppress("UNCHECKED_CAST")
-        val contradictions = extraction.fields["vocabulary_contradictions"] as List<Map<String, Any?>>
-        assertEquals(1, contradictions.size)
-        assertEquals("fine", contradictions[0]["term_a"])
 
         assertTrue(extraction.flags.isEmpty())
     }
@@ -53,9 +45,7 @@ class LensResponseParserTest {
             {
               "tags": ["migration"],
               "template_label": "Decision-Spiral",
-              "energy_descriptor": null,
               "state_shift": false,
-              "vocabulary_contradictions": [],
               "stated_commitment": null,
               "flags": []
             }
@@ -76,9 +66,7 @@ class LensResponseParserTest {
         val raw = """
             {
               "tags": ["audit"],
-              "energy_descriptor": null,
               "state_shift": false,
-              "vocabulary_contradictions": [],
               "stated_commitment": null,
               "recurrence_link": null,
               "recurrence_kind": null,
@@ -95,7 +83,7 @@ class LensResponseParserTest {
             listOf("state-behavior-mismatch:fine but flatlined:stated state contradicts described behavior"),
             extraction!!.flags,
         )
-        assertNull(extraction.fields["energy_descriptor"])
+        assertEquals(false, extraction.fields["state_shift"])
         assertNull(extraction.fields["stated_commitment"])
     }
 
@@ -123,12 +111,12 @@ class LensResponseParserTest {
 
     @Test
     fun `legacy bare-string flag entries pass through unchanged`() {
-        val raw = """{"flags":["energy_descriptor:contradicts:fine"]}"""
+        val raw = """{"flags":["state-behavior-mismatch:contradicts:fine"]}"""
 
         val extraction = LensResponseParser.parse(Lens.SKEPTICAL, raw)
 
         assertNotNull(extraction)
-        assertEquals(listOf("energy_descriptor:contradicts:fine"), extraction!!.flags)
+        assertEquals(listOf("state-behavior-mismatch:contradicts:fine"), extraction!!.flags)
     }
 
     @Test
@@ -160,7 +148,7 @@ class LensResponseParserTest {
             Here's the JSON:
 
             ```json
-            {"tags":["a"],"energy_descriptor":"calm","state_shift":false,"vocabulary_contradictions":[],"stated_commitment":null,"recurrence_link":null,"recurrence_kind":null,"flags":[]}
+            {"tags":["a"],"state_shift":false,"stated_commitment":null,"recurrence_link":null,"recurrence_kind":null,"flags":[]}
             ```
 
             Done.
@@ -170,20 +158,20 @@ class LensResponseParserTest {
 
         assertNotNull(extraction)
         assertEquals(listOf("a"), extraction!!.fields["tags"])
-        assertEquals("calm", extraction.fields["energy_descriptor"])
+        assertEquals(false, extraction.fields["state_shift"])
     }
 
     @Test
     fun `does not split on a brace inside a string literal`() {
-        val raw = """{"tags":["{}"],"energy_descriptor":"a {b} c","state_shift":false,""" +
-            """"vocabulary_contradictions":[],"stated_commitment":null,"recurrence_link":null,""" +
+        val raw = """{"tags":["{}"],"state_shift":false,""" +
+            """"stated_commitment":null,"recurrence_link":"a {b} c",""" +
             """"recurrence_kind":null,"flags":[]}"""
 
         val extraction = LensResponseParser.parse(Lens.LITERAL, raw)
 
         assertNotNull(extraction)
         assertEquals(listOf("{}"), extraction!!.fields["tags"])
-        assertEquals("a {b} c", extraction.fields["energy_descriptor"])
+        assertEquals("a {b} c", extraction.fields["recurrence_link"])
     }
 
     @Test
@@ -199,7 +187,7 @@ class LensResponseParserTest {
 
     @Test
     fun `returns null when the JSON object is truncated mid-stream`() {
-        val raw = """{"tags":["a","b"],"energy_descriptor":"calm"""
+        val raw = """{"tags":["a","b"],"recurrence_link":"calm"""
         assertNull(LensResponseParser.parse(Lens.LITERAL, raw))
     }
 
@@ -208,21 +196,13 @@ class LensResponseParserTest {
         val raw = """
             {
             "tags": ["sink", "noon", "1pm", "three-hours-later"],
-            "energy_descriptor": null,
             "state_shift": true
-            "vocabulary_contradictions": [
-            {
-            "term_a": "fine",
-            "term_b": "not tired exactly",
-            "snippet": "completely fine by 1pm i was gone not tired exactly"
-            }
-            ]
             "stated_commitment": null
             "recurrence_link": null
             "recurrence_kind": null
             "flags": [
             {
-            "kind": "vocabulary-contradiction",
+            "kind": "state-behavior-mismatch",
             "snippet": "completely fine by 1pm i was gone not tired exactly",
             "note": "The user describes a state of being fine then immediately negates it with 'not tired exactly'."
             }
@@ -237,7 +217,7 @@ class LensResponseParserTest {
         assertEquals(true, extraction.fields["state_shift"])
         assertEquals(
             listOf(
-                "vocabulary-contradiction:completely fine by 1pm i was gone not tired exactly:" +
+                "state-behavior-mismatch:completely fine by 1pm i was gone not tired exactly:" +
                     "The user describes a state of being fine then immediately negates it with 'not tired exactly'.",
             ),
             extraction.flags,
@@ -252,9 +232,7 @@ class LensResponseParserTest {
             "work",
             "
             ],
-            "energy_descriptor": null,
             "state_shift": false,
-            "vocabulary_contradictions": [],
             "stated_commitment": null,
             "recurrence_link": null,
             "recurrence_kind": null,
@@ -365,7 +343,7 @@ class LensResponseParserTest {
     @Test
     fun `skips parseable prose object that does not contain schema keys`() {
         val raw = """
-            Flag example: {"kind":"vocabulary-contradiction","snippet":"x","note":"y"}
+            Flag example: {"kind":"state-behavior-mismatch","snippet":"x","note":"y"}
             Actual payload: {"tags":["work"],"flags":[]}
         """.trimIndent()
 
@@ -382,7 +360,6 @@ class LensResponseParserTest {
               "analysis": "ignored",
               "result": {
                 "tags": ["Work"],
-                "energy_descriptor": "flat",
                 "state_shift": true,
                 "flags": []
               }
@@ -393,7 +370,6 @@ class LensResponseParserTest {
 
         assertNotNull(extraction)
         assertEquals(listOf("work"), extraction!!.fields["tags"])
-        assertEquals("flat", extraction.fields["energy_descriptor"])
         assertEquals(true, extraction.fields["state_shift"])
     }
 
@@ -402,7 +378,6 @@ class LensResponseParserTest {
         val raw = """
             {
               "tags": ["work",],
-              "energy_descriptor": "flat",
               "state_shift": false,
               "flags": [],
             }
@@ -422,21 +397,16 @@ class LensResponseParserTest {
             
               {
                 "tags": ["standup", "payroll-doc"],
-                "energy_descriptor": "flat",
                 "state_shift": true,
-                ,"vocabulary_contradictions": [
-                  {
-                    "term_a": "fine",
-                    "term_b": "stuck",
-                    "snippet": "I said I was fine but felt stuck"
-                  }
-                ],
-                "stated_commitment": null,
+                ,"stated_commitment": {
+                  "text": "send the payroll doc",
+                  "topic_or_person": "Riley"
+                },
                 "recurrence_link": null,
                 "recurrence_kind": null,
                 "flags": []
               }
-            
+
 
         """.trimIndent()
 
@@ -444,11 +414,10 @@ class LensResponseParserTest {
 
         assertNotNull(extraction)
         assertEquals(listOf("standup", "payroll-doc"), extraction!!.fields["tags"])
-        assertEquals("flat", extraction.fields["energy_descriptor"])
         assertEquals(true, extraction.fields["state_shift"])
         @Suppress("UNCHECKED_CAST")
-        val contradictions = extraction.fields["vocabulary_contradictions"] as List<Map<String, Any?>>
-        assertEquals("fine", contradictions.single()["term_a"])
+        val commitment = extraction.fields["stated_commitment"] as Map<String, Any?>
+        assertEquals("send the payroll doc", commitment["text"])
     }
 
     @Test
@@ -457,9 +426,7 @@ class LensResponseParserTest {
             {
               ,
               "tags": ["work"],
-              "energy_descriptor": "flat",
               "state_shift": false,
-              "vocabulary_contradictions": [],
               "stated_commitment": null,
               "recurrence_link": null,
               "recurrence_kind": null,
@@ -471,7 +438,7 @@ class LensResponseParserTest {
 
         assertNotNull(extraction)
         assertEquals(listOf("work"), extraction!!.fields["tags"])
-        assertEquals("flat", extraction.fields["energy_descriptor"])
+        assertEquals(false, extraction.fields["state_shift"])
     }
 
     @Test
@@ -479,21 +446,13 @@ class LensResponseParserTest {
         val raw = """
             {
               "tags": ["standup", "kitchen", "payroll-doc", "stuck", "muttering"],
-              "energy_descriptor": "flat",
               "state_shift": true,
-              "vocabulary_contradictions": [
-                {
-                  "term_a": "fine",
-                  "term_b": "stuck",
-                  "snippet": "I said I was fine but felt stuck"
-                }
-              ],
               "stated_commitment": null,
               "recurrence_link": null,
               "recurrence_kind": null,
               "flags": [
                 {
-                  "kind": "vocabulary-contradiction",
+                  "kind": "state-behavior-mismatch",
                   "snippet": "I said I was fine but felt stuck",
                   "note": ""fine" and "stuck" are used to describe the same feeling state.
             }]}
@@ -505,7 +464,7 @@ class LensResponseParserTest {
         assertEquals(listOf("standup", "kitchen", "payroll-doc", "stuck", "muttering"), extraction!!.fields["tags"])
         assertEquals(
             listOf(
-                "vocabulary-contradiction:I said I was fine but felt stuck:" +
+                "state-behavior-mismatch:I said I was fine but felt stuck:" +
                     "\"fine\" and \"stuck\" are used to describe the same feeling state.",
             ),
             extraction.flags,
@@ -517,7 +476,6 @@ class LensResponseParserTest {
         val raw = """
             {
               tags: ["Work"],
-              energy_descriptor: "flat",
               state_shift: false,
               flags: []
             }
@@ -527,7 +485,7 @@ class LensResponseParserTest {
 
         assertNotNull(extraction)
         assertEquals(listOf("work"), extraction!!.fields["tags"])
-        assertEquals("flat", extraction.fields["energy_descriptor"])
+        assertEquals(false, extraction.fields["state_shift"])
     }
 
     @Test
@@ -535,7 +493,6 @@ class LensResponseParserTest {
         val raw = """
             {
               “tags”: [“Work”],
-              “energy_descriptor”: “flat”,
               “state_shift”: false,
               “flags”: []
             }
@@ -545,16 +502,16 @@ class LensResponseParserTest {
 
         assertNotNull(extraction)
         assertEquals(listOf("work"), extraction!!.fields["tags"])
-        assertEquals("flat", extraction.fields["energy_descriptor"])
+        assertEquals(false, extraction.fields["state_shift"])
     }
 
     @Test
     fun `treats JSON null and missing keys as equivalent absence`() {
-        val raw = """{"tags":[],"energy_descriptor":null}"""
+        val raw = """{"tags":[],"state_shift":null}"""
         val extraction = LensResponseParser.parse(Lens.LITERAL, raw)
 
         assertNotNull(extraction)
-        assertNull(extraction!!.fields["energy_descriptor"])
+        assertNull(extraction!!.fields["state_shift"])
         // Missing keys come through as null (the convergence resolver treats null and absent the
         // same way, so the parser flattens both to null).
         assertNull(extraction.fields["stated_commitment"])

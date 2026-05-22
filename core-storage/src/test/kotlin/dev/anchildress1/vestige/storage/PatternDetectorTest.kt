@@ -52,7 +52,6 @@ class PatternDetectorTest {
         templateLabel: TemplateLabel? = null,
         timestamp: Instant = now,
         tagNames: List<String> = emptyList(),
-        energyDescriptor: String? = null,
         commitmentTopic: String? = null,
         extractionStatus: ExtractionStatus = ExtractionStatus.COMPLETED,
     ): EntryEntity {
@@ -61,7 +60,6 @@ class PatternDetectorTest {
             entryText = text,
             timestampEpochMs = timestamp.toEpochMilli(),
             templateLabel = templateLabel,
-            energyDescriptor = energyDescriptor,
             statedCommitmentJson = commitmentTopic?.let { """{"topic_or_person":"$it","text":"do it"}""" },
             extractionStatus = extractionStatus,
         )
@@ -241,6 +239,15 @@ class PatternDetectorTest {
     }
 
     @Test
+    fun `vocab pattern excludes function-word stopwords`() {
+        // Every >=4-char token here is a closed-class stopword. Without the stopword filter these
+        // mint "Just-Token" / "That-Token" vocab patterns — filler masquerading as vocabulary.
+        repeat(5) { putEntry(text = "just that this with from your what when", templateLabel = null) }
+        val vocab = detector.detect().filter { it.kind == PatternKind.VOCAB_FREQUENCY }
+        assertTrue("filler stopwords must not mint vocab patterns, got $vocab", vocab.isEmpty())
+    }
+
+    @Test
     fun `vocab pattern fires even when all supporting entries lack a template label`() {
         // ADR-003's diversity guard ("a single long sentence using 'tired' four times") is
         // satisfied by the per-entry Set semantics — the templated-context narrowing rejected
@@ -254,11 +261,11 @@ class PatternDetectorTest {
     fun `vocab pattern folds true-synonym variants into the tired root`() {
         // One entry per kept alias — covers every key in VOCAB_ROOT_ALIASES so a typo regression
         // (e.g. "drained" → "draind") would drop the count below 6.
-        putEntry(text = "exhausted again, every limb gave up at once", energyDescriptor = "exhausted")
-        putEntry(text = "drained to the bone, eyes won't focus", energyDescriptor = "drained")
+        putEntry(text = "exhausted again, every limb gave up at once")
+        putEntry(text = "drained to the bone, eyes won't focus")
         putEntry(text = "sluggish, the brain fog is back", tagNames = listOf("sluggish"))
         putEntry(text = "wiped from another all-day", tagNames = listOf("wiped"))
-        putEntry(text = "depleted, body feels heavier today", energyDescriptor = "depleted")
+        putEntry(text = "depleted, body feels heavier today")
         putEntry(text = "burnt out, screen looks blurry from inside out", tagNames = listOf("burnt-out"))
 
         val pattern = detector.detect().single {
@@ -274,16 +281,16 @@ class PatternDetectorTest {
         // "caffeine", "empty" onto "tired" — that lies about user vocabulary because the
         // underlying state (arousal-up vs arousal-down) is different. Make sure these stay
         // distinct from "tired".
-        putEntry(text = "wired-tired, body wants sleep, brain refuses", tagNames = listOf("wired"))
-        putEntry(text = "amped but somehow still spent", energyDescriptor = "amped")
-        putEntry(text = "anxious-tired, lying down doesn't count as rest", tagNames = listOf("anxious"))
-        putEntry(text = "running on caffeine and adrenaline", energyDescriptor = "caffeine")
+        putEntry(text = "wired, body wants sleep, brain refuses", tagNames = listOf("wired"))
+        putEntry(text = "amped but somehow still spent")
+        putEntry(text = "anxious, lying down doesn't count as rest", tagNames = listOf("anxious"))
+        putEntry(text = "running on caffeine and adrenaline")
 
         val tiredPattern = detector.detect().firstOrNull {
             it.kind == PatternKind.VOCAB_FREQUENCY && it.signatureJson.contains("\"token\":\"tired\"")
         }
         // None of these entries contain the literal "tired" token outside of compound words
-        // (`wired-tired`, `anxious-tired`). The compound splits via WORD_SPLIT, so "tired"
+        // (`wired`, `anxious`). The compound splits via WORD_SPLIT, so "tired"
         // appears in 2 of 4 entries — below VOCAB_THRESHOLD (4). No false-positive pattern.
         assertEquals(null, tiredPattern)
     }

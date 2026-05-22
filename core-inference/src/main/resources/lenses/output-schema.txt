@@ -8,13 +8,11 @@ Required keys:
 - `template_label`: pick exactly one serial naming the entry's archetype:
   - `aftermath` — a cognitive or energy crash, especially after a named event
   - `tunnel-exit` — surfacing from deep focus or hyperfocus
-  - `concrete-shoes` — stuck, task paralysis, resistance, can't start
+  - `stalled` — stuck, task paralysis, resistance, can't start
   - `decision-spiral` — looping on the same choice without resolving
   - `goblin-hours` — awake and spinning between midnight and 5am
   - `audit` — catch-all when no archetype dominates
-- `energy_descriptor`: the state in one or two words, or null.
 - `state_shift`: boolean.
-- `vocabulary_contradictions`: array of `{term_a, term_b, snippet}` or `[]`. Never null — always emit the array.
 - `stated_commitment`: object `{text, topic_or_person}` or `null`.
 - `flags`: array of `{kind, snippet, note}` or `[]` — only the Skeptical lens populates this; the other two always return `[]`.
 
@@ -25,7 +23,6 @@ Hard rules:
 - Do not invent fields. The keys above are the entire schema for this call.
 - `template_label` is required and never null — pick the closest archetype, or `audit` when none dominates.
 - Each tag is a single word marking a key point. Emit about one tag per 20 words of the entry — pick the key points, not every noun.
-- When the entry contains concrete anchors, return at least one substantive field. If the user names any activity, object, place, time anchor, state word, repeated term, or commitment, surface at least one of them.
+- When the entry contains specific anchors, return at least one substantive field. If the user names any activity, object, place, time anchor, state word, repeated term, or commitment, surface at least one of them.
 - `state_shift=false`, empty arrays, and nulls do not count as substantive output.
 - When the read is sparse, anchor it with explicit `tags` taken from the user's own words rather than leaving the object empty by default.
-- `vocabulary_contradictions` must always be an array — use `[]` when there are none. Never output `null` for this field.

@@ -113,14 +113,14 @@ class EntryDetailScreenTest {
 
     @Test
     fun `resolved view shows persisted three-lens receipts and field grid`() {
-        val id = entryStore.createPendingEntry("battery got yanked", FIXTURE_INSTANT)
+        val id = entryStore.createPendingEntry("battery died", FIXTURE_INSTANT)
         entryStore.completeEntry(
             id,
             ResolvedExtraction(
                 mapOf(
-                    "tags" to ResolvedField(listOf("meeting", "battery-yanked"), ConfidenceVerdict.CANONICAL),
-                    "energy_descriptor" to ResolvedField(
-                        "crashed",
+                    "tags" to ResolvedField(listOf("meeting", "battery-died"), ConfidenceVerdict.CANONICAL),
+                    "state_shift" to ResolvedField(
+                        true,
                         ConfidenceVerdict.CANONICAL_WITH_CONFLICT,
                     ),
                 ),
@@ -130,18 +130,18 @@ class EntryDetailScreenTest {
                 EntryLensReceipt(
                     lens = Lens.LITERAL,
                     extracted = true,
-                    fields = mapOf("energy_descriptor" to "battery yanked"),
+                    fields = mapOf("tags" to "battery died"),
                 ),
                 EntryLensReceipt(
                     lens = Lens.INFERENTIAL,
                     extracted = true,
-                    fields = mapOf("energy_descriptor" to "post-meeting energy crash"),
+                    fields = mapOf("state_shift" to true),
                 ),
                 EntryLensReceipt(
                     lens = Lens.SKEPTICAL,
                     extracted = true,
-                    fields = mapOf("energy_descriptor" to "not tired vs yanked"),
-                    flags = listOf("vocabulary-contradiction:not tired:battery yanked"),
+                    fields = mapOf("state_shift" to true),
+                    flags = listOf("state-behavior-mismatch:not tired:battery died"),
                 ),
             ),
         )
@@ -149,8 +149,8 @@ class EntryDetailScreenTest {
         composeRule.onNodeWithTag("entry_three_lens").assertIsDisplayed()
         composeRule.onNodeWithTag("entry_field_grid").assertIsDisplayed()
         composeRule.onNodeWithText(EntryDetailCopy.THREE_LENS_EYEBROW).assertIsDisplayed()
-        composeRule.onNodeWithText("battery yanked").assertIsDisplayed()
-        composeRule.onNodeWithText("crashed").assertIsDisplayed()
+        composeRule.onNodeWithText("battery died").assertIsDisplayed()
+        composeRule.onNodeWithText("state shift").assertIsDisplayed()
         composeRule.onNodeWithText(EntryDetailCopy.THREE_LENS_STATUS_CONFLICT).assertIsDisplayed()
         // The extracting/skeleton branch is not the resolved view.
         composeRule.onAllNodesWithTag("entry_extracting").assertCountEquals(0)
@@ -166,8 +166,8 @@ class EntryDetailScreenTest {
             observations = listOf(
                 dev.anchildress1.vestige.model.EntryObservation(
                     text = "You used fine twice.",
-                    evidence = dev.anchildress1.vestige.model.ObservationEvidence.VOCABULARY_CONTRADICTION,
-                    fields = listOf("vocabulary_contradictions", "tags"),
+                    evidence = dev.anchildress1.vestige.model.ObservationEvidence.THEME_NOTICING,
+                    fields = listOf("tags", "recurrence_link"),
                 ),
             ),
             lensReceipts = listOf(
@@ -183,7 +183,7 @@ class EntryDetailScreenTest {
 
         composeRule.onNodeWithTag("entry_observations").assertExists()
         composeRule.onNodeWithText("You used fine twice.").assertExists()
-        composeRule.onNodeWithText("VOCABULARY CONTRADICTION · vocabulary_contradictions, tags").assertExists()
+        composeRule.onNodeWithText("THEME NOTICING · tags, recurrence_link").assertExists()
     }
 
     @Test
@@ -196,7 +196,7 @@ class EntryDetailScreenTest {
             observations = listOf(
                 dev.anchildress1.vestige.model.EntryObservation(
                     text = "You used fine twice.",
-                    evidence = dev.anchildress1.vestige.model.ObservationEvidence.VOCABULARY_CONTRADICTION,
+                    evidence = dev.anchildress1.vestige.model.ObservationEvidence.THEME_NOTICING,
                     fields = emptyList(),
                 ),
             ),

@@ -18,9 +18,9 @@ import java.time.ZonedDateTime
  *
  * Strategy:
  *
- * 1. **Deterministic first.** Walks the resolved fields for stated commitments and vocabulary
- *    contradictions; checks the capture timestamp for goblin-hours (00:00–04:59 local) volunteered
- *    context. If 1+ deterministic observations land, they win — the model call is skipped.
+ * 1. **Deterministic first.** Walks the resolved fields for stated commitments; checks the
+ *    capture timestamp for goblin-hours (00:00–04:59 local) volunteered context. If 1+
+ *    deterministic observations land, they win — the model call is skipped.
  * 2. **Model fallback.** When deterministic assembly produces nothing useful, fires one short
  *    model call. The response is parsed + validated against the AGENTS.md §guardrail 7 /
  *    `concept-locked.md` §"Voice rules" forbidden-phrase list. A single retry on validation
@@ -58,7 +58,6 @@ class ObservationGenerator(
     private fun buildDeterministic(resolved: ResolvedExtraction, capturedAt: ZonedDateTime): List<EntryObservation> {
         val out = mutableListOf<EntryObservation>()
         commitmentObservation(resolved)?.let { out += it }
-        vocabularyContradictionObservation(resolved)?.let { out += it }
         if (out.isEmpty()) {
             goblinHoursObservation(capturedAt)?.let { out += it }
         }
@@ -77,21 +76,12 @@ class ObservationGenerator(
         return EntryObservation(line, ObservationEvidence.COMMITMENT_FLAG, listOf(KEY_COMMITMENT))
     }
 
-    private fun vocabularyContradictionObservation(resolved: ResolvedExtraction): EntryObservation? {
-        val contradictions = resolved.fields[KEY_VOCAB_CONTRADICTIONS]?.value as? List<*> ?: return null
-        val pick = contradictions.firstOrNull() as? Map<*, *> ?: return null
-        val termA = (pick["term_a"] as? String)?.trim()?.takeIf { it.isNotEmpty() } ?: return null
-        val termB = (pick["term_b"] as? String)?.trim()?.takeIf { it.isNotEmpty() } ?: return null
-        val line = "You said \"$termA\" and \"$termB\" in the same entry."
-        return EntryObservation(line, ObservationEvidence.VOCABULARY_CONTRADICTION, listOf(KEY_VOCAB_CONTRADICTIONS))
-    }
-
     private fun goblinHoursObservation(capturedAt: ZonedDateTime): EntryObservation? {
         if (capturedAt.hour !in TemplateLabel.GOBLIN_HOURS_LOCAL_HOUR_RANGE) return null
         // `fields` is empty per ADR-002 §3: the array maps to canonical extraction field names
-        // (tags / energy_descriptor / recurrence_link / stated_commitment) or a snippet ref.
-        // The capture timestamp is metadata, not a resolved extraction field — surfacing it
-        // as a fields[] entry would corrupt the persisted schema for downstream consumers.
+        // (tags / recurrence_link / stated_commitment) or a snippet ref. The capture timestamp is
+        // metadata, not a resolved extraction field — surfacing it as a fields[] entry would
+        // corrupt the persisted schema for downstream consumers.
         return EntryObservation(
             text = "Captured between midnight and 5am — flagged as goblin hours.",
             evidence = ObservationEvidence.VOLUNTEERED_CONTEXT,
@@ -158,7 +148,6 @@ class ObservationGenerator(
         private const val MAX_MODEL_ATTEMPTS = 2
 
         private const val KEY_COMMITMENT = "stated_commitment"
-        private const val KEY_VOCAB_CONTRADICTIONS = "vocabulary_contradictions"
 
         private fun loadResource(path: String): String {
             val stream = ObservationGenerator::class.java.getResourceAsStream(path)

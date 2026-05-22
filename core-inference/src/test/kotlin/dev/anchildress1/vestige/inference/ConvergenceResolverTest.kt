@@ -23,7 +23,7 @@ class ConvergenceResolverTest {
             lens = Lens.LITERAL,
             fields = mapOf(
                 "template_label" to "aftermath",
-                "energy_descriptor" to "flattened",
+                "state_shift" to true,
                 "tags" to listOf("standup", "launch-doc"),
             ),
         )
@@ -37,8 +37,8 @@ class ConvergenceResolverTest {
             resolved.fields["template_label"],
         )
         assertEquals(
-            ResolvedField("flattened", ConfidenceVerdict.CANONICAL),
-            resolved.fields["energy_descriptor"],
+            ResolvedField(true, ConfidenceVerdict.CANONICAL),
+            resolved.fields["state_shift"],
         )
         assertEquals(
             ResolvedField(listOf("standup", "launch-doc"), ConfidenceVerdict.CANONICAL),
@@ -87,24 +87,24 @@ class ConvergenceResolverTest {
 
     @Test
     fun `Skeptical flags conflict even when others agree resolves to canonical with conflict marker`() {
-        val literal = LensExtraction(Lens.LITERAL, fields = mapOf("energy_descriptor" to "flattened"))
-        val inferential = LensExtraction(Lens.INFERENTIAL, fields = mapOf("energy_descriptor" to "flattened"))
+        val literal = LensExtraction(Lens.LITERAL, fields = mapOf("state_shift" to true))
+        val inferential = LensExtraction(Lens.INFERENTIAL, fields = mapOf("state_shift" to true))
         val skeptical = LensExtraction(
             Lens.SKEPTICAL,
-            fields = mapOf("energy_descriptor" to "flattened"),
-            // Real Skeptical flag shape from `lenses/skeptical.txt`: kind = vocabulary-contradiction.
-            flags = listOf("vocabulary-contradiction:fine before:state word contradicts later flattened"),
+            fields = mapOf("state_shift" to true),
+            // Real Skeptical flag shape from `lenses/skeptical.txt`: kind = state-behavior-mismatch.
+            flags = listOf("state-behavior-mismatch:fine before:state change with no named trigger"),
         )
 
         val resolved = resolver.resolve(listOf(literal, inferential, skeptical))
 
         assertEquals(
             ResolvedField(
-                value = "flattened",
+                value = true,
                 verdict = ConfidenceVerdict.CANONICAL_WITH_CONFLICT,
-                flags = listOf("vocabulary-contradiction:fine before:state word contradicts later flattened"),
+                flags = listOf("state-behavior-mismatch:fine before:state change with no named trigger"),
             ),
-            resolved.fields["energy_descriptor"],
+            resolved.fields["state_shift"],
         )
     }
 
@@ -138,12 +138,12 @@ class ConvergenceResolverTest {
 
     @Test
     fun `Skeptical-only flag without populated value still surfaces conflict on consensus`() {
-        val literal = LensExtraction(Lens.LITERAL, fields = mapOf("energy_descriptor" to "flattened"))
-        val inferential = LensExtraction(Lens.INFERENTIAL, fields = mapOf("energy_descriptor" to "flattened"))
-        val flag = "state-behavior-mismatch:fine before:claims fine but described as flattened"
+        val literal = LensExtraction(Lens.LITERAL, fields = mapOf("state_shift" to true))
+        val inferential = LensExtraction(Lens.INFERENTIAL, fields = mapOf("state_shift" to true))
+        val flag = "state-behavior-mismatch:fine before:state change with no named trigger"
         val skeptical = LensExtraction(
             Lens.SKEPTICAL,
-            fields = mapOf("energy_descriptor" to null),
+            fields = mapOf("state_shift" to null),
             flags = listOf(flag),
         )
 
@@ -151,11 +151,11 @@ class ConvergenceResolverTest {
 
         assertEquals(
             ResolvedField(
-                value = "flattened",
+                value = true,
                 verdict = ConfidenceVerdict.CANONICAL_WITH_CONFLICT,
                 flags = listOf(flag),
             ),
-            resolved.fields["energy_descriptor"],
+            resolved.fields["state_shift"],
         )
     }
 
@@ -165,67 +165,18 @@ class ConvergenceResolverTest {
         // is under-evidenced, so every field resolves AMBIGUOUS rather than minting a value.
         val literal = LensExtraction(
             Lens.LITERAL,
-            fields = mapOf("energy_descriptor" to "flattened", "template_label" to "aftermath"),
+            fields = mapOf("state_shift" to true, "template_label" to "aftermath"),
         )
 
         val resolved = resolver.resolve(listOf(literal))
 
         assertEquals(
             ResolvedField(value = null, verdict = ConfidenceVerdict.AMBIGUOUS),
-            resolved.fields["energy_descriptor"],
+            resolved.fields["state_shift"],
         )
         assertEquals(
             ResolvedField(value = null, verdict = ConfidenceVerdict.AMBIGUOUS),
             resolved.fields["template_label"],
-        )
-    }
-
-    @Test
-    fun `energy majority without Literal corroboration resolves ambiguous`() {
-        // Inferential + Skeptical agree on a behavior-clause energy; Literal abstains (null). The
-        // strict floor did not back the value, so it is suppressed rather than promoted.
-        val literal = LensExtraction(Lens.LITERAL, fields = mapOf("energy_descriptor" to null))
-        val inferential =
-            LensExtraction(Lens.INFERENTIAL, fields = mapOf("energy_descriptor" to "slows everything down"))
-        val skeptical = LensExtraction(Lens.SKEPTICAL, fields = mapOf("energy_descriptor" to "slows everything down"))
-
-        val resolved = resolver.resolve(listOf(literal, inferential, skeptical))
-
-        assertEquals(
-            ResolvedField(value = null, verdict = ConfidenceVerdict.AMBIGUOUS),
-            resolved.fields["energy_descriptor"],
-        )
-    }
-
-    @Test
-    fun `energy majority with Literal substring corroboration stays canonical`() {
-        // Literal's "crashed hard" backs the majority "crashed" via substring match — no collateral
-        // suppression of a genuinely corroborated state.
-        val literal = LensExtraction(Lens.LITERAL, fields = mapOf("energy_descriptor" to "crashed hard"))
-        val inferential = LensExtraction(Lens.INFERENTIAL, fields = mapOf("energy_descriptor" to "crashed"))
-        val skeptical = LensExtraction(Lens.SKEPTICAL, fields = mapOf("energy_descriptor" to "crashed"))
-
-        val resolved = resolver.resolve(listOf(literal, inferential, skeptical))
-
-        assertEquals(
-            ResolvedField(value = "crashed", verdict = ConfidenceVerdict.CANONICAL),
-            resolved.fields["energy_descriptor"],
-        )
-    }
-
-    @Test
-    fun `energy majority with negated Literal stays ambiguous`() {
-        // "not crashed" shares the "crashed" substring but flips polarity — the negated Literal is a
-        // dissent, not corroboration, so the majority must be suppressed rather than promoted.
-        val literal = LensExtraction(Lens.LITERAL, fields = mapOf("energy_descriptor" to "not crashed"))
-        val inferential = LensExtraction(Lens.INFERENTIAL, fields = mapOf("energy_descriptor" to "crashed"))
-        val skeptical = LensExtraction(Lens.SKEPTICAL, fields = mapOf("energy_descriptor" to "crashed"))
-
-        val resolved = resolver.resolve(listOf(literal, inferential, skeptical))
-
-        assertEquals(
-            ResolvedField(value = null, verdict = ConfidenceVerdict.AMBIGUOUS),
-            resolved.fields["energy_descriptor"],
         )
     }
 
@@ -246,30 +197,28 @@ class ConvergenceResolverTest {
     }
 
     @Test
-    fun `energy majority suppressed when Literal lens parse-fails entirely`() {
+    fun `state_shift majority suppressed when Literal lens parse-fails entirely`() {
         // Literal absent from the list (parse-fail, not null-valued). Inferential + Skeptical agree
         // but have no corroboration floor — same suppression as null-valued Literal.
-        val inferential =
-            LensExtraction(Lens.INFERENTIAL, fields = mapOf("energy_descriptor" to "slows everything down"))
-        val skeptical =
-            LensExtraction(Lens.SKEPTICAL, fields = mapOf("energy_descriptor" to "slows everything down"))
+        val inferential = LensExtraction(Lens.INFERENTIAL, fields = mapOf("state_shift" to true))
+        val skeptical = LensExtraction(Lens.SKEPTICAL, fields = mapOf("state_shift" to true))
 
         val resolved = resolver.resolve(listOf(inferential, skeptical))
 
         assertEquals(
             ResolvedField(value = null, verdict = ConfidenceVerdict.AMBIGUOUS),
-            resolved.fields["energy_descriptor"],
+            resolved.fields["state_shift"],
         )
     }
 
     @Test
     fun `skeptical-only contradicted field does not mint a candidate`() {
         val flag = "state-behavior-mismatch:fine:claims fine but described as stalled"
-        val literal = LensExtraction(Lens.LITERAL, fields = mapOf("energy_descriptor" to null))
-        val inferential = LensExtraction(Lens.INFERENTIAL, fields = mapOf("energy_descriptor" to null))
+        val literal = LensExtraction(Lens.LITERAL, fields = mapOf("state_shift" to null))
+        val inferential = LensExtraction(Lens.INFERENTIAL, fields = mapOf("state_shift" to null))
         val skeptical = LensExtraction(
             Lens.SKEPTICAL,
-            fields = mapOf("energy_descriptor" to "fine"),
+            fields = mapOf("state_shift" to true),
             flags = listOf(flag),
         )
 
@@ -280,7 +229,7 @@ class ConvergenceResolverTest {
                 verdict = ConfidenceVerdict.AMBIGUOUS,
                 flags = listOf(flag),
             ),
-            resolved.fields["energy_descriptor"],
+            resolved.fields["state_shift"],
         )
     }
 
@@ -331,21 +280,6 @@ class ConvergenceResolverTest {
                 flags = listOf("lens-disagreement"),
             ),
             resolved.fields["template_label"],
-        )
-    }
-
-    @Test
-    fun `energy_descriptor agreement is case insensitive after trim`() {
-        val literal = LensExtraction(Lens.LITERAL, fields = mapOf("energy_descriptor" to "Flattened"))
-        val inferential = LensExtraction(Lens.INFERENTIAL, fields = mapOf("energy_descriptor" to "flattened "))
-        val skeptical = LensExtraction(Lens.SKEPTICAL, fields = mapOf("energy_descriptor" to "fine"))
-
-        val resolved = resolver.resolve(listOf(literal, inferential, skeptical))
-
-        // Majority wins after canonicalization; the consensus value is the first matching variant.
-        assertEquals(
-            ResolvedField(value = "Flattened", verdict = ConfidenceVerdict.CANONICAL),
-            resolved.fields["energy_descriptor"],
         )
     }
 
@@ -405,21 +339,21 @@ class ConvergenceResolverTest {
             Lens.LITERAL,
             fields = mapOf(
                 "state_shift" to false,
-                "vocabulary_contradictions" to emptyList<String>(),
+                "tags" to emptyList<String>(),
             ),
         )
         val inferential = LensExtraction(
             Lens.INFERENTIAL,
             fields = mapOf(
                 "state_shift" to false,
-                "vocabulary_contradictions" to emptyList<String>(),
+                "tags" to emptyList<String>(),
             ),
         )
         val skeptical = LensExtraction(
             Lens.SKEPTICAL,
             fields = mapOf(
                 "state_shift" to false,
-                "vocabulary_contradictions" to emptyList<String>(),
+                "tags" to emptyList<String>(),
             ),
         )
 
@@ -431,7 +365,7 @@ class ConvergenceResolverTest {
         )
         assertEquals(
             ResolvedField(value = null, verdict = ConfidenceVerdict.AMBIGUOUS),
-            resolved.fields["vocabulary_contradictions"],
+            resolved.fields["tags"],
         )
     }
 
@@ -483,19 +417,19 @@ class ConvergenceResolverTest {
     @Test
     fun `field union covers keys present on only one lens`() {
         val literal = LensExtraction(Lens.LITERAL, fields = mapOf("template_label" to "aftermath"))
-        val inferential = LensExtraction(Lens.INFERENTIAL, fields = mapOf("energy_descriptor" to "flattened"))
+        val inferential = LensExtraction(Lens.INFERENTIAL, fields = mapOf("state_shift" to true))
         val skeptical = LensExtraction(Lens.SKEPTICAL, fields = mapOf("template_label" to "aftermath"))
 
         val resolved = resolver.resolve(listOf(literal, inferential, skeptical))
 
-        assertEquals(setOf("template_label", "energy_descriptor"), resolved.fields.keys)
+        assertEquals(setOf("template_label", "state_shift"), resolved.fields.keys)
         assertEquals(
             ResolvedField("aftermath", ConfidenceVerdict.CANONICAL),
             resolved.fields["template_label"],
         )
         assertEquals(
-            ResolvedField("flattened", ConfidenceVerdict.CANDIDATE, sourceLens = Lens.INFERENTIAL),
-            resolved.fields["energy_descriptor"],
+            ResolvedField(true, ConfidenceVerdict.CANDIDATE, sourceLens = Lens.INFERENTIAL),
+            resolved.fields["state_shift"],
         )
     }
 

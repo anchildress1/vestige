@@ -4,7 +4,7 @@ package dev.anchildress1.vestige.model
 enum class TemplateLabel(val serial: String) {
     AFTERMATH("aftermath"),
     TUNNEL_EXIT("tunnel-exit"),
-    CONCRETE_SHOES("concrete-shoes"),
+    STALLED("stalled"),
     DECISION_SPIRAL("decision-spiral"),
     GOBLIN_HOURS("goblin-hours"),
     AUDIT("audit"),

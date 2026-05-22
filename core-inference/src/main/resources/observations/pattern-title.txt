@@ -6,7 +6,7 @@ OUTPUT RULES — non-negotiable:
 3. Title-case: capitalize major words. Lowercase short prepositions/articles.
 4. No emoji. No punctuation except a single hyphen if necessary.
 5. No interpretation, no feelings, no advice. Name the pattern, do not analyze it.
-6. Reuse the most concrete noun phrase from the signature inputs when possible.
+6. Reuse the most specific noun phrase from the signature inputs when possible.
 
 INPUTS:
 - pattern kind

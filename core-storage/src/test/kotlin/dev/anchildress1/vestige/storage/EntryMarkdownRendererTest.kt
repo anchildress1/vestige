@@ -36,7 +36,6 @@ class EntryMarkdownRendererTest {
             timestampEpochMs = Instant.parse("2026-05-19T13:30:00Z").toEpochMilli(),
             durationMs = 12_000L,
             templateLabel = TemplateLabel.AUDIT,
-            energyDescriptor = "wired",
             recurrenceLink = "pattern-1",
             statedCommitmentJson = """{"text":"send invoice"}""",
             confidenceJson = """{"tags":"CANONICAL"}""",
@@ -50,7 +49,6 @@ class EntryMarkdownRendererTest {
         assertTrue(markdown.contains("persona: hardass"))
         assertTrue(markdown.contains("follow_up: What happened after the invoice?"))
         assertTrue(markdown.contains("template_label: audit"))
-        assertTrue(markdown.contains("energy_descriptor: wired"))
         assertTrue(markdown.contains("recurrence_link: pattern-1"))
         assertTrue(markdown.contains("""stated_commitment: {"text":"send invoice"}"""))
         assertTrue(markdown.contains("tags: []"))
@@ -67,7 +65,6 @@ class EntryMarkdownRendererTest {
             timestampEpochMs = 0L,
             followUpText = null,
             templateLabel = null,
-            energyDescriptor = null,
             recurrenceLink = null,
             statedCommitmentJson = null,
             confidenceJson = "",
@@ -79,7 +76,6 @@ class EntryMarkdownRendererTest {
 
         assertTrue(markdown.contains("follow_up: null"))
         assertTrue(markdown.contains("template_label: null"))
-        assertTrue(markdown.contains("energy_descriptor: null"))
         assertTrue(markdown.contains("recurrence_link: null"))
         assertTrue(markdown.contains("stated_commitment: null"))
         assertTrue(markdown.contains("tags: []"))

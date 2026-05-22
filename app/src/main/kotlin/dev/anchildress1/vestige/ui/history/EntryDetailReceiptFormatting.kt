@@ -57,29 +57,11 @@ internal fun buildFieldRows(entity: EntryEntity): List<FieldRow> {
     val confidence = parseConfidence(entity.confidenceJson)
     val receipts = EntryLensReceiptJson.decodeOrNull(entity.lensReceiptsJson)
     val tagsText = entity.tags.map { it.name }.sorted().take(DISPLAY_LIMIT).joinToString(", ").ifBlank { DASH }
-    val topLevelState = entity.energyDescriptor?.takeIf(String::isNotBlank)
-    val stateValue = topLevelState
-        ?: receipts?.let { firstReceiptFieldDisplay(it, KEY_ENERGY) }
-        ?: DASH
+    val stateValue = receipts?.let { firstReceiptFieldDisplay(it, KEY_STATE_SHIFT) } ?: DASH
     val stateTone = when {
-        receipts == null -> confidence[KEY_ENERGY].toTone()
-        topLevelState != null -> confidence[KEY_ENERGY].toTone()
-        stateValue != DASH -> receiptFieldTone(receipts, KEY_ENERGY)
-        else -> confidence[KEY_ENERGY].toTone()
-    }
-    val vocabFromReceipts = receipts?.let { firstReceiptFieldDisplay(it, KEY_VOCAB) }
-    val vocabFallback = receipts?.let { repeatedLexicalTerms(entity.entryText, it) }
-    val vocabValue = when {
-        receipts == null -> EntryDetailCopy.LENS_UNREADABLE
-        vocabFromReceipts != null -> vocabFromReceipts
-        vocabFallback != null -> vocabFallback
-        else -> DASH
-    }
-    val vocabTone = when {
-        receipts == null -> LensTone.CONFLICT
-        vocabFromReceipts != null -> receiptFieldTone(receipts, KEY_VOCAB)
-        vocabFallback != null -> receiptLexicalTone(entity.entryText, receipts)
-        else -> confidence[KEY_VOCAB].toTone()
+        receipts == null -> confidence[KEY_STATE_SHIFT].toTone()
+        stateValue != DASH -> receiptFieldTone(receipts, KEY_STATE_SHIFT)
+        else -> confidence[KEY_STATE_SHIFT].toTone()
     }
     val topLevelCommitment = commitmentText(entity.statedCommitmentJson)
     val commitmentValue = topLevelCommitment
@@ -112,7 +94,6 @@ internal fun buildFieldRows(entity: EntryEntity): List<FieldRow> {
             value = stateValue,
             tone = stateTone,
         ),
-        FieldRow(label = "VOCAB", value = vocabValue, tone = vocabTone),
         FieldRow(
             label = "PROMISES",
             value = commitmentValue,
@@ -216,69 +197,6 @@ private fun receiptPatternTone(receipts: List<EntryLensReceipt>): LensTone {
     }
 }
 
-private fun repeatedLexicalTerms(entryText: String, receipts: List<EntryLensReceipt>): String? {
-    val counts = entryText.lowercase()
-        .split(WORD_SPLIT_REGEX)
-        .map { it.trim() }
-        .filter { it.length >= MIN_VOCAB_TERM_LENGTH && it !in VOCAB_STOP_WORDS }
-        .groupingBy { it }
-        .eachCount()
-    if (counts.isEmpty()) return null
-
-    val receiptSupport = receiptLexicalSupport(receipts, counts)
-
-    val terms = receiptSupport.entries
-        .asSequence()
-        .filter { (_, support) -> support >= MIN_RECEIPT_SUPPORT_FOR_VOCAB }
-        .sortedWith(
-            compareByDescending<Map.Entry<String, Int>> { it.value }
-                .thenByDescending { counts[it.key] ?: 0 }
-                .thenBy { it.key },
-        )
-        .map(Map.Entry<String, Int>::key)
-        .take(DISPLAY_LIMIT)
-        .toList()
-    return terms.joinToString(", ").takeIf(String::isNotBlank)
-}
-
-private fun receiptLexicalSupport(receipts: List<EntryLensReceipt>, counts: Map<String, Int>): Map<String, Int> {
-    val receiptSupport = mutableMapOf<String, Int>()
-    receipts.forEach { receipt ->
-        val supportedTerms = receiptSupportedTerms(receipt, counts)
-        supportedTerms.forEach { term ->
-            receiptSupport[term] = (receiptSupport[term] ?: 0) + 1
-        }
-    }
-    return receiptSupport
-}
-
-private fun receiptSupportedTerms(receipt: EntryLensReceipt, counts: Map<String, Int>): Set<String> {
-    val tags = (receipt.fields[KEY_TAGS] as? List<*>)?.mapNotNull { it as? String }.orEmpty()
-    return tags.asSequence()
-        .flatMap { tag -> tag.lowercase().split('-').asSequence() }
-        .filter { part -> part.length >= MIN_VOCAB_TERM_LENGTH && part !in VOCAB_STOP_WORDS }
-        .filter { part -> (counts[part] ?: 0) > 1 }
-        .toSet()
-}
-
-private fun receiptLexicalTone(entryText: String, receipts: List<EntryLensReceipt>): LensTone {
-    val repeatedTerms = repeatedLexicalTerms(entryText, receipts)?.split(", ")?.toSet().orEmpty()
-    if (repeatedTerms.isEmpty()) return LensTone.AMBIGUOUS
-    val supported = receipts.count { receipt ->
-        val tags = (receipt.fields[KEY_TAGS] as? List<*>)?.mapNotNull { it as? String }.orEmpty()
-        tags.any { tag ->
-            tag.lowercase()
-                .split('-')
-                .any { part -> part in repeatedTerms }
-        }
-    }
-    return when {
-        supported >= 2 -> LensTone.CANONICAL
-        supported == 1 -> LensTone.CANDIDATE
-        else -> LensTone.AMBIGUOUS
-    }
-}
-
 private fun displayValue(value: Any?): String? = when (value) {
     null -> null
 
@@ -311,44 +229,15 @@ private fun ConfidenceVerdict?.toTone(fallback: LensTone = LensTone.AMBIGUOUS): 
 private const val DASH = "—"
 private const val DISPLAY_LIMIT = 2
 private const val KEY_TAGS = "tags"
-private const val KEY_ENERGY = "energy_descriptor"
-private const val KEY_VOCAB = "vocabulary_contradictions"
+private const val KEY_STATE_SHIFT = "state_shift"
 private const val KEY_COMMITMENT = "stated_commitment"
 private const val KEY_RECURRENCE = "recurrence_link"
 private const val KEY_COMMITMENT_TEXT = "text"
 private const val KEY_TOPIC_OR_PERSON = "topic_or_person"
 private val PATTERN_ID_REGEX = Regex("[0-9a-f]{64}")
-private val WORD_SPLIT_REGEX = Regex("[^a-z0-9]+")
-private const val MIN_VOCAB_TERM_LENGTH = 3
-private const val MIN_RECEIPT_SUPPORT_FOR_VOCAB = 2
-private val VOCAB_STOP_WORDS = setOf(
-    "the",
-    "and",
-    "for",
-    "with",
-    "that",
-    "this",
-    "have",
-    "from",
-    "were",
-    "they",
-    "still",
-    "after",
-    "before",
-    "while",
-    "today",
-    "again",
-    "your",
-    "just",
-    "into",
-    "even",
-    "worth",
-)
 private val SUMMARY_KEYS = listOf(
-    KEY_ENERGY,
-    KEY_VOCAB,
     KEY_TAGS,
     KEY_COMMITMENT,
     KEY_RECURRENCE,
-    "state_shift",
+    KEY_STATE_SHIFT,
 )

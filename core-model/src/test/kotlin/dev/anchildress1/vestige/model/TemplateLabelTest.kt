@@ -10,7 +10,7 @@ class TemplateLabelTest {
     fun `serial values match concept-locked kebab-case spec`() {
         assertEquals("aftermath", TemplateLabel.AFTERMATH.serial)
         assertEquals("tunnel-exit", TemplateLabel.TUNNEL_EXIT.serial)
-        assertEquals("concrete-shoes", TemplateLabel.CONCRETE_SHOES.serial)
+        assertEquals("stalled", TemplateLabel.STALLED.serial)
         assertEquals("decision-spiral", TemplateLabel.DECISION_SPIRAL.serial)
         assertEquals("goblin-hours", TemplateLabel.GOBLIN_HOURS.serial)
         assertEquals("audit", TemplateLabel.AUDIT.serial)

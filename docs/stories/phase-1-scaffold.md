@@ -136,7 +136,7 @@ If STT-A fails after the time-box: stop. Write a superseding ADR. Do not proceed
 
 **Done when:**
 - [x] `:core-storage` exposes an export renderer that writes one generated markdown file per entry into the export zip with the deterministic filename format from `architecture-brief.md` §"Generated Entry Markdown" — `entries/{ISO8601-utc-second}--{slug}.md`, with kebab-case slug ≤32 chars derived from the first 5–6 content words after stop-word strip, collision suffixes `-2` / `-3`. Filenames are stable for the life of the entry.
-- [x] Markdown front-matter carries the structured fields from the ObjectBox `Entry` (template_label, tags, energy_descriptor, recurrence_link, stated_commitment, confidence per field, timestamp, entry_observations). _Observations live in frontmatter, not body — aligned with `architecture-brief.md` §"Field placement rules" which is the data-shape canonical (story originally said body; corrected here)._
+- [x] Markdown front-matter carries the structured fields from the ObjectBox `Entry` (template_label, tags, vocabulary, recurrence_link, stated_commitment, confidence per field, timestamp, entry_observations). _Observations live in frontmatter, not body — aligned with `architecture-brief.md` §"Field placement rules" which is the data-shape canonical (story originally said body; corrected here)._
 - [x] Markdown body carries the `entry_text` exactly as captured.
 - [x] Smoke test: exporting an ObjectBox row produces matching markdown plus the structured snapshot.
 - [x] Audio is not written. Per `AGENTS.md` guardrail 11, only transcription text persists.

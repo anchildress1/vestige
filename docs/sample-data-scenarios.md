@@ -197,7 +197,7 @@ Wording variation does not count. Three lenses saying the same thing in differen
 
 Expected pressure points:
 - A1: Literal should catch standup/doc/stare; Inferential may label post-meeting crash; Skeptical may flag `fine before` vs `flattened by 11` as a state shift, not a contradiction.
-- A4: `Not tired exactly` vs `battery died` should pressure `energy_descriptor`; Skeptical should avoid saving `tired` as canonical without a conflict marker.
+- A4: `Not tired exactly` vs `battery died` should pressure `tags` (state words) and `vocabulary` (felt tone); Skeptical should avoid saving `tired` as canonical without a conflict marker.
 - B1: Literal sees invoice/email/opened/closed; Inferential may identify task paralysis; Skeptical should note no explicit commitment yet.
 - B2: Commitment should be stronger than B1 because `Said I would send` is explicit.
 - C2: Inferential can label Decision spiral; Skeptical should note the actual options are missing.
@@ -254,7 +254,7 @@ Story 5.1 / Story 5.4 — seeded into the reference device for recording. Distin
 | Text | "After the all-hands I did the hollow routine. Coffee went cold on the desk. Everything I was going to do right after evaporated. Three tabs open. I know what they're for. Still open." |
 | template_label | Crashed |
 | tags | `all-hands`, `meeting`, `work`, `hollow-routine`, `tabs` |
-| energy_descriptor | `hollow` |
+| vocabulary | `hollow` |
 | stated_commitment | null |
 | entry_observations | 1. Post-meeting crash — work context this time. Vocabulary: "hollow routine" implies this is a recurring shape the user has named themselves. 2. Specific evidence: cold coffee, three tabs, zero execution. |
 | pattern contribution | Crashed cluster #3. First work-context entry in the cluster — broadens the pattern beyond personal social events. |
@@ -268,7 +268,7 @@ Story 5.1 / Story 5.4 — seeded into the reference device for recording. Distin
 | Text | "Said I would drop the package off today. Drive past UPS on my route. Spent twenty minutes googling whether the thing is even worth returning. It is. Label is still on the counter." |
 | template_label | Stalled |
 | tags | `return-label`, `package`, `UPS`, `commitment`, `googling` |
-| energy_descriptor | null |
+| vocabulary | null |
 | stated_commitment | "drop the return package off today" |
 | entry_observations | 1. Explicit commitment logged: "said I would drop it off today." 2. Avoidance behavior: researched the validity of the task instead of doing it. Commitment connects to DEMO-04. |
 | pattern contribution | Stalled #2. Stated commitment makes this the STT-D B2 analog — stronger signal than DEMO-04. |
@@ -282,7 +282,7 @@ Story 5.1 / Story 5.4 — seeded into the reference device for recording. Distin
 | Text | "Spent an hour and a half comparing couches. Dimensions, reviews, lead time, return policy. Made a spreadsheet. Did not buy a couch. Twelve rows." |
 | template_label | Decision spiral |
 | tags | `couch`, `spreadsheet`, `comparing`, `decision`, `twelve-rows` |
-| energy_descriptor | null |
+| vocabulary | null |
 | stated_commitment | null |
 | entry_observations | 1. Decision loop: 90 minutes, spreadsheet, 12 options, no decision. 2. Vocabulary: the user measures their own loop ("twelve rows") without explaining why they can't choose. |
 | pattern contribution | Decision spiral standalone. |

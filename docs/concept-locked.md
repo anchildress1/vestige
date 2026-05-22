@@ -28,7 +28,7 @@
 Templates are no longer user-picked. Capture screen has no template grid. The user just records or types. The agent labels each entry post-extraction based on which surfaces dominate.
 
 Six labels:
-- **Crashed** — energy crash (State surface signals: `state_descriptor` = "crashed" + state shift evidence)
+- **Crashed** — energy crash (State surface: crash / depletion state words → `tags`)
 - **Deep Space** — hyperfocus debrief (Behavioral surface: focus subject + extended duration + things-ignored mentions)
 - **Busy Stalling** — task paralysis (Behavioral surface: stuck task + resistance markers)
 - **Nonstop Spiral** — rumination loop (State surface: decision-looping + iteration markers)
@@ -43,8 +43,8 @@ Each entry runs through a **3-lens × 5-surface** extraction pipeline. Three len
 
 **Five surfaces** (orthogonal extraction modules — what gets extracted):
 1. **Behavioral** — activities, sequence, time-of-day, environmental context → contributes to `tags`
-2. **State** — attention/energy markers → contributes to `energy_descriptor`
-3. **Vocabulary** — recurring words, in-entry contradictions → contributes to `tags`
+2. **State** — attention/energy markers → contributes to `tags` (state words)
+3. **Vocabulary** — the entry's overall felt tone → contributes to `vocabulary` (one word)
 4. **Commitment** — things the user said they'd do → contributes to `stated_commitment`
 5. **Recurrence** — match against history → contributes to `recurrence_link`
 
@@ -75,7 +75,7 @@ Eleven content fields total. Extracted fields are convergence-driven; `entry_obs
 - `timestamp` — auto
 - `template_label` — agent-emitted (Crashed / Deep Space / Busy Stalling / Nonstop Spiral / Goblin Hours / Brain Dump)
 - `tags` — free-form, model-extracted (people, topics, activities, places)
-- `energy_descriptor` — nullable; captured if user mentioned a state
+- `vocabulary` — nullable; one lowercase word for the entry's overall felt tone (Inferential lens wins)
 - `recurrence_link` — nullable; pattern_id if entry matches a known pattern
 - `stated_commitment` — nullable; tag-only tracking (text + entry_id + topic/person). Pattern engine surfaces "logged commitments about [topic] in N entries, last on [date]." No formal resolution logic in v1.
 - `entry_observations` — 1–2 persisted observations from this entry alone, each with evidence text or a field reference. Generated after convergence; never freeform speculation.

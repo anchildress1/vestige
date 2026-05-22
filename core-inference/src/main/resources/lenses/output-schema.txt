@@ -13,6 +13,7 @@ Required keys:
   - `goblin-hours` — awake and spinning between midnight and 5am
   - `audit` — catch-all when no archetype dominates
 - `stated_commitment`: object `{text, topic_or_person}` or `null`.
+- `vocabulary`: a single lowercase word for the entry's overall tone — the user's own word for how it felt when they name one, else the closest single word. Never a phrase or clause. `null` when the entry carries no discernible tone.
 - `flags`: array of `{kind, snippet, note}` or `[]` — only the Skeptical lens populates this; the other two always return `[]`.
 
 Hard rules:

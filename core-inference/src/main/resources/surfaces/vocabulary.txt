@@ -1,17 +1,12 @@
 ## Surface: Vocabulary
 
-Extract linguistic patterns: recurring words, in-entry contradictions, hedging, and circling.
+Name the entry's overall tone in a single word.
 
 What to capture:
 
-- Words the user repeated more than once within the same entry (excluding stop words). Repetition signals salience.
-- Hedging or imprecision used to avoid naming something directly. These often signal the user is circling something unresolved.
-- Circling patterns: user restates the same problem or decision in different words across multiple sentences without resolving it. Tag the topic being circled.
-- Avoidance vocabulary: user names a task repeatedly then always adds a hedge or deflection.
-- Self-aware measurement: when the user quantifies their own loop. These are vocabulary signals of pattern-recognition.
-- User-coined idioms: tag the user's coined phrasing verbatim when it appears.
+- One word that best captures the felt quality of the entry as a whole. Prefer the user's own word when they name how it felt; otherwise pick the closest single word for the tone the entry carries.
+- This is the felt tone, not the topic (topic goes to `tags`) and not the physical state word (that goes to `tags` via the State surface).
 
 What goes in the schema:
 
-- Append vocabulary signals to `tags` as short lowercase kebab-case tokens.
-- Do not extract emotional vocabulary as a state — state words belong to the State surface.
+- `vocabulary`: a single lowercase word, or `null` when the entry carries no discernible tone. Never a phrase or clause.

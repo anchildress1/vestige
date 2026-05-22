@@ -268,6 +268,7 @@ class EntryStore(private val boxStore: BoxStore) {
 
     private fun applyResolved(entry: EntryEntity, resolved: ResolvedExtraction, templateLabel: TemplateLabel?) {
         entry.templateLabel = templateLabel
+        entry.vocabularyWord = stringField(resolved, KEY_VOCABULARY)?.trim()?.lowercase()
         entry.recurrenceLink = recurrenceField(resolved)
         entry.statedCommitmentJson = commitmentJson(resolved)
         entry.confidenceJson = confidenceJson(resolved)
@@ -336,6 +337,7 @@ class EntryStore(private val boxStore: BoxStore) {
     private companion object {
         private const val MAX_FILENAME_SUFFIX = 1000
         private const val KEY_TAGS = "tags"
+        private const val KEY_VOCABULARY = "vocabulary"
         private const val KEY_RECURRENCE = "recurrence_link"
         private const val KEY_COMMITMENT = "stated_commitment"
         private const val KEY_TOPIC_OR_PERSON = "topic_or_person"

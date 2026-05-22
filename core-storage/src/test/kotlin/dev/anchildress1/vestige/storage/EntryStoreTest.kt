@@ -129,6 +129,27 @@ class EntryStoreTest {
     }
 
     @Test
+    fun `completeEntry persists the vocabulary tone word trimmed and lowercased`() {
+        val id = entryStore.createPendingEntry(SAMPLE_TEXT, SAMPLE_INSTANT)
+        val resolved = ResolvedExtraction(
+            mapOf("vocabulary" to ResolvedField("  Hollow  ", ConfidenceVerdict.CANONICAL)),
+        )
+
+        entryStore.completeEntry(id, resolved, TemplateLabel.AFTERMATH)
+
+        assertEquals("hollow", boxStore.boxFor<EntryEntity>().get(id).vocabularyWord)
+    }
+
+    @Test
+    fun `completeEntry leaves vocabularyWord null when the field is absent`() {
+        val id = entryStore.createPendingEntry(SAMPLE_TEXT, SAMPLE_INSTANT)
+
+        entryStore.completeEntry(id, ResolvedExtraction(emptyMap()), TemplateLabel.AUDIT)
+
+        assertNull(boxStore.boxFor<EntryEntity>().get(id).vocabularyWord)
+    }
+
+    @Test
     fun `completeEntry drops invalid recurrence sentinels instead of persisting them`() {
         val id = entryStore.createPendingEntry(SAMPLE_TEXT, SAMPLE_INSTANT)
         val resolved = ResolvedExtraction(

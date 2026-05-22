@@ -28,6 +28,7 @@ internal object LensResponseParser {
         "tags",
         "template_label",
         "stated_commitment",
+        "vocabulary",
         "recurrence_link",
         "recurrence_kind",
     )

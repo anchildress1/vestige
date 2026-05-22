@@ -240,7 +240,7 @@ class EntryStoreTest {
         val mixed = ResolvedExtraction(
             mapOf(
                 "tags" to ResolvedField(listOf("focus"), ConfidenceVerdict.CANONICAL),
-                "state_shift" to ResolvedField(null, ConfidenceVerdict.AMBIGUOUS),
+                "template_label" to ResolvedField(null, ConfidenceVerdict.AMBIGUOUS),
                 "stated_commitment" to ResolvedField(null, ConfidenceVerdict.CANONICAL),
                 "recurrence_link" to ResolvedField(
                     "abc",
@@ -255,7 +255,7 @@ class EntryStoreTest {
         val row = boxStore.boxFor<EntryEntity>().get(id)
         val confidence = JSONObject(row.confidenceJson)
         assertEquals(ConfidenceVerdict.CANONICAL.name, confidence.getString("tags"))
-        assertEquals(ConfidenceVerdict.AMBIGUOUS.name, confidence.getString("state_shift"))
+        assertEquals(ConfidenceVerdict.AMBIGUOUS.name, confidence.getString("template_label"))
         assertEquals(ConfidenceVerdict.CANDIDATE.name, confidence.getString("recurrence_link"))
         assertNull(row.recurrenceLink)
     }
@@ -323,15 +323,15 @@ class EntryStoreTest {
             EntryLensReceipt(
                 lens = Lens.LITERAL,
                 extracted = true,
-                fields = mapOf("tags" to listOf("standup"), "state_shift" to true),
+                fields = mapOf("tags" to listOf("standup"), "template_label" to "aftermath"),
                 attemptCount = 1,
                 elapsedMs = 900L,
             ),
             EntryLensReceipt(
                 lens = Lens.SKEPTICAL,
                 extracted = true,
-                fields = mapOf("state_shift" to true),
-                flags = listOf("state-behavior-mismatch:fine:flattened"),
+                fields = mapOf("template_label" to "aftermath"),
+                flags = listOf("commitment-without-anchor:fine:flattened"),
                 attemptCount = 1,
                 elapsedMs = 1_100L,
             ),
@@ -343,8 +343,8 @@ class EntryStoreTest {
         val decoded = EntryLensReceiptJson.decode(row.lensReceiptsJson)
         assertEquals(2, decoded.size)
         assertEquals(Lens.LITERAL, decoded[0].lens)
-        assertEquals(true, decoded[0].fields["state_shift"])
-        assertEquals(listOf("state-behavior-mismatch:fine:flattened"), decoded[1].flags)
+        assertEquals("aftermath", decoded[0].fields["template_label"])
+        assertEquals(listOf("commitment-without-anchor:fine:flattened"), decoded[1].flags)
     }
 
     @Test

@@ -147,13 +147,6 @@ class EntryDetailReceiptFormattingTest {
         readOf(encode(EntryLensReceipt(Lens.LITERAL, extracted = true, fields = field)), Lens.LITERAL).value
 
     @Test
-    fun `boolean true field renders as state shift, false falls through`() {
-        assertEquals("state shift", summaryFor(mapOf("state_shift" to true)))
-        // false -> null -> no other key -> no-fields
-        assertEquals(EntryDetailCopy.LENS_NO_FIELDS, summaryFor(mapOf("state_shift" to false)))
-    }
-
-    @Test
     fun `list field joins at most two non-blank elements`() {
         assertEquals("a, b", summaryFor(mapOf("tags" to listOf("a", "b", "c"))))
     }
@@ -240,7 +233,6 @@ class EntryDetailReceiptFormattingTest {
                     Lens.LITERAL,
                     extracted = true,
                     fields = mapOf(
-                        "state_shift" to true,
                         "stated_commitment" to mapOf("topic_or_person" to "Riley"),
                         "recurrence_link" to VALID_PATTERN_ID,
                     ),
@@ -262,8 +254,6 @@ class EntryDetailReceiptFormattingTest {
             ),
         )
 
-        assertEquals("state shift", fieldRow(rows, "STATE").value)
-        assertEquals(LensTone.CONFLICT, fieldRow(rows, "STATE").tone)
         assertEquals("Riley", fieldRow(rows, "PROMISES").value)
         assertEquals(LensTone.CONFLICT, fieldRow(rows, "PROMISES").tone)
         assertEquals(VALID_PATTERN_ID, fieldRow(rows, "REPEAT").value)
@@ -301,7 +291,6 @@ class EntryDetailReceiptFormattingTest {
                     Lens.LITERAL,
                     extracted = true,
                     fields = mapOf(
-                        "state_shift" to true,
                         "stated_commitment" to "send the note",
                         "recurrence_link" to VALID_PATTERN_ID,
                     ),
@@ -309,7 +298,6 @@ class EntryDetailReceiptFormattingTest {
             ),
         )
 
-        assertEquals(LensTone.CANDIDATE, fieldRow(rows, "STATE").tone)
         assertEquals(LensTone.CANDIDATE, fieldRow(rows, "PROMISES").tone)
         assertEquals(LensTone.CANDIDATE, fieldRow(rows, "REPEAT").tone)
     }
@@ -350,13 +338,13 @@ class EntryDetailReceiptFormattingTest {
         val missingRows = rowsOf(
             receiptsJson = "[]",
             confidenceJson = confidence(
-                "state_shift" to ConfidenceVerdict.CANDIDATE,
+                "tags" to ConfidenceVerdict.CANDIDATE,
                 "stated_commitment" to ConfidenceVerdict.CANONICAL_WITH_CONFLICT,
             ),
         )
 
-        assertEquals("—", fieldRow(missingRows, "STATE").value)
-        assertEquals(LensTone.CANDIDATE, fieldRow(missingRows, "STATE").tone)
+        assertEquals("—", fieldRow(missingRows, "BEHAVIOR").value)
+        assertEquals(LensTone.CANDIDATE, fieldRow(missingRows, "BEHAVIOR").tone)
         assertEquals(LensTone.CONFLICT, fieldRow(missingRows, "PROMISES").tone)
     }
 
@@ -403,10 +391,10 @@ class EntryDetailReceiptFormattingTest {
     fun `unknown confidence verdicts are ignored field by field`() {
         val rows = rowsOf(
             receiptsJson = "[]",
-            confidenceJson = """{"state_shift":"CANONICAL","stated_commitment":"GARBAGE"}""",
+            confidenceJson = """{"tags":"CANONICAL","stated_commitment":"GARBAGE"}""",
         )
 
-        assertEquals(LensTone.CANONICAL, fieldRow(rows, "STATE").tone)
+        assertEquals(LensTone.CANONICAL, fieldRow(rows, "BEHAVIOR").tone)
         assertEquals(LensTone.AMBIGUOUS, fieldRow(rows, "PROMISES").tone)
     }
 
@@ -469,7 +457,7 @@ class EntryDetailReceiptFormattingTest {
     fun `conflict verdict outranks canonical in lens status`() {
         val json = confidence(
             "tags" to ConfidenceVerdict.CANONICAL,
-            "state_shift" to ConfidenceVerdict.CANONICAL_WITH_CONFLICT,
+            "stated_commitment" to ConfidenceVerdict.CANONICAL_WITH_CONFLICT,
         )
 
         assertEquals(EntryDetailCopy.THREE_LENS_STATUS_CONFLICT, lensStatus(json))
@@ -479,7 +467,7 @@ class EntryDetailReceiptFormattingTest {
     fun `canonical outranks candidate when no conflict present`() {
         val json = confidence(
             "tags" to ConfidenceVerdict.CANDIDATE,
-            "state_shift" to ConfidenceVerdict.CANONICAL,
+            "stated_commitment" to ConfidenceVerdict.CANONICAL,
         )
 
         assertEquals(EntryDetailCopy.THREE_LENS_STATUS_CANONICAL, lensStatus(json))

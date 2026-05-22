@@ -23,7 +23,6 @@ class ConvergenceResolverTest {
             lens = Lens.LITERAL,
             fields = mapOf(
                 "template_label" to "aftermath",
-                "state_shift" to true,
                 "tags" to listOf("standup", "launch-doc"),
             ),
         )
@@ -35,10 +34,6 @@ class ConvergenceResolverTest {
         assertEquals(
             ResolvedField("aftermath", ConfidenceVerdict.CANONICAL),
             resolved.fields["template_label"],
-        )
-        assertEquals(
-            ResolvedField(true, ConfidenceVerdict.CANONICAL),
-            resolved.fields["state_shift"],
         )
         assertEquals(
             ResolvedField(listOf("standup", "launch-doc"), ConfidenceVerdict.CANONICAL),
@@ -87,24 +82,25 @@ class ConvergenceResolverTest {
 
     @Test
     fun `Skeptical flags conflict even when others agree resolves to canonical with conflict marker`() {
-        val literal = LensExtraction(Lens.LITERAL, fields = mapOf("state_shift" to true))
-        val inferential = LensExtraction(Lens.INFERENTIAL, fields = mapOf("state_shift" to true))
+        val commitment = mapOf("text" to "send the doc tonight", "topic_or_person" to "Nora")
+        val literal = LensExtraction(Lens.LITERAL, fields = mapOf("stated_commitment" to commitment))
+        val inferential = LensExtraction(Lens.INFERENTIAL, fields = mapOf("stated_commitment" to commitment))
         val skeptical = LensExtraction(
             Lens.SKEPTICAL,
-            fields = mapOf("state_shift" to true),
-            // Real Skeptical flag shape from `lenses/skeptical.txt`: kind = state-behavior-mismatch.
-            flags = listOf("state-behavior-mismatch:fine before:state change with no named trigger"),
+            fields = mapOf("stated_commitment" to commitment),
+            // Real Skeptical flag shape from `lenses/skeptical.txt`: kind = commitment-without-anchor.
+            flags = listOf("commitment-without-anchor:send the doc:no deadline named"),
         )
 
         val resolved = resolver.resolve(listOf(literal, inferential, skeptical))
 
         assertEquals(
             ResolvedField(
-                value = true,
+                value = commitment,
                 verdict = ConfidenceVerdict.CANONICAL_WITH_CONFLICT,
-                flags = listOf("state-behavior-mismatch:fine before:state change with no named trigger"),
+                flags = listOf("commitment-without-anchor:send the doc:no deadline named"),
             ),
-            resolved.fields["state_shift"],
+            resolved.fields["stated_commitment"],
         )
     }
 
@@ -138,12 +134,13 @@ class ConvergenceResolverTest {
 
     @Test
     fun `Skeptical-only flag without populated value still surfaces conflict on consensus`() {
-        val literal = LensExtraction(Lens.LITERAL, fields = mapOf("state_shift" to true))
-        val inferential = LensExtraction(Lens.INFERENTIAL, fields = mapOf("state_shift" to true))
-        val flag = "state-behavior-mismatch:fine before:state change with no named trigger"
+        val commitment = mapOf("text" to "send the doc tonight", "topic_or_person" to "Nora")
+        val literal = LensExtraction(Lens.LITERAL, fields = mapOf("stated_commitment" to commitment))
+        val inferential = LensExtraction(Lens.INFERENTIAL, fields = mapOf("stated_commitment" to commitment))
+        val flag = "commitment-without-anchor:send the doc:no deadline named"
         val skeptical = LensExtraction(
             Lens.SKEPTICAL,
-            fields = mapOf("state_shift" to null),
+            fields = mapOf("stated_commitment" to null),
             flags = listOf(flag),
         )
 
@@ -151,11 +148,11 @@ class ConvergenceResolverTest {
 
         assertEquals(
             ResolvedField(
-                value = true,
+                value = commitment,
                 verdict = ConfidenceVerdict.CANONICAL_WITH_CONFLICT,
                 flags = listOf(flag),
             ),
-            resolved.fields["state_shift"],
+            resolved.fields["stated_commitment"],
         )
     }
 
@@ -165,15 +162,11 @@ class ConvergenceResolverTest {
         // is under-evidenced, so every field resolves AMBIGUOUS rather than minting a value.
         val literal = LensExtraction(
             Lens.LITERAL,
-            fields = mapOf("state_shift" to true, "template_label" to "aftermath"),
+            fields = mapOf("template_label" to "aftermath"),
         )
 
         val resolved = resolver.resolve(listOf(literal))
 
-        assertEquals(
-            ResolvedField(value = null, verdict = ConfidenceVerdict.AMBIGUOUS),
-            resolved.fields["state_shift"],
-        )
         assertEquals(
             ResolvedField(value = null, verdict = ConfidenceVerdict.AMBIGUOUS),
             resolved.fields["template_label"],
@@ -181,44 +174,13 @@ class ConvergenceResolverTest {
     }
 
     @Test
-    fun `state_shift majority without Literal resolves ambiguous`() {
-        // Inferential + Skeptical infer a transition; Literal read co-occurrence (false, filtered as
-        // a no-op). With no Literal backing, the inferred shift is suppressed.
-        val literal = LensExtraction(Lens.LITERAL, fields = mapOf("state_shift" to false))
-        val inferential = LensExtraction(Lens.INFERENTIAL, fields = mapOf("state_shift" to true))
-        val skeptical = LensExtraction(Lens.SKEPTICAL, fields = mapOf("state_shift" to true))
-
-        val resolved = resolver.resolve(listOf(literal, inferential, skeptical))
-
-        assertEquals(
-            ResolvedField(value = null, verdict = ConfidenceVerdict.AMBIGUOUS),
-            resolved.fields["state_shift"],
-        )
-    }
-
-    @Test
-    fun `state_shift majority suppressed when Literal lens parse-fails entirely`() {
-        // Literal absent from the list (parse-fail, not null-valued). Inferential + Skeptical agree
-        // but have no corroboration floor — same suppression as null-valued Literal.
-        val inferential = LensExtraction(Lens.INFERENTIAL, fields = mapOf("state_shift" to true))
-        val skeptical = LensExtraction(Lens.SKEPTICAL, fields = mapOf("state_shift" to true))
-
-        val resolved = resolver.resolve(listOf(inferential, skeptical))
-
-        assertEquals(
-            ResolvedField(value = null, verdict = ConfidenceVerdict.AMBIGUOUS),
-            resolved.fields["state_shift"],
-        )
-    }
-
-    @Test
     fun `skeptical-only contradicted field does not mint a candidate`() {
-        val flag = "state-behavior-mismatch:fine:claims fine but described as stalled"
-        val literal = LensExtraction(Lens.LITERAL, fields = mapOf("state_shift" to null))
-        val inferential = LensExtraction(Lens.INFERENTIAL, fields = mapOf("state_shift" to null))
+        val flag = "commitment-without-anchor:send it:no object named"
+        val literal = LensExtraction(Lens.LITERAL, fields = mapOf("stated_commitment" to null))
+        val inferential = LensExtraction(Lens.INFERENTIAL, fields = mapOf("stated_commitment" to null))
         val skeptical = LensExtraction(
             Lens.SKEPTICAL,
-            fields = mapOf("state_shift" to true),
+            fields = mapOf("stated_commitment" to mapOf("text" to "send it", "topic_or_person" to null)),
             flags = listOf(flag),
         )
 
@@ -229,7 +191,7 @@ class ConvergenceResolverTest {
                 verdict = ConfidenceVerdict.AMBIGUOUS,
                 flags = listOf(flag),
             ),
-            resolved.fields["state_shift"],
+            resolved.fields["stated_commitment"],
         )
     }
 
@@ -335,24 +297,26 @@ class ConvergenceResolverTest {
 
     @Test
     fun `false booleans and empty lists do not count as corroborating evidence`() {
+        // A boolean field is no longer in the schema, but the resolver is field-agnostic for
+        // generic keys; an arbitrary boolean key guards the `false` no-op filter alongside tags.
         val literal = LensExtraction(
             Lens.LITERAL,
             fields = mapOf(
-                "state_shift" to false,
+                "some_flag" to false,
                 "tags" to emptyList<String>(),
             ),
         )
         val inferential = LensExtraction(
             Lens.INFERENTIAL,
             fields = mapOf(
-                "state_shift" to false,
+                "some_flag" to false,
                 "tags" to emptyList<String>(),
             ),
         )
         val skeptical = LensExtraction(
             Lens.SKEPTICAL,
             fields = mapOf(
-                "state_shift" to false,
+                "some_flag" to false,
                 "tags" to emptyList<String>(),
             ),
         )
@@ -361,7 +325,7 @@ class ConvergenceResolverTest {
 
         assertEquals(
             ResolvedField(value = null, verdict = ConfidenceVerdict.AMBIGUOUS),
-            resolved.fields["state_shift"],
+            resolved.fields["some_flag"],
         )
         assertEquals(
             ResolvedField(value = null, verdict = ConfidenceVerdict.AMBIGUOUS),
@@ -417,19 +381,19 @@ class ConvergenceResolverTest {
     @Test
     fun `field union covers keys present on only one lens`() {
         val literal = LensExtraction(Lens.LITERAL, fields = mapOf("template_label" to "aftermath"))
-        val inferential = LensExtraction(Lens.INFERENTIAL, fields = mapOf("state_shift" to true))
+        val inferential = LensExtraction(Lens.INFERENTIAL, fields = mapOf("recurrence_link" to "p_aftermath_001"))
         val skeptical = LensExtraction(Lens.SKEPTICAL, fields = mapOf("template_label" to "aftermath"))
 
         val resolved = resolver.resolve(listOf(literal, inferential, skeptical))
 
-        assertEquals(setOf("template_label", "state_shift"), resolved.fields.keys)
+        assertEquals(setOf("template_label", "recurrence_link"), resolved.fields.keys)
         assertEquals(
             ResolvedField("aftermath", ConfidenceVerdict.CANONICAL),
             resolved.fields["template_label"],
         )
         assertEquals(
-            ResolvedField(true, ConfidenceVerdict.CANDIDATE, sourceLens = Lens.INFERENTIAL),
-            resolved.fields["state_shift"],
+            ResolvedField("p_aftermath_001", ConfidenceVerdict.CANDIDATE, sourceLens = Lens.INFERENTIAL),
+            resolved.fields["recurrence_link"],
         )
     }
 

@@ -12,7 +12,6 @@ Required keys:
   - `decision-spiral` — looping on the same choice without resolving
   - `goblin-hours` — awake and spinning between midnight and 5am
   - `audit` — catch-all when no archetype dominates
-- `state_shift`: boolean.
 - `stated_commitment`: object `{text, topic_or_person}` or `null`.
 - `flags`: array of `{kind, snippet, note}` or `[]` — only the Skeptical lens populates this; the other two always return `[]`.
 
@@ -24,5 +23,5 @@ Hard rules:
 - `template_label` is required and never null — pick the closest archetype, or `audit` when none dominates.
 - Each tag is a single word marking a key point. Emit about one tag per 20 words of the entry — pick the key points, not every noun.
 - When the entry contains specific anchors, return at least one substantive field. If the user names any activity, object, place, time anchor, state word, repeated term, or commitment, surface at least one of them.
-- `state_shift=false`, empty arrays, and nulls do not count as substantive output.
+- Empty arrays and nulls do not count as substantive output.
 - When the read is sparse, anchor it with explicit `tags` taken from the user's own words rather than leaving the object empty by default.

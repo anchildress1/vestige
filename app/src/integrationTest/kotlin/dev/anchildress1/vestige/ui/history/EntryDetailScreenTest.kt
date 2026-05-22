@@ -118,9 +118,8 @@ class EntryDetailScreenTest {
             id,
             ResolvedExtraction(
                 mapOf(
-                    "tags" to ResolvedField(listOf("meeting", "battery-died"), ConfidenceVerdict.CANONICAL),
-                    "state_shift" to ResolvedField(
-                        true,
+                    "tags" to ResolvedField(
+                        listOf("meeting", "battery-died"),
                         ConfidenceVerdict.CANONICAL_WITH_CONFLICT,
                     ),
                 ),
@@ -135,13 +134,13 @@ class EntryDetailScreenTest {
                 EntryLensReceipt(
                     lens = Lens.INFERENTIAL,
                     extracted = true,
-                    fields = mapOf("state_shift" to true),
+                    fields = mapOf("tags" to "battery died"),
                 ),
                 EntryLensReceipt(
                     lens = Lens.SKEPTICAL,
                     extracted = true,
-                    fields = mapOf("state_shift" to true),
-                    flags = listOf("state-behavior-mismatch:not tired:battery died"),
+                    fields = mapOf("tags" to "battery died"),
+                    flags = listOf("commitment-without-anchor:not tired:battery died"),
                 ),
             ),
         )
@@ -150,7 +149,6 @@ class EntryDetailScreenTest {
         composeRule.onNodeWithTag("entry_field_grid").assertIsDisplayed()
         composeRule.onNodeWithText(EntryDetailCopy.THREE_LENS_EYEBROW).assertIsDisplayed()
         composeRule.onNodeWithText("battery died").assertIsDisplayed()
-        composeRule.onNodeWithText("state shift").assertIsDisplayed()
         composeRule.onNodeWithText(EntryDetailCopy.THREE_LENS_STATUS_CONFLICT).assertIsDisplayed()
         // The extracting/skeleton branch is not the resolved view.
         composeRule.onAllNodesWithTag("entry_extracting").assertCountEquals(0)

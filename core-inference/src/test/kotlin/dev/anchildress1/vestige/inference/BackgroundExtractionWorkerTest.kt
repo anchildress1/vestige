@@ -33,7 +33,6 @@ class BackgroundExtractionWorkerTest {
     private val resolved = ResolvedExtraction(
         fields = mapOf(
             "tags" to ResolvedField(listOf("crashed"), ConfidenceVerdict.CANONICAL),
-            "state_shift" to ResolvedField(true, ConfidenceVerdict.CANONICAL),
         ),
     )
 
@@ -51,20 +50,19 @@ class BackgroundExtractionWorkerTest {
         )
     }
 
-    private fun compactSuccessJson(stateShift: Boolean): String = """
-        {"tags":["sink"],"state_shift":$stateShift,"stated_commitment":null,"recurrence_link":null,"recurrence_kind":null,"flags":[]}
+    private fun compactSuccessJson(): String = """
+        {"tags":["sink"],"stated_commitment":null,"recurrence_link":null,"recurrence_kind":null,"flags":[]}
     """.trimIndent()
 
     private fun malformedSkepticalJson(): String = """
         {
-        "tags": ["sink", "noon", "1pm", "three-hours-later"],
-        "state_shift": true
+        "tags": ["sink", "noon", "1pm", "three-hours-later"]
         "stated_commitment": null
         "recurrence_link": null
         "recurrence_kind": null
         "flags": [
         {
-        "kind": "state-behavior-mismatch",
+        "kind": "commitment-without-anchor",
         "snippet": "completely fine by 1pm i was gone not tired exactly",
         "note": "The user describes a state of being fine then immediately negates it with 'not tired exactly'."
         }
@@ -73,7 +71,7 @@ class BackgroundExtractionWorkerTest {
     """.trimIndent()
 
     private fun skepticalFlag(): String =
-        "state-behavior-mismatch:completely fine by 1pm i was gone not tired exactly:" +
+        "commitment-without-anchor:completely fine by 1pm i was gone not tired exactly:" +
             "The user describes a state of being fine then immediately negates it with 'not tired exactly'."
 
     private class RecordingResolver(val resolved: ResolvedExtraction) : ConvergenceResolver {
@@ -228,9 +226,9 @@ class BackgroundExtractionWorkerTest {
     @Test
     fun `worker parses malformed skeptical near-json without burning retries`() = runTest {
         val engine = mockk<LiteRtLmEngine>()
-        every { engine.streamText("prompt-for-LITERAL", any()) } returns flowOf(compactSuccessJson(stateShift = true))
+        every { engine.streamText("prompt-for-LITERAL", any()) } returns flowOf(compactSuccessJson())
         every { engine.streamText("prompt-for-INFERENTIAL", any()) } returns
-            flowOf(compactSuccessJson(stateShift = false))
+            flowOf(compactSuccessJson())
         every { engine.streamText("prompt-for-SKEPTICAL", any()) } returns flowOf(malformedSkepticalJson())
         val listener = RecordingListener()
 
@@ -407,7 +405,6 @@ class BackgroundExtractionWorkerTest {
         val modelLabeled = ResolvedExtraction(
             fields = mapOf(
                 "tags" to ResolvedField(listOf("crashed"), ConfidenceVerdict.CANONICAL),
-                "state_shift" to ResolvedField(true, ConfidenceVerdict.CANONICAL),
                 "template_label" to ResolvedField("decision-spiral", ConfidenceVerdict.CANONICAL),
             ),
         )
@@ -446,7 +443,6 @@ class BackgroundExtractionWorkerTest {
         val badLabel = ResolvedExtraction(
             fields = mapOf(
                 "tags" to ResolvedField(listOf("crashed"), ConfidenceVerdict.CANONICAL),
-                "state_shift" to ResolvedField(true, ConfidenceVerdict.CANONICAL),
                 "template_label" to ResolvedField("not-a-real-archetype", ConfidenceVerdict.CANONICAL),
             ),
         )

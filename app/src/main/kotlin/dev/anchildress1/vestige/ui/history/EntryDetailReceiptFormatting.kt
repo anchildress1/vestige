@@ -57,12 +57,6 @@ internal fun buildFieldRows(entity: EntryEntity): List<FieldRow> {
     val confidence = parseConfidence(entity.confidenceJson)
     val receipts = EntryLensReceiptJson.decodeOrNull(entity.lensReceiptsJson)
     val tagsText = entity.tags.map { it.name }.sorted().take(DISPLAY_LIMIT).joinToString(", ").ifBlank { DASH }
-    val stateValue = receipts?.let { firstReceiptFieldDisplay(it, KEY_STATE_SHIFT) } ?: DASH
-    val stateTone = when {
-        receipts == null -> confidence[KEY_STATE_SHIFT].toTone()
-        stateValue != DASH -> receiptFieldTone(receipts, KEY_STATE_SHIFT)
-        else -> confidence[KEY_STATE_SHIFT].toTone()
-    }
     val topLevelCommitment = commitmentText(entity.statedCommitmentJson)
     val commitmentValue = topLevelCommitment
         ?: receipts?.let { firstReceiptFieldDisplay(it, KEY_COMMITMENT) }
@@ -88,11 +82,6 @@ internal fun buildFieldRows(entity: EntryEntity): List<FieldRow> {
             label = "BEHAVIOR",
             value = tagsText,
             tone = confidence[KEY_TAGS].toTone(),
-        ),
-        FieldRow(
-            label = "STATE",
-            value = stateValue,
-            tone = stateTone,
         ),
         FieldRow(
             label = "PROMISES",
@@ -200,8 +189,6 @@ private fun receiptPatternTone(receipts: List<EntryLensReceipt>): LensTone {
 private fun displayValue(value: Any?): String? = when (value) {
     null -> null
 
-    is Boolean -> if (value) "state shift" else null
-
     is String -> value.takeIf(String::isNotBlank)
 
     is List<*> -> value.mapNotNull(
@@ -229,7 +216,6 @@ private fun ConfidenceVerdict?.toTone(fallback: LensTone = LensTone.AMBIGUOUS): 
 private const val DASH = "—"
 private const val DISPLAY_LIMIT = 2
 private const val KEY_TAGS = "tags"
-private const val KEY_STATE_SHIFT = "state_shift"
 private const val KEY_COMMITMENT = "stated_commitment"
 private const val KEY_RECURRENCE = "recurrence_link"
 private const val KEY_COMMITMENT_TEXT = "text"
@@ -239,5 +225,4 @@ private val SUMMARY_KEYS = listOf(
     KEY_TAGS,
     KEY_COMMITMENT,
     KEY_RECURRENCE,
-    KEY_STATE_SHIFT,
 )

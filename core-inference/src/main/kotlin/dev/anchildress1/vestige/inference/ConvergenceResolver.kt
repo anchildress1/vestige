@@ -73,7 +73,7 @@ class DefaultConvergenceResolver : ConvergenceResolver {
                 sourceLens = populated.single().first,
             )
 
-            else -> resolveMultiple(key, populated, matchingFlags)
+            else -> resolveMultiple(populated, matchingFlags)
         }
     }
 
@@ -126,11 +126,7 @@ class DefaultConvergenceResolver : ConvergenceResolver {
         }
     }
 
-    private fun resolveMultiple(
-        key: String,
-        populated: List<Pair<Lens, Any>>,
-        matchingFlags: List<String>,
-    ): ResolvedField {
+    private fun resolveMultiple(populated: List<Pair<Lens, Any>>, matchingFlags: List<String>): ResolvedField {
         val groups: Map<Any, List<Any>> = populated.groupBy(
             keySelector = { it.second },
             valueTransform = { it.second },
@@ -138,11 +134,6 @@ class DefaultConvergenceResolver : ConvergenceResolver {
         val majority = groups.entries.firstOrNull { it.value.size >= MAJORITY_THRESHOLD }
         return if (majority != null) {
             val majorityValue = majority.value.first()
-            if (key in LITERAL_GATED_FIELDS && !literalCorroborates(populated, majorityValue)) {
-                // Inferential + Skeptical agreed, but the strict Literal floor did not back the value.
-                // Suppress rather than promote an uncorroborated interpretive read.
-                return ambiguousField(matchingFlags)
-            }
             val verdict =
                 if (matchingFlags.isEmpty()) ConfidenceVerdict.CANONICAL else ConfidenceVerdict.CANONICAL_WITH_CONFLICT
             ResolvedField(value = majorityValue, verdict = verdict, flags = matchingFlags)
@@ -153,12 +144,6 @@ class DefaultConvergenceResolver : ConvergenceResolver {
                 flags = listOf(LENS_DISAGREEMENT_FLAG) + matchingFlags,
             )
         }
-    }
-
-    // Literal corroborates the majority when it contributed an exactly matching value.
-    private fun literalCorroborates(populated: List<Pair<Lens, Any>>, majorityValue: Any): Boolean {
-        val literalValue = populated.firstOrNull { it.first == Lens.LITERAL }?.second ?: return false
-        return literalValue == majorityValue
     }
 
     private fun disagreementField(matchingFlags: List<String>) = ResolvedField(
@@ -326,19 +311,12 @@ class DefaultConvergenceResolver : ConvergenceResolver {
 
     private companion object {
         const val TAGS_KEY = "tags"
-        const val STATE_SHIFT_KEY = "state_shift"
         const val STATED_COMMITMENT_KEY = "stated_commitment"
         const val TOPIC_OR_PERSON_KEY = "topic_or_person"
         const val ENTRY_ID_KEY = "entry_id"
         const val LENS_DISAGREEMENT_FLAG = "lens-disagreement"
         const val MAJORITY_THRESHOLD = 2
         const val MIN_SURVIVING_LENSES_FOR_AMBIGUOUS = 1
-
-        // `state_shift` is interpretive: a majority of Inferential + Skeptical can share the same
-        // over-reach (an inferred shift) while Literal — the strict floor — correctly abstains or
-        // dissents. For this field a majority is only authoritative when Literal corroborates it;
-        // otherwise the value is suppressed to AMBIGUOUS.
-        val LITERAL_GATED_FIELDS: Set<String> = setOf(STATE_SHIFT_KEY)
         const val MIN_STEM_LENGTH = 3
         const val IES_SUFFIX = "ies"
 

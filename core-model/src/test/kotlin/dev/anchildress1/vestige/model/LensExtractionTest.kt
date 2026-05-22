@@ -119,7 +119,7 @@ class LensExtractionTest {
     fun `ResolvedExtraction equality discriminates on field name`() {
         val field = ResolvedField("aftermath", ConfidenceVerdict.CANONICAL)
         val a = ResolvedExtraction(fields = mapOf("template_label" to field))
-        val b = ResolvedExtraction(fields = mapOf("state_shift" to field))
+        val b = ResolvedExtraction(fields = mapOf("recurrence_link" to field))
         assertNotEquals(a, b)
     }
 }

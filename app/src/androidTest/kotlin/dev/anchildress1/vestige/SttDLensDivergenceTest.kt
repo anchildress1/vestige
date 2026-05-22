@@ -163,12 +163,11 @@ class SttDLensDivergenceTest {
             val lensResult = result.lensResults.firstOrNull { it.lens == lens }
             val extraction = lensResult?.extraction
             val tags = (extraction?.fields?.get("tags") as? List<*>)?.joinToString(",") ?: "<no-parse>"
-            val stateShift = extraction?.fields?.get("state_shift")?.toString() ?: "null"
             val commitment = extraction?.fields?.get("stated_commitment")?.let { "present" } ?: "null"
             val flagCount = extraction?.flags?.size ?: 0
             android.util.Log.i(
                 TAG,
-                "  $lens tags=[$tags] state_shift=$stateShift commitment=$commitment flags=$flagCount " +
+                "  $lens tags=[$tags] commitment=$commitment flags=$flagCount " +
                     "attempts=${lensResult?.attemptCount ?: 0} err=${lensResult?.lastError ?: "-"}",
             )
         }
@@ -234,7 +233,6 @@ class SttDLensDivergenceTest {
         /** Schema fields the STT-D divergence verdict compares across lenses. */
         val COMPARABLE_FIELDS: List<String> = listOf(
             "tags",
-            "state_shift",
             "stated_commitment",
             "recurrence_link",
             "recurrence_kind",

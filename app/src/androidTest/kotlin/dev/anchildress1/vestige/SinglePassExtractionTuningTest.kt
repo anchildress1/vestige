@@ -94,14 +94,6 @@ class SinglePassExtractionTuningTest {
                 JSONArray(result.lensResults.map { "${it.lens.name}=${it.elapsedMs}ms/${it.attemptCount}att" }),
             )
             .put(
-                "lensStateShift",
-                JSONArray(
-                    result.lensResults.map { lr ->
-                        "${lr.lens.name}=${lr.extraction?.fields?.get("state_shift")}"
-                    },
-                ),
-            )
-            .put(
                 // Per-lens template_label pick — shows which lens confuses which archetype and
                 // whether the three converge (the resolved template_label verdict is in `resolved`).
                 "lensTemplate",

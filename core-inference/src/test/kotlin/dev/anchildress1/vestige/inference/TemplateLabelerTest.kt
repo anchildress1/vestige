@@ -24,25 +24,23 @@ class TemplateLabelerTest {
     fun `crashed tag resolves to aftermath`() {
         val resolved = resolved(
             "tags" to listOf("crashed").canonical(),
-            "state_shift" to true.canonical(),
         )
 
         assertEquals(TemplateLabel.AFTERMATH, labeler.label(resolved, capturedAt = noon))
     }
 
     @Test
-    fun `state shift without an aftermath tag falls through to audit`() {
+    fun `no aftermath tag falls through to audit`() {
         val resolved = resolved(
-            "state_shift" to false.canonical(),
+            "tags" to listOf("groceries").canonical(),
         )
 
         assertEquals(TemplateLabel.AUDIT, labeler.label(resolved, capturedAt = noon))
     }
 
     @Test
-    fun `aftermath tags drive aftermath even when state shift is absent`() {
+    fun `aftermath tags drive aftermath`() {
         val resolved = resolved(
-            "state_shift" to false.canonical(),
             "tags" to listOf("aftermath").canonical(),
         )
 
@@ -187,9 +185,8 @@ class TemplateLabelerTest {
                 "tags" to ResolvedField(
                     value = listOf("crashed"),
                     verdict = ConfidenceVerdict.CANONICAL_WITH_CONFLICT,
-                    flags = listOf("state-behavior-mismatch:fine vs couldn't"),
+                    flags = listOf("commitment-without-anchor:fine vs couldn't"),
                 ),
-                "state_shift" to true.canonical(),
             ),
         )
 

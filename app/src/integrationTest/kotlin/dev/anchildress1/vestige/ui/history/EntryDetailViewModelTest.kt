@@ -371,9 +371,8 @@ class EntryDetailViewModelTest {
             id,
             ResolvedExtraction(
                 mapOf(
-                    "tags" to ResolvedField(listOf("meeting", "battery-died"), ConfidenceVerdict.CANONICAL),
-                    "state_shift" to ResolvedField(
-                        true,
+                    "tags" to ResolvedField(
+                        listOf("meeting", "battery-died"),
                         ConfidenceVerdict.CANONICAL_WITH_CONFLICT,
                     ),
                 ),
@@ -388,8 +387,8 @@ class EntryDetailViewModelTest {
                 EntryLensReceipt(
                     lens = Lens.SKEPTICAL,
                     extracted = true,
-                    fields = mapOf("state_shift" to true),
-                    flags = listOf("state-behavior-mismatch:not tired:battery died"),
+                    fields = mapOf("tags" to "battery died"),
+                    flags = listOf("commitment-without-anchor:not tired:battery died"),
                 ),
             ),
         )
@@ -401,8 +400,7 @@ class EntryDetailViewModelTest {
             assertEquals("battery died", loaded.model.lenses.first { it.label == "LITERAL" }.value)
             assertEquals(LensTone.CONFLICT, loaded.model.lenses.first { it.label == "SKEPTICAL" }.tone)
             assertEquals(EntryDetailCopy.THREE_LENS_STATUS_CONFLICT, loaded.model.lensStatus)
-            assertEquals("state shift", loaded.model.fields.first { it.label == "STATE" }.value)
-            assertEquals(LensTone.CONFLICT, loaded.model.fields.first { it.label == "STATE" }.tone)
+            assertEquals(LensTone.CONFLICT, loaded.model.fields.first { it.label == "BEHAVIOR" }.tone)
         }
     }
 
@@ -419,9 +417,9 @@ class EntryDetailViewModelTest {
                 assertEquals(EntryDetailCopy.LENS_UNREADABLE, it.value)
                 assertEquals(LensTone.CONFLICT, it.tone)
             }
-            val state = loaded.model.fields.first { it.label == "STATE" }
-            assertEquals("—", state.value)
-            assertEquals(LensTone.AMBIGUOUS, state.tone)
+            val repeat = loaded.model.fields.first { it.label == "REPEAT" }
+            assertEquals("—", repeat.value)
+            assertEquals(LensTone.AMBIGUOUS, repeat.tone)
         }
     }
 

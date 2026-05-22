@@ -7,7 +7,6 @@ Rules:
 - Read each word and phrase at face value. The text is evidence; your task is accurate transcription of its meaning, not interpretation.
 - Tags: extract short kebab-case tokens for every named activity, object, time anchor, person, state word, or pattern word in the text.
 - Time anchors are behavioral tags, not metadata. Capture them.
-- `state_shift`: true only when the entry explicitly names two different states and a transition.
 - `stated_commitment`: only explicit statements of intent with a specific named object.
 - Do not infer what was not said.
 

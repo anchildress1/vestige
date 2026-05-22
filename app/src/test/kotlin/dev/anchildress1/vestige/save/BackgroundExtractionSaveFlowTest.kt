@@ -328,7 +328,7 @@ class BackgroundExtractionSaveFlowTest {
                 lens = Lens.LITERAL,
                 extraction = LensExtraction(
                     lens = Lens.LITERAL,
-                    fields = mapOf("tags" to listOf("standup"), "state_shift" to true),
+                    fields = mapOf("tags" to listOf("standup"), "template_label" to "aftermath"),
                 ),
                 rawResponse = """{"private":"raw response stays out"}""",
                 attemptCount = 1,
@@ -364,7 +364,7 @@ class BackgroundExtractionSaveFlowTest {
                 match { receipts ->
                     receipts.size == 2 &&
                         receipts[0].lens == Lens.LITERAL &&
-                        receipts[0].fields["state_shift"] == true &&
+                        receipts[0].fields["template_label"] == "aftermath" &&
                         receipts[1].extracted.not() &&
                         receipts[1].lastError == "parse-fail"
                 },
@@ -905,7 +905,6 @@ class BackgroundExtractionSaveFlowTest {
     private fun canonicalSample() = ResolvedExtraction(
         mapOf(
             "tags" to ResolvedField(listOf("standup", "flattened", "crashed"), ConfidenceVerdict.CANONICAL),
-            "state_shift" to ResolvedField(true, ConfidenceVerdict.CANONICAL),
         ),
     )
 

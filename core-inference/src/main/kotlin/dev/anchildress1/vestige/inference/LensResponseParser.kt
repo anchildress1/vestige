@@ -27,7 +27,6 @@ internal object LensResponseParser {
     private val SCHEMA_KEYS: Set<String> = setOf(
         "tags",
         "template_label",
-        "state_shift",
         "stated_commitment",
         "recurrence_link",
         "recurrence_kind",
@@ -151,7 +150,7 @@ internal object LensResponseParser {
 
     /**
      * LiteRT occasionally drops commas between top-level object fields while still emitting the
-     * full schema in order, e.g. `"state_shift": true\n"stated_commitment": {...}`.
+     * full schema in order, e.g. `"template_label": "audit"\n"stated_commitment": {...}`.
      * Repair only the narrow "value directly followed by the next quoted key" shape so genuine
      * non-JSON garbage still fails closed.
      */

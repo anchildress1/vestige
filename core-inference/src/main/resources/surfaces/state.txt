@@ -10,4 +10,3 @@ What to capture:
 What goes in the schema:
 
 - Append the state word to `tags` as a short lowercase kebab-case token (`crashed`, `drained`, `foggy`). Single root word only — never a clause. Omit when the entry names no such condition.
-- `state_shift`: true when the entry describes a before/after transition between two distinct states. Both states must be present. False for a single static state.

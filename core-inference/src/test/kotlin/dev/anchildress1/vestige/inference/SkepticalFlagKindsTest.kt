@@ -12,7 +12,6 @@ class SkepticalFlagKindsTest {
         // Locked set; updating it requires touching resources/lenses/skeptical.txt + this test.
         assertEquals(
             mapOf(
-                "state-behavior-mismatch" to "state_shift",
                 "commitment-without-anchor" to "stated_commitment",
                 "unsupported-recurrence" to "recurrence_link",
             ),
@@ -23,7 +22,7 @@ class SkepticalFlagKindsTest {
     @Test
     fun `isSchemaBinding accepts known kinds with snippet and note suffixes`() {
         assertTrue(SkepticalFlagKinds.isSchemaBinding("unsupported-recurrence:third time:no history"))
-        assertTrue(SkepticalFlagKinds.isSchemaBinding("state-behavior-mismatch::"))
+        assertTrue(SkepticalFlagKinds.isSchemaBinding("unsupported-recurrence::"))
         assertTrue(SkepticalFlagKinds.isSchemaBinding("commitment-without-anchor:send invoice:"))
     }
 

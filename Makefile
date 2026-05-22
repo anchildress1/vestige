@@ -56,6 +56,9 @@ SEED_EXTRACT_FLAGS := $(if $(filter 1 true yes,$(EXTRACT)),--ez run_extraction t
 
 # App tags + inference/GPU runtime tags. AndroidRuntime ensures crash stacktraces are never swallowed.
 LOGCAT_TAGS := Vestige|CaptureVM|PatternDetailVM|PatternsListVM|OnboardingPrefs|HistoryViewModel|DebugSeedReceiver|litertlm|LiteRt|tflite|TfLite|GpuDelegate|Adreno|Mali|AndroidRuntime|System\.err
+# Noise the GPU/runtime drivers spew under the tags above that setNativeMinLogSeverity can't reach
+# (e.g. the per-op "unknown struct" flood). Dropped from the tail so app logs stay readable.
+LOGCAT_EXCLUDE := unknown struct
 
 # Filenames must match `core-model/src/main/resources/model/manifest.properties` exactly so
 # the artifact store accepts the pushed files without re-downloading. Local source paths
@@ -131,10 +134,10 @@ logcat:
 	done; \
 	if [ -z "$$pid" ]; then \
 		echo "⚠ could not resolve app PID — filtering by tags only (Ctrl-C to stop)"; \
-		adb logcat -v color -T 1 $(EXTRA) | grep -E "$(LOGCAT_TAGS)"; \
+		adb logcat -v color -T 1 $(EXTRA) | grep -E "$(LOGCAT_TAGS)" | grep -vE "$(LOGCAT_EXCLUDE)"; \
 	else \
 		echo "📱 tailing pid=$$pid (Ctrl-C to stop)"; \
-		adb logcat -v color -T 1 --pid="$$pid" $(EXTRA) | grep -E "$(LOGCAT_TAGS)"; \
+		adb logcat -v color -T 1 --pid="$$pid" $(EXTRA) | grep -E "$(LOGCAT_TAGS)" | grep -vE "$(LOGCAT_EXCLUDE)"; \
 	fi
 
 assemble:

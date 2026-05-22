@@ -41,29 +41,25 @@ object VocabClusterLabeler {
     }
 
     /**
-     * Token-frequency rank across the cluster's `entryText` corpus. Excludes [rootToken] (the
-     * cluster is a framing *of* the root word — repeating it is noise). Excludes stopwords.
-     * Tie-breaks by alphabetical order so the picked tokens are stable across runs.
+     * Distinct tone words of the cluster, ranked by frequency. Each member contributes its single
+     * model-emitted [EntryEntity.vocabularyWord], canonicalized via
+     * [PatternSignature.canonicalVocabToken]. Excludes [rootToken] (already canonical — it's the
+     * cluster's dominant word, repeating it is noise). Tie-breaks alphabetically so the picked
+     * tokens are stable across runs.
      */
     private fun topDistinctiveTokens(members: List<EntryEntity>, rootToken: String): List<String> {
-        val rootLower = rootToken.lowercase()
         val counts = mutableMapOf<String, Int>()
         members
             .asSequence()
-            .flatMap { tokenize(it.entryText) }
-            .filter { it != rootLower && it !in STOPWORDS }
+            .mapNotNull { it.vocabularyWord?.takeIf { word -> word.isNotBlank() } }
+            .map { PatternSignature.canonicalVocabToken(it) }
+            .filter { it != rootToken }
             .forEach { token -> counts.merge(token, 1) { a, b -> a + b } }
         return counts.entries
             .sortedWith(compareByDescending<Map.Entry<String, Int>> { it.value }.thenBy { it.key })
             .take(DESCRIPTION_TOKEN_LIMIT)
             .map { it.key }
     }
-
-    private fun tokenize(text: String): Sequence<String> = TOKEN_SPLIT_REGEX
-        .split(text.lowercase())
-        .asSequence()
-        .filter { it.length >= MIN_TOKEN_CHARS }
-        .filter { it.all(Char::isLetter) }
 
     /**
      * Member whose vector is closest to the centroid (cosine), tiebreak by ascending id.
@@ -104,21 +100,4 @@ object VocabClusterLabeler {
         for (i in a.indices) dot += a[i].toDouble() * b[i].toDouble()
         return dot
     }
-
-    private const val MIN_TOKEN_CHARS: Int = 3
-    private val TOKEN_SPLIT_REGEX = Regex("""[\s.,;:!?\-'"()/]+""")
-
-    // Tiny stop-list — the v1 pattern surface speaks American English; a small list keeps the
-    // dependency footprint zero (no external NLP libs). Tokens shorter than MIN_TOKEN_CHARS
-    // are already filtered.
-    private val STOPWORDS: Set<String> = setOf(
-        "the", "and", "but", "for", "with", "from", "into", "onto", "this", "that", "those",
-        "these", "you", "your", "yours", "are", "was", "were", "been", "being", "have", "had",
-        "has", "not", "out", "all", "any", "some", "very", "just", "still", "even", "again",
-        "more", "most", "much", "many", "really", "today", "tomorrow", "yesterday", "now",
-        "then", "when", "where", "what", "which", "who", "how", "why", "about", "after",
-        "before", "during", "over", "under", "while", "until", "than", "though", "since",
-        "because", "would", "could", "should", "will", "going", "get", "got", "make", "made",
-        "feel", "feels", "felt", "feeling", "kind", "sort", "thing", "things", "stuff",
-    )
 }

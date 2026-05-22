@@ -8,7 +8,6 @@ import dev.anchildress1.vestige.storage.EntryStore
 import dev.anchildress1.vestige.storage.PatternEntity
 import dev.anchildress1.vestige.storage.PatternRepo
 import dev.anchildress1.vestige.storage.PatternStore
-import dev.anchildress1.vestige.storage.buildEmbeddingText
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
@@ -22,7 +21,6 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.time.Clock
-import java.util.Locale
 
 /**
  * Drives the Pattern detail screen. Loads the pattern + its supporting entries on construction;
@@ -186,33 +184,13 @@ class PatternDetailViewModel(
         hasVocabClusters = vocabClustersJson.isNotBlank(),
     )
 
-    private fun vocabularyFrom(entries: List<EntryEntity>): List<String> {
-        val words = entries.asSequence()
-            .map(::buildEmbeddingText)
-            .flatMap { WORD_SPLIT.splitToSequence(it.lowercase(Locale.ROOT)) }
-            .map(String::trim)
-            .filter { it.length >= MIN_VOCAB_LENGTH && it !in STOP_WORDS }
-        return words
-            .filter(String::isNotBlank)
-            .distinct()
-            .take(VOCABULARY_LIMIT)
-            .toList()
-    }
+    private fun vocabularyFrom(entries: List<EntryEntity>): List<String> = entries
+        .mapNotNull { it.vocabularyWord?.trim()?.lowercase()?.takeIf(String::isNotEmpty) }
+        .distinct()
+        .take(VOCABULARY_LIMIT)
 
     private companion object {
         const val TAG = "PatternDetailVM"
         const val VOCABULARY_LIMIT = 8
-        const val MIN_VOCAB_LENGTH = 4
-        val WORD_SPLIT: Regex = Regex("[^a-z0-9]+")
-        val STOP_WORDS = setOf(
-            "after",
-            "again",
-            "that",
-            "this",
-            "with",
-            "until",
-            "same",
-            "entry",
-        )
     }
 }

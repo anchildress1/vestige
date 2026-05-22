@@ -245,6 +245,60 @@ Story 5.1 / Story 5.4 — seeded into the reference device for recording. Distin
 
 **Dates:** Apr 21 – May 15 (one month, realistic cadence).
 
+> Template label is omitted on purpose: it is model-emitted post-extraction, not seeded. The `pattern contribution` line records the *intended demo shape* the entry is engineered to elicit, not a prepopulated value.
+
+### DEMO-01
+
+| Field | Value |
+|---|---|
+| ID | DEMO-01 |
+| Timestamp | Apr 21 (Mon) 20:45 |
+| Text | "Got home from my sister's birthday dinner an hour ago. Was completely normal the whole drive back. Sat down and it was like someone flipped a switch off. Opened the laptop to book the thing I promised her. Just sat there looking at the tab." |
+| tags | `sister`, `birthday-dinner`, `social`, `laptop`, `commitment` |
+| energy_descriptor | `switched off` |
+| stated_commitment | "book the thing I promised her" |
+| entry_observations | 1. State flip between "completely normal" and "switched off" — sharp boundary after social event. 2. Commitment logged: unspecified booking for sister. |
+| pattern contribution | Anchor — first Crashed entry. |
+
+### DEMO-02
+
+| Field | Value |
+|---|---|
+| ID | DEMO-02 |
+| Timestamp | Apr 24 (Thu) 03:17 |
+| Text | "3:17am. I'm reorganizing my photo library by location instead of by date. Nobody asked me to do this. I've been at it for 90 minutes and I'm not done." |
+| tags | `3am`, `photo-library`, `reorganizing`, `location` |
+| energy_descriptor | null |
+| stated_commitment | null |
+| entry_observations | 1. Time-of-day: 3:17am. Task is self-initiated reorganization with no stated trigger. 2. Duration: 90 minutes on a task nobody requested — the user names this explicitly. |
+| pattern contribution | Goblin Hours standalone. Not in Crashed cluster. |
+
+### DEMO-03
+
+| Field | Value |
+|---|---|
+| ID | DEMO-03 |
+| Timestamp | Apr 26 (Sat) 15:10 |
+| Text | "Family lunch. Three hours. I knew it would be three hours and I went anyway. Got home and went fully horizontal. Didn't open anything. Nothing happened the rest of the day." |
+| tags | `family`, `lunch`, `social`, `horizontal` |
+| energy_descriptor | `fully horizontal` |
+| stated_commitment | null |
+| entry_observations | 1. Social event → zero output for the rest of the day. Vocabulary: "went fully horizontal" — behavioral, not feelings. 2. Self-aware: "I knew it would be three hours and I went anyway." No surprise, still crashed. |
+| pattern contribution | Crashed cluster #2. Different event type (family vs birthday dinner), same shape. |
+
+### DEMO-04
+
+| Field | Value |
+|---|---|
+| ID | DEMO-04 |
+| Timestamp | Apr 28 (Mon) 10:15 |
+| Text | "The return label has been printed for eleven days. I look at it on the counter every morning. Today I moved it to a different spot on the counter. That is the action I took." |
+| tags | `return-label`, `package`, `counter`, `paralysis` |
+| energy_descriptor | null |
+| stated_commitment | null |
+| entry_observations | 1. Stuck task: return label, 11 days. Observable inaction: moved the label rather than acting on it — user names this as "the action I took." 2. No stated reason for the block. |
+| pattern contribution | Busy Stalling standalone. |
+
 ### DEMO-05
 
 | Field | Value |
@@ -252,7 +306,6 @@ Story 5.1 / Story 5.4 — seeded into the reference device for recording. Distin
 | ID | DEMO-05 |
 | Timestamp | May 1 (Thu) 11:40 |
 | Text | "After the all-hands I did the hollow routine. Coffee went cold on the desk. Everything I was going to do right after evaporated. Three tabs open. I know what they're for. Still open." |
-| template_label | Crashed |
 | tags | `all-hands`, `meeting`, `work`, `hollow-routine`, `tabs` |
 | energy_descriptor | `hollow` |
 | stated_commitment | null |
@@ -266,12 +319,11 @@ Story 5.1 / Story 5.4 — seeded into the reference device for recording. Distin
 | ID | DEMO-06 |
 | Timestamp | May 3 (Sat) 12:00 |
 | Text | "Said I would drop the package off today. Drive past UPS on my route. Spent twenty minutes googling whether the thing is even worth returning. It is. Label is still on the counter." |
-| template_label | Concrete shoes |
 | tags | `return-label`, `package`, `UPS`, `commitment`, `googling` |
 | energy_descriptor | null |
 | stated_commitment | "drop the return package off today" |
 | entry_observations | 1. Explicit commitment logged: "said I would drop it off today." 2. Avoidance behavior: researched the validity of the task instead of doing it. Commitment connects to DEMO-04. |
-| pattern contribution | Concrete shoes #2. Stated commitment makes this the STT-D B2 analog — stronger signal than DEMO-04. |
+| pattern contribution | Busy Stalling #2. Stated commitment makes this the STT-D B2 analog — stronger signal than DEMO-04. |
 
 ### DEMO-07
 
@@ -280,12 +332,76 @@ Story 5.1 / Story 5.4 — seeded into the reference device for recording. Distin
 | ID | DEMO-07 |
 | Timestamp | May 5 (Mon) 21:00 |
 | Text | "Spent an hour and a half comparing couches. Dimensions, reviews, lead time, return policy. Made a spreadsheet. Did not buy a couch. Twelve rows." |
-| template_label | Decision spiral |
 | tags | `couch`, `spreadsheet`, `comparing`, `decision`, `twelve-rows` |
 | energy_descriptor | null |
 | stated_commitment | null |
 | entry_observations | 1. Decision loop: 90 minutes, spreadsheet, 12 options, no decision. 2. Vocabulary: the user measures their own loop ("twelve rows") without explaining why they can't choose. |
-| pattern contribution | Decision spiral standalone. |
+| pattern contribution | Nonstop Spiral standalone. |
+
+### DEMO-08
+
+| Field | Value |
+|---|---|
+| ID | DEMO-08 |
+| Timestamp | May 6 (Tue) 18:20 |
+| Text | "Not tired exactly. More like the signal dropped. Dinner with a friend was good, normal, whatever. After he left I just couldn't reboot. Looked at my to-do list for a while and closed it." |
+| tags | `friend`, `dinner`, `social`, `signal-dropped`, `to-do-list` |
+| energy_descriptor | `signal dropped` |
+| stated_commitment | null |
+| entry_observations | 1. "Not tired exactly" — user explicitly rejects the easy label, then names their own: "signal dropped." Behavioral precision. 2. Social event → functional shutdown, different vocabulary than previous Crashed entries. |
+| pattern contribution | Crashed cluster #4. **Key embedding-demo entry** — no keywords overlapping with DEMO-01/03/05 (`dinner with a friend`, `signal dropped`, `couldn't reboot`). Tag-only misses it; embeddings surface it. |
+
+### DEMO-09
+
+| Field | Value |
+|---|---|
+| ID | DEMO-09 |
+| Timestamp | May 9 (Sat) 04:03 |
+| Text | "4:03am. Started rewriting my budget categories. The current ones were working fine. I'm adding sub-categories. No one has asked me for a more granular budget. This is not time-sensitive." |
+| tags | `4am`, `budget`, `categories`, `reorganizing`, `sub-categories` |
+| energy_descriptor | null |
+| stated_commitment | null |
+| entry_observations | 1. Time-of-day: 4:03am. Self-initiated admin loop on a working system. 2. User narrates the absence of a reason: "no one has asked," "not time-sensitive." |
+| pattern contribution | Goblin Hours #2. Same time-of-day + unsolicited-reorganization shape as DEMO-02. |
+
+### DEMO-10
+
+| Field | Value |
+|---|---|
+| ID | DEMO-10 |
+| Timestamp | May 10 (Sat) 16:55 |
+| Text | "Farmer's market. One hour, maybe 200 people. Came home and sat in the car in the driveway for fifteen minutes before going inside. Then did nothing useful for four hours. Productive morning though." |
+| tags | `farmer's-market`, `social`, `crowd`, `driveway`, `car` |
+| energy_descriptor | `did nothing useful` |
+| stated_commitment | null |
+| entry_observations | 1. Sat in car before entering home — decompression behavior after a crowd. 2. "Productive morning though" — productive period before the crash, not a bad day overall. The crash is specific to the post-crowd window. |
+| pattern contribution | Crashed cluster #5. Non-work, non-dinner trigger: a crowd at a market. Broadens the pattern further. |
+
+### DEMO-11
+
+| Field | Value |
+|---|---|
+| ID | DEMO-11 |
+| Timestamp | May 13 (Tue) 09:30 |
+| Text | "Return package is still here. Fourteen days since I printed the label. I know where UPS is. I have driven past it four times. The box is by the door now instead of on the counter. Progress." |
+| tags | `return-label`, `package`, `UPS`, `fourteen-days`, `door` |
+| energy_descriptor | null |
+| stated_commitment | null |
+| entry_observations | 1. Third entry about the same stuck task. Box location has changed (counter → door); task has not. 2. "Progress." — sarcasm. User is aware of the loop. |
+| pattern contribution | Busy Stalling #3. Three entries on the same task — enough for a pattern callout. |
+
+### DEMO-12
+
+| Field | Value |
+|---|---|
+| ID | DEMO-12 |
+| Timestamp | May 15 (Thu) 13:05 |
+| Text | "Video call with my mom. It was fine. Completely fine. Hung up and then just sat there for twenty minutes doing nothing. Eventually opened something. Closed it. Made tea. Did not drink the tea." |
+| tags | `mom`, `video-call`, `social`, `tea`, `doing-nothing` |
+| energy_descriptor | `sat there doing nothing` |
+| stated_commitment | null |
+| entry_observations | 1. Post-social crash after a call the user describes as "completely fine" — the trigger is the social event, not distress. 2. Specific behavioral evidence: opened something, closed it, made tea, didn't drink it. |
+| pattern contribution | Crashed cluster #6. **Pattern callout fires here.** Six Crashed entries, spanning work all-hands, birthday dinner, family lunch, friend dinner, farmer's market, video call — all different words, same shape. |
 
 ### Demo Set — expected pattern callout
 

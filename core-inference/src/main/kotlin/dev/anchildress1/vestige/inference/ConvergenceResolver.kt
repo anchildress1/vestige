@@ -143,12 +143,10 @@ class DefaultConvergenceResolver : ConvergenceResolver {
         val chosen = words.firstOrNull { it.first == Lens.INFERENTIAL }
             ?: words.firstOrNull()
             ?: return ambiguousField(matchingFlags)
+        // No Skeptical flag kind binds to vocabulary (SkepticalFlagKinds.SCHEMA_BINDING), so there
+        // is no CANONICAL_WITH_CONFLICT path here — corroboration is the only lift on the verdict.
         val agreement = words.count { it.second == chosen.second }
-        val verdict = when {
-            matchingFlags.isNotEmpty() -> ConfidenceVerdict.CANONICAL_WITH_CONFLICT
-            agreement >= MAJORITY_THRESHOLD -> ConfidenceVerdict.CANONICAL
-            else -> ConfidenceVerdict.CANDIDATE
-        }
+        val verdict = if (agreement >= MAJORITY_THRESHOLD) ConfidenceVerdict.CANONICAL else ConfidenceVerdict.CANDIDATE
         return ResolvedField(value = chosen.second, verdict = verdict, flags = matchingFlags, sourceLens = chosen.first)
     }
 

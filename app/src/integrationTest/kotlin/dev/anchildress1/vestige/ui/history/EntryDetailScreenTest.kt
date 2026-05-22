@@ -16,6 +16,7 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import dev.anchildress1.vestige.model.ConfidenceVerdict
 import dev.anchildress1.vestige.model.EntryLensReceipt
 import dev.anchildress1.vestige.model.ExtractionStatus
@@ -190,6 +191,23 @@ class EntryDetailScreenTest {
         setDetail(id)
         composeRule.onNodeWithText("VOCAB").assertIsDisplayed()
         composeRule.onAllNodesWithText("drained").onFirst().assertIsDisplayed()
+    }
+
+    @Test
+    fun `vocab row shows the spread when lenses named different tone words`() {
+        val id = entryStore.createPendingEntry("hard to name how this felt", FIXTURE_INSTANT)
+        entryStore.completeEntry(
+            id,
+            ResolvedExtraction(emptyMap()),
+            null,
+            lensReceipts = listOf(
+                EntryLensReceipt(lens = Lens.LITERAL, extracted = true, fields = mapOf("vocabulary" to "tired")),
+                EntryLensReceipt(lens = Lens.INFERENTIAL, extracted = true, fields = mapOf("vocabulary" to "wired")),
+            ),
+        )
+        setDetail(id)
+        composeRule.onNodeWithText("VOCAB").assertIsDisplayed()
+        composeRule.onNodeWithText("tired / wired").performScrollTo().assertIsDisplayed()
     }
 
     @Test

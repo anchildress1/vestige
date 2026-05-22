@@ -124,6 +124,19 @@ class ObservationResponseParserTest {
     }
 
     @Test
+    fun `drops an observation missing the evidence key`() {
+        val raw = """{"observations": [{"text": "obs", "fields": []}]}"""
+        assertNull(ObservationResponseParser.parse(raw))
+    }
+
+    @Test
+    fun `drops an observation whose fields are invalid for its evidence`() {
+        // commitment-flag must carry exactly ["stated_commitment"]; an empty list is invalid.
+        val raw = """{"observations": [{"text": "obs", "evidence": "commitment-flag", "fields": []}]}"""
+        assertNull(ObservationResponseParser.parse(raw))
+    }
+
+    @Test
     fun `returns null on missing observations key`() {
         val raw = """{"summary": "nothing useful"}"""
         assertNull(ObservationResponseParser.parse(raw))

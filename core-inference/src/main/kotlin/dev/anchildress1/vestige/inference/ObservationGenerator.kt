@@ -58,7 +58,7 @@ class ObservationGenerator(
                 Log.d(TAG, "model attempt ${attempt + 1} produced ${parsed.size} observations")
                 return parsed.take(MAX_OBSERVATIONS)
             }
-            Log.w(TAG, "model attempt ${attempt + 1} parsed null/empty or forbidden-phrase violation")
+            Log.w(TAG, "model attempt ${attempt + 1} produced no usable observations (parser logged the reason)")
         }
         Log.w(TAG, "observation model attempts exhausted; returning empty list")
         return emptyList()

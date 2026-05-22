@@ -1,5 +1,6 @@
 package dev.anchildress1.vestige.inference
 
+import android.util.Log
 import dev.anchildress1.vestige.model.EntryObservation
 import dev.anchildress1.vestige.model.ObservationEvidence
 import org.json.JSONArray
@@ -42,6 +43,7 @@ internal object ObservationResponseParser {
         "you should",
     )
 
+    private const val TAG = "VestigeObservationParse"
     private const val MAX_OBSERVATIONS = 2
     private val KNOWN_FIELDS = setOf(
         "tags",
@@ -50,18 +52,25 @@ internal object ObservationResponseParser {
     )
 
     fun parse(raw: String): List<EntryObservation>? {
-        val root = findFirstParseableObject(raw) ?: return null
-        val array = root.optJSONArray("observations") ?: return null
-        if (array.length() == 0) return null
+        val root = findFirstParseableObject(raw) ?: return reject("no-json-object")
+        val array = root.optJSONArray("observations") ?: return reject("no-observations-array")
+        if (array.length() == 0) return reject("empty-observations-array")
 
         val accepted = mutableListOf<EntryObservation>()
         for (idx in 0 until array.length()) {
             if (accepted.size >= MAX_OBSERVATIONS) break
-            val observation = parseOne(array.opt(idx)) ?: return null
-            if (containsForbiddenPhrase(observation.text)) return null
+            val observation = parseOne(array.opt(idx)) ?: return null // parseOne logged the reason
+            if (containsForbiddenPhrase(observation.text)) return reject("forbidden-phrase")
             accepted += observation
         }
-        return accepted.takeIf { it.isNotEmpty() }
+        return accepted.takeIf { it.isNotEmpty() } ?: reject("no-accepted-observations")
+    }
+
+    // Privacy-safe: logs the rejection category + schema values (evidence serial / field names)
+    // only — never the observation text, which is journal-derived content.
+    private fun <T> reject(reason: String): T? {
+        Log.w(TAG, "observation response rejected: $reason")
+        return null
     }
 
     fun containsForbiddenPhrase(text: String): Boolean {
@@ -70,16 +79,17 @@ internal object ObservationResponseParser {
     }
 
     private fun parseOne(node: Any?): EntryObservation? {
-        val obj = node as? JSONObject ?: return null
-        val text = (obj.opt("text") as? String)?.trim()?.takeIf { it.isNotEmpty() } ?: return null
-        val evidenceSerial = (obj.opt("evidence") as? String) ?: return null
-        val evidence = ObservationEvidence.fromSerial(evidenceSerial) ?: return null
-        if (evidence == ObservationEvidence.PATTERN_CALLOUT) return null
+        val obj = node as? JSONObject ?: return reject("non-object-entry")
+        val text = (obj.opt("text") as? String)?.trim()?.takeIf { it.isNotEmpty() } ?: return reject("missing-text")
+        val evidenceSerial = (obj.opt("evidence") as? String) ?: return reject("missing-evidence")
+        val evidence = ObservationEvidence.fromSerial(evidenceSerial)
+            ?: return reject("unknown-evidence:$evidenceSerial")
+        if (evidence == ObservationEvidence.PATTERN_CALLOUT) return reject("pattern-callout-from-model")
 
         val fields = (obj.opt("fields") as? JSONArray)?.let { arr ->
             (0 until arr.length()).mapNotNull { idx -> (arr.opt(idx) as? String)?.trim()?.takeIf { it.isNotEmpty() } }
         } ?: emptyList()
-        if (!fieldsAreValid(evidence, fields)) return null
+        if (!fieldsAreValid(evidence, fields)) return reject("invalid-fields:${evidence.serial}")
 
         return EntryObservation(text = text, evidence = evidence, fields = fields)
     }

@@ -98,7 +98,9 @@ class LiteRtLmEngine(
                 "maxTokens=$maxNumTokens speculativeDecoding=$speculativeDecoding sampler=topK=${samplerConfig.topK}," +
                 "topP=${samplerConfig.topP},temp=${samplerConfig.temperature},seed=${samplerConfig.seed}",
         )
-        Engine.setNativeMinLogSeverity(LogSeverity.INFO)
+        // ERROR, not INFO: native LiteRT-LM spams per-op INFO lines that drown the logcat. Our own
+        // diagnostics use android.util.Log (VestigeLiteRtLm tag), which this does not touch.
+        Engine.setNativeMinLogSeverity(LogSeverity.ERROR)
         val started = System.nanoTime()
         engine = Engine(
             EngineConfig(

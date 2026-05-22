@@ -17,8 +17,9 @@ import java.time.ZoneId
  * (30-day for the goblin-hours bucket). No model calls — the orchestrator generates titles and
  * callout text once a new pattern is upserted into [PatternStore].
  *
- * Tags are normalized (lowercase) at compare time; vocabulary tokens are folded through the
- * shared stemmer rules so `tired` / `Tired` / `tireds` collapse into one signature.
+ * Tags are normalized (lowercase) at compare time. Vocab-drift detection is embedding-cluster
+ * based (`EmbeddingClustering` over each entry's vector), keyed on the cluster's dominant
+ * model-emitted `vocabularyWord` — not a token-frequency count.
  */
 class PatternDetector(
     private val boxStore: BoxStore,
@@ -136,30 +137,32 @@ class PatternDetector(
             }
     }
 
+    // Vocab-drift detection is one embedding cluster per pattern, not a token count. Candidates
+    // carry a usable vector AND a model-emitted tone word; `EmbeddingClustering` groups them by
+    // semantic proximity (same feeling) and each cluster's distinct `vocabularyWord`s are the
+    // drift (different words). Identity stays token-keyed on the cluster's dominant word so the
+    // pattern's lifecycle (skip / drop / cooldown) survives across re-detection runs.
     private fun detectVocab(entries: List<EntryEntity>): List<DetectedPattern> {
-        val tokenToEntries = linkedMapOf<String, MutableList<EntryEntity>>()
-        for (entry in entries) {
-            val tokens = vocabTokensFor(entry)
-            for (token in tokens) {
-                tokenToEntries.getOrPut(token) { mutableListOf() }.add(entry)
-            }
-        }
-        // ADR-003 §"Vocabulary-frequency context check" guards against "a single long sentence
-        // using 'tired' four times." `vocabTokensFor` returns a Set, so each entry contributes
-        // at most once per token — the ≥4 distinct-entry threshold already enforces the
-        // diversity requirement. Templated-context narrowing rejected legitimate cases (e.g.
-        // four entries with `templateLabel = null`, which is the predominant shape early in
-        // the corpus); using entry distinctness instead matches the ADR's stated intent.
-        return tokenToEntries
-            .mapValues { it.value.toList() }
-            .filter { (_, supporting) -> supporting.distinctBy { it.id }.size >= VOCAB_THRESHOLD }
-            .map { (token, supporting) ->
-                val sig = PatternSignature.forVocabToken(token)
-                detected(sig, supporting)
+        val candidates = entries.filter { !it.vocabularyWord.isNullOrBlank() }
+        return EmbeddingClustering.cluster(candidates)
+            .filter { it.members.size >= VOCAB_THRESHOLD }
+            .map { cluster ->
+                val sig = PatternSignature.forVocabToken(dominantVocabularyWord(cluster.members))
+                detected(sig, cluster.members)
             }
     }
 
-    private fun vocabTokensFor(entry: EntryEntity): Set<String> = VocabTokens.forEntry(entry)
+    // Most frequent canonical tone word across the cluster; alphabetical tie-break for
+    // determinism. Grouping on the canonical form (not the raw word) so `Tired` / `tireds` /
+    // `tired` collapse into one count and the identity matches what the matcher compares.
+    // Members are pre-filtered to non-blank tone words, so the comparator always has input.
+    private fun dominantVocabularyWord(members: List<EntryEntity>): String = members
+        .groupingBy { PatternSignature.canonicalVocabToken(it.vocabularyWord!!) }
+        .eachCount()
+        .entries
+        .sortedWith(compareByDescending<Map.Entry<String, Int>> { it.value }.thenBy { it.key })
+        .first()
+        .key
 
     private fun detected(signature: Signature, supporting: List<EntryEntity>): DetectedPattern {
         val ids = supporting.map { it.id }.sorted()

@@ -86,11 +86,12 @@ object PatternMatcher {
 
     private fun matchesVocab(entry: EntryEntity, signature: JSONObject): Boolean {
         val token = signature.optString("token").lowercase(Locale.ROOT)
-        if (token.isEmpty()) return false
-        // Detection and matching MUST extract the same tokens. Delegate to the shared helper
-        // so a `drained` entry (alias-folded to `tired` at detection) keeps matching the
-        // `tired` pattern it minted, and energy-descriptor tokens behave symmetrically.
-        return token in VocabTokens.forEntry(entry)
+        val word = entry.vocabularyWord?.takeIf { it.isNotBlank() }
+        // Vocab patterns are embedding clusters keyed on the dominant `vocabularyWord`. A new
+        // entry matches when its own tone word canonicalizes to the same token — the shared
+        // [PatternSignature.canonicalVocabToken] the signature was minted with, so detection and
+        // matching stay aligned (`tireds` → `tired`). Blank token or no tone word ⇒ no match.
+        return token.isNotEmpty() && word != null && PatternSignature.canonicalVocabToken(word) == token
     }
 
     private fun matchesTemporal(entry: EntryEntity, signature: JSONObject, zoneId: ZoneId): Boolean {

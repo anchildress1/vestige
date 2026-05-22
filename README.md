@@ -139,7 +139,7 @@ Module boundaries: `:app` (UI), `:core-inference` (LiteRT-LM + lens composition)
 │   ├── sample-data-scenarios.md
 │   ├── backlog.md             # deferred features w/ unblock conditions
 │   └── stories/               # phase-1..7 build queue
-├── poc/                       # Compose-port reference (JSX prototypes + screenshots)
+├── poc/                       # Compose-port reference (screenshots)
 ├── gradle/                    # version catalog + dependency verification
 ├── scripts/                   # doctor, lint, secret scan helpers
 ├── AGENTS.md                  # AI implementor guardrails (authoritative)
@@ -202,7 +202,7 @@ make reinstall  # reinstall APK, push models, seed debug fixtures, tail logcat
 `make reinstall` runs the dev path by default: clean debug install, push the local model artifacts from `~/Downloads`, seed deterministic fixture entries + pattern cards, launch, then tail logcat.
 
 ```bash
-make reinstall EXTRACT=1
+make reinstall ENV=dev EXTRACT=1
 ```
 
 - `EXTRACT=1` runs the LiteRT-LM background extraction over the seeded corpus so cards land with real lens receipts (matches saved-entry shape).

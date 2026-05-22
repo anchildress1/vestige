@@ -5,7 +5,7 @@
   "entities": [
     {
       "id": "1:8495295597095795304",
-      "lastPropertyId": "19:3372537850009881235",
+      "lastPropertyId": "20:1797652485036911303",
       "name": "EntryEntity",
       "properties": [
         {
@@ -103,6 +103,11 @@
         {
           "id": "19:3372537850009881235",
           "name": "lensReceiptsJson",
+          "type": 9
+        },
+        {
+          "id": "20:1797652485036911303",
+          "name": "vocabularyWord",
           "type": 9
         }
       ],

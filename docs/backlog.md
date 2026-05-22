@@ -242,3 +242,17 @@ scope-estimate: ~1d uncompressed, ~1.5d with Opus compression
 hard-constraint: opt-in only, encrypted, never default
 forbidden-in-v1: any cloud touchpoint, any analytics, any RemoteConfig (per adrs/ADR-001 §Q7)
 ```
+
+### `seed-data-prepopulation`
+
+```
+tier: v1.5 (demo tooling)
+flagged: 2026-05-22
+problem: the dev seed (DebugPatternSeeder writes PENDING rows; run_extraction=true runs
+         recovery extraction) is not returning responses on-device this run — seeded entries
+         land without resolved fields, so detail surfaces (vocab, promises, three-lens read)
+         and the vocab/template patterns stay empty.
+deferred-by: user (2026-05-22) — do NOT change the seed path now.
+future-task: bake extraction output (resolved fields + lens receipts) for the demo set so the
+             walkthrough opens populated entries without waiting on a live model run.
+```

@@ -197,7 +197,7 @@ class ObservationResponseParserTest {
     @Test
     fun `parser handles escaped quotes inside JSON string literals`() {
         val raw =
-            """{"observations":[{"text":"You said \"fine\".","evidence":"vocabulary-contradiction","fields":[]}]}"""
+            """{"observations":[{"text":"You said \"fine\".","evidence":"theme-noticing","fields":[]}]}"""
 
         val observations = ObservationResponseParser.parse(raw)
 

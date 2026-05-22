@@ -62,18 +62,18 @@ class VocabClusterLabelerTest {
 
     @Test
     fun `tone words are canonicalized before counting`() {
-        // "Exhausted" and "exhausted" fold to one token; "foggies" plural-folds to "foggy".
+        // "Exhausted" and "exhausted" case-fold to one token; "jitters" singularizes to "jitter".
         val cluster = clusterOf(
             members = listOf(
                 "Exhausted" to 1L,
                 "exhausted" to 2L,
-                "foggies" to 3L,
+                "jitters" to 3L,
             ),
         )
 
         val result = VocabClusterLabeler.label(cluster, rootToken = "tired")
 
-        assertEquals("exhausted, foggy", result.label)
+        assertEquals("exhausted, jitter", result.label)
     }
 
     @Test

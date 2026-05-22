@@ -48,7 +48,7 @@ class DebugPatternSeederTest {
     fun `seed writes the active corpus as pending entries`() {
         DebugPatternSeeder.seed(boxStore)
 
-        assertEquals(DebugPatternSeeder.ACTIVE_SEED_COUNT.toLong(), entryStore.count())
+        assertEquals(DebugPatternSeeder.SEED_COUNT.toLong(), entryStore.count())
         val entries = boxStore.boxFor(EntryEntity::class.java).all
         assertTrue(entries.all { it.extractionStatus == ExtractionStatus.PENDING })
     }
@@ -65,7 +65,7 @@ class DebugPatternSeederTest {
         DebugPatternSeeder.seed(boxStore)
         DebugPatternSeeder.seed(boxStore)
 
-        assertEquals(DebugPatternSeeder.ACTIVE_SEED_COUNT.toLong(), entryStore.count())
+        assertEquals(DebugPatternSeeder.SEED_COUNT.toLong(), entryStore.count())
     }
 
     @Test

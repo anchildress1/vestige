@@ -10,9 +10,9 @@ import java.time.Instant
 
 object DebugPatternSeeder {
 
-    // Only the first ACTIVE_SEED_COUNT entries of the corpus are seeded. The active set is the
-    // archetype-spread tuning batch ([DEMO_ENTRIES]); the rest are preserved for later rounds.
-    const val ACTIVE_SEED_COUNT = 10
+    // The full corpus is seeded — DEMO_ENTRIES + backlog narrative + vocab-drift (incl. positives).
+    // Exposed so the on-device tuning harness and tests share the exact count.
+    val SEED_COUNT: Int get() = corpus().size
 
     // Vocab-drift fixtures share one duration; the prose carries the variation, not the timing.
     private const val VOCAB_DRIFT_DURATION_MS = 14_000L
@@ -21,17 +21,13 @@ object DebugPatternSeeder {
     data class SeedEntry(val text: String, val timestamp: Instant, val durationMs: Long)
 
     fun seed(boxStore: BoxStore) {
-        val corpus = corpus()
-        check(ACTIVE_SEED_COUNT <= corpus.size) {
-            "ACTIVE_SEED_COUNT=$ACTIVE_SEED_COUNT exceeds corpus size=${corpus.size}"
-        }
         boxStore.runInTx {
             boxStore.boxFor(EntryEntity::class.java).removeAll()
             boxStore.boxFor(TagEntity::class.java).removeAll()
             boxStore.boxFor(PatternEntity::class.java).removeAll()
             boxStore.boxFor(CalloutCooldownEntity::class.java).removeAll()
 
-            corpus.take(ACTIVE_SEED_COUNT).forEachIndexed { idx, seed ->
+            corpus().forEachIndexed { idx, seed ->
                 boxStore.boxFor(EntryEntity::class.java).put(
                     EntryEntity(
                         markdownFilename = "debug-seed-$idx.md",
@@ -48,23 +44,23 @@ object DebugPatternSeeder {
     private fun corpus(): List<SeedEntry> = DEMO_ENTRIES + backlogNarrative() + vocabDriftEntries()
 
     /**
-     * Active demo set — what [seed] loads and the on-device tuning harness runs. Ten archetype-spread
-     * entries: aftermath ×4 (clears the ≥3 template-recurrence floor), decision-spiral ×2,
-     * stalled ×2, goblin-hours ×1, tunnel-exit ×1. The stalled-archetype prose is deliberately
-     * keyword-free so the run measures whether the lenses + labeler recover the archetype from
-     * natural resistance/paralysis language rather than a planted phrase.
+     * Archetype-spread batch — the first slice of the seeded corpus. Ten entries: aftermath ×4
+     * (clears the ≥3 template-recurrence floor), decision-spiral ×2, stalled ×2, goblin-hours ×1,
+     * tunnel-exit ×1. The stalled-archetype prose is deliberately keyword-free so the run measures
+     * whether the lenses + labeler recover the archetype from natural resistance/paralysis language
+     * rather than a planted phrase. [seed] loads the full corpus (this + backlog + vocab-drift).
      */
     @Suppress("MagicNumber")
     val DEMO_ENTRIES: List<SeedEntry> = listOf(
         SeedEntry(
-            "I was completely fine going into the standup but crashed hard within about twenty minutes. " +
-                "Couldn't get back to the doc for the rest of the day. Then somehow wired until 2am. " +
+            "I was completely fine going into the standup but I crashed hard in about twenty minutes. " +
+                "I couldn't get back to the doc for the rest of the day. Then I was somehow wired until 2am. " +
                 "That's the whole cycle in one day.",
             Instant.parse("2026-05-07T18:42:00Z"),
             18_000L,
         ),
         SeedEntry(
-            "Another Tuesday, same pattern as always. The meeting ends and I just kind of decompress " +
+            "Another Tuesday and the same pattern as always. The meeting ends and I just kind of decompress " +
                 "for two hours whether I want to or not. Doesn't matter how much coffee I had beforehand. " +
                 "Body just decides it's done and that's that.",
             Instant.parse("2026-05-12T15:33:00Z"),
@@ -87,7 +83,7 @@ object DebugPatternSeeder {
             25_000L,
         ),
         SeedEntry(
-            "Decided to rewrite the migration again tonight. This is the third time this week I've " +
+            "I decided to rewrite the migration again tonight. This is the third time this week I've " +
                 "restarted it with completely different reasoning each time. " +
                 "I keep convincing myself the new approach is obviously better. " +
                 "I think I might just be spinning and calling it progress.",
@@ -95,7 +91,7 @@ object DebugPatternSeeder {
             28_000L,
         ),
         SeedEntry(
-            "Rewrote the whole thing again and this time it actually feels right. " +
+            "I rewrote the whole doc again and this time it actually feels right. " +
                 "But I said that last time too so I don't fully trust myself on this. " +
                 "Different structure at least. I'm committing to this version even if it costs me another day.",
             Instant.parse("2026-05-16T11:05:00Z"),
@@ -131,20 +127,20 @@ object DebugPatternSeeder {
         ),
     )
 
-    // Preserved for later tuning rounds — not seeded while ACTIVE_SEED_COUNT = 10.
+    // Post-completion / audit narrative — part of the seeded corpus.
     @Suppress("MagicNumber")
     private fun backlogNarrative(): List<SeedEntry> = listOf(
         SeedEntry(
-            "Shipped the feature this afternoon and then immediately hit a wall. " +
-                "Couldn't start anything else for like two hours, just sat there staring at the next ticket. " +
+            "I shipped the big feature this afternoon and then immediately hit a wall. " +
+                "I couldn't start anything else for like two hours. I just sat there staring at the next ticket. " +
                 "I don't know why completing things does this to me but it happens every single time.",
             Instant.parse("2026-05-13T21:08:00Z"),
             20_000L,
         ),
         SeedEntry(
-            "Audit cycle started today and I reviewed everything twice before sending anything. " +
+            "Our audit cycle started today and I reviewed everything twice before sending anything. " +
                 "That kind of second-guessing slows everything down to a crawl. " +
-                "Took me twice as long as it should have and I'm still not confident it was right. " +
+                "It took me twice as long as it should have and I'm still not confident it was right. " +
                 "That's the worst combination.",
             Instant.parse("2026-05-18T19:22:00Z"),
             16_000L,
@@ -152,8 +148,8 @@ object DebugPatternSeeder {
     )
 
     // Vocab-drift corpus: uniform duration, stored as dense (prose, timestamp) pairs so the
-    // repeated SeedEntry/Instant.parse boilerplate collapses into a single mapping. Preserved for
-    // later tuning rounds. Timestamps are deliberately off-the-hour to read like real captures.
+    // repeated SeedEntry/Instant.parse boilerplate collapses into a single mapping. Part of the
+    // seeded corpus. Timestamps are deliberately off-the-hour to read like real captures.
     @Suppress("LongMethod")
     private fun vocabDriftEntries(): List<SeedEntry> = listOf(
         Pair(
@@ -190,92 +186,58 @@ object DebugPatternSeeder {
             "2026-05-02T19:08:00Z",
         ),
         Pair(
-            "Exhausted by 10am and that's a new floor for me. I've been running behind my own capacity for weeks " +
-                "but this is the first time I ran out before lunch. That felt like a line being crossed.",
+            "I was exhausted by 10am and that's new for me. I've been running behind my own capacity for weeks " +
+                "but this is the first time I ran out before lunch. " +
+                "That felt like a line being crossed I did not authorize.",
             "2026-05-03T00:41:00Z",
         ),
         Pair(
-            "Wiped and it's the kind that ignores caffeine. Had two coffees before noon " +
-                "and felt nothing from either. " +
-                "Body decided to stop being functional before I had any say in it.",
-            "2026-05-03T06:33:00Z",
-        ),
-        Pair(
-            "Sluggish all day with that brain fog that makes everything take three times longer than it should. " +
-                "I kept losing my place in the middle of sentences. It was back, same as before.",
+            "I've been sluggish all day with a brain fog " +
+                "that makes everything take three times longer than it should. " +
+                "I kept losing my place in the middle of sentences.",
             "2026-05-03T13:17:00Z",
         ),
         Pair(
-            "Foggy in a way I can't push through. Couldn't string two sentences together without losing the thread. " +
-                "Sat with the document open for an hour and wrote maybe thirty usable words.",
-            "2026-05-03T18:49:00Z",
-        ),
-        Pair(
-            "Burnt out and my attention just skating across everything without landing anywhere. " +
-                "I'd start reading something and be three paragraphs in with zero retention. " +
-                "Tried resetting four times.",
+            "Maybe I'm burnt out and my attention is just skating across " +
+                "everything without actually landing anywhere. " +
+                "I'd start reading something and be three paragraphs in and have no idea what I was looking at.",
             "2026-05-04T02:04:00Z",
         ),
         Pair(
-            "Brain fog today. The cursor was blinking faster than I could think, which is how I know it's bad. " +
-                "I'm slower than the default blink rate. Ended up closing everything and going for a walk.",
-            "2026-05-04T07:22:00Z",
-        ),
-        Pair(
-            "Sluggish in a way that made every task take twice as long. Simple things felt hard. " +
-                "I kept re-reading the same paragraph to figure out what I was supposed to do next.",
-            "2026-05-04T12:51:00Z",
-        ),
-        Pair(
-            "Foggy and slow all day, mind moving through something that felt like molasses. " +
-                "Not in a dramatic way. Just everything requiring more effort than it should. " +
-                "I got through it but barely.",
-            "2026-05-04T17:38:00Z",
-        ),
-        Pair(
-            "Burnt out and the screen looked blurry even though my eyes were fine. It was coming from inside. " +
-                "That's my signal that I need to stop but I kept going anyway. Bad call.",
-            "2026-05-05T01:06:00Z",
-        ),
-        Pair(
-            "Brain fog. Started three separate sentences and finished none of them. I know what I'm trying to say " +
-                "but the path from that to words just isn't there right now. Closing the doc.",
-            "2026-05-05T06:47:00Z",
-        ),
-        Pair(
-            "Wired again tonight and I don't know which is worse. Body wants sleep, brain just refuses. " +
-                "Lying down doesn't help. Not anxious about anything specific, just running at the wrong frequency.",
+            "Tonight I'm wired again and I really don't know which is worse. " +
+                "My body wants sleep, but my brain refuses. " +
+                "Lying down doesn't help. Guess I'm just running on the wrong frequency.",
             "2026-05-05T11:33:00Z",
         ),
         Pair(
-            "Anxious is the only way I can describe what this is. Lying down doesn't count as rest " +
-                "when my brain is still processing everything. Slept but woke up like I hadn't slept at all.",
-            "2026-05-05T19:14:00Z",
-        ),
-        Pair(
-            "Can't sleep but I'm genuinely exhausted. The static won't quit even when I'm completely flat. " +
-                "I've been horizontal for an hour and nothing is happening. Brain won't stop, body gave up.",
-            "2026-05-06T00:58:00Z",
-        ),
-        Pair(
-            "Amped but exhausted and my body and brain are completely disagreeing about what state I'm in. " +
-                "Body says stop, brain says go. They've been sending opposite signals since about 8pm.",
-            "2026-05-06T05:42:00Z",
-        ),
-        Pair(
-            "Wired again and it's the third night in a row. I keep expecting it to flip into actual sleep " +
-                "but it doesn't. I just lie there staring at the ceiling processing nothing useful.",
-            "2026-05-06T13:09:00Z",
-        ),
-        Pair(
-            "Anxious with eyes closed and chest racing even though nothing is happening. " +
-                "No reason for it. I just can't get below a certain level of activation no matter how tired I am.",
-            "2026-05-06T18:27:00Z",
-        ),
-        Pair(
-            "Can't sleep, can't focus, both tanks empty at the same time. I don't know how that works " +
-                "but here I am at 1am, fully depleted and fully awake. Completely contradictory.",
+            "I can't sleep, can't focus, like both tanks are empty at the same time. I don't know how that works " +
+                "but here I am after 1am, fully depleted and fully awake. Completely at war with myself.",
             "2026-05-07T01:51:00Z",
+        ),
+        // Positives — a counterweight to the exhaustion drift so the corpus isn't all doom.
+        // Distinct upbeat tone words (locked-in / clear / good / sharp) form their own cluster.
+        Pair(
+            "Locked in for three hours and didn't notice a single one of them go by. " +
+                "I looked up and the whole thing was just done. " +
+                "I don't get days like this often so I'm writing it down.",
+            "2026-05-08T15:23:00Z",
+        ),
+        Pair(
+            "Clear today. No fog, no bouncing off the start. " +
+                "I opened the doc and the words were already there. " +
+                "It felt almost suspicious after the week I've had.",
+            "2026-05-09T13:41:00Z",
+        ),
+        Pair(
+            "Genuinely good day. I got through the whole list with energy to spare " +
+                "and still went for a walk after. " +
+                "Logging it so future me knows it's possible.",
+            "2026-05-10T16:17:00Z",
+        ),
+        Pair(
+            "Sharp this morning in a way I didn't earn. Everything I touched worked on the first try. " +
+                "I rode it until it wore off around 3 and that was fine.",
+            "2026-05-11T14:52:00Z",
         ),
     ).map { (text, timestamp) -> SeedEntry(text, Instant.parse(timestamp), VOCAB_DRIFT_DURATION_MS) }
 }

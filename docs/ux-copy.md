@@ -251,7 +251,7 @@ extracting). Top → bottom: AppTop pill + hamburger; `← BACK`; the filed **ti
 `{PERSONA} · FOLLOW-UP` card (lime left-rule); then —
 
 - **Resolved:** `● THREE-LENS READ` + status, the LITERAL / INFERENTIAL / SKEPTICAL columns,
-  and the BEHAVIOR / STATE / VOCAB / PROMISES / REPEAT field grid with tone tags
+  and the BEHAVIOR / PROMISES / REPEAT field grid with tone tags
   (`CANONICAL` lime · `CONFLICT` coral · `AMBIGUOUS` ember · `CANDIDATE` teal).
 - **Extracting:** `● EXTRACTING · 3 LENSES` with an animated spinner +
   "Convergence resolves in the background. Open the entry later for the full read.", and the

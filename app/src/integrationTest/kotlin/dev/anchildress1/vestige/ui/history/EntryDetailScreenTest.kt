@@ -23,6 +23,7 @@ import dev.anchildress1.vestige.model.Lens
 import dev.anchildress1.vestige.model.Persona
 import dev.anchildress1.vestige.model.ResolvedExtraction
 import dev.anchildress1.vestige.model.ResolvedField
+import dev.anchildress1.vestige.model.TemplateLabel
 import dev.anchildress1.vestige.storage.EntryEntity
 import dev.anchildress1.vestige.storage.EntryStore
 import dev.anchildress1.vestige.storage.closeAfterCleaningThreadResources
@@ -156,6 +157,39 @@ class EntryDetailScreenTest {
         composeRule.onNodeWithText(EntryDetailCopy.THREE_LENS_STATUS_CONFLICT).assertIsDisplayed()
         // The extracting/skeleton branch is not the resolved view.
         composeRule.onAllNodesWithTag("entry_extracting").assertCountEquals(0)
+    }
+
+    @Test
+    fun `picked template shows in the top label slot by display name`() {
+        val id = entryStore.createPendingEntry("awake at 3am rearranging the notes app", FIXTURE_INSTANT)
+        entryStore.completeEntry(id, ResolvedExtraction(emptyMap()), TemplateLabel.GOBLIN_HOURS)
+        setDetail(id)
+        composeRule.onNodeWithTag("entry_template_label").assertIsDisplayed()
+        composeRule.onNodeWithText("GOBLIN HOURS").assertIsDisplayed()
+    }
+
+    @Test
+    fun `top label slot is absent when the entry has no template`() {
+        val id = entryStore.createPendingEntry("no archetype here", FIXTURE_INSTANT)
+        entryStore.completeEntry(id, ResolvedExtraction(emptyMap()), null)
+        setDetail(id)
+        composeRule.onAllNodesWithTag("entry_template_label").assertCountEquals(0)
+    }
+
+    @Test
+    fun `field grid shows the resolved vocab tone word`() {
+        val id = entryStore.createPendingEntry("drained to the bone by mid-morning", FIXTURE_INSTANT)
+        entryStore.completeEntry(
+            id,
+            ResolvedExtraction(mapOf("vocabulary" to ResolvedField("drained", ConfidenceVerdict.CANONICAL))),
+            null,
+            lensReceipts = listOf(
+                EntryLensReceipt(lens = Lens.LITERAL, extracted = true, fields = mapOf("vocabulary" to "drained")),
+            ),
+        )
+        setDetail(id)
+        composeRule.onNodeWithText("VOCAB").assertIsDisplayed()
+        composeRule.onAllNodesWithText("drained").onFirst().assertIsDisplayed()
     }
 
     @Test

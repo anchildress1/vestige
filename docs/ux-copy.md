@@ -439,6 +439,8 @@ Header:
 
 No inaccurate agent-emitted template label or archetype eyebrow appears in the UI. A future trusted semantic label may appear only where the POC layout has a label slot.
 
+> _Update (2026-05-22):_ `template_label` is now trusted (single-pass 3-lens picks it, convergence-voted, proven on-device). It occupies the Entry Detail top label slot as a lime pill, by **display name** — `TemplateLabel.displayName`: Crashed / Deep Space / Busy Stalling / Nonstop Spiral / Goblin Hours / Brain Dump. The kebab serial stays internal (markdown / export). Pattern Detail still binds `pattern.kind` for its title.
+
 Summary observation (one line, primary text):
 > {The card's one-line observation, expanded slightly with timing}
 

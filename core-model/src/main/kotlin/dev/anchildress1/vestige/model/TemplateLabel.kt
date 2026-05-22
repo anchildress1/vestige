@@ -1,13 +1,16 @@
 package dev.anchildress1.vestige.model
 
-/** Agent-emitted (never user-selected). [serial] is the kebab-case form in markdown. */
-enum class TemplateLabel(val serial: String) {
-    AFTERMATH("aftermath"),
-    TUNNEL_EXIT("tunnel-exit"),
-    STALLED("stalled"),
-    DECISION_SPIRAL("decision-spiral"),
-    GOBLIN_HOURS("goblin-hours"),
-    AUDIT("audit"),
+/**
+ * Agent-emitted (never user-selected). [serial] is the kebab-case form persisted in markdown /
+ * export; [displayName] is the human label shown in the UI's template slot.
+ */
+enum class TemplateLabel(val serial: String, val displayName: String) {
+    AFTERMATH("aftermath", "Crashed"),
+    TUNNEL_EXIT("tunnel-exit", "Deep Space"),
+    STALLED("stalled", "Busy Stalling"),
+    DECISION_SPIRAL("decision-spiral", "Nonstop Spiral"),
+    GOBLIN_HOURS("goblin-hours", "Goblin Hours"),
+    AUDIT("audit", "Brain Dump"),
     ;
 
     companion object {

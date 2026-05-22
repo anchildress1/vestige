@@ -17,6 +17,8 @@ data class EntryDetailUiModel(
     val transcription: String,
     val followUp: String?,
     val personaName: String,
+    /** Trusted model-picked archetype shown in the top label slot; null when unlabelled. */
+    val templateLabel: String?,
     val lensStatus: String,
     val lenses: List<LensRead>,
     val fields: List<FieldRow>,
@@ -39,6 +41,7 @@ data class EntryDetailUiModel(
                 transcription = entity.entryText,
                 followUp = entity.followUpText?.takeIf(String::isNotBlank),
                 personaName = entity.persona.name,
+                templateLabel = entity.templateLabel?.displayName,
                 lensStatus = lensStatus(entity.confidenceJson),
                 lenses = buildLensReads(entity.lensReceiptsJson),
                 fields = buildFieldRows(entity),

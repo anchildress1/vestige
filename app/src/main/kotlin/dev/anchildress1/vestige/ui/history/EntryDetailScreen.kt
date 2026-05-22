@@ -41,6 +41,7 @@ import dev.anchildress1.vestige.ui.components.AppTop
 import dev.anchildress1.vestige.ui.components.AppTopStatuses
 import dev.anchildress1.vestige.ui.components.BottomTab
 import dev.anchildress1.vestige.ui.components.EyebrowE
+import dev.anchildress1.vestige.ui.components.Pill
 import dev.anchildress1.vestige.ui.components.VestigeBottomNav
 import dev.anchildress1.vestige.ui.components.VestigeSpinner
 import dev.anchildress1.vestige.ui.components.limeLeftRuleForActive
@@ -136,6 +137,12 @@ private fun EntryDetailContent(model: EntryDetailUiModel, onBack: () -> Unit, mo
             modifier = Modifier.testTag("entry_time"),
         )
         EyebrowE(text = "${model.dateLabel} · ${model.audioLabel.uppercase()} · ${model.wordCount} WORDS")
+        if (model.templateLabel != null) {
+            Pill(
+                text = model.templateLabel.uppercase(Locale.US),
+                modifier = Modifier.testTag("entry_template_label"),
+            )
+        }
 
         if (model.followUp != null) {
             FollowUpCard(personaName = model.personaName, body = model.followUp)

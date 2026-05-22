@@ -60,7 +60,7 @@ Edge cases:
 - Audio bytes discarded after each call; transcription persists as `entry_text` (same posture as a typed note)
 - **Single-turn-per-capture** (STT-B v1 scope choice per `adrs/ADR-005-stt-b-scope-and-v1-single-turn.md`, which amends `adrs/ADR-002-multi-lens-extraction-pattern.md` §"Multi-turn behavior"): each recording produces one self-contained transcription + follow-up exchange. Subsequent recordings start a fresh capture. The history surface is a list of independent entries — not a scrolling conversation thread.
 - Witness / Hardass / Editor personas fully working as prompt-and-copy variants. They change tone only, not extraction logic. This keeps onboarding honest and gives the demo its visible bite without adding a second analytical system.
-- Multi-lens extraction pipeline (3 lenses × 5 surfaces) producing the minimal v1 schema with convergence-based confidence. Templates are agent-emitted labels (Aftermath, Tunnel exit, Concrete shoes, Decision spiral, Goblin hours, Audit), not user-picked.
+- Multi-lens extraction pipeline (3 lenses × 5 surfaces) producing the minimal v1 schema with convergence-based confidence. Templates are agent-emitted labels (Aftermath, Tunnel exit, Stalled, Decision spiral, Goblin hours, Audit), not user-picked.
 - Tag extraction per entry, visible to user, stored as queryable structured data
 - **Per-entry observations:** every saved entry surfaces 1–2 behavioral or vocabulary observations from that entry alone, even before any cross-entry pattern exists. The product produces useful observable signal from entry one. Pattern-enhanced callouts remain gated at ≥10 entries + ≥3 supporting entries.
 

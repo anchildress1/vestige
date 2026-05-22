@@ -449,7 +449,7 @@ Source section header:
 Source list (date · short snippet, tappable to full entry):
 > Apr 12 — crashed after standup
 > Apr 18 — wired until 2am
-> Apr 26 — same concrete shoes again
+> Apr 26 — stuck on it again
 
 Vocabulary section header (when relevant):
 > **Words you used:**

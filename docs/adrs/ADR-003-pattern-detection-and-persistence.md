@@ -61,7 +61,7 @@ Five kinds. Each emits one `Pattern` row when its threshold trips. Each is indep
 
 **Why a 90-day rolling window for `template_recurrence` and `tag_pair_co_occurrence` but 30-day for `time_of_day_cluster`.** Behavioral clusters drift. Witness saying "fourth Aftermath" feels honest when it's "fourth in twelve recent entries"; "fourth Aftermath in your entire history of 200 entries" reads as nagging. Goblin-hours specifically is meant to catch *current* sleep patterns, hence the tighter window.
 
-**Why no machine-learning-shaped detection in v1.** Counting is sourced and explainable. A learned pattern model would need training data we don't have, and AGENTS.md guardrail 12 would invalidate any pattern the engine couldn't justify with concrete evidence.
+**Why no machine-learning-shaped detection in v1.** Counting is sourced and explainable. A learned pattern model would need training data we don't have, and AGENTS.md guardrail 12 would invalidate any pattern the engine couldn't justify with specific evidence.
 
 ---
 

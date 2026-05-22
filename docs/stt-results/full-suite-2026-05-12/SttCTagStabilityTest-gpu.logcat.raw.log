@@ -137,7 +137,7 @@
 05-12 15:20:23.432 13861 13880 D VestigeLiteRtLm: generateText completed in 19934ms (prompt=8116c, reply=527c)
 05-12 15:20:23.433 13861 13880 D VestigeBackgroundExtraction: lens=SKEPTICAL done parsed=true attempts=1 elapsed=19940ms
 05-12 15:20:23.434 13861 13880 D VestigeBackgroundExtraction: extract completed: lenses=3/3 model_calls=3 elapsed=40401ms
-05-12 15:20:23.435 13861 13878 I VestigeSttC: entry=A4 run=1/3 elapsed=40401ms lenses_parsed=3/3 tags=battery-yanked
+05-12 15:20:23.435 13861 13878 I VestigeSttC: entry=A4 run=1/3 elapsed=40401ms lenses_parsed=3/3 tags=battery-died
 05-12 15:20:23.438 13861 13880 D VestigePromptComposer: compose lens=LITERAL chars=7625 tokens~=1907 history=0
 05-12 15:20:33.102 13861 13880 D VestigeLiteRtLm: generateText completed in 9664ms (prompt=7625c, reply=204c)
 05-12 15:20:33.103 13861 13880 D VestigeBackgroundExtraction: lens=LITERAL done parsed=true attempts=1 elapsed=9667ms
@@ -148,7 +148,7 @@
 05-12 15:21:00.903 13861 13880 D VestigeLiteRtLm: generateText completed in 18627ms (prompt=8116c, reply=527c)
 05-12 15:21:00.905 13861 13880 D VestigeBackgroundExtraction: lens=SKEPTICAL done parsed=true attempts=1 elapsed=18632ms
 05-12 15:21:00.906 13861 13880 D VestigeBackgroundExtraction: extract completed: lenses=3/3 model_calls=3 elapsed=37469ms
-05-12 15:21:00.906 13861 13878 I VestigeSttC: entry=A4 run=2/3 elapsed=37469ms lenses_parsed=3/3 tags=battery-yanked
+05-12 15:21:00.906 13861 13878 I VestigeSttC: entry=A4 run=2/3 elapsed=37469ms lenses_parsed=3/3 tags=battery-died
 05-12 15:21:00.910 13861 13880 D VestigePromptComposer: compose lens=LITERAL chars=7625 tokens~=1907 history=0
 05-12 15:21:11.913 13861 13880 D VestigeLiteRtLm: generateText completed in 11002ms (prompt=7625c, reply=204c)
 05-12 15:21:11.913 13861 13880 D VestigeBackgroundExtraction: lens=LITERAL done parsed=true attempts=1 elapsed=11006ms
@@ -159,7 +159,7 @@
 05-12 15:21:40.089 13861 13880 D VestigeLiteRtLm: generateText completed in 19044ms (prompt=8116c, reply=527c)
 05-12 15:21:40.090 13861 13880 D VestigeBackgroundExtraction: lens=SKEPTICAL done parsed=true attempts=1 elapsed=19050ms
 05-12 15:21:40.091 13861 13880 D VestigeBackgroundExtraction: extract completed: lenses=3/3 model_calls=3 elapsed=39184ms
-05-12 15:21:40.092 13861 13878 I VestigeSttC: entry=A4 run=3/3 elapsed=39184ms lenses_parsed=3/3 tags=battery-yanked
+05-12 15:21:40.092 13861 13878 I VestigeSttC: entry=A4 run=3/3 elapsed=39184ms lenses_parsed=3/3 tags=battery-died
 05-12 15:21:40.096 13861 13880 D VestigePromptComposer: compose lens=LITERAL chars=7627 tokens~=1907 history=0
 05-12 15:21:52.687 13861 13880 D VestigeLiteRtLm: generateText completed in 12589ms (prompt=7627c, reply=217c)
 05-12 15:21:52.688 13861 13880 D VestigeBackgroundExtraction: lens=LITERAL done parsed=true attempts=1 elapsed=12594ms

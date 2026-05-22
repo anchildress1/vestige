@@ -426,7 +426,7 @@ Tap a card → detail screen. Make the pattern claim visually sourceable. This s
 > **Seen in:**
 > Apr 12 — crashed after standup
 > Apr 18 — wired until 2am
-> Apr 26 — same concrete shoes again
+> Apr 26 — stuck on it again
 
 Do not style this like a medical chart or therapy dashboard. Cards-on-dark, restrained, with the purple left-rule on the active claim.
 

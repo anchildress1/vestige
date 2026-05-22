@@ -82,7 +82,7 @@ convergence resolver (not a 4th model call). Two-tier: voice foreground returns
 `{transcription, follow_up}`; typed entries persist text only; background runs the 3 lenses +
 resolver in 30–90 s. **Agreement
 predicate is written against the storage enum** (`template_label` ∈ {Aftermath, Tunnel exit,
-Concrete shoes, Decision spiral, Goblin hours, Audit} — positional 1:1 with the
+Stalled, Decision spiral, Goblin hours, Audit} — positional 1:1 with the
 `concept-locked` product names). Full sequence + resolver decision:
 [llm-functionality.md](llm-functionality.md).
 

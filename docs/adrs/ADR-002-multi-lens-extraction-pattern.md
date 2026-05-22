@@ -132,7 +132,7 @@ Each extracted schema field has its own equality predicate. The locked spec didn
 
 | Field | Agreement predicate |
 |---|---|
-| `template_label` | Exact string match against the closed enum (Aftermath / Tunnel exit / Concrete shoes / Decision spiral / Goblin hours / Audit) |
+| `template_label` | Exact string match against the closed enum (Aftermath / Tunnel exit / Stalled / Decision spiral / Goblin hours / Audit) |
 | `tags` | Normalize case/plurals, then save any tag emitted by at least 2 lenses. If no tag reaches 2 lenses, save the Literal lens's strongest tag as `candidate` so the P0 "at least one visible tag" requirement does not randomly fail on sparse entries. Per-tag confidence = count of lenses including it. |
 | `energy_descriptor` | Case-insensitive string match after stop-word strip; or null on all three |
 | `recurrence_link` | Same `pattern_id` (deterministic — pattern engine emits stable IDs) |
@@ -281,13 +281,13 @@ STT-D corpus: 9/15 (60%) meaningful divergence — passing the gate but with wea
 evidence than the architecture is capable of.
 
 Sharpened framings (`literal.txt`, `inferential.txt`, `skeptical.txt`) push each lens harder
-in its direction with concrete examples and bounded directives:
+in its direction with specific examples and bounded directives:
 
 - LITERAL: codifies verbatim-bias for coined phrases (`administrative-haunting`,
-  `concrete-in-my-limbs`, `4:07am`).
-- INFERENTIAL: names pattern-level abstractions (`aftermath`, `concrete-shoes`,
+  `lead-in-my-limbs`, `4:07am`).
+- INFERENTIAL: names pattern-level abstractions (`aftermath`, `stalled`,
   `decision-spiral`, `goblin-hours`) as the lens's specialty.
-- SKEPTICAL: lowers the flag-emission bar with concrete trigger patterns; aims for ≥1 flag
+- SKEPTICAL: lowers the flag-emission bar with specific trigger patterns; aims for ≥1 flag
   per non-trivial entry.
 
 GPU re-run with these prompts produced **13/15 (87%) meaningful divergence** with 8 entries
@@ -333,7 +333,7 @@ prompt-budget cliff the other two lenses already respect.
 - LITERAL + INFERENTIAL: restored to baseline. The Run 1/Run 3 sharpening added net tokens
   that pushed FP16 over the cliff (confirmed twice).
 - SKEPTICAL: revised to 1398 chars — 43 chars *under* the 1441 baseline budget. Keeps five
-  named flag kinds with one-line concrete triggers; drops Run 3's over-prescriptive "aim for
+  named flag kinds with one-line specific triggers; drops Run 3's over-prescriptive "aim for
   ≥1 flag per non-trivial entry" directive and replaces it with "do not invent a contradiction".
 - `maxAttemptsPerLens` back to 2 (the Run 3 bump was a band-aid for the prompt-budget
   violation).
@@ -595,7 +595,7 @@ should have used and didn't.
 
 Witness's current opening rule ("echo a user phrase") is what most LLMs do by default with
 any persona prompt — it does not produce a recognizable Witness fingerprint. New mandatory
-shape clause for Witness only: name two concrete details the user mentioned and one timing
+shape clause for Witness only: name two specific details the user mentioned and one timing
 anchor before the question. Three nouns + a clock reference = a fingerprint that no other
 persona produces. Hardass and Editor's distinguishing weapons (imperative + deadline /
 quoted word + pick-one) already meet the bar; only Witness needs the strengthening pass.
@@ -604,7 +604,7 @@ quoted word + pick-one) already meet the bar; only Witness needs the strengtheni
 
 Each persona file currently ships 3-4 examples drawn from the same demo scenario (Nora /
 outline / standup / "fine"-"flattened"). E4B will pattern-match shape AND nouns. Expand
-to ≥2 examples per template archetype (Aftermath, Tunnel exit, Concrete shoes, Decision
+to ≥2 examples per template archetype (Aftermath, Tunnel exit, Stalled, Decision
 spiral, Goblin hours, Audit) per persona — ~12 examples per persona, 36 total. Ablate
 against ADR-002 §"Token budget" 2K/system-block ceiling; if expansion pushes over, the
 Skeptical-only revision pattern from the fifth addendum is the precedent — tighten one

@@ -373,7 +373,7 @@ private fun loadAllowedHosts(rootDir: File): Set<String> {
 
 private fun resolveTelemetryCoordinates(module: Project, configurationName: String): List<String> {
     val configuration = module.configurations.getByName(configurationName)
-    // Force a concrete artifact selection so variant mismatches fail hard instead of turning into
+    // Force a specific artifact selection so variant mismatches fail hard instead of turning into
     // an empty "clean" result. The coordinate list itself comes from the resolved graph.
     configuration.incoming.artifactView {
         attributes {

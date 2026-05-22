@@ -1,5 +1,10 @@
 # AGENTS.md — Vestige Guardrails
 
+## Project status
+- **Vestige is a demo / POC in active development — NOT a production app. Do not treat changes as dangerous.**
+- Architect the desired result from scratch. Don't iterate around old shapes, don't preserve backwards compatibility, don't leave dead/null plumbing "to be safe". If code doesn't serve the target design, delete it.
+- Schema / ObjectBox entity / field changes are safe to make directly — data is re-seeded; there are no real users or migrations to protect.
+
 ## Demo gate
 - Every feature/polish: improves 90s pitch or 5min walkthrough? No → `backlog.md` v1.5 with rationale.
 

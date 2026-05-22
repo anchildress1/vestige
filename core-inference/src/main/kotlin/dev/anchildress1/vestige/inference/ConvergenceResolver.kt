@@ -56,6 +56,8 @@ class DefaultConvergenceResolver : ConvergenceResolver {
 
             key == STATED_COMMITMENT_KEY -> resolveCommitment(byLens, matchingFlags)
 
+            key == VOCABULARY_KEY -> resolveVocabulary(byLens, matchingFlags)
+
             // Two of three lenses parse-failed: per ADR-002 §"Edge case — lens errors mid-call",
             // the surviving lens lacks corroboration, so every populated field is ambiguous.
             byLens.size == MIN_SURVIVING_LENSES_FOR_AMBIGUOUS -> ambiguousField(matchingFlags)
@@ -124,6 +126,30 @@ class DefaultConvergenceResolver : ConvergenceResolver {
                 }
             }
         }
+    }
+
+    /**
+     * Tone is an inferential read, not a vote: the Inferential lens wins the [VOCABULARY_KEY] word
+     * outright. Literal/Skeptical can only corroborate (raising the verdict to CANONICAL when they
+     * agree) — they never override Inferential's word. Falls back to whichever lens did name a tone
+     * when Inferential abstained, and only AMBIGUOUS when no lens named one at all.
+     */
+    private fun resolveVocabulary(byLens: Map<Lens, LensExtraction>, matchingFlags: List<String>): ResolvedField {
+        val words: List<Pair<Lens, String>> = Lens.entries.mapNotNull { lens ->
+            (byLens[lens]?.fields?.get(VOCABULARY_KEY) as? String)
+                ?.trim()?.lowercase()?.takeIf(String::isNotBlank)
+                ?.let { lens to it }
+        }
+        val chosen = words.firstOrNull { it.first == Lens.INFERENTIAL }
+            ?: words.firstOrNull()
+            ?: return ambiguousField(matchingFlags)
+        val agreement = words.count { it.second == chosen.second }
+        val verdict = when {
+            matchingFlags.isNotEmpty() -> ConfidenceVerdict.CANONICAL_WITH_CONFLICT
+            agreement >= MAJORITY_THRESHOLD -> ConfidenceVerdict.CANONICAL
+            else -> ConfidenceVerdict.CANDIDATE
+        }
+        return ResolvedField(value = chosen.second, verdict = verdict, flags = matchingFlags, sourceLens = chosen.first)
     }
 
     private fun resolveMultiple(populated: List<Pair<Lens, Any>>, matchingFlags: List<String>): ResolvedField {
@@ -312,6 +338,7 @@ class DefaultConvergenceResolver : ConvergenceResolver {
     private companion object {
         const val TAGS_KEY = "tags"
         const val STATED_COMMITMENT_KEY = "stated_commitment"
+        const val VOCABULARY_KEY = "vocabulary"
         const val TOPIC_OR_PERSON_KEY = "topic_or_person"
         const val ENTRY_ID_KEY = "entry_id"
         const val LENS_DISAGREEMENT_FLAG = "lens-disagreement"

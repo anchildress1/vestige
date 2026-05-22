@@ -617,4 +617,60 @@ class ConvergenceResolverTest {
             resolved.fields["stated_commitment"],
         )
     }
+
+    @Test
+    fun `Inferential wins the vocabulary word even when the lenses disagree`() {
+        val literal = LensExtraction(Lens.LITERAL, fields = mapOf("vocabulary" to "tired"))
+        val inferential = LensExtraction(Lens.INFERENTIAL, fields = mapOf("vocabulary" to "resigned"))
+        val skeptical = LensExtraction(Lens.SKEPTICAL, fields = mapOf("vocabulary" to "numb"))
+
+        val resolved = resolver.resolve(listOf(literal, inferential, skeptical))
+
+        assertEquals(
+            ResolvedField(value = "resigned", verdict = ConfidenceVerdict.CANDIDATE, sourceLens = Lens.INFERENTIAL),
+            resolved.fields["vocabulary"],
+        )
+    }
+
+    @Test
+    fun `vocabulary is canonical when another lens corroborates Inferential`() {
+        val literal = LensExtraction(Lens.LITERAL, fields = mapOf("vocabulary" to "resigned"))
+        val inferential = LensExtraction(Lens.INFERENTIAL, fields = mapOf("vocabulary" to "resigned"))
+        val skeptical = LensExtraction(Lens.SKEPTICAL, fields = mapOf("vocabulary" to "numb"))
+
+        val resolved = resolver.resolve(listOf(literal, inferential, skeptical))
+
+        assertEquals(
+            ResolvedField(value = "resigned", verdict = ConfidenceVerdict.CANONICAL, sourceLens = Lens.INFERENTIAL),
+            resolved.fields["vocabulary"],
+        )
+    }
+
+    @Test
+    fun `vocabulary falls back to another lens when Inferential abstains`() {
+        val literal = LensExtraction(Lens.LITERAL, fields = mapOf("vocabulary" to "tired"))
+        val inferential = LensExtraction(Lens.INFERENTIAL, fields = mapOf("vocabulary" to null))
+        val skeptical = LensExtraction(Lens.SKEPTICAL, fields = mapOf("vocabulary" to null))
+
+        val resolved = resolver.resolve(listOf(literal, inferential, skeptical))
+
+        assertEquals(
+            ResolvedField(value = "tired", verdict = ConfidenceVerdict.CANDIDATE, sourceLens = Lens.LITERAL),
+            resolved.fields["vocabulary"],
+        )
+    }
+
+    @Test
+    fun `vocabulary resolves ambiguous when no lens names a tone`() {
+        val literal = LensExtraction(Lens.LITERAL, fields = mapOf("vocabulary" to null))
+        val inferential = LensExtraction(Lens.INFERENTIAL, fields = mapOf("vocabulary" to "   "))
+        val skeptical = LensExtraction(Lens.SKEPTICAL, fields = mapOf("vocabulary" to null))
+
+        val resolved = resolver.resolve(listOf(literal, inferential, skeptical))
+
+        assertEquals(
+            ResolvedField(value = null, verdict = ConfidenceVerdict.AMBIGUOUS),
+            resolved.fields["vocabulary"],
+        )
+    }
 }

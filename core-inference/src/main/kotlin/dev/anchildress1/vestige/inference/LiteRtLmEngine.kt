@@ -41,7 +41,10 @@ sealed interface AudioBackendChoice {
  * at most one conversation is ever live. [close] flips a closing gate and waits for the
  * in-flight call to drain before freeing the native handle.
  */
-@Suppress("LongParameterList") // Mirrors the SDK's EngineConfig + ConversationConfig surfaces.
+@Suppress(
+    "LongParameterList", // Mirrors the SDK's EngineConfig + ConversationConfig surfaces.
+    "TooManyFunctions", // Thin wrapper exposing the SDK's call surface (init/generate/stream/warm/close).
+)
 class LiteRtLmEngine(
     private val modelPath: String,
     private val backend: BackendChoice = BackendChoice.Gpu,
@@ -146,6 +149,18 @@ class LiteRtLmEngine(
             )
             response
         }
+    }
+
+    /**
+     * Primes the model with one short throwaway generation so the first real inference doesn't pay
+     * the cold-start tax (graph compile + first-token latency on GPU). Failures are swallowed and
+     * logged — a warm-up that errors must not block the batch that follows.
+     */
+    suspend fun warmUp() {
+        val started = System.nanoTime()
+        runCatching { generateText(WARMUP_SYSTEM_INSTRUCTION, WARMUP_PROMPT) }
+            .onSuccess { Log.d(TAG, "warmUp completed in ${(System.nanoTime() - started) / NANOS_PER_MILLI}ms") }
+            .onFailure { Log.w(TAG, "warmUp failed (${it.javaClass.simpleName}); first inference pays cold start") }
     }
 
     /** Streaming counterpart to [generateText]. Closes the conversation on flow completion. */
@@ -319,6 +334,11 @@ class LiteRtLmEngine(
     companion object {
         private const val TAG = "VestigeLiteRtLm"
         private const val NANOS_PER_MILLI = 1_000_000L
+
+        // Minimal prompt for [warmUp] — content is irrelevant; the goal is to trigger graph
+        // compile + first-token latency once, off the critical path of the first real entry.
+        private const val WARMUP_SYSTEM_INSTRUCTION = "Reply with the single word: ok."
+        private const val WARMUP_PROMPT = "ok"
 
         /**
          * Engine-side token budget. Caps KV-cache reservation per call. 4096 comfortably covers

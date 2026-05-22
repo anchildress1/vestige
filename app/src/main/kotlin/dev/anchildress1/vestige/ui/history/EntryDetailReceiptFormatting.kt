@@ -78,7 +78,7 @@ internal fun buildFieldRows(entity: EntryEntity): List<FieldRow> {
         recurrenceValue != DASH -> receiptPatternTone(receipts)
         else -> LensTone.AMBIGUOUS
     }
-    val resolvedVocab = entity.vocabularyWord?.trim()?.takeIf(String::isNotBlank)
+    val resolvedVocab = entity.vocabularyWord?.trim()?.takeIf { it.isNotBlank() && it.lowercase() !in NULLISH_VOCAB }
     val receiptVocab = receipts?.let(::distinctReceiptVocab).orEmpty()
     val vocabValue = resolvedVocab
         ?: receiptVocab.take(DISPLAY_LIMIT).joinToString(" / ").takeIf(String::isNotBlank)
@@ -209,6 +209,7 @@ private fun receiptPatternTone(receipts: List<EntryLensReceipt>): LensTone {
 
 private fun distinctReceiptVocab(receipts: List<EntryLensReceipt>): List<String> = receipts.asSequence()
     .mapNotNull { (it.fields[KEY_VOCABULARY] as? String)?.trim()?.lowercase()?.takeIf(String::isNotBlank) }
+    .filter { it !in NULLISH_VOCAB }
     .distinct()
     .toList()
 
@@ -245,6 +246,7 @@ private const val KEY_TAGS = "tags"
 private const val KEY_COMMITMENT = "stated_commitment"
 private const val KEY_RECURRENCE = "recurrence_link"
 private const val KEY_VOCABULARY = "vocabulary"
+private val NULLISH_VOCAB = setOf("null", "none", "n/a", "nil")
 private const val KEY_COMMITMENT_TEXT = "text"
 private const val KEY_TOPIC_OR_PERSON = "topic_or_person"
 private val PATTERN_ID_REGEX = Regex("[0-9a-f]{64}")

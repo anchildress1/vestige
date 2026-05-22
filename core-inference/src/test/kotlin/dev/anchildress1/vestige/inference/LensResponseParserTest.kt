@@ -55,6 +55,28 @@ class LensResponseParserTest {
     }
 
     @Test
+    fun `folds a literal-string null or none vocabulary back to JSON null`() {
+        val nullish = LensResponseParser.parse(
+            Lens.INFERENTIAL,
+            """{"tags":["standup"],"vocabulary":"null","flags":[]}""",
+        )
+        assertNotNull(nullish)
+        assertNull(nullish!!.fields["vocabulary"])
+
+        val none = LensResponseParser.parse(
+            Lens.INFERENTIAL,
+            """{"tags":["standup"],"vocabulary":"None","flags":[]}""",
+        )
+        assertNull(none!!.fields["vocabulary"])
+
+        val real = LensResponseParser.parse(
+            Lens.INFERENTIAL,
+            """{"tags":["standup"],"vocabulary":"Drained","flags":[]}""",
+        )
+        assertEquals("drained", real!!.fields["vocabulary"])
+    }
+
+    @Test
     fun `routes Skeptical flags off the fields map and onto the flags list`() {
         // `flags` are emitted by the model as `{kind, snippet, note}` objects per
         // `core-inference/src/main/resources/lenses/output-schema.txt`. The parser encodes each

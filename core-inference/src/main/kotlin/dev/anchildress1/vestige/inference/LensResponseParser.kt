@@ -34,6 +34,9 @@ internal object LensResponseParser {
     )
     private val PAYLOAD_KEYS: Set<String> = SCHEMA_KEYS + "flags"
 
+    /** Literal strings models emit in place of a JSON null tone word — folded back to null. */
+    private val NULLISH_WORDS: Set<String> = setOf("null", "none", "n/a", "nil")
+
     fun parse(lens: Lens, raw: String): LensExtraction? {
         val root = findFirstSchemaObject(raw) ?: return null
         val fields = SCHEMA_KEYS.associateWith { key -> normalizeField(key, root.opt(key)) }
@@ -50,7 +53,14 @@ internal object LensResponseParser {
         val normalized = normalize(value)
         return when (key) {
             "tags" -> (normalized as? List<*>)?.mapNotNull(::normalizeTag)
+
             "template_label" -> (normalized as? String)?.lowercase()?.takeIf { it.isNotEmpty() }
+
+            // Models routinely emit the literal string "null"/"none" for a no-tone vocabulary
+            // instead of JSON null; fold those back to null so a non-word never becomes the tone.
+            "vocabulary" ->
+                (normalized as? String)?.trim()?.lowercase()?.takeIf { it.isNotEmpty() && it !in NULLISH_WORDS }
+
             else -> normalized
         }
     }

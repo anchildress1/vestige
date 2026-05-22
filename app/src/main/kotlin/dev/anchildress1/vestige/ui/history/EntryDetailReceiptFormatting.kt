@@ -48,6 +48,7 @@ internal fun buildLensReads(json: String?): List<LensRead> {
             label = lens.name,
             value = receipt?.summaryText() ?: EntryDetailCopy.LENS_MISSING,
             tone = receipt?.tone() ?: LensTone.AMBIGUOUS,
+            rawResponse = receipt?.rawResponse?.takeIf(String::isNotBlank),
         )
     }
 }

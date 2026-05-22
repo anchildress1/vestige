@@ -320,9 +320,10 @@ class BackgroundExtractionSaveFlowTest {
     }
 
     @Test
-    fun `success routes parsed lens receipts to completeEntry without raw responses`() = runTest {
+    fun `success routes parsed lens receipts to completeEntry with raw model output`() = runTest {
         every { entryStore.createPendingEntry(any(), any(), any()) } returns ENTRY_ID
         val resolved = canonicalSample()
+        val literalRaw = """{"tags":["standup"],"template_label":"aftermath"}"""
         val lensResults = listOf(
             LensResult(
                 lens = Lens.LITERAL,
@@ -330,7 +331,7 @@ class BackgroundExtractionSaveFlowTest {
                     lens = Lens.LITERAL,
                     fields = mapOf("tags" to listOf("standup"), "template_label" to "aftermath"),
                 ),
-                rawResponse = """{"private":"raw response stays out"}""",
+                rawResponse = literalRaw,
                 attemptCount = 1,
                 elapsedMs = 900L,
                 lastError = null,
@@ -365,8 +366,10 @@ class BackgroundExtractionSaveFlowTest {
                     receipts.size == 2 &&
                         receipts[0].lens == Lens.LITERAL &&
                         receipts[0].fields["template_label"] == "aftermath" &&
+                        receipts[0].rawResponse == literalRaw &&
                         receipts[1].extracted.not() &&
-                        receipts[1].lastError == "parse-fail"
+                        receipts[1].lastError == "parse-fail" &&
+                        receipts[1].rawResponse == "bad json"
                 },
             )
         }

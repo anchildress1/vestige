@@ -1,5 +1,6 @@
 package dev.anchildress1.vestige.ui.history
 
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
@@ -10,6 +11,7 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onFirst
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -148,10 +150,47 @@ class EntryDetailScreenTest {
         composeRule.onNodeWithTag("entry_three_lens").assertIsDisplayed()
         composeRule.onNodeWithTag("entry_field_grid").assertIsDisplayed()
         composeRule.onNodeWithText(EntryDetailCopy.THREE_LENS_EYEBROW).assertIsDisplayed()
-        composeRule.onNodeWithText("battery died").assertIsDisplayed()
+        // The receipt tag value renders once per lens (3 cells) — assert at least one is shown,
+        // not exactly one, so the per-lens read isn't mistaken for an ambiguous match.
+        composeRule.onAllNodesWithText("battery died").onFirst().assertIsDisplayed()
         composeRule.onNodeWithText(EntryDetailCopy.THREE_LENS_STATUS_CONFLICT).assertIsDisplayed()
         // The extracting/skeleton branch is not the resolved view.
         composeRule.onAllNodesWithTag("entry_extracting").assertCountEquals(0)
+    }
+
+    @Test
+    fun `raw model output is a collapsed accessible disclosure that reveals per-lens text on tap`() {
+        val literalRaw = """{"tags":["battery-died"],"template_label":"aftermath"}"""
+        val id = entryStore.createPendingEntry("battery died", FIXTURE_INSTANT)
+        entryStore.completeEntry(
+            id,
+            ResolvedExtraction(
+                mapOf("tags" to ResolvedField(listOf("battery-died"), ConfidenceVerdict.CANONICAL)),
+            ),
+            null,
+            lensReceipts = listOf(
+                EntryLensReceipt(
+                    lens = Lens.LITERAL,
+                    extracted = true,
+                    fields = mapOf("tags" to "battery died"),
+                    rawResponse = literalRaw,
+                ),
+            ),
+        )
+        setDetail(id)
+
+        val toggle = composeRule.onNodeWithContentDescription(EntryDetailCopy.RAW_OUTPUT_EXPAND_CD)
+        toggle.assert(SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.Button))
+        toggle.assertHasClickAction()
+        // Collapsed by default — the raw payload is not on screen.
+        composeRule.onAllNodesWithText(literalRaw, substring = true).assertCountEquals(0)
+
+        toggle.performClick()
+
+        // Expanded: the verbatim per-lens payload renders inside an announced region.
+        composeRule.onNodeWithText(literalRaw, substring = true).assertIsDisplayed()
+        composeRule.onNodeWithContentDescription("LITERAL raw output: $literalRaw")
+            .assert(SemanticsMatcher.keyIsDefined(SemanticsProperties.LiveRegion))
     }
 
     @Test

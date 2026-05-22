@@ -21,6 +21,9 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -221,6 +224,64 @@ private fun ThreeLensRead(status: String, lenses: List<LensRead>) {
                 ) {
                     EyebrowE(text = lens.label, maxLines = 1, softWrap = false)
                     Text(text = lens.value, style = VestigeTheme.typography.pCompact, color = lens.tone.color())
+                }
+            }
+        }
+        val rawReads = lenses.filter { it.rawResponse != null }
+        if (rawReads.isNotEmpty()) {
+            RawModelOutput(rawReads)
+        }
+    }
+}
+
+@Composable
+private fun RawModelOutput(lenses: List<LensRead>) {
+    val colors = VestigeTheme.colors
+    var expanded by remember { mutableStateOf(false) }
+    val toggleCd = if (expanded) EntryDetailCopy.RAW_OUTPUT_COLLAPSE_CD else EntryDetailCopy.RAW_OUTPUT_EXPAND_CD
+    Column(
+        modifier = Modifier.fillMaxWidth().testTag("entry_raw_output"),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable { expanded = !expanded }
+                .semantics {
+                    role = Role.Button
+                    contentDescription = toggleCd
+                }
+                .padding(vertical = 4.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            EyebrowE(
+                text = EntryDetailCopy.RAW_OUTPUT_EYEBROW,
+                modifier = Modifier.weight(1f),
+                maxLines = 1,
+                softWrap = false,
+            )
+            EyebrowE(text = if (expanded) "−" else "+", color = colors.lime, maxLines = 1)
+        }
+        if (expanded) {
+            lenses.forEach { lens ->
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(colors.s1)
+                        .padding(horizontal = 14.dp, vertical = 10.dp)
+                        .semantics(mergeDescendants = true) {
+                            liveRegion = LiveRegionMode.Polite
+                            contentDescription = "${lens.label} raw output: ${lens.rawResponse.orEmpty()}"
+                        },
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                ) {
+                    EyebrowE(text = lens.label, maxLines = 1, softWrap = false)
+                    Text(
+                        text = lens.rawResponse ?: EntryDetailCopy.RAW_OUTPUT_NONE,
+                        style = VestigeTheme.typography.pCompact,
+                        color = colors.ink,
+                    )
                 }
             }
         }

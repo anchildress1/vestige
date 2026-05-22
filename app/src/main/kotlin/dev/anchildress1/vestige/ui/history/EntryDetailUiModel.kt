@@ -68,7 +68,7 @@ enum class ExtractionDisplay { IN_PROGRESS, COMPLETE, FAILED, NO_READ }
 
 enum class LensTone { CANONICAL, CONFLICT, AMBIGUOUS, CANDIDATE }
 
-data class LensRead(val label: String, val value: String, val tone: LensTone)
+data class LensRead(val label: String, val value: String, val tone: LensTone, val rawResponse: String? = null)
 
 data class FieldRow(val label: String, val value: String, val tone: LensTone)
 

@@ -11,6 +11,7 @@ class EntryLensReceiptJsonTest {
 
     @Test
     fun `encode and decode preserve parsed fields flags and failure metadata`() {
+        val literalRaw = """{"tags":["standup","crashed"]}"""
         val receipts = listOf(
             EntryLensReceipt(
                 lens = Lens.LITERAL,
@@ -22,6 +23,7 @@ class EntryLensReceiptJsonTest {
                 flags = emptyList(),
                 attemptCount = 1,
                 elapsedMs = 1_200L,
+                rawResponse = literalRaw,
             ),
             EntryLensReceipt(
                 lens = Lens.SKEPTICAL,
@@ -38,7 +40,9 @@ class EntryLensReceiptJsonTest {
         assertEquals(true, decoded[0].extracted)
         assertEquals(listOf("standup", "crashed"), decoded[0].fields["tags"])
         assertEquals(mapOf("text" to "review doc", "entry_id" to null), decoded[0].fields["stated_commitment"])
+        assertEquals(literalRaw, decoded[0].rawResponse)
         assertEquals("parse-fail", decoded[1].lastError)
+        assertNull("absent raw output decodes to null", decoded[1].rawResponse)
     }
 
     @Test

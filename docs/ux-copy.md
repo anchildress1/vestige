@@ -268,7 +268,12 @@ Then `YOU · TRANSCRIPT` (dim user transcription), `▸ TAGS` chips, and the sha
 card.
 
 > _Final-polish note (2026-05-19):_ the 3-lens read + field grid are wired from persisted
-> parsed lens receipts and resolved fields. Raw model responses are not stored.
+> parsed lens receipts and resolved fields.
+>
+> _Update (2026-05-22):_ each lens receipt also persists the verbatim model output, surfaced on
+> the detail page as a collapsed `● RAW MODEL OUTPUT` disclosure (tap to expand per-lens text).
+> This is a demo/tuning affordance — it reverses the earlier perf-driven exclusion of raw
+> responses.
 
 ---
 

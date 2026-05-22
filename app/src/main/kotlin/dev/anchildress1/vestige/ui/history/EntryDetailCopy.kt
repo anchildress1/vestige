@@ -25,6 +25,11 @@ object EntryDetailCopy {
     const val LENS_NO_FIELDS = "no fields"
     const val LENS_UNREADABLE = "unreadable"
 
+    const val RAW_OUTPUT_EYEBROW = "● RAW MODEL OUTPUT"
+    const val RAW_OUTPUT_EXPAND_CD = "Show raw model output per lens"
+    const val RAW_OUTPUT_COLLAPSE_CD = "Hide raw model output per lens"
+    const val RAW_OUTPUT_NONE = "no raw output captured"
+
     const val BACK_LABEL = "←"
     const val BACK_CD = "Back"
     const val NEW_ENTRY_LABEL = "● NEW ENTRY"

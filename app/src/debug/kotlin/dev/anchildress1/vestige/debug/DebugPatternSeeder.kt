@@ -157,33 +157,34 @@ object DebugPatternSeeder {
     @Suppress("LongMethod")
     private fun vocabDriftEntries(): List<SeedEntry> = listOf(
         Pair(
-            "I hit the wall hard today — exhausted again in a way that felt different from just being tired. " +
-                "Every limb gave up at once somewhere around 2pm. Not dramatic, just suddenly nothing left.",
+            "I hit a wall today — I'm exhausted again in a way that feels different from just tired. " +
+                "Everything gave up at once around 2pm. It wasn't dramatic, I just suddenly had nothing left.",
             "2026-05-01T12:37:00Z",
         ),
         Pair(
-            "Drained to the bone by mid-morning and I don't even know why. Eyes won't focus on anything. " +
-                "I tried to push through it and just made everything worse. Had to stop completely.",
+            "I was drained by mid-morning and I don't even know why. My eyes won't focus on anything. " +
+                "I tried to push through it but that just made everything worse. Then I just stopped completely.",
             "2026-05-01T17:52:00Z",
         ),
         Pair(
-            "Wiped out before noon. There was no energy left for anything, not even the stuff I wanted to do. " +
-                "I kept telling myself five more minutes and nothing happened.",
+            "I was wiped out before noon today. There was no energy left for anything, " +
+                "not even the stuff I wanted to do. " +
+                "I kept telling myself five more minutes but I never moved.",
             "2026-05-02T01:19:00Z",
         ),
         Pair(
-            "Running on empty and I've been running on empty for days. Fumes only at this point. " +
-                "I got the basics done but barely. There was nothing left at the end of it.",
+            "I've been running on empty for days. The only thing left is fumes at this point. " +
+                "I got the basics done but barely. There's nothing left to pull from.",
             "2026-05-02T07:44:00Z",
         ),
         Pair(
-            "Completely depleted today. My body feels heavier than it did yesterday and " +
-                "yesterday already felt heavy. " +
-                "I sat down to start and stared at it for twenty minutes before giving up.",
+            "I'm completely depleted today. My body feels heavier than it did yesterday and " +
+                "yesterday already felt heavy enough. " +
+                "I sat down to start the report and stared at it for twenty minutes before just giving up.",
             "2026-05-02T11:26:00Z",
         ),
         Pair(
-            "Drained. Just drained. Not tired, not sleepy, not worn out — drained. " +
+            "Drained. I'm just drained. Not tired, not sleepy, not worn out. Totally drained. " +
                 "Like something pulled the plug around noon and I spent the rest of the day " +
                 "waiting for it to come back.",
             "2026-05-02T19:08:00Z",

@@ -1,7 +1,3 @@
-<p align="center">
-  <img src="https://repository-images.githubusercontent.com/1233196257/6d5cb58c-808a-4c73-8627-ee3d5dc7ad7c" alt="Vestige social banner" />
-</p>
-
 <h1 align="center">Vestige</h1>
 
 <p align="center"><em>On-device cognition tracker for ADHD-flavored adults. Anti-sycophant, behavioral, private.</em></p>
@@ -20,9 +16,9 @@
   <img alt="Sonar Tests" src="https://img.shields.io/sonar/tests/anchildress1_vestige?server=https%3A%2F%2Fsonarcloud.io&compact_message&style=for-the-badge" />
 </p>
 
-
-
----
+<p align="center">
+  <img src="https://repository-images.githubusercontent.com/1233196257/6d5cb58c-808a-4c73-8627-ee3d5dc7ad7c" alt="Vestige social banner" />
+</p>
 
 ## Table of Contents
 
@@ -53,7 +49,7 @@ The positioning is deliberate: cognition tracker, not journal app. Patterns are 
 
 ## Status
 
-Phase-4 P0 shipped. The capture loop, history, pattern list + detail, settings, model-status, and the onboarding model-download UX are implemented against the canonical spec under [`docs/`](docs). Pattern lifecycle actions are Skip / Drop / Restart — closure is model-detected only (v1.5, see [`backlog.md`](docs/backlog.md) §`pattern-auto-close`). On-device verification (fresh install on the Galaxy S24 Ultra, STT no-regression round-trip) is the remaining gate before the v1 cut; risk through phases 1–3 was managed via five stop-and-test points (STT-A–E). Full README pass + demo video land in Phase 6 — see [`docs/PRD.md`](docs/PRD.md) §Timeline. Screen-flow diagrams: [`docs/diagrams/user-flows.md`](docs/diagrams/user-flows.md).
+The full loop is implemented and runs on-device: voice / typed capture → Gemma 4 E4B → single-pass 3-lens extraction → convergence resolver → ObjectBox, with deterministic pattern detection and EmbeddingGemma hybrid retrieval (STT-E passed — see [`backlog.md`](docs/backlog.md) §`embeddings-fallback`). Entry Detail surfaces the model's actual work: the three-lens read, the picked archetype, the tone word, and a collapsible raw per-lens model-output view. Capture, history, pattern list + detail, settings, model-status, and onboarding model-download are all built against the canonical spec under [`docs/`](docs). Pattern lifecycle is Skip / Drop / Restart — closure is model-detected only (v1.5, see [`backlog.md`](docs/backlog.md) §`pattern-auto-close`). The active phase is on-device prompt tuning against a seeded demo corpus; risk through phases 1–3 was managed via five stop-and-test points (STT-A–E). Screen-flow diagrams: [`docs/diagrams/user-flows.md`](docs/diagrams/user-flows.md).
 
 ---
 
@@ -62,13 +58,15 @@ Phase-4 P0 shipped. The capture loop, history, pattern list + detail, settings, 
 | Feature | What it does |
 |---|---|
 | Voice capture | `AudioRecord` → Gemma 4 E4B native audio modality. No third-party STT. Audio bytes discarded after inference. |
-| Multi-lens extraction | Each entry runs through 3 lenses × 5 surfaces; convergence determines per-field confidence. See [ADR-002](docs/adrs/ADR-002-multi-lens-extraction-pattern.md). |
+| Multi-lens extraction | Each entry runs 3 lens passes (Literal / Inferential / Skeptical), each covering all 5 surfaces in one call; a convergence resolver votes every field canonical / candidate / ambiguous — tags, archetype, stated commitment, recurrence, and tone word. See [ADR-002](docs/adrs/ADR-002-multi-lens-extraction-pattern.md). |
+| Model transparency | Entry Detail exposes the model's actual work — the picked archetype, the per-lens read, the resolved field grid, and a collapsible raw per-lens model-output block. Nothing is hidden behind a score. |
+| Tone & vocab drift | The Inferential lens names a one-word tone per entry; recurring related tone words surface as an embedding cluster (EmbeddingGemma) so drift is visible over time. |
 | Three personas | Witness / Hardass / Editor — tone-only variants. They do not fork extraction logic. |
 | Pattern detection | Five primitives counted over the last 90 days; sourced (counts, dates, snippets), no feelings or motivation interpretation. See [ADR-003](docs/adrs/ADR-003-pattern-detection-and-persistence.md). |
 | Storage | ObjectBox is the internal source of truth. Export renders readable markdown from rows on demand. |
 | Pattern lifecycle | Skip (returns in 7 days) / Drop (noise, archived) / Restart, with Undo. Closure is model-detected only — v1.5. |
 | Export | System-picker (SAF) zip of per-entry markdown. No storage permission; failures surface, never silent. |
-| Hybrid retrieval | Keyword + tags + recency. Vector layer (EmbeddingGemma 300M) ships only if STT-E passes. |
+| Hybrid retrieval | Keyword + tags + recency + EmbeddingGemma 300M cosine over an ObjectBox HNSW index. STT-E passed; ships in v1. |
 | Local-only | Zero outbound network calls during normal operation; model download is the only network event. Verified with `tcpdump`. |
 
 ---
@@ -90,26 +88,30 @@ Four-module split with manual constructor injection through a single `AppContain
 ```mermaid
 flowchart TB
     User([User]) -- voice --> Audio
-    User -- type --> Coord
+    User -- type --> FG
 
     subgraph onDevice["on-device only — no network at runtime"]
       Audio["AudioRecord<br/>30s chunk normalization"]
-      Coord["InferenceCoordinator<br/>foreground call → background 3-lens"]
+      FG["ForegroundInference<br/>fast transcription + persona follow-up"]
+      BG["BackgroundExtractionWorker<br/>3 lens passes × 5 surfaces"]
       Gemma[("Gemma 4 E4B<br/>via LiteRT-LM")]
       Resolver["Convergence Resolver<br/>canonical · candidate · ambiguous"]
-      ObjectBox[("ObjectBox<br/>entries · tags · patterns")]
+      ObjectBox[("ObjectBox<br/>entries · tags · patterns · vectors")]
       Export[("Export renderer<br/>markdown + JSON snapshot")]
-      Patterns["Pattern Detection<br/>5 primitives · every 10 entries"]
+      Patterns["Pattern Detection<br/>5 primitives · 90-day window"]
 
-      Audio --> Coord
-      Coord -- "prompt + audio" --> Gemma
-      Gemma -- "transcription + lens output" --> Coord
-      Coord --> Resolver
+      Audio --> FG
+      FG -- "prompt + audio" --> Gemma
+      Gemma -- "transcription + follow-up" --> FG
+      FG --> ObjectBox
+      FG -. "hands off" .-> BG
+      BG -- "3 lens prompts" --> Gemma
+      Gemma -- "lens output" --> BG
+      BG --> Resolver
       Resolver --> ObjectBox
       ObjectBox --> Patterns
-      ObjectBox --> Export
-      ObjectBox --> Patterns
       Patterns --> ObjectBox
+      ObjectBox --> Export
     end
 ```
 

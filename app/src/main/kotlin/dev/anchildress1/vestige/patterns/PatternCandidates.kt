@@ -31,6 +31,9 @@ object PatternCandidates {
         maxPriorEntries: Int,
     ): List<HistoryChunk> = activePatterns
         .filter { PatternMatcher.matches(target, it, zoneId) }
+        // Most-recently-seen patterns first so when prompt composition truncates history to its
+        // fixed budget it keeps the freshest matches, not whatever order the store returned.
+        .sortedByDescending { it.lastSeenTimestamp }
         .mapNotNull { pattern ->
             val priors = pattern.supportingEntries.asSequence()
                 .filter { it.id != target.id && it.timestampEpochMs < target.timestampEpochMs }

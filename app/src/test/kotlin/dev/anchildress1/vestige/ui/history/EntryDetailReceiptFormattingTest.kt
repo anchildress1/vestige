@@ -288,11 +288,22 @@ class EntryDetailReceiptFormattingTest {
     }
 
     @Test
-    fun `REPEAT shows the validated pattern title with a consensus tone`() {
-        val rows = rowsOf(receiptsJson = "[]", repeatTitle = "Tuesday Crash")
+    fun `REPEAT shows the validated pattern title with the recurrence verdict tone`() {
+        val consensusRows = rowsOf(
+            receiptsJson = "[]",
+            confidenceJson = confidence("recurrence_link" to ConfidenceVerdict.CONSENSUS),
+            repeatTitle = "Tuesday Crash",
+        )
+        assertEquals("Tuesday Crash", fieldRow(consensusRows, "REPEAT").value)
+        assertEquals(LensTone.CONSENSUS, fieldRow(consensusRows, "REPEAT").tone)
 
-        assertEquals("Tuesday Crash", fieldRow(rows, "REPEAT").value)
-        assertEquals(LensTone.CONSENSUS, fieldRow(rows, "REPEAT").tone)
+        // A single-lens CANDIDATE link must not render as fully-corroborated CONSENSUS.
+        val candidateRows = rowsOf(
+            receiptsJson = "[]",
+            confidenceJson = confidence("recurrence_link" to ConfidenceVerdict.CANDIDATE),
+            repeatTitle = "Tuesday Crash",
+        )
+        assertEquals(LensTone.CANDIDATE, fieldRow(candidateRows, "REPEAT").tone)
     }
 
     @Test

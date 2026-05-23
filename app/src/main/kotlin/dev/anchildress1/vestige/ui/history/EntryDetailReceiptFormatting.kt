@@ -85,7 +85,13 @@ internal fun buildFieldRows(entity: EntryEntity, repeatTitle: String?): List<Fie
     // the caller from the stored pattern_id). Deterministic detection only proposes the candidate;
     // the model decides viability, so a blank here means "no confirmed recurrence", not "no data".
     val recurrenceValue = repeatTitle?.takeIf(String::isNotBlank) ?: DASH
-    val recurrenceTone = if (recurrenceValue == DASH) LensTone.AMBIGUOUS else LensTone.CONSENSUS
+    // Tone follows the recurrence_link verdict, not the mere presence of a title: a single-lens
+    // CANDIDATE link must not render as fully-corroborated CONSENSUS.
+    val recurrenceTone = if (recurrenceValue == DASH) {
+        LensTone.AMBIGUOUS
+    } else {
+        confidence[KEY_RECURRENCE].toTone(fallback = LensTone.CANDIDATE)
+    }
     val resolvedVocab = entity.vocabularyWord?.trim()?.takeIf { it.isNotBlank() && it.lowercase() !in NULLISH_VOCAB }
     val receiptVocab = receipts?.let(::distinctReceiptVocab).orEmpty()
     val vocabValue = resolvedVocab

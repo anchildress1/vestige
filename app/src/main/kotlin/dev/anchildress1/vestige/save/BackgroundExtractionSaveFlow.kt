@@ -250,11 +250,14 @@ class BackgroundExtractionSaveFlow(
         seededHistory: List<HistoryChunk>,
     ): List<HistoryChunk> {
         if (seededHistory.isNotEmpty()) return seededHistory
-        // Pattern candidates first: they carry the deterministic pattern_id the recurrence surface
-        // validates. Semantic chunks follow as context-only background. Either source degrades to
-        // empty independently so one failing never starves the other.
-        return historyOrEmpty(entryId, "candidate") { retrievePatternCandidates(entryId) } +
-            historyOrEmpty(entryId, "semantic") { retrieveHistory(entryText) }
+        // Pattern candidates lead — they carry the deterministic pattern_id the recurrence surface
+        // validates — but are capped so they leave room in PromptComposer's history budget for the
+        // semantic background chunks that follow. Either source degrades to empty independently so
+        // one failing never starves the other.
+        val candidates = historyOrEmpty(entryId, "candidate") { retrievePatternCandidates(entryId) }
+            .take(MAX_CANDIDATE_HISTORY)
+        val semantic = historyOrEmpty(entryId, "semantic") { retrieveHistory(entryText) }
+        return candidates + semantic
     }
 
     private suspend fun historyOrEmpty(
@@ -527,6 +530,10 @@ class BackgroundExtractionSaveFlow(
         // Candidate window scanned for same-slot priors, and how many matches to feed the read.
         private const val TEMPORAL_HISTORY_CANDIDATES = 250
         private const val TEMPORAL_HISTORY_TOP_N = 5
+
+        // Cap the recurrence candidates so they can't fill PromptComposer's whole history budget and
+        // crowd out the semantic background context entirely.
+        private const val MAX_CANDIDATE_HISTORY = 2
     }
 }
 

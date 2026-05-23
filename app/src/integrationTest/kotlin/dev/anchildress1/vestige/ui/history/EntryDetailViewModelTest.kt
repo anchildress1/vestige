@@ -398,7 +398,10 @@ class EntryDetailViewModelTest {
             val loaded = awaitItem() as EntryDetailUiState.Loaded
             assertEquals(3, loaded.model.lenses.size)
             assertEquals("battery died", loaded.model.lenses.first { it.label == "LITERAL" }.value)
-            assertEquals(LensTone.CONFLICT, loaded.model.lenses.first { it.label == "SKEPTICAL" }.tone)
+            // Skeptical agrees with Literal here ("battery died"), so despite its flag it reads
+            // CANONICAL — red is reserved for a divergent Skeptical. Field-grid + status stay
+            // CONFLICT, driven by the persisted CANONICAL_WITH_CONFLICT confidence.
+            assertEquals(LensTone.CANONICAL, loaded.model.lenses.first { it.label == "SKEPTICAL" }.tone)
             assertEquals(EntryDetailCopy.THREE_LENS_STATUS_CONFLICT, loaded.model.lensStatus)
             assertEquals(LensTone.CONFLICT, loaded.model.fields.first { it.label == "BEHAVIOR" }.tone)
         }

@@ -145,7 +145,7 @@ class HistoryScreenTest {
         composeRule.onNodeWithText("12:16 AM").assertIsDisplayed()
         composeRule.onNodeWithText("JAN 1").assertIsDisplayed()
         composeRule.onNodeWithText("standup crashed me again", substring = true).assertIsDisplayed()
-        composeRule.onNodeWithText("0s · 4 WORDS").assertIsDisplayed()
+        composeRule.onNodeWithText("0sec · 4 WORDS").assertIsDisplayed()
     }
 
     // a11y — tap target ≥ 48 dp
@@ -174,7 +174,7 @@ class HistoryScreenTest {
 
         composeRule.setContent { HistoryScreen(viewModel = newViewModel(), persona = Persona.WITNESS) }
         composeRule.onNodeWithContentDescription(
-            "12:16 AM JAN 1 · something happened today · 0s · 3 words",
+            "12:16 AM JAN 1 · something happened today · 0sec · 3 words",
         ).assertIsDisplayed()
     }
 

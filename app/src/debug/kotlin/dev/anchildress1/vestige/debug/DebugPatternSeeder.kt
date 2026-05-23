@@ -65,7 +65,7 @@ object DebugPatternSeeder {
             "Another Tuesday and the same pattern as always. The meeting ends and I just kind of decompress " +
                 "for two hours whether I want to or not. Doesn't matter how much coffee I had beforehand. " +
                 "Body just decides it's done and that's that.",
-            Instant.parse("2026-05-05T14:12:00Z"),
+            Instant.parse("2026-05-06T18:42:00Z"),
             12_000L,
         ),
         SeedEntry(
@@ -73,7 +73,7 @@ object DebugPatternSeeder {
                 "just the usual check-in, but something about the framing left me completely flat afterward. " +
                 "Couldn't do anything useful for the rest of the morning. " +
                 "Ate lunch just to have something to do.",
-            Instant.parse("2026-05-12T15:33:00Z"),
+            Instant.parse("2026-05-13T20:17:00Z"),
             24_000L,
         ),
         SeedEntry(
@@ -81,7 +81,7 @@ object DebugPatternSeeder {
                 "I was functional an hour earlier and then just gone. " +
                 "Had to give up on the rest of the afternoon. " +
                 "I don't know what happened.",
-            Instant.parse("2026-05-06T18:42:00Z"),
+            Instant.parse("2026-05-09T23:13:00Z"),
             25_000L,
         ),
         SeedEntry(
@@ -203,13 +203,13 @@ object DebugPatternSeeder {
             "Maybe I'm burnt out and my attention is just skating across " +
                 "everything without actually landing anywhere. " +
                 "I'd start reading something and be three paragraphs in and have no idea what I was looking at.",
-            "2026-05-13T20:17:00Z",
+            "2026-05-12T15:33:00Z",
         ),
         Pair(
             "Tonight I'm wired again and I really don't know which is worse. " +
                 "My body wants sleep, but my brain refuses. " +
                 "Lying down doesn't help. Guess I'm just running on the wrong frequency.",
-            "2026-05-09T23:13:00Z",
+            "2026-05-05T14:12:00Z",
         ),
         Pair(
             "I can't sleep, can't focus, like both tanks are empty at the same time. I don't know how that works " +

@@ -276,11 +276,7 @@ private fun RawModelOutput(lenses: List<LensRead>) {
                     modifier = Modifier
                         .fillMaxWidth()
                         .background(colors.s1)
-                        .padding(horizontal = 14.dp, vertical = 10.dp)
-                        .semantics(mergeDescendants = true) {
-                            liveRegion = LiveRegionMode.Polite
-                            contentDescription = "${lens.label} raw output: ${lens.rawResponse.orEmpty()}"
-                        },
+                        .padding(horizontal = 14.dp, vertical = 10.dp),
                     verticalArrangement = Arrangement.spacedBy(4.dp),
                 ) {
                     EyebrowE(text = lens.label, maxLines = 1, softWrap = false)

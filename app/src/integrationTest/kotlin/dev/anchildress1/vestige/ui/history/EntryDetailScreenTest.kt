@@ -9,6 +9,7 @@ import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertHasClickAction
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onFirst
@@ -239,10 +240,12 @@ class EntryDetailScreenTest {
 
         toggle.performClick()
 
-        // Expanded: the verbatim per-lens payload renders inside an announced region.
+        // Expanded: the verbatim per-lens payload renders as ordinary readable text — the raw
+        // blob is not crammed into contentDescription, and the debug panel does not auto-announce
+        // via a live region.
         composeRule.onNodeWithText(literalRaw, substring = true).assertIsDisplayed()
-        composeRule.onNodeWithContentDescription("LITERAL raw output: $literalRaw")
-            .assert(SemanticsMatcher.keyIsDefined(SemanticsProperties.LiveRegion))
+        composeRule.onAllNodesWithContentDescription("LITERAL raw output: $literalRaw")
+            .assertCountEquals(0)
     }
 
     @Test

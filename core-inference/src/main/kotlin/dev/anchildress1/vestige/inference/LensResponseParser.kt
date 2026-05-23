@@ -36,11 +36,17 @@ internal object LensResponseParser {
         }
     }
 
-    /** `key: value` -> (lowercased key, trimmed value); null for lines without a leading key. */
+    /**
+     * `key: value` -> (normalized key, trimmed value); null for lines without a leading key. The key
+     * is lowercased and `-`→`_` so the model's inconsistent `template-label` / `recurrence-kind`
+     * spellings still bind to the schema keys instead of being silently dropped. Hyphens in the
+     * value (kebab-case tags) are untouched.
+     */
     private fun splitLine(line: String): Pair<String, String>? {
         val separator = line.indexOf(':')
         if (separator <= 0) return null
-        return line.substring(0, separator).trim().lowercase() to line.substring(separator + 1).trim()
+        val key = line.substring(0, separator).trim().lowercase().replace('-', '_')
+        return key to line.substring(separator + 1).trim()
     }
 
     /** Last value wins per scalar key; maps to the field shapes convergence expects. */

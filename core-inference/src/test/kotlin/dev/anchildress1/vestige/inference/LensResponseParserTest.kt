@@ -118,4 +118,17 @@ class LensResponseParserTest {
     fun `returns null when no recognizable field line is present`() {
         assertNull(LensResponseParser.parse(Lens.LITERAL, "the model forgot the format again"))
     }
+
+    @Test
+    fun `hyphenated keys bind to the underscore schema keys`() {
+        // Gemma inconsistently writes template-label / recurrence-kind; both must still bind.
+        val raw = "template-label: aftermath\nrecurrence-kind: exact\ntags: standup, battery-died"
+        val extraction = LensResponseParser.parse(Lens.LITERAL, raw)
+
+        assertNotNull(extraction)
+        assertEquals("aftermath", extraction!!.fields["template_label"])
+        assertEquals("exact", extraction.fields["recurrence_kind"])
+        // Hyphens inside values (kebab-case tags) are preserved.
+        assertEquals(listOf("standup", "battery-died"), extraction.fields["tags"])
+    }
 }

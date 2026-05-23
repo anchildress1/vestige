@@ -4,7 +4,7 @@
 
 <p align="center">
   Built for the <a href="https://dev.to/devteam/join-the-gemma-4-challenge-3000-prize-pool-for-ten-winners-23in">Gemma 4 Challenge</a> — submission category: Build with Gemma 4.<br/>
-  Canonical product spec lives under <a href="docs"><code>docs/</code></a>; see <a href="AGENTS.md"><code>AGENTS.md</code></a> for AI agent rules.
+  Canonical product spec lives under <a href="./docs/"><code>docs/</code></a>; see <a href="AGENTS.md"><code>AGENTS.md</code></a> for AI agent rules.
 </p>
 
 <p align="center">
@@ -49,7 +49,7 @@ The positioning is deliberate: cognition tracker, not journal app. Patterns are 
 
 ## Status
 
-The full loop is implemented and runs on-device: voice / typed capture → Gemma 4 E4B → single-pass 3-lens extraction → convergence resolver → ObjectBox, with deterministic pattern detection and EmbeddingGemma hybrid retrieval (STT-E passed — see [`backlog.md`](docs/backlog.md) §`embeddings-fallback`). Entry Detail surfaces the model's actual work: the three-lens read, the picked archetype, the tone word, and a collapsible raw per-lens model-output view. Capture, history, pattern list + detail, settings, model-status, and onboarding model-download are all built against the canonical spec under [`docs/`](docs). Pattern lifecycle is Skip / Drop / Restart — closure is model-detected only (v1.5, see [`backlog.md`](docs/backlog.md) §`pattern-auto-close`). The active phase is on-device prompt tuning against a seeded demo corpus; risk through phases 1–3 was managed via five stop-and-test points (STT-A–E). Screen-flow diagrams: [`docs/diagrams/user-flows.md`](docs/diagrams/user-flows.md).
+The full loop is implemented and runs on-device: voice / typed capture → Gemma 4 E4B → single-pass 3-lens extraction → convergence resolver → ObjectBox, with deterministic pattern detection and EmbeddingGemma hybrid retrieval (STT-E passed — see [`backlog.md`](docs/backlog.md) §`embeddings-fallback`). Entry Detail surfaces the model's actual work: the three-lens read, the picked archetype, the tone word, and a collapsible raw per-lens model-output view. Capture, history, pattern list + detail, settings, model-status, and onboarding model-download are all built against the canonical spec under [`./docs/`](docs). Pattern lifecycle is Skip / Drop / Restart — closure is model-detected only (v1.5, see [`backlog.md`](docs/backlog.md) §`pattern-auto-close`). The active phase is on-device prompt tuning against a seeded demo corpus; risk through phases 1–3 was managed via five stop-and-test points (STT-A–E). Screen-flow diagrams: [`docs/diagrams/user-flows.md`](docs/diagrams/user-flows.md).
 
 ---
 

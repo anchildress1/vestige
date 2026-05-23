@@ -154,7 +154,7 @@ class AppContainer(
     ) -> VectorBackfillWorker = { store, embedEntryText ->
         VectorBackfillWorker(store, embedEntryText)
     },
-    private val backgroundExtractionSaveFlowFactory: (
+    private val backgroundExtractionSaveFlowFactory: ( // NOSONAR kotlin:S107
         EntryStore,
         BackgroundExtractionWorker,
         ObservationGenerator,

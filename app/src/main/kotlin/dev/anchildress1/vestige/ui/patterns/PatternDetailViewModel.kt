@@ -22,6 +22,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.time.Clock
+import java.util.Locale
 
 /**
  * Drives the Pattern detail screen. Loads the pattern + its supporting entries on construction;
@@ -186,7 +187,7 @@ class PatternDetailViewModel(
     )
 
     private fun vocabularyFrom(entries: List<EntryEntity>): List<String> = entries
-        .mapNotNull { it.vocabularyWord?.trim()?.lowercase()?.takeIf(String::isNotEmpty) }
+        .mapNotNull { it.vocabularyWord?.trim()?.lowercase(Locale.ROOT)?.takeIf(String::isNotEmpty) }
         .distinct()
         .take(VOCABULARY_LIMIT)
 

@@ -1,9 +1,7 @@
 package dev.anchildress1.vestige.ui.history
 
 import dev.anchildress1.vestige.model.ExtractionStatus
-import dev.anchildress1.vestige.model.PatternState
 import dev.anchildress1.vestige.storage.EntryEntity
-import dev.anchildress1.vestige.storage.PatternEntity
 import dev.anchildress1.vestige.storage.lensReceiptsJsonOrEmpty
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.persistentListOf
@@ -53,7 +51,7 @@ data class EntryDetailUiModel(
                     entity.lensReceiptsJson,
                     hasConflict = status == EntryDetailCopy.THREE_LENS_STATUS_CONFLICT,
                 ).toImmutableList(),
-                fields = buildFieldRows(entity, repeatPatternTitle(entity.patterns)).toImmutableList(),
+                fields = buildFieldRows(entity).toImmutableList(),
                 observations = parseObservations(entity.entryObservationsJson).toImmutableList(),
                 tags = entity.tags.map { it.name }.sorted().toImmutableList(),
                 extraction = when (entity.extractionStatus) {
@@ -75,16 +73,6 @@ data class EntryDetailUiModel(
         }
     }
 }
-
-/**
- * REPEAT shows the H2 title of the strongest ACTIVE pattern this entry belongs to — the same
- * deterministic title the Patterns page renders, not a model-emitted id. Strongest = most
- * supporting entries, tie-broken by most recent. Null when the entry is in no live pattern.
- */
-internal fun repeatPatternTitle(patterns: List<PatternEntity>): String? = patterns
-    .filter { it.state == PatternState.ACTIVE && it.title.isNotBlank() }
-    .maxWithOrNull(compareBy({ it.supportingEntries.size }, { it.lastSeenTimestamp }))
-    ?.title
 
 enum class ExtractionDisplay { IN_PROGRESS, COMPLETE, FAILED, NO_READ }
 

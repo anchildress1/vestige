@@ -3,10 +3,8 @@ package dev.anchildress1.vestige.ui.history
 import dev.anchildress1.vestige.model.ConfidenceVerdict
 import dev.anchildress1.vestige.model.EntryLensReceipt
 import dev.anchildress1.vestige.model.Lens
-import dev.anchildress1.vestige.model.PatternState
 import dev.anchildress1.vestige.storage.EntryEntity
 import dev.anchildress1.vestige.storage.EntryLensReceiptJson
-import dev.anchildress1.vestige.storage.PatternEntity
 import dev.anchildress1.vestige.storage.TagEntity
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
@@ -30,25 +28,20 @@ class EntryDetailReceiptFormattingTest {
         receiptsJson: String?,
         entryText: String = "",
         confidenceJson: String = "{}",
+        recurrenceLink: String? = null,
         statedCommitmentJson: String? = null,
         tags: List<String> = emptyList(),
-        repeatTitle: String? = null,
     ): List<FieldRow> = buildFieldRows(
         EntryEntity(
             entryText = entryText,
             confidenceJson = confidenceJson,
+            recurrenceLink = recurrenceLink,
             statedCommitmentJson = statedCommitmentJson,
             lensReceiptsJson = receiptsJson,
         ).also { entity ->
             tags.forEach { tag -> entity.tags.add(TagEntity(name = tag)) }
         },
-        repeatTitle = repeatTitle,
     )
-
-    private fun pattern(title: String, state: PatternState, supporting: Int, lastSeen: Long): PatternEntity =
-        PatternEntity(title = title, state = state, lastSeenTimestamp = lastSeen).also { p ->
-            repeat(supporting) { p.supportingEntries.add(EntryEntity()) }
-        }
 
     private fun fieldRow(rows: List<FieldRow>, label: String): FieldRow = rows.first { it.label == label }
 
@@ -223,13 +216,18 @@ class EntryDetailReceiptFormattingTest {
                 EntryLensReceipt(
                     Lens.LITERAL,
                     extracted = true,
-                    fields = mapOf("stated_commitment" to "ignored commitment"),
+                    fields = mapOf(
+                        "stated_commitment" to "ignored commitment",
+                        "recurrence_link" to VALID_PATTERN_ID,
+                    ),
                 ),
             ),
             confidenceJson = confidence(
                 "stated_commitment" to ConfidenceVerdict.CANONICAL,
+                "recurrence_link" to ConfidenceVerdict.CANDIDATE,
                 "tags" to ConfidenceVerdict.CANONICAL,
             ),
+            recurrenceLink = "existing-pattern",
             statedCommitmentJson = """{"text":"call Pat"}""",
             tags = listOf("zeta", "alpha", "beta"),
         )
@@ -238,6 +236,8 @@ class EntryDetailReceiptFormattingTest {
         assertEquals(LensTone.CANONICAL, fieldRow(rows, "BEHAVIOR").tone)
         assertEquals("call Pat", fieldRow(rows, "PROMISES").value)
         assertEquals(LensTone.CANONICAL, fieldRow(rows, "PROMISES").tone)
+        assertEquals("existing-pattern", fieldRow(rows, "REPEAT").value)
+        assertEquals(LensTone.CANDIDATE, fieldRow(rows, "REPEAT").tone)
     }
 
     @Test
@@ -247,36 +247,55 @@ class EntryDetailReceiptFormattingTest {
                 EntryLensReceipt(
                     Lens.LITERAL,
                     extracted = true,
-                    fields = mapOf("stated_commitment" to mapOf("topic_or_person" to "Riley")),
+                    fields = mapOf(
+                        "stated_commitment" to mapOf("topic_or_person" to "Riley"),
+                        "recurrence_link" to VALID_PATTERN_ID,
+                    ),
                     flags = listOf("state disagreement"),
                 ),
                 EntryLensReceipt(
                     Lens.INFERENTIAL,
                     extracted = true,
-                    fields = mapOf("stated_commitment" to mapOf("note" to "call Riley")),
+                    fields = mapOf(
+                        "stated_commitment" to mapOf("note" to "call Riley"),
+                        "recurrence_link" to VALID_PATTERN_ID,
+                    ),
+                ),
+                EntryLensReceipt(
+                    Lens.SKEPTICAL,
+                    extracted = true,
+                    fields = mapOf("recurrence_link" to "not-a-pattern-id"),
                 ),
             ),
         )
 
         assertEquals("Riley", fieldRow(rows, "PROMISES").value)
         assertEquals(LensTone.CONFLICT, fieldRow(rows, "PROMISES").tone)
+        assertEquals(VALID_PATTERN_ID, fieldRow(rows, "REPEAT").value)
+        assertEquals(LensTone.CONFLICT, fieldRow(rows, "REPEAT").tone)
     }
 
     @Test
     fun `two receipt field supports read as canonical without flags`() {
         val rows = rowsOf(
             receiptsJson = encode(
-                EntryLensReceipt(Lens.LITERAL, extracted = true, fields = mapOf("stated_commitment" to "send note")),
+                EntryLensReceipt(
+                    Lens.LITERAL,
+                    extracted = true,
+                    fields = mapOf("stated_commitment" to "send note", "recurrence_link" to VALID_PATTERN_ID),
+                ),
                 EntryLensReceipt(
                     Lens.INFERENTIAL,
                     extracted = true,
-                    fields = mapOf("stated_commitment" to "send note"),
+                    fields = mapOf("stated_commitment" to "send note", "recurrence_link" to VALID_PATTERN_ID),
                 ),
             ),
         )
 
         assertEquals("send note", fieldRow(rows, "PROMISES").value)
         assertEquals(LensTone.CANONICAL, fieldRow(rows, "PROMISES").tone)
+        assertEquals(VALID_PATTERN_ID, fieldRow(rows, "REPEAT").value)
+        assertEquals(LensTone.CANONICAL, fieldRow(rows, "REPEAT").tone)
     }
 
     @Test
@@ -286,59 +305,47 @@ class EntryDetailReceiptFormattingTest {
                 EntryLensReceipt(
                     Lens.LITERAL,
                     extracted = true,
-                    fields = mapOf("stated_commitment" to "send the note"),
+                    fields = mapOf(
+                        "stated_commitment" to "send the note",
+                        "recurrence_link" to VALID_PATTERN_ID,
+                    ),
                 ),
             ),
         )
 
         assertEquals(LensTone.CANDIDATE, fieldRow(rows, "PROMISES").tone)
+        assertEquals(LensTone.CANDIDATE, fieldRow(rows, "REPEAT").tone)
     }
 
     @Test
-    fun `REPEAT shows the detected pattern title with a canonical tone`() {
-        val rows = rowsOf(receiptsJson = "[]", repeatTitle = "Tuesday Crash")
+    fun `invalid receipt recurrence falls back to dash and ambiguous tone`() {
+        val rows = rowsOf(
+            receiptsJson = encode(
+                EntryLensReceipt(Lens.LITERAL, extracted = true, fields = mapOf("recurrence_link" to "short")),
+                EntryLensReceipt(Lens.INFERENTIAL, extracted = true, fields = mapOf("recurrence_link" to 123)),
+                EntryLensReceipt(Lens.SKEPTICAL, extracted = true, fields = mapOf("recurrence_link" to " ")),
+            ),
+        )
 
-        assertEquals("Tuesday Crash", fieldRow(rows, "REPEAT").value)
-        assertEquals(LensTone.CANONICAL, fieldRow(rows, "REPEAT").tone)
+        assertEquals("—", fieldRow(rows, "REPEAT").value)
+        assertEquals(LensTone.AMBIGUOUS, fieldRow(rows, "REPEAT").tone)
     }
 
     @Test
-    fun `REPEAT falls back to dash and ambiguous when the entry is in no pattern`() {
-        val none = rowsOf(receiptsJson = "[]", repeatTitle = null)
-        val blank = rowsOf(receiptsJson = "[]", repeatTitle = "   ")
+    fun `receipt recurrence with flags reads as conflict`() {
+        val rows = rowsOf(
+            receiptsJson = encode(
+                EntryLensReceipt(
+                    Lens.LITERAL,
+                    extracted = true,
+                    fields = mapOf("recurrence_link" to VALID_PATTERN_ID),
+                    flags = listOf("pattern conflict"),
+                ),
+            ),
+        )
 
-        assertEquals("—", fieldRow(none, "REPEAT").value)
-        assertEquals(LensTone.AMBIGUOUS, fieldRow(none, "REPEAT").tone)
-        assertEquals("—", fieldRow(blank, "REPEAT").value)
-    }
-
-    // --- repeatPatternTitle selection ---
-
-    @Test
-    fun `repeat title picks the active pattern with the most supporting entries`() {
-        val weak = pattern(title = "Weak", state = PatternState.ACTIVE, supporting = 3, lastSeen = 100)
-        val strong = pattern(title = "Tuesday Crash", state = PatternState.ACTIVE, supporting = 5, lastSeen = 50)
-
-        assertEquals("Tuesday Crash", repeatPatternTitle(listOf(weak, strong)))
-    }
-
-    @Test
-    fun `repeat title breaks support ties on the most recent pattern`() {
-        val older = pattern(title = "Older", state = PatternState.ACTIVE, supporting = 4, lastSeen = 100)
-        val newer = pattern(title = "Newer", state = PatternState.ACTIVE, supporting = 4, lastSeen = 200)
-
-        assertEquals("Newer", repeatPatternTitle(listOf(older, newer)))
-    }
-
-    @Test
-    fun `repeat title ignores non-active and untitled patterns`() {
-        val snoozed = pattern(title = "Snoozed", state = PatternState.SNOOZED, supporting = 9, lastSeen = 999)
-        val untitled = pattern(title = "", state = PatternState.ACTIVE, supporting = 9, lastSeen = 999)
-        val live = pattern(title = "Live", state = PatternState.ACTIVE, supporting = 2, lastSeen = 1)
-
-        assertEquals("Live", repeatPatternTitle(listOf(snoozed, untitled, live)))
-        assertNull(repeatPatternTitle(listOf(snoozed, untitled)))
-        assertNull(repeatPatternTitle(emptyList()))
+        assertEquals(VALID_PATTERN_ID, fieldRow(rows, "REPEAT").value)
+        assertEquals(LensTone.CONFLICT, fieldRow(rows, "REPEAT").tone)
     }
 
     @Test
@@ -493,5 +500,9 @@ class EntryDetailReceiptFormattingTest {
     fun `empty or malformed confidence reads as ambiguous`() {
         assertEquals(EntryDetailCopy.THREE_LENS_STATUS_AMBIGUOUS, lensStatus("{}"))
         assertEquals(EntryDetailCopy.THREE_LENS_STATUS_AMBIGUOUS, lensStatus("not json"))
+    }
+
+    private companion object {
+        private val VALID_PATTERN_ID = "a".repeat(64)
     }
 }

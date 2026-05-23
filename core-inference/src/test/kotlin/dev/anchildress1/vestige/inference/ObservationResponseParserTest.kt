@@ -37,6 +37,30 @@ class ObservationResponseParserTest {
     }
 
     @Test
+    fun `salvages a theme-noticing observation by dropping fields outside the schema`() {
+        val raw = """
+            {
+              "observations": [
+                {
+                  "text": "Third Tuesday running the energy crashed after the meeting.",
+                  "evidence": "theme-noticing",
+                  "fields": ["weekday", "tags"]
+                }
+              ]
+            }
+        """.trimIndent()
+
+        val observations = ObservationResponseParser.parse(raw)
+
+        assertNotNull(observations)
+        assertEquals(1, observations!!.size)
+        // "weekday" is outside the schema and is dropped; the observation survives on "tags"
+        // rather than being rejected outright.
+        assertEquals(listOf("tags"), observations[0].fields)
+        assertEquals(ObservationEvidence.THEME_NOTICING, observations[0].evidence)
+    }
+
+    @Test
     fun `truncates to two when the model overshoots`() {
         val raw = """
             {

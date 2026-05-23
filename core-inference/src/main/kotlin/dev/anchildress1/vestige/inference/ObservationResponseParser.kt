@@ -101,22 +101,27 @@ internal object ObservationResponseParser {
             ?: return skip("unknown-evidence:len=${evidenceSerial.length}")
         if (evidence == ObservationEvidence.PATTERN_CALLOUT) return skip("pattern-callout-from-model")
 
-        val fields = (obj.opt("fields") as? JSONArray)?.let { arr ->
+        val rawFields = (obj.opt("fields") as? JSONArray)?.let { arr ->
             (0 until arr.length()).mapNotNull { idx -> (arr.opt(idx) as? String)?.trim()?.takeIf { it.isNotEmpty() } }
         } ?: emptyList()
-        if (!fieldsAreValid(evidence, fields)) return skip("invalid-fields:${evidence.serial}")
+        val fields = sanitizeFields(evidence, rawFields) ?: return skip("invalid-fields:${evidence.serial}")
 
         return EntryObservation(text = text, evidence = evidence, fields = fields)
     }
 
-    private fun fieldsAreValid(evidence: ObservationEvidence, fields: List<String>): Boolean = when (evidence) {
-        ObservationEvidence.COMMITMENT_FLAG -> fields == listOf("stated_commitment")
+    // Salvage over reject (matches the entry-parser contract): theme-noticing / volunteered lines
+    // keep their text and we just drop any field outside the schema — the observation still stands
+    // on `entry_text`. A commitment flag must cite `stated_commitment`, so keep that field when
+    // present and reject only when it's absent (a commitment flag with no commitment is empty).
+    private fun sanitizeFields(evidence: ObservationEvidence, fields: List<String>): List<String>? = when (evidence) {
+        ObservationEvidence.COMMITMENT_FLAG ->
+            listOf("stated_commitment").takeIf { "stated_commitment" in fields }
 
         ObservationEvidence.VOLUNTEERED_CONTEXT,
         ObservationEvidence.THEME_NOTICING,
-        -> fields.all { it in KNOWN_FIELDS }
+        -> fields.filter { it in KNOWN_FIELDS }
 
-        ObservationEvidence.PATTERN_CALLOUT -> false
+        ObservationEvidence.PATTERN_CALLOUT -> null
     }
 
     private fun findFirstParseableObject(raw: String): JSONObject? {

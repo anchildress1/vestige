@@ -154,13 +154,12 @@ class AppContainer(
     ) -> VectorBackfillWorker = { store, embedEntryText ->
         VectorBackfillWorker(store, embedEntryText)
     },
-    private val backgroundExtractionSaveFlowFactory: ( // NOSONAR kotlin:S107
+    private val backgroundExtractionSaveFlowFactory: (
         EntryStore,
         BackgroundExtractionWorker,
         ObservationGenerator,
         BackgroundExtractionLifecycleCallbacks,
         CoroutineScope,
-        suspend (String) -> List<HistoryChunk>,
         suspend (Long) -> List<HistoryChunk>,
         PatternDetectionOrchestrator?,
     ) -> BackgroundExtractionSaveFlow =
@@ -170,7 +169,6 @@ class AppContainer(
                 observationGenerator,
                 lifecycleCallbacks,
                 extractionScope,
-                retrieveHistory,
                 retrievePatternCandidates,
                 orchestrator,
             ->
@@ -180,7 +178,6 @@ class AppContainer(
                 observationGenerator = observationGenerator,
                 lifecycleCallbacks = lifecycleCallbacks,
                 scope = extractionScope,
-                retrieveHistory = retrieveHistory,
                 retrievePatternCandidates = retrievePatternCandidates,
                 patternOrchestrator = orchestrator,
             )
@@ -379,7 +376,6 @@ class AppContainer(
                 onPatternCalloutAppended = { _dataRevision.value += 1 },
             ),
             scope,
-            ::retrieveHistory,
             ::retrievePatternCandidates,
             patternDetectionOrchestrator,
         )

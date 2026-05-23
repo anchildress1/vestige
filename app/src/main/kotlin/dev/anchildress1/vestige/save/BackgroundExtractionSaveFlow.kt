@@ -64,7 +64,6 @@ class BackgroundExtractionSaveFlow(
     private val observationGenerator: ObservationGenerator,
     private val lifecycleCallbacks: BackgroundExtractionLifecycleCallbacks,
     private val scope: CoroutineScope,
-    private val retrieveHistory: suspend (String) -> List<HistoryChunk> = { emptyList() },
     private val retrievePatternCandidates: suspend (Long) -> List<HistoryChunk> = { emptyList() },
     private val patternOrchestrator: PatternDetectionOrchestrator? = null,
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
@@ -202,7 +201,7 @@ class BackgroundExtractionSaveFlow(
     ) {
         try {
             val requestWithHistory = request.copy(
-                retrievedHistory = resolveRetrievedHistory(entryId, entryText, request.retrievedHistory),
+                retrievedHistory = resolveRetrievedHistory(entryId, request.retrievedHistory),
             )
             when (val result = worker.extract(requestWithHistory, terminalRelay.workerListener)) {
                 is BackgroundExtractionResult.Success -> handleSuccess(
@@ -247,20 +246,13 @@ class BackgroundExtractionSaveFlow(
         }
     }
 
-    private suspend fun resolveRetrievedHistory(
-        entryId: Long,
-        entryText: String,
-        seededHistory: List<HistoryChunk>,
-    ): List<HistoryChunk> {
+    private suspend fun resolveRetrievedHistory(entryId: Long, seededHistory: List<HistoryChunk>): List<HistoryChunk> {
         if (seededHistory.isNotEmpty()) return seededHistory
-        // Pattern candidates lead — they carry the deterministic pattern_id the recurrence surface
-        // validates — but are capped so they leave room in PromptComposer's history budget for the
-        // semantic background chunks that follow. Either source degrades to empty independently so
-        // one failing never starves the other.
-        val candidates = historyOrEmpty(entryId, "candidate") { retrievePatternCandidates(entryId) }
+        // Only the deterministic, strictly-prior, same-slot candidate feeds the read. Semantic
+        // similarity is NOT time-bounded — it surfaces look-alikes from any date, which made the
+        // model report recurrence on the very first entry. Recurrence must judge real priors only.
+        return historyOrEmpty(entryId, "candidate") { retrievePatternCandidates(entryId) }
             .take(MAX_CANDIDATE_HISTORY)
-        val semantic = historyOrEmpty(entryId, "semantic") { retrieveHistory(entryText) }
-        return candidates + semantic
     }
 
     private suspend fun historyOrEmpty(
@@ -288,6 +280,10 @@ class BackgroundExtractionSaveFlow(
         persona: Persona,
     ) {
         val observations = runObservations(entryId, entryText, result, capturedAt)
+        // Recurrence decision trace (no user content): kind is the model's verdict, candidate is the
+        // matched pattern_id the app will link when kind is non-null.
+        val recurrenceKind = result.resolved.fields[KEY_RECURRENCE_KIND]?.value
+        Log.i(TAG, "recurrence entry=$entryId kind=$recurrenceKind candidate=$candidatePatternId")
         persistTerminalState(
             entryId = entryId,
             entryAttemptCount = entryAttemptCount,

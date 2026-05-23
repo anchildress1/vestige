@@ -474,39 +474,8 @@ class BackgroundExtractionSaveFlowTest {
     }
 
     @Test
-    fun `saveAndExtract retrieves history inside the detached path when caller provides none`() = runTest {
-        val history = listOf(HistoryChunk(patternId = null, text = "same loop last Thursday"))
-        val flowWithLookup = BackgroundExtractionSaveFlow(
-            entryStore = entryStore,
-            worker = worker,
-            observationGenerator = observationGenerator,
-            lifecycleCallbacks = BackgroundExtractionLifecycleCallbacks(listenerFactory),
-            scope = flowScope,
-            ioDispatcher = Dispatchers.Unconfined,
-            retrieveHistory = { query ->
-                assertEquals(SAMPLE_TEXT, query)
-                history
-            },
-        )
-        every { entryStore.createPendingEntry(any(), any(), any()) } returns ENTRY_ID
-        coEvery { worker.extract(capture(capturedRequest), any()) } returns BackgroundExtractionResult.Success(
-            totalElapsedMs = 10L,
-            lensResults = emptyList(),
-            modelCallCount = 3,
-            resolved = consensusSample(),
-            templateLabel = TemplateLabel.AFTERMATH,
-        )
-        coEvery { observationGenerator.generate(any(), any(), any()) } returns emptyList()
-
-        flowWithLookup.saveAndExtract(SAMPLE_TEXT, SAMPLE_TIMESTAMP)
-
-        assertEquals(history, capturedRequest.captured.retrievedHistory)
-    }
-
-    @Test
-    fun `detached path prepends pattern candidates ahead of semantic history`() = runTest {
+    fun `detached path feeds the matched pattern candidate as the read history`() = runTest {
         val candidate = HistoryChunk(patternId = "abc123", text = "prior Tuesday crash")
-        val semantic = HistoryChunk(patternId = null, text = "loosely related entry")
         val flowWithLookup = BackgroundExtractionSaveFlow(
             entryStore = entryStore,
             worker = worker,
@@ -514,7 +483,6 @@ class BackgroundExtractionSaveFlowTest {
             lifecycleCallbacks = BackgroundExtractionLifecycleCallbacks(listenerFactory),
             scope = flowScope,
             ioDispatcher = Dispatchers.Unconfined,
-            retrieveHistory = { listOf(semantic) },
             retrievePatternCandidates = { id ->
                 assertEquals(ENTRY_ID, id)
                 listOf(candidate)
@@ -532,7 +500,8 @@ class BackgroundExtractionSaveFlowTest {
 
         flowWithLookup.saveAndExtract(SAMPLE_TEXT, SAMPLE_TIMESTAMP)
 
-        assertEquals(listOf(candidate, semantic), capturedRequest.captured.retrievedHistory)
+        // Recurrence reads only the deterministic candidate — no untemporal semantic history.
+        assertEquals(listOf(candidate), capturedRequest.captured.retrievedHistory)
     }
 
     @Test
@@ -546,7 +515,7 @@ class BackgroundExtractionSaveFlowTest {
             lifecycleCallbacks = BackgroundExtractionLifecycleCallbacks(listenerFactory),
             scope = flowScope,
             ioDispatcher = Dispatchers.Unconfined,
-            retrieveHistory = {
+            retrievePatternCandidates = {
                 lookupCalls.incrementAndGet()
                 emptyList()
             },
@@ -576,7 +545,7 @@ class BackgroundExtractionSaveFlowTest {
             lifecycleCallbacks = BackgroundExtractionLifecycleCallbacks(listenerFactory),
             scope = flowScope,
             ioDispatcher = Dispatchers.Unconfined,
-            retrieveHistory = { error("vector store unavailable") },
+            retrievePatternCandidates = { error("pattern store unavailable") },
         )
         every { entryStore.createPendingEntry(any(), any(), any()) } returns ENTRY_ID
         coEvery { worker.extract(capture(capturedRequest), any()) } returns BackgroundExtractionResult.Success(

@@ -117,7 +117,7 @@ class EntryDetailScreenTest {
 
     @Test
     fun `resolved view shows persisted three-lens receipts and field grid`() {
-        val id = entryStore.createPendingEntry("battery died", FIXTURE_INSTANT)
+        val id = entryStore.createPendingEntry("receipt fixture transcript", FIXTURE_INSTANT)
         entryStore.completeEntry(
             id,
             ResolvedExtraction(
@@ -133,18 +133,18 @@ class EntryDetailScreenTest {
                 EntryLensReceipt(
                     lens = Lens.LITERAL,
                     extracted = true,
-                    fields = mapOf("tags" to "battery died"),
+                    fields = mapOf("tags" to "literal receipt"),
                 ),
                 EntryLensReceipt(
                     lens = Lens.INFERENTIAL,
                     extracted = true,
-                    fields = mapOf("tags" to "battery died"),
+                    fields = mapOf("tags" to "inferential receipt"),
                 ),
                 EntryLensReceipt(
                     lens = Lens.SKEPTICAL,
                     extracted = true,
-                    fields = mapOf("tags" to "battery died"),
-                    flags = listOf("commitment-without-anchor:not tired:battery died"),
+                    fields = mapOf("tags" to "skeptical receipt"),
+                    flags = listOf("commitment-without-anchor:not tired:skeptical receipt"),
                 ),
             ),
         )
@@ -152,9 +152,9 @@ class EntryDetailScreenTest {
         composeRule.onNodeWithTag("entry_three_lens").assertIsDisplayed()
         composeRule.onNodeWithTag("entry_field_grid").assertIsDisplayed()
         composeRule.onNodeWithText(EntryDetailCopy.THREE_LENS_EYEBROW).assertIsDisplayed()
-        // The receipt tag value renders once per lens (3 cells) — assert at least one is shown,
-        // not exactly one, so the per-lens read isn't mistaken for an ambiguous match.
-        composeRule.onAllNodesWithText("battery died").onFirst().assertIsDisplayed()
+        composeRule.onNodeWithText("literal receipt").assertIsDisplayed()
+        composeRule.onNodeWithText("inferential receipt").assertIsDisplayed()
+        composeRule.onNodeWithText("skeptical receipt").assertIsDisplayed()
         composeRule.onNodeWithText(EntryDetailCopy.THREE_LENS_STATUS_CONFLICT).assertIsDisplayed()
         // The extracting/skeleton branch is not the resolved view.
         composeRule.onAllNodesWithTag("entry_extracting").assertCountEquals(0)

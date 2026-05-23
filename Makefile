@@ -2,11 +2,19 @@
 
 SHELL := /bin/bash
 
+# Pin JAVA_HOME to the .sdkmanrc JDK so gradlew, the Kotlin daemon, keytool, and adb-launched
+# processes use JDK 25 instead of ambient Java. Resolved straight from the SDKMAN candidate dir —
+# `sdk env` is avoided because its path helper uses bash-4 `${x^^}`, which the macOS system bash
+# (3.2) rejects. Empty when the candidate is absent (e.g. CI, where actions/setup-java already
+# exports JAVA_HOME), so the toolchain is used as-is.
+SDKMAN_JAVA := $(HOME)/.sdkman/candidates/java/$(shell sed -n 's/^java=//p' .sdkmanrc 2>/dev/null)
+JAVA_HOME_ENV := $(if $(wildcard $(SDKMAN_JAVA)/bin/java),JAVA_HOME=$(SDKMAN_JAVA),)
+JAVA_BIN := $(if $(wildcard $(SDKMAN_JAVA)/bin/java),$(SDKMAN_JAVA)/bin/java,java)
+
 GRADLE_FLAGS ?= --console=plain --quiet
-SDK_ENV := source $(HOME)/.sdkman/bin/sdkman-init.sh && sdk env &&
-GRADLE := $(SDK_ENV) ./gradlew $(GRADLE_FLAGS)
+GRADLE := $(JAVA_HOME_ENV) ./gradlew $(GRADLE_FLAGS)
 GRADLE_TEST_FLAGS ?= --no-parallel
-GRADLE_TEST := bash -o pipefail -c '$(SDK_ENV) ./gradlew $(GRADLE_FLAGS) $(GRADLE_TEST_FLAGS) "$$@" 2>&1 | { grep -v "\[ERROR\] Destroying inactive transaction" || true; }' --
+GRADLE_TEST := bash -o pipefail -c '$(JAVA_HOME_ENV) ./gradlew $(GRADLE_FLAGS) $(GRADLE_TEST_FLAGS) "$$@" 2>&1 | { grep -v "\[ERROR\] Destroying inactive transaction" || true; }' --
 KTLINT := $(or $(shell command -v ktlint 2>/dev/null), $(HOME)/.local/bin/ktlint)
 KTLINT_FLAGS ?= --log-level=error
 DETEKT := $(or $(shell command -v detekt 2>/dev/null), $(HOME)/.local/bin/detekt)
@@ -179,9 +187,9 @@ ktlint-check:
 detekt:
 	@command -v $(DETEKT) >/dev/null 2>&1 || { echo "❌ detekt not found. Install: brew install detekt"; exit 1; }
 	@if [ -n "$(DETEKT_JAR)" ]; then \
-		$(SDK_ENV) java --sun-misc-unsafe-memory-access=allow -jar "$(DETEKT_JAR)" --build-upon-default-config --config detekt.yml --input $(DETEKT_INPUTS); \
+		$(JAVA_BIN) --sun-misc-unsafe-memory-access=allow -jar "$(DETEKT_JAR)" --build-upon-default-config --config detekt.yml --input $(DETEKT_INPUTS); \
 	else \
-		$(SDK_ENV) $(DETEKT) --build-upon-default-config --config detekt.yml --input $(DETEKT_INPUTS); \
+		$(JAVA_HOME_ENV) $(DETEKT) --build-upon-default-config --config detekt.yml --input $(DETEKT_INPUTS); \
 	fi
 
 android-lint:

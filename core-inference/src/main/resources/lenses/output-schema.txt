@@ -4,7 +4,7 @@ Return one JSON object. No prose outside the JSON, no commentary, no markdown fe
 
 Required keys:
 
-- `tags`: array of lowercase kebab-case tokens (e.g. `standup`, `hit-a-wall`).
+- `tags`: array of lowercase kebab-case tokens, each at most two words / one hyphen (e.g. `standup`, `battery-died`).
 - `template_label`: pick exactly one serial naming the entry's archetype:
   - `aftermath` — a cognitive or energy crash, especially after a named event
   - `tunnel-exit` — surfacing from deep focus or hyperfocus

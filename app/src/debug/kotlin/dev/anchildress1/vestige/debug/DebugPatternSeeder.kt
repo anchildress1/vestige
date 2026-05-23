@@ -48,7 +48,10 @@ object DebugPatternSeeder {
 
     /**
      * Archetype spread — aftermath ×4 (clears the ≥3 template-recurrence floor), decision-spiral ×2,
-     * stalled ×2, goblin-hours ×1, tunnel-exit ×1. The stalled-archetype prose is deliberately
+     * stalled ×2, goblin-hours ×1, tunnel-exit ×1, plus one commitment-anchor seed whose modal,
+     * deadline-free promise the Literal/Inferential lenses read as a commitment while Skeptical flags
+     * `commitment-without-anchor` — the convergence path that resolves to CANONICAL_WITH_CONFLICT, so
+     * the demo has a Skeptical-red conflict to show. The stalled-archetype prose is deliberately
      * keyword-free so the run measures whether the lenses + labeler recover the archetype from
      * natural resistance/paralysis language rather than a planted phrase.
      */
@@ -126,6 +129,13 @@ object DebugPatternSeeder {
                 "Weird but I'll take it. Not sure what was different.",
             Instant.parse("2026-05-15T10:24:00Z"),
             15_000L,
+        ),
+        SeedEntry(
+            "I told myself I'd finally deal with the backlog. Said it like I meant it, but there's no " +
+                "date on it, no plan, just deal with it eventually. " +
+                "Same shape as every other promise I make to myself.",
+            Instant.parse("2026-05-22T13:00:00Z"),
+            21_000L,
         ),
     )
 

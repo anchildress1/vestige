@@ -118,20 +118,38 @@ class EntryDetailReceiptFormattingTest {
         assertEquals("wired", readOf(json, Lens.LITERAL).value)
     }
 
-    // --- tone: flags-first invariant ---
+    // --- tone: Skeptical reads red only when it diverges AND flags ---
 
     @Test
-    fun `flags force conflict tone even when extracted with usable fields`() {
+    fun `agreeing Skeptical reads canonical even with flags`() {
         val json = encode(
+            EntryLensReceipt(Lens.LITERAL, extracted = true, fields = mapOf("tags" to "calm")),
+            EntryLensReceipt(Lens.INFERENTIAL, extracted = true, fields = mapOf("tags" to "calm")),
             EntryLensReceipt(
-                Lens.LITERAL,
+                Lens.SKEPTICAL,
                 extracted = true,
                 fields = mapOf("tags" to "calm"),
                 flags = listOf("contradiction"),
             ),
         )
 
-        assertEquals(LensTone.CONFLICT, readOf(json, Lens.LITERAL).tone)
+        assertEquals(LensTone.CANONICAL, readOf(json, Lens.SKEPTICAL).tone)
+    }
+
+    @Test
+    fun `divergent Skeptical with a flag reads conflict`() {
+        val json = encode(
+            EntryLensReceipt(Lens.LITERAL, extracted = true, fields = mapOf("tags" to "calm")),
+            EntryLensReceipt(Lens.INFERENTIAL, extracted = true, fields = mapOf("tags" to "calm")),
+            EntryLensReceipt(
+                Lens.SKEPTICAL,
+                extracted = true,
+                fields = mapOf("tags" to "tense"),
+                flags = listOf("contradiction"),
+            ),
+        )
+
+        assertEquals(LensTone.CONFLICT, readOf(json, Lens.SKEPTICAL).tone)
     }
 
     @Test

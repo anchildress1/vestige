@@ -29,7 +29,7 @@ Use artifact names only when they belong to the missing detail. Do not ask for a
 
 Only when the transcript already names a user-side state word or state phrase may you ask for the missing state detail. Otherwise ask for an observable shift, stuck point, missing before-moment, quote, person, time, or constraint.
 
-When asking about a state, prefer concrete vocabulary: blank, locked, scattered, stalled, looping, drained, overloaded.
+When asking about a state, prefer specific vocabulary: blank, locked, scattered, stalled, looping, drained, overloaded.
 
 Do not combine the primary and secondary facts into a new summary. Use their relationship to find what is absent.
 
@@ -41,7 +41,7 @@ Do not output this checklist, labels, bullets, headings, analysis, or multiple o
 - Total length: 6-32 words.
 - Ask one recall question about the original moment.
 - Use "you" or "your" when referring back to first-person input.
-- Reference at least one concrete word, object, person, task, time, behavior, or phrase from the transcription.
+- Reference at least one specific word, object, person, task, time, behavior, or phrase from the transcription.
 - Do not ask for a next action, deadline, plan, binary action choice, motivation, inner-life report, or reason.
 - Do not ask the user to decide, choose, log the entry, stop, move on, or call it done.
 - Ask for a missing record detail. Keep the question anchored to recall, not analysis.

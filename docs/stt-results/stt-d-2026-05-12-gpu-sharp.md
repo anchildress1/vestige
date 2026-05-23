@@ -55,19 +55,19 @@ greedy run (48s mean) — cost of richer prompts + retry budget.
 
 Before (greedy with old prompts):
 ```
-LITERAL     tags=[battery-yanked]
-INFERENTIAL tags=[battery-yanked]
+LITERAL     tags=[battery-died]
+INFERENTIAL tags=[battery-died]
 SKEPTICAL   tags=[battery-drain, sync]
 ```
 Divergence: `tags` only. 1 axis.
 
 After (sharpened prompts):
 ```
-LITERAL     tags=[battery-yanked, sync] energy=null state_shift=false flags=[]
-INFERENTIAL tags=[tired, battery-yanked, sync] energy=tired state_shift=false flags=[]
-SKEPTICAL   tags=[battery-yanked, sync] energy=null state_shift=true
+LITERAL     tags=[battery-died, sync] energy=null state_shift=false flags=[]
+INFERENTIAL tags=[tired, battery-died, sync] energy=tired state_shift=false flags=[]
+SKEPTICAL   tags=[battery-died, sync] energy=null state_shift=true
             flags=[vocabulary-contradiction:"Not tired exactly":
-                   The user's energy state is immediately contradicted by 'battery got yanked'.]
+                   The user's energy state is immediately contradicted by 'battery died'.]
 ```
 Divergence: 4 axes — `tags` (INF adds `tired`), `energy_descriptor` (INF only), `state_shift`
 (SKEP only), and a Skeptical flag with quoted evidence. This is the demo signal — the
@@ -82,14 +82,14 @@ All three lenses returned tags=[meeting, late-night], everything else null. Not 
 
 After (sharpened):
 ```
-LITERAL     tags=[tuesday-meeting, concrete-in-my-limbs, late-night]
-INFERENTIAL tags=[meeting, concrete-shoes]
-SKEPTICAL   tags=[tuesday, meeting, same-thing, normal, concrete, limbs, late-night, lost-plot]
+LITERAL     tags=[tuesday-meeting, lead-in-my-limbs, late-night]
+INFERENTIAL tags=[meeting, stalled]
+SKEPTICAL   tags=[tuesday, meeting, same-thing, normal, specific, limbs, late-night, lost-plot]
             flags=[unsupported-recurrence:"Same thing.":
                    The recurrence claim lacks supporting history.]
 ```
 Divergence: `tags` (three completely different tag sets, including LITERAL's verbatim
-`concrete-in-my-limbs` and INFERENTIAL's pattern label `concrete-shoes`), `state_shift`, and a
+`lead-in-my-limbs` and INFERENTIAL's pattern label `stalled`), `state_shift`, and a
 Skeptical flag.
 
 ## The trade

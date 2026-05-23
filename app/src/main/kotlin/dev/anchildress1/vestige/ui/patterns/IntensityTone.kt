@@ -9,7 +9,7 @@ import dev.anchildress1.vestige.ui.theme.VestigeTheme
  * list screen can resolve a tone without importing types from the detail screen (the prior
  * arrangement crossed file boundaries through `IntensityTone` defined on detail).
  *
- * `peak` is the only carrier on the enum itself — the concrete color binding lives in
+ * `peak` is the only carrier on the enum itself — the specific color binding lives in
  * [themedStyle], the single composable resolver. One source of truth: tone → color resolves
  * through `VestigeTheme.colors` in exactly one place.
  */

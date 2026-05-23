@@ -24,8 +24,8 @@ flowchart LR
     subgraph surfaces["5 surfaces — WHAT (orthogonal modules)"]
       direction TB
       B["Behavioral → tags"]
-      S["State → energy_descriptor"]
-      V["Vocabulary → tags + contradictions"]
+      S["State → tags (state words)"]
+      V["Vocabulary → vocabulary (one tone word)"]
       C["Commitment → stated_commitment"]
       R["Recurrence → recurrence_link"]
     end

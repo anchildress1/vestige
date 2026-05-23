@@ -115,7 +115,6 @@ class EntryStoreTest {
         val row = boxStore.boxFor<EntryEntity>().get(id)
         assertEquals(ExtractionStatus.COMPLETED, row.extractionStatus)
         assertEquals(TemplateLabel.AFTERMATH, row.templateLabel)
-        assertEquals("crashed", row.energyDescriptor)
         assertEquals("a3f9c2b8d4e7f1a2b3c4d5e6f7890abc1234567890abcdef1234567890abcdef", row.recurrenceLink)
         assertNull(row.lastError)
 
@@ -124,10 +123,30 @@ class EntryStoreTest {
 
         val confidence = JSONObject(row.confidenceJson)
         assertEquals(ConfidenceVerdict.CANONICAL.name, confidence.getString("tags"))
-        assertEquals(ConfidenceVerdict.CANONICAL.name, confidence.getString("energy_descriptor"))
 
         val commitment = JSONObject(row.statedCommitmentJson!!)
         assertEquals("review the doc by Friday", commitment.getString("text"))
+    }
+
+    @Test
+    fun `completeEntry persists the vocabulary tone word trimmed and lowercased`() {
+        val id = entryStore.createPendingEntry(SAMPLE_TEXT, SAMPLE_INSTANT)
+        val resolved = ResolvedExtraction(
+            mapOf("vocabulary" to ResolvedField("  Hollow  ", ConfidenceVerdict.CANONICAL)),
+        )
+
+        entryStore.completeEntry(id, resolved, TemplateLabel.AFTERMATH)
+
+        assertEquals("hollow", boxStore.boxFor<EntryEntity>().get(id).vocabularyWord)
+    }
+
+    @Test
+    fun `completeEntry leaves vocabularyWord null when the field is absent`() {
+        val id = entryStore.createPendingEntry(SAMPLE_TEXT, SAMPLE_INSTANT)
+
+        entryStore.completeEntry(id, ResolvedExtraction(emptyMap()), TemplateLabel.AUDIT)
+
+        assertNull(boxStore.boxFor<EntryEntity>().get(id).vocabularyWord)
     }
 
     @Test
@@ -242,7 +261,7 @@ class EntryStoreTest {
         val mixed = ResolvedExtraction(
             mapOf(
                 "tags" to ResolvedField(listOf("focus"), ConfidenceVerdict.CANONICAL),
-                "energy_descriptor" to ResolvedField(null, ConfidenceVerdict.AMBIGUOUS),
+                "template_label" to ResolvedField(null, ConfidenceVerdict.AMBIGUOUS),
                 "stated_commitment" to ResolvedField(null, ConfidenceVerdict.CANONICAL),
                 "recurrence_link" to ResolvedField(
                     "abc",
@@ -257,9 +276,8 @@ class EntryStoreTest {
         val row = boxStore.boxFor<EntryEntity>().get(id)
         val confidence = JSONObject(row.confidenceJson)
         assertEquals(ConfidenceVerdict.CANONICAL.name, confidence.getString("tags"))
-        assertEquals(ConfidenceVerdict.AMBIGUOUS.name, confidence.getString("energy_descriptor"))
+        assertEquals(ConfidenceVerdict.AMBIGUOUS.name, confidence.getString("template_label"))
         assertEquals(ConfidenceVerdict.CANDIDATE.name, confidence.getString("recurrence_link"))
-        assertNull(row.energyDescriptor)
         assertNull(row.recurrenceLink)
     }
 
@@ -296,8 +314,8 @@ class EntryStoreTest {
         val observations = listOf(
             EntryObservation(
                 text = "You said \"fine\" and \"flattened\" in the same entry.",
-                evidence = ObservationEvidence.VOCABULARY_CONTRADICTION,
-                fields = listOf("vocabulary_contradictions"),
+                evidence = ObservationEvidence.THEME_NOTICING,
+                fields = listOf("tags"),
             ),
             EntryObservation(
                 text = "You said you'd talk to her — flagged.",
@@ -313,8 +331,8 @@ class EntryStoreTest {
         assertEquals(2, array.length())
         val first = array.getJSONObject(0)
         assertEquals(observations[0].text, first.getString("text"))
-        assertEquals("vocabulary-contradiction", first.getString("evidence"))
-        assertEquals("vocabulary_contradictions", first.getJSONArray("fields").getString(0))
+        assertEquals("theme-noticing", first.getString("evidence"))
+        assertEquals("tags", first.getJSONArray("fields").getString(0))
         val second = array.getJSONObject(1)
         assertEquals("commitment-flag", second.getString("evidence"))
     }
@@ -326,15 +344,15 @@ class EntryStoreTest {
             EntryLensReceipt(
                 lens = Lens.LITERAL,
                 extracted = true,
-                fields = mapOf("tags" to listOf("standup"), "energy_descriptor" to "flattened"),
+                fields = mapOf("tags" to listOf("standup"), "template_label" to "aftermath"),
                 attemptCount = 1,
                 elapsedMs = 900L,
             ),
             EntryLensReceipt(
                 lens = Lens.SKEPTICAL,
                 extracted = true,
-                fields = mapOf("energy_descriptor" to "flattened"),
-                flags = listOf("vocabulary-contradiction:fine:flattened"),
+                fields = mapOf("template_label" to "aftermath"),
+                flags = listOf("commitment-without-anchor:fine:flattened"),
                 attemptCount = 1,
                 elapsedMs = 1_100L,
             ),
@@ -346,8 +364,8 @@ class EntryStoreTest {
         val decoded = EntryLensReceiptJson.decode(row.lensReceiptsJson)
         assertEquals(2, decoded.size)
         assertEquals(Lens.LITERAL, decoded[0].lens)
-        assertEquals("flattened", decoded[0].fields["energy_descriptor"])
-        assertEquals(listOf("vocabulary-contradiction:fine:flattened"), decoded[1].flags)
+        assertEquals("aftermath", decoded[0].fields["template_label"])
+        assertEquals(listOf("commitment-without-anchor:fine:flattened"), decoded[1].flags)
     }
 
     @Test
@@ -396,7 +414,7 @@ class EntryStoreTest {
         val id = entryStore.createPendingEntry(SAMPLE_TEXT, SAMPLE_INSTANT)
         val first = EntryObservation(
             text = "You used fine twice.",
-            evidence = ObservationEvidence.VOCABULARY_CONTRADICTION,
+            evidence = ObservationEvidence.THEME_NOTICING,
             fields = listOf("fine"),
         )
         entryStore.completeEntry(id, resolvedSample(), null, listOf(first))
@@ -506,7 +524,6 @@ class EntryStoreTest {
                 listOf("tuesday-meeting", "standup", "flattened"),
                 ConfidenceVerdict.CANONICAL,
             ),
-            "energy_descriptor" to ResolvedField("crashed", ConfidenceVerdict.CANONICAL),
             "recurrence_link" to ResolvedField(
                 "a3f9c2b8d4e7f1a2b3c4d5e6f7890abc1234567890abcdef1234567890abcdef",
                 ConfidenceVerdict.CANONICAL,

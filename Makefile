@@ -1,9 +1,20 @@
 .PHONY: setup install bootstrap-wrapper doctor build assemble reinstall reinstall-prod _reinstall_base push-model seed-entries logcat test test-full lint format ktlint-format ktlint-check detekt android-lint secret-scan commitlint verify-no-telemetry verify ci clean
 
+SHELL := /bin/bash
+
+# Pin JAVA_HOME to the .sdkmanrc JDK so gradlew, the Kotlin daemon, keytool, and adb-launched
+# processes use JDK 25 instead of ambient Java. Resolved straight from the SDKMAN candidate dir —
+# `sdk env` is avoided because its path helper uses bash-4 `${x^^}`, which the macOS system bash
+# (3.2) rejects. Empty when the candidate is absent (e.g. CI, where actions/setup-java already
+# exports JAVA_HOME), so the toolchain is used as-is.
+SDKMAN_JAVA := $(HOME)/.sdkman/candidates/java/$(shell sed -n 's/^java=//p' .sdkmanrc 2>/dev/null)
+JAVA_HOME_ENV := $(if $(wildcard $(SDKMAN_JAVA)/bin/java),JAVA_HOME=$(SDKMAN_JAVA),)
+JAVA_BIN := $(if $(wildcard $(SDKMAN_JAVA)/bin/java),$(SDKMAN_JAVA)/bin/java,java)
+
 GRADLE_FLAGS ?= --console=plain --quiet
-GRADLE := ./gradlew $(GRADLE_FLAGS)
+GRADLE := $(JAVA_HOME_ENV) ./gradlew $(GRADLE_FLAGS)
 GRADLE_TEST_FLAGS ?= --no-parallel
-GRADLE_TEST := bash -o pipefail -c '$(GRADLE) $(GRADLE_TEST_FLAGS) "$$@" 2>&1 | { grep -v "\[ERROR\] Destroying inactive transaction" || true; }' --
+GRADLE_TEST := bash -o pipefail -c '$(JAVA_HOME_ENV) ./gradlew $(GRADLE_FLAGS) $(GRADLE_TEST_FLAGS) "$$@" 2>&1 | { grep -v "\[ERROR\] Destroying inactive transaction" || true; }' --
 KTLINT := $(or $(shell command -v ktlint 2>/dev/null), $(HOME)/.local/bin/ktlint)
 KTLINT_FLAGS ?= --log-level=error
 DETEKT := $(or $(shell command -v detekt 2>/dev/null), $(HOME)/.local/bin/detekt)
@@ -56,6 +67,9 @@ SEED_EXTRACT_FLAGS := $(if $(filter 1 true yes,$(EXTRACT)),--ez run_extraction t
 
 # App tags + inference/GPU runtime tags. AndroidRuntime ensures crash stacktraces are never swallowed.
 LOGCAT_TAGS := Vestige|CaptureVM|PatternDetailVM|PatternsListVM|OnboardingPrefs|HistoryViewModel|DebugSeedReceiver|litertlm|LiteRt|tflite|TfLite|GpuDelegate|Adreno|Mali|AndroidRuntime|System\.err
+# Noise the GPU/runtime drivers spew under the tags above that setNativeMinLogSeverity can't reach
+# (e.g. the per-op "unknown struct" flood). Dropped from the tail so app logs stay readable.
+LOGCAT_EXCLUDE := unknown struct
 
 # Filenames must match `core-model/src/main/resources/model/manifest.properties` exactly so
 # the artifact store accepts the pushed files without re-downloading. Local source paths
@@ -131,10 +145,10 @@ logcat:
 	done; \
 	if [ -z "$$pid" ]; then \
 		echo "⚠ could not resolve app PID — filtering by tags only (Ctrl-C to stop)"; \
-		adb logcat -v color -T 1 $(EXTRA) | grep -E "$(LOGCAT_TAGS)"; \
+		adb logcat -v color -T 1 $(EXTRA) | grep -E "$(LOGCAT_TAGS)" | grep -vE "$(LOGCAT_EXCLUDE)"; \
 	else \
 		echo "📱 tailing pid=$$pid (Ctrl-C to stop)"; \
-		adb logcat -v color -T 1 --pid="$$pid" $(EXTRA) | grep -E "$(LOGCAT_TAGS)"; \
+		adb logcat -v color -T 1 --pid="$$pid" $(EXTRA) | grep -E "$(LOGCAT_TAGS)" | grep -vE "$(LOGCAT_EXCLUDE)"; \
 	fi
 
 assemble:
@@ -173,9 +187,9 @@ ktlint-check:
 detekt:
 	@command -v $(DETEKT) >/dev/null 2>&1 || { echo "❌ detekt not found. Install: brew install detekt"; exit 1; }
 	@if [ -n "$(DETEKT_JAR)" ]; then \
-		java --sun-misc-unsafe-memory-access=allow -jar "$(DETEKT_JAR)" --build-upon-default-config --config detekt.yml --input $(DETEKT_INPUTS); \
+		$(JAVA_BIN) --sun-misc-unsafe-memory-access=allow -jar "$(DETEKT_JAR)" --build-upon-default-config --config detekt.yml --input $(DETEKT_INPUTS); \
 	else \
-		$(DETEKT) --build-upon-default-config --config detekt.yml --input $(DETEKT_INPUTS); \
+		$(JAVA_HOME_ENV) $(DETEKT) --build-upon-default-config --config detekt.yml --input $(DETEKT_INPUTS); \
 	fi
 
 android-lint:

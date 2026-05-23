@@ -32,8 +32,7 @@ class BackgroundExtractionWorkerTest {
     private val request = BackgroundExtractionRequest(entryText = "user words", capturedAt = capturedAt)
     private val resolved = ResolvedExtraction(
         fields = mapOf(
-            "energy_descriptor" to ResolvedField("crashed", ConfidenceVerdict.CANONICAL),
-            "state_shift" to ResolvedField(true, ConfidenceVerdict.CANONICAL),
+            "tags" to ResolvedField(listOf("crashed"), ConfidenceVerdict.CANONICAL),
         ),
     )
 
@@ -51,28 +50,19 @@ class BackgroundExtractionWorkerTest {
         )
     }
 
-    private fun compactSuccessJson(stateShift: Boolean): String = """
-        {"tags":["sink"],"energy_descriptor":null,"state_shift":$stateShift,"vocabulary_contradictions":[],"stated_commitment":null,"recurrence_link":null,"recurrence_kind":null,"flags":[]}
+    private fun compactSuccessJson(): String = """
+        {"tags":["sink"],"stated_commitment":null,"recurrence_link":null,"recurrence_kind":null,"flags":[]}
     """.trimIndent()
 
     private fun malformedSkepticalJson(): String = """
         {
-        "tags": ["sink", "noon", "1pm", "three-hours-later"],
-        "energy_descriptor": null,
-        "state_shift": true
-        "vocabulary_contradictions": [
-        {
-        "term_a": "fine",
-        "term_b": "not tired exactly",
-        "snippet": "completely fine by 1pm i was gone not tired exactly"
-        }
-        ]
+        "tags": ["sink", "noon", "1pm", "three-hours-later"]
         "stated_commitment": null
         "recurrence_link": null
         "recurrence_kind": null
         "flags": [
         {
-        "kind": "vocabulary-contradiction",
+        "kind": "commitment-without-anchor",
         "snippet": "completely fine by 1pm i was gone not tired exactly",
         "note": "The user describes a state of being fine then immediately negates it with 'not tired exactly'."
         }
@@ -81,7 +71,7 @@ class BackgroundExtractionWorkerTest {
     """.trimIndent()
 
     private fun skepticalFlag(): String =
-        "vocabulary-contradiction:completely fine by 1pm i was gone not tired exactly:" +
+        "commitment-without-anchor:completely fine by 1pm i was gone not tired exactly:" +
             "The user describes a state of being fine then immediately negates it with 'not tired exactly'."
 
     private class RecordingResolver(val resolved: ResolvedExtraction) : ConvergenceResolver {
@@ -236,9 +226,9 @@ class BackgroundExtractionWorkerTest {
     @Test
     fun `worker parses malformed skeptical near-json without burning retries`() = runTest {
         val engine = mockk<LiteRtLmEngine>()
-        every { engine.streamText("prompt-for-LITERAL", any()) } returns flowOf(compactSuccessJson(stateShift = true))
+        every { engine.streamText("prompt-for-LITERAL", any()) } returns flowOf(compactSuccessJson())
         every { engine.streamText("prompt-for-INFERENTIAL", any()) } returns
-            flowOf(compactSuccessJson(stateShift = false))
+            flowOf(compactSuccessJson())
         every { engine.streamText("prompt-for-SKEPTICAL", any()) } returns flowOf(malformedSkepticalJson())
         val listener = RecordingListener()
 
@@ -410,12 +400,11 @@ class BackgroundExtractionWorkerTest {
     fun `model-emitted template_label wins over the deterministic labeler`() = runTest {
         val engine = mockk<LiteRtLmEngine>()
         every { engine.streamText(any(), any()) } returns flowOf("raw-ok")
-        // Energy "crashed" + state_shift true would make the labeler pick AFTERMATH; the model's
-        // converged template_label overrides it.
+        // A "crashed" tag would make the labeler pick AFTERMATH; the model's converged
+        // template_label overrides it.
         val modelLabeled = ResolvedExtraction(
             fields = mapOf(
-                "energy_descriptor" to ResolvedField("crashed", ConfidenceVerdict.CANONICAL),
-                "state_shift" to ResolvedField(true, ConfidenceVerdict.CANONICAL),
+                "tags" to ResolvedField(listOf("crashed"), ConfidenceVerdict.CANONICAL),
                 "template_label" to ResolvedField("decision-spiral", ConfidenceVerdict.CANONICAL),
             ),
         )
@@ -435,7 +424,7 @@ class BackgroundExtractionWorkerTest {
     fun `template_label falls back to the labeler when the model pick is absent`() = runTest {
         val engine = mockk<LiteRtLmEngine>()
         every { engine.streamText(any(), any()) } returns flowOf("raw-ok")
-        // No template_label resolved -> labeler computes it (energy "crashed" + shift -> AFTERMATH).
+        // No template_label resolved -> labeler computes it ("crashed" tag -> AFTERMATH).
         val result = BackgroundExtractionWorker(
             engine = engine,
             resolver = RecordingResolver(resolved),
@@ -453,8 +442,7 @@ class BackgroundExtractionWorkerTest {
         every { engine.streamText(any(), any()) } returns flowOf("raw-ok")
         val badLabel = ResolvedExtraction(
             fields = mapOf(
-                "energy_descriptor" to ResolvedField("crashed", ConfidenceVerdict.CANONICAL),
-                "state_shift" to ResolvedField(true, ConfidenceVerdict.CANONICAL),
+                "tags" to ResolvedField(listOf("crashed"), ConfidenceVerdict.CANONICAL),
                 "template_label" to ResolvedField("not-a-real-archetype", ConfidenceVerdict.CANONICAL),
             ),
         )

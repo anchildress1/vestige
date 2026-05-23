@@ -27,14 +27,15 @@ internal object LensResponseParser {
     private val SCHEMA_KEYS: Set<String> = setOf(
         "tags",
         "template_label",
-        "energy_descriptor",
-        "state_shift",
-        "vocabulary_contradictions",
         "stated_commitment",
+        "vocabulary",
         "recurrence_link",
         "recurrence_kind",
     )
     private val PAYLOAD_KEYS: Set<String> = SCHEMA_KEYS + "flags"
+
+    /** Literal strings models emit in place of a JSON null tone word — folded back to null. */
+    private val NULLISH_WORDS: Set<String> = setOf("null", "none", "n/a", "nil")
 
     fun parse(lens: Lens, raw: String): LensExtraction? {
         val root = findFirstSchemaObject(raw) ?: return null
@@ -47,13 +48,19 @@ internal object LensResponseParser {
         return LensExtraction(lens = lens, fields = fields, flags = flags)
     }
 
-    /** Per-field normalization. Tags trimmed+lowercased; vocabulary_contradictions null→[]; others pass through. */
+    /** Per-field normalization. Tags trimmed+lowercased; others pass through. */
     private fun normalizeField(key: String, value: Any?): Any? {
         val normalized = normalize(value)
         return when (key) {
             "tags" -> (normalized as? List<*>)?.mapNotNull(::normalizeTag)
-            "vocabulary_contradictions" -> normalized ?: emptyList<Any?>()
+
             "template_label" -> (normalized as? String)?.lowercase()?.takeIf { it.isNotEmpty() }
+
+            // Models routinely emit the literal string "null"/"none" for a no-tone vocabulary
+            // instead of JSON null; fold those back to null so a non-word never becomes the tone.
+            "vocabulary" ->
+                (normalized as? String)?.trim()?.lowercase()?.takeIf { it.isNotEmpty() && it !in NULLISH_WORDS }
+
             else -> normalized
         }
     }
@@ -154,7 +161,7 @@ internal object LensResponseParser {
 
     /**
      * LiteRT occasionally drops commas between top-level object fields while still emitting the
-     * full schema in order, e.g. `"state_shift": true\n"vocabulary_contradictions": [...]`.
+     * full schema in order, e.g. `"template_label": "audit"\n"stated_commitment": {...}`.
      * Repair only the narrow "value directly followed by the next quoted key" shape so genuine
      * non-JSON garbage still fails closed.
      */

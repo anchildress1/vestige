@@ -21,13 +21,13 @@ class EntryDetailReceiptFormattingTest {
 
     private fun encode(vararg receipts: EntryLensReceipt): String = EntryLensReceiptJson.encode(receipts.toList())
 
-    private fun readOf(json: String?, lens: Lens): LensRead = buildLensReads(json).first { it.label == lens.name }
+    private fun readOf(json: String?, lens: Lens, hasConflict: Boolean = false): LensRead =
+        buildLensReads(json, hasConflict).first { it.label == lens.name }
 
     private fun rowsOf(
         receiptsJson: String?,
         entryText: String = "",
         confidenceJson: String = "{}",
-        energyDescriptor: String? = null,
         recurrenceLink: String? = null,
         statedCommitmentJson: String? = null,
         tags: List<String> = emptyList(),
@@ -35,7 +35,6 @@ class EntryDetailReceiptFormattingTest {
         EntryEntity(
             entryText = entryText,
             confidenceJson = confidenceJson,
-            energyDescriptor = energyDescriptor,
             recurrenceLink = recurrenceLink,
             statedCommitmentJson = statedCommitmentJson,
             lensReceiptsJson = receiptsJson,
@@ -108,32 +107,46 @@ class EntryDetailReceiptFormattingTest {
     }
 
     @Test
-    fun `summary key precedence prefers energy_descriptor over later keys`() {
+    fun `summary key precedence prefers tags over later keys`() {
         val json = encode(
             EntryLensReceipt(
                 Lens.LITERAL,
                 extracted = true,
-                fields = mapOf("energy_descriptor" to "wired", "tags" to "ignored"),
+                fields = mapOf("tags" to "wired", "recurrence_link" to "ignored"),
             ),
         )
 
         assertEquals("wired", readOf(json, Lens.LITERAL).value)
     }
 
-    // --- tone: flags-first invariant ---
+    // --- tone: Skeptical reads red only on a real (CANONICAL_WITH_CONFLICT) conflict ---
 
     @Test
-    fun `flags force conflict tone even when extracted with usable fields`() {
+    fun `Skeptical with a flag reads canonical when convergence found no conflict`() {
         val json = encode(
             EntryLensReceipt(
-                Lens.LITERAL,
+                Lens.SKEPTICAL,
                 extracted = true,
                 fields = mapOf("tags" to "calm"),
                 flags = listOf("contradiction"),
             ),
         )
 
-        assertEquals(LensTone.CONFLICT, readOf(json, Lens.LITERAL).tone)
+        assertEquals(LensTone.CANONICAL, readOf(json, Lens.SKEPTICAL, hasConflict = false).tone)
+    }
+
+    @Test
+    fun `Skeptical with a flag reads conflict when convergence flagged a conflict`() {
+        val json = encode(
+            EntryLensReceipt(
+                Lens.SKEPTICAL,
+                extracted = true,
+                fields = mapOf("tags" to "calm"),
+                flags = listOf("contradiction"),
+            ),
+        )
+
+        assertEquals(LensTone.CONFLICT, readOf(json, Lens.SKEPTICAL, hasConflict = true).tone)
     }
 
     @Test
@@ -149,32 +162,25 @@ class EntryDetailReceiptFormattingTest {
         readOf(encode(EntryLensReceipt(Lens.LITERAL, extracted = true, fields = field)), Lens.LITERAL).value
 
     @Test
-    fun `boolean true field renders as state shift, false falls through`() {
-        assertEquals("state shift", summaryFor(mapOf("state_shift" to true)))
-        // false -> null -> no other key -> no-fields
-        assertEquals(EntryDetailCopy.LENS_NO_FIELDS, summaryFor(mapOf("state_shift" to false)))
-    }
-
-    @Test
     fun `list field joins at most two non-blank elements`() {
-        assertEquals("a, b", summaryFor(mapOf("energy_descriptor" to listOf("a", "b", "c"))))
+        assertEquals("a, b", summaryFor(mapOf("tags" to listOf("a", "b", "c"))))
     }
 
     @Test
     fun `map field prefers a known text key over arbitrary values`() {
-        assertEquals("hello", summaryFor(mapOf("energy_descriptor" to mapOf("text" to "hello", "z" to "zzz"))))
+        assertEquals("hello", summaryFor(mapOf("stated_commitment" to mapOf("text" to "hello", "z" to "zzz"))))
     }
 
     @Test
     fun `map field with no preferred key joins its values`() {
-        assertEquals("a, b", summaryFor(mapOf("energy_descriptor" to linkedMapOf("x" to "a", "y" to "b"))))
+        assertEquals("a, b", summaryFor(mapOf("stated_commitment" to linkedMapOf("x" to "a", "y" to "b"))))
     }
 
     @Test
     fun `map field falls back when preferred keys are blank`() {
         assertEquals(
             "fallback",
-            summaryFor(mapOf("energy_descriptor" to linkedMapOf("text" to " ", "z" to "fallback"))),
+            summaryFor(mapOf("stated_commitment" to linkedMapOf("text" to " ", "z" to "fallback"))),
         )
     }
 
@@ -182,23 +188,23 @@ class EntryDetailReceiptFormattingTest {
     fun `map field with only blank values is treated as no value`() {
         assertEquals(
             EntryDetailCopy.LENS_NO_FIELDS,
-            summaryFor(mapOf("energy_descriptor" to linkedMapOf("text" to " ", "z" to ""))),
+            summaryFor(mapOf("stated_commitment" to linkedMapOf("text" to " ", "z" to ""))),
         )
     }
 
     @Test
     fun `blank list field is treated as no value`() {
-        assertEquals(EntryDetailCopy.LENS_NO_FIELDS, summaryFor(mapOf("energy_descriptor" to listOf(" ", ""))))
+        assertEquals(EntryDetailCopy.LENS_NO_FIELDS, summaryFor(mapOf("tags" to listOf(" ", ""))))
     }
 
     @Test
     fun `blank string field is treated as no value`() {
-        assertEquals(EntryDetailCopy.LENS_NO_FIELDS, summaryFor(mapOf("energy_descriptor" to "   ")))
+        assertEquals(EntryDetailCopy.LENS_NO_FIELDS, summaryFor(mapOf("tags" to "   ")))
     }
 
     @Test
     fun `numeric field falls back to string rendering`() {
-        assertEquals("42", summaryFor(mapOf("energy_descriptor" to 42)))
+        assertEquals("42", summaryFor(mapOf("tags" to 42)))
     }
 
     // --- buildFieldRows ---
@@ -211,19 +217,16 @@ class EntryDetailReceiptFormattingTest {
                     Lens.LITERAL,
                     extracted = true,
                     fields = mapOf(
-                        "energy_descriptor" to "ignored",
                         "stated_commitment" to "ignored commitment",
                         "recurrence_link" to VALID_PATTERN_ID,
                     ),
                 ),
             ),
             confidenceJson = confidence(
-                "energy_descriptor" to ConfidenceVerdict.CANONICAL_WITH_CONFLICT,
                 "stated_commitment" to ConfidenceVerdict.CANONICAL,
                 "recurrence_link" to ConfidenceVerdict.CANDIDATE,
                 "tags" to ConfidenceVerdict.CANONICAL,
             ),
-            energyDescriptor = "wired",
             recurrenceLink = "existing-pattern",
             statedCommitmentJson = """{"text":"call Pat"}""",
             tags = listOf("zeta", "alpha", "beta"),
@@ -231,8 +234,6 @@ class EntryDetailReceiptFormattingTest {
 
         assertEquals("alpha, beta", fieldRow(rows, "BEHAVIOR").value)
         assertEquals(LensTone.CANONICAL, fieldRow(rows, "BEHAVIOR").tone)
-        assertEquals("wired", fieldRow(rows, "STATE").value)
-        assertEquals(LensTone.CONFLICT, fieldRow(rows, "STATE").tone)
         assertEquals("call Pat", fieldRow(rows, "PROMISES").value)
         assertEquals(LensTone.CANONICAL, fieldRow(rows, "PROMISES").tone)
         assertEquals("existing-pattern", fieldRow(rows, "REPEAT").value)
@@ -247,7 +248,6 @@ class EntryDetailReceiptFormattingTest {
                     Lens.LITERAL,
                     extracted = true,
                     fields = mapOf(
-                        "energy_descriptor" to "wired",
                         "stated_commitment" to mapOf("topic_or_person" to "Riley"),
                         "recurrence_link" to VALID_PATTERN_ID,
                     ),
@@ -269,8 +269,6 @@ class EntryDetailReceiptFormattingTest {
             ),
         )
 
-        assertEquals("wired", fieldRow(rows, "STATE").value)
-        assertEquals(LensTone.CONFLICT, fieldRow(rows, "STATE").tone)
         assertEquals("Riley", fieldRow(rows, "PROMISES").value)
         assertEquals(LensTone.CONFLICT, fieldRow(rows, "PROMISES").tone)
         assertEquals(VALID_PATTERN_ID, fieldRow(rows, "REPEAT").value)
@@ -308,7 +306,6 @@ class EntryDetailReceiptFormattingTest {
                     Lens.LITERAL,
                     extracted = true,
                     fields = mapOf(
-                        "energy_descriptor" to "flat",
                         "stated_commitment" to "send the note",
                         "recurrence_link" to VALID_PATTERN_ID,
                     ),
@@ -316,7 +313,6 @@ class EntryDetailReceiptFormattingTest {
             ),
         )
 
-        assertEquals(LensTone.CANDIDATE, fieldRow(rows, "STATE").tone)
         assertEquals(LensTone.CANDIDATE, fieldRow(rows, "PROMISES").tone)
         assertEquals(LensTone.CANDIDATE, fieldRow(rows, "REPEAT").tone)
     }
@@ -353,75 +349,18 @@ class EntryDetailReceiptFormattingTest {
     }
 
     @Test
-    fun `vocab receipt field outranks lexical fallback`() {
-        val rows = rowsOf(
-            receiptsJson = encode(
-                EntryLensReceipt(
-                    Lens.LITERAL,
-                    extracted = true,
-                    fields = mapOf("vocabulary_contradictions" to listOf("wired", "tired", "ignored")),
-                ),
-                EntryLensReceipt(
-                    Lens.INFERENTIAL,
-                    extracted = true,
-                    fields = mapOf("vocabulary_contradictions" to listOf("wired")),
-                ),
-            ),
-            entryText = "meeting meeting ticket ticket",
-        )
-
-        assertEquals("wired, tired", fieldRow(rows, "VOCAB").value)
-        assertEquals(LensTone.CANONICAL, fieldRow(rows, "VOCAB").tone)
-    }
-
-    @Test
-    fun `vocab lexical fallback uses repeated entry terms supported by receipt tags`() {
-        val rows = rowsOf(
-            receiptsJson = encode(
-                EntryLensReceipt(Lens.LITERAL, extracted = true, fields = mapOf("tags" to listOf("meeting-retro"))),
-                EntryLensReceipt(Lens.INFERENTIAL, extracted = true, fields = mapOf("tags" to listOf("meeting"))),
-                EntryLensReceipt(Lens.SKEPTICAL, extracted = true, fields = mapOf("tags" to listOf("ticket"))),
-            ),
-            entryText = "meeting meeting ticket ticket the the",
-        )
-
-        assertEquals("meeting", fieldRow(rows, "VOCAB").value)
-        assertEquals(LensTone.CANONICAL, fieldRow(rows, "VOCAB").tone)
-    }
-
-    @Test
-    fun `vocab lexical fallback requires two supporting receipts`() {
-        val rows = rowsOf(
-            receiptsJson = encode(
-                EntryLensReceipt(Lens.LITERAL, extracted = true, fields = mapOf("tags" to listOf("ticket"))),
-                EntryLensReceipt(Lens.INFERENTIAL, extracted = true, fields = mapOf("tags" to listOf("noise"))),
-                EntryLensReceipt(Lens.SKEPTICAL, extracted = true, fields = mapOf("tags" to listOf(123, "the"))),
-            ),
-            entryText = "ticket ticket",
-        )
-
-        assertEquals("—", fieldRow(rows, "VOCAB").value)
-        assertEquals(LensTone.AMBIGUOUS, fieldRow(rows, "VOCAB").tone)
-    }
-
-    @Test
     fun `missing and unreadable receipts produce explicit field fallbacks`() {
         val missingRows = rowsOf(
             receiptsJson = "[]",
             confidenceJson = confidence(
-                "energy_descriptor" to ConfidenceVerdict.CANDIDATE,
+                "tags" to ConfidenceVerdict.CANDIDATE,
                 "stated_commitment" to ConfidenceVerdict.CANONICAL_WITH_CONFLICT,
             ),
         )
-        val unreadableRows = rowsOf(receiptsJson = "{nope")
 
-        assertEquals("—", fieldRow(missingRows, "STATE").value)
-        assertEquals(LensTone.CANDIDATE, fieldRow(missingRows, "STATE").tone)
-        assertEquals("—", fieldRow(missingRows, "VOCAB").value)
-        assertEquals(LensTone.AMBIGUOUS, fieldRow(missingRows, "VOCAB").tone)
+        assertEquals("—", fieldRow(missingRows, "BEHAVIOR").value)
+        assertEquals(LensTone.CANDIDATE, fieldRow(missingRows, "BEHAVIOR").tone)
         assertEquals(LensTone.CONFLICT, fieldRow(missingRows, "PROMISES").tone)
-        assertEquals(EntryDetailCopy.LENS_UNREADABLE, fieldRow(unreadableRows, "VOCAB").value)
-        assertEquals(LensTone.CONFLICT, fieldRow(unreadableRows, "VOCAB").tone)
     }
 
     @Test
@@ -467,10 +406,10 @@ class EntryDetailReceiptFormattingTest {
     fun `unknown confidence verdicts are ignored field by field`() {
         val rows = rowsOf(
             receiptsJson = "[]",
-            confidenceJson = """{"energy_descriptor":"CANONICAL","stated_commitment":"GARBAGE"}""",
+            confidenceJson = """{"tags":"CANONICAL","stated_commitment":"GARBAGE"}""",
         )
 
-        assertEquals(LensTone.CANONICAL, fieldRow(rows, "STATE").tone)
+        assertEquals(LensTone.CANONICAL, fieldRow(rows, "BEHAVIOR").tone)
         assertEquals(LensTone.AMBIGUOUS, fieldRow(rows, "PROMISES").tone)
     }
 
@@ -486,12 +425,12 @@ class EntryDetailReceiptFormattingTest {
     @Test
     fun `observation parses text, evidence and non-blank fields`() {
         val line = parseObservations(
-            """[{"text":"slept poorly","evidence":"energy","fields":["energy_descriptor","  ","tags"]}]""",
+            """[{"text":"slept poorly","evidence":"theme-noticing","fields":["recurrence_link","  ","tags"]}]""",
         ).single()
 
         assertEquals("slept poorly", line.text)
-        assertEquals("energy", line.evidence)
-        assertEquals(listOf("energy_descriptor", "tags"), line.fields)
+        assertEquals("theme-noticing", line.evidence)
+        assertEquals(listOf("recurrence_link", "tags"), line.fields)
     }
 
     @Test
@@ -533,7 +472,7 @@ class EntryDetailReceiptFormattingTest {
     fun `conflict verdict outranks canonical in lens status`() {
         val json = confidence(
             "tags" to ConfidenceVerdict.CANONICAL,
-            "energy_descriptor" to ConfidenceVerdict.CANONICAL_WITH_CONFLICT,
+            "stated_commitment" to ConfidenceVerdict.CANONICAL_WITH_CONFLICT,
         )
 
         assertEquals(EntryDetailCopy.THREE_LENS_STATUS_CONFLICT, lensStatus(json))
@@ -543,7 +482,7 @@ class EntryDetailReceiptFormattingTest {
     fun `canonical outranks candidate when no conflict present`() {
         val json = confidence(
             "tags" to ConfidenceVerdict.CANDIDATE,
-            "energy_descriptor" to ConfidenceVerdict.CANONICAL,
+            "stated_commitment" to ConfidenceVerdict.CANONICAL,
         )
 
         assertEquals(EntryDetailCopy.THREE_LENS_STATUS_CANONICAL, lensStatus(json))

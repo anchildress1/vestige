@@ -13,7 +13,7 @@ class EntryFilenameTest {
             "Standup ran long again. I was fine before it, then completely flattened by 11.",
         )
         // First six non-stop-words after lowercasing. `i`, `was`, `before`, `it`, `by` are stops;
-        // `then`, `completely`, `flattened`, `11` are not (concrete words win — slug carries
+        // `then`, `completely`, `flattened`, `11` are not (specific words win — slug carries
         // the salient content).
         assertEquals("standup-ran-long-again-fine-then", slug)
     }

@@ -34,80 +34,7 @@ class ObservationGeneratorTest {
         )
 
     @Test
-    fun `commitment in resolved fields short-circuits to deterministic commitment-flag observation`() = runTest {
-        val resolved = ResolvedExtraction(
-            mapOf(
-                "stated_commitment" to ResolvedField(
-                    mapOf("text" to "talk to Nora before Friday", "topic_or_person" to "Nora"),
-                    ConfidenceVerdict.CANONICAL,
-                ),
-            ),
-        )
-
-        val observations = newGenerator().generate(SAMPLE_TEXT, resolved, SAMPLE_DAY)
-
-        assertEquals(1, observations.size)
-        val obs = observations.first()
-        assertEquals(ObservationEvidence.COMMITMENT_FLAG, obs.evidence)
-        assertTrue(obs.text.contains("talk to Nora before Friday"))
-        assertTrue(obs.text.contains("Nora"))
-        assertEquals(listOf("stated_commitment"), obs.fields)
-        verify(exactly = 0) { engine.streamText(any(), any()) }
-    }
-
-    @Test
-    fun `vocabulary contradiction routes to deterministic observation without model call`() = runTest {
-        val resolved = ResolvedExtraction(
-            mapOf(
-                "vocabulary_contradictions" to ResolvedField(
-                    listOf(
-                        mapOf("term_a" to "fine", "term_b" to "flattened", "snippet" to "ran long again"),
-                    ),
-                    ConfidenceVerdict.CANONICAL,
-                ),
-            ),
-        )
-
-        val observations = newGenerator().generate(SAMPLE_TEXT, resolved, SAMPLE_DAY)
-
-        assertEquals(1, observations.size)
-        val obs = observations.first()
-        assertEquals(ObservationEvidence.VOCABULARY_CONTRADICTION, obs.evidence)
-        assertTrue(obs.text.contains("fine"))
-        assertTrue(obs.text.contains("flattened"))
-        verify(exactly = 0) { engine.streamText(any(), any()) }
-    }
-
-    @Test
-    fun `goblin hours capture produces a volunteered-context observation when no other signal exists`() = runTest {
-        val resolved = ResolvedExtraction(emptyMap())
-        val capturedAt = ZonedDateTime.of(2026, 5, 11, 3, 14, 0, 0, ZoneId.of("America/New_York"))
-
-        val observations = newGenerator().generate(SAMPLE_TEXT, resolved, capturedAt)
-
-        assertEquals(1, observations.size)
-        assertEquals(ObservationEvidence.VOLUNTEERED_CONTEXT, observations.first().evidence)
-        assertTrue(observations.first().text.contains("goblin hours"))
-        verify(exactly = 0) { engine.streamText(any(), any()) }
-    }
-
-    @Test
-    fun `5am capture is outside goblin hours and falls through to the model`() = runTest {
-        val resolved = ResolvedExtraction(emptyMap())
-        val capturedAt = ZonedDateTime.of(2026, 5, 11, 5, 0, 0, 0, ZoneId.of("America/New_York"))
-        every { engine.streamText(any(), any()) } returns flowOf(
-            """{"observations":[{"text":"Three boss mentions.","evidence":"theme-noticing","fields":["tags"]}]}""",
-        )
-
-        val observations = newGenerator().generate(SAMPLE_TEXT, resolved, capturedAt)
-
-        assertEquals(1, observations.size)
-        assertEquals(ObservationEvidence.THEME_NOTICING, observations.first().evidence)
-        verify(exactly = 1) { engine.streamText(any(), any()) }
-    }
-
-    @Test
-    fun `falls back to model when no deterministic signal is present`() = runTest {
+    fun `generates observations from the model`() = runTest {
         val resolved = ResolvedExtraction(emptyMap())
         every { engine.streamText(any(), any()) } returns
             flowOf(themeNoticingPayload("You logged three boss mentions."))
@@ -116,6 +43,20 @@ class ObservationGeneratorTest {
 
         assertEquals(1, observations.size)
         assertEquals(ObservationEvidence.THEME_NOTICING, observations.first().evidence)
+    }
+
+    @Test
+    fun `capture time is rendered into the prompt`() = runTest {
+        val resolved = ResolvedExtraction(emptyMap())
+        val capturedPrompt = io.mockk.slot<String>()
+        every { engine.streamText(capture(capturedPrompt), any()) } returns
+            flowOf(themeNoticingPayload("Theme noted."))
+
+        newGenerator().generate(SAMPLE_TEXT, resolved, GOBLIN_HOUR)
+
+        val prompt = capturedPrompt.captured
+        assertTrue(prompt.contains("CAPTURE TIME"), "prompt should carry a capture-time section")
+        assertTrue(prompt.contains("03:14"), "prompt should render the local capture clock time")
     }
 
     @Test
@@ -162,29 +103,6 @@ class ObservationGeneratorTest {
     }
 
     @Test
-    fun `deterministic commitment plus vocabulary-contradiction both land, capped at two`() = runTest {
-        val resolved = ResolvedExtraction(
-            mapOf(
-                "stated_commitment" to ResolvedField(
-                    mapOf("text" to "send the doc"),
-                    ConfidenceVerdict.CANONICAL,
-                ),
-                "vocabulary_contradictions" to ResolvedField(
-                    listOf(mapOf("term_a" to "fine", "term_b" to "stuck")),
-                    ConfidenceVerdict.CANONICAL,
-                ),
-            ),
-        )
-
-        val observations = newGenerator().generate(SAMPLE_TEXT, resolved, SAMPLE_DAY)
-
-        assertEquals(2, observations.size)
-        assertEquals(ObservationEvidence.COMMITMENT_FLAG, observations[0].evidence)
-        assertEquals(ObservationEvidence.VOCABULARY_CONTRADICTION, observations[1].evidence)
-        verify(exactly = 0) { engine.streamText(any(), any()) }
-    }
-
-    @Test
     fun `blank entryText is rejected before any model call`() = runTest {
         val resolved = ResolvedExtraction(emptyMap())
         try {
@@ -197,89 +115,13 @@ class ObservationGeneratorTest {
     }
 
     @Test
-    fun `commitment without topic_or_person emits the no-topic line shape`() = runTest {
-        val resolved = ResolvedExtraction(
-            mapOf(
-                "stated_commitment" to ResolvedField(
-                    mapOf("text" to "ship the doc"),
-                    ConfidenceVerdict.CANONICAL,
-                ),
-            ),
-        )
-
-        val observations = newGenerator().generate(SAMPLE_TEXT, resolved, SAMPLE_DAY)
-
-        assertEquals(1, observations.size)
-        assertTrue(observations.first().text.contains("ship the doc"))
-        assertEquals(false, observations.first().text.contains("re:"))
-        verify(exactly = 0) { engine.streamText(any(), any()) }
-    }
-
-    @Test
-    fun `commitment with blank text falls through to other deterministic paths`() = runTest {
-        val resolved = ResolvedExtraction(
-            mapOf(
-                "stated_commitment" to ResolvedField(
-                    mapOf("text" to "   ", "topic_or_person" to "Nora"),
-                    ConfidenceVerdict.CANONICAL,
-                ),
-            ),
-        )
-        // No vocab, no goblin — model fallback should fire.
-        every { engine.streamText(any(), any()) } returns flowOf(themeNoticingPayload("Theme noted."))
-
-        val observations = newGenerator().generate(SAMPLE_TEXT, resolved, SAMPLE_DAY)
-
-        assertEquals(1, observations.size)
-        assertEquals(ObservationEvidence.THEME_NOTICING, observations.first().evidence)
-        verify(exactly = 1) { engine.streamText(any(), any()) }
-    }
-
-    @Test
-    fun `vocabulary contradiction with missing term skips to next deterministic or model`() = runTest {
-        val resolved = ResolvedExtraction(
-            mapOf(
-                "vocabulary_contradictions" to ResolvedField(
-                    listOf(mapOf("term_a" to "fine")),
-                    ConfidenceVerdict.CANONICAL,
-                ),
-            ),
-        )
-        every { engine.streamText(any(), any()) } returns flowOf(themeNoticingPayload("Theme noted."))
-
-        val observations = newGenerator().generate(SAMPLE_TEXT, resolved, SAMPLE_DAY)
-
-        assertEquals(1, observations.size)
-        assertEquals(ObservationEvidence.THEME_NOTICING, observations.first().evidence)
-        verify(exactly = 1) { engine.streamText(any(), any()) }
-    }
-
-    @Test
-    fun `vocabulary contradictions value with wrong shape is ignored`() = runTest {
-        val resolved = ResolvedExtraction(
-            mapOf(
-                "vocabulary_contradictions" to ResolvedField(
-                    listOf("not-a-map"),
-                    ConfidenceVerdict.CANONICAL,
-                ),
-            ),
-        )
-        every { engine.streamText(any(), any()) } returns flowOf(themeNoticingPayload("Theme noted."))
-
-        val observations = newGenerator().generate(SAMPLE_TEXT, resolved, SAMPLE_DAY)
-
-        assertEquals(1, observations.size)
-        verify(exactly = 1) { engine.streamText(any(), any()) }
-    }
-
-    @Test
-    fun `model fallback renders all resolved field value shapes into the prompt`() = runTest {
+    fun `prompt renders all resolved field value shapes`() = runTest {
         val resolved = ResolvedExtraction(
             mapOf(
                 "tags" to ResolvedField(listOf("focus", "long-stretch"), ConfidenceVerdict.CANONICAL),
-                "energy_descriptor" to ResolvedField("locked-in", ConfidenceVerdict.CANONICAL_WITH_CONFLICT),
+                "template_label" to ResolvedField("locked-in", ConfidenceVerdict.CANONICAL_WITH_CONFLICT),
                 "recurrence_link" to ResolvedField(null, ConfidenceVerdict.AMBIGUOUS),
-                "state_shift" to ResolvedField(true, ConfidenceVerdict.CANONICAL),
+                "some_flag" to ResolvedField(true, ConfidenceVerdict.CANONICAL),
                 "nested" to ResolvedField(mapOf("a" to 1, "b" to listOf(2, 3)), ConfidenceVerdict.CANDIDATE),
             ),
         )
@@ -294,12 +136,12 @@ class ObservationGeneratorTest {
         assertTrue(prompt.contains("[\"focus\""), "prompt should render tags list")
         assertTrue(prompt.contains("\"locked-in\""), "prompt should render scalar string")
         assertTrue(prompt.contains("recurrence_link"), "prompt should render null")
-        assertTrue(prompt.contains("state_shift"), "prompt should render boolean")
+        assertTrue(prompt.contains("some_flag"), "prompt should render boolean")
         assertTrue(prompt.contains("a=1"), "prompt should render nested map")
     }
 
     @Test
-    fun `model fallback with empty resolved fields renders the no-fields sentinel`() = runTest {
+    fun `prompt renders the no-fields sentinel when resolved is empty`() = runTest {
         val resolved = ResolvedExtraction(emptyMap())
         val capturedPrompt = io.mockk.slot<String>()
         every { engine.streamText(capture(capturedPrompt), any()) } returns
@@ -314,9 +156,13 @@ class ObservationGeneratorTest {
         "{\"observations\":[{\"text\":\"$text\",\"evidence\":\"theme-noticing\",\"fields\":[\"tags\"]}]}"
 
     private companion object {
-        // 2026-05-11 14:00 America/New_York — outside the goblin-hours window.
+        // 2026-05-11 14:00 America/New_York — an ordinary daytime capture.
         private val SAMPLE_DAY: ZonedDateTime =
             ZonedDateTime.of(2026, 5, 11, 14, 0, 0, 0, ZoneId.of("America/New_York"))
+
+        // 2026-05-11 03:14 America/New_York — an odd-hour capture the model may choose to note.
+        private val GOBLIN_HOUR: ZonedDateTime =
+            ZonedDateTime.of(2026, 5, 11, 3, 14, 0, 0, ZoneId.of("America/New_York"))
         private const val SAMPLE_TEXT = "Standup ran long again. The doc is still not sent."
     }
 }

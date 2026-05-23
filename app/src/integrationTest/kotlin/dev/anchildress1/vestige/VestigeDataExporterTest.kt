@@ -138,7 +138,6 @@ class VestigeDataExporterTest {
                 followUpText = null,
                 persona = Persona.WITNESS,
                 timestampEpochMs = 10L,
-                energyDescriptor = "wired",
                 recurrenceLink = null,
                 statedCommitmentJson = null,
                 lastError = null,
@@ -156,7 +155,6 @@ class VestigeDataExporterTest {
         assertTrue(entry.isNull("stated_commitment_json"))
         assertTrue(entry.isNull("last_error"))
         assertTrue(entry.isNull("vector"))
-        assertEquals("wired", entry.getString("energy_descriptor"))
         assertEquals("no follow-up here", entry.getString("entry_text"))
     }
 

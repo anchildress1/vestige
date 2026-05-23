@@ -9,6 +9,7 @@ import dev.anchildress1.vestige.storage.PatternStore
 import dev.anchildress1.vestige.storage.VocabCluster
 import dev.anchildress1.vestige.storage.VocabClustersCodec
 import dev.anchildress1.vestige.storage.vocabRootTokenOrNull
+import kotlinx.collections.immutable.toImmutableList
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -57,7 +58,7 @@ class VocabDriftViewModel(
             patternTitle = pattern.title,
             rootToken = rootToken,
             totalEntries = clusters.sumOf { it.memberEntryIds.size },
-            clusters = clusters.map { it.toUiModel() },
+            clusters = clusters.map { it.toUiModel() }.toImmutableList(),
         )
     }
 

@@ -19,8 +19,8 @@ object EntryMarkdownRenderer {
         append("persona: ").append(entry.persona.name.lowercase()).append('\n')
         append("follow_up: ").append(yamlScalar(entry.followUpText)).append('\n')
         append("template_label: ").append(yamlScalar(entry.templateLabel?.serial)).append('\n')
-        append("energy_descriptor: ").append(yamlScalar(entry.energyDescriptor)).append('\n')
         append("recurrence_link: ").append(yamlScalar(entry.recurrenceLink)).append('\n')
+        append("vocabulary: ").append(yamlScalar(entry.vocabularyWord)).append('\n')
         append("stated_commitment: ").append(yamlJsonBlob(entry.statedCommitmentJson)).append('\n')
         val tags = tagNames(entry)
         if (tags.isEmpty()) {

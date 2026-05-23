@@ -263,6 +263,8 @@ private const val TICK_RAIL_HEIGHT: Float = 0.40f
 private val MinTapTarget: Dp = 48.dp
 
 private val HamburgerGlyphSize = 24.sp
+private val AirplaneGlyphSize = 18.sp
+private const val AIRPLANE_MODE_CD = "Airplane mode on"
 
 /**
  * App shell top — status pill on the left (lime idle `GEMMA 4 · LOCAL ONLY`, coral recording
@@ -278,6 +280,7 @@ fun AppTop(
     onMenuTap: (() -> Unit)? = null,
     onStatusTap: (() -> Unit)? = null,
     rightContent: (@Composable () -> Unit)? = null,
+    airplaneMode: Boolean = rememberAirplaneMode(),
 ) {
     val hairlineColor = VestigeTheme.colors.hair
     Row(
@@ -297,12 +300,20 @@ fun AppTop(
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        ChromePill(
-            onClick = onStatusTap,
-            alignment = Alignment.CenterStart,
-            a11yLabel = status.contentDescription,
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
-            Pill(text = status.text, color = status.color, dot = status.dot, blink = status.blink, fill = false)
+            ChromePill(
+                onClick = onStatusTap,
+                alignment = Alignment.CenterStart,
+                a11yLabel = status.contentDescription,
+            ) {
+                Pill(text = status.text, color = status.color, dot = status.dot, blink = status.blink, fill = false)
+            }
+            if (airplaneMode) {
+                AirplaneIndicator()
+            }
         }
         if (rightContent != null) {
             rightContent()
@@ -325,6 +336,21 @@ fun AppTop(
             }
         }
     }
+}
+
+/** Non-interactive offline indicator: shown in [AppTop] only while the device is in airplane mode. */
+@Composable
+private fun AirplaneIndicator() {
+    Text(
+        text = "✈",
+        style = VestigeTheme.typography.displayBig.copy(
+            fontSize = AirplaneGlyphSize,
+            lineHeight = AirplaneGlyphSize,
+            fontWeight = FontWeight.Bold,
+        ),
+        color = VestigeTheme.colors.lime,
+        modifier = Modifier.semantics { contentDescription = AIRPLANE_MODE_CD },
+    )
 }
 
 /**

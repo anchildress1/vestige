@@ -8,6 +8,7 @@ import dev.anchildress1.vestige.inference.ForegroundResult
 import dev.anchildress1.vestige.inference.ForegroundStreamEvent
 import dev.anchildress1.vestige.inference.HistoryChunk
 import dev.anchildress1.vestige.model.Persona
+import kotlinx.collections.immutable.toImmutableList
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
@@ -159,7 +160,7 @@ class CaptureViewModel(
                     persona = current.persona,
                     modelReadiness = current.modelReadiness,
                     elapsedMs = 0L,
-                    recentLevels = meter.levels,
+                    recentLevels = meter.levels.toImmutableList(),
                 )
             } else {
                 current
@@ -290,7 +291,10 @@ class CaptureViewModel(
         }
         _state.update { current ->
             if (current is CaptureUiState.Recording) {
-                current.copy(elapsedMs = elapsed.coerceAtMost(maxDurationMs), recentLevels = meter.levels)
+                current.copy(
+                    elapsedMs = elapsed.coerceAtMost(maxDurationMs),
+                    recentLevels = meter.levels.toImmutableList(),
+                )
             } else {
                 current
             }

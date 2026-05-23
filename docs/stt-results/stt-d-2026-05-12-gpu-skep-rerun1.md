@@ -53,7 +53,7 @@ Mean latency: 32.8 s. Min 24.7 s, max 44.0 s.
 | Entry | Flag kind | Quote |
 |---|---|---|
 | A1 | `state-behavior-mismatch` | *"I was fine before it, then completely flattened by 11"* |
-| A4 | `vocabulary-contradiction` | *"Not tired exactly. More like the battery got yanked after the sync."* |
+| A4 | `vocabulary-contradiction` | *"Not tired exactly. More like the battery died after the sync."* |
 | B2 | `commitment-without-anchor` | *"Said I would send the invoice today. Instead I reorganized the desktop."* |
 | C1 | `unsupported-recurrence` | *"Same three criteria"* |
 

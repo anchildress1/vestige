@@ -94,12 +94,11 @@ class SinglePassExtractionTuningTest {
                 JSONArray(result.lensResults.map { "${it.lens.name}=${it.elapsedMs}ms/${it.attemptCount}att" }),
             )
             .put(
-                "lensEnergyShift",
+                // Per-lens template_label pick — shows which lens confuses which archetype and
+                // whether the three converge (the resolved template_label verdict is in `resolved`).
+                "lensTemplate",
                 JSONArray(
-                    result.lensResults.map { lr ->
-                        "${lr.lens.name}=${lr.extraction?.fields?.get("energy_descriptor")}/" +
-                            "${lr.extraction?.fields?.get("state_shift")}"
-                    },
+                    result.lensResults.map { lr -> "${lr.lens.name}=${lr.extraction?.fields?.get("template_label")}" },
                 ),
             )
         if (result is BackgroundExtractionResult.Success) {
@@ -154,9 +153,9 @@ class SinglePassExtractionTuningTest {
                 capturedAt = Instant.parse("2026-05-07T18:42:00Z").atZone(ZONE),
             ),
             TuningEntry(
-                id = "tuesday-concrete-shoes",
-                text = "Every Tuesday meeting does the same thing to me. I go in okay and come out with " +
-                    "what I can only describe as concrete shoes. Everything feels heavier and slower " +
+                id = "tuesday-stalled",
+                text = "Every Tuesday meeting does the same thing to me. I go in okay and come out " +
+                    "completely unable to get moving again. Everything feels heavier and slower " +
                     "for the rest of the afternoon, and I never seem to account for it.",
                 capturedAt = Instant.parse("2026-05-05T14:10:00Z").atZone(ZONE),
             ),
@@ -211,15 +210,15 @@ class SinglePassExtractionTuningTest {
                 capturedAt = Instant.parse("2026-05-20T19:00:00Z").atZone(ZONE),
             ),
             TuningEntry(
-                id = "wired-tired-third-night",
-                text = "Wired-tired again tonight and I don't know which is worse. Body wants sleep, brain just " +
+                id = "wired-third-night",
+                text = "Wired again tonight and I don't know which is worse. Body wants sleep, brain just " +
                     "refuses. Lying down doesn't help. Not anxious about anything specific, just running at " +
                     "the wrong frequency.",
                 capturedAt = Instant.parse("2026-05-05T12:00:00Z").atZone(ZONE),
             ),
             TuningEntry(
-                id = "anxious-tired",
-                text = "Anxious-tired is the only way I can describe what this is. Lying down doesn't count as " +
+                id = "anxious",
+                text = "Anxious is the only way I can describe what this is. Lying down doesn't count as " +
                     "rest when my brain is still processing everything. Slept but woke up like I hadn't slept " +
                     "at all.",
                 capturedAt = Instant.parse("2026-05-05T18:00:00Z").atZone(ZONE),

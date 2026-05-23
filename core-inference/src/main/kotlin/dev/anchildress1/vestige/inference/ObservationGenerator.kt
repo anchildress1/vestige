@@ -2,35 +2,31 @@ package dev.anchildress1.vestige.inference
 
 import android.util.Log
 import dev.anchildress1.vestige.model.EntryObservation
-import dev.anchildress1.vestige.model.ObservationEvidence
 import dev.anchildress1.vestige.model.ResolvedExtraction
-import dev.anchildress1.vestige.model.TemplateLabel
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.withContext
 import java.time.ZonedDateTime
+import java.time.format.DateTimeFormatter
+import java.util.Locale
 
 /**
  * Emits 1–2 per-entry observations per `concept-locked.md` §"Analysis (two-layer)" and
  * `adrs/ADR-002-multi-lens-extraction-pattern.md` §3.
  *
- * Strategy:
- *
- * 1. **Deterministic first.** Walks the resolved fields for stated commitments and vocabulary
- *    contradictions; checks the capture timestamp for goblin-hours (00:00–04:59 local) volunteered
- *    context. If 1+ deterministic observations land, they win — the model call is skipped.
- * 2. **Model fallback.** When deterministic assembly produces nothing useful, fires one short
- *    model call. The response is parsed + validated against the AGENTS.md §guardrail 7 /
- *    `concept-locked.md` §"Voice rules" forbidden-phrase list. A single retry on validation
- *    violation; if the retry still violates, the generator returns an empty list rather than
- *    persisting noise.
+ * Observations are model-derived only: one short model call grounded in the resolved 3-lens
+ * fields. The response is parsed + validated against the AGENTS.md §guardrail 7 /
+ * `concept-locked.md` §"Voice rules" forbidden-phrase list. A single retry on validation
+ * violation; if the retry still violates, the generator returns an empty list rather than
+ * persisting noise. Deterministic, metadata-derived lines (e.g. capture-timestamp) are never
+ * surfaced as observations — those are not model reads of the entry.
  *
  * The `pattern-callout` evidence type is never emitted here — it lives in the pattern engine's
  * deterministic post-append step (per ADR-002 §3).
  */
-@Suppress("ReturnCount") // Deterministic-assembly guards are clearer as early-returns than nested when chains.
+@Suppress("ReturnCount") // Retry-loop early-returns read clearer than nested when chains.
 class ObservationGenerator(
     private val engine: LiteRtLmEngine,
     private val parser: (String) -> List<EntryObservation>? = ObservationResponseParser::parse,
@@ -45,62 +41,15 @@ class ObservationGenerator(
         capturedAt: ZonedDateTime,
     ): List<EntryObservation> = withContext(ioDispatcher) {
         require(entryText.isNotBlank()) { "ObservationGenerator.generate requires a non-blank entryText" }
-
-        val deterministic = buildDeterministic(resolved, capturedAt).take(MAX_OBSERVATIONS)
-        if (deterministic.isNotEmpty()) {
-            Log.d(TAG, "deterministic observations=${deterministic.size}; skipping model call")
-            return@withContext deterministic
-        }
-
-        runModelFallback(entryText, resolved)
+        runModel(entryText, resolved, capturedAt)
     }
 
-    private fun buildDeterministic(resolved: ResolvedExtraction, capturedAt: ZonedDateTime): List<EntryObservation> {
-        val out = mutableListOf<EntryObservation>()
-        commitmentObservation(resolved)?.let { out += it }
-        vocabularyContradictionObservation(resolved)?.let { out += it }
-        if (out.isEmpty()) {
-            goblinHoursObservation(capturedAt)?.let { out += it }
-        }
-        return out
-    }
-
-    private fun commitmentObservation(resolved: ResolvedExtraction): EntryObservation? {
-        val commitment = resolved.fields[KEY_COMMITMENT]?.value as? Map<*, *> ?: return null
-        val text = (commitment["text"] as? String)?.trim()?.takeIf { it.isNotEmpty() } ?: return null
-        val topic = (commitment["topic_or_person"] as? String)?.trim()?.takeIf { it.isNotEmpty() }
-        val line = if (topic != null) {
-            "You said you'd do this — flagged: \"$text\" (re: $topic)."
-        } else {
-            "You said you'd do this — flagged: \"$text\"."
-        }
-        return EntryObservation(line, ObservationEvidence.COMMITMENT_FLAG, listOf(KEY_COMMITMENT))
-    }
-
-    private fun vocabularyContradictionObservation(resolved: ResolvedExtraction): EntryObservation? {
-        val contradictions = resolved.fields[KEY_VOCAB_CONTRADICTIONS]?.value as? List<*> ?: return null
-        val pick = contradictions.firstOrNull() as? Map<*, *> ?: return null
-        val termA = (pick["term_a"] as? String)?.trim()?.takeIf { it.isNotEmpty() } ?: return null
-        val termB = (pick["term_b"] as? String)?.trim()?.takeIf { it.isNotEmpty() } ?: return null
-        val line = "You said \"$termA\" and \"$termB\" in the same entry."
-        return EntryObservation(line, ObservationEvidence.VOCABULARY_CONTRADICTION, listOf(KEY_VOCAB_CONTRADICTIONS))
-    }
-
-    private fun goblinHoursObservation(capturedAt: ZonedDateTime): EntryObservation? {
-        if (capturedAt.hour !in TemplateLabel.GOBLIN_HOURS_LOCAL_HOUR_RANGE) return null
-        // `fields` is empty per ADR-002 §3: the array maps to canonical extraction field names
-        // (tags / energy_descriptor / recurrence_link / stated_commitment) or a snippet ref.
-        // The capture timestamp is metadata, not a resolved extraction field — surfacing it
-        // as a fields[] entry would corrupt the persisted schema for downstream consumers.
-        return EntryObservation(
-            text = "Captured between midnight and 5am — flagged as goblin hours.",
-            evidence = ObservationEvidence.VOLUNTEERED_CONTEXT,
-            fields = emptyList(),
-        )
-    }
-
-    private suspend fun runModelFallback(entryText: String, resolved: ResolvedExtraction): List<EntryObservation> {
-        val systemInstruction = composeSystemInstruction(resolved)
+    private suspend fun runModel(
+        entryText: String,
+        resolved: ResolvedExtraction,
+        capturedAt: ZonedDateTime,
+    ): List<EntryObservation> {
+        val systemInstruction = composeSystemInstruction(resolved, capturedAt)
         val userText = entryText.trimEnd()
         repeat(MAX_MODEL_ATTEMPTS) { attempt ->
             val raw = attemptModelCall(systemInstruction, userText, attempt + 1) ?: return@repeat
@@ -109,9 +58,9 @@ class ObservationGenerator(
                 Log.d(TAG, "model attempt ${attempt + 1} produced ${parsed.size} observations")
                 return parsed.take(MAX_OBSERVATIONS)
             }
-            Log.w(TAG, "model attempt ${attempt + 1} parsed null/empty or forbidden-phrase violation")
+            Log.w(TAG, "model attempt ${attempt + 1} produced no usable observations (parser logged the reason)")
         }
-        Log.w(TAG, "observation model fallback exhausted; returning empty list")
+        Log.w(TAG, "observation model attempts exhausted; returning empty list")
         return emptyList()
     }
 
@@ -129,13 +78,16 @@ class ObservationGenerator(
         null
     }
 
-    private fun composeSystemInstruction(resolved: ResolvedExtraction): String = buildString {
-        append(systemPromptLoader())
-        append("\n\n")
-        append(outputSchemaLoader())
-        append("\n\n## RESOLVED FIELDS\n")
-        append(renderResolved(resolved))
-    }
+    private fun composeSystemInstruction(resolved: ResolvedExtraction, capturedAt: ZonedDateTime): String =
+        buildString {
+            append(systemPromptLoader())
+            append("\n\n")
+            append(outputSchemaLoader())
+            append("\n\n## CAPTURE TIME\n")
+            append(capturedAt.format(CAPTURE_TIME_FORMAT))
+            append("\n\n## RESOLVED FIELDS\n")
+            append(renderResolved(resolved))
+        }
 
     private fun renderResolved(resolved: ResolvedExtraction): String {
         if (resolved.fields.isEmpty()) return "(no resolved fields)"
@@ -157,8 +109,10 @@ class ObservationGenerator(
         private const val MAX_OBSERVATIONS = 2
         private const val MAX_MODEL_ATTEMPTS = 2
 
-        private const val KEY_COMMITMENT = "stated_commitment"
-        private const val KEY_VOCAB_CONTRADICTIONS = "vocabulary_contradictions"
+        // Local wall-clock the entry was captured at, e.g. "Sunday 03:14" — lets the model note
+        // an odd-hour capture as a sourced observation instead of us fabricating one from metadata.
+        private val CAPTURE_TIME_FORMAT: DateTimeFormatter =
+            DateTimeFormatter.ofPattern("EEEE HH:mm", Locale.US)
 
         private fun loadResource(path: String): String {
             val stream = ObservationGenerator::class.java.getResourceAsStream(path)

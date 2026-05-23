@@ -57,7 +57,6 @@ class EntryEntitySmokeTest {
         assertEquals("", readBack.entryText)
         assertEquals(0L, readBack.timestampEpochMs)
         assertNull(readBack.templateLabel)
-        assertNull(readBack.energyDescriptor)
         assertNull(readBack.recurrenceLink)
         assertNull(readBack.statedCommitmentJson)
         assertEquals("[]", readBack.entryObservationsJson)
@@ -84,7 +83,6 @@ class EntryEntitySmokeTest {
             entryText = "Standup ran long again.",
             timestampEpochMs = 1_715_252_335_000L,
             templateLabel = TemplateLabel.AFTERMATH,
-            energyDescriptor = "flattened",
             extractionStatus = ExtractionStatus.RUNNING,
             attemptCount = 1,
             lastError = null,

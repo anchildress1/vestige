@@ -20,9 +20,8 @@ fun interface ConvergenceResolver {
  * Pure data merge. Iterates the union of field keys across the supplied lenses and applies the
  * four resolution rules per ADR-002 §"Convergence Resolver Contract". `tags` use a per-tag
  * ≥2-of-3 majority count with a Literal-strongest fallback (CANDIDATE) when no tag reaches
- * majority; other fields use a per-key equality predicate (case-insensitive trim for
- * `energy_descriptor`, identity-tuple match for `stated_commitment`, structural equality
- * otherwise).
+ * majority; other fields use a per-key equality predicate (identity-tuple match for
+ * `stated_commitment`, structural equality otherwise).
  *
  * Lens parse failures are honored by the caller — a missing lens is treated as no opinion. With
  * only one surviving lens the entry is under-evidenced; every field (populated or not) resolves
@@ -61,6 +60,8 @@ class DefaultConvergenceResolver : ConvergenceResolver {
             // the surviving lens lacks corroboration, so every populated field is ambiguous.
             byLens.size == MIN_SURVIVING_LENSES_FOR_AMBIGUOUS -> ambiguousField(matchingFlags)
 
+            key == VOCABULARY_KEY -> resolveVocabulary(byLens, matchingFlags)
+
             populated.isEmpty() -> ambiguousField(matchingFlags)
 
             populated.size == 1 &&
@@ -74,7 +75,7 @@ class DefaultConvergenceResolver : ConvergenceResolver {
                 sourceLens = populated.single().first,
             )
 
-            else -> resolveMultiple(key, populated, matchingFlags)
+            else -> resolveMultiple(populated, matchingFlags)
         }
     }
 
@@ -127,23 +128,36 @@ class DefaultConvergenceResolver : ConvergenceResolver {
         }
     }
 
-    private fun resolveMultiple(
-        key: String,
-        populated: List<Pair<Lens, Any>>,
-        matchingFlags: List<String>,
-    ): ResolvedField {
+    /**
+     * Tone is an inferential read, not a vote: the Inferential lens wins the [VOCABULARY_KEY] word
+     * outright. Literal/Skeptical can only corroborate (raising the verdict to CANONICAL when they
+     * agree) — they never override Inferential's word. Falls back to whichever lens did name a tone
+     * when Inferential abstained, and only AMBIGUOUS when no lens named one at all.
+     */
+    private fun resolveVocabulary(byLens: Map<Lens, LensExtraction>, matchingFlags: List<String>): ResolvedField {
+        val words: List<Pair<Lens, String>> = Lens.entries.mapNotNull { lens ->
+            (byLens[lens]?.fields?.get(VOCABULARY_KEY) as? String)
+                ?.trim()?.lowercase()?.takeIf(String::isNotBlank)
+                ?.let { lens to it }
+        }
+        val chosen = words.firstOrNull { it.first == Lens.INFERENTIAL }
+            ?: words.firstOrNull()
+            ?: return ambiguousField(matchingFlags)
+        // No Skeptical flag kind binds to vocabulary (SkepticalFlagKinds.SCHEMA_BINDING), so there
+        // is no CANONICAL_WITH_CONFLICT path here — corroboration is the only lift on the verdict.
+        val agreement = words.count { it.second == chosen.second }
+        val verdict = if (agreement >= MAJORITY_THRESHOLD) ConfidenceVerdict.CANONICAL else ConfidenceVerdict.CANDIDATE
+        return ResolvedField(value = chosen.second, verdict = verdict, flags = matchingFlags, sourceLens = chosen.first)
+    }
+
+    private fun resolveMultiple(populated: List<Pair<Lens, Any>>, matchingFlags: List<String>): ResolvedField {
         val groups: Map<Any, List<Any>> = populated.groupBy(
-            keySelector = { canonicalize(key, it.second) },
+            keySelector = { it.second },
             valueTransform = { it.second },
         )
         val majority = groups.entries.firstOrNull { it.value.size >= MAJORITY_THRESHOLD }
         return if (majority != null) {
             val majorityValue = majority.value.first()
-            if (key in LITERAL_GATED_FIELDS && !literalCorroborates(key, populated, majorityValue)) {
-                // Inferential + Skeptical agreed, but the strict Literal floor did not back the value.
-                // Suppress rather than promote an uncorroborated interpretive read.
-                return ambiguousField(matchingFlags)
-            }
             val verdict =
                 if (matchingFlags.isEmpty()) ConfidenceVerdict.CANONICAL else ConfidenceVerdict.CANONICAL_WITH_CONFLICT
             ResolvedField(value = majorityValue, verdict = verdict, flags = matchingFlags)
@@ -155,30 +169,6 @@ class DefaultConvergenceResolver : ConvergenceResolver {
             )
         }
     }
-
-    // Literal corroborates the majority when it contributed a matching value. Energy uses a
-    // substring match so "crashed hard" still backs "crashed"; everything else is exact equality.
-    private fun literalCorroborates(key: String, populated: List<Pair<Lens, Any>>, majorityValue: Any): Boolean {
-        val literalValue = populated.firstOrNull { it.first == Lens.LITERAL }?.second ?: return false
-        return when (key) {
-            ENERGY_DESCRIPTOR_KEY -> energyCorroborates(literalValue, majorityValue)
-            else -> literalValue == majorityValue
-        }
-    }
-
-    // Literal backs the majority on an exact match, or on substring overlap ("crashed hard" ⊇
-    // "crashed") — but only when both share negation polarity, so "not crashed" dissents from
-    // "crashed" rather than corroborating it.
-    private fun energyCorroborates(literalValue: Any, majorityValue: Any): Boolean {
-        val literal = (literalValue as? String)?.trim()?.lowercase()
-        val majority = (majorityValue as? String)?.trim()?.lowercase()
-        if (literal == null || majority == null) return false
-        val polarityAgrees = isNegated(literal) == isNegated(majority)
-        return literal == majority ||
-            (polarityAgrees && (literal.contains(majority) || majority.contains(literal)))
-    }
-
-    private fun isNegated(value: String): Boolean = value.split(' ').any { it in NEGATION_TOKENS }
 
     private fun disagreementField(matchingFlags: List<String>) = ResolvedField(
         value = null,
@@ -300,11 +290,6 @@ class DefaultConvergenceResolver : ConvergenceResolver {
         }
     }
 
-    private fun canonicalize(key: String, value: Any): Any = when (key) {
-        ENERGY_DESCRIPTOR_KEY -> (value as? String)?.trim()?.lowercase() ?: value
-        else -> value
-    }
-
     private fun meaningfulValue(value: Any?): Any? = when (value) {
         null -> null
         is String -> value.takeIf(String::isNotBlank)
@@ -350,21 +335,13 @@ class DefaultConvergenceResolver : ConvergenceResolver {
 
     private companion object {
         const val TAGS_KEY = "tags"
-        const val ENERGY_DESCRIPTOR_KEY = "energy_descriptor"
-        const val STATE_SHIFT_KEY = "state_shift"
         const val STATED_COMMITMENT_KEY = "stated_commitment"
+        const val VOCABULARY_KEY = "vocabulary"
         const val TOPIC_OR_PERSON_KEY = "topic_or_person"
         const val ENTRY_ID_KEY = "entry_id"
         const val LENS_DISAGREEMENT_FLAG = "lens-disagreement"
-        val NEGATION_TOKENS: Set<String> = setOf("not", "no", "never", "without")
         const val MAJORITY_THRESHOLD = 2
         const val MIN_SURVIVING_LENSES_FOR_AMBIGUOUS = 1
-
-        // Energy/state are interpretive: a majority of Inferential + Skeptical can share the same
-        // over-reach (a behavior clause, an inferred shift) while Literal — the strict floor —
-        // correctly abstains or dissents. For these fields a majority is only authoritative when
-        // Literal corroborates it; otherwise the value is suppressed to AMBIGUOUS.
-        val LITERAL_GATED_FIELDS: Set<String> = setOf(ENERGY_DESCRIPTOR_KEY, STATE_SHIFT_KEY)
         const val MIN_STEM_LENGTH = 3
         const val IES_SUFFIX = "ies"
 

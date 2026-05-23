@@ -21,6 +21,9 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -38,6 +41,7 @@ import dev.anchildress1.vestige.ui.components.AppTop
 import dev.anchildress1.vestige.ui.components.AppTopStatuses
 import dev.anchildress1.vestige.ui.components.BottomTab
 import dev.anchildress1.vestige.ui.components.EyebrowE
+import dev.anchildress1.vestige.ui.components.Pill
 import dev.anchildress1.vestige.ui.components.VestigeBottomNav
 import dev.anchildress1.vestige.ui.components.VestigeSpinner
 import dev.anchildress1.vestige.ui.components.limeLeftRuleForActive
@@ -125,6 +129,12 @@ private fun EntryDetailContent(model: EntryDetailUiModel, onBack: () -> Unit, mo
                 .padding(vertical = 6.dp),
         ) {
             EyebrowE(text = "← BACK", modifier = Modifier.testTag("detail_back"))
+        }
+        if (model.templateLabel != null) {
+            Pill(
+                text = model.templateLabel.uppercase(Locale.US),
+                modifier = Modifier.testTag("entry_template_label"),
+            )
         }
         Text(
             text = model.timeOfDayLabel,
@@ -221,6 +231,60 @@ private fun ThreeLensRead(status: String, lenses: List<LensRead>) {
                 ) {
                     EyebrowE(text = lens.label, maxLines = 1, softWrap = false)
                     Text(text = lens.value, style = VestigeTheme.typography.pCompact, color = lens.tone.color())
+                }
+            }
+        }
+        val rawReads = lenses.filter { it.rawResponse != null }
+        if (rawReads.isNotEmpty()) {
+            RawModelOutput(rawReads)
+        }
+    }
+}
+
+@Composable
+private fun RawModelOutput(lenses: List<LensRead>) {
+    val colors = VestigeTheme.colors
+    var expanded by remember { mutableStateOf(false) }
+    val toggleCd = if (expanded) EntryDetailCopy.RAW_OUTPUT_COLLAPSE_CD else EntryDetailCopy.RAW_OUTPUT_EXPAND_CD
+    Column(
+        modifier = Modifier.fillMaxWidth().testTag("entry_raw_output"),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable { expanded = !expanded }
+                .semantics {
+                    role = Role.Button
+                    contentDescription = toggleCd
+                }
+                .padding(vertical = 4.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            EyebrowE(
+                text = EntryDetailCopy.RAW_OUTPUT_EYEBROW,
+                modifier = Modifier.weight(1f),
+                maxLines = 1,
+                softWrap = false,
+            )
+            EyebrowE(text = if (expanded) "−" else "+", color = colors.lime, maxLines = 1)
+        }
+        if (expanded) {
+            lenses.forEach { lens ->
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(colors.s1)
+                        .padding(horizontal = 14.dp, vertical = 10.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                ) {
+                    EyebrowE(text = lens.label, maxLines = 1, softWrap = false)
+                    Text(
+                        text = lens.rawResponse ?: EntryDetailCopy.RAW_OUTPUT_NONE,
+                        style = VestigeTheme.typography.pCompact,
+                        color = colors.ink,
+                    )
                 }
             }
         }

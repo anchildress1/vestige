@@ -24,7 +24,9 @@ object PromptComposer {
     private const val SYSTEM_HEADER =
         "You are an extraction-only reader for a cognition-tracking app. " +
             "You do not greet the user, do not ask follow-up questions, and do not produce " +
-            "tone. The user is not in this loop — your output is consumed by other code."
+            "tone. The user is not in this loop — your output is consumed by other code. " +
+            "Every tag is kebab-case and at most two words (one hyphen max), e.g. \"standup\", " +
+            "\"battery-died\" — never longer."
 
     private val SURFACE_ORDER: List<String> = listOf(
         "behavioral",

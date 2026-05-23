@@ -133,7 +133,7 @@ class EntryDetailViewModelTest {
     fun `observations list contains text from entryObservationsJson`() = runTest {
         val id = entryStore.createPendingEntry("said fine twice", FIXTURE_INSTANT)
         val obs = listOf(
-            EntryObservation("You used \"fine\" twice.", ObservationEvidence.VOCABULARY_CONTRADICTION, emptyList()),
+            EntryObservation("You used \"fine\" twice.", ObservationEvidence.THEME_NOTICING, emptyList()),
             EntryObservation("You committed to review by Friday.", ObservationEvidence.COMMITMENT_FLAG, emptyList()),
         )
         entryStore.completeEntry(id, ResolvedExtraction(emptyMap()), null, obs)
@@ -143,7 +143,7 @@ class EntryDetailViewModelTest {
             val loaded = awaitItem() as EntryDetailUiState.Loaded
             assertEquals(2, loaded.model.observations.size)
             assertEquals("You used \"fine\" twice.", loaded.model.observations[0].text)
-            assertEquals("vocabulary-contradiction", loaded.model.observations[0].evidence)
+            assertEquals("theme-noticing", loaded.model.observations[0].evidence)
         }
     }
 
@@ -234,13 +234,13 @@ class EntryDetailViewModelTest {
         val box = boxStore.boxFor(EntryEntity::class.java)
         box.get(id).also {
             it.entryObservationsJson =
-                """[{"text":"Notice this.","evidence":"theme-noticing","fields":["tags","energy_descriptor"]}]"""
+                """[{"text":"Notice this.","evidence":"theme-noticing","fields":["tags","recurrence_link"]}]"""
         }.let(box::put)
         val vm = buildVm(id)
 
         vm.state.test {
             val loaded = awaitItem() as EntryDetailUiState.Loaded
-            assertEquals(listOf("tags", "energy_descriptor"), loaded.model.observations[0].fields)
+            assertEquals(listOf("tags", "recurrence_link"), loaded.model.observations[0].fields)
         }
     }
 
@@ -312,31 +312,6 @@ class EntryDetailViewModelTest {
         }
     }
 
-    // --- energy descriptor ---
-
-    @Test
-    fun `energyDescriptor is exposed when present`() = runTest {
-        val id = createCompleted("energy entry")
-        completeWithEnergy(id, "cruisy in, crashed out")
-        val vm = buildVm(id)
-
-        vm.state.test {
-            val loaded = awaitItem() as EntryDetailUiState.Loaded
-            assertEquals("cruisy in, crashed out", loaded.model.energyDescriptor)
-        }
-    }
-
-    @Test
-    fun `energyDescriptor is null when none extracted`() = runTest {
-        val id = createCompleted("no energy")
-        val vm = buildVm(id)
-
-        vm.state.test {
-            val loaded = awaitItem() as EntryDetailUiState.Loaded
-            assertNull(loaded.model.energyDescriptor)
-        }
-    }
-
     // --- tags ---
 
     @Test
@@ -391,14 +366,13 @@ class EntryDetailViewModelTest {
 
     @Test
     fun `lens receipts are projected into compact reads and field rows`() = runTest {
-        val id = entryStore.createPendingEntry("battery got yanked", FIXTURE_INSTANT)
+        val id = entryStore.createPendingEntry("battery died", FIXTURE_INSTANT)
         entryStore.completeEntry(
             id,
             ResolvedExtraction(
                 mapOf(
-                    "tags" to ResolvedField(listOf("meeting", "battery-yanked"), ConfidenceVerdict.CANONICAL),
-                    "energy_descriptor" to ResolvedField(
-                        "crashed",
+                    "tags" to ResolvedField(
+                        listOf("meeting", "battery-died"),
                         ConfidenceVerdict.CANONICAL_WITH_CONFLICT,
                     ),
                 ),
@@ -408,13 +382,13 @@ class EntryDetailViewModelTest {
                 EntryLensReceipt(
                     lens = Lens.LITERAL,
                     extracted = true,
-                    fields = mapOf("energy_descriptor" to "battery yanked"),
+                    fields = mapOf("tags" to "battery died"),
                 ),
                 EntryLensReceipt(
                     lens = Lens.SKEPTICAL,
                     extracted = true,
-                    fields = mapOf("energy_descriptor" to "not tired vs yanked"),
-                    flags = listOf("vocabulary-contradiction:not tired:battery got yanked"),
+                    fields = mapOf("tags" to "battery died"),
+                    flags = listOf("commitment-without-anchor:not tired:battery died"),
                 ),
             ),
         )
@@ -423,17 +397,18 @@ class EntryDetailViewModelTest {
         vm.state.test {
             val loaded = awaitItem() as EntryDetailUiState.Loaded
             assertEquals(3, loaded.model.lenses.size)
-            assertEquals("battery yanked", loaded.model.lenses.first { it.label == "LITERAL" }.value)
+            assertEquals("battery died", loaded.model.lenses.first { it.label == "LITERAL" }.value)
+            // tags resolved CANONICAL_WITH_CONFLICT, so the card status is CONFLICT and the
+            // flagged Skeptical lens reads red — lens colour tracks the real conflict, not a tag diff.
             assertEquals(LensTone.CONFLICT, loaded.model.lenses.first { it.label == "SKEPTICAL" }.tone)
             assertEquals(EntryDetailCopy.THREE_LENS_STATUS_CONFLICT, loaded.model.lensStatus)
-            assertEquals("crashed", loaded.model.fields.first { it.label == "STATE" }.value)
-            assertEquals(LensTone.CONFLICT, loaded.model.fields.first { it.label == "STATE" }.tone)
+            assertEquals(LensTone.CONFLICT, loaded.model.fields.first { it.label == "BEHAVIOR" }.tone)
         }
     }
 
     @Test
     fun `corrupt lens receipts read as unreadable, not as lens-never-ran`() = runTest {
-        val id = createCompleted("battery got yanked")
+        val id = createCompleted("battery died")
         val box = boxStore.boxFor(EntryEntity::class.java)
         box.get(id).also { it.lensReceiptsJson = "{not valid json" }.let(box::put)
         val vm = buildVm(id)
@@ -444,46 +419,9 @@ class EntryDetailViewModelTest {
                 assertEquals(EntryDetailCopy.LENS_UNREADABLE, it.value)
                 assertEquals(LensTone.CONFLICT, it.tone)
             }
-            val vocab = loaded.model.fields.first { it.label == "VOCAB" }
-            assertEquals(EntryDetailCopy.LENS_UNREADABLE, vocab.value)
-            assertEquals(LensTone.CONFLICT, vocab.tone)
-        }
-    }
-
-    @Test
-    fun `vocab field falls back to repeated lexical tag terms when contradictions are empty`() = runTest {
-        val id = entryStore.createPendingEntry("tabs stayed open and the tabs are still open", FIXTURE_INSTANT)
-        entryStore.completeEntry(
-            id,
-            ResolvedExtraction(
-                mapOf(
-                    "tags" to ResolvedField(
-                        listOf("tabs", "desk"),
-                        ConfidenceVerdict.CANONICAL,
-                    ),
-                ),
-            ),
-            null,
-            lensReceipts = listOf(
-                EntryLensReceipt(
-                    lens = Lens.LITERAL,
-                    extracted = true,
-                    fields = mapOf("tags" to listOf("tabs", "desk")),
-                ),
-                EntryLensReceipt(
-                    lens = Lens.INFERENTIAL,
-                    extracted = true,
-                    fields = mapOf("tags" to listOf("tabs-open", "desk")),
-                ),
-            ),
-        )
-        val vm = buildVm(id)
-
-        vm.state.test {
-            val loaded = awaitItem() as EntryDetailUiState.Loaded
-            val vocab = loaded.model.fields.first { it.label == "VOCAB" }
-            assertEquals("tabs", vocab.value)
-            assertEquals(LensTone.CANONICAL, vocab.tone)
+            val repeat = loaded.model.fields.first { it.label == "REPEAT" }
+            assertEquals("—", repeat.value)
+            assertEquals(LensTone.AMBIGUOUS, repeat.tone)
         }
     }
 
@@ -631,18 +569,6 @@ class EntryDetailViewModelTest {
         )
         entryStore.completeEntry(id, ResolvedExtraction(emptyMap()), null)
         return id
-    }
-
-    private fun completeWithEnergy(id: Long, energy: String) {
-        val resolved = ResolvedExtraction(
-            mapOf(
-                "energy_descriptor" to dev.anchildress1.vestige.model.ResolvedField(
-                    energy,
-                    dev.anchildress1.vestige.model.ConfidenceVerdict.CANONICAL,
-                ),
-            ),
-        )
-        entryStore.completeEntry(id, resolved, null)
     }
 
     private fun resolvedTags(vararg tags: String): ResolvedExtraction = ResolvedExtraction(

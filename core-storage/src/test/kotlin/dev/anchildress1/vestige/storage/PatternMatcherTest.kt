@@ -43,14 +43,14 @@ class PatternMatcherTest {
         tags: List<String> = emptyList(),
         text: String = "",
         commitmentTopic: String? = null,
-        energyDescriptor: String? = null,
+        vocabularyWord: String? = null,
         timestamp: Instant = Instant.parse("2026-05-11T12:00:00Z"),
     ): EntryEntity {
         val entry = EntryEntity(
             entryText = text,
             templateLabel = templateLabel,
-            energyDescriptor = energyDescriptor,
             statedCommitmentJson = commitmentTopic?.let { """{"topic_or_person":"$it","text":"do it"}""" },
+            vocabularyWord = vocabularyWord,
             timestampEpochMs = timestamp.toEpochMilli(),
         )
         boxStore.boxFor<EntryEntity>().put(entry)
@@ -180,76 +180,48 @@ class PatternMatcherTest {
     }
 
     @Test
-    fun `vocab matches when tag contains the token`() {
-        val entry = putEntry(tags = listOf("tired"))
+    fun `vocab matches when the entry tone word equals the token`() {
+        val entry = putEntry(vocabularyWord = "tired")
         val p = pattern(PatternKind.VOCAB_FREQUENCY, "{\"token\":\"tired\"}")
         assertTrue(PatternMatcher.matches(entry, p, ZoneOffset.UTC))
     }
 
     @Test
-    fun `vocab matches when entry_text contains stemmed form`() {
-        val entry = putEntry(text = "I am tireds again", tags = emptyList())
+    fun `vocab matches when the tone word only differs by casing or plural`() {
+        // The matcher canonicalizes the tone word the same way the signature was minted, so
+        // `Tireds` collapses to the `tired` token.
+        val entry = putEntry(vocabularyWord = "Tireds")
         val p = pattern(PatternKind.VOCAB_FREQUENCY, "{\"token\":\"tired\"}")
         assertTrue(PatternMatcher.matches(entry, p, ZoneOffset.UTC))
     }
 
     @Test
-    fun `vocab rejects unrelated text`() {
-        val entry = putEntry(text = "rested and great", tags = emptyList())
+    fun `vocab rejects a different tone word`() {
+        val entry = putEntry(vocabularyWord = "wired")
+        val p = pattern(PatternKind.VOCAB_FREQUENCY, "{\"token\":\"tired\"}")
+        assertFalse(PatternMatcher.matches(entry, p, ZoneOffset.UTC))
+    }
+
+    @Test
+    fun `vocab rejects an entry with no tone word`() {
+        // Entry text mentions the word but no model-emitted tone word — the cluster predicate
+        // keys on `vocabularyWord`, not free text, so this must not match.
+        val entry = putEntry(text = "tired all day", vocabularyWord = null)
+        val p = pattern(PatternKind.VOCAB_FREQUENCY, "{\"token\":\"tired\"}")
+        assertFalse(PatternMatcher.matches(entry, p, ZoneOffset.UTC))
+    }
+
+    @Test
+    fun `vocab rejects a blank tone word`() {
+        val entry = putEntry(vocabularyWord = "   ")
         val p = pattern(PatternKind.VOCAB_FREQUENCY, "{\"token\":\"tired\"}")
         assertFalse(PatternMatcher.matches(entry, p, ZoneOffset.UTC))
     }
 
     @Test
     fun `vocab rejects blank signature token`() {
-        val entry = putEntry(text = "tired all day", tags = emptyList())
+        val entry = putEntry(vocabularyWord = "tired")
         val p = pattern(PatternKind.VOCAB_FREQUENCY, "{}")
-        assertFalse(PatternMatcher.matches(entry, p, ZoneOffset.UTC))
-    }
-
-    @Test
-    fun `vocab stems entry text via the shared TokenStemmer — no prefix-overreach`() {
-        // `newscast` should NOT match the `news` signature — naive startsWith would let it through.
-        val entry = putEntry(text = "I watched the newscast last night", tags = emptyList())
-        val p = pattern(PatternKind.VOCAB_FREQUENCY, "{\"token\":\"news\"}")
-        assertFalse(
-            "preserved-surface tokens must not match longer words",
-            PatternMatcher.matches(entry, p, ZoneOffset.UTC),
-        )
-    }
-
-    @Test
-    fun `vocab matches plural form when stemmer folds it`() {
-        val entry = putEntry(text = "I had three meetings", tags = emptyList())
-        val p = pattern(PatternKind.VOCAB_FREQUENCY, "{\"token\":\"meeting\"}")
-        assertTrue(PatternMatcher.matches(entry, p, ZoneOffset.UTC))
-    }
-
-    @Test
-    fun `vocab matches via alias fold so detection and matching stay aligned`() {
-        // Detection alias-folds "drained" → "tired" when minting the pattern signature. The
-        // matcher MUST do the same — otherwise the pattern that created itself from drained
-        // entries can never match a subsequent drained entry, and callouts silently stop.
-        val entry = putEntry(text = "drained again, every limb gave up at once", tags = emptyList())
-        val p = pattern(PatternKind.VOCAB_FREQUENCY, "{\"token\":\"tired\"}")
-        assertTrue(PatternMatcher.matches(entry, p, ZoneOffset.UTC))
-    }
-
-    @Test
-    fun `vocab matches via energy descriptor path`() {
-        // Detection includes energy descriptor tokens. Matcher must too, otherwise an
-        // energy-only signal that created the pattern can't sustain callouts.
-        val entry = putEntry(text = "yet another tuesday", energyDescriptor = "exhausted", tags = emptyList())
-        val p = pattern(PatternKind.VOCAB_FREQUENCY, "{\"token\":\"tired\"}")
-        assertTrue(PatternMatcher.matches(entry, p, ZoneOffset.UTC))
-    }
-
-    @Test
-    fun `vocab does not match below the MIN_VOCAB_LENGTH floor`() {
-        // 3-letter energy descriptor must not satisfy a vocab signature even if it stems exactly.
-        // Same floor as text path — Codex P2 finding.
-        val entry = putEntry(text = "neutral body of text", energyDescriptor = "low", tags = emptyList())
-        val p = pattern(PatternKind.VOCAB_FREQUENCY, "{\"token\":\"low\"}")
         assertFalse(PatternMatcher.matches(entry, p, ZoneOffset.UTC))
     }
 

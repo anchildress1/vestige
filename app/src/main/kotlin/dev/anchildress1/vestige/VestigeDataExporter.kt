@@ -92,7 +92,7 @@ internal class VestigeDataExporter(private val boxStore: BoxStore, private val o
                 .put("persona", entry.persona.name)
                 .put("timestamp_epoch_ms", entry.timestampEpochMs)
                 .putNullable("template_label", entry.templateLabel?.serial)
-                .putNullable("energy_descriptor", entry.energyDescriptor)
+                .putNullable("vocabulary", entry.vocabularyWord)
                 .putNullable("recurrence_link", entry.recurrenceLink)
                 .putNullable("stated_commitment_json", entry.statedCommitmentJson)
                 .put("entry_observations_json", entry.entryObservationsJson)

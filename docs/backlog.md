@@ -61,7 +61,7 @@ stt-N : conditional on stop-and-test outcome (see PRD §"Build philosophy: build
 | `pattern-detail-energy-stats` | v1.5 | design | **Deferred 2026-05-17 (Story 4.15 triage).** POC Pattern Detail (`poc/pattern-detail-final.png`) renders `StatRibbon` cells like `100% ON TUES` / `6W STREAK` / `~85m TO CRASH`. These require `EnergyDescriptor` data wiring per Story 2.13 — gated by upstream work, not by UI capacity | Story 2.13 `EnergyDescriptor` plumbing lands AND post-submission polish window |
 | `pattern-detail-trace-peak` | v1.5 | design | **Deferred 2026-05-17 (Story 4.15 triage).** POC Pattern Detail trace strip renders a `▼` peak marker above the highest-intensity bar. Decorative — the bars themselves already convey the same information | Post-submission polish window |
 | `goblin-hours-addendum-persona-aware` | v1.5 | inference | **Removed 2026-05-17.** The single shared `goblin-hours-addendum.txt` flattened persona divergence at the 3am capture beat — the one moment persona voice should be most distinct (full-suite test: near-zero night/day delta). The addendum, its `ForegroundInference` injection + `isGoblinHours()`/`GOBLIN_HOURS_*`, and the `zoneId` seam were **deleted entirely** for v1 (commit `69784a60`). The ADR-002 §625 plan to make it persona-aware (three voice-matched files) was **cancelled, not deferred** — see ADR-002 §Addendum (2026-05-17). This row is a speculative v1.5 marker only; the `TemplateLabel.GOBLIN_HOURS` label + `time_of_day_cluster` pattern are unaffected. | Speculative — only if post-v1 multi-turn/voice work revisits the foreground follow-up; a revival is a fresh design (no `isGoblinHours()` branch exists) |
-| `tag-chip-primitive-split` | v1.5 | design | **Deferred 2026-05-17 (Story 4.15 triage).** Entry Detail tags (`battery-yanked`, `fell-out`, `meeting`) and Pattern Detail action buttons (`Drop`, `Skip`) both render via the `Pill` primitive, creating a passive-vs-interactive semantic conflict at the call sites. Real but marginal demo risk — tags sit in a clearly subordinate position (bottom of Entry Detail, smaller scale). New `Chip` primitive is new infrastructure for low demo lift | Post-submission infra work OR user feedback that tags are mistaken for actions |
+| `tag-chip-primitive-split` | v1.5 | design | **Deferred 2026-05-17 (Story 4.15 triage).** Entry Detail tags (`battery-died`, `fell-out`, `meeting`) and Pattern Detail action buttons (`Drop`, `Skip`) both render via the `Pill` primitive, creating a passive-vs-interactive semantic conflict at the call sites. Real but marginal demo risk — tags sit in a clearly subordinate position (bottom of Entry Detail, smaller scale). New `Chip` primitive is new infrastructure for low demo lift | Post-submission infra work OR user feedback that tags are mistaken for actions |
 | `recording-screen-density` | v1.5 | design | **Deferred 2026-05-17 (Story 4.15 triage).** Recording-screen layout (`Screenshot_20260516_220422_Vestige.png`) has ~50% dead vertical space between the chunk progress bar and the `LEVEL · LIVE` audio meter. Active surface during the 30 s record window — functional, just sparse. Reorder is cheap but not demo-blocking | Post-submission polish window |
 | `settings-back-affordance` | v1.5 | design | **Deferred 2026-05-17 (Story 4.15 triage).** Settings ships without an explicit `← BACK` link — only predictive-back gesture exits the surface. Discoverability concern for non-Android-power users; not a 90 s pitch or 5 min walkthrough blocker (judge uses predictive-back or system gesture) | First-run usability data shows users stranded on Settings, or Settings is added to the demo walkthrough script |
 | `mtp-latency-ab` | v1.5 | inference | **Deferred 2026-05-17 — non-gating measurement.** Story 2.15's MTP fore/background latency A/B decides nothing (MTP ships enabled regardless of the ratio per the story's own rule), is not demo-visible, and correctness is already pinned by `LiteRtLmEngineTest`. Measuring needs two invasive builds (no runtime MTP toggle). Pure verification debt — fails the demo-impact test | A v1.5 perf-tuning pass that actually acts on the number, or a `macrobenchmark` module if decode latency becomes a real regression surface |
@@ -241,4 +241,18 @@ scope-estimate: ~1d uncompressed, ~1.5d with Opus compression
 ```
 hard-constraint: opt-in only, encrypted, never default
 forbidden-in-v1: any cloud touchpoint, any analytics, any RemoteConfig (per adrs/ADR-001 §Q7)
+```
+
+### `seed-data-prepopulation`
+
+```
+tier: v1.5 (demo tooling)
+flagged: 2026-05-22
+problem: the dev seed (DebugPatternSeeder writes PENDING rows; run_extraction=true runs
+         recovery extraction) is not returning responses on-device this run — seeded entries
+         land without resolved fields, so detail surfaces (vocab, promises, three-lens read)
+         and the vocab/template patterns stay empty.
+deferred-by: user (2026-05-22) — do NOT change the seed path now.
+future-task: bake extraction output (resolved fields + lens receipts) for the demo set so the
+             walkthrough opens populated entries without waiting on a live model run.
 ```

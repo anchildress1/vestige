@@ -95,7 +95,9 @@ class PatternDetailScreenTest {
 
     @Test
     fun `Loaded state renders title observation sources and action row`() {
-        val supporting = listOf(seedEntry("crashed after standup", tagNames = listOf("crashed", "standup")))
+        val supporting = listOf(
+            seedEntry("crashed after standup", tagNames = listOf("crashed", "standup"), vocabularyWord = "crashed"),
+        )
         seedActivePattern(
             patternId = "p-detail-render",
             title = "Tuesday Meetings",
@@ -299,13 +301,17 @@ class PatternDetailScreenTest {
         ioDispatcher = testDispatcher,
     )
 
-    private fun seedEntry(text: String, tagNames: List<String> = emptyList()): EntryEntity {
+    private fun seedEntry(
+        text: String,
+        tagNames: List<String> = emptyList(),
+        vocabularyWord: String? = null,
+    ): EntryEntity {
         val entity = EntryEntity(
             entryText = text,
             timestampEpochMs = MAY_12_2026_EPOCH_MS,
             markdownFilename = "entry-${System.nanoTime()}.md",
             extractionStatus = ExtractionStatus.COMPLETED,
-        )
+        ).apply { this.vocabularyWord = vocabularyWord }
         val entryBox = boxStore.boxFor(EntryEntity::class.java)
         val tagBox = boxStore.boxFor(TagEntity::class.java)
         entryBox.put(entity)

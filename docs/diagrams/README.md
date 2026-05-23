@@ -26,7 +26,7 @@ Authority order if anything here disagrees with prose: the ADRs and `concept-loc
 **Dual template vocabulary.** The product spec (`concept-locked.md`, authoritative) uses
 `Crashed / Deep Space / Busy Stalling / Nonstop Spiral / Goblin Hours / Brain Dump`. ADR-002's
 agreement predicate and the storage enum are written with the older positional names
-(`Aftermath / Tunnel exit / Concrete shoes / Decision spiral / Goblin hours / Audit`). They map
+(`Aftermath / Tunnel exit / Stalled / Decision spiral / Goblin hours / Audit`). They map
 1:1. **User-facing diagrams use the `concept-locked` names; the ADR-002 page quotes the enum form
 as written.**
 

@@ -21,30 +21,26 @@ class TemplateLabelerTest {
     private val labeler = TemplateLabeler()
 
     @Test
-    fun `crashed plus state shift resolves to aftermath`() {
+    fun `crashed tag resolves to aftermath`() {
         val resolved = resolved(
-            "energy_descriptor" to "crashed".canonical(),
-            "state_shift" to true.canonical(),
+            "tags" to listOf("crashed").canonical(),
         )
 
         assertEquals(TemplateLabel.AFTERMATH, labeler.label(resolved, capturedAt = noon))
     }
 
     @Test
-    fun `crashed without state shift falls through to audit when tags do not carry aftermath`() {
+    fun `no aftermath tag falls through to audit`() {
         val resolved = resolved(
-            "energy_descriptor" to "crashed".canonical(),
-            "state_shift" to false.canonical(),
+            "tags" to listOf("groceries").canonical(),
         )
 
         assertEquals(TemplateLabel.AUDIT, labeler.label(resolved, capturedAt = noon))
     }
 
     @Test
-    fun `aftermath tags drive aftermath even when state shift is absent`() {
+    fun `aftermath tags drive aftermath`() {
         val resolved = resolved(
-            "energy_descriptor" to "crashed".canonical(),
-            "state_shift" to false.canonical(),
             "tags" to listOf("aftermath").canonical(),
         )
 
@@ -52,18 +48,8 @@ class TemplateLabelerTest {
     }
 
     @Test
-    fun `hollow energy drives aftermath for post-meeting demo entries`() {
-        val resolved = resolved("energy_descriptor" to "hollow".canonical())
-
-        assertEquals(TemplateLabel.AFTERMATH, labeler.label(resolved, capturedAt = noon))
-    }
-
-    @Test
-    fun `aftermath energy match is case-insensitive and trimmed`() {
-        val resolved = resolved(
-            "energy_descriptor" to "  CRASHED  ".canonical(),
-            "state_shift" to true.canonical(),
-        )
+    fun `hollow tag drives aftermath for post-meeting demo entries`() {
+        val resolved = resolved("tags" to listOf("hollow").canonical())
 
         assertEquals(TemplateLabel.AFTERMATH, labeler.label(resolved, capturedAt = noon))
     }
@@ -90,10 +76,10 @@ class TemplateLabelerTest {
     }
 
     @Test
-    fun `stuck marker tag yields concrete shoes label`() {
+    fun `stuck marker tag yields stalled label`() {
         val resolved = resolved("tags" to listOf("stuck", "q3-doc").canonical())
 
-        assertEquals(TemplateLabel.CONCRETE_SHOES, labeler.label(resolved, capturedAt = noon))
+        assertEquals(TemplateLabel.STALLED, labeler.label(resolved, capturedAt = noon))
     }
 
     @Test
@@ -132,9 +118,7 @@ class TemplateLabelerTest {
     @Test
     fun `aftermath wins over tunnel exit when both signals fire`() {
         val resolved = resolved(
-            "energy_descriptor" to "crashed".canonical(),
-            "state_shift" to true.canonical(),
-            "tags" to listOf("tunnel-exit").canonical(),
+            "tags" to listOf("crashed", "tunnel-exit").canonical(),
         )
 
         assertEquals(TemplateLabel.AFTERMATH, labeler.label(resolved, capturedAt = threeAm))
@@ -143,9 +127,7 @@ class TemplateLabelerTest {
     @Test
     fun `aftermath wins over goblin hours at 3am`() {
         val resolved = resolved(
-            "energy_descriptor" to "crashed".canonical(),
-            "state_shift" to true.canonical(),
-            "tags" to listOf("late-night").canonical(),
+            "tags" to listOf("crashed", "late-night").canonical(),
         )
 
         assertEquals(TemplateLabel.AFTERMATH, labeler.label(resolved, capturedAt = threeAm))
@@ -159,10 +141,10 @@ class TemplateLabelerTest {
     }
 
     @Test
-    fun `concrete shoes wins over goblin hours when both signals fire at 3am`() {
+    fun `stalled wins over goblin hours when both signals fire at 3am`() {
         val resolved = resolved("tags" to listOf("stuck", "late-night").canonical())
 
-        assertEquals(TemplateLabel.CONCRETE_SHOES, labeler.label(resolved, capturedAt = threeAm))
+        assertEquals(TemplateLabel.STALLED, labeler.label(resolved, capturedAt = threeAm))
     }
 
     @Test
@@ -179,22 +161,6 @@ class TemplateLabelerTest {
         val resolved = resolved("tags" to listOf("Decision-Loop").canonical())
 
         assertEquals(TemplateLabel.DECISION_SPIRAL, labeler.label(resolved, capturedAt = noon))
-    }
-
-    @Test
-    fun `candidate verdict on energy descriptor is not load-bearing for aftermath`() {
-        val resolved = ResolvedExtraction(
-            mapOf(
-                "energy_descriptor" to ResolvedField(
-                    value = "crashed",
-                    verdict = ConfidenceVerdict.CANDIDATE,
-                    sourceLens = dev.anchildress1.vestige.model.Lens.INFERENTIAL,
-                ),
-                "state_shift" to true.canonical(),
-            ),
-        )
-
-        assertEquals(TemplateLabel.AUDIT, labeler.label(resolved, capturedAt = noon))
     }
 
     @Test
@@ -216,12 +182,11 @@ class TemplateLabelerTest {
     fun `canonical-with-conflict still drives the label`() {
         val resolved = ResolvedExtraction(
             mapOf(
-                "energy_descriptor" to ResolvedField(
-                    value = "crashed",
+                "tags" to ResolvedField(
+                    value = listOf("crashed"),
                     verdict = ConfidenceVerdict.CANONICAL_WITH_CONFLICT,
-                    flags = listOf("vocabulary-contradiction:fine vs couldn't"),
+                    flags = listOf("commitment-without-anchor:fine vs couldn't"),
                 ),
-                "state_shift" to true.canonical(),
             ),
         )
 
@@ -271,7 +236,7 @@ class TemplateLabelerTest {
             ),
         )
 
-        assertEquals(TemplateLabel.CONCRETE_SHOES, labeler.label(resolved, capturedAt = noon))
+        assertEquals(TemplateLabel.STALLED, labeler.label(resolved, capturedAt = noon))
     }
 
     private fun resolved(vararg entries: Pair<String, ResolvedField>): ResolvedExtraction =

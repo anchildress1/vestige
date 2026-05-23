@@ -44,7 +44,7 @@ SKEPTICAL is also under-budget. Total per-call prefill is smaller than the greed
 | Entry | Flag kind | Quoted evidence (model's `note`) |
 |---|---|---|
 | A1 | `state-behavior-mismatch` | *"I was fine before it, then completely flattened by 11"* — state change lacks a triggering event |
-| A4 | `vocabulary-contradiction` | *"Not tired exactly. More like the battery got yanked after the sync."* — user negated tiredness then reasserted energy |
+| A4 | `vocabulary-contradiction` | *"Not tired exactly. More like the battery died after the sync."* — user negated tiredness then reasserted energy |
 | B2 | `commitment-without-anchor` | *"Said I would send the invoice today. Instead I reorganized the desktop."* — commitment was not followed by the action |
 | C1 | `unsupported-recurrence` | *"Same three criteria"* — claim lacks supporting history |
 

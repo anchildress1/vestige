@@ -1,5 +1,6 @@
 package dev.anchildress1.vestige.inference
 
+import android.util.Log
 import dev.anchildress1.vestige.model.EntryObservation
 import dev.anchildress1.vestige.model.ObservationEvidence
 import org.json.JSONArray
@@ -11,17 +12,19 @@ import org.json.JSONTokener
  * `resources/observations/output-schema.txt`) into a list of [EntryObservation]. Tolerant of
  * surrounding prose / markdown fences — locates the first balanced `{...}` block that parses
  * as a JSON object with an `observations` array, the same shape as [LensResponseParser].
- * Returns `null` on any parse failure or schema violation; the caller treats null as "no
- * model-generated observations" and falls back to deterministic / empty.
+ *
+ * Salvage-first: a malformed or voice-rule-violating *entry* is dropped, never the whole batch.
+ * `null` is returned only when nothing usable survives — no parseable JSON object, no
+ * `observations` array, or every entry failed. The caller treats null as "no model-generated
+ * observations".
  *
  * Validation:
  *
- * - Up to 2 observations retained; extras truncated.
+ * - Up to 2 surviving observations retained; extras truncated.
  * - Each observation must carry a non-blank `text` and a recognized `evidence` value (other
  *   than `pattern-callout`, which is owned by the pattern engine, not this call).
- * - `text` is scanned for forbidden phrases per `concept-locked.md` §"Voice rules" — any match
- *   drops the entire response (returns `null`). One retry is the caller's responsibility; this
- *   parser is single-pass.
+ * - `text` is scanned for forbidden phrases per `concept-locked.md` §"Voice rules"; a match
+ *   drops that one observation. The retry loop is the caller's responsibility; single-pass here.
  */
 @Suppress("ReturnCount") // Guard-style early-returns are clearer than nested when/let chains here.
 internal object ObservationResponseParser {
@@ -42,29 +45,45 @@ internal object ObservationResponseParser {
         "you should",
     )
 
+    private const val TAG = "VestigeObservationParse"
     private const val MAX_OBSERVATIONS = 2
     private val KNOWN_FIELDS = setOf(
         "tags",
-        "energy_descriptor",
         "recurrence_link",
         "stated_commitment",
-        "vocabulary_contradictions",
     )
-    private val VOCAB_FIELDS = setOf("vocabulary_contradictions", "tags")
 
     fun parse(raw: String): List<EntryObservation>? {
-        val root = findFirstParseableObject(raw) ?: return null
-        val array = root.optJSONArray("observations") ?: return null
-        if (array.length() == 0) return null
+        val root = findFirstParseableObject(raw) ?: return reject("no-json-object")
+        val array = root.optJSONArray("observations") ?: return reject("no-observations-array")
+        if (array.length() == 0) return reject("empty-observations-array")
 
-        val accepted = mutableListOf<EntryObservation>()
-        for (idx in 0 until array.length()) {
-            if (accepted.size >= MAX_OBSERVATIONS) break
-            val observation = parseOne(array.opt(idx)) ?: return null
-            if (containsForbiddenPhrase(observation.text)) return null
-            accepted += observation
-        }
-        return accepted.takeIf { it.isNotEmpty() }
+        // Salvage: keep every observation that parses and passes the voice rules; drop only the
+        // bad ones. A response is rejected wholesale solely when nothing usable survives.
+        val accepted = (0 until array.length())
+            .asSequence()
+            .mapNotNull { idx -> acceptOne(array.opt(idx)) }
+            .take(MAX_OBSERVATIONS)
+            .toList()
+        return accepted.takeIf { it.isNotEmpty() } ?: reject("no-usable-observations")
+    }
+
+    private fun acceptOne(node: Any?): EntryObservation? {
+        val observation = parseOne(node) ?: return null // parseOne logged the skip reason
+        return if (containsForbiddenPhrase(observation.text)) skip("forbidden-phrase") else observation
+    }
+
+    // Privacy-safe logging: category + schema values (evidence serial / field names) only — never
+    // the observation text, which is journal-derived content. [reject] = whole response unusable;
+    // [skip] = one observation dropped while the rest are still considered.
+    private fun <T> reject(reason: String): T? {
+        Log.w(TAG, "observation response rejected: $reason")
+        return null
+    }
+
+    private fun skip(reason: String): EntryObservation? {
+        Log.w(TAG, "observation skipped: $reason")
+        return null
     }
 
     fun containsForbiddenPhrase(text: String): Boolean {
@@ -73,25 +92,25 @@ internal object ObservationResponseParser {
     }
 
     private fun parseOne(node: Any?): EntryObservation? {
-        val obj = node as? JSONObject ?: return null
-        val text = (obj.opt("text") as? String)?.trim()?.takeIf { it.isNotEmpty() } ?: return null
-        val evidenceSerial = (obj.opt("evidence") as? String) ?: return null
-        val evidence = ObservationEvidence.fromSerial(evidenceSerial) ?: return null
-        if (evidence == ObservationEvidence.PATTERN_CALLOUT) return null
+        val obj = node as? JSONObject ?: return skip("non-object-entry")
+        val text = (obj.opt("text") as? String)?.trim()?.takeIf { it.isNotEmpty() } ?: return skip("missing-text")
+        val evidenceSerial = (obj.opt("evidence") as? String) ?: return skip("missing-evidence")
+        val evidence = ObservationEvidence.fromSerial(evidenceSerial)
+            // Don't log the raw serial — model output is untrusted and could carry journal text.
+            // Length alone is enough to spot a hallucinated blob vs a typo'd token.
+            ?: return skip("unknown-evidence:len=${evidenceSerial.length}")
+        if (evidence == ObservationEvidence.PATTERN_CALLOUT) return skip("pattern-callout-from-model")
 
         val fields = (obj.opt("fields") as? JSONArray)?.let { arr ->
             (0 until arr.length()).mapNotNull { idx -> (arr.opt(idx) as? String)?.trim()?.takeIf { it.isNotEmpty() } }
         } ?: emptyList()
-        if (!fieldsAreValid(evidence, fields)) return null
+        if (!fieldsAreValid(evidence, fields)) return skip("invalid-fields:${evidence.serial}")
 
         return EntryObservation(text = text, evidence = evidence, fields = fields)
     }
 
     private fun fieldsAreValid(evidence: ObservationEvidence, fields: List<String>): Boolean = when (evidence) {
         ObservationEvidence.COMMITMENT_FLAG -> fields == listOf("stated_commitment")
-
-        ObservationEvidence.VOCABULARY_CONTRADICTION ->
-            fields.isEmpty() || ("vocabulary_contradictions" in fields && fields.all { it in VOCAB_FIELDS })
 
         ObservationEvidence.VOLUNTEERED_CONTEXT,
         ObservationEvidence.THEME_NOTICING,

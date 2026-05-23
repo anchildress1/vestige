@@ -66,7 +66,7 @@ Content fields:
 - `timestamp`
 - `template_label`
 - `tags`
-- `energy_descriptor`
+- `vocabulary`
 - `recurrence_link`
 - `stated_commitment`
 - `entry_observations`
@@ -104,7 +104,7 @@ timestamp: 2026-05-08T14:32:15Z
 persona: witness
 follow_up: What happened right after that?
 template_label: aftermath
-energy_descriptor: crashed
+vocabulary: drained
 recurrence_link: a3f9c2b8d4e7f1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6
 stated_commitment: null
 tags:
@@ -114,7 +114,7 @@ tags:
 confidence:
   template_label: canonical
   tags: canonical
-  energy_descriptor: canonical
+  vocabulary: canonical
   recurrence_link: canonical
   stated_commitment: canonical
 entry_observations:
@@ -138,9 +138,9 @@ Standup ran long again. I was fine before it, then completely flattened by 11. O
 | `persona` | frontmatter | Lowercase enum value for the saved model turn's author (`witness`, `hardass`, `editor`). |
 | `follow_up` | frontmatter | Foreground persona follow-up for voice captures; `null` for typed entries. |
 | `duration_ms` | frontmatter | Millis of captured audio; `0` for typed entries and rows written before Story 4.6. |
-| `template_label` | frontmatter | Lowercase enum value (one of: aftermath, tunnel-exit, concrete-shoes, decision-spiral, goblin-hours, audit). |
+| `template_label` | frontmatter | Lowercase enum value (one of: aftermath, tunnel-exit, stalled, decision-spiral, goblin-hours, audit). |
 | `tags` | frontmatter list | Lowercase, kebab-case. Sorted lexicographically on write for diff stability. Empty case serializes as the inline `tags: []` — bare `tags:` parses as `null` under YAML 1.2 and breaks round-trip importers. |
-| `energy_descriptor` | frontmatter | Free string or `null`. |
+| `vocabulary` | frontmatter | Single lowercase tone word or `null`. |
 | `recurrence_link` | frontmatter | `pattern_id` or `null`. |
 | `stated_commitment` | frontmatter | Object with `text`, `topic_or_person`, `entry_id` keys, or `null`. |
 | `entry_observations` | frontmatter list | 1–2 objects with `text`, `evidence`, `fields[]`. Generated per ADR-002. |

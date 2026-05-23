@@ -38,7 +38,8 @@ class EntryEntity(
     @Convert(converter = TemplateLabelConverter::class, dbType = String::class)
     var templateLabel: TemplateLabel? = null,
 
-    var energyDescriptor: String? = null,
+    /** The model's single-word read of the entry's overall tone — source for vocab-drift clustering. */
+    var vocabularyWord: String? = null,
 
     /** `pattern_id` when the entry matches a known pattern. */
     var recurrenceLink: String? = null,

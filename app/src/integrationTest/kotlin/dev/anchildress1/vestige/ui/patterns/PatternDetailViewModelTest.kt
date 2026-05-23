@@ -111,19 +111,27 @@ class PatternDetailViewModelTest {
     }
 
     @Test
-    fun `Loaded surfaces vocabulary from supporting entries embedding source`() = runTest(testDispatcher) {
+    fun `Loaded surfaces the distinct tone words of supporting entries, not raw text`() = runTest(testDispatcher) {
         val entries = listOf(
             seedEntry(
                 text = "raw transcript words should not leak",
                 timestampEpochMs = 100L,
-                tagNames = listOf("crashed", "standup"),
-                observationsJson = OBSERVATION_SLEPT_THROUGH_DINNER,
+                vocabularyWord = "Exhausted",
             ),
             seedEntry(
                 text = "another raw transcript should not leak",
                 timestampEpochMs = 200L,
-                tagNames = listOf("wired", "standup"),
-                observationsJson = OBSERVATION_REPLAYED_MEETING,
+                vocabularyWord = "wired",
+            ),
+            seedEntry(
+                text = "duplicate tone word collapses",
+                timestampEpochMs = 300L,
+                vocabularyWord = "exhausted",
+            ),
+            seedEntry(
+                text = "blank tone word is skipped",
+                timestampEpochMs = 400L,
+                vocabularyWord = "  ",
             ),
         )
         seedActivePattern("p-vocab", lastSeenMs = 500L, supporting = entries)
@@ -132,10 +140,8 @@ class PatternDetailViewModelTest {
 
         vm.state.test {
             val loaded = expectMostRecentItem() as PatternDetailUiState.Loaded
-            assertEquals(
-                listOf("crashed", "standup", "slept", "through", "dinner", "wired", "replayed", "meeting"),
-                loaded.vocabulary,
-            )
+            // Lowercased, trimmed, blank skipped, "Exhausted"/"exhausted" deduped.
+            assertEquals(listOf("exhausted", "wired"), loaded.vocabulary)
             assertFalse(loaded.vocabulary.contains("transcript"))
         }
     }
@@ -380,6 +386,7 @@ class PatternDetailViewModelTest {
         timestampEpochMs: Long,
         tagNames: List<String> = emptyList(),
         observationsJson: String = "[]",
+        vocabularyWord: String? = null,
     ): EntryEntity {
         val entity = EntryEntity(
             entryText = text,
@@ -387,6 +394,7 @@ class PatternDetailViewModelTest {
             markdownFilename = "$timestampEpochMs--entry.md",
             extractionStatus = ExtractionStatus.COMPLETED,
             entryObservationsJson = observationsJson,
+            vocabularyWord = vocabularyWord,
         )
         val entryBox = boxStore.boxFor(EntryEntity::class.java)
         val tagBox = boxStore.boxFor(TagEntity::class.java)
@@ -421,12 +429,5 @@ class PatternDetailViewModelTest {
             ?: error("pattern not persisted: $patternId")
         saved.supportingEntries.addAll(supporting)
         boxStore.boxFor(PatternEntity::class.java).put(saved)
-    }
-
-    private companion object {
-        const val OBSERVATION_SLEPT_THROUGH_DINNER =
-            """[{"text":"slept through dinner","evidence":"theme-noticing","fields":["energy_descriptor"]}]"""
-        const val OBSERVATION_REPLAYED_MEETING =
-            """[{"text":"replayed meeting","evidence":"theme-noticing","fields":["recurrence_link"]}]"""
     }
 }

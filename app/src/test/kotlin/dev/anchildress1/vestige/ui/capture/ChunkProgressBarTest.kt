@@ -28,10 +28,10 @@ class ChunkProgressBarTest {
                 ChunkProgressBar(progress = 0.5f, modifier = Modifier.size(width = 320.dp, height = 30.dp))
             }
         }
-        composeRule.onNodeWithText("0s").assertIsDisplayed()
-        composeRule.onNodeWithText("10s").assertIsDisplayed()
-        composeRule.onNodeWithText("20s").assertIsDisplayed()
-        composeRule.onNodeWithText("30s ▲").assertIsDisplayed()
+        composeRule.onNodeWithText("0sec").assertIsDisplayed()
+        composeRule.onNodeWithText("10sec").assertIsDisplayed()
+        composeRule.onNodeWithText("20sec").assertIsDisplayed()
+        composeRule.onNodeWithText("30sec ▲").assertIsDisplayed()
     }
 
     @Test

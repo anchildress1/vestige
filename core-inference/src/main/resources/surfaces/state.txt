@@ -2,10 +2,11 @@
 
 Captures the user's cognitive and energy state.
 
-Schema fields:
+What to capture:
 
-- `energy_descriptor`: a word or short noun phrase naming the person's physical or cognitive condition (drained, crashed, foggy, wired). Use the user's exact words; do not paraphrase to clinical language. Null when the entry names no such condition.
-  - It must describe the person, not the event. A span that says how something happened (completely out of nowhere) or what it caused (slows everything down) is a manner qualifier or effect — discard it.
-  - If the best candidate is a verb phrase or clause describing what the energy did, return null.
-  - If the candidate is longer than three words, reduce it to the root state word; if none survives, return null. Never return a clause.
-- `state_shift`: true when the entry describes a before/after transition between two distinct states. Both states must be present. False for a single static state.
+- The state word the user uses for their physical or cognitive condition (drained, crashed, foggy, flat, wired). Use the user's exact word, not clinical paraphrase. It must describe the person, not the event — discard manner qualifiers (completely out of nowhere) and effects (slows everything down).
+- A before/after transition between two distinct states.
+
+What goes in the schema:
+
+- Append the state word to `tags` as a short lowercase kebab-case token (`crashed`, `drained`, `foggy`). Single root word only — never a clause. Omit when the entry names no such condition.

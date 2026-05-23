@@ -515,6 +515,7 @@ private fun List<LensResult>.toReceipts(): List<EntryLensReceipt> = map { result
         attemptCount = result.attemptCount,
         elapsedMs = result.elapsedMs,
         lastError = result.lastError,
+        rawResponse = result.rawResponse.takeIf { it.isNotBlank() },
     )
 }
 

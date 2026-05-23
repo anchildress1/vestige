@@ -16,7 +16,6 @@ data class EntryObservation(val text: String, val evidence: ObservationEvidence,
 }
 
 enum class ObservationEvidence(val serial: String) {
-    VOCABULARY_CONTRADICTION("vocabulary-contradiction"),
     COMMITMENT_FLAG("commitment-flag"),
     VOLUNTEERED_CONTEXT("volunteered-context"),
     THEME_NOTICING("theme-noticing"),

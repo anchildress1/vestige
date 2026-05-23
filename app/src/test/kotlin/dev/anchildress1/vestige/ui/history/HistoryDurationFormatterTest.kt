@@ -9,27 +9,27 @@ class HistoryDurationFormatterTest {
 
     @Test
     fun `1 second formats as 1s`() {
-        assertEquals("1s", HistoryDurationFormatter.format(1_000L))
+        assertEquals("1sec", HistoryDurationFormatter.format(1_000L))
     }
 
     @Test
     fun `30 seconds formats as 30s`() {
-        assertEquals("30s", HistoryDurationFormatter.format(30_000L))
+        assertEquals("30sec", HistoryDurationFormatter.format(30_000L))
     }
 
     @Test
     fun `15 seconds formats as 15s`() {
-        assertEquals("15s", HistoryDurationFormatter.format(15_000L))
+        assertEquals("15sec", HistoryDurationFormatter.format(15_000L))
     }
 
     @Test
     fun `59 seconds stays in seconds instead of zero minutes`() {
-        assertEquals("59s", HistoryDurationFormatter.format(59_000L))
+        assertEquals("59sec", HistoryDurationFormatter.format(59_000L))
     }
 
     @Test
     fun `62 seconds formats as 1m 02s`() {
-        assertEquals("1m 02s", HistoryDurationFormatter.format(62_000L))
+        assertEquals("1m 02sec", HistoryDurationFormatter.format(62_000L))
     }
 
     // neg — typed entries and zero-duration rows
@@ -48,7 +48,7 @@ class HistoryDurationFormatterTest {
 
     @Test
     fun `999 ms truncates to 0s`() {
-        assertEquals("0s", HistoryDurationFormatter.format(999L))
+        assertEquals("0sec", HistoryDurationFormatter.format(999L))
     }
 
     // edge — boundary values

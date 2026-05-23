@@ -4,6 +4,9 @@ import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dev.anchildress1.vestige.storage.EntryStore
+import kotlinx.collections.immutable.ImmutableList
+import kotlinx.collections.immutable.persistentListOf
+import kotlinx.collections.immutable.toImmutableList
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
@@ -16,7 +19,7 @@ import kotlinx.coroutines.withContext
 import java.time.ZoneId
 import java.time.ZoneOffset
 
-data class HistoryUiState(val entries: List<HistorySummary> = emptyList(), val loading: Boolean = true)
+data class HistoryUiState(val entries: ImmutableList<HistorySummary> = persistentListOf(), val loading: Boolean = true)
 
 class HistoryViewModel(
     private val entryStore: EntryStore,
@@ -43,7 +46,7 @@ class HistoryViewModel(
             emptyList()
         }
         _state.value = HistoryUiState(
-            entries = rows.map { entity -> HistorySummary.from(entity, zoneId) },
+            entries = rows.map { entity -> HistorySummary.from(entity, zoneId) }.toImmutableList(),
             loading = false,
         )
     }

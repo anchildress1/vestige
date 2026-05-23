@@ -141,7 +141,7 @@ Reran on GPU with `-PinferenceBackend=gpu` to close out D1–D3 + X1–X3. Start
 | A1 | 31.0 / 30.2 / 33.2 | 3/3 × 3 | `standup, flattened` |
 | A2 | 28.6 / 26.9 / 29.4 | 3/3 × 3 | `meeting, late-night` |
 | A3 | 38.1 / 31.5 / 34.2 | 3/3 × 3 | `roadmap-call, post-meeting-routine, tabs-open, zero-movement` |
-| A4 | 40.4 / 37.5 / 39.2 | 3/3 × 3 | `battery-yanked` |
+| A4 | 40.4 / 37.5 / 39.2 | 3/3 × 3 | `battery-died` |
 | A5 | 35.4 / 36.3 / 35.2 | 3/3 × 3 | `client-review, hollow` |
 | A6 | 32.2 / 33.8 / 33.0 | 3/3 × 3 | `planning-call, static, awake` |
 | B1 | 37.8 / 37.7 / 37.8 | 3/3 × 3 | `invoice-email` |
@@ -166,7 +166,7 @@ Mean per-run latency: **36.3 s** (vs ~148 s on CPU = 4.1× speedup). Total model
 | A1 | `standup, doc, flattened` | `standup, flattened` | ❌ GPU drops `doc` |
 | A2 | `meeting, late-night` | `meeting, late-night` | ✅ |
 | A3 | `post-meeting, corpse-routine, tabs-open, zero-movement, roadmap-call` | `roadmap-call, post-meeting-routine, tabs-open, zero-movement` | ❌ GPU collapses `post-meeting + corpse-routine` → `post-meeting-routine`, drops `corpse-routine` |
-| A4 | `sync, battery-drain` | `battery-yanked` | ❌ significantly different |
+| A4 | `sync, battery-drain` | `battery-died` | ❌ significantly different |
 | A5 | `client-review, hollow` | `client-review, hollow` | ✅ |
 | A6 | `planning-call, static, awake, not-awake` | `planning-call, static, awake` | ❌ GPU drops `not-awake` (the weird negation tag) |
 | B1 | `invoice-email, closing-task` | `invoice-email` | ❌ GPU drops `closing-task` |

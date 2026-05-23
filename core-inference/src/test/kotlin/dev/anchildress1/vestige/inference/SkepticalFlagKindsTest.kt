@@ -12,10 +12,9 @@ class SkepticalFlagKindsTest {
         // Locked set; updating it requires touching resources/lenses/skeptical.txt + this test.
         assertEquals(
             mapOf(
-                "vocabulary-contradiction" to "energy_descriptor",
-                "state-behavior-mismatch" to "energy_descriptor",
                 "commitment-without-anchor" to "stated_commitment",
                 "unsupported-recurrence" to "recurrence_link",
+                "vocabulary-contradiction" to "tags",
             ),
             SkepticalFlagKinds.SCHEMA_BINDING,
         )
@@ -23,9 +22,10 @@ class SkepticalFlagKindsTest {
 
     @Test
     fun `isSchemaBinding accepts known kinds with snippet and note suffixes`() {
-        assertTrue(SkepticalFlagKinds.isSchemaBinding("vocabulary-contradiction:fine before vs flattened:state shift"))
-        assertTrue(SkepticalFlagKinds.isSchemaBinding("state-behavior-mismatch::"))
+        assertTrue(SkepticalFlagKinds.isSchemaBinding("unsupported-recurrence:third time:no history"))
+        assertTrue(SkepticalFlagKinds.isSchemaBinding("unsupported-recurrence::"))
         assertTrue(SkepticalFlagKinds.isSchemaBinding("commitment-without-anchor:send invoice:"))
+        assertTrue(SkepticalFlagKinds.isSchemaBinding("vocabulary-contradiction:fine but cannot function:"))
     }
 
     @Test

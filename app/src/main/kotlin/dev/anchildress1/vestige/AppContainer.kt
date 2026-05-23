@@ -701,6 +701,9 @@ class AppContainer(
             .getOrDefault(emptyList())
         if (ids.isEmpty()) return
         ensureBackgroundEngineInitialized()
+        // One throwaway generation so the first pending entry doesn't lose its whole budget to
+        // cold start (graph compile + first-token latency) and time out with zero lens output.
+        backgroundEngine.warmUp()
         ids.forEach { entryId ->
             val entry = entryStore.readEntry(entryId)
             when {
@@ -1030,7 +1033,11 @@ class AppContainer(
         const val TAG = "VestigeAppContainer"
         const val MODEL_ARTIFACTS_SUBDIR = "models"
         const val DEFAULT_MISSING_EXTRACTION_BACKFILL_LIMIT = 100
-        const val MISSING_EXTRACTION_BACKFILL_TIMEOUT_MS = 180_000L
+
+        // Three lenses run sequentially, each retryable; a single slow Skeptical pass has been
+        // measured at ~52s, and a parse-fail retry doubles a lens. 180s clipped valid entries —
+        // 300s leaves headroom for the worst observed lens + one retry without unbounding a hang.
+        const val MISSING_EXTRACTION_BACKFILL_TIMEOUT_MS = 300_000L
         const val VECTOR_BACKFILL_RETRY_DELAY_MS = 5_000L
         const val VECTOR_BACKFILL_MAX_RETRIES = 12
         const val PCT_MAX = 100

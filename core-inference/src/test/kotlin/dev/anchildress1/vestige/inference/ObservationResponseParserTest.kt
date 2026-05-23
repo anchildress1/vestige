@@ -58,7 +58,7 @@ class ObservationResponseParserTest {
     }
 
     @Test
-    fun `rejects entire response when any observation hits a forbidden opening`() {
+    fun `drops a forbidden-opening observation, returning null when it was the only one`() {
         val raw = """
             {
               "observations": [
@@ -71,7 +71,7 @@ class ObservationResponseParserTest {
     }
 
     @Test
-    fun `rejects when a forbidden phrase is embedded mid-sentence`() {
+    fun `drops the only observation when a forbidden phrase is embedded mid-sentence`() {
         val raw = """
             {
               "observations": [
@@ -84,6 +84,55 @@ class ObservationResponseParserTest {
             }
         """.trimIndent()
 
+        assertNull(ObservationResponseParser.parse(raw))
+    }
+
+    @Test
+    fun `keeps the clean observation when a sibling violates the voice rules`() {
+        val raw = """
+            {
+              "observations": [
+                { "text": "You might be feeling overwhelmed.", "evidence": "theme-noticing", "fields": [] },
+                { "text": "This dump is mostly about your boss.", "evidence": "theme-noticing", "fields": ["tags"] }
+              ]
+            }
+        """.trimIndent()
+
+        val observations = ObservationResponseParser.parse(raw)
+
+        assertNotNull(observations)
+        assertEquals(1, observations!!.size)
+        assertEquals("This dump is mostly about your boss.", observations[0].text)
+    }
+
+    @Test
+    fun `keeps the valid observation when a sibling has unknown evidence`() {
+        val raw = """
+            {
+              "observations": [
+                { "text": "obs bad", "evidence": "made-up-kind", "fields": [] },
+                { "text": "obs good", "evidence": "theme-noticing", "fields": [] }
+              ]
+            }
+        """.trimIndent()
+
+        val observations = ObservationResponseParser.parse(raw)
+
+        assertNotNull(observations)
+        assertEquals(1, observations!!.size)
+        assertEquals("obs good", observations[0].text)
+    }
+
+    @Test
+    fun `drops an observation missing the evidence key`() {
+        val raw = """{"observations": [{"text": "obs", "fields": []}]}"""
+        assertNull(ObservationResponseParser.parse(raw))
+    }
+
+    @Test
+    fun `drops an observation whose fields are invalid for its evidence`() {
+        // commitment-flag must carry exactly ["stated_commitment"]; an empty list is invalid.
+        val raw = """{"observations": [{"text": "obs", "evidence": "commitment-flag", "fields": []}]}"""
         assertNull(ObservationResponseParser.parse(raw))
     }
 
@@ -197,7 +246,7 @@ class ObservationResponseParserTest {
     @Test
     fun `parser handles escaped quotes inside JSON string literals`() {
         val raw =
-            """{"observations":[{"text":"You said \"fine\".","evidence":"vocabulary-contradiction","fields":[]}]}"""
+            """{"observations":[{"text":"You said \"fine\".","evidence":"theme-noticing","fields":[]}]}"""
 
         val observations = ObservationResponseParser.parse(raw)
 

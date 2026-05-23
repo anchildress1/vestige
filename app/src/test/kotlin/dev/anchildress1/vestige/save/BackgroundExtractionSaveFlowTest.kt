@@ -320,17 +320,18 @@ class BackgroundExtractionSaveFlowTest {
     }
 
     @Test
-    fun `success routes parsed lens receipts to completeEntry without raw responses`() = runTest {
+    fun `success routes parsed lens receipts to completeEntry with raw model output`() = runTest {
         every { entryStore.createPendingEntry(any(), any(), any()) } returns ENTRY_ID
         val resolved = canonicalSample()
+        val literalRaw = """{"tags":["standup"],"template_label":"aftermath"}"""
         val lensResults = listOf(
             LensResult(
                 lens = Lens.LITERAL,
                 extraction = LensExtraction(
                     lens = Lens.LITERAL,
-                    fields = mapOf("tags" to listOf("standup"), "energy_descriptor" to "flattened"),
+                    fields = mapOf("tags" to listOf("standup"), "template_label" to "aftermath"),
                 ),
-                rawResponse = """{"private":"raw response stays out"}""",
+                rawResponse = literalRaw,
                 attemptCount = 1,
                 elapsedMs = 900L,
                 lastError = null,
@@ -364,9 +365,11 @@ class BackgroundExtractionSaveFlowTest {
                 match { receipts ->
                     receipts.size == 2 &&
                         receipts[0].lens == Lens.LITERAL &&
-                        receipts[0].fields["energy_descriptor"] == "flattened" &&
+                        receipts[0].fields["template_label"] == "aftermath" &&
+                        receipts[0].rawResponse == literalRaw &&
                         receipts[1].extracted.not() &&
-                        receipts[1].lastError == "parse-fail"
+                        receipts[1].lastError == "parse-fail" &&
+                        receipts[1].rawResponse == "bad json"
                 },
             )
         }
@@ -904,8 +907,7 @@ class BackgroundExtractionSaveFlowTest {
 
     private fun canonicalSample() = ResolvedExtraction(
         mapOf(
-            "tags" to ResolvedField(listOf("standup", "flattened"), ConfidenceVerdict.CANONICAL),
-            "energy_descriptor" to ResolvedField("crashed", ConfidenceVerdict.CANONICAL),
+            "tags" to ResolvedField(listOf("standup", "flattened", "crashed"), ConfidenceVerdict.CANONICAL),
         ),
     )
 
@@ -1097,8 +1099,8 @@ class BackgroundExtractionSaveFlowTest {
         private const val SAMPLE_TEXT = "Standup ran long again, then completely flattened."
         private val SAMPLE_OBSERVATION = EntryObservation(
             text = "You said \"fine\" and \"flattened\" in the same entry.",
-            evidence = ObservationEvidence.VOCABULARY_CONTRADICTION,
-            fields = listOf("vocabulary_contradictions"),
+            evidence = ObservationEvidence.THEME_NOTICING,
+            fields = listOf("tags"),
         )
     }
 }

@@ -1,6 +1,7 @@
 package dev.anchildress1.vestige.ui.capture
 
 import dev.anchildress1.vestige.model.Persona
+import kotlinx.collections.immutable.ImmutableList
 
 /**
  * Screen-level state for `CaptureScreen`. Three phases drive the layout swap: idle frame vs
@@ -24,7 +25,7 @@ sealed interface CaptureUiState {
         override val persona: Persona,
         override val modelReadiness: ModelReadiness,
         val elapsedMs: Long,
-        val recentLevels: List<Float>,
+        val recentLevels: ImmutableList<Float>,
     ) : CaptureUiState
 
     /**

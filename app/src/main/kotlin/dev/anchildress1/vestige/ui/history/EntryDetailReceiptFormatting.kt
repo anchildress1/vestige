@@ -8,6 +8,7 @@ import dev.anchildress1.vestige.model.EntryLensReceipt
 import dev.anchildress1.vestige.model.Lens
 import dev.anchildress1.vestige.storage.EntryEntity
 import dev.anchildress1.vestige.storage.EntryLensReceiptJson
+import kotlinx.collections.immutable.toImmutableList
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -26,7 +27,7 @@ internal fun parseObservations(json: String): List<ObservationLine> {
                     }
                 }
                 ?: emptyList()
-            text?.let { ObservationLine(text = it, evidence = evidence, fields = fields) }
+            text?.let { ObservationLine(text = it, evidence = evidence, fields = fields.toImmutableList()) }
         }
     }.getOrElse {
         // Surfaced so an empty reading card is debuggable, but never the payload:
@@ -36,7 +37,7 @@ internal fun parseObservations(json: String): List<ObservationLine> {
     }
 }
 
-internal fun buildLensReads(json: String?): List<LensRead> {
+internal fun buildLensReads(json: String?, hasConflict: Boolean = false): List<LensRead> {
     val decoded = EntryLensReceiptJson.decodeOrNull(json)
         ?: return Lens.entries.map { lens ->
             LensRead(label = lens.name, value = EntryDetailCopy.LENS_UNREADABLE, tone = LensTone.CONFLICT)
@@ -47,9 +48,22 @@ internal fun buildLensReads(json: String?): List<LensRead> {
         LensRead(
             label = lens.name,
             value = receipt?.summaryText() ?: EntryDetailCopy.LENS_MISSING,
-            tone = receipt?.tone() ?: LensTone.AMBIGUOUS,
+            tone = lensTone(lens, receipt, hasConflict),
+            rawResponse = receipt?.rawResponse?.takeIf(String::isNotBlank),
         )
     }
+}
+
+/**
+ * Skeptical reads red only when its flag produced a real conflict in convergence — a
+ * CANONICAL_WITH_CONFLICT verdict, surfaced as [hasConflict] — not when its raw tag list merely
+ * differs while the lenses still agree on the resolved value. This keeps the lens colour
+ * consistent with the card's CANONICAL / CONFLICT status. Literal / Inferential carry no flags.
+ */
+private fun lensTone(lens: Lens, receipt: EntryLensReceipt?, hasConflict: Boolean): LensTone {
+    if (receipt == null) return LensTone.AMBIGUOUS
+    val skepticalConflict = lens == Lens.SKEPTICAL && hasConflict && receipt.flags.isNotEmpty()
+    return if (skepticalConflict) LensTone.CONFLICT else receipt.baseTone()
 }
 
 @Suppress("LongMethod", "CyclomaticComplexMethod")
@@ -57,30 +71,6 @@ internal fun buildFieldRows(entity: EntryEntity): List<FieldRow> {
     val confidence = parseConfidence(entity.confidenceJson)
     val receipts = EntryLensReceiptJson.decodeOrNull(entity.lensReceiptsJson)
     val tagsText = entity.tags.map { it.name }.sorted().take(DISPLAY_LIMIT).joinToString(", ").ifBlank { DASH }
-    val topLevelState = entity.energyDescriptor?.takeIf(String::isNotBlank)
-    val stateValue = topLevelState
-        ?: receipts?.let { firstReceiptFieldDisplay(it, KEY_ENERGY) }
-        ?: DASH
-    val stateTone = when {
-        receipts == null -> confidence[KEY_ENERGY].toTone()
-        topLevelState != null -> confidence[KEY_ENERGY].toTone()
-        stateValue != DASH -> receiptFieldTone(receipts, KEY_ENERGY)
-        else -> confidence[KEY_ENERGY].toTone()
-    }
-    val vocabFromReceipts = receipts?.let { firstReceiptFieldDisplay(it, KEY_VOCAB) }
-    val vocabFallback = receipts?.let { repeatedLexicalTerms(entity.entryText, it) }
-    val vocabValue = when {
-        receipts == null -> EntryDetailCopy.LENS_UNREADABLE
-        vocabFromReceipts != null -> vocabFromReceipts
-        vocabFallback != null -> vocabFallback
-        else -> DASH
-    }
-    val vocabTone = when {
-        receipts == null -> LensTone.CONFLICT
-        vocabFromReceipts != null -> receiptFieldTone(receipts, KEY_VOCAB)
-        vocabFallback != null -> receiptLexicalTone(entity.entryText, receipts)
-        else -> confidence[KEY_VOCAB].toTone()
-    }
     val topLevelCommitment = commitmentText(entity.statedCommitmentJson)
     val commitmentValue = topLevelCommitment
         ?: receipts?.let { firstReceiptFieldDisplay(it, KEY_COMMITMENT) }
@@ -101,6 +91,21 @@ internal fun buildFieldRows(entity: EntryEntity): List<FieldRow> {
         recurrenceValue != DASH -> receiptPatternTone(receipts)
         else -> LensTone.AMBIGUOUS
     }
+    val resolvedVocab = entity.vocabularyWord?.trim()?.takeIf { it.isNotBlank() && it.lowercase() !in NULLISH_VOCAB }
+    val receiptVocab = receipts?.let(::distinctReceiptVocab).orEmpty()
+    val vocabValue = resolvedVocab
+        ?: receiptVocab.take(DISPLAY_LIMIT).joinToString(" / ").takeIf(String::isNotBlank)
+        ?: DASH
+    val vocabTone = when {
+        resolvedVocab != null -> confidence[KEY_VOCABULARY].toTone()
+
+        // Lenses named different tone words and convergence didn't resolve one — show the spread.
+        receiptVocab.size > 1 -> LensTone.AMBIGUOUS
+
+        receiptVocab.size == 1 -> confidence[KEY_VOCABULARY].toTone(fallback = LensTone.CANDIDATE)
+
+        else -> LensTone.AMBIGUOUS
+    }
     return listOf(
         FieldRow(
             label = "BEHAVIOR",
@@ -108,11 +113,10 @@ internal fun buildFieldRows(entity: EntryEntity): List<FieldRow> {
             tone = confidence[KEY_TAGS].toTone(),
         ),
         FieldRow(
-            label = "STATE",
-            value = stateValue,
-            tone = stateTone,
+            label = "VOCAB",
+            value = vocabValue,
+            tone = vocabTone,
         ),
-        FieldRow(label = "VOCAB", value = vocabValue, tone = vocabTone),
         FieldRow(
             label = "PROMISES",
             value = commitmentValue,
@@ -161,8 +165,7 @@ private fun EntryLensReceipt.summaryText(): String = when {
         ?: EntryDetailCopy.LENS_NO_FIELDS
 }
 
-private fun EntryLensReceipt.tone(): LensTone = when {
-    flags.isNotEmpty() -> LensTone.CONFLICT
+private fun EntryLensReceipt.baseTone(): LensTone = when {
     !extracted -> LensTone.AMBIGUOUS
     fields.values.any { displayValue(it) != null } -> LensTone.CANONICAL
     else -> LensTone.AMBIGUOUS
@@ -216,73 +219,14 @@ private fun receiptPatternTone(receipts: List<EntryLensReceipt>): LensTone {
     }
 }
 
-private fun repeatedLexicalTerms(entryText: String, receipts: List<EntryLensReceipt>): String? {
-    val counts = entryText.lowercase()
-        .split(WORD_SPLIT_REGEX)
-        .map { it.trim() }
-        .filter { it.length >= MIN_VOCAB_TERM_LENGTH && it !in VOCAB_STOP_WORDS }
-        .groupingBy { it }
-        .eachCount()
-    if (counts.isEmpty()) return null
-
-    val receiptSupport = receiptLexicalSupport(receipts, counts)
-
-    val terms = receiptSupport.entries
-        .asSequence()
-        .filter { (_, support) -> support >= MIN_RECEIPT_SUPPORT_FOR_VOCAB }
-        .sortedWith(
-            compareByDescending<Map.Entry<String, Int>> { it.value }
-                .thenByDescending { counts[it.key] ?: 0 }
-                .thenBy { it.key },
-        )
-        .map(Map.Entry<String, Int>::key)
-        .take(DISPLAY_LIMIT)
-        .toList()
-    return terms.joinToString(", ").takeIf(String::isNotBlank)
-}
-
-private fun receiptLexicalSupport(receipts: List<EntryLensReceipt>, counts: Map<String, Int>): Map<String, Int> {
-    val receiptSupport = mutableMapOf<String, Int>()
-    receipts.forEach { receipt ->
-        val supportedTerms = receiptSupportedTerms(receipt, counts)
-        supportedTerms.forEach { term ->
-            receiptSupport[term] = (receiptSupport[term] ?: 0) + 1
-        }
-    }
-    return receiptSupport
-}
-
-private fun receiptSupportedTerms(receipt: EntryLensReceipt, counts: Map<String, Int>): Set<String> {
-    val tags = (receipt.fields[KEY_TAGS] as? List<*>)?.mapNotNull { it as? String }.orEmpty()
-    return tags.asSequence()
-        .flatMap { tag -> tag.lowercase().split('-').asSequence() }
-        .filter { part -> part.length >= MIN_VOCAB_TERM_LENGTH && part !in VOCAB_STOP_WORDS }
-        .filter { part -> (counts[part] ?: 0) > 1 }
-        .toSet()
-}
-
-private fun receiptLexicalTone(entryText: String, receipts: List<EntryLensReceipt>): LensTone {
-    val repeatedTerms = repeatedLexicalTerms(entryText, receipts)?.split(", ")?.toSet().orEmpty()
-    if (repeatedTerms.isEmpty()) return LensTone.AMBIGUOUS
-    val supported = receipts.count { receipt ->
-        val tags = (receipt.fields[KEY_TAGS] as? List<*>)?.mapNotNull { it as? String }.orEmpty()
-        tags.any { tag ->
-            tag.lowercase()
-                .split('-')
-                .any { part -> part in repeatedTerms }
-        }
-    }
-    return when {
-        supported >= 2 -> LensTone.CANONICAL
-        supported == 1 -> LensTone.CANDIDATE
-        else -> LensTone.AMBIGUOUS
-    }
-}
+private fun distinctReceiptVocab(receipts: List<EntryLensReceipt>): List<String> = receipts.asSequence()
+    .mapNotNull { (it.fields[KEY_VOCABULARY] as? String)?.trim()?.lowercase()?.takeIf(String::isNotBlank) }
+    .filter { it !in NULLISH_VOCAB }
+    .distinct()
+    .toList()
 
 private fun displayValue(value: Any?): String? = when (value) {
     null -> null
-
-    is Boolean -> if (value) "state shift" else null
 
     is String -> value.takeIf(String::isNotBlank)
 
@@ -311,44 +255,15 @@ private fun ConfidenceVerdict?.toTone(fallback: LensTone = LensTone.AMBIGUOUS): 
 private const val DASH = "—"
 private const val DISPLAY_LIMIT = 2
 private const val KEY_TAGS = "tags"
-private const val KEY_ENERGY = "energy_descriptor"
-private const val KEY_VOCAB = "vocabulary_contradictions"
 private const val KEY_COMMITMENT = "stated_commitment"
 private const val KEY_RECURRENCE = "recurrence_link"
+private const val KEY_VOCABULARY = "vocabulary"
+private val NULLISH_VOCAB = setOf("null", "none", "n/a", "nil")
 private const val KEY_COMMITMENT_TEXT = "text"
 private const val KEY_TOPIC_OR_PERSON = "topic_or_person"
 private val PATTERN_ID_REGEX = Regex("[0-9a-f]{64}")
-private val WORD_SPLIT_REGEX = Regex("[^a-z0-9]+")
-private const val MIN_VOCAB_TERM_LENGTH = 3
-private const val MIN_RECEIPT_SUPPORT_FOR_VOCAB = 2
-private val VOCAB_STOP_WORDS = setOf(
-    "the",
-    "and",
-    "for",
-    "with",
-    "that",
-    "this",
-    "have",
-    "from",
-    "were",
-    "they",
-    "still",
-    "after",
-    "before",
-    "while",
-    "today",
-    "again",
-    "your",
-    "just",
-    "into",
-    "even",
-    "worth",
-)
 private val SUMMARY_KEYS = listOf(
-    KEY_ENERGY,
-    KEY_VOCAB,
     KEY_TAGS,
     KEY_COMMITMENT,
     KEY_RECURRENCE,
-    "state_shift",
 )

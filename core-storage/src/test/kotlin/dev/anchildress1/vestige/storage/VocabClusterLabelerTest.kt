@@ -7,55 +7,88 @@ import org.junit.Test
 class VocabClusterLabelerTest {
 
     @Test
-    fun `label uses the top distinctive token excluding the root`() {
+    fun `framings are the distinct tone words ranked by frequency`() {
+        // numb 3×, foggy 2×, edgy 1×. Freq desc → numb, foggy, edgy (joins to 17 chars, no cap).
         val cluster = clusterOf(
             members = listOf(
-                "I am exhausted and drained from work" to 1L,
-                "Exhausted again today, drained completely" to 2L,
-                "Wiped out, exhausted, drained" to 3L,
+                "numb" to 1L,
+                "numb" to 2L,
+                "numb" to 3L,
+                "foggy" to 4L,
+                "foggy" to 5L,
+                "edgy" to 6L,
             ),
         )
 
         val result = VocabClusterLabeler.label(cluster, rootToken = "tired")
 
-        // "exhausted" and "drained" each appear 3×; alphabetical tiebreak picks them first
-        // (drained, exhausted). The third slot is a single-occurrence tie between
-        // "completely", "wiped", and "work" — alpha-asc picks "completely", which pushes the
-        // joined length past MAX_LABEL_CHARS=24 → "drained, exhausted, com…".
-        assertEquals("drained, exhausted, com…", result.label)
+        assertEquals("numb, foggy, edgy", result.label)
     }
 
     @Test
-    fun `label excludes the root token even when it appears`() {
+    fun `frequency ties break alphabetically`() {
+        // foggy 2×, sluggish 2×, brain 1×. Tie at 2× → alpha asc (foggy, sluggish), then brain.
         val cluster = clusterOf(
             members = listOf(
-                "tired tired tired exhausted" to 1L,
-                "tired exhausted exhausted" to 2L,
-                "tired so tired exhausted" to 3L,
+                "sluggish" to 1L,
+                "foggy" to 2L,
+                "foggy" to 3L,
+                "sluggish" to 4L,
+                "brain" to 5L,
             ),
         )
 
         val result = VocabClusterLabeler.label(cluster, rootToken = "tired")
 
-        // "tired" is excluded — it's the framing-of, not the framing itself.
+        assertEquals("5 entries · framings: foggy, sluggish, brain", result.description)
+    }
+
+    @Test
+    fun `the cluster root tone word is excluded from framings`() {
+        // Member tone words include the root "tired" — it's the framing-of, never a framing.
+        val cluster = clusterOf(
+            members = listOf(
+                "tired" to 1L,
+                "exhausted" to 2L,
+                "exhausted" to 3L,
+            ),
+        )
+
+        val result = VocabClusterLabeler.label(cluster, rootToken = "tired")
+
         assertTrue("label must not include the root token", "tired" !in result.label)
-        assertTrue("label must surface exhausted", "exhausted" in result.label)
+        assertEquals("exhausted", result.label)
     }
 
     @Test
-    fun `description includes member count and top tokens`() {
+    fun `tone words are canonicalized before counting`() {
+        // "Exhausted" and "exhausted" case-fold to one token; "jitters" singularizes to "jitter".
         val cluster = clusterOf(
             members = listOf(
-                "sluggish foggy" to 1L,
-                "sluggish brain foggy" to 2L,
-                "foggy sluggish" to 3L,
-                "burnt out foggy" to 4L,
+                "Exhausted" to 1L,
+                "exhausted" to 2L,
+                "jitters" to 3L,
             ),
         )
 
         val result = VocabClusterLabeler.label(cluster, rootToken = "tired")
 
-        assertEquals("4 entries · framings: foggy, sluggish, brain", result.description)
+        assertEquals("exhausted, jitter", result.label)
+    }
+
+    @Test
+    fun `multi-word tone phrases kebab intact instead of splitting`() {
+        // The tone word is a single label, not a sentence — "burnt out" canonicalizes whole.
+        val cluster = clusterOf(
+            members = listOf(
+                "burnt out" to 1L,
+                "burnt out" to 2L,
+            ),
+        )
+
+        val result = VocabClusterLabeler.label(cluster, rootToken = "tired")
+
+        assertEquals("burnt-out", result.label)
     }
 
     @Test
@@ -71,15 +104,14 @@ class VocabClusterLabelerTest {
     }
 
     @Test
-    fun `label and description survive when no distinctive tokens are available`() {
-        // All text is the root word + stopwords.
-        val cluster = clusterOf(
-            members = listOf(
-                "tired and tired" to 1L,
-                "very tired" to 2L,
-                "still tired today" to 3L,
-            ),
+    fun `framings unavailable when members have no usable tone words`() {
+        // Members are null, blank, or duplicate-of-root → nothing distinctive survives.
+        val members = listOf(
+            entry(id = 1L, vocabularyWord = null, vector = nearAxis(0, 0.0)),
+            entry(id = 2L, vocabularyWord = "  ", vector = nearAxis(0, 0.0)),
+            entry(id = 3L, vocabularyWord = "tired", vector = nearAxis(0, 0.0)),
         )
+        val cluster = EmbeddingClustering.Cluster.of(members)
 
         val result = VocabClusterLabeler.label(cluster, rootToken = "tired")
 
@@ -92,12 +124,12 @@ class VocabClusterLabelerTest {
         // Three members near axis 0; the middle one is also nearest to the centroid because
         // its perturbation cancels the others'.
         val members = listOf(
-            entry(id = 10L, text = "a", vector = nearAxis(axis = 0, perturb = -0.1)),
-            entry(id = 11L, text = "b", vector = nearAxis(axis = 0, perturb = 0.0)),
-            entry(id = 12L, text = "c", vector = nearAxis(axis = 0, perturb = 0.1)),
-            entry(id = 13L, text = "d", vector = nearAxis(axis = 0, perturb = 0.0)),
-            entry(id = 14L, text = "e", vector = nearAxis(axis = 0, perturb = 0.0)),
-            entry(id = 15L, text = "f", vector = nearAxis(axis = 0, perturb = 0.0)),
+            entry(id = 10L, vocabularyWord = "a", vector = nearAxis(axis = 0, perturb = -0.1)),
+            entry(id = 11L, vocabularyWord = "b", vector = nearAxis(axis = 0, perturb = 0.0)),
+            entry(id = 12L, vocabularyWord = "c", vector = nearAxis(axis = 0, perturb = 0.1)),
+            entry(id = 13L, vocabularyWord = "d", vector = nearAxis(axis = 0, perturb = 0.0)),
+            entry(id = 14L, vocabularyWord = "e", vector = nearAxis(axis = 0, perturb = 0.0)),
+            entry(id = 15L, vocabularyWord = "f", vector = nearAxis(axis = 0, perturb = 0.0)),
         )
         val cluster = EmbeddingClustering.Cluster.of(members)
 
@@ -122,7 +154,7 @@ class VocabClusterLabelerTest {
 
     @Test
     fun `label respects 24-char cap with ellipsis`() {
-        // Three very long tokens, comma-joined, will blow the cap.
+        // Three very long tone words, comma-joined, will blow the cap.
         val cluster = clusterOf(
             members = listOf(
                 "supercalifragilistic" to 1L,
@@ -140,30 +172,15 @@ class VocabClusterLabelerTest {
         assertTrue("truncated label must end with ellipsis", result.label.endsWith("…"))
     }
 
-    @Test
-    fun `stopwords are dropped from the label`() {
-        val cluster = clusterOf(
-            members = listOf(
-                "I have been exhausted just today" to 1L,
-                "Just so exhausted" to 2L,
-                "Today I have exhausted everything" to 3L,
-            ),
-        )
-
-        val result = VocabClusterLabeler.label(cluster, rootToken = "tired")
-
-        // "exhausted" is the only non-stopword that survives.
-        assertEquals("exhausted, everything", result.label)
-    }
-
     private fun clusterOf(members: List<Pair<String, Long>>): EmbeddingClustering.Cluster =
         EmbeddingClustering.Cluster.of(
-            members.map { (text, id) -> entry(id = id, text = text, vector = nearAxis(0, 0.0)) },
+            members.map { (word, id) -> entry(id = id, vocabularyWord = word, vector = nearAxis(0, 0.0)) },
         )
 
-    private fun entry(id: Long, text: String, vector: FloatArray?): EntryEntity =
-        EntryEntity(entryText = text, timestampEpochMs = id * 1000L).also {
+    private fun entry(id: Long, vocabularyWord: String?, vector: FloatArray?): EntryEntity =
+        EntryEntity(entryText = "entry-$id", timestampEpochMs = id * 1000L).also {
             it.id = id
+            it.vocabularyWord = vocabularyWord
             it.vector = vector
         }
 

@@ -251,7 +251,7 @@ extracting). Top → bottom: AppTop pill + hamburger; `← BACK`; the filed **ti
 `{PERSONA} · FOLLOW-UP` card (lime left-rule); then —
 
 - **Resolved:** `● THREE-LENS READ` + status, the LITERAL / INFERENTIAL / SKEPTICAL columns,
-  and the BEHAVIOR / STATE / VOCAB / PROMISES / REPEAT field grid with tone tags
+  and the BEHAVIOR / PROMISES / REPEAT field grid with tone tags
   (`CANONICAL` lime · `CONFLICT` coral · `AMBIGUOUS` ember · `CANDIDATE` teal).
 - **Extracting:** `● EXTRACTING · 3 LENSES` with an animated spinner +
   "Convergence resolves in the background. Open the entry later for the full read.", and the
@@ -268,7 +268,12 @@ Then `YOU · TRANSCRIPT` (dim user transcription), `▸ TAGS` chips, and the sha
 card.
 
 > _Final-polish note (2026-05-19):_ the 3-lens read + field grid are wired from persisted
-> parsed lens receipts and resolved fields. Raw model responses are not stored.
+> parsed lens receipts and resolved fields.
+>
+> _Update (2026-05-22):_ each lens receipt also persists the verbatim model output, surfaced on
+> the detail page as a collapsed `● RAW MODEL OUTPUT` disclosure (tap to expand per-lens text).
+> This is a demo/tuning affordance — it reverses the earlier perf-driven exclusion of raw
+> responses.
 
 ---
 
@@ -434,6 +439,8 @@ Header:
 
 No inaccurate agent-emitted template label or archetype eyebrow appears in the UI. A future trusted semantic label may appear only where the POC layout has a label slot.
 
+> _Update (2026-05-22):_ `template_label` is now trusted (single-pass 3-lens picks it, convergence-voted, proven on-device). It occupies the Entry Detail top label slot as a lime pill, by **display name** — `TemplateLabel.displayName`: Crashed / Deep Space / Busy Stalling / Nonstop Spiral / Goblin Hours / Brain Dump. The kebab serial stays internal (markdown / export). Pattern Detail still binds `pattern.kind` for its title.
+
 Summary observation (one line, primary text):
 > {The card's one-line observation, expanded slightly with timing}
 
@@ -449,7 +456,7 @@ Source section header:
 Source list (date · short snippet, tappable to full entry):
 > Apr 12 — crashed after standup
 > Apr 18 — wired until 2am
-> Apr 26 — same concrete shoes again
+> Apr 26 — stuck on it again
 
 Vocabulary section header (when relevant):
 > **Words you used:**

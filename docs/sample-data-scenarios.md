@@ -46,7 +46,7 @@ Run the same 4 turns under Witness, Hardass, and Editor. Expected follow-ups may
 
 Expected evidence:
 - Prior-turn references: `standup`, `launch doc`, `risk section`, `Nora`, `outline by two`
-- Follow-up style: asks for concrete context or next observable action
+- Follow-up style: asks for specific context or next observable action
 - Forbidden style: "how did that make you feel", diagnosis, motivation theory, pep talk
 
 ## Manual Voice Recording Script — Back-to-back capture
@@ -58,12 +58,12 @@ This sequence is for content patterns, not calendar-relative patterns. Back-to-b
 ### Meeting crash run
 
 1. "Standup ran long again. I was fine before it, then by eleven my brain had fully left the building. Opened the launch doc and just stared at it like that was a strategy."
-2. "Another Tuesday meeting, same bullshit. Went in normal, came out with concrete in my limbs. Lost the next hour rearranging tabs like a professional idiot."
+2. "Another Tuesday meeting, same bullshit. Went in normal, came out with lead in my limbs. Lost the next hour rearranging tabs like a professional idiot."
 3. "Roadmap call ended and I did the little post-meeting corpse routine. Three tabs open, no motion, launch doc still sitting there judging me."
 
 Expected evidence:
 - Group-work event followed by attention / movement collapse
-- Vocabulary drift: `left the building`, `concrete in my limbs`, `corpse routine`
+- Vocabulary drift: `left the building`, `lead in my limbs`, `corpse routine`
 - Should strengthen a Crashed / post-meeting aftermath pattern once background analysis lands
 
 ### Invoice stall run
@@ -75,7 +75,7 @@ Expected evidence:
 Expected evidence:
 - Repeated stuck task: `invoice`
 - Explicit commitment in entry 5
-- Should strengthen Concrete shoes / commitment recurrence without moralizing or avoidance diagnosis
+- Should strengthen Stalled / commitment recurrence without moralizing or avoidance diagnosis
 
 ### Decision loop run
 
@@ -91,7 +91,7 @@ Expected evidence:
 
 10. "The battery died on my keyboard during the meeting."
 11. "I crashed the test app after changing the ObjectBox entity."
-12. "Concrete shoes came up in a song lyric."
+12. "Stalled came up in a song lyric."
 
 Expected evidence:
 - These share keywords with the meeting-crash run but should not support the cognitive-aftereffect pattern.
@@ -107,11 +107,11 @@ Purpose: tag consistency, recurring Crashed pattern, STT-D divergence, STT-E voc
 
 A1. Tuesday 11:15 — "Standup ran long again. I was fine before it, then completely flattened by 11. Opened the doc and just stared at it."
 
-A2. Tuesday 12:10 — "Tuesday meeting. Same thing. Went in normal, came out with concrete in my limbs. Ate late because I lost the plot."
+A2. Tuesday 12:10 — "Tuesday meeting. Same thing. Went in normal, came out with lead in my limbs. Ate late because I lost the plot."
 
 A3. Thursday 15:40 — "After the roadmap call I did the little post-meeting corpse routine. Three tabs open, zero movement."
 
-A4. Friday 10:25 — "Not tired exactly. More like the battery got yanked after the sync."
+A4. Friday 10:25 — "Not tired exactly. More like the battery died after the sync."
 
 A5. Monday 16:20 — "After the client review I went hollow. Couldn't start the next thing."
 
@@ -120,10 +120,10 @@ A6. Wednesday 14:05 — "The planning call left static in my head. Technically a
 Expected evidence:
 - Related event terms: `standup`, `meeting`, `roadmap call`, `sync`, `client review`, `planning call`
 - Energy/attention drop after a group work event
-- Vocabulary drift: `flattened`, `concrete`, `corpse routine`, `battery got yanked`, `hollow`, `static`
+- Vocabulary drift: `flattened`, `specific`, `corpse routine`, `battery died`, `hollow`, `static`
 - Likely labels: Crashed for A1-A6 unless the model has a better sourced reason
 
-### Scenario B — Invoice Concrete Shoes
+### Scenario B — Invoice Stalled
 
 Purpose: task paralysis label, commitment tracking, STT-D literal vs inferential split.
 
@@ -136,7 +136,7 @@ B3. "Invoice again. No mystery. I know what to do. The cursor just sits there li
 Expected evidence:
 - Stuck task: `invoice email`
 - Repeated commitment around sending invoice, especially B2
-- Likely label: Concrete shoes
+- Likely label: Stalled
 - Forbidden output: avoidance diagnosis, moralizing, mood score
 
 ### Scenario C — Decision Spiral
@@ -168,7 +168,7 @@ Expected evidence:
 - Local time between midnight and 5am
 - Admin/reorganization loop
 - Likely label: Goblin Hours
-- Follow-up should be shorter and concrete; no sleep hygiene lecture
+- Follow-up should be shorter and specific; no sleep hygiene lecture
 
 ### Scenario X — Literal Keyword Distractors
 
@@ -178,7 +178,7 @@ X1. "The battery died on my keyboard during the meeting."
 
 X2. "I crashed the test app after changing the ObjectBox entity."
 
-X3. "Concrete shoes came up in a song lyric."
+X3. "Stalled came up in a song lyric."
 
 Expected evidence:
 - These may match keywords, but they are not cognitive aftermath entries.
@@ -197,7 +197,7 @@ Wording variation does not count. Three lenses saying the same thing in differen
 
 Expected pressure points:
 - A1: Literal should catch standup/doc/stare; Inferential may label post-meeting crash; Skeptical may flag `fine before` vs `flattened by 11` as a state shift, not a contradiction.
-- A4: `Not tired exactly` vs `battery got yanked` should pressure `energy_descriptor`; Skeptical should avoid saving `tired` as canonical without a conflict marker.
+- A4: `Not tired exactly` vs `battery died` should pressure `tags` (state words) and `vocabulary` (felt tone); Skeptical should avoid saving `tired` as canonical without a conflict marker.
 - B1: Literal sees invoice/email/opened/closed; Inferential may identify task paralysis; Skeptical should note no explicit commitment yet.
 - B2: Commitment should be stronger than B1 because `Said I would send` is explicit.
 - C2: Inferential can label Decision spiral; Skeptical should note the actual options are missing.
@@ -254,7 +254,7 @@ Story 5.1 / Story 5.4 — seeded into the reference device for recording. Distin
 | Text | "After the all-hands I did the hollow routine. Coffee went cold on the desk. Everything I was going to do right after evaporated. Three tabs open. I know what they're for. Still open." |
 | template_label | Crashed |
 | tags | `all-hands`, `meeting`, `work`, `hollow-routine`, `tabs` |
-| energy_descriptor | `hollow` |
+| vocabulary | `hollow` |
 | stated_commitment | null |
 | entry_observations | 1. Post-meeting crash — work context this time. Vocabulary: "hollow routine" implies this is a recurring shape the user has named themselves. 2. Specific evidence: cold coffee, three tabs, zero execution. |
 | pattern contribution | Crashed cluster #3. First work-context entry in the cluster — broadens the pattern beyond personal social events. |
@@ -266,12 +266,12 @@ Story 5.1 / Story 5.4 — seeded into the reference device for recording. Distin
 | ID | DEMO-06 |
 | Timestamp | May 3 (Sat) 12:00 |
 | Text | "Said I would drop the package off today. Drive past UPS on my route. Spent twenty minutes googling whether the thing is even worth returning. It is. Label is still on the counter." |
-| template_label | Concrete shoes |
+| template_label | Stalled |
 | tags | `return-label`, `package`, `UPS`, `commitment`, `googling` |
-| energy_descriptor | null |
+| vocabulary | null |
 | stated_commitment | "drop the return package off today" |
 | entry_observations | 1. Explicit commitment logged: "said I would drop it off today." 2. Avoidance behavior: researched the validity of the task instead of doing it. Commitment connects to DEMO-04. |
-| pattern contribution | Concrete shoes #2. Stated commitment makes this the STT-D B2 analog — stronger signal than DEMO-04. |
+| pattern contribution | Stalled #2. Stated commitment makes this the STT-D B2 analog — stronger signal than DEMO-04. |
 
 ### DEMO-07
 
@@ -282,7 +282,7 @@ Story 5.1 / Story 5.4 — seeded into the reference device for recording. Distin
 | Text | "Spent an hour and a half comparing couches. Dimensions, reviews, lead time, return policy. Made a spreadsheet. Did not buy a couch. Twelve rows." |
 | template_label | Decision spiral |
 | tags | `couch`, `spreadsheet`, `comparing`, `decision`, `twelve-rows` |
-| energy_descriptor | null |
+| vocabulary | null |
 | stated_commitment | null |
 | entry_observations | 1. Decision loop: 90 minutes, spreadsheet, 12 options, no decision. 2. Vocabulary: the user measures their own loop ("twelve rows") without explaining why they can't choose. |
 | pattern contribution | Decision spiral standalone. |

@@ -3,8 +3,9 @@ package dev.anchildress1.vestige.model
 /**
  * Persisted proof of what one extraction lens emitted for an entry.
  *
- * Raw model responses are intentionally excluded; downstream UI and pattern surfaces need the
- * parsed fields, flags, and failure metadata, not a private debug transcript.
+ * [rawResponse] is the verbatim per-lens model output, surfaced on the Entry Detail raw block so
+ * prompt tuning can read exactly what the model returned. Null when the lens produced no text
+ * (engine error / empty stream) or for receipts stored before this field existed.
  *
  * [fields] mirrors the persisted JSON object shape (`Any?` = String / List / nested Map / null);
  * numeric value types are not guaranteed stable across the JSON round-trip.
@@ -17,6 +18,7 @@ data class EntryLensReceipt(
     val attemptCount: Int = 0,
     val elapsedMs: Long = 0L,
     val lastError: String? = null,
+    val rawResponse: String? = null,
 ) {
     init {
         require(attemptCount >= 0) { "attemptCount must be >= 0, got $attemptCount" }

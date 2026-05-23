@@ -91,7 +91,7 @@ Lock the demo. Curate the sample data set the recording will use, write the demo
 **As** the AI implementor, **I need** the sample-data narrative documented in `sample-data-scenarios.md` §"Demo set" with explicit per-entry text, expected pattern outputs, and the persona behavior expected on each beat, **so that** the demo can be reproduced months from now (post-submission, when polishing v1.5) without losing the canonical demo state.
 
 **Done when:**
-- [ ] `sample-data-scenarios.md` has a "Demo set" section listing each seeded entry's: ID, text, template label, tags, energy_descriptor, the expected per-entry observation, and the cross-entry pattern it contributes to.
+- [ ] `sample-data-scenarios.md` has a "Demo set" section listing each seeded entry's: ID, text, template label, tags, vocabulary, the expected per-entry observation, and the cross-entry pattern it contributes to.
 - [ ] The expected output for each demo beat is written down (e.g., "Tap Roast me on the patterns list → Witness produces a roast that mentions Tuesday meetings and the body-count line").
 - [ ] If any expected output isn't reliably reproducible after Story 5.3's dry runs, the entry is reworked or the beat is adjusted in `demo-storyboard.md`.
 - [ ] An ADR addendum is **NOT** required — sample data is a build artifact, not an architecture decision. But the demo storyboard's pattern outcomes inform Phase 6's recording shotlist (Story 6.1).

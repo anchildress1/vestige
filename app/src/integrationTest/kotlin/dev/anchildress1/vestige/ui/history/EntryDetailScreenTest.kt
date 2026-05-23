@@ -1,5 +1,6 @@
 package dev.anchildress1.vestige.ui.history
 
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
@@ -8,12 +9,15 @@ import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertHasClickAction
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onFirst
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import dev.anchildress1.vestige.model.ConfidenceVerdict
 import dev.anchildress1.vestige.model.EntryLensReceipt
 import dev.anchildress1.vestige.model.ExtractionStatus
@@ -21,6 +25,7 @@ import dev.anchildress1.vestige.model.Lens
 import dev.anchildress1.vestige.model.Persona
 import dev.anchildress1.vestige.model.ResolvedExtraction
 import dev.anchildress1.vestige.model.ResolvedField
+import dev.anchildress1.vestige.model.TemplateLabel
 import dev.anchildress1.vestige.storage.EntryEntity
 import dev.anchildress1.vestige.storage.EntryStore
 import dev.anchildress1.vestige.storage.closeAfterCleaningThreadResources
@@ -113,14 +118,13 @@ class EntryDetailScreenTest {
 
     @Test
     fun `resolved view shows persisted three-lens receipts and field grid`() {
-        val id = entryStore.createPendingEntry("battery got yanked", FIXTURE_INSTANT)
+        val id = entryStore.createPendingEntry("receipt fixture transcript", FIXTURE_INSTANT)
         entryStore.completeEntry(
             id,
             ResolvedExtraction(
                 mapOf(
-                    "tags" to ResolvedField(listOf("meeting", "battery-yanked"), ConfidenceVerdict.CANONICAL),
-                    "energy_descriptor" to ResolvedField(
-                        "crashed",
+                    "tags" to ResolvedField(
+                        listOf("meeting", "battery-died"),
                         ConfidenceVerdict.CANONICAL_WITH_CONFLICT,
                     ),
                 ),
@@ -130,18 +134,18 @@ class EntryDetailScreenTest {
                 EntryLensReceipt(
                     lens = Lens.LITERAL,
                     extracted = true,
-                    fields = mapOf("energy_descriptor" to "battery yanked"),
+                    fields = mapOf("tags" to "literal receipt"),
                 ),
                 EntryLensReceipt(
                     lens = Lens.INFERENTIAL,
                     extracted = true,
-                    fields = mapOf("energy_descriptor" to "post-meeting energy crash"),
+                    fields = mapOf("tags" to "inferential receipt"),
                 ),
                 EntryLensReceipt(
                     lens = Lens.SKEPTICAL,
                     extracted = true,
-                    fields = mapOf("energy_descriptor" to "not tired vs yanked"),
-                    flags = listOf("vocabulary-contradiction:not tired:battery yanked"),
+                    fields = mapOf("tags" to "skeptical receipt"),
+                    flags = listOf("commitment-without-anchor:not tired:skeptical receipt"),
                 ),
             ),
         )
@@ -149,11 +153,99 @@ class EntryDetailScreenTest {
         composeRule.onNodeWithTag("entry_three_lens").assertIsDisplayed()
         composeRule.onNodeWithTag("entry_field_grid").assertIsDisplayed()
         composeRule.onNodeWithText(EntryDetailCopy.THREE_LENS_EYEBROW).assertIsDisplayed()
-        composeRule.onNodeWithText("battery yanked").assertIsDisplayed()
-        composeRule.onNodeWithText("crashed").assertIsDisplayed()
+        composeRule.onNodeWithText("literal receipt").assertIsDisplayed()
+        composeRule.onNodeWithText("inferential receipt").assertIsDisplayed()
+        composeRule.onNodeWithText("skeptical receipt").assertIsDisplayed()
         composeRule.onNodeWithText(EntryDetailCopy.THREE_LENS_STATUS_CONFLICT).assertIsDisplayed()
         // The extracting/skeleton branch is not the resolved view.
         composeRule.onAllNodesWithTag("entry_extracting").assertCountEquals(0)
+    }
+
+    @Test
+    fun `picked template shows in the top label slot by display name`() {
+        val id = entryStore.createPendingEntry("awake at 3am rearranging the notes app", FIXTURE_INSTANT)
+        entryStore.completeEntry(id, ResolvedExtraction(emptyMap()), TemplateLabel.GOBLIN_HOURS)
+        setDetail(id)
+        composeRule.onNodeWithTag("entry_template_label").assertIsDisplayed()
+        composeRule.onNodeWithText("GOBLIN HOURS").assertIsDisplayed()
+    }
+
+    @Test
+    fun `top label slot is absent when the entry has no template`() {
+        val id = entryStore.createPendingEntry("no archetype here", FIXTURE_INSTANT)
+        entryStore.completeEntry(id, ResolvedExtraction(emptyMap()), null)
+        setDetail(id)
+        composeRule.onAllNodesWithTag("entry_template_label").assertCountEquals(0)
+    }
+
+    @Test
+    fun `field grid shows the resolved vocab tone word`() {
+        val id = entryStore.createPendingEntry("drained to the bone by mid-morning", FIXTURE_INSTANT)
+        entryStore.completeEntry(
+            id,
+            ResolvedExtraction(mapOf("vocabulary" to ResolvedField("drained", ConfidenceVerdict.CANONICAL))),
+            null,
+            lensReceipts = listOf(
+                EntryLensReceipt(lens = Lens.LITERAL, extracted = true, fields = mapOf("vocabulary" to "drained")),
+            ),
+        )
+        setDetail(id)
+        composeRule.onNodeWithText("VOCAB").assertIsDisplayed()
+        composeRule.onAllNodesWithText("drained").onFirst().assertIsDisplayed()
+    }
+
+    @Test
+    fun `vocab row shows the spread when lenses named different tone words`() {
+        val id = entryStore.createPendingEntry("hard to name how this felt", FIXTURE_INSTANT)
+        entryStore.completeEntry(
+            id,
+            ResolvedExtraction(emptyMap()),
+            null,
+            lensReceipts = listOf(
+                EntryLensReceipt(lens = Lens.LITERAL, extracted = true, fields = mapOf("vocabulary" to "tired")),
+                EntryLensReceipt(lens = Lens.INFERENTIAL, extracted = true, fields = mapOf("vocabulary" to "wired")),
+            ),
+        )
+        setDetail(id)
+        composeRule.onNodeWithText("VOCAB").assertIsDisplayed()
+        composeRule.onNodeWithText("tired / wired").performScrollTo().assertIsDisplayed()
+    }
+
+    @Test
+    fun `raw model output is a collapsed accessible disclosure that reveals per-lens text on tap`() {
+        val literalRaw = """{"tags":["battery-died"],"template_label":"aftermath"}"""
+        val id = entryStore.createPendingEntry("battery died", FIXTURE_INSTANT)
+        entryStore.completeEntry(
+            id,
+            ResolvedExtraction(
+                mapOf("tags" to ResolvedField(listOf("battery-died"), ConfidenceVerdict.CANONICAL)),
+            ),
+            null,
+            lensReceipts = listOf(
+                EntryLensReceipt(
+                    lens = Lens.LITERAL,
+                    extracted = true,
+                    fields = mapOf("tags" to "battery died"),
+                    rawResponse = literalRaw,
+                ),
+            ),
+        )
+        setDetail(id)
+
+        val toggle = composeRule.onNodeWithContentDescription(EntryDetailCopy.RAW_OUTPUT_EXPAND_CD)
+        toggle.assert(SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.Button))
+        toggle.assertHasClickAction()
+        // Collapsed by default — the raw payload is not on screen.
+        composeRule.onAllNodesWithText(literalRaw, substring = true).assertCountEquals(0)
+
+        toggle.performClick()
+
+        // Expanded: the verbatim per-lens payload renders as ordinary readable text — the raw
+        // blob is not crammed into contentDescription, and the debug panel does not auto-announce
+        // via a live region.
+        composeRule.onNodeWithText(literalRaw, substring = true).assertIsDisplayed()
+        composeRule.onAllNodesWithContentDescription("LITERAL raw output: $literalRaw")
+            .assertCountEquals(0)
     }
 
     @Test
@@ -166,8 +258,8 @@ class EntryDetailScreenTest {
             observations = listOf(
                 dev.anchildress1.vestige.model.EntryObservation(
                     text = "You used fine twice.",
-                    evidence = dev.anchildress1.vestige.model.ObservationEvidence.VOCABULARY_CONTRADICTION,
-                    fields = listOf("vocabulary_contradictions", "tags"),
+                    evidence = dev.anchildress1.vestige.model.ObservationEvidence.THEME_NOTICING,
+                    fields = listOf("tags", "recurrence_link"),
                 ),
             ),
             lensReceipts = listOf(
@@ -183,7 +275,7 @@ class EntryDetailScreenTest {
 
         composeRule.onNodeWithTag("entry_observations").assertExists()
         composeRule.onNodeWithText("You used fine twice.").assertExists()
-        composeRule.onNodeWithText("VOCABULARY CONTRADICTION · vocabulary_contradictions, tags").assertExists()
+        composeRule.onNodeWithText("THEME NOTICING · tags, recurrence_link").assertExists()
     }
 
     @Test
@@ -196,7 +288,7 @@ class EntryDetailScreenTest {
             observations = listOf(
                 dev.anchildress1.vestige.model.EntryObservation(
                     text = "You used fine twice.",
-                    evidence = dev.anchildress1.vestige.model.ObservationEvidence.VOCABULARY_CONTRADICTION,
+                    evidence = dev.anchildress1.vestige.model.ObservationEvidence.THEME_NOTICING,
                     fields = emptyList(),
                 ),
             ),

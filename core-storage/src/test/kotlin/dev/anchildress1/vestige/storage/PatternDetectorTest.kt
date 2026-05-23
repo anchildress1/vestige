@@ -52,18 +52,20 @@ class PatternDetectorTest {
         templateLabel: TemplateLabel? = null,
         timestamp: Instant = now,
         tagNames: List<String> = emptyList(),
-        energyDescriptor: String? = null,
         commitmentTopic: String? = null,
         extractionStatus: ExtractionStatus = ExtractionStatus.COMPLETED,
+        vocabularyWord: String? = null,
+        vector: FloatArray? = null,
     ): EntryEntity {
         val tagBox = boxStore.boxFor<TagEntity>()
         val entry = EntryEntity(
             entryText = text,
             timestampEpochMs = timestamp.toEpochMilli(),
             templateLabel = templateLabel,
-            energyDescriptor = energyDescriptor,
             statedCommitmentJson = commitmentTopic?.let { """{"topic_or_person":"$it","text":"do it"}""" },
             extractionStatus = extractionStatus,
+            vocabularyWord = vocabularyWord,
+            vector = vector,
         )
         boxStore.boxFor<EntryEntity>().put(entry)
         if (tagNames.isNotEmpty()) {
@@ -76,6 +78,19 @@ class PatternDetectorTest {
         }
         return entry
     }
+
+    // A vector pointed (mostly) along one coordinate axis — same construction the clustering
+    // tests use so members of one axis fall inside the cosine cut and split from other axes.
+    private fun nearVector(axis: Int, jitter: Double): FloatArray {
+        val v = FloatArray(VOCAB_EMBED_DIM)
+        v[axis] = 1.0f
+        for (i in v.indices) v[i] = v[i] + jitter.toFloat() * ((i + 1) % 5 - 2) * 0.01f
+        return v
+    }
+
+    // Vocab-candidate seam: vectored entry on [axis] (jittered per [seed]) with a tone word.
+    private fun putVocab(word: String?, axis: Int, seed: Int): EntryEntity =
+        putEntry(vocabularyWord = word, vector = nearVector(axis, seed * 0.001))
 
     private fun putRawCommitmentEntry(rawCommitmentJson: String): EntryEntity = EntryEntity(
         entryText = "",
@@ -229,63 +244,60 @@ class PatternDetectorTest {
     }
 
     @Test
-    fun `vocab pattern requires four distinct entries containing the token`() {
-        // 3 entries — below threshold.
-        repeat(3) { putEntry(text = "I am tired again", templateLabel = TemplateLabel.AFTERMATH) }
-        assertNull(detector.detect().firstOrNull { it.kind == PatternKind.VOCAB_FREQUENCY })
-
-        // 4th entry crosses threshold. Template label irrelevant — vocab fires on entry count.
-        putEntry(text = "tired all morning", templateLabel = TemplateLabel.AFTERMATH)
+    fun `vocab pattern mints one cluster keyed on the dominant tone word`() {
+        // Six vectored entries on one semantic axis, all carrying a "tired"-family tone word →
+        // one embedding cluster ≥ VOCAB_THRESHOLD → one VOCAB_FREQUENCY keyed on the dominant
+        // word. Tone word, not a token count, is the identity.
+        repeat(6) { i -> putVocab(word = "tired", axis = 0, seed = i) }
         val patterns = detector.detect().filter { it.kind == PatternKind.VOCAB_FREQUENCY }
-        assertTrue(patterns.any { it.signatureJson.contains("\"token\":\"tired\"") })
+        assertEquals(1, patterns.size)
+        assertTrue(patterns.single().signatureJson.contains("\"token\":\"tired\""))
+        assertEquals(6, patterns.single().supportingEntryCount)
     }
 
     @Test
-    fun `vocab pattern fires even when all supporting entries lack a template label`() {
-        // ADR-003's diversity guard ("a single long sentence using 'tired' four times") is
-        // satisfied by the per-entry Set semantics — the templated-context narrowing rejected
-        // legitimate corpus shapes early in capture.
-        repeat(4) { putEntry(text = "I am tired again", templateLabel = null) }
-        val patterns = detector.detect().filter { it.kind == PatternKind.VOCAB_FREQUENCY }
-        assertTrue(patterns.any { it.signatureJson.contains("\"token\":\"tired\"") })
-    }
-
-    @Test
-    fun `vocab pattern folds true-synonym variants into the tired root`() {
-        // One entry per kept alias — covers every key in VOCAB_ROOT_ALIASES so a typo regression
-        // (e.g. "drained" → "draind") would drop the count below 6.
-        putEntry(text = "exhausted again, every limb gave up at once", energyDescriptor = "exhausted")
-        putEntry(text = "drained to the bone, eyes won't focus", energyDescriptor = "drained")
-        putEntry(text = "sluggish, the brain fog is back", tagNames = listOf("sluggish"))
-        putEntry(text = "wiped from another all-day", tagNames = listOf("wiped"))
-        putEntry(text = "depleted, body feels heavier today", energyDescriptor = "depleted")
-        putEntry(text = "burnt out, screen looks blurry from inside out", tagNames = listOf("burnt-out"))
-
-        val pattern = detector.detect().single {
-            it.kind == PatternKind.VOCAB_FREQUENCY && it.signatureJson.contains("\"token\":\"tired\"")
-        }
-
+    fun `vocab dominant word is the most frequent tone word — ties broken alphabetically`() {
+        // 3 "tired" + 3 "wired" in one cluster → alpha tie-break picks "tired".
+        repeat(3) { i -> putVocab(word = "tired", axis = 0, seed = i) }
+        repeat(3) { i -> putVocab(word = "wired", axis = 0, seed = i + 3) }
+        val pattern = detector.detect().single { it.kind == PatternKind.VOCAB_FREQUENCY }
+        assertTrue(pattern.signatureJson.contains("\"token\":\"tired\""))
         assertEquals(6, pattern.supportingEntryCount)
     }
 
     @Test
-    fun `vocab pattern does not fold arousal-up vocabulary onto tired`() {
-        // Regression guard: prior alias map collapsed "wired", "amped", "anxious", "static",
-        // "caffeine", "empty" onto "tired" — that lies about user vocabulary because the
-        // underlying state (arousal-up vs arousal-down) is different. Make sure these stay
-        // distinct from "tired".
-        putEntry(text = "wired-tired, body wants sleep, brain refuses", tagNames = listOf("wired"))
-        putEntry(text = "amped but somehow still spent", energyDescriptor = "amped")
-        putEntry(text = "anxious-tired, lying down doesn't count as rest", tagNames = listOf("anxious"))
-        putEntry(text = "running on caffeine and adrenaline", energyDescriptor = "caffeine")
+    fun `vocab below the cluster threshold mints nothing`() {
+        // Two semantic axes, three entries each → two clusters of 3, both below VOCAB_THRESHOLD
+        // (4). No pattern even though six candidates exist.
+        repeat(3) { i -> putVocab(word = "tired", axis = 0, seed = i) }
+        repeat(3) { i -> putVocab(word = "wired", axis = 1, seed = i) }
+        assertNull(detector.detect().firstOrNull { it.kind == PatternKind.VOCAB_FREQUENCY })
+    }
 
-        val tiredPattern = detector.detect().firstOrNull {
-            it.kind == PatternKind.VOCAB_FREQUENCY && it.signatureJson.contains("\"token\":\"tired\"")
-        }
-        // None of these entries contain the literal "tired" token outside of compound words
-        // (`wired-tired`, `anxious-tired`). The compound splits via WORD_SPLIT, so "tired"
-        // appears in 2 of 4 entries — below VOCAB_THRESHOLD (4). No false-positive pattern.
-        assertEquals(null, tiredPattern)
+    @Test
+    fun `vocab ignores entries without a tone word`() {
+        // Vectored, well-clustered, but no model-emitted tone word → not a candidate.
+        repeat(6) { i -> putVocab(word = null, axis = 0, seed = i) }
+        assertNull(detector.detect().firstOrNull { it.kind == PatternKind.VOCAB_FREQUENCY })
+    }
+
+    @Test
+    fun `vocab ignores entries without a usable vector`() {
+        // Tone word present but no vector → clustering drops them, so no candidates survive.
+        repeat(6) { putEntry(vocabularyWord = "tired", vector = null) }
+        assertNull(detector.detect().firstOrNull { it.kind == PatternKind.VOCAB_FREQUENCY })
+    }
+
+    @Test
+    fun `vocab tone-word variants collapse into one canonical token`() {
+        // Casing + plural variants of the same tone word all canonicalize to "tired" — the
+        // dominant-word grouping must count them as one, not three competing keys.
+        repeat(2) { i -> putVocab(word = "Tired", axis = 0, seed = i) }
+        repeat(2) { i -> putVocab(word = "tireds", axis = 0, seed = i + 2) }
+        repeat(2) { i -> putVocab(word = "tired", axis = 0, seed = i + 4) }
+        val pattern = detector.detect().single { it.kind == PatternKind.VOCAB_FREQUENCY }
+        assertTrue(pattern.signatureJson.contains("\"token\":\"tired\""))
+        assertEquals(6, pattern.supportingEntryCount)
     }
 
     @Test
@@ -522,5 +534,10 @@ class PatternDetectorTest {
                     it.signatureJson.contains("\"relation\":\"month_start\"")
             },
         )
+    }
+
+    private companion object {
+        // Small enough for fast tests, large enough that cosine separation is meaningful.
+        const val VOCAB_EMBED_DIM: Int = 32
     }
 }

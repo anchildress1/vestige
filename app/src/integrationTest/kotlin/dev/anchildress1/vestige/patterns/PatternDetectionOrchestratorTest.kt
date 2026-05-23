@@ -597,7 +597,9 @@ class PatternDetectionOrchestratorTest {
         fallbackOrchestrator.onEntryCommitted(putEntry(templateLabel = TemplateLabel.AFTERMATH), Persona.WITNESS)
 
         val pattern = patternStore.findByPatternId("z".repeat(64))!!
-        assertEquals("Commitment recurrence", pattern.title)
+        // PatternTitle.sanitize strips the category noun, so the kind fallback "Commitment
+        // recurrence" surfaces as just "Commitment".
+        assertEquals("Commitment", pattern.title)
         assertEquals(1, pattern.supportingEntries.size)
         assertEquals(supporting.id, pattern.supportingEntries.single().id)
     }

@@ -3,7 +3,6 @@ package dev.anchildress1.vestige.storage
 import dev.anchildress1.vestige.model.PatternKind
 import java.security.MessageDigest
 import java.util.HexFormat
-import java.util.Locale
 
 /**
  * Canonical signature serialization per ADR-003 §"`pattern_id` generation". Tags + labels are
@@ -17,8 +16,8 @@ import java.util.Locale
  * serialization would produce different SHA-256 hashes for the same logical signature and
  * silently break the content-addressable contract that ADR-002's `recurrence_link` predicate
  * depends on. All inputs are constrained to `[a-z0-9-]` by [TagNormalize.kebab] (labels, tags,
- * commitment topics) or by [TokenStemmer.stem] + `WORD_SPLIT` in [PatternDetector] (vocab
- * tokens), so JSON string-escaping isn't required.
+ * commitment topics) or lowercased + [TokenStemmer.stem]-folded (vocab tone words), so JSON
+ * string-escaping isn't required.
  */
 internal object PatternSignature {
 
@@ -50,16 +49,23 @@ internal object PatternSignature {
     }
 
     /**
-     * Defensive stemming: callers in [PatternDetector] already feed stemmed tokens, but
-     * [PatternMatcher.matchesVocab] also stems entry tokens before comparing to the signature.
-     * Applying [TokenStemmer.stem] here means an out-of-band caller passing `"meetings"` still
-     * produces a signature that the matcher's stemmed entry tokens will hit.
+     * Stems the dominant `vocabularyWord` of a vocab cluster. [PatternMatcher.matchesVocab]
+     * canonicalizes each entry's tone word the same way before comparing to this signature, so a
+     * `tireds` tone word still hits a pattern minted from `tired`.
      */
     fun forVocabToken(token: String): Signature {
-        val canonical = TokenStemmer.stem(token.lowercase(Locale.ROOT))
+        val canonical = canonicalVocabToken(token)
         val json = """{"kind":"${PatternKind.VOCAB_FREQUENCY.serial}","token":"$canonical"}"""
         return Signature.of(PatternKind.VOCAB_FREQUENCY, json, null)
     }
+
+    /**
+     * Canonical form of a model-emitted tone word: kebab-folded to `[a-z0-9-]` (the tone word is
+     * free-form, so this both keeps the hand-built signature JSON escape-free and gives the
+     * matcher a stable compare key) then plural-folded via [TokenStemmer]. The shared chokepoint
+     * for detection identity and matching so the two cannot drift.
+     */
+    fun canonicalVocabToken(word: String): String = TokenStemmer.stem(TagNormalize.kebab(word))
 
     fun forWeekdayTimeBlock(dayOfWeek: String, timeBlock: String): Signature {
         val canonicalDay = TagNormalize.kebab(dayOfWeek)

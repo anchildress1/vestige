@@ -20,7 +20,8 @@ object EntryLensReceiptJson {
                     .put(KEY_FLAGS, JSONArray(receipt.flags))
                     .put(KEY_ATTEMPT_COUNT, receipt.attemptCount)
                     .put(KEY_ELAPSED_MS, receipt.elapsedMs)
-                    .put(KEY_LAST_ERROR, receipt.lastError ?: JSONObject.NULL),
+                    .put(KEY_LAST_ERROR, receipt.lastError ?: JSONObject.NULL)
+                    .put(KEY_RAW_RESPONSE, receipt.rawResponse ?: JSONObject.NULL),
             )
         }
         return array.toString()
@@ -55,6 +56,11 @@ object EntryLensReceiptJson {
                         null
                     } else {
                         obj.optString(KEY_LAST_ERROR).takeIf(String::isNotBlank)
+                    },
+                    rawResponse = if (obj.isNull(KEY_RAW_RESPONSE)) {
+                        null
+                    } else {
+                        obj.optString(KEY_RAW_RESPONSE).takeIf(String::isNotBlank)
                     },
                 )
             }
@@ -98,4 +104,5 @@ object EntryLensReceiptJson {
     private const val KEY_ATTEMPT_COUNT = "attempt_count"
     private const val KEY_ELAPSED_MS = "elapsed_ms"
     private const val KEY_LAST_ERROR = "last_error"
+    private const val KEY_RAW_RESPONSE = "raw_response"
 }

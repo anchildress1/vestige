@@ -25,12 +25,12 @@
 05-12 04:31:19.239 18089 18103 I VestigeSttD:   RAW id=A3 lens=SKEPTICAL attempts=1 err=- fields={tags=[roadmap-call, post-meeting-routine, tabs-open, zero-movement], energy_descriptor=null, state_shift=false, vocabulary_contradictions=[], stated_commitment=null, recurrence_link=null, recurrence_kind=null} flags=[]
 05-12 04:31:19.239 18089 18103 I VestigeSttD:   DIVERGENCE id=A3 disagree_fields=[tags] inferential_only=[energy_descriptor] skeptical_flags_kept=[] meaningful=true
 05-12 04:31:52.935 18089 18103 I VestigeSttD: ENTRY id=A4 elapsed=33692ms lenses_parsed=3/3 model_calls=3
-05-12 04:31:52.936 18089 18103 I VestigeSttD:   LITERAL tags=[battery-yanked] energy=null commitment=null flags=0 attempts=1 err=-
-05-12 04:31:52.937 18089 18103 I VestigeSttD:   INFERENTIAL tags=[battery-yanked] energy=null commitment=null flags=0 attempts=1 err=-
-05-12 04:31:52.938 18089 18103 I VestigeSttD:   SKEPTICAL tags=[battery-yanked] energy=null commitment=null flags=0 attempts=1 err=-
-05-12 04:31:52.939 18089 18103 I VestigeSttD:   RAW id=A4 lens=LITERAL attempts=1 err=- fields={tags=[battery-yanked], energy_descriptor=null, state_shift=false, vocabulary_contradictions=[], stated_commitment=null, recurrence_link=null, recurrence_kind=null} flags=[]
-05-12 04:31:52.939 18089 18103 I VestigeSttD:   RAW id=A4 lens=INFERENTIAL attempts=1 err=- fields={tags=[battery-yanked], energy_descriptor=null, state_shift=false, vocabulary_contradictions=[], stated_commitment=null, recurrence_link=null, recurrence_kind=null} flags=[]
-05-12 04:31:52.939 18089 18103 I VestigeSttD:   RAW id=A4 lens=SKEPTICAL attempts=1 err=- fields={tags=[battery-yanked], energy_descriptor=null, state_shift=false, vocabulary_contradictions=[], stated_commitment=null, recurrence_link=null, recurrence_kind=null} flags=[]
+05-12 04:31:52.936 18089 18103 I VestigeSttD:   LITERAL tags=[battery-died] energy=null commitment=null flags=0 attempts=1 err=-
+05-12 04:31:52.937 18089 18103 I VestigeSttD:   INFERENTIAL tags=[battery-died] energy=null commitment=null flags=0 attempts=1 err=-
+05-12 04:31:52.938 18089 18103 I VestigeSttD:   SKEPTICAL tags=[battery-died] energy=null commitment=null flags=0 attempts=1 err=-
+05-12 04:31:52.939 18089 18103 I VestigeSttD:   RAW id=A4 lens=LITERAL attempts=1 err=- fields={tags=[battery-died], energy_descriptor=null, state_shift=false, vocabulary_contradictions=[], stated_commitment=null, recurrence_link=null, recurrence_kind=null} flags=[]
+05-12 04:31:52.939 18089 18103 I VestigeSttD:   RAW id=A4 lens=INFERENTIAL attempts=1 err=- fields={tags=[battery-died], energy_descriptor=null, state_shift=false, vocabulary_contradictions=[], stated_commitment=null, recurrence_link=null, recurrence_kind=null} flags=[]
+05-12 04:31:52.939 18089 18103 I VestigeSttD:   RAW id=A4 lens=SKEPTICAL attempts=1 err=- fields={tags=[battery-died], energy_descriptor=null, state_shift=false, vocabulary_contradictions=[], stated_commitment=null, recurrence_link=null, recurrence_kind=null} flags=[]
 05-12 04:31:52.939 18089 18103 I VestigeSttD:   DIVERGENCE id=A4 disagree_fields=[] inferential_only=[] skeptical_flags_kept=[] meaningful=false
 05-12 04:32:37.221 18089 18103 I VestigeSttD: ENTRY id=A5 elapsed=44278ms lenses_parsed=3/3 model_calls=3
 05-12 04:32:37.222 18089 18103 I VestigeSttD:   LITERAL tags=[client-review,hollow] energy=hollow commitment=null flags=0 attempts=1 err=-

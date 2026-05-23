@@ -96,7 +96,9 @@ internal object ObservationResponseParser {
         val text = (obj.opt("text") as? String)?.trim()?.takeIf { it.isNotEmpty() } ?: return skip("missing-text")
         val evidenceSerial = (obj.opt("evidence") as? String) ?: return skip("missing-evidence")
         val evidence = ObservationEvidence.fromSerial(evidenceSerial)
-            ?: return skip("unknown-evidence:$evidenceSerial")
+            // Don't log the raw serial — model output is untrusted and could carry journal text.
+            // Length alone is enough to spot a hallucinated blob vs a typo'd token.
+            ?: return skip("unknown-evidence:len=${evidenceSerial.length}")
         if (evidence == ObservationEvidence.PATTERN_CALLOUT) return skip("pattern-callout-from-model")
 
         val fields = (obj.opt("fields") as? JSONArray)?.let { arr ->

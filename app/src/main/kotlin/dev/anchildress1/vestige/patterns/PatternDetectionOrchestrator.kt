@@ -169,7 +169,7 @@ class PatternDetectionOrchestrator(
         persona: Persona,
     ) {
         val analysis = analysisGenerator.generatePatternAnalysis(detected, supporting, persona)
-        val title = analysis?.title ?: titleGenerator
+        val rawTitle = analysis?.title ?: titleGenerator
             .runCatching { generate(persona, detected) }
             .getOrElse {
                 if (it is CancellationException) throw it
@@ -182,6 +182,7 @@ class PatternDetectionOrchestrator(
                 null
             }
             ?: deterministicFallbackTitle(detected)
+        val title = PatternTitle.sanitize(rawTitle)
         logDegradedIfTemporal(detected, analysis)
         val callout = analysis?.calloutText ?: PatternCalloutText.build(detected)
         val now = clock.millis()

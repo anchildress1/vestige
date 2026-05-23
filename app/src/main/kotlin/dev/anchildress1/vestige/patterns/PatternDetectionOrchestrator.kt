@@ -84,7 +84,6 @@ class PatternDetectionOrchestrator(
         val entryCount = completedEntryCount(boxStore)
         if (entryCount >= patternDetectionCadence && entryCount % patternDetectionCadence == 0L) {
             runDetection(persona)
-            vocabClusterUpdater.stampAll()
         } else if (entryCount > 0L) {
             Log.d(
                 TAG,
@@ -137,11 +136,19 @@ class PatternDetectionOrchestrator(
         cooldownStore.decrementAllActive()
     }
 
-    private suspend fun runDetection(persona: Persona) {
+    /**
+     * Detect patterns and stamp vocab clusters. Public so the vector-backfill drain can re-run it
+     * once embeddings land: VOCAB_FREQUENCY rows can't be minted until members carry vectors, so a
+     * backfill that completes after the cadence detection leaves [vocabClusterUpdater] with nothing
+     * to stamp. Detection is idempotent (upsert) and callout/cooldown reservation is owned by
+     * [onEntryCommitted], so re-running here mints the missing pattern without double-firing.
+     */
+    suspend fun runDetection(persona: Persona) {
         val detected = detector.detect()
         for (pattern in detected) {
             upsert(pattern, persona)
         }
+        vocabClusterUpdater.stampAll()
     }
 
     private val vocabClusterUpdater = PatternVocabClusterUpdater(boxStore, patternStore)

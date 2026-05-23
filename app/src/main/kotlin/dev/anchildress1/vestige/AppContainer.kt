@@ -33,7 +33,6 @@ import dev.anchildress1.vestige.model.ModelManifest
 import dev.anchildress1.vestige.model.NetworkGate
 import dev.anchildress1.vestige.model.Persona
 import dev.anchildress1.vestige.patterns.PatternDetectionOrchestrator
-import dev.anchildress1.vestige.patterns.PatternVocabClusterUpdater
 import dev.anchildress1.vestige.save.BackgroundExtractionLifecycleCallbacks
 import dev.anchildress1.vestige.save.BackgroundExtractionSaveFlow
 import dev.anchildress1.vestige.save.PendingExtractionWork
@@ -977,7 +976,11 @@ class AppContainer(
                 Log.e(TAG, "Vector backfill: ${stats.failed}/${stats.total} failures; will retry on next trigger")
             }
             if (stats.processed > 0) {
-                PatternVocabClusterUpdater(boxStore, patternStore).stampAll()
+                // Re-run detection (not just stamp) — stampAll can only stamp an existing
+                // VOCAB_FREQUENCY row, but when vectors land after the cadence detection ran the
+                // pattern was never minted. runDetection creates it now that members carry
+                // vectors, then stamps clusters.
+                patternDetectionOrchestrator.runDetection(Persona.WITNESS)
                 _dataRevision.value += 1
             }
             VectorBackfillOutcome.COMPLETE

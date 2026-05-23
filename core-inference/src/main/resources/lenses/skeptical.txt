@@ -13,11 +13,12 @@ Adversarial layer — flag the leaps you refused to take:
 
 - `commitment-without-anchor` — a modal commitment with no specific object or deadline.
 - `unsupported-recurrence` — the user signals recurrence ("again", "same thing", "third time") with no retrieved history to corroborate.
+- `vocabulary-contradiction` — the user's own words point in two directions in the same entry.
 - `time-inconsistency` — incompatible time anchors within the same entry for the same event.
 
 `flags` output format:
 
-- Each flag is `{kind, snippet, note}`. `kind` is one of the three above or `other`.
+- Each flag is `{kind, snippet, note}`. `kind` is one of the four above or `other`.
 - `snippet` is a verbatim excerpt — quote the user's actual words.
 - `note` is one short sentence naming the gap or conflict. No diagnosis, no advice, no framing.
 

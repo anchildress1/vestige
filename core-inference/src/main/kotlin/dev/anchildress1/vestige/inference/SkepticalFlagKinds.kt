@@ -7,6 +7,7 @@ object SkepticalFlagKinds {
     val SCHEMA_BINDING: Map<String, String> = mapOf(
         "commitment-without-anchor" to "stated_commitment",
         "unsupported-recurrence" to "recurrence_link",
+        "vocabulary-contradiction" to "tags",
     )
 
     val SCHEMA_BINDING_KINDS: Set<String> = SCHEMA_BINDING.keys

@@ -157,6 +157,30 @@ class ConvergenceResolverTest {
     }
 
     @Test
+    fun `Skeptical vocabulary-contradiction flag marks agreed tags canonical with conflict`() {
+        val tags = listOf("fine", "exhausted")
+        val literal = LensExtraction(Lens.LITERAL, fields = mapOf("tags" to tags))
+        val inferential = LensExtraction(Lens.INFERENTIAL, fields = mapOf("tags" to tags))
+        val flag = "vocabulary-contradiction:fine but cannot function:words point both ways"
+        val skeptical = LensExtraction(
+            Lens.SKEPTICAL,
+            fields = mapOf("tags" to tags),
+            flags = listOf(flag),
+        )
+
+        val resolved = resolver.resolve(listOf(literal, inferential, skeptical))
+
+        assertEquals(
+            ResolvedField(
+                value = tags,
+                verdict = ConfidenceVerdict.CANONICAL_WITH_CONFLICT,
+                flags = listOf(flag),
+            ),
+            resolved.fields["tags"],
+        )
+    }
+
+    @Test
     fun `single surviving lens leaves populated fields ambiguous`() {
         // Two lenses parse-failed at the worker; only Literal reaches the resolver. A lone witness
         // is under-evidenced, so every field resolves AMBIGUOUS rather than minting a value.

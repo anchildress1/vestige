@@ -14,6 +14,7 @@ class SkepticalFlagKindsTest {
             mapOf(
                 "commitment-without-anchor" to "stated_commitment",
                 "unsupported-recurrence" to "recurrence_link",
+                "vocabulary-contradiction" to "tags",
             ),
             SkepticalFlagKinds.SCHEMA_BINDING,
         )
@@ -24,6 +25,7 @@ class SkepticalFlagKindsTest {
         assertTrue(SkepticalFlagKinds.isSchemaBinding("unsupported-recurrence:third time:no history"))
         assertTrue(SkepticalFlagKinds.isSchemaBinding("unsupported-recurrence::"))
         assertTrue(SkepticalFlagKinds.isSchemaBinding("commitment-without-anchor:send invoice:"))
+        assertTrue(SkepticalFlagKinds.isSchemaBinding("vocabulary-contradiction:fine but cannot function:"))
     }
 
     @Test

@@ -15,6 +15,7 @@ import org.json.JSONArray
 import org.json.JSONObject
 import java.io.IOException
 import java.time.Instant
+import java.util.Locale
 
 /**
  * ObjectBox owner for entry rows. Persists the two-phase pending → completed/failed lifecycle
@@ -268,7 +269,7 @@ class EntryStore(private val boxStore: BoxStore) {
 
     private fun applyResolved(entry: EntryEntity, resolved: ResolvedExtraction, templateLabel: TemplateLabel?) {
         entry.templateLabel = templateLabel
-        entry.vocabularyWord = stringField(resolved, KEY_VOCABULARY)?.trim()?.lowercase()
+        entry.vocabularyWord = stringField(resolved, KEY_VOCABULARY)?.trim()?.lowercase(Locale.ROOT)
         entry.recurrenceLink = recurrenceField(resolved)
         entry.statedCommitmentJson = commitmentJson(resolved)
         entry.confidenceJson = confidenceJson(resolved)
@@ -279,7 +280,7 @@ class EntryStore(private val boxStore: BoxStore) {
             ?.takeIf { it.verdict in PROMOTABLE_VERDICTS }
             ?.value
         val names = (resolvedTags as? List<*>)
-            ?.mapNotNull { (it as? String)?.trim()?.lowercase()?.takeIf(String::isNotEmpty) }
+            ?.mapNotNull { (it as? String)?.trim()?.lowercase(Locale.ROOT)?.takeIf(String::isNotEmpty) }
             ?.distinct()
             ?: emptyList()
         val previous = entry.tags.toList()

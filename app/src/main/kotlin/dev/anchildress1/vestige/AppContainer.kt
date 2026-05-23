@@ -50,6 +50,7 @@ import dev.anchildress1.vestige.storage.RetrievalRepo
 import dev.anchildress1.vestige.storage.TagEntity
 import dev.anchildress1.vestige.storage.VectorBackfillWorker
 import dev.anchildress1.vestige.storage.VestigeBoxStore
+import dev.anchildress1.vestige.storage.callClosingThreadResources
 import dev.anchildress1.vestige.storage.closeAfterCleaningThreadResources
 import dev.anchildress1.vestige.ui.capture.ModelReadiness
 import dev.anchildress1.vestige.ui.components.ModelDownloadProgress
@@ -321,12 +322,17 @@ class AppContainer(
     suspend fun retrievePatternCandidates(entryId: Long): List<HistoryChunk> = withContext(computeDispatcher) {
         try {
             val entry = entryStore.readEntry(entryId) ?: return@withContext emptyList()
-            PatternCandidates.forEntry(
-                target = entry,
-                activePatterns = patternStore.findActive(),
-                zoneId = ZoneId.systemDefault(),
-                maxPriorEntries = PATTERN_CANDIDATE_PRIOR_ENTRIES,
-            )
+            val active = patternStore.findActive()
+            // forEntry walks each pattern's supportingEntries ToMany; do it inside the guard so the
+            // relation read-tx thread resources are released instead of leaking a stale-read warning.
+            boxStore.callClosingThreadResources {
+                PatternCandidates.forEntry(
+                    target = entry,
+                    activePatterns = active,
+                    zoneId = ZoneId.systemDefault(),
+                    maxPriorEntries = PATTERN_CANDIDATE_PRIOR_ENTRIES,
+                )
+            }
         } catch (cancel: CancellationException) {
             throw cancel
         } catch (@Suppress("TooGenericExceptionCaught") error: Exception) {

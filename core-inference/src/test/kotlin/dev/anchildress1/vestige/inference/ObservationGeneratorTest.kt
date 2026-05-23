@@ -78,8 +78,10 @@ class ObservationGeneratorTest {
 
         val prompt = capturedPrompt.captured
         assertTrue(prompt.contains("RECURRING CONTEXT"), "prompt should carry the recurring-context section")
-        assertTrue(prompt.contains("1. meeting then crashed"), "prior entries should be listed")
-        assertTrue(prompt.contains("2. drained after standup"), "entries are numbered so the model reads the count")
+        // Retrieval hands chunks back most-recent-first; the render reverses to oldest-first, so the
+        // most-recent ("meeting then crashed") is numbered last, closest to the current entry.
+        assertTrue(prompt.contains("1. drained after standup"), "oldest prior entry is listed first")
+        assertTrue(prompt.contains("2. meeting then crashed"), "entries are numbered so the model reads the count")
     }
 
     @Test

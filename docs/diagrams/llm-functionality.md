@@ -95,8 +95,8 @@ flowchart TD
 
     F(["per field across 3 lens results"]) --> A{"≥2 lenses agree?"}
     A -- yes --> SK{"Skeptical flags<br/>a contradiction?"}
-    SK -- no --> CAN["canonical<br/>(saved authoritative)"]
-    SK -- yes --> CWC["consensus_with_conflict<br/>(canonical + conflict marker)"]
+    SK -- no --> CAN["consensus<br/>(saved authoritative)"]
+    SK -- yes --> CWC["consensus_with_conflict<br/>(consensus + conflict marker)"]
     A -- no --> ONE{"only Inferential<br/>populated it?"}
     ONE -- yes --> CND["candidate<br/>(low confidence; not used by pattern engine)"]
     ONE -- no --> AMB["ambiguous<br/>(saved null + note)"]

@@ -49,7 +49,9 @@ internal object LensResponseParser {
             mapOf("text" to text, "topic_or_person" to byKey["commitment_topic"]?.ifNotNullish())
         }
         return mapOf(
-            "tags" to byKey["tags"]?.split(',')?.mapNotNull(::normalizeToken),
+            // A `tags:` line that holds only blanks/nullish tokens is no usable signal — fold the
+            // empty result back to null so an otherwise-empty parse returns null and the lens retries.
+            "tags" to byKey["tags"]?.split(',')?.mapNotNull(::normalizeToken)?.takeIf { it.isNotEmpty() },
             "template_label" to byKey["template_label"]?.let(::normalizeWord),
             "vocabulary" to byKey["vocabulary"]?.let(::normalizeWord),
             "recurrence_link" to byKey["recurrence_link"]?.ifNotNullish(),

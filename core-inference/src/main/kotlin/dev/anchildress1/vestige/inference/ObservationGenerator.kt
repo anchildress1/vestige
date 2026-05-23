@@ -98,10 +98,12 @@ class ObservationGenerator(
         append(renderResolved(resolved))
     }
 
-    // Prior entries at this entry's weekday + time-of-day, oldest-context-first as fed. The count
-    // (plus the current entry) is the recurrence signal the model reads — it is not told a number.
+    // Prior entries at this entry's weekday + time-of-day. Retrieval hands them back most-recent
+    // first; reverse to oldest-first so the numbered list reads chronologically toward the current
+    // entry. The count (plus the current entry) is the recurrence signal the model reads — it is not
+    // told a number.
     private fun renderTemporalHistory(history: List<HistoryChunk>): String =
-        history.mapIndexed { index, chunk -> "${index + 1}. ${chunk.text}" }.joinToString("\n")
+        history.asReversed().mapIndexed { index, chunk -> "${index + 1}. ${chunk.text}" }.joinToString("\n")
 
     private fun renderResolved(resolved: ResolvedExtraction): String {
         if (resolved.fields.isEmpty()) return "(no resolved fields)"

@@ -189,7 +189,7 @@ Expected evidence:
 Run A1, A4, B1, B2, C2, and D1 as independent three-call background extractions: Literal, Inferential, Skeptical.
 
 Meaningful divergence counts when at least one of these happens:
-- A field changes confidence: canonical vs candidate vs ambiguous vs consensus_with_conflict.
+- A field changes confidence: consensus vs candidate vs ambiguous vs consensus_with_conflict.
 - Skeptical flags a contradiction or missing detail that changes how the field should be stored.
 - Literal refuses an inference that Inferential makes, and the resolver records that difference.
 
@@ -197,7 +197,7 @@ Wording variation does not count. Three lenses saying the same thing in differen
 
 Expected pressure points:
 - A1: Literal should catch standup/doc/stare; Inferential may label post-meeting crash; Skeptical may flag `fine before` vs `flattened by 11` as a state shift, not a contradiction.
-- A4: `Not tired exactly` vs `battery died` should pressure `tags` (state words) and `vocabulary` (felt tone); Skeptical should avoid saving `tired` as canonical without a conflict marker.
+- A4: `Not tired exactly` vs `battery died` should pressure `tags` (state words) and `vocabulary` (felt tone); Skeptical should avoid saving `tired` as consensus without a conflict marker.
 - B1: Literal sees invoice/email/opened/closed; Inferential may identify task paralysis; Skeptical should note no explicit commitment yet.
 - B2: Commitment should be stronger than B1 because `Said I would send` is explicit.
 - C2: Inferential can label Decision spiral; Skeptical should note the actual options are missing.

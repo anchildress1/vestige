@@ -98,7 +98,7 @@ flowchart TB
     NORM --> FG["Foreground Gemma call<br/>→ transcription + follow-up"]
     FG --> ES["EntryStore.persist<br/>ObjectBox row only"]
     ES --> BG["Background pass<br/>3 sequential lens calls (Literal→Inferential→Skeptical)"]
-    BG --> CR["Convergence Resolver<br/>canonical · candidate · ambiguous · consensus_with_conflict"]
+    BG --> CR["Convergence Resolver<br/>consensus · candidate · ambiguous · consensus_with_conflict"]
     CR --> OBS["entry_observations<br/>generated from transcript + resolved fields"]
     OBS --> PD{"≥10 entries AND<br/>pattern ≥3 supporting?"}
     PD -- yes --> PAT["Pattern detection<br/>persist sourced patterns + callout (cooldown 3)"]

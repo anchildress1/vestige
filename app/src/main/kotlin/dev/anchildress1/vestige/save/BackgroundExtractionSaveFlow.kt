@@ -16,10 +16,13 @@ import dev.anchildress1.vestige.patterns.PatternDetectionOrchestrator
 import dev.anchildress1.vestige.storage.EntryStore
 import dev.anchildress1.vestige.storage.TemporalHistoryRetrieval
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.time.ZonedDateTime
 
 data class BackgroundExtractionLifecycleCallbacks(
@@ -62,6 +65,7 @@ class BackgroundExtractionSaveFlow(
     private val retrieveHistory: suspend (String) -> List<HistoryChunk> = { emptyList() },
     private val retrievePatternCandidates: suspend (Long) -> List<HistoryChunk> = { emptyList() },
     private val patternOrchestrator: PatternDetectionOrchestrator? = null,
+    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) {
 
     /**
@@ -440,12 +444,15 @@ class BackgroundExtractionSaveFlow(
     // Prior entries at this entry's weekday + time-of-day, fed to the observation read as
     // RECURRING CONTEXT so the model can surface a repeat observation. Deterministic + local — no
     // embeddings — so it works on the very first read, before any pattern is detected.
-    private fun temporalHistoryFor(entryId: Long, capturedAt: ZonedDateTime): List<HistoryChunk> {
-        val target = entryStore.readEntry(entryId) ?: return emptyList()
-        val candidates = entryStore.listCompleted(TEMPORAL_HISTORY_CANDIDATES)
-        return TemporalHistoryRetrieval.matching(target, candidates, capturedAt.zone, TEMPORAL_HISTORY_TOP_N)
-            .map { HistoryChunk(patternId = null, text = it.entryText) }
-    }
+    // ObjectBox reads run on IO, not the save-flow's Default (CPU) context, so the DB hit doesn't
+    // park a compute thread before the in-memory slot matching.
+    private suspend fun temporalHistoryFor(entryId: Long, capturedAt: ZonedDateTime): List<HistoryChunk> =
+        withContext(ioDispatcher) {
+            val target = entryStore.readEntry(entryId) ?: return@withContext emptyList()
+            val candidates = entryStore.listCompleted(TEMPORAL_HISTORY_CANDIDATES)
+            TemporalHistoryRetrieval.matching(target, candidates, capturedAt.zone, TEMPORAL_HISTORY_TOP_N)
+                .map { HistoryChunk(patternId = null, text = it.entryText) }
+        }
 
     private suspend fun compensatePersistenceFailure(
         entryId: Long,

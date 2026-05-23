@@ -28,7 +28,7 @@ import dev.anchildress1.vestige.ui.theme.VestigeTheme
 
 /**
  * 168 dp circular REC button — coral hairline border + outer halo, pulsing inner dot, condensed
- * "REC" display, mono "TAP · TALK · 30s" hint stack. Tap target is the full 168 dp circle, well
+ * "REC" display, mono "TAP · TALK · 30sec" hint stack. Tap target is the full 168 dp circle, well
  * past the 48 dp Material guideline. Stateless — the caller passes [enabled] (e.g. false while
  * the model is loading) and handles the click.
  *
@@ -91,7 +91,7 @@ fun RecButton(
 }
 
 private const val DEFAULT_CD: String = "Record"
-private const val HINT_TEXT: String = "TAP · TALK · 30s"
+private const val HINT_TEXT: String = "TAP · TALK · 30sec"
 private val BUTTON_SIZE: Dp = 168.dp
 private val BORDER_WIDTH: Dp = 2.dp
 private val DOT_SIZE: Dp = 18.dp

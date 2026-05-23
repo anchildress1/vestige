@@ -69,7 +69,7 @@ class RecButtonTest {
     fun `renders REC label and hint text`() {
         composeRule.setContent { VestigeTheme { RecButton(onClick = {}) } }
         composeRule.onNodeWithText("REC").assertIsDisplayed()
-        composeRule.onNodeWithText("TAP · TALK · 30s").assertIsDisplayed()
+        composeRule.onNodeWithText("TAP · TALK · 30sec").assertIsDisplayed()
     }
 
     @Test

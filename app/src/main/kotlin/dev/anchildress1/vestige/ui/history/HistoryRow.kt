@@ -27,7 +27,7 @@ fun HistoryRow(summary: HistorySummary, onClick: (() -> Unit)?, modifier: Modifi
     val durationLabel = summary.durationMs
         .takeIf { it > 0L }
         ?.let(HistoryDurationFormatter::format)
-        ?: "0s"
+        ?: "0sec"
     val meta = "$durationLabel · ${summary.wordCount} WORDS"
     val a11yDesc = "${summary.timeLabel} ${summary.dateLabel} · ${summary.snippet} · " +
         "$durationLabel · ${summary.wordCount} words"

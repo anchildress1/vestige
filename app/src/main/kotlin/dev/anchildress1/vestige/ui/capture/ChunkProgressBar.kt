@@ -20,7 +20,7 @@ import dev.anchildress1.vestige.ui.theme.VestigeTheme
 
 /**
  * Capture chunk progress — 6 dp lime fill with hairline ticks at every [tickIntervalSec], plus
- * the `0s · 10s · 20s · 30s` label row beneath. Decorative; the live timer above carries the
+ * the `0sec · 10sec · 20sec · 30sec` label row beneath. Decorative; the live timer above carries the
  * a11y announcement. Caller passes `elapsedMs / maxMs` as [progress] (clamped to `[0, 1]`).
  */
 @Composable
@@ -41,8 +41,8 @@ fun ChunkProgressBar(
                 .fillMaxWidth()
                 .height(barHeight)
                 // Bar is decorative — the timer above announces remaining seconds. Labels below
-                // keep their own default semantics so TalkBack can still read "0s · 10s · 20s ·
-                // 30s" as ruler text.
+                // keep their own default semantics so TalkBack can still read "0sec · 10sec ·
+                // 20sec · 30sec" as ruler text.
                 .clearAndSetSemantics { },
         ) {
             drawRect(color = colors.s2, topLeft = Offset.Zero, size = size)
@@ -71,10 +71,10 @@ fun ChunkProgressBar(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
         ) {
-            ChunkLabel("0s")
-            ChunkLabel("10s")
-            ChunkLabel("20s")
-            ChunkLabel("30s ▲")
+            ChunkLabel("0sec")
+            ChunkLabel("10sec")
+            ChunkLabel("20sec")
+            ChunkLabel("30sec ▲")
         }
     }
 }

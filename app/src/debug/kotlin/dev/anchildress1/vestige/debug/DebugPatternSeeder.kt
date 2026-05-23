@@ -54,6 +54,12 @@ object DebugPatternSeeder {
      * the demo has a Skeptical-red conflict to show. The stalled-archetype prose is deliberately
      * keyword-free so the run measures whether the lenses + labeler recover the archetype from
      * natural resistance/paralysis language rather than a planted phrase.
+     *
+     * The three standup/meeting crashes are timed to consecutive Tuesday afternoons (05-05, 05-12,
+     * 05-19) so they share a weekday + time-of-day slot. TemporalHistoryRetrieval feeds the earlier
+     * two as RECURRING CONTEXT when the third extracts, so the observation read surfaces the repeat
+     * ("third Tuesday running"). This is a deliberate temporal cluster, not the accidental
+     * front-loading the aftermath spread otherwise avoids.
      */
     @Suppress("MagicNumber")
     val DEMO_ENTRIES: List<SeedEntry> = listOf(
@@ -61,22 +67,22 @@ object DebugPatternSeeder {
             "I was completely fine going into the standup but I crashed hard in about twenty minutes. " +
                 "I couldn't get back to the doc for the rest of the day. Then I was somehow wired until 2am. " +
                 "That's the whole cycle in one day.",
-            Instant.parse("2026-05-02T13:55:00Z"),
+            Instant.parse("2026-05-05T18:00:00Z"),
             18_000L,
         ),
         SeedEntry(
             "Another Tuesday and the same pattern as always. The meeting ends and I just kind of decompress " +
                 "for two hours whether I want to or not. Doesn't matter how much coffee I had beforehand. " +
                 "Body just decides it's done and that's that.",
-            Instant.parse("2026-05-06T18:42:00Z"),
+            Instant.parse("2026-05-19T17:30:00Z"),
             12_000L,
         ),
         SeedEntry(
             "Tuesday standup hit harder than expected today. Nothing dramatic was said, " +
                 "just the usual check-in, but something about the framing left me completely flat afterward. " +
-                "Couldn't do anything useful for the rest of the morning. " +
+                "Couldn't do anything useful for the rest of the afternoon. " +
                 "Ate lunch just to have something to do.",
-            Instant.parse("2026-05-13T20:17:00Z"),
+            Instant.parse("2026-05-12T18:30:00Z"),
             24_000L,
         ),
         SeedEntry(

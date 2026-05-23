@@ -130,6 +130,12 @@ private fun EntryDetailContent(model: EntryDetailUiModel, onBack: () -> Unit, mo
         ) {
             EyebrowE(text = "← BACK", modifier = Modifier.testTag("detail_back"))
         }
+        if (model.templateLabel != null) {
+            Pill(
+                text = model.templateLabel.uppercase(Locale.US),
+                modifier = Modifier.testTag("entry_template_label"),
+            )
+        }
         Text(
             text = model.timeOfDayLabel,
             style = VestigeTheme.typography.displayBig,
@@ -137,12 +143,6 @@ private fun EntryDetailContent(model: EntryDetailUiModel, onBack: () -> Unit, mo
             modifier = Modifier.testTag("entry_time"),
         )
         EyebrowE(text = "${model.dateLabel} · ${model.audioLabel.uppercase()} · ${model.wordCount} WORDS")
-        if (model.templateLabel != null) {
-            Pill(
-                text = model.templateLabel.uppercase(Locale.US),
-                modifier = Modifier.testTag("entry_template_label"),
-            )
-        }
 
         if (model.followUp != null) {
             FollowUpCard(personaName = model.personaName, body = model.followUp)

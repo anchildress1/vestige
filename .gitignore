@@ -70,5 +70,8 @@ libobjectbox-jni-*.dylib
 libobjectbox-jni-*.so
 libobjectbox-jni-*.dll
 
+# ObjectBox model descriptor backups — the live default.json is the only one we track
+core-storage/objectbox-models/*.json.bak
+
 # Claude Code session state — session locks, transcripts, scheduled-task metadata
 .claude/

@@ -1,12 +1,15 @@
 ## Lens: Skeptical
 
-Apply an adversarial reading. Read what is NOT said. Populate the schema fields fully, then flag gaps, conflicts, and unsupported claims in `flags`.
+Apply an adversarial reading. Assume the charitable interpretation is wrong until the words force it. Challenge the obvious read — do not echo it.
 
-Schema extraction — same surfaces as any lens:
+Schema extraction — read against the grain:
 
-Apply the surface rules exactly as any lens would: extract `tags` and `stated_commitment` from the text. The surface files define what each field captures — follow them. Do the extraction fully and correctly first. Then layer the adversarial flags on top.
+Populate every schema field, but extract only what the text directly supports. Where the natural read takes an inferential leap — a mood, a cause, an archetype the entry implies but never states — refuse it: take the more conservative value the literal evidence backs, even when that disagrees with the other lenses. Skeptical earns its seat by diverging when divergence is warranted, then naming why.
 
-Adversarial layer — what to flag:
+- `template_label`: pick the archetype only when the behaviour is on the page. When the dominant archetype is inferred, not stated, do not rubber-stamp it — choose the label the literal evidence supports (or `audit`) and flag the leap.
+- `tags`: only tokens anchored in the user's own words. `stated_commitment`: only an explicit, specific intent.
+
+Adversarial layer — flag the leaps you refused to take:
 
 - `commitment-without-anchor` — a modal commitment with no specific object or deadline.
 - `unsupported-recurrence` — the user signals recurrence ("again", "same thing", "third time") with no retrieved history to corroborate.
@@ -14,12 +17,12 @@ Adversarial layer — what to flag:
 
 `flags` output format:
 
-- Each flag is `{kind, snippet, note}`. `kind` is one of the four above or `other`.
-- `snippet` is a verbatim excerpt from the entry text. Quote the user's actual words.
+- Each flag is `{kind, snippet, note}`. `kind` is one of the three above or `other`.
+- `snippet` is a verbatim excerpt — quote the user's actual words.
 - `note` is one short sentence naming the gap or conflict. No diagnosis, no advice, no framing.
 
 Output discipline:
 
-- Flags annotate the resolved fields — they do not replace them. Populate schema fields fully, then add flags.
-- Convergence treats Skeptical flags as `canonical_with_conflict` when the other lenses agree on the underlying value.
-- Genuinely unambiguous entries may produce zero flags. Do not manufacture contradictions.
+- Populate fields first, then flag — flags annotate the read, they do not replace it.
+- A divergent Skeptical read plus a flag is the conflict signal convergence is built on; an agreeing read is not a conflict.
+- A genuinely plain entry may produce zero flags and agree with the other lenses. Do not manufacture contradictions.

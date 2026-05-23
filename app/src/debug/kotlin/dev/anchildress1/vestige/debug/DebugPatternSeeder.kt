@@ -7,6 +7,8 @@ import dev.anchildress1.vestige.storage.PatternEntity
 import dev.anchildress1.vestige.storage.TagEntity
 import io.objectbox.BoxStore
 import java.time.Instant
+import java.time.LocalDateTime
+import java.time.ZoneId
 
 object DebugPatternSeeder {
 
@@ -126,7 +128,9 @@ object DebugPatternSeeder {
             "Still awake at 2am, not anxious exactly, just can't seem to land. " +
                 "Brain keeps spinning on things that genuinely don't need to be thought about right now. " +
                 "I don't even know if this is productive or just restless. Hard to tell the difference tonight.",
-            Instant.parse("2026-05-08T02:13:00Z"),
+            // Anchored to the demo device's zone so it both displays as 2am and trips goblin-hours;
+            // a fixed `Z` instant would render to evening and miss the window in any non-UTC zone.
+            LocalDateTime.parse("2026-05-08T02:13:00").atZone(ZoneId.systemDefault()).toInstant(),
             27_000L,
         ),
         SeedEntry(

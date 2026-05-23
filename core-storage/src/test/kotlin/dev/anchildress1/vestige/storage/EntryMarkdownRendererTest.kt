@@ -37,6 +37,7 @@ class EntryMarkdownRendererTest {
             durationMs = 12_000L,
             templateLabel = TemplateLabel.AUDIT,
             recurrenceLink = "pattern-1",
+            vocabularyWord = "hollow",
             statedCommitmentJson = """{"text":"send invoice"}""",
             confidenceJson = """{"tags":"CANONICAL"}""",
             entryObservationsJson = """[{"text":"invoice repeated"}]""",
@@ -50,6 +51,7 @@ class EntryMarkdownRendererTest {
         assertTrue(markdown.contains("follow_up: What happened after the invoice?"))
         assertTrue(markdown.contains("template_label: audit"))
         assertTrue(markdown.contains("recurrence_link: pattern-1"))
+        assertTrue(markdown.contains("vocabulary: hollow"))
         assertTrue(markdown.contains("""stated_commitment: {"text":"send invoice"}"""))
         assertTrue(markdown.contains("tags: []"))
         assertTrue(markdown.contains("""confidence: {"tags":"CANONICAL"}"""))
@@ -77,6 +79,7 @@ class EntryMarkdownRendererTest {
         assertTrue(markdown.contains("follow_up: null"))
         assertTrue(markdown.contains("template_label: null"))
         assertTrue(markdown.contains("recurrence_link: null"))
+        assertTrue(markdown.contains("vocabulary: null"))
         assertTrue(markdown.contains("stated_commitment: null"))
         assertTrue(markdown.contains("tags: []"))
         assertTrue(markdown.contains("confidence: {}"))

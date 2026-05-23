@@ -1,9 +1,12 @@
 .PHONY: setup install bootstrap-wrapper doctor build assemble reinstall reinstall-prod _reinstall_base push-model seed-entries logcat test test-full lint format ktlint-format ktlint-check detekt android-lint secret-scan commitlint verify-no-telemetry verify ci clean
 
+SHELL := /bin/bash
+
 GRADLE_FLAGS ?= --console=plain --quiet
-GRADLE := ./gradlew $(GRADLE_FLAGS)
+SDK_ENV := source $(HOME)/.sdkman/bin/sdkman-init.sh && sdk env &&
+GRADLE := $(SDK_ENV) ./gradlew $(GRADLE_FLAGS)
 GRADLE_TEST_FLAGS ?= --no-parallel
-GRADLE_TEST := bash -o pipefail -c '$(GRADLE) $(GRADLE_TEST_FLAGS) "$$@" 2>&1 | { grep -v "\[ERROR\] Destroying inactive transaction" || true; }' --
+GRADLE_TEST := bash -o pipefail -c '$(SDK_ENV) ./gradlew $(GRADLE_FLAGS) $(GRADLE_TEST_FLAGS) "$$@" 2>&1 | { grep -v "\[ERROR\] Destroying inactive transaction" || true; }' --
 KTLINT := $(or $(shell command -v ktlint 2>/dev/null), $(HOME)/.local/bin/ktlint)
 KTLINT_FLAGS ?= --log-level=error
 DETEKT := $(or $(shell command -v detekt 2>/dev/null), $(HOME)/.local/bin/detekt)
@@ -176,9 +179,9 @@ ktlint-check:
 detekt:
 	@command -v $(DETEKT) >/dev/null 2>&1 || { echo "❌ detekt not found. Install: brew install detekt"; exit 1; }
 	@if [ -n "$(DETEKT_JAR)" ]; then \
-		java --sun-misc-unsafe-memory-access=allow -jar "$(DETEKT_JAR)" --build-upon-default-config --config detekt.yml --input $(DETEKT_INPUTS); \
+		$(SDK_ENV) java --sun-misc-unsafe-memory-access=allow -jar "$(DETEKT_JAR)" --build-upon-default-config --config detekt.yml --input $(DETEKT_INPUTS); \
 	else \
-		$(DETEKT) --build-upon-default-config --config detekt.yml --input $(DETEKT_INPUTS); \
+		$(SDK_ENV) $(DETEKT) --build-upon-default-config --config detekt.yml --input $(DETEKT_INPUTS); \
 	fi
 
 android-lint:

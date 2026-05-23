@@ -51,10 +51,11 @@ object DebugPatternSeeder {
     // [seed] sorts the merged corpus by timestamp before persisting, so the three source lists are
     // just groupings — the timeline the demo shows is the interleaved chronological order, not the
     // list order. Timestamps are hand-spread so same-archetype entries rarely land back-to-back.
-    private fun corpus(): List<SeedEntry> = DEMO_ENTRIES + backlogNarrative() + vocabDriftEntries()
+    private fun corpus(): List<SeedEntry> =
+        DEMO_ENTRIES + backlogNarrative() + vocabDriftEntries() + artifactRecurrenceEntries()
 
     /**
-     * Archetype spread — aftermath ×4 (clears the ≥3 template-recurrence floor), decision-spiral ×2,
+     * Archetype spread — aftermath ×5 (clears the ≥3 template-recurrence floor), decision-spiral ×2,
      * stalled ×2, goblin-hours ×1, tunnel-exit ×1, plus one commitment-anchor seed whose modal,
      * deadline-free promise the Literal/Inferential lenses read as a commitment while Skeptical flags
      * `commitment-without-anchor` — the convergence path that resolves to CONSENSUS_WITH_CONFLICT, so
@@ -62,11 +63,12 @@ object DebugPatternSeeder {
      * keyword-free so the run measures whether the lenses + labeler recover the archetype from
      * natural resistance/paralysis language rather than a planted phrase.
      *
-     * The three standup/meeting crashes are timed to consecutive Tuesday afternoons (05-05, 05-12,
-     * 05-19) so they share a weekday + time-of-day slot. TemporalHistoryRetrieval feeds the earlier
-     * two as RECURRING CONTEXT when the third extracts, so the observation read surfaces the repeat
-     * ("third Tuesday running"). This is a deliberate temporal cluster, not the accidental
-     * front-loading the aftermath spread otherwise avoids.
+     * Four standup/meeting crashes are timed to consecutive Tuesday afternoons (05-05, 05-12, 05-19,
+     * 05-26) so they share a weekday + time-of-day slot. The weekday-time-block pattern forms once the
+     * third lands; the fourth then extracts WITH that pattern as a candidate, so the model validates a
+     * genuine recurrence (`recurrence_link` set → REPEAT shows the pattern title) instead of only
+     * surfacing it in the observation read. [artifactRecurrenceEntries] is the negative control — a
+     * same-slot cluster the model must reject.
      */
     @Suppress("MagicNumber")
     val DEMO_ENTRIES: List<SeedEntry> = listOf(
@@ -91,6 +93,13 @@ object DebugPatternSeeder {
                 "Ate lunch just to have something to do.",
             localTs("2026-05-12T14:30:00"),
             24_000L,
+        ),
+        SeedEntry(
+            "Tuesday again, and again the meeting flattened me. Twenty minutes in I was done " +
+                "and the rest of the afternoon went nowhere. " +
+                "I'm starting to think it's the meeting itself, not me.",
+            localTs("2026-05-26T14:00:00"),
+            20_000L,
         ),
         SeedEntry(
             "Crashed at 3pm completely out of nowhere. No warning, no buildup, just suddenly couldn't think. " +
@@ -169,6 +178,38 @@ object DebugPatternSeeder {
                 "That's the worst combination.",
             localTs("2026-05-20T15:22:00"),
             16_000L,
+        ),
+    )
+
+    /**
+     * Negative control for the recurrence pipeline: four entries sharing a weekday + time-of-day slot
+     * (Thursday evening) so deterministic detection mints a weekday-time-block pattern — but the prose
+     * is unrelated end-of-day logistics with no recurring cognitive or energy state. When the fourth
+     * extracts WITH that pattern as a candidate, the model should judge it a logging artifact and leave
+     * `recurrence_link` empty (Skeptical may flag `unsupported-recurrence`), so REPEAT stays blank. This
+     * is the "I always log at 5pm ≠ I'm tired after work" distinction the recurrence surface must make.
+     */
+    @Suppress("MagicNumber")
+    private fun artifactRecurrenceEntries(): List<SeedEntry> = listOf(
+        SeedEntry(
+            "Wrapping up for the day. Need to grab coffee filters on the way home or there's none tomorrow.",
+            localTs("2026-05-07T18:30:00"),
+            9_000L,
+        ),
+        SeedEntry(
+            "Closing the laptop. The standing-desk part finally shipped — supposedly here by the weekend.",
+            localTs("2026-05-14T18:30:00"),
+            9_000L,
+        ),
+        SeedEntry(
+            "End of the day. Reminder to email the landlord about the parking spot before the first.",
+            localTs("2026-05-21T18:30:00"),
+            9_000L,
+        ),
+        SeedEntry(
+            "Done for the day. Might try that new ramen place tonight if it isn't packed.",
+            localTs("2026-05-28T18:30:00"),
+            9_000L,
         ),
     )
 

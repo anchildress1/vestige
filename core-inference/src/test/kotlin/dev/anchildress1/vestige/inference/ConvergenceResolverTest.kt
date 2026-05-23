@@ -174,6 +174,21 @@ class ConvergenceResolverTest {
     }
 
     @Test
+    fun `single surviving vocabulary lens leaves tone word ambiguous`() {
+        val inferential = LensExtraction(
+            Lens.INFERENTIAL,
+            fields = mapOf("vocabulary" to "drained"),
+        )
+
+        val resolved = resolver.resolve(listOf(inferential))
+
+        assertEquals(
+            ResolvedField(value = null, verdict = ConfidenceVerdict.AMBIGUOUS),
+            resolved.fields["vocabulary"],
+        )
+    }
+
+    @Test
     fun `skeptical-only contradicted field does not mint a candidate`() {
         val flag = "commitment-without-anchor:send it:no object named"
         val literal = LensExtraction(Lens.LITERAL, fields = mapOf("stated_commitment" to null))

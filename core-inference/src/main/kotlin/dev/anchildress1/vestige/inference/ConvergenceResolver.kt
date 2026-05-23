@@ -56,11 +56,11 @@ class DefaultConvergenceResolver : ConvergenceResolver {
 
             key == STATED_COMMITMENT_KEY -> resolveCommitment(byLens, matchingFlags)
 
-            key == VOCABULARY_KEY -> resolveVocabulary(byLens, matchingFlags)
-
             // Two of three lenses parse-failed: per ADR-002 §"Edge case — lens errors mid-call",
             // the surviving lens lacks corroboration, so every populated field is ambiguous.
             byLens.size == MIN_SURVIVING_LENSES_FOR_AMBIGUOUS -> ambiguousField(matchingFlags)
+
+            key == VOCABULARY_KEY -> resolveVocabulary(byLens, matchingFlags)
 
             populated.isEmpty() -> ambiguousField(matchingFlags)
 

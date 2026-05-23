@@ -56,9 +56,9 @@ internal fun buildLensReads(json: String?, hasConflict: Boolean = false): List<L
 
 /**
  * Skeptical reads red only when its flag produced a real conflict in convergence — a
- * CANONICAL_WITH_CONFLICT verdict, surfaced as [hasConflict] — not when its raw tag list merely
+ * CONSENSUS_WITH_CONFLICT verdict, surfaced as [hasConflict] — not when its raw tag list merely
  * differs while the lenses still agree on the resolved value. This keeps the lens colour
- * consistent with the card's CANONICAL / CONFLICT status. Literal / Inferential carry no flags.
+ * consistent with the card's CONSENSUS / CONFLICT status. Literal / Inferential carry no flags.
  */
 private fun lensTone(lens: Lens, receipt: EntryLensReceipt?, hasConflict: Boolean): LensTone {
     if (receipt == null) return LensTone.AMBIGUOUS
@@ -85,7 +85,7 @@ internal fun buildFieldRows(entity: EntryEntity, repeatTitle: String?): List<Fie
     // the caller from the stored pattern_id). Deterministic detection only proposes the candidate;
     // the model decides viability, so a blank here means "no confirmed recurrence", not "no data".
     val recurrenceValue = repeatTitle?.takeIf(String::isNotBlank) ?: DASH
-    val recurrenceTone = if (recurrenceValue == DASH) LensTone.AMBIGUOUS else LensTone.CANONICAL
+    val recurrenceTone = if (recurrenceValue == DASH) LensTone.AMBIGUOUS else LensTone.CONSENSUS
     val resolvedVocab = entity.vocabularyWord?.trim()?.takeIf { it.isNotBlank() && it.lowercase() !in NULLISH_VOCAB }
     val receiptVocab = receipts?.let(::distinctReceiptVocab).orEmpty()
     val vocabValue = resolvedVocab
@@ -128,10 +128,10 @@ internal fun buildFieldRows(entity: EntryEntity, repeatTitle: String?): List<Fie
 internal fun lensStatus(confidenceJson: String): String {
     val verdicts = parseConfidence(confidenceJson).values
     return when {
-        verdicts.any { it == ConfidenceVerdict.CANONICAL_WITH_CONFLICT } ->
+        verdicts.any { it == ConfidenceVerdict.CONSENSUS_WITH_CONFLICT } ->
             EntryDetailCopy.THREE_LENS_STATUS_CONFLICT
 
-        verdicts.any { it == ConfidenceVerdict.CANONICAL } -> EntryDetailCopy.THREE_LENS_STATUS_CANONICAL
+        verdicts.any { it == ConfidenceVerdict.CONSENSUS } -> EntryDetailCopy.THREE_LENS_STATUS_CONSENSUS
 
         verdicts.any { it == ConfidenceVerdict.CANDIDATE } -> EntryDetailCopy.THREE_LENS_STATUS_CANDIDATE
 
@@ -162,7 +162,7 @@ private fun EntryLensReceipt.summaryText(): String = when {
 
 private fun EntryLensReceipt.baseTone(): LensTone = when {
     !extracted -> LensTone.AMBIGUOUS
-    fields.values.any { displayValue(it) != null } -> LensTone.CANONICAL
+    fields.values.any { displayValue(it) != null } -> LensTone.CONSENSUS
     else -> LensTone.AMBIGUOUS
 }
 
@@ -185,7 +185,7 @@ private fun receiptFieldTone(receipts: List<EntryLensReceipt>, key: String): Len
     val supported = receipts.count { displayValue(it.fields[key]) != null }
     return when {
         receipts.any { displayValue(it.fields[key]) != null && it.flags.isNotEmpty() } -> LensTone.CONFLICT
-        supported >= 2 -> LensTone.CANONICAL
+        supported >= 2 -> LensTone.CONSENSUS
         supported == 1 -> LensTone.CANDIDATE
         else -> LensTone.AMBIGUOUS
     }
@@ -217,8 +217,8 @@ private fun displayValue(value: Any?): String? = when (value) {
 }
 
 private fun ConfidenceVerdict?.toTone(fallback: LensTone = LensTone.AMBIGUOUS): LensTone = when (this) {
-    ConfidenceVerdict.CANONICAL -> LensTone.CANONICAL
-    ConfidenceVerdict.CANONICAL_WITH_CONFLICT -> LensTone.CONFLICT
+    ConfidenceVerdict.CONSENSUS -> LensTone.CONSENSUS
+    ConfidenceVerdict.CONSENSUS_WITH_CONFLICT -> LensTone.CONFLICT
     ConfidenceVerdict.CANDIDATE -> LensTone.CANDIDATE
     ConfidenceVerdict.AMBIGUOUS -> LensTone.AMBIGUOUS
     null -> fallback

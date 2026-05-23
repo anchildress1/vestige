@@ -37,7 +37,7 @@ Adopt the multi-lens pattern from `concept-locked.md` verbatim. Implement it as 
 | Prompt composition | One lens module + all five surface modules per call | `concept-locked.md` |
 | Calls per entry | 3 (background) + 1 (foreground) = 4 total | `concept-locked.md` |
 | Convergence resolver | Deterministic code, not a model call | This ADR |
-| Schema output | 9 content fields, with extracted fields carrying per-field confidence (`canonical` / `candidate` / `ambiguous` / `canonical_with_conflict`) | `concept-locked.md` §Schema |
+| Schema output | 9 content fields, with extracted fields carrying per-field confidence (`consensus` / `candidate` / `ambiguous` / `consensus_with_conflict`) | `concept-locked.md` §Schema |
 | Re-eval | Re-runs the same 3-lens pipeline; diff against original | `concept-locked.md` §Re-eval |
 
 These are recorded for the handoff. Future ADRs may supersede individual rows.
@@ -48,13 +48,13 @@ These are recorded for the handoff. Future ADRs may supersede individual rows.
 
 The obvious cost-saving move is "send one prompt that says give me Literal, Inferential, and Skeptical extractions in three labeled sections." Don't.
 
-The whole convergence story rests on **statistical independence between the three lens outputs.** A single rollout that produces all three sections sees its own earlier tokens — the Skeptical section will be conditioned on what Literal already wrote, which is the opposite of adversarial. Convergence becomes a self-fulfilling agreement signal. The 3-of-3 canonical rule degenerates into "the model said it once and didn't contradict itself."
+The whole convergence story rests on **statistical independence between the three lens outputs.** A single rollout that produces all three sections sees its own earlier tokens — the Skeptical section will be conditioned on what Literal already wrote, which is the opposite of adversarial. Convergence becomes a self-fulfilling agreement signal. The 3-of-3 consensus rule degenerates into "the model said it once and didn't contradict itself."
 
 Three independent calls cost more tokens and more battery. They are also the entire reason this architecture earns its name. If STT-D ("3-lens multi-pass produces meaningfully different outputs sometimes") fails on three independent calls, the architecture fails — combining them into one call would only mask the failure. Combined-prompt is therefore not a fallback; it's a different feature.
 
 **One concession:** within a single lens call, all five surfaces share a rollout. That is intentional — surfaces are orthogonal *information* but they share the same lens framing, so co-rollout doesn't violate independence at the lens level.
 
-> **ADR-008 footnote — concurrent lenses preserve independence.** Running the three lens calls concurrently does not collapse them into a combined call. Each runs in its own [ADR-008](ADR-008-parallel-lens-execution.md) context (`Engine.createSession`/`createConversation` — independent, not cloned; **no** shared-prefix CoW — see ADR-008 §Correction 2026-05-16) and generates its own rollout. The 3-of-3 canonical rule applies to three independent rollouts regardless of whether they run serially or concurrently.
+> **ADR-008 footnote — concurrent lenses preserve independence.** Running the three lens calls concurrently does not collapse them into a combined call. Each runs in its own [ADR-008](ADR-008-parallel-lens-execution.md) context (`Engine.createSession`/`createConversation` — independent, not cloned; **no** shared-prefix CoW — see ADR-008 §Correction 2026-05-16) and generates its own rollout. The 3-of-3 consensus rule applies to three independent rollouts regardless of whether they run serially or concurrently.
 >
 > **Sequencing (2026-05-16, corrected).** A prior ADR-009 claimed the SDK could not do concurrent contexts and reverted this to sequential; that probe was mis-scoped and ADR-009 was deleted as a mistake. The 0.11.0 SDK *does* support concurrent independent contexts (ADR-008 restored). v1 still ships **sequential** until Story 2.6.6 / 2.19 measures concurrent-context RAM + wall-clock against the timebox — a scope position, not an SDK limitation. The independence-of-rollouts argument is unaffected either way.
 
@@ -104,7 +104,7 @@ The resolver attempts deterministic assembly first (commitment captured, vocabul
 [system role — observation generation, sourced-only, no diagnosis]
 [persona module — same persona as the active session]
 [output schema reminder — 1–2 observations, each with text + evidence + fields[]]
-[user content — entry_text + canonical/candidate fields + nearby resolved entries]
+[user content — entry_text + consensus/candidate fields + nearby resolved entries]
 ```
 
 - **Persona module location:** same slot as the foreground prompt. The observation inherits the active session's tone.
@@ -137,7 +137,7 @@ Each extracted schema field has its own equality predicate. The locked spec didn
 | `energy_descriptor` | Case-insensitive string match after stop-word strip; or null on all three |
 | `recurrence_link` | Same `pattern_id` (deterministic — pattern engine emits stable IDs) |
 | `stated_commitment` | Both same `topic_or_person` AND same `entry_id` reference |
-| `entry_observations` | Not equality-resolved as free text. Generated after convergence from `entry_text`, canonical/candidate fields, and evidence snippets. |
+| `entry_observations` | Not equality-resolved as free text. Generated after convergence from `entry_text`, consensus/candidate fields, and evidence snippets. |
 | `confidence` | Computed, not extracted |
 | `entry_text`, `timestamp` | Not lens-extracted; substrate fields |
 
@@ -145,10 +145,10 @@ Each extracted schema field has its own equality predicate. The locked spec didn
 
 Per field, applied independently:
 
-1. **≥2 of 3 lenses produce equal value (per the predicate above)** → `canonical`, value = the agreed value (for `tags`: the intersection).
+1. **≥2 of 3 lenses produce equal value (per the predicate above)** → `consensus`, value = the agreed value (for `tags`: the intersection).
 2. **Only one lens populates the field, others null** → `candidate`, with the source lens recorded. Pattern engine ignores candidates until promoted by re-eval or later corroboration (auto-promotion deferred to v1.5 per `../backlog.md`).
 3. **All three produce values, none agree** → `ambiguous`. Field saved null with a debug note listing the three values.
-4. **Skeptical flags a contradiction even when Literal and Inferential agree** → `canonical_with_conflict`. Saved with the agreed value AND a `conflicts` blob containing Skeptical's flag. UI surfaces the marker on the entry detail's Reading section.
+4. **Skeptical flags a contradiction even when Literal and Inferential agree** → `consensus_with_conflict`. Saved with the agreed value AND a `conflicts` blob containing Skeptical's flag. UI surfaces the marker on the entry detail's Reading section.
 
 ### Entry observation generation
 
@@ -323,7 +323,7 @@ The fourth addendum (sharpened LITERAL + INFERENTIAL + SKEPTICAL with `maxAttemp
 produced 87% divergence but at unacceptable cost: 1 entry timed out at the 5-min ceiling, 1
 entry parsed only 1 of 3 lenses, mean latency ~88s. Investigation document (2026-05-12,
 in-thread) reframed: the architecture's load-bearing claim isn't divergence count, it's
-**Skeptical doing adversarial work** — `canonical_with_conflict` verdicts reachable in the
+**Skeptical doing adversarial work** — `consensus_with_conflict` verdicts reachable in the
 data. The greedy baseline (Run 2 — 60% divergence) fired zero Skeptical flags, leaving the
 architecture's distinguishing beat unverified.
 
@@ -344,21 +344,21 @@ Result on the 15-entry STT-D corpus (GPU, greedy, 2026-05-12 — Run 4):
 |---|---|---|---|
 | Meaningful divergence | 9/15 (60%) | 11/15 (73%) | +13 pp |
 | Skeptical flags fired | 0 | **4** | **+4** |
-| `canonical_with_conflict`-eligible entries | 0 | **2** (A4, B2) | +2 |
+| `consensus_with_conflict`-eligible entries | 0 | **2** (A4, B2) | +2 |
 | Mean per-entry latency | 48s | **33s** | −31% |
 | Full 3-lens entries | 15/15 | 14/15 (B3 partial) | −1 |
 | Timeouts | 0 | 0 | 0 |
 
 The four flags fire on quoted user evidence — A1 `state-behavior-mismatch`, A4
 `vocabulary-contradiction`, B2 `commitment-without-anchor`, C1 `unsupported-recurrence`. A4
-and B2 fire with `disagree_fields=[]`, making `canonical_with_conflict` reachable for the
+and B2 fire with `disagree_fields=[]`, making `consensus_with_conflict` reachable for the
 first time on the corpus.
 
 **The verdict missed the investigation document's strict gate (≥5 flags) by one.** Shipped
 anyway because:
 
 1. The qualitative move is real — 0 → 4 flags with quoted evidence, 0 → 2 entries with
-   reachable `canonical_with_conflict` verdict, 4 flag kinds fired (only `time-inconsistency`
+   reachable `consensus_with_conflict` verdict, 4 flag kinds fired (only `time-inconsistency`
    silent — corpus has no incompatible time anchors).
 2. The architecture's load-bearing claim is now demonstrable. Demo Chapter 3 has 4 flagged
    entries to choose from for the storyboard.
@@ -392,7 +392,7 @@ rubric moves.
 | Factor | Cut | What it measures | Why |
 |---|---|---|---|
 | 1. Meaningful divergence rate | ≥ 50% of corpus entries flagged `meaningful=true` | Original gate, raised from 30% — the v1 corpus is now 15 entries with pressure-point coverage, so the 30% floor (5 entries) is too generous to be informative | Anchors against the "lenses always agree" failure mode ADR-002 §"If lenses always agree" calls out |
-| 2. `canonical_with_conflict` reachability | ≥ 2 entries with `disagree_fields=[]` AND ≥ 1 Skeptical schema-binding flag | The exact verdict the convergence resolver writes; reachability is what makes the Reading-screen demo beat real | Without this, Skeptical's adversarial role is decorative |
+| 2. `consensus_with_conflict` reachability | ≥ 2 entries with `disagree_fields=[]` AND ≥ 1 Skeptical schema-binding flag | The exact verdict the convergence resolver writes; reachability is what makes the Reading-screen demo beat real | Without this, Skeptical's adversarial role is decorative |
 | 3. Parse stability | ≥ 90% of (entry × lens) calls produce a parsed extraction; 0 timeouts at the 5-min per-entry ceiling | Catches the sharpened-prompt regression (Run 3: 87% divergence but 13% timeouts + 33% partial parses) | A higher divergence number bought with parse failures is a worse architecture, not a better one |
 | 4. Run-to-run consistency | Across 2 back-to-back runs same config: meaningful-set Jaccard ≥ 0.75 AND Skeptical-flag count delta ≤ 1 | Catches "the model happened to fire this time" results | A single greedy run with `seed=42` should be deterministic; non-determinism here points at engine state leakage and must be investigated, not averaged away |
 
@@ -408,7 +408,7 @@ the same day:
 | Factor | Cut | Rerun #1 | Rerun #2 | Suite-run (3rd) |
 |---|---|---|---|---|
 | 1. Meaningful divergence | ≥ 50% | 11/15 = 73% ✅ | 11/15 = 73% ✅ | 11/15 = 73% ✅ |
-| 2. `canonical_with_conflict` reachable | ≥ 2 entries | A4 + B2 ✅ | A4 + B2 ✅ | A4 + B2 ✅ |
+| 2. `consensus_with_conflict` reachable | ≥ 2 entries | A4 + B2 ✅ | A4 + B2 ✅ | A4 + B2 ✅ |
 | 3. Parse stability | ≥ 90%, 0 timeouts | 44/45 = 97.8%, 0 ✅ | 44/45 = 97.8%, 0 ✅ | 44/45 = 97.8%, 0 ✅ |
 | 4a. Meaningful-set Jaccard (pairwise across runs) | ≥ 0.75 | **1.0** ✅ | **1.0** ✅ | **1.0** ✅ |
 | 4b. Skeptical flag count delta (pairwise across runs) | ≤ 1 | **0** ✅ | **0** ✅ | **0** ✅ |
@@ -416,7 +416,7 @@ the same day:
 **All four rubric factors satisfied across three runs. Multi-lens architecture validated.**
 The verdict is byte-identical entry-by-entry across all three runs: same 11 meaningful
 entries, same 4 Skeptical flags with the same evidence quotes and the same `note` strings,
-same A4 + B2 `canonical_with_conflict` reachability, same B3 partial-parse miss. Greedy
+same A4 + B2 `consensus_with_conflict` reachability, same B3 partial-parse miss. Greedy
 decoding with `seed=42` is genuinely deterministic on this engine + this corpus —
 reproduced three times in one session, including across a different gradle invocation
 (individual rerun vs full-suite runner).
@@ -433,7 +433,7 @@ Two corollaries to record:
    sharpened-prompt failure pattern (output unstable enough to need a retry budget).
 
 The "0 → 4 flags with quoted evidence" and "0 → 2 entries with reachable
-`canonical_with_conflict`" carry-overs from the fifth addendum are now Factor 2 of the
+`consensus_with_conflict`" carry-overs from the fifth addendum are now Factor 2 of the
 rubric, not narrative justification appended after a missed integer gate.
 
 Evidence:
@@ -769,6 +769,23 @@ Scope: prompt resources (`lenses/output-schema.txt`, `literal.txt`, `inferential
 Observation generation (`observations/output-schema.txt`) is a separate path and stays JSON for now.
 
 **Verification pending:** adopted on the JSON-reliability rationale; on-device divergence / parse-rate numbers not yet re-measured. Revisit with logcat evidence if the flat format underperforms the JSON baseline.
+
+---
+
+### Addendum (2026-05-23) — verdict rename `canonical` → `consensus` (UX terminology only)
+
+The convergence verdict `CANONICAL` / `CANONICAL_WITH_CONFLICT` is renamed to `CONSENSUS` /
+`CONSENSUS_WITH_CONFLICT` across code and docs (`ConfidenceVerdict`, `LensTone`, UI status copy,
+verdict-ladder prose). **This is a UX/terminology rename, not a design change** — "consensus"
+reads to a user as "the lenses agreed," which is exactly what the verdict already meant (≥2 of 3
+lenses produce the agreed value). The resolution rules, thresholds, predicates, and the Skeptical
+conflict marker are all unchanged; only the label moves. Recorded here because the rename touches
+this ADR's prose, and an additive note is the discipline-compliant way to keep the historical text
+readable without rewriting a prior decision.
+
+Scope note: "canonical" in its *normalization* sense (canonical tag form, signature serialization,
+canonical corpus / order / SHA, `TemporalPatternRules.canonicalTimeBlock`) is a different concept
+and is deliberately left untouched.
 
 ---
 

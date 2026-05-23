@@ -32,7 +32,7 @@ class BackgroundExtractionWorkerTest {
     private val request = BackgroundExtractionRequest(entryText = "user words", capturedAt = capturedAt)
     private val resolved = ResolvedExtraction(
         fields = mapOf(
-            "tags" to ResolvedField(listOf("crashed"), ConfidenceVerdict.CANONICAL),
+            "tags" to ResolvedField(listOf("crashed"), ConfidenceVerdict.CONSENSUS),
         ),
     )
 
@@ -393,8 +393,8 @@ class BackgroundExtractionWorkerTest {
         // template_label overrides it.
         val modelLabeled = ResolvedExtraction(
             fields = mapOf(
-                "tags" to ResolvedField(listOf("crashed"), ConfidenceVerdict.CANONICAL),
-                "template_label" to ResolvedField("decision-spiral", ConfidenceVerdict.CANONICAL),
+                "tags" to ResolvedField(listOf("crashed"), ConfidenceVerdict.CONSENSUS),
+                "template_label" to ResolvedField("decision-spiral", ConfidenceVerdict.CONSENSUS),
             ),
         )
 
@@ -431,8 +431,8 @@ class BackgroundExtractionWorkerTest {
         every { engine.streamText(any(), any()) } returns flowOf("raw-ok")
         val badLabel = ResolvedExtraction(
             fields = mapOf(
-                "tags" to ResolvedField(listOf("crashed"), ConfidenceVerdict.CANONICAL),
-                "template_label" to ResolvedField("not-a-real-archetype", ConfidenceVerdict.CANONICAL),
+                "tags" to ResolvedField(listOf("crashed"), ConfidenceVerdict.CONSENSUS),
+                "template_label" to ResolvedField("not-a-real-archetype", ConfidenceVerdict.CONSENSUS),
             ),
         )
 
@@ -452,7 +452,7 @@ class BackgroundExtractionWorkerTest {
         val engine = mockk<LiteRtLmEngine>()
         every { engine.streamText(any(), any()) } returns flowOf("raw-ok")
         val lateNightResolved = ResolvedExtraction(
-            fields = mapOf("tags" to ResolvedField(listOf("late-night"), ConfidenceVerdict.CANONICAL)),
+            fields = mapOf("tags" to ResolvedField(listOf("late-night"), ConfidenceVerdict.CONSENSUS)),
         )
         val parser: (Lens, String) -> LensExtraction? = { lens, _ -> extraction(lens) }
         // 08:00 UTC = 03:00 Chicago (inside goblin) but 08:00 UTC zone (outside goblin). Asserting

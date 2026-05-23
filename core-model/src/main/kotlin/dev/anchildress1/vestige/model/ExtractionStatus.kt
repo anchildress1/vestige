@@ -11,7 +11,7 @@ enum class ExtractionStatus {
     /** Background running. A cold start that finds this implies a kill mid-flight. */
     RUNNING,
 
-    /** Convergence resolver finished and the canonical fields are written. */
+    /** Convergence resolver finished and the consensus fields are written. */
     COMPLETED,
 
     /** Per-entry timeout exceeded. */

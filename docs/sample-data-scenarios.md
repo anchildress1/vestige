@@ -189,7 +189,7 @@ Expected evidence:
 Run A1, A4, B1, B2, C2, and D1 as independent three-call background extractions: Literal, Inferential, Skeptical.
 
 Meaningful divergence counts when at least one of these happens:
-- A field changes confidence: canonical vs candidate vs ambiguous vs canonical_with_conflict.
+- A field changes confidence: canonical vs candidate vs ambiguous vs consensus_with_conflict.
 - Skeptical flags a contradiction or missing detail that changes how the field should be stored.
 - Literal refuses an inference that Inferential makes, and the resolver records that difference.
 

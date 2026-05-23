@@ -117,7 +117,7 @@ If STT-A fails after the time-box: stop. Write a superseding ADR. Do not proceed
 
 ### Story 1.6 — ObjectBox schema with operational fields
 
-**As** the AI implementor, **I need** the canonical ObjectBox entities for entries, tags, and patterns — including the operational fields ADR-001 Q3 specifies for the retry-based background-extraction recovery path — **so that** Phase 2 background extraction has somewhere to write canonical/candidate/ambiguous fields and Phase 3 pattern detection has somewhere to find them.
+**As** the AI implementor, **I need** the canonical ObjectBox entities for entries, tags, and patterns — including the operational fields ADR-001 Q3 specifies for the retry-based background-extraction recovery path — **so that** Phase 2 background extraction has somewhere to write consensus/candidate/ambiguous fields and Phase 3 pattern detection has somewhere to find them.
 
 **Done when:**
 - [x] `Entry`, `Tag`, `Pattern` entities defined in `:core-storage` per `concept-locked.md` §Schema and ADR-001 Q3.
@@ -214,7 +214,7 @@ If STT-A fails after the time-box: stop. Write a superseding ADR. Do not proceed
 **As** the AI implementor, **I need** the convergence resolver's unit-test scaffolding in place per ADR-002 Q4, **so that** Phase 2's resolver implementation lands into existing tests rather than an empty test directory.
 
 **Done when:**
-- [x] `:core-inference` test source set contains a `ConvergenceResolverTest` class with stub test cases covering each convergence outcome from `concept-locked.md` §"Convergence rules": canonical (≥2 of 3 agree), candidate (only Inferential populates), ambiguous (lenses disagree), canonical-with-conflict (Skeptical flags conflict).
+- [x] `:core-inference` test source set contains a `ConvergenceResolverTest` class with stub test cases covering each convergence outcome from `concept-locked.md` §"Convergence rules": canonical (≥2 of 3 agree), candidate (only Inferential populates), ambiguous (lenses disagree), consensus-with-conflict (Skeptical flags conflict).
 - [x] Each stub test case has a clearly-stated `@Test` annotation, a meaningful name, and a body that compiles but is annotated `@Disabled` or asserts a placeholder until Phase 2 wires the real resolver.
 - [x] At least one happy-path test case (all three lenses return identical structured output → canonical) is *fully written* as a documentation example, even though the underlying resolver isn't implemented yet.
 - [x] Test infrastructure (JUnit, Truth/AssertJ, fake LiteRT-LM client) wired so Phase 2 can drop in real implementations without configuration changes. _(JUnit Jupiter only at the resolver layer — the resolver consumes parsed `LensExtraction`s, not engine output, so a fake LiteRT-LM client is a Phase-2 prompt-side concern, not a Story 1.12 deliverable.)_

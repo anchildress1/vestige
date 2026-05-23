@@ -23,7 +23,7 @@ class TemplateLabelerTest {
     @Test
     fun `crashed tag resolves to aftermath`() {
         val resolved = resolved(
-            "tags" to listOf("crashed").canonical(),
+            "tags" to listOf("crashed").consensus(),
         )
 
         assertEquals(TemplateLabel.AFTERMATH, labeler.label(resolved, capturedAt = noon))
@@ -32,7 +32,7 @@ class TemplateLabelerTest {
     @Test
     fun `no aftermath tag falls through to audit`() {
         val resolved = resolved(
-            "tags" to listOf("groceries").canonical(),
+            "tags" to listOf("groceries").consensus(),
         )
 
         assertEquals(TemplateLabel.AUDIT, labeler.label(resolved, capturedAt = noon))
@@ -41,7 +41,7 @@ class TemplateLabelerTest {
     @Test
     fun `aftermath tags drive aftermath`() {
         val resolved = resolved(
-            "tags" to listOf("aftermath").canonical(),
+            "tags" to listOf("aftermath").consensus(),
         )
 
         assertEquals(TemplateLabel.AFTERMATH, labeler.label(resolved, capturedAt = noon))
@@ -49,63 +49,63 @@ class TemplateLabelerTest {
 
     @Test
     fun `hollow tag drives aftermath for post-meeting demo entries`() {
-        val resolved = resolved("tags" to listOf("hollow").canonical())
+        val resolved = resolved("tags" to listOf("hollow").consensus())
 
         assertEquals(TemplateLabel.AFTERMATH, labeler.label(resolved, capturedAt = noon))
     }
 
     @Test
     fun `tunnel-exit tag yields tunnel exit label`() {
-        val resolved = resolved("tags" to listOf("standup", "tunnel-exit").canonical())
+        val resolved = resolved("tags" to listOf("standup", "tunnel-exit").consensus())
 
         assertEquals(TemplateLabel.TUNNEL_EXIT, labeler.label(resolved, capturedAt = noon))
     }
 
     @Test
     fun `decision-loop tag yields decision spiral label`() {
-        val resolved = resolved("tags" to listOf("decision-loop").canonical())
+        val resolved = resolved("tags" to listOf("decision-loop").consensus())
 
         assertEquals(TemplateLabel.DECISION_SPIRAL, labeler.label(resolved, capturedAt = noon))
     }
 
     @Test
     fun `spreadsheet comparison tags yield decision spiral label`() {
-        val resolved = resolved("tags" to listOf("spreadsheet", "comparing").canonical())
+        val resolved = resolved("tags" to listOf("spreadsheet", "comparing").consensus())
 
         assertEquals(TemplateLabel.DECISION_SPIRAL, labeler.label(resolved, capturedAt = noon))
     }
 
     @Test
     fun `stuck marker tag yields stalled label`() {
-        val resolved = resolved("tags" to listOf("stuck", "q3-doc").canonical())
+        val resolved = resolved("tags" to listOf("stuck", "q3-doc").consensus())
 
         assertEquals(TemplateLabel.STALLED, labeler.label(resolved, capturedAt = noon))
     }
 
     @Test
     fun `late-night tag inside the midnight-5am window yields goblin hours`() {
-        val resolved = resolved("tags" to listOf("late-night").canonical())
+        val resolved = resolved("tags" to listOf("late-night").consensus())
 
         assertEquals(TemplateLabel.GOBLIN_HOURS, labeler.label(resolved, capturedAt = threeAm))
     }
 
     @Test
     fun `late-night tag outside the window falls through to audit`() {
-        val resolved = resolved("tags" to listOf("late-night").canonical())
+        val resolved = resolved("tags" to listOf("late-night").consensus())
 
         assertEquals(TemplateLabel.AUDIT, labeler.label(resolved, capturedAt = noon))
     }
 
     @Test
     fun `5am is past the goblin window so late-night at 5am does not label as goblin hours`() {
-        val resolved = resolved("tags" to listOf("late-night").canonical())
+        val resolved = resolved("tags" to listOf("late-night").consensus())
 
         assertEquals(TemplateLabel.AUDIT, labeler.label(resolved, capturedAt = fiveAm))
     }
 
     @Test
     fun `goblin window without late-night tag still falls through to audit`() {
-        val resolved = resolved("tags" to listOf("standup").canonical())
+        val resolved = resolved("tags" to listOf("standup").consensus())
 
         assertEquals(TemplateLabel.AUDIT, labeler.label(resolved, capturedAt = threeAm))
     }
@@ -118,7 +118,7 @@ class TemplateLabelerTest {
     @Test
     fun `aftermath wins over tunnel exit when both signals fire`() {
         val resolved = resolved(
-            "tags" to listOf("crashed", "tunnel-exit").canonical(),
+            "tags" to listOf("crashed", "tunnel-exit").consensus(),
         )
 
         assertEquals(TemplateLabel.AFTERMATH, labeler.label(resolved, capturedAt = threeAm))
@@ -127,7 +127,7 @@ class TemplateLabelerTest {
     @Test
     fun `aftermath wins over goblin hours at 3am`() {
         val resolved = resolved(
-            "tags" to listOf("crashed", "late-night").canonical(),
+            "tags" to listOf("crashed", "late-night").consensus(),
         )
 
         assertEquals(TemplateLabel.AFTERMATH, labeler.label(resolved, capturedAt = threeAm))
@@ -135,14 +135,14 @@ class TemplateLabelerTest {
 
     @Test
     fun `decision spiral wins over tunnel exit when both tags are present`() {
-        val resolved = resolved("tags" to listOf("tunnel-exit", "decision-loop").canonical())
+        val resolved = resolved("tags" to listOf("tunnel-exit", "decision-loop").consensus())
 
         assertEquals(TemplateLabel.DECISION_SPIRAL, labeler.label(resolved, capturedAt = noon))
     }
 
     @Test
     fun `stalled wins over goblin hours when both signals fire at 3am`() {
-        val resolved = resolved("tags" to listOf("stuck", "late-night").canonical())
+        val resolved = resolved("tags" to listOf("stuck", "late-night").consensus())
 
         assertEquals(TemplateLabel.STALLED, labeler.label(resolved, capturedAt = threeAm))
     }
@@ -158,7 +158,7 @@ class TemplateLabelerTest {
 
     @Test
     fun `tag matching is case-insensitive`() {
-        val resolved = resolved("tags" to listOf("Decision-Loop").canonical())
+        val resolved = resolved("tags" to listOf("Decision-Loop").consensus())
 
         assertEquals(TemplateLabel.DECISION_SPIRAL, labeler.label(resolved, capturedAt = noon))
     }
@@ -179,12 +179,12 @@ class TemplateLabelerTest {
     }
 
     @Test
-    fun `canonical-with-conflict still drives the label`() {
+    fun `consensus-with-conflict still drives the label`() {
         val resolved = ResolvedExtraction(
             mapOf(
                 "tags" to ResolvedField(
                     value = listOf("crashed"),
-                    verdict = ConfidenceVerdict.CANONICAL_WITH_CONFLICT,
+                    verdict = ConfidenceVerdict.CONSENSUS_WITH_CONFLICT,
                     flags = listOf("commitment-without-anchor:fine vs couldn't"),
                 ),
             ),
@@ -196,7 +196,7 @@ class TemplateLabelerTest {
     @Test
     fun `midnight local time is inside the goblin window`() {
         val midnight = LocalDateTime.of(2026, 5, 9, 0, 0).atZone(zone)
-        val resolved = resolved("tags" to listOf("late-night").canonical())
+        val resolved = resolved("tags" to listOf("late-night").consensus())
 
         assertEquals(TemplateLabel.GOBLIN_HOURS, labeler.label(resolved, capturedAt = midnight))
     }
@@ -204,7 +204,7 @@ class TemplateLabelerTest {
     @Test
     fun `0459 local time is the inclusive upper edge of the goblin window`() {
         val justBeforeFive = LocalDateTime.of(2026, 5, 9, 4, 59).atZone(zone)
-        val resolved = resolved("tags" to listOf("late-night").canonical())
+        val resolved = resolved("tags" to listOf("late-night").consensus())
 
         assertEquals(TemplateLabel.GOBLIN_HOURS, labeler.label(resolved, capturedAt = justBeforeFive))
     }
@@ -214,7 +214,7 @@ class TemplateLabelerTest {
         // 08:00 UTC = 03:00 America/Chicago (inside) vs 08:00 UTC (outside). The labeler reads
         // hour from the captured ZonedDateTime, not from any ambient JVM default.
         val instant = Instant.parse("2026-05-09T08:00:00Z")
-        val resolved = resolved("tags" to listOf("late-night").canonical())
+        val resolved = resolved("tags" to listOf("late-night").consensus())
 
         val labeledLocal = labeler.label(resolved, capturedAt = instant.atZone(ZoneId.of("America/Chicago")))
         val labeledUtc = labeler.label(resolved, capturedAt = instant.atZone(ZoneId.of("UTC")))
@@ -231,7 +231,7 @@ class TemplateLabelerTest {
             mapOf(
                 "tags" to ResolvedField(
                     value = listOf("stuck", 42, null),
-                    verdict = ConfidenceVerdict.CANONICAL,
+                    verdict = ConfidenceVerdict.CONSENSUS,
                 ),
             ),
         )
@@ -242,5 +242,5 @@ class TemplateLabelerTest {
     private fun resolved(vararg entries: Pair<String, ResolvedField>): ResolvedExtraction =
         ResolvedExtraction(mapOf(*entries))
 
-    private fun Any?.canonical(): ResolvedField = ResolvedField(value = this, verdict = ConfidenceVerdict.CANONICAL)
+    private fun Any?.consensus(): ResolvedField = ResolvedField(value = this, verdict = ConfidenceVerdict.CONSENSUS)
 }

@@ -43,7 +43,7 @@ The user only ever waits for step 1. Steps 2 and 3 deliver the same eventual inf
 | User taps `I'm done.` | Foreground | Foreground call (transcription + persona-flavored follow-up) | Yes — `Reading the entry.` state until response | Surface error in capture; entry not persisted unless transcription returns |
 | Foreground returns | Persist + enqueue | `EntryStore.persist(entry_text, follow_up, persona)` then enqueue background lens worker | No | Persist succeeds before background scheduled; markdown is source of truth |
 | Background lens N completes | Background analytics | Per-lens parse + accumulate `LensResult` | No | Per-lens parse-fail → `no opinion`; resolver runs on survivors; ≥2 fail → all-ambiguous (ADR-002 contract holds) |
-| All 3 lenses complete | Background analytics | `ConvergenceResolver.resolve` runs; writes canonical / candidate / ambiguous fields per ADR-002 | No | Per ADR-001 §Q3 retry-based recovery |
+| All 3 lenses complete | Background analytics | `ConvergenceResolver.resolve` runs; writes consensus / candidate / ambiguous fields per ADR-002 | No | Per ADR-001 §Q3 retry-based recovery |
 | `EntryStore.write` count % 5 == 0 | Background pattern | `PatternDetector` pass against the rolling 90-day window per ADR-003 | No | Patterns view updates atomically; partial completion leaves prior pattern state intact; only one pattern pass in flight per process |
 
 ---
@@ -61,7 +61,7 @@ The user only ever waits for step 1. Steps 2 and 3 deliver the same eventual inf
 ## What This Does NOT Change
 
 - ADR-002's convergence resolver contract (deterministic Kotlin, not a model call).
-- ADR-002's per-field confidence states (`canonical` / `candidate` / `ambiguous` / `canonical_with_conflict`).
+- ADR-002's per-field confidence states (`consensus` / `candidate` / `ambiguous` / `consensus_with_conflict`).
 - ADR-002's foreground prompt contract (single-turn-per-capture, persona module, structured `{transcription, follow_up}` output).
 - ADR-001 §Q3's retry-based recovery contract.
 - AGENTS.md guardrail 13 (single inference runtime).

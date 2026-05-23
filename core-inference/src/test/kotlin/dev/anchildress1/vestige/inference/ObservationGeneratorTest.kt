@@ -156,10 +156,10 @@ class ObservationGeneratorTest {
     fun `prompt renders all resolved field value shapes`() = runTest {
         val resolved = ResolvedExtraction(
             mapOf(
-                "tags" to ResolvedField(listOf("focus", "long-stretch"), ConfidenceVerdict.CANONICAL),
-                "template_label" to ResolvedField("locked-in", ConfidenceVerdict.CANONICAL_WITH_CONFLICT),
+                "tags" to ResolvedField(listOf("focus", "long-stretch"), ConfidenceVerdict.CONSENSUS),
+                "template_label" to ResolvedField("locked-in", ConfidenceVerdict.CONSENSUS_WITH_CONFLICT),
                 "recurrence_link" to ResolvedField(null, ConfidenceVerdict.AMBIGUOUS),
-                "some_flag" to ResolvedField(true, ConfidenceVerdict.CANONICAL),
+                "some_flag" to ResolvedField(true, ConfidenceVerdict.CONSENSUS),
                 "nested" to ResolvedField(mapOf("a" to 1, "b" to listOf(2, 3)), ConfidenceVerdict.CANDIDATE),
             ),
         )

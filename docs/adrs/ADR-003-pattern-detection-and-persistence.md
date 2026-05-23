@@ -471,18 +471,18 @@ state machine are the contract this pre-work commits to.
 surface.**
 
 §"`pattern_id` generation" + ADR-002 §"Convergence Resolver Contract / Resolution rules"
-write per-field verdicts (`canonical` / `candidate` / `ambiguous` / `canonical_with_conflict`)
+write per-field verdicts (`consensus` / `candidate` / `ambiguous` / `consensus_with_conflict`)
 that today live in storage and never reach the user except indirectly through the
 deterministic-vs-model observation-generation routing. The Reading section per
 `concept-locked.md` §Re-eval is described as showing per-lens output collapsed; surface the
-**verdict** on each canonical field as a small chip in the same view (`canonical` /
-`candidate` / `ambiguous` / `canonical_with_conflict`).
+**verdict** on each canonical field as a small chip in the same view (`consensus` /
+`candidate` / `ambiguous` / `consensus_with_conflict`).
 
 The data exists in ObjectBox today (Story 2.8 ticked, `ResolvedField.verdict` is persisted
 per Story 2.12). The work is a Phase-4 read path, not a Phase-3 write path. This is the
 demo beat that earns the multi-lens architecture *visually* — judges see "the model
 disagreed with itself here" without needing the technical-walkthrough explanation. ADR-002's
-sixth-addendum rubric verified `canonical_with_conflict` reaches A4 and B2 on the STT-D
+sixth-addendum rubric verified `consensus_with_conflict` reaches A4 and B2 on the STT-D
 corpus deterministically across three runs; those entries become the demo storyboard
 material when this surfacing lands.
 

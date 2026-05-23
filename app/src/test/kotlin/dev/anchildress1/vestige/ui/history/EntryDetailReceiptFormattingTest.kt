@@ -119,10 +119,10 @@ class EntryDetailReceiptFormattingTest {
         assertEquals("wired", readOf(json, Lens.LITERAL).value)
     }
 
-    // --- tone: Skeptical reads red only on a real (CANONICAL_WITH_CONFLICT) conflict ---
+    // --- tone: Skeptical reads red only on a real (CONSENSUS_WITH_CONFLICT) conflict ---
 
     @Test
-    fun `Skeptical with a flag reads canonical when convergence found no conflict`() {
+    fun `Skeptical with a flag reads consensus when convergence found no conflict`() {
         val json = encode(
             EntryLensReceipt(
                 Lens.SKEPTICAL,
@@ -132,7 +132,7 @@ class EntryDetailReceiptFormattingTest {
             ),
         )
 
-        assertEquals(LensTone.CANONICAL, readOf(json, Lens.SKEPTICAL, hasConflict = false).tone)
+        assertEquals(LensTone.CONSENSUS, readOf(json, Lens.SKEPTICAL, hasConflict = false).tone)
     }
 
     @Test
@@ -150,10 +150,10 @@ class EntryDetailReceiptFormattingTest {
     }
 
     @Test
-    fun `extracted receipt with a usable field is canonical`() {
+    fun `extracted receipt with a usable field is consensus`() {
         val json = encode(EntryLensReceipt(Lens.LITERAL, extracted = true, fields = mapOf("tags" to "calm")))
 
-        assertEquals(LensTone.CANONICAL, readOf(json, Lens.LITERAL).tone)
+        assertEquals(LensTone.CONSENSUS, readOf(json, Lens.LITERAL).tone)
     }
 
     // --- displayValue: every value-shape arm, exercised through summaryText ---
@@ -220,17 +220,17 @@ class EntryDetailReceiptFormattingTest {
                 ),
             ),
             confidenceJson = confidence(
-                "stated_commitment" to ConfidenceVerdict.CANONICAL,
-                "tags" to ConfidenceVerdict.CANONICAL,
+                "stated_commitment" to ConfidenceVerdict.CONSENSUS,
+                "tags" to ConfidenceVerdict.CONSENSUS,
             ),
             statedCommitmentJson = """{"text":"call Pat"}""",
             tags = listOf("zeta", "alpha", "beta"),
         )
 
         assertEquals("alpha, beta", fieldRow(rows, "BEHAVIOR").value)
-        assertEquals(LensTone.CANONICAL, fieldRow(rows, "BEHAVIOR").tone)
+        assertEquals(LensTone.CONSENSUS, fieldRow(rows, "BEHAVIOR").tone)
         assertEquals("call Pat", fieldRow(rows, "PROMISES").value)
-        assertEquals(LensTone.CANONICAL, fieldRow(rows, "PROMISES").tone)
+        assertEquals(LensTone.CONSENSUS, fieldRow(rows, "PROMISES").tone)
     }
 
     @Test
@@ -256,7 +256,7 @@ class EntryDetailReceiptFormattingTest {
     }
 
     @Test
-    fun `two receipt field supports read as canonical without flags`() {
+    fun `two receipt field supports read as consensus without flags`() {
         val rows = rowsOf(
             receiptsJson = encode(
                 EntryLensReceipt(Lens.LITERAL, extracted = true, fields = mapOf("stated_commitment" to "send note")),
@@ -269,7 +269,7 @@ class EntryDetailReceiptFormattingTest {
         )
 
         assertEquals("send note", fieldRow(rows, "PROMISES").value)
-        assertEquals(LensTone.CANONICAL, fieldRow(rows, "PROMISES").tone)
+        assertEquals(LensTone.CONSENSUS, fieldRow(rows, "PROMISES").tone)
     }
 
     @Test
@@ -288,11 +288,11 @@ class EntryDetailReceiptFormattingTest {
     }
 
     @Test
-    fun `REPEAT shows the validated pattern title with a canonical tone`() {
+    fun `REPEAT shows the validated pattern title with a consensus tone`() {
         val rows = rowsOf(receiptsJson = "[]", repeatTitle = "Tuesday Crash")
 
         assertEquals("Tuesday Crash", fieldRow(rows, "REPEAT").value)
-        assertEquals(LensTone.CANONICAL, fieldRow(rows, "REPEAT").tone)
+        assertEquals(LensTone.CONSENSUS, fieldRow(rows, "REPEAT").tone)
     }
 
     @Test
@@ -311,7 +311,7 @@ class EntryDetailReceiptFormattingTest {
             receiptsJson = "[]",
             confidenceJson = confidence(
                 "tags" to ConfidenceVerdict.CANDIDATE,
-                "stated_commitment" to ConfidenceVerdict.CANONICAL_WITH_CONFLICT,
+                "stated_commitment" to ConfidenceVerdict.CONSENSUS_WITH_CONFLICT,
             ),
         )
 
@@ -363,10 +363,10 @@ class EntryDetailReceiptFormattingTest {
     fun `unknown confidence verdicts are ignored field by field`() {
         val rows = rowsOf(
             receiptsJson = "[]",
-            confidenceJson = """{"tags":"CANONICAL","stated_commitment":"GARBAGE"}""",
+            confidenceJson = """{"tags":"CONSENSUS","stated_commitment":"GARBAGE"}""",
         )
 
-        assertEquals(LensTone.CANONICAL, fieldRow(rows, "BEHAVIOR").tone)
+        assertEquals(LensTone.CONSENSUS, fieldRow(rows, "BEHAVIOR").tone)
         assertEquals(LensTone.AMBIGUOUS, fieldRow(rows, "PROMISES").tone)
     }
 
@@ -426,23 +426,23 @@ class EntryDetailReceiptFormattingTest {
         JSONObject().apply { verdicts.forEach { (k, v) -> put(k, v.name) } }.toString()
 
     @Test
-    fun `conflict verdict outranks canonical in lens status`() {
+    fun `conflict verdict outranks consensus in lens status`() {
         val json = confidence(
-            "tags" to ConfidenceVerdict.CANONICAL,
-            "stated_commitment" to ConfidenceVerdict.CANONICAL_WITH_CONFLICT,
+            "tags" to ConfidenceVerdict.CONSENSUS,
+            "stated_commitment" to ConfidenceVerdict.CONSENSUS_WITH_CONFLICT,
         )
 
         assertEquals(EntryDetailCopy.THREE_LENS_STATUS_CONFLICT, lensStatus(json))
     }
 
     @Test
-    fun `canonical outranks candidate when no conflict present`() {
+    fun `consensus outranks candidate when no conflict present`() {
         val json = confidence(
             "tags" to ConfidenceVerdict.CANDIDATE,
-            "stated_commitment" to ConfidenceVerdict.CANONICAL,
+            "stated_commitment" to ConfidenceVerdict.CONSENSUS,
         )
 
-        assertEquals(EntryDetailCopy.THREE_LENS_STATUS_CANONICAL, lensStatus(json))
+        assertEquals(EntryDetailCopy.THREE_LENS_STATUS_CONSENSUS, lensStatus(json))
     }
 
     @Test

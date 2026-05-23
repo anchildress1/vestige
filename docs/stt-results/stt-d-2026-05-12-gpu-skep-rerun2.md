@@ -24,7 +24,7 @@ identical device session to rerun #1; this run was started immediately after rer
 
 **Pass.** Output verdict byte-identical to rerun #1 at the per-entry level: same 11 meaningful
 entries, same 4 Skeptical flags with the same quoted evidence and same `note` text, same A4 +
-B2 `canonical_with_conflict` reachability, same B3 partial-parse miss. Greedy decoding with
+B2 `consensus_with_conflict` reachability, same B3 partial-parse miss. Greedy decoding with
 `seed=42` is genuinely deterministic on this engine + this corpus.
 
 ## Per-entry summary
@@ -34,11 +34,11 @@ B2 `canonical_with_conflict` reachability, same B3 partial-parse miss. Greedy de
 | A1 | 3/3 | 32.5 | ✅ | `tags` + `state-behavior-mismatch` flag |
 | A2 | 3/3 | 31.7 | ❌ | — |
 | A3 | 3/3 | 38.2 | ✅ | `tags` + `energy_descriptor` + INF-only `energy_descriptor` |
-| **A4** | 3/3 | 41.0 | ✅ | **`vocabulary-contradiction` flag only — `canonical_with_conflict` eligible** |
+| **A4** | 3/3 | 41.0 | ✅ | **`vocabulary-contradiction` flag only — `consensus_with_conflict` eligible** |
 | A5 | 3/3 | 33.2 | ❌ | — |
 | A6 | 3/3 | 33.9 | ✅ | `tags` + `state_shift` |
 | B1 | 3/3 | 35.6 | ✅ | `tags` |
-| **B2** | 3/3 | 46.1 | ✅ | **`commitment-without-anchor` flag only — `canonical_with_conflict` eligible** |
+| **B2** | 3/3 | 46.1 | ✅ | **`commitment-without-anchor` flag only — `consensus_with_conflict` eligible** |
 | B3 | 2/3 | 43.6 | ❌ | partial parse |
 | C1 | 3/3 | 40.0 | ✅ | `tags` + `unsupported-recurrence` flag |
 | C2 | 3/3 | 36.8 | ✅ | `tags` |
@@ -58,7 +58,7 @@ Mean latency: 37.1 s. Min 31.7 s, max 46.1 s. ~13% slower than rerun #1 — wall
 | Meaningful-set Jaccard | — | — | **1.0** (cut ≥ 0.75) ✅ |
 | Skeptical flag count | 4 | 4 | **0** (cut ≤ 1) ✅ |
 | Skeptical flag kinds | state-behavior-mismatch, vocabulary-contradiction, commitment-without-anchor, unsupported-recurrence | identical kinds + identical evidence quotes + identical `note` strings | 0 |
-| `canonical_with_conflict`-eligible | A4, B2 | A4, B2 | 0 |
+| `consensus_with_conflict`-eligible | A4, B2 | A4, B2 | 0 |
 | Partial-parse entries | B3 | B3 | 0 |
 | Mean per-entry latency | 32.8 s | 37.1 s | +13% (engine non-determinism in *wall clock*, not output) |
 
@@ -70,7 +70,7 @@ overlap, zero flag-count delta).
 | Factor | Cut | Result |
 |---|---|---|
 | 1. Meaningful divergence ≥ 50% | 50% | 73% ✅ |
-| 2. `canonical_with_conflict` reachable ≥ 2 | 2 | A4 + B2 = 2 ✅ |
+| 2. `consensus_with_conflict` reachable ≥ 2 | 2 | A4 + B2 = 2 ✅ |
 | 3. Parse stability ≥ 90% lens-calls, 0 timeouts | 90% / 0 | 97.8% (44/45), 0 ✅ |
 | 4. Run-to-run consistency Jaccard ≥ 0.75, flag delta ≤ 1 | 0.75 / 1 | 1.0 / 0 ✅ |
 

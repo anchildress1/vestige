@@ -57,7 +57,7 @@ object DebugPatternSeeder {
      * Archetype spread — aftermath ×4 (clears the ≥3 template-recurrence floor), decision-spiral ×2,
      * stalled ×2, goblin-hours ×1, tunnel-exit ×1, plus one commitment-anchor seed whose modal,
      * deadline-free promise the Literal/Inferential lenses read as a commitment while Skeptical flags
-     * `commitment-without-anchor` — the convergence path that resolves to CANONICAL_WITH_CONFLICT, so
+     * `commitment-without-anchor` — the convergence path that resolves to CONSENSUS_WITH_CONFLICT, so
      * the demo has a Skeptical-red conflict to show. The stalled-archetype prose is deliberately
      * keyword-free so the run measures whether the lenses + labeler recover the archetype from
      * natural resistance/paralysis language rather than a planted phrase.

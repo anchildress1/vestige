@@ -76,7 +76,7 @@ data class EntryDetailUiModel(
 
 enum class ExtractionDisplay { IN_PROGRESS, COMPLETE, FAILED, NO_READ }
 
-enum class LensTone { CANONICAL, CONFLICT, AMBIGUOUS, CANDIDATE }
+enum class LensTone { CONSENSUS, CONFLICT, AMBIGUOUS, CANDIDATE }
 
 data class LensRead(val label: String, val value: String, val tone: LensTone, val rawResponse: String? = null)
 

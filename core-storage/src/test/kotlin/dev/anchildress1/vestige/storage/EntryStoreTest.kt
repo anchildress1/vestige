@@ -122,7 +122,7 @@ class EntryStoreTest {
         assertEquals(listOf("flattened", "standup", "tuesday-meeting"), tagNames)
 
         val confidence = JSONObject(row.confidenceJson)
-        assertEquals(ConfidenceVerdict.CANONICAL.name, confidence.getString("tags"))
+        assertEquals(ConfidenceVerdict.CONSENSUS.name, confidence.getString("tags"))
 
         val commitment = JSONObject(row.statedCommitmentJson!!)
         assertEquals("review the doc by Friday", commitment.getString("text"))
@@ -132,7 +132,7 @@ class EntryStoreTest {
     fun `completeEntry persists the vocabulary tone word trimmed and lowercased`() {
         val id = entryStore.createPendingEntry(SAMPLE_TEXT, SAMPLE_INSTANT)
         val resolved = ResolvedExtraction(
-            mapOf("vocabulary" to ResolvedField("  Hollow  ", ConfidenceVerdict.CANONICAL)),
+            mapOf("vocabulary" to ResolvedField("  Hollow  ", ConfidenceVerdict.CONSENSUS)),
         )
 
         entryStore.completeEntry(id, resolved, TemplateLabel.AFTERMATH)
@@ -260,9 +260,9 @@ class EntryStoreTest {
         val id = entryStore.createPendingEntry(SAMPLE_TEXT, SAMPLE_INSTANT)
         val mixed = ResolvedExtraction(
             mapOf(
-                "tags" to ResolvedField(listOf("focus"), ConfidenceVerdict.CANONICAL),
+                "tags" to ResolvedField(listOf("focus"), ConfidenceVerdict.CONSENSUS),
                 "template_label" to ResolvedField(null, ConfidenceVerdict.AMBIGUOUS),
-                "stated_commitment" to ResolvedField(null, ConfidenceVerdict.CANONICAL),
+                "stated_commitment" to ResolvedField(null, ConfidenceVerdict.CONSENSUS),
                 "recurrence_link" to ResolvedField(
                     "abc",
                     ConfidenceVerdict.CANDIDATE,
@@ -275,7 +275,7 @@ class EntryStoreTest {
 
         val row = boxStore.boxFor<EntryEntity>().get(id)
         val confidence = JSONObject(row.confidenceJson)
-        assertEquals(ConfidenceVerdict.CANONICAL.name, confidence.getString("tags"))
+        assertEquals(ConfidenceVerdict.CONSENSUS.name, confidence.getString("tags"))
         assertEquals(ConfidenceVerdict.AMBIGUOUS.name, confidence.getString("template_label"))
         assertEquals(ConfidenceVerdict.CANDIDATE.name, confidence.getString("recurrence_link"))
         assertNull(row.recurrenceLink)
@@ -522,11 +522,11 @@ class EntryStoreTest {
         mapOf(
             "tags" to ResolvedField(
                 listOf("tuesday-meeting", "standup", "flattened"),
-                ConfidenceVerdict.CANONICAL,
+                ConfidenceVerdict.CONSENSUS,
             ),
             "recurrence_link" to ResolvedField(
                 "a3f9c2b8d4e7f1a2b3c4d5e6f7890abc1234567890abcdef1234567890abcdef",
-                ConfidenceVerdict.CANONICAL,
+                ConfidenceVerdict.CONSENSUS,
             ),
             "stated_commitment" to ResolvedField(
                 mapOf(
@@ -534,7 +534,7 @@ class EntryStoreTest {
                     "topic_or_person" to "Nora",
                     "entry_id" to null,
                 ),
-                ConfidenceVerdict.CANONICAL,
+                ConfidenceVerdict.CONSENSUS,
             ),
         ),
     )

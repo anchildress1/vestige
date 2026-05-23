@@ -347,8 +347,8 @@ class EntryStore(private val boxStore: BoxStore) {
         private val NON_TERMINAL_STATUS_NAMES: Array<String> =
             NON_TERMINAL_STATUSES.map(ExtractionStatus::name).toTypedArray()
         private val PROMOTABLE_VERDICTS = setOf(
-            ConfidenceVerdict.CANONICAL,
-            ConfidenceVerdict.CANONICAL_WITH_CONFLICT,
+            ConfidenceVerdict.CONSENSUS,
+            ConfidenceVerdict.CONSENSUS_WITH_CONFLICT,
         )
     }
 }

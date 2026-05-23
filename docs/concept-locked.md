@@ -79,7 +79,7 @@ Eleven content fields total. Extracted fields are convergence-driven; `entry_obs
 - `recurrence_link` — nullable; pattern_id if entry matches a known pattern
 - `stated_commitment` — nullable; tag-only tracking (text + entry_id + topic/person). Pattern engine surfaces "logged commitments about [topic] in N entries, last on [date]." No formal resolution logic in v1.
 - `entry_observations` — 1–2 persisted observations from this entry alone, each with evidence text or a field reference. Generated after convergence; never freeform speculation.
-- `confidence` — per-field convergence result (canonical / candidate / ambiguous / canonical_with_conflict)
+- `confidence` — per-field convergence result (consensus / candidate / ambiguous / consensus_with_conflict)
 
 These eleven are the **content schema** — what the agent extracts/generates and the user sees. The ObjectBox `Entry` entity also carries operational metadata (`extraction_status`, `attempt_count`, `last_error`) for the retry-based background-extraction recovery path. Operational fields are owned by `adrs/ADR-001-stack-and-build-infra.md` §Q3, not by this spec — they are storage concerns, not product concerns.
 

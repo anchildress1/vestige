@@ -487,7 +487,7 @@ Checked bullets above are the historical record that the Mist tokens shipped to 
 
 **As** the AI implementor, **I need** every UI surface that renders the agent-emitted template label to stop rendering it, **so that** the demo never shows the structurally-guaranteed `AUDIT` label that makes the product look broken in the 90 s pitch and 5 min walkthrough.
 
-**Why now, not in Phase 2:** The root cause is architectural (CANONICAL requires ≥2-lens agreement; archetype triggers are Inferential-only → CANDIDATE → discarded → always `AUDIT`). The redesign is a new ADR superseding the ADR-002 resolver coupling — v1.5 scope. Ripping `TemplateLabeler` + the `template_label` field mid-Phase-2 is a cross-cutting change touching storage, the extraction worker, and ~20 test files for zero demo value. The label is **inert, not removed**: it stays computed and persisted; only the UI stops showing it. This story is the UI yank only.
+**Why now, not in Phase 2:** The root cause is architectural (CONSENSUS requires ≥2-lens agreement; archetype triggers are Inferential-only → CANDIDATE → discarded → always `AUDIT`). The redesign is a new ADR superseding the ADR-002 resolver coupling — v1.5 scope. Ripping `TemplateLabeler` + the `template_label` field mid-Phase-2 is a cross-cutting change touching storage, the extraction worker, and ~20 test files for zero demo value. The label is **inert, not removed**: it stays computed and persisted; only the UI stops showing it. This story is the UI yank only.
 
 **Done when:**
 - [x] History rows (Story 4.6): the template-label `Pill` is removed. The row leads with the date; snippet + timestamp only. `HistoryRow` / `HistorySummary` stop reading `templateLabel`.

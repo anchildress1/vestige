@@ -257,9 +257,9 @@ class PatternDetectorTest {
 
     @Test
     fun `vocab dominant word is the most frequent tone word — ties broken alphabetically`() {
-        // 4 "tired" + 2 "wired" in one cluster → dominant is "tired" (frequency wins).
-        repeat(4) { i -> putVocab(word = "tired", axis = 0, seed = i) }
-        repeat(2) { i -> putVocab(word = "wired", axis = 0, seed = i + 4) }
+        // 3 "tired" + 3 "wired" in one cluster → alpha tie-break picks "tired".
+        repeat(3) { i -> putVocab(word = "tired", axis = 0, seed = i) }
+        repeat(3) { i -> putVocab(word = "wired", axis = 0, seed = i + 3) }
         val pattern = detector.detect().single { it.kind == PatternKind.VOCAB_FREQUENCY }
         assertTrue(pattern.signatureJson.contains("\"token\":\"tired\""))
         assertEquals(6, pattern.supportingEntryCount)

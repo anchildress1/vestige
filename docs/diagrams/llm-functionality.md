@@ -91,7 +91,7 @@ Not a 4th model call. Per-field agreement predicate decides the verdict.
 ```mermaid
 flowchart TD
     accTitle: Convergence resolver per-field decision
-    accDescr: For each field, if two or more of three lenses agree the verdict is canonical, unless Skeptical flags a conflict in which case it is consensus_with_conflict. If only Inferential populated it, the verdict is candidate. If all three disagree, the verdict is ambiguous and the field is saved null with a debug note.
+    accDescr: For each field, if two or more of three lenses agree the verdict is consensus, unless Skeptical flags a conflict in which case it is consensus_with_conflict. If only Inferential populated it, the verdict is candidate. If all three disagree, the verdict is ambiguous and the field is saved null with a debug note.
 
     F(["per field across 3 lens results"]) --> A{"≥2 lenses agree?"}
     A -- yes --> SK{"Skeptical flags<br/>a contradiction?"}

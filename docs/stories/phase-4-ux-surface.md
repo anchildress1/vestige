@@ -362,7 +362,7 @@ Checked bullets above are the historical record that the Mist tokens shipped to 
 - [x] / ~~**Re-eval cost confirmation per `adrs/ADR-002-multi-lens-extraction-pattern.md` §Q3:** on the *second* re-read tap within 60 seconds, show the soft-confirm copy `Costs ~30s of inference. Continue?` from `ux-copy.md` §"Re-eval / Reading" before triggering another pipeline pass. First tap of the session goes through without the prompt.~~
 - [x] / ~~During re-read, a placeholder per `ux-copy.md` §"Loading States — Roast generation" or similar shows. The user can leave the screen and the work continues in the background.~~
 - [x] / ~~When the re-read completes, the per-lens outputs are shown side-by-side with the original convergence-resolved fields. Differences are highlighted.~~
-- [x] / ~~User affordances: `Apply this read` (replaces the saved canonical fields with the new ones) or `Keep original` (discards the new read).~~
+- [x] / ~~User affordances: `Apply this read` (replaces the saved consensus fields with the new ones) or `Keep original` (discards the new read).~~
 - [x] / ~~If the re-read converges to the same shape, copy: `Confirmed. Same shape.`~~
 - [x] / ~~Vocabulary chips appear in the Reading section if STT-E passed and Story 3.4 shipped.~~
 

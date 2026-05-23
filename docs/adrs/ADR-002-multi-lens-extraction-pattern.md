@@ -454,7 +454,7 @@ Supersedes the earlier `tags` wording that implied plural normalization should r
 
 - **Agreement counting:** the resolver may normalize case/plurals to decide whether lenses agree on a tag.
 - **Persisted value:** the resolver must save a deterministic surface form that was actually emitted by a lens. It must not persist a generated stem/singular form unless a future ADR adopts a proven morphology layer.
-- **Current v1 behavior:** `meeting` and `meetings` count as agreement-equivalent for convergence, but the saved canonical tag is the first majority-winning surface form in lens order. If no tag reaches majority, the Literal lens's strongest tag is saved as `candidate`.
+- **Current v1 behavior:** `meeting` and `meetings` count as agreement-equivalent for convergence, but the saved consensus tag is the first majority-winning surface form in lens order. If no tag reaches majority, the Literal lens's strongest tag is saved as `candidate`.
 - **Reason:** the lightweight singularizer that is good enough for counting is not safe for storage. It corrupts legitimate singular tags such as `news` and `series`, which is worse than tolerated plural drift.
 - **Deferred work:** full canonical morphology stays in backlog land until retrieval/embeddings work justifies a stronger normalization layer.
 

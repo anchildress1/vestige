@@ -58,7 +58,7 @@ The full loop is implemented and runs on-device: voice / typed capture → Gemma
 | Feature | What it does |
 |---|---|
 | Voice capture | `AudioRecord` → Gemma 4 E4B native audio modality. No third-party STT. Audio bytes discarded after inference. |
-| Multi-lens extraction | Each entry runs 3 lens passes (Literal / Inferential / Skeptical), each covering all 5 surfaces in one call; a convergence resolver votes every field canonical / candidate / ambiguous — tags, archetype, stated commitment, recurrence, and tone word. See [ADR-002](docs/adrs/ADR-002-multi-lens-extraction-pattern.md). |
+| Multi-lens extraction | Each entry runs 3 lens passes (Literal / Inferential / Skeptical), each covering all 5 surfaces in one call; a convergence resolver votes every field consensus / candidate / ambiguous — tags, archetype, stated commitment, recurrence, and tone word. See [ADR-002](docs/adrs/ADR-002-multi-lens-extraction-pattern.md). |
 | Model transparency | Entry Detail exposes the model's actual work — the picked archetype, the per-lens read, the resolved field grid, and a collapsible raw per-lens model-output block. Nothing is hidden behind a score. |
 | Tone & vocab drift | The Inferential lens names a one-word tone per entry; recurring related tone words surface as an embedding cluster (EmbeddingGemma) so drift is visible over time. |
 | Three personas | Witness / Hardass / Editor — tone-only variants. They do not fork extraction logic. |
@@ -83,7 +83,7 @@ The full loop is implemented and runs on-device: voice / typed capture → Gemma
 
 ## Architecture
 
-Four-module split with manual constructor injection through a single `AppContainer` ([ADR-001 §Q1–Q2](docs/adrs/ADR-001-stack-and-build-infra.md)). Foreground call returns transcription + persona-flavored follow-up fast; the 3-lens convergence pass runs in the background and writes canonical / candidate / ambiguous fields when it lands.
+Four-module split with manual constructor injection through a single `AppContainer` ([ADR-001 §Q1–Q2](docs/adrs/ADR-001-stack-and-build-infra.md)). Foreground call returns transcription + persona-flavored follow-up fast; the 3-lens convergence pass runs in the background and writes consensus / candidate / ambiguous fields when it lands.
 
 ```mermaid
 flowchart TB
@@ -95,7 +95,7 @@ flowchart TB
       FG["ForegroundInference<br/>fast transcription + persona follow-up"]
       BG["BackgroundExtractionWorker<br/>3 lens passes × 5 surfaces"]
       Gemma[("Gemma 4 E4B<br/>via LiteRT-LM")]
-      Resolver["Convergence Resolver<br/>canonical · candidate · ambiguous"]
+      Resolver["Convergence Resolver<br/>consensus · candidate · ambiguous"]
       ObjectBox[("ObjectBox<br/>entries · tags · patterns · vectors")]
       Export[("Export renderer<br/>markdown + JSON snapshot")]
       Patterns["Pattern Detection<br/>5 primitives · 90-day window"]

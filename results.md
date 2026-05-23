@@ -205,7 +205,7 @@ Pre-suite results (from the two dedicated back-to-back reruns earlier today, com
 | Factor | Cut | Rerun #1 | Rerun #2 |
 |---|---|---|---|
 | Meaningful divergence | ≥ 50% | 11/15 = 73% | 11/15 = 73% |
-| `canonical_with_conflict` reachable | ≥ 2 | A4 + B2 | A4 + B2 |
+| `consensus_with_conflict` reachable | ≥ 2 | A4 + B2 | A4 + B2 |
 | Parse stability | ≥ 90%, 0 timeouts | 44/45, 0 | 44/45, 0 |
 | Run-to-run consistency | Jaccard ≥ 0.75, flag Δ ≤ 1 | **Jaccard 1.0, Δ 0** | |
 

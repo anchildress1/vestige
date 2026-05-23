@@ -56,10 +56,10 @@ Each entry runs through a **3-lens × 5-surface** extraction pipeline. Three len
 **Mix-and-match prompt architecture:** surface modules and lens modules stored separately. Each vector pass = one lens + all five surface instructions composed into a single prompt. 3 model calls per entry (one per lens), each returning the full schema.
 
 **Convergence rules:**
-- ≥2 of 3 lenses agree on a field → **canonical**, saved as authoritative
+- ≥2 of 3 lenses agree on a field → **consensus**, saved as authoritative
 - Only Inferential populates a field → **candidate**, lower confidence, not used by pattern engine until promoted
 - Lenses disagree → **ambiguous**, saved null with a note
-- Skeptical flags conflict even when others agree → **canonical with conflict marker**
+- Skeptical flags conflict even when others agree → **consensus with conflict marker**
 
 **Two-tier processing:**
 - *Foreground:* fast pass returns transcription + one persona follow-up per `adrs/ADR-018-inline-foreground-follow-up.md`. Prior-entry recall stays out of foreground; pattern callouts are how Vestige references older entries.

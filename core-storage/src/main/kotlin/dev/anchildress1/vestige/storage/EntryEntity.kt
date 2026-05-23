@@ -3,6 +3,7 @@ package dev.anchildress1.vestige.storage
 import dev.anchildress1.vestige.model.ExtractionStatus
 import dev.anchildress1.vestige.model.Persona
 import dev.anchildress1.vestige.model.TemplateLabel
+import io.objectbox.annotation.Backlink
 import io.objectbox.annotation.Convert
 import io.objectbox.annotation.Entity
 import io.objectbox.annotation.HnswIndex
@@ -90,6 +91,10 @@ class EntryEntity(
     var vectorSchemaVersion: Int = 0,
 ) {
     lateinit var tags: ToMany<TagEntity>
+
+    /** Detected patterns this entry supports — backlink of [PatternEntity.supportingEntries]. */
+    @Backlink(to = "supportingEntries")
+    lateinit var patterns: ToMany<PatternEntity>
 
     companion object {
         const val EMBEDDING_DIMENSIONS = 768L

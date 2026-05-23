@@ -42,15 +42,29 @@ internal fun buildLensReads(json: String?): List<LensRead> {
             LensRead(label = lens.name, value = EntryDetailCopy.LENS_UNREADABLE, tone = LensTone.CONFLICT)
         }
     val byLens = decoded.associateBy { it.lens }
+    val values = Lens.entries.associateWith { lens -> byLens[lens]?.summaryText() ?: EntryDetailCopy.LENS_MISSING }
     return Lens.entries.map { lens ->
-        val receipt = byLens[lens]
         LensRead(
             label = lens.name,
-            value = receipt?.summaryText() ?: EntryDetailCopy.LENS_MISSING,
-            tone = receipt?.tone() ?: LensTone.AMBIGUOUS,
-            rawResponse = receipt?.rawResponse?.takeIf(String::isNotBlank),
+            value = values.getValue(lens),
+            tone = lensTone(lens, byLens[lens], values),
+            rawResponse = byLens[lens]?.rawResponse?.takeIf(String::isNotBlank),
         )
     }
+}
+
+/**
+ * Skeptical reads as a conflict (red) only when it BOTH raised a flag AND its summary diverges
+ * from the other two lenses — an agreeing Skeptical read is not "in conflict" just because the
+ * adversarial lens always files flags. Literal / Inferential carry no flags, so they fall through
+ * to the base verdict.
+ */
+private fun lensTone(lens: Lens, receipt: EntryLensReceipt?, values: Map<Lens, String>): LensTone {
+    if (receipt == null) return LensTone.AMBIGUOUS
+    val divergentSkeptical = lens == Lens.SKEPTICAL &&
+        receipt.flags.isNotEmpty() &&
+        values.filterKeys { it != Lens.SKEPTICAL }.values.none { it == values[Lens.SKEPTICAL] }
+    return if (divergentSkeptical) LensTone.CONFLICT else receipt.baseTone()
 }
 
 @Suppress("LongMethod", "CyclomaticComplexMethod")
@@ -152,8 +166,7 @@ private fun EntryLensReceipt.summaryText(): String = when {
         ?: EntryDetailCopy.LENS_NO_FIELDS
 }
 
-private fun EntryLensReceipt.tone(): LensTone = when {
-    flags.isNotEmpty() -> LensTone.CONFLICT
+private fun EntryLensReceipt.baseTone(): LensTone = when {
     !extracted -> LensTone.AMBIGUOUS
     fields.values.any { displayValue(it) != null } -> LensTone.CANONICAL
     else -> LensTone.AMBIGUOUS

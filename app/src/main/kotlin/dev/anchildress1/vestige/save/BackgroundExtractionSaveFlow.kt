@@ -12,6 +12,8 @@ import dev.anchildress1.vestige.model.EntryLensReceipt
 import dev.anchildress1.vestige.model.EntryObservation
 import dev.anchildress1.vestige.model.ExtractionStatus
 import dev.anchildress1.vestige.model.Persona
+import dev.anchildress1.vestige.model.ResolvedExtraction
+import dev.anchildress1.vestige.model.ResolvedField
 import dev.anchildress1.vestige.patterns.PatternDetectionOrchestrator
 import dev.anchildress1.vestige.storage.EntryStore
 import dev.anchildress1.vestige.storage.TemporalHistoryRetrieval
@@ -209,6 +211,7 @@ class BackgroundExtractionSaveFlow(
                     capturedAt = capturedAt,
                     entryAttemptCount = requestWithHistory.entryAttemptCount,
                     result = result,
+                    candidatePatternId = requestWithHistory.retrievedHistory.firstNotNullOfOrNull { it.patternId },
                     terminalRelay = terminalRelay,
                     persona = persona,
                 )
@@ -280,6 +283,7 @@ class BackgroundExtractionSaveFlow(
         capturedAt: ZonedDateTime,
         entryAttemptCount: Int,
         result: BackgroundExtractionResult.Success,
+        candidatePatternId: String?,
         terminalRelay: DeferredTerminalRelay,
         persona: Persona,
     ) {
@@ -293,7 +297,7 @@ class BackgroundExtractionSaveFlow(
         ) {
             entryStore.completeEntry(
                 entryId,
-                result.resolved,
+                linkRecurrence(result.resolved, candidatePatternId),
                 result.templateLabel,
                 observations,
                 result.lensResults.toReceipts(),
@@ -301,6 +305,18 @@ class BackgroundExtractionSaveFlow(
         }
         schedulePatternOrchestration(entryId, persona)
         runEntryFinalization(entryId)
+    }
+
+    // The model judges recurrence (recurrence_kind); the app owns the id. When the read confirms a
+    // recurrence and a candidate pattern was fed, stamp that pattern_id as recurrence_link so REPEAT
+    // resolves to its title. The link inherits recurrence_kind's verdict so the field's confidence
+    // (and REPEAT's tone) stays honest about single-lens vs multi-lens agreement.
+    private fun linkRecurrence(resolved: ResolvedExtraction, candidatePatternId: String?): ResolvedExtraction {
+        val kind = resolved.fields[KEY_RECURRENCE_KIND]
+        if (kind?.value == null || candidatePatternId == null) return resolved
+        return resolved.copy(
+            fields = resolved.fields + (KEY_RECURRENCE_LINK to ResolvedField(candidatePatternId, kind.verdict)),
+        )
     }
 
     private fun schedulePatternOrchestration(entryId: Long, persona: Persona) {
@@ -531,9 +547,12 @@ class BackgroundExtractionSaveFlow(
         private const val TEMPORAL_HISTORY_CANDIDATES = 250
         private const val TEMPORAL_HISTORY_TOP_N = 5
 
-        // Cap the recurrence candidates so they can't fill PromptComposer's whole history budget and
-        // crowd out the semantic background context entirely.
-        private const val MAX_CANDIDATE_HISTORY = 2
+        // Exactly one recurrence candidate (the most-recently-seen matched pattern) is judged and
+        // linked — REPEAT shows a single pattern, so there is nothing to gain from feeding more.
+        private const val MAX_CANDIDATE_HISTORY = 1
+
+        private const val KEY_RECURRENCE_KIND = "recurrence_kind"
+        private const val KEY_RECURRENCE_LINK = "recurrence_link"
     }
 }
 

@@ -54,7 +54,8 @@ internal object LensResponseParser {
             "tags" to byKey["tags"]?.split(',')?.mapNotNull(::normalizeToken)?.takeIf { it.isNotEmpty() },
             "template_label" to byKey["template_label"]?.let(::normalizeWord),
             "vocabulary" to byKey["vocabulary"]?.let(::normalizeWord),
-            "recurrence_link" to byKey["recurrence_link"]?.ifNotNullish(),
+            // recurrence_link is no longer model-emitted — the app sets it deterministically from the
+            // matched candidate pattern when the model confirms recurrence_kind. See ADR-002.
             "recurrence_kind" to byKey["recurrence_kind"]?.ifNotNullish(),
             "stated_commitment" to commitment,
         )

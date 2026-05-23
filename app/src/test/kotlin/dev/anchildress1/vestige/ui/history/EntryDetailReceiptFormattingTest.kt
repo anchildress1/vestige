@@ -326,8 +326,10 @@ class EntryDetailReceiptFormattingTest {
             ),
         )
 
+        // No promoted tags and no receipt fallback → empty value, so the tone is AMBIGUOUS, not the
+        // bare confidence verdict. A CANDIDATE tone with no value shown is the bug this guards against.
         assertEquals("—", fieldRow(missingRows, "BEHAVIOR").value)
-        assertEquals(LensTone.CANDIDATE, fieldRow(missingRows, "BEHAVIOR").tone)
+        assertEquals(LensTone.AMBIGUOUS, fieldRow(missingRows, "BEHAVIOR").tone)
         assertEquals(LensTone.CONFLICT, fieldRow(missingRows, "PROMISES").tone)
     }
 
@@ -375,6 +377,7 @@ class EntryDetailReceiptFormattingTest {
         val rows = rowsOf(
             receiptsJson = "[]",
             confidenceJson = """{"tags":"CONSENSUS","stated_commitment":"GARBAGE"}""",
+            tags = listOf("calm"),
         )
 
         assertEquals(LensTone.CONSENSUS, fieldRow(rows, "BEHAVIOR").tone)

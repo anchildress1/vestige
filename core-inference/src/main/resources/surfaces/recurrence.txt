@@ -1,31 +1,25 @@
 ## Surface: Recurrence
 
-A RETRIEVED HISTORY chunk with a `pattern_id` is a deterministic *candidate*: prior entries that share
-this entry's time slot. Your job is to decide whether that candidate is a real recurrence or a coincidence.
-
-What to capture:
-
-- Whether this entry repeats the behavior or state shift the candidate's prior entries describe.
-- Whether the recurrence is exact (same activity + same context) or partial (same activity, different context).
+The RETRIEVED HISTORY block holds prior entries the app already matched to this entry's recurring
+time slot. Your only job is to decide whether the current entry genuinely repeats them.
 
 The viability test (the whole point):
 
 - A shared time slot is NOT recurrence. "I happened to log at this hour again" is not a pattern.
-- Link only when the same behavior or state genuinely recurs — e.g. the energy crash returns after each
-  meeting, not merely that the entries land at the same clock time.
-- When the candidate is only a logging coincidence, omit `recurrence_link`. The Skeptical lens additionally
-  raises an `unsupported-recurrence` flag for a candidate it judges an artifact.
+- It recurs only when the same behavior or state returns — e.g. the energy crash comes back after the
+  meeting every week — not merely that the entries land at the same clock time.
 
 What goes in the schema:
 
-- `recurrence_link`: copy the candidate's `pattern_id` verbatim when it genuinely recurs; omit otherwise.
-- `recurrence_kind`: `exact` or `partial`, only alongside a `recurrence_link` line.
-- Do not encode the pattern id into `tags`. The `recurrence_link` line is the only place pattern ids belong.
-- Ignore list ordinals, bullets, and chunk numbers. Only copy the identifier that appears after `pattern_id=`.
+- `recurrence_kind: exact` — the same behavior/state recurs in the same context.
+- `recurrence_kind: partial` — the same behavior recurs in a different context.
+- Omit `recurrence_kind` entirely when nothing recurs, when only the clock time coincides, or when
+  there is no retrieved-history block (normal for early entries).
+- Do NOT emit a pattern id of any kind. The app owns the mapping from "this recurs" to which pattern;
+  you judge recurrence, nothing more. The Skeptical lens additionally raises an
+  `unsupported-recurrence` flag for history it judges a coincidence rather than a real recurrence.
 
 Constraints:
 
-- Do not invent a `pattern_id`. Use only IDs present in the retrieved-history block.
-- Retrieved chunks without a `pattern_id` are context-only — they inform the reading but cannot populate `recurrence_link`.
-- Do not infer recurrence from semantic similarity alone. Only a chunk's `pattern_id` can be linked.
-- No retrieved-history block means no `recurrence_link`. Normal for early entries.
+- Judge recurrence only against the retrieved history shown — do not infer it from memory or from
+  semantic hunches about entries that aren't in the block.

@@ -789,3 +789,26 @@ and is deliberately left untouched.
 
 ---
 
+### Addendum (2026-05-23, second) — recurrence: the model judges, the app owns the pattern id
+
+The lens recurrence contract is split by ownership. Previously the model was asked to copy a
+`pattern_id` (a 64-hex signature hash) verbatim into `recurrence_link` — brittle (the exact
+free-text-copy failure mode the flat format exists to avoid) and pointless (the deterministic layer
+fed the candidate, so it already knows the id).
+
+New contract:
+
+- **Deterministic layer owns the id.** `PatternCandidates` matches the entry against ACTIVE patterns
+  (timestamp-signature kinds match pre-extraction), ranks most-recently-seen first, and feeds **one**
+  candidate's prior entries as plain `## RETRIEVED HISTORY` content — no `pattern_id` in the prompt.
+- **Model owns the verdict.** The Recurrence surface emits only `recurrence_kind: exact | partial`
+  when the current entry genuinely repeats the retrieved history (omitted = coincidence). It never
+  emits or sees a pattern id. `recurrence_link` is removed from the model's output schema and parser.
+- **App links it back.** After convergence, when `recurrence_kind` resolved non-null, the save flow
+  stamps `recurrence_link` = the fed candidate's `pattern_id`, inheriting `recurrence_kind`'s verdict
+  so REPEAT's tone is honest. REPEAT then resolves that id to the pattern's title (the Patterns-page H2).
+
+The convergence resolver is unchanged — `recurrence_kind` resolves like any field; `recurrence_link`
+is no longer a model field. The Skeptical `unsupported-recurrence` flag still marks a coincidence.
+
+---

@@ -73,12 +73,12 @@ class PromptComposerTest {
         val chunks = (1..6).map { HistoryChunk(patternId = "p$it", text = "chunk $it text") }
         val text = PromptComposer.compose(Lens.LITERAL, entry, retrievedHistory = chunks).systemInstruction
 
-        assertTrue(text.contains("pattern_id=p1"))
-        assertTrue(text.contains("pattern_id=p2"))
-        assertTrue(text.contains("pattern_id=p3"))
-        assertFalse(text.contains("pattern_id=p4"))
-        assertFalse(text.contains("pattern_id=p5"))
-        assertFalse(text.contains("pattern_id=p6"))
+        assertTrue(text.contains("chunk 1 text"))
+        assertTrue(text.contains("chunk 2 text"))
+        assertTrue(text.contains("chunk 3 text"))
+        assertFalse(text.contains("chunk 4 text"))
+        assertFalse(text.contains("chunk 5 text"))
+        assertFalse(text.contains("chunk 6 text"))
     }
 
     @Test
@@ -106,21 +106,15 @@ class PromptComposerTest {
     }
 
     @Test
-    fun `chunks without a pattern id render as context only`() {
-        val chunks = listOf(HistoryChunk(patternId = null, text = "ad-hoc historical chunk"))
-        val text = PromptComposer.compose(Lens.LITERAL, entry, retrievedHistory = chunks).systemInstruction
-        assertTrue(text.contains("- context-only"))
-        assertFalse(text.contains("pattern_id=null"))
-        assertFalse(text.contains("pattern_id unavailable"))
-    }
-
-    @Test
-    fun `retrieved history does not prefix real pattern ids with numeric ordinals`() {
+    fun `retrieved history renders chunk content without leaking pattern ids`() {
+        // pattern_id is the app's internal handle — the model judges recurrence from content only and
+        // must never see (or be asked to echo) an id. See ADR-002 recurrence addendum.
         val chunks = listOf(HistoryChunk(patternId = "abc123", text = "similar historical chunk"))
         val text = PromptComposer.compose(Lens.LITERAL, entry, retrievedHistory = chunks).systemInstruction
 
-        assertTrue(text.contains("- pattern_id=abc123"))
-        assertFalse(text.contains("[1] pattern_id=abc123"))
+        assertTrue(text.contains("similar historical chunk"))
+        assertFalse(text.contains("pattern_id"))
+        assertFalse(text.contains("context-only"))
     }
 
     @Test

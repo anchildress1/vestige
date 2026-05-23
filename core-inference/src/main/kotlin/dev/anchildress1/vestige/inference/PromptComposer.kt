@@ -104,6 +104,8 @@ object PromptComposer {
         return text.substring(0, budget).trimEnd() + ELLIPSIS
     }
 
+    // Prior entries as plain content — no pattern ids. Recurrence is judged on whether the current
+    // entry repeats the behavior/state these describe; the app owns which pattern that maps to.
     private fun renderHistory(chunks: List<HistoryChunk>): String {
         if (chunks.isEmpty()) {
             return "## RETRIEVED HISTORY\n(no prior entries)"
@@ -111,10 +113,7 @@ object PromptComposer {
         return buildString {
             append("## RETRIEVED HISTORY")
             chunks.forEach { chunk ->
-                append('\n')
-                val metadata = chunk.patternId?.let { "pattern_id=$it" } ?: "context-only"
-                append("- $metadata\n")
-                append("  ")
+                append("\n- ")
                 append(chunk.text.replace("\n", "\n  "))
             }
         }

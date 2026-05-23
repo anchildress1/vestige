@@ -70,7 +70,11 @@ private fun lensTone(lens: Lens, receipt: EntryLensReceipt?, hasConflict: Boolea
 internal fun buildFieldRows(entity: EntryEntity, repeatTitle: String?): List<FieldRow> {
     val confidence = parseConfidence(entity.confidenceJson)
     val receipts = EntryLensReceiptJson.decodeOrNull(entity.lensReceiptsJson)
-    val tagsText = entity.tags.map { it.name }.sorted().take(DISPLAY_LIMIT).joinToString(", ").ifBlank { DASH }
+    // Promoted (CONSENSUS) tags persist on the entity; a CANDIDATE-only read isn't promoted, so fall
+    // back to the lens receipts to show the candidate tags rather than a verdict tone with no value.
+    val tagsText = entity.tags.map { it.name }.sorted().take(DISPLAY_LIMIT).joinToString(", ")
+        .ifBlank { receipts?.let { firstReceiptFieldDisplay(it, KEY_TAGS) } ?: DASH }
+    val behaviorTone = if (tagsText == DASH) LensTone.AMBIGUOUS else confidence[KEY_TAGS].toTone()
     val topLevelCommitment = commitmentText(entity.statedCommitmentJson)
     val commitmentValue = topLevelCommitment
         ?: receipts?.let { firstReceiptFieldDisplay(it, KEY_COMMITMENT) }
@@ -111,7 +115,7 @@ internal fun buildFieldRows(entity: EntryEntity, repeatTitle: String?): List<Fie
         FieldRow(
             label = "BEHAVIOR",
             value = tagsText,
-            tone = confidence[KEY_TAGS].toTone(),
+            tone = behaviorTone,
         ),
         FieldRow(
             label = "VOCAB",

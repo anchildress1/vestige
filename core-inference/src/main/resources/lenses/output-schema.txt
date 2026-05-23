@@ -14,10 +14,10 @@ Lines:
   felt when they name one, else the closest single word. One word, never a phrase. Omit if none.
 - `commitment: <near-verbatim text>` — the strongest explicit statement of intent. Omit if none.
 - `commitment_topic: <named object or person>` — omit if the user named none.
-- `recurrence_link: <pattern_id>` — copy a `pattern_id=` verbatim from a RETRIEVED HISTORY chunk
-  only when this entry genuinely repeats that chunk's behavior or state, not merely shares its time
-  slot. Omit when nothing genuinely recurs. See the Recurrence surface.
-- `recurrence_kind: exact | partial` — only alongside a `recurrence_link` line; omit otherwise.
+- `recurrence_kind: exact | partial` — emit only when this entry genuinely repeats a behavior or
+  state described in the RETRIEVED HISTORY (`exact` = same activity + same context, `partial` = same
+  behavior, different context). Omit when nothing recurs or only the clock time coincides. Never
+  emit a pattern id — the app owns that. See the Recurrence surface.
 - `flag: <kind> | <snippet> | <note>` — Skeptical lens only; one line per flag, omit if none.
   `kind` is one of the documented kinds; `snippet` is a verbatim excerpt; `note` is one short
   sentence. The other two lenses never emit a `flag:` line.

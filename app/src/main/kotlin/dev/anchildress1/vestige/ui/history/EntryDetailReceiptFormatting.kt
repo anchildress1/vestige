@@ -36,35 +36,33 @@ internal fun parseObservations(json: String): List<ObservationLine> {
     }
 }
 
-internal fun buildLensReads(json: String?): List<LensRead> {
+internal fun buildLensReads(json: String?, hasConflict: Boolean = false): List<LensRead> {
     val decoded = EntryLensReceiptJson.decodeOrNull(json)
         ?: return Lens.entries.map { lens ->
             LensRead(label = lens.name, value = EntryDetailCopy.LENS_UNREADABLE, tone = LensTone.CONFLICT)
         }
     val byLens = decoded.associateBy { it.lens }
-    val values = Lens.entries.associateWith { lens -> byLens[lens]?.summaryText() ?: EntryDetailCopy.LENS_MISSING }
     return Lens.entries.map { lens ->
+        val receipt = byLens[lens]
         LensRead(
             label = lens.name,
-            value = values.getValue(lens),
-            tone = lensTone(lens, byLens[lens], values),
-            rawResponse = byLens[lens]?.rawResponse?.takeIf(String::isNotBlank),
+            value = receipt?.summaryText() ?: EntryDetailCopy.LENS_MISSING,
+            tone = lensTone(lens, receipt, hasConflict),
+            rawResponse = receipt?.rawResponse?.takeIf(String::isNotBlank),
         )
     }
 }
 
 /**
- * Skeptical reads as a conflict (red) only when it BOTH raised a flag AND its summary diverges
- * from the other two lenses — an agreeing Skeptical read is not "in conflict" just because the
- * adversarial lens always files flags. Literal / Inferential carry no flags, so they fall through
- * to the base verdict.
+ * Skeptical reads red only when its flag produced a real conflict in convergence — a
+ * CANONICAL_WITH_CONFLICT verdict, surfaced as [hasConflict] — not when its raw tag list merely
+ * differs while the lenses still agree on the resolved value. This keeps the lens colour
+ * consistent with the card's CANONICAL / CONFLICT status. Literal / Inferential carry no flags.
  */
-private fun lensTone(lens: Lens, receipt: EntryLensReceipt?, values: Map<Lens, String>): LensTone {
+private fun lensTone(lens: Lens, receipt: EntryLensReceipt?, hasConflict: Boolean): LensTone {
     if (receipt == null) return LensTone.AMBIGUOUS
-    val divergentSkeptical = lens == Lens.SKEPTICAL &&
-        receipt.flags.isNotEmpty() &&
-        values.filterKeys { it != Lens.SKEPTICAL }.values.none { it == values[Lens.SKEPTICAL] }
-    return if (divergentSkeptical) LensTone.CONFLICT else receipt.baseTone()
+    val skepticalConflict = lens == Lens.SKEPTICAL && hasConflict && receipt.flags.isNotEmpty()
+    return if (skepticalConflict) LensTone.CONFLICT else receipt.baseTone()
 }
 
 @Suppress("LongMethod", "CyclomaticComplexMethod")

@@ -30,6 +30,7 @@ data class EntryDetailUiModel(
     companion object {
         fun from(entity: EntryEntity, zoneId: ZoneId): EntryDetailUiModel {
             val hasLensReceiptPayload = entity.lensReceiptsJsonOrEmpty != "[]"
+            val status = lensStatus(entity.confidenceJson)
             return EntryDetailUiModel(
                 id = entity.id,
                 timeOfDayLabel = HistoryDateFormatter.formatClock12(entity.timestampEpochMs, zoneId),
@@ -42,8 +43,11 @@ data class EntryDetailUiModel(
                 followUp = entity.followUpText?.takeIf(String::isNotBlank),
                 personaName = entity.persona.name,
                 templateLabel = entity.templateLabel?.displayName,
-                lensStatus = lensStatus(entity.confidenceJson),
-                lenses = buildLensReads(entity.lensReceiptsJson),
+                lensStatus = status,
+                lenses = buildLensReads(
+                    entity.lensReceiptsJson,
+                    hasConflict = status == EntryDetailCopy.THREE_LENS_STATUS_CONFLICT,
+                ),
                 fields = buildFieldRows(entity),
                 observations = parseObservations(entity.entryObservationsJson),
                 tags = entity.tags.map { it.name }.sorted(),

@@ -21,7 +21,8 @@ class EntryDetailReceiptFormattingTest {
 
     private fun encode(vararg receipts: EntryLensReceipt): String = EntryLensReceiptJson.encode(receipts.toList())
 
-    private fun readOf(json: String?, lens: Lens): LensRead = buildLensReads(json).first { it.label == lens.name }
+    private fun readOf(json: String?, lens: Lens, hasConflict: Boolean = false): LensRead =
+        buildLensReads(json, hasConflict).first { it.label == lens.name }
 
     private fun rowsOf(
         receiptsJson: String?,
@@ -118,13 +119,11 @@ class EntryDetailReceiptFormattingTest {
         assertEquals("wired", readOf(json, Lens.LITERAL).value)
     }
 
-    // --- tone: Skeptical reads red only when it diverges AND flags ---
+    // --- tone: Skeptical reads red only on a real (CANONICAL_WITH_CONFLICT) conflict ---
 
     @Test
-    fun `agreeing Skeptical reads canonical even with flags`() {
+    fun `Skeptical with a flag reads canonical when convergence found no conflict`() {
         val json = encode(
-            EntryLensReceipt(Lens.LITERAL, extracted = true, fields = mapOf("tags" to "calm")),
-            EntryLensReceipt(Lens.INFERENTIAL, extracted = true, fields = mapOf("tags" to "calm")),
             EntryLensReceipt(
                 Lens.SKEPTICAL,
                 extracted = true,
@@ -133,23 +132,21 @@ class EntryDetailReceiptFormattingTest {
             ),
         )
 
-        assertEquals(LensTone.CANONICAL, readOf(json, Lens.SKEPTICAL).tone)
+        assertEquals(LensTone.CANONICAL, readOf(json, Lens.SKEPTICAL, hasConflict = false).tone)
     }
 
     @Test
-    fun `divergent Skeptical with a flag reads conflict`() {
+    fun `Skeptical with a flag reads conflict when convergence flagged a conflict`() {
         val json = encode(
-            EntryLensReceipt(Lens.LITERAL, extracted = true, fields = mapOf("tags" to "calm")),
-            EntryLensReceipt(Lens.INFERENTIAL, extracted = true, fields = mapOf("tags" to "calm")),
             EntryLensReceipt(
                 Lens.SKEPTICAL,
                 extracted = true,
-                fields = mapOf("tags" to "tense"),
+                fields = mapOf("tags" to "calm"),
                 flags = listOf("contradiction"),
             ),
         )
 
-        assertEquals(LensTone.CONFLICT, readOf(json, Lens.SKEPTICAL).tone)
+        assertEquals(LensTone.CONFLICT, readOf(json, Lens.SKEPTICAL, hasConflict = true).tone)
     }
 
     @Test

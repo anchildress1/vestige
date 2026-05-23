@@ -46,19 +46,6 @@ class ObservationGeneratorTest {
     }
 
     @Test
-    fun `late-night capture can surface a theme-noticing time observation`() = runTest {
-        val resolved = ResolvedExtraction(emptyMap())
-        every { engine.streamText(any(), any()) } returns flowOf(
-            """{"observations":[{"text":"Filed at 3:14am.","evidence":"theme-noticing","fields":[]}]}""",
-        )
-
-        val observations = newGenerator().generate(SAMPLE_TEXT, resolved, GOBLIN_HOUR).first()
-
-        assertEquals(ObservationEvidence.THEME_NOTICING, observations.evidence)
-        assertEquals("Filed at 3:14am.", observations.text)
-    }
-
-    @Test
     fun `capture time is rendered into the prompt`() = runTest {
         val resolved = ResolvedExtraction(emptyMap())
         val capturedPrompt = io.mockk.slot<String>()

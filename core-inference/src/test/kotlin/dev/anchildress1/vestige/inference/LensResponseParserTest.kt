@@ -10,185 +10,102 @@ import org.junit.jupiter.api.Test
 class LensResponseParserTest {
 
     @Test
-    fun `parses a clean schema-conformant JSON object into LensExtraction fields`() {
+    fun `parses flat key-value lines into LensExtraction fields`() {
         val raw = """
-            {
-              "tags": ["standup", "launch-doc"],
-              "stated_commitment": {"text":"will draft tonight","topic_or_person":"Nora"},
-              "recurrence_link": "p_aftermath_001",
-              "recurrence_kind": "exact",
-              "flags": []
-            }
+            template_label: Aftermath
+            tags: Standup, battery-died
+            vocabulary: Drained
+            commitment: send the doc to nora
+            commitment_topic: Nora
         """.trimIndent()
 
         val extraction = LensResponseParser.parse(Lens.LITERAL, raw)
 
         assertNotNull(extraction)
         assertEquals(Lens.LITERAL, extraction!!.lens)
-        assertEquals(listOf("standup", "launch-doc"), extraction.fields["tags"])
-        assertEquals("p_aftermath_001", extraction.fields["recurrence_link"])
-        assertEquals("exact", extraction.fields["recurrence_kind"])
-
-        @Suppress("UNCHECKED_CAST")
-        val commitment = extraction.fields["stated_commitment"] as Map<String, Any?>
-        assertEquals("will draft tonight", commitment["text"])
-        assertEquals("Nora", commitment["topic_or_person"])
-
+        assertEquals(listOf("standup", "battery-died"), extraction.fields["tags"])
+        assertEquals("aftermath", extraction.fields["template_label"])
+        assertEquals("drained", extraction.fields["vocabulary"])
+        assertEquals(
+            mapOf("text" to "send the doc to nora", "topic_or_person" to "Nora"),
+            extraction.fields["stated_commitment"],
+        )
         assertTrue(extraction.flags.isEmpty())
     }
 
     @Test
-    fun `parses template_label and lowercases the serial`() {
-        val raw = """
-            {
-              "tags": ["migration"],
-              "template_label": "Decision-Spiral",
-              "stated_commitment": null,
-              "flags": []
-            }
-        """.trimIndent()
-
-        val extraction = LensResponseParser.parse(Lens.LITERAL, raw)
-
+    fun `folds a nullish vocabulary back to null`() {
+        val extraction = LensResponseParser.parse(Lens.INFERENTIAL, "template_label: audit\nvocabulary: none")
         assertNotNull(extraction)
-        assertEquals("decision-spiral", extraction!!.fields["template_label"])
+        assertNull(extraction!!.fields["vocabulary"])
     }
 
     @Test
-    fun `folds a literal-string null or none vocabulary back to JSON null`() {
-        val nullish = LensResponseParser.parse(
-            Lens.INFERENTIAL,
-            """{"tags":["standup"],"vocabulary":"null","flags":[]}""",
-        )
-        assertNotNull(nullish)
-        assertNull(nullish!!.fields["vocabulary"])
-
-        val none = LensResponseParser.parse(
-            Lens.INFERENTIAL,
-            """{"tags":["standup"],"vocabulary":"None","flags":[]}""",
-        )
-        assertNull(none!!.fields["vocabulary"])
-
-        val real = LensResponseParser.parse(
-            Lens.INFERENTIAL,
-            """{"tags":["standup"],"vocabulary":"Drained","flags":[]}""",
-        )
-        assertEquals("drained", real!!.fields["vocabulary"])
-    }
-
-    @Test
-    fun `routes Skeptical flags off the fields map and onto the flags list`() {
-        // `flags` are emitted by the model as `{kind, snippet, note}` objects per
-        // `core-inference/src/main/resources/lenses/output-schema.txt`. The parser encodes each
-        // object into the stable `kind:snippet:note` form so convergence-time equality is
-        // deterministic regardless of JSON key order or sub-key spacing.
+    fun `skeptical flag lines collapse to kind colon snippet colon note`() {
         val raw = """
-            {
-              "tags": ["audit"],
-              "stated_commitment": null,
-              "recurrence_link": null,
-              "recurrence_kind": null,
-              "flags": [
-                {"kind":"commitment-without-anchor","snippet":"i should follow up","note":"modal commitment with no named object"}
-              ]
-            }
+            template_label: aftermath
+            flag: commitment-without-anchor | send the doc | no deadline named
+            flag: unsupported-recurrence | again | no history
         """.trimIndent()
 
         val extraction = LensResponseParser.parse(Lens.SKEPTICAL, raw)
 
         assertNotNull(extraction)
         assertEquals(
-            listOf("commitment-without-anchor:i should follow up:modal commitment with no named object"),
+            listOf(
+                "commitment-without-anchor:send the doc:no deadline named",
+                "unsupported-recurrence:again:no history",
+            ),
             extraction!!.flags,
         )
-        assertNull(extraction.fields["stated_commitment"])
     }
 
     @Test
-    fun `flag with missing sub-keys collapses to empty segments and keeps the colon count fixed`() {
-        val raw = """
-            {"flags":[{"kind":"unsupported-recurrence","snippet":"third Tuesday in a row"}]}
-        """.trimIndent()
-
-        val extraction = LensResponseParser.parse(Lens.SKEPTICAL, raw)
-
-        assertNotNull(extraction)
-        assertEquals(listOf("unsupported-recurrence:third Tuesday in a row:"), extraction!!.flags)
-    }
-
-    @Test
-    fun `flag with all sub-keys missing or empty is dropped`() {
-        val raw = """{"flags":[{},{"kind":""}]}"""
-
-        val extraction = LensResponseParser.parse(Lens.SKEPTICAL, raw)
-
+    fun `non-skeptical lenses ignore flag lines`() {
+        val extraction = LensResponseParser.parse(
+            Lens.LITERAL,
+            "template_label: aftermath\nflag: commitment-without-anchor | x | y",
+        )
         assertNotNull(extraction)
         assertTrue(extraction!!.flags.isEmpty())
     }
 
     @Test
-    fun `legacy bare-string flag entries pass through unchanged`() {
-        val raw = """{"flags":["commitment-without-anchor:contradicts:fine"]}"""
-
-        val extraction = LensResponseParser.parse(Lens.SKEPTICAL, raw)
-
-        assertNotNull(extraction)
-        assertEquals(listOf("commitment-without-anchor:contradicts:fine"), extraction!!.flags)
+    fun `flag with missing trailing parts keeps empty segments`() {
+        val extraction = LensResponseParser.parse(Lens.SKEPTICAL, "flag: time-inconsistency")
+        assertEquals(listOf("time-inconsistency::"), extraction!!.flags)
     }
 
     @Test
-    fun `blank and non-string flag entries are dropped, valid ones kept`() {
-        // encodeFlag arms: blank String -> null, non-String/Map (number, bool) -> null,
-        // non-blank String -> kept.
-        val raw = """{"flags":["keep-me","   ",42,true]}"""
-
-        val extraction = LensResponseParser.parse(Lens.SKEPTICAL, raw)
-
-        assertNotNull(extraction)
-        assertEquals(listOf("keep-me"), extraction!!.flags)
+    fun `tags drop blank and nullish entries and lowercase the rest`() {
+        val extraction = LensResponseParser.parse(Lens.LITERAL, "tags: Standup, , none,  Meeting ")
+        assertEquals(listOf("standup", "meeting"), extraction!!.fields["tags"])
     }
 
     @Test
-    fun `tags drop whitespace-only and non-string entries, lowercasing the rest`() {
-        // normalizeTag arms: valid String -> trimmed+lowercased, "   " -> null, non-String -> null.
-        val raw = """{"tags":["Standup","   ",7]}"""
-
-        val extraction = LensResponseParser.parse(Lens.LITERAL, raw)
-
-        assertNotNull(extraction)
-        assertEquals(listOf("standup"), extraction!!.fields["tags"])
-    }
-
-    @Test
-    fun `tolerates surrounding prose and markdown fences by extracting the first balanced object`() {
+    fun `tolerates surrounding prose, fences, and unknown lines`() {
         val raw = """
-            Here's the JSON:
-
-            ```json
-            {"tags":["a"],"stated_commitment":null,"recurrence_link":null,"recurrence_kind":null,"flags":[]}
+            Here is my read:
             ```
-
-            Done.
+            template_label: stalled
+            random_key: ignored
+            tags: doc, wall
+            ```
+            done.
         """.trimIndent()
 
         val extraction = LensResponseParser.parse(Lens.INFERENTIAL, raw)
 
         assertNotNull(extraction)
-        assertEquals(listOf("a"), extraction!!.fields["tags"])
-        assertNull(extraction.fields["stated_commitment"])
+        assertEquals("stalled", extraction!!.fields["template_label"])
+        assertEquals(listOf("doc", "wall"), extraction.fields["tags"])
     }
 
     @Test
-    fun `does not split on a brace inside a string literal`() {
-        val raw = """{"tags":["{}"],""" +
-            """"stated_commitment":null,"recurrence_link":"a {b} c",""" +
-            """"recurrence_kind":null,"flags":[]}"""
-
-        val extraction = LensResponseParser.parse(Lens.LITERAL, raw)
-
+    fun `omitted commitment leaves stated_commitment null`() {
+        val extraction = LensResponseParser.parse(Lens.LITERAL, "template_label: audit\ntags: doc")
         assertNotNull(extraction)
-        assertEquals(listOf("{}"), extraction!!.fields["tags"])
-        assertEquals("a {b} c", extraction.fields["recurrence_link"])
+        assertNull(extraction!!.fields["stated_commitment"])
     }
 
     @Test
@@ -198,327 +115,7 @@ class LensResponseParserTest {
     }
 
     @Test
-    fun `returns null when no JSON object is present`() {
-        assertNull(LensResponseParser.parse(Lens.LITERAL, "the model forgot the schema again"))
-    }
-
-    @Test
-    fun `returns null when the JSON object is truncated mid-stream`() {
-        val raw = """{"tags":["a","b"],"recurrence_link":"calm"""
-        assertNull(LensResponseParser.parse(Lens.LITERAL, raw))
-    }
-
-    @Test
-    fun `repairs missing commas between sibling object fields in skeptical payload`() {
-        val raw = """
-            {
-            "tags": ["sink", "noon", "1pm", "three-hours-later"]
-            "stated_commitment": null
-            "recurrence_link": null
-            "recurrence_kind": null
-            "flags": [
-            {
-            "kind": "commitment-without-anchor",
-            "snippet": "completely fine by 1pm i was gone not tired exactly",
-            "note": "The user describes a state of being fine then immediately negates it with 'not tired exactly'."
-            }
-            ]
-            }
-        """.trimIndent()
-
-        val extraction = LensResponseParser.parse(Lens.SKEPTICAL, raw)
-
-        assertNotNull(extraction)
-        assertEquals(listOf("sink", "noon", "1pm", "three-hours-later"), extraction!!.fields["tags"])
-        assertEquals(
-            listOf(
-                "commitment-without-anchor:completely fine by 1pm i was gone not tired exactly:" +
-                    "The user describes a state of being fine then immediately negates it with 'not tired exactly'.",
-            ),
-            extraction.flags,
-        )
-    }
-
-    @Test
-    fun `drops dangling quoted array item so the rest of the lens payload can parse`() {
-        val raw = """
-            {
-            "tags": [
-            "work",
-            "
-            ],
-            "stated_commitment": null,
-            "recurrence_link": null,
-            "recurrence_kind": null,
-            "flags": []
-            }
-        """.trimIndent()
-
-        val extraction = LensResponseParser.parse(Lens.SKEPTICAL, raw)
-
-        assertNotNull(extraction)
-        assertEquals(listOf("work"), extraction!!.fields["tags"])
-        assertTrue(extraction.flags.isEmpty())
-    }
-
-    @Test
-    fun `returns null when no schema-shaped object is present`() {
-        assertNull(LensResponseParser.parse(Lens.LITERAL, """["tags","not","an","object"]"""))
-    }
-
-    @Test
-    fun `normalizes tags by trimming and lowercasing so cross-lens equality works`() {
-        val raw = """{"tags":["  Standup  ", "Launch-Doc", "", "  "]}"""
-        val extraction = LensResponseParser.parse(Lens.LITERAL, raw)
-
-        assertNotNull(extraction)
-        // Mixed-case + padded tags converge to the same form across lenses; empty tags drop.
-        assertEquals(listOf("standup", "launch-doc"), extraction!!.fields["tags"])
-    }
-
-    @Test
-    fun `drops flags from non-Skeptical lens output`() {
-        // Literal/Inferential drift into emitting flags would corrupt convergence; the schema is
-        // explicit that flags belong only to the Skeptical lens.
-        val raw = """{"flags":[{"kind":"commitment-without-anchor","snippet":"x","note":"y"}]}"""
-
-        val literal = LensResponseParser.parse(Lens.LITERAL, raw)
-        val inferential = LensResponseParser.parse(Lens.INFERENTIAL, raw)
-        val skeptical = LensResponseParser.parse(Lens.SKEPTICAL, raw)
-
-        assertNotNull(literal)
-        assertNotNull(inferential)
-        assertNotNull(skeptical)
-        assertTrue(literal!!.flags.isEmpty())
-        assertTrue(inferential!!.flags.isEmpty())
-        assertEquals(listOf("commitment-without-anchor:x:y"), skeptical!!.flags)
-    }
-
-    @Test
-    fun `keeps scanning when an earlier brace block is not parseable JSON`() {
-        // A model that echoes schema commentary like `{kind, snippet, note}` ahead of the actual
-        // payload would have made a single-shot parser return null and burn a retry. The parser
-        // walks past the unparseable block and finds the real object.
-        val raw = """
-            We expect each flag as {kind, snippet, note}. Here it is:
-            {"tags":["a"],"flags":[]}
-        """.trimIndent()
-
-        val extraction = LensResponseParser.parse(Lens.LITERAL, raw)
-
-        assertNotNull(extraction)
-        assertEquals(listOf("a"), extraction!!.fields["tags"])
-    }
-
-    @Test
-    fun `accepts array-wrapped payload like square-bracket inner object`() {
-        val raw = """[{"tags":["a"]}]"""
-        val extraction = LensResponseParser.parse(Lens.LITERAL, raw)
-
-        assertNotNull(extraction)
-        assertEquals(listOf("a"), extraction!!.fields["tags"])
-    }
-
-    @Test
-    fun `accepts a brace after an unrelated bracket pair earlier in the prose`() {
-        // `[note]` is prose, not an array opener for the payload. The "is the payload wrapped"
-        // check looks at the immediate predecessor of the first `{`, not the first `[` anywhere
-        // in the response.
-        val raw = """[note] {"tags":["a"]}"""
-        val extraction = LensResponseParser.parse(Lens.LITERAL, raw)
-
-        assertNotNull(extraction)
-        assertEquals(listOf("a"), extraction!!.fields["tags"])
-    }
-
-    @Test
-    fun `accepts array-wrapped payload when bracketed prose appears first`() {
-        val raw = """[note] [{"tags":["a"]}]"""
-        val extraction = LensResponseParser.parse(Lens.LITERAL, raw)
-
-        assertNotNull(extraction)
-        assertEquals(listOf("a"), extraction!!.fields["tags"])
-    }
-
-    @Test
-    fun `accepts array-wrapped payload after earlier non-JSON brace commentary`() {
-        val raw = """
-            We expect flags shaped like {kind, snippet, note}.
-            [{"tags":["a"]}]
-        """.trimIndent()
-
-        val extraction = LensResponseParser.parse(Lens.LITERAL, raw)
-
-        assertNotNull(extraction)
-        assertEquals(listOf("a"), extraction!!.fields["tags"])
-    }
-
-    @Test
-    fun `skips parseable prose object that does not contain schema keys`() {
-        val raw = """
-            Flag example: {"kind":"commitment-without-anchor","snippet":"x","note":"y"}
-            Actual payload: {"tags":["work"],"flags":[]}
-        """.trimIndent()
-
-        val extraction = LensResponseParser.parse(Lens.LITERAL, raw)
-
-        assertNotNull(extraction)
-        assertEquals(listOf("work"), extraction!!.fields["tags"])
-    }
-
-    @Test
-    fun `unwraps schema object from a model-added result envelope`() {
-        val raw = """
-            {
-              "analysis": "ignored",
-              "result": {
-                "tags": ["Work"],
-                "flags": []
-              }
-            }
-        """.trimIndent()
-
-        val extraction = LensResponseParser.parse(Lens.INFERENTIAL, raw)
-
-        assertNotNull(extraction)
-        assertEquals(listOf("work"), extraction!!.fields["tags"])
-    }
-
-    @Test
-    fun `repairs trailing commas in object and array payloads`() {
-        val raw = """
-            {
-              "tags": ["work",],
-              "flags": [],
-            }
-        """.trimIndent()
-
-        val extraction = LensResponseParser.parse(Lens.LITERAL, raw)
-
-        assertNotNull(extraction)
-        assertEquals(listOf("work"), extraction!!.fields["tags"])
-    }
-
-    @Test
-    fun `repairs duplicate commas between sibling fields after trimming payload whitespace`() {
-        val raw = """
-
-            
-              {
-                "tags": ["standup", "payroll-doc"],
-                ,"stated_commitment": {
-                  "text": "send the payroll doc",
-                  "topic_or_person": "Riley"
-                },
-                "recurrence_link": null,
-                "recurrence_kind": null,
-                "flags": []
-              }
-
-
-        """.trimIndent()
-
-        val extraction = LensResponseParser.parse(Lens.INFERENTIAL, raw)
-
-        assertNotNull(extraction)
-        assertEquals(listOf("standup", "payroll-doc"), extraction!!.fields["tags"])
-        @Suppress("UNCHECKED_CAST")
-        val commitment = extraction.fields["stated_commitment"] as Map<String, Any?>
-        assertEquals("send the payroll doc", commitment["text"])
-    }
-
-    @Test
-    fun `repairs duplicate commas immediately after object open`() {
-        val raw = """
-            {
-              ,
-              "tags": ["work"],
-              "stated_commitment": null,
-              "recurrence_link": null,
-              "recurrence_kind": null,
-              "flags": []
-            }
-        """.trimIndent()
-
-        val extraction = LensResponseParser.parse(Lens.LITERAL, raw)
-
-        assertNotNull(extraction)
-        assertEquals(listOf("work"), extraction!!.fields["tags"])
-    }
-
-    @Test
-    fun `repairs unescaped quotes and missing closing quote in skeptical note string`() {
-        val raw = """
-            {
-              "tags": ["standup", "kitchen", "payroll-doc", "stuck", "muttering"],
-              "stated_commitment": null,
-              "recurrence_link": null,
-              "recurrence_kind": null,
-              "flags": [
-                {
-                  "kind": "commitment-without-anchor",
-                  "snippet": "I said I was fine but felt stuck",
-                  "note": ""fine" and "stuck" are used to describe the same feeling state.
-            }]}
-        """.trimIndent()
-
-        val extraction = LensResponseParser.parse(Lens.SKEPTICAL, raw)
-
-        assertNotNull(extraction)
-        assertEquals(listOf("standup", "kitchen", "payroll-doc", "stuck", "muttering"), extraction!!.fields["tags"])
-        assertEquals(
-            listOf(
-                "commitment-without-anchor:I said I was fine but felt stuck:" +
-                    "\"fine\" and \"stuck\" are used to describe the same feeling state.",
-            ),
-            extraction.flags,
-        )
-    }
-
-    @Test
-    fun `repairs unquoted schema keys`() {
-        val raw = """
-            {
-              tags: ["Work"],
-              template_label: "audit",
-              flags: []
-            }
-        """.trimIndent()
-
-        val extraction = LensResponseParser.parse(Lens.LITERAL, raw)
-
-        assertNotNull(extraction)
-        assertEquals(listOf("work"), extraction!!.fields["tags"])
-        assertEquals("audit", extraction.fields["template_label"])
-    }
-
-    @Test
-    fun `repairs curly double quotes around schema payload`() {
-        val raw = """
-            {
-              “tags”: [“Work”],
-              “template_label”: “audit”,
-              “flags”: []
-            }
-        """.trimIndent()
-
-        val extraction = LensResponseParser.parse(Lens.LITERAL, raw)
-
-        assertNotNull(extraction)
-        assertEquals(listOf("work"), extraction!!.fields["tags"])
-        assertEquals("audit", extraction.fields["template_label"])
-    }
-
-    @Test
-    fun `treats JSON null and missing keys as equivalent absence`() {
-        val raw = """{"tags":[],"template_label":null}"""
-        val extraction = LensResponseParser.parse(Lens.LITERAL, raw)
-
-        assertNotNull(extraction)
-        assertNull(extraction!!.fields["template_label"])
-        // Missing keys come through as null (the convergence resolver treats null and absent the
-        // same way, so the parser flattens both to null).
-        assertNull(extraction.fields["stated_commitment"])
-        assertNull(extraction.fields["recurrence_link"])
+    fun `returns null when no recognizable field line is present`() {
+        assertNull(LensResponseParser.parse(Lens.LITERAL, "the model forgot the format again"))
     }
 }

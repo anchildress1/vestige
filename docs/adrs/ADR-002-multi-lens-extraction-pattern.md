@@ -758,3 +758,17 @@ Scope is the **addendum only**. The separate goblin-hours layers stay: `Template
 
 ---
 
+### Addendum (2026-05-23) — lens output flattened from JSON to `key: value` lines
+
+Exercises the §"Output format" escape hatch ("if JSON returns are flaky, switch … and parse with a deterministic Kotlin parser"). The background lens contract is now flat lines, one field per line, not a JSON object.
+
+Why: E4B has no native structured output — JSON is prompt-engineered, not enforced. LiteRT-LM constrained decoding (`SetEnableConstrainedDecoding` / JSON-schema / Lark) is C++-only and not exposed in the Kotlin 0.11.0 SDK, so we can't pin the shape engine-side. Free text inside a JSON string is where the decoder loops and drops braces; flat lines remove the brace-balancing burden entirely while keeping one field per line trivially parseable.
+
+Scope: prompt resources (`lenses/output-schema.txt`, `literal.txt`, `inferential.txt`, `skeptical.txt`, `surfaces/commitment.txt`) + `LensResponseParser`. The parser maps lines back to the **same `LensExtraction` field shapes** (`tags` → List, `stated_commitment` → `{text, topic_or_person}`, skeptical `flag:` lines → `kind:snippet:note`), so convergence, storage, and UI are untouched. Skeptical flags move to one `flag: <kind> | <snippet> | <note>` line each. Omitted line = absent; literal `null`/`none`/`n/a`/`nil` is dropped (denylist, not an allowed-key whitelist — the model owns every value except `template_label`'s closed enum).
+
+Observation generation (`observations/output-schema.txt`) is a separate path and stays JSON for now.
+
+**Verification pending:** adopted on the JSON-reliability rationale; on-device divergence / parse-rate numbers not yet re-measured. Revisit with logcat evidence if the flat format underperforms the JSON baseline.
+
+---
+

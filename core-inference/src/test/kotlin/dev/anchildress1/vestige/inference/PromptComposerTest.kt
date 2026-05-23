@@ -50,9 +50,9 @@ class PromptComposerTest {
     }
 
     @Test
-    fun `composed prompt contains the JSON output schema and entry text`() {
+    fun `composed prompt contains the output format and entry text`() {
         val composed = PromptComposer.compose(Lens.INFERENTIAL, entry)
-        assertTrue(composed.systemInstruction.contains("## Output schema"))
+        assertTrue(composed.systemInstruction.contains("## Output format"))
         assertEquals(entry, composed.userText)
     }
 

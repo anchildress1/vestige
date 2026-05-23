@@ -2,397 +2,77 @@ package dev.anchildress1.vestige.inference
 
 import dev.anchildress1.vestige.model.Lens
 import dev.anchildress1.vestige.model.LensExtraction
-import org.json.JSONArray
-import org.json.JSONObject
-import org.json.JSONTokener
 
 /**
- * Parses a lens call's raw response into a [LensExtraction] (schema:
- * `resources/lenses/output-schema.txt`). Tolerant of surrounding prose / markdown fences — walks
- * every balanced `{...}` block, repairs narrow Gemma JSON drift, and returns the first
- * schema-shaped object. Returns `null` on any parse failure — the worker treats that as "no
- * opinion."
+ * Parses a lens call's flat `key: value` line response into a [LensExtraction] (format:
+ * `resources/lenses/output-schema.txt`). Gemma botches nested JSON far more often than simple
+ * lines — free-text inside a JSON string is where it loops and drops braces — so the lens contract
+ * is line-based: one field per line, value runs to the newline. Unknown lines and surrounding prose
+ * are ignored; returns `null` only when nothing usable is present.
  *
- * `tags` are normalized at parse time (trim + lowercase, empty strings dropped) so a "Standup"
- * from one lens equals a "standup" from another at convergence-time string comparison.
- *
- * Schema-shaped flag objects (`{kind, snippet, note}`) collapse to a stable
- * `"$kind:$snippet:$note"` string. Only Skeptical lens output keeps its flags; Literal /
- * Inferential `flags` are dropped — the schema makes this single-lens contract explicit and
- * propagating drift would corrupt convergence.
+ * Values map to the same shapes convergence expects: `tags` -> List<String>, `stated_commitment`
+ * -> {text, topic_or_person}, skeptical `flag:` lines -> "kind:snippet:note" strings.
+ * `tags`/`template_label`/`vocabulary` are trimmed + lowercased; literal nullish junk is dropped.
+ * Only the Skeptical lens keeps flags.
  */
-@Suppress("TooManyFunctions") // Small parsing helpers keep the repair path narrow and testable.
 internal object LensResponseParser {
 
-    private val SCHEMA_KEYS: Set<String> = setOf(
-        "tags",
-        "template_label",
-        "stated_commitment",
-        "vocabulary",
-        "recurrence_link",
-        "recurrence_kind",
-    )
-    private val PAYLOAD_KEYS: Set<String> = SCHEMA_KEYS + "flags"
-
-    /** Literal strings models emit in place of a JSON null tone word — folded back to null. */
+    /** Literal tokens models emit for an absent value — folded back to null / dropped. */
     private val NULLISH_WORDS: Set<String> = setOf("null", "none", "n/a", "nil")
 
     fun parse(lens: Lens, raw: String): LensExtraction? {
-        val root = findFirstSchemaObject(raw) ?: return null
-        val fields = SCHEMA_KEYS.associateWith { key -> normalizeField(key, root.opt(key)) }
+        if (raw.isBlank()) return null
+        val lines = raw.lineSequence().mapNotNull(::splitLine).toList()
         val flags = if (lens == Lens.SKEPTICAL) {
-            (normalize(root.opt("flags")) as? List<*>)?.mapNotNull(::encodeFlag) ?: emptyList()
+            lines.filter { it.first == "flag" }.mapNotNull { encodeFlagLine(it.second) }
         } else {
             emptyList()
         }
-        return LensExtraction(lens = lens, fields = fields, flags = flags)
-    }
-
-    /** Per-field normalization. Tags trimmed+lowercased; others pass through. */
-    private fun normalizeField(key: String, value: Any?): Any? {
-        val normalized = normalize(value)
-        return when (key) {
-            "tags" -> (normalized as? List<*>)?.mapNotNull(::normalizeTag)
-
-            "template_label" -> (normalized as? String)?.lowercase()?.takeIf { it.isNotEmpty() }
-
-            // Models routinely emit the literal string "null"/"none" for a no-tone vocabulary
-            // instead of JSON null; fold those back to null so a non-word never becomes the tone.
-            "vocabulary" ->
-                (normalized as? String)?.trim()?.lowercase()?.takeIf { it.isNotEmpty() && it !in NULLISH_WORDS }
-
-            else -> normalized
-        }
-    }
-
-    private fun normalizeTag(entry: Any?): String? = (entry as? String)?.trim()?.lowercase()?.takeIf { it.isNotEmpty() }
-
-    private fun encodeFlag(entry: Any?): String? = when (entry) {
-        is String -> entry.takeIf { it.isNotBlank() }
-
-        is Map<*, *> -> {
-            val kind = entry["kind"]?.toString().orEmpty()
-            val snippet = entry["snippet"]?.toString().orEmpty()
-            val note = entry["note"]?.toString().orEmpty()
-            "$kind:$snippet:$note".takeIf { kind.isNotEmpty() || snippet.isNotEmpty() || note.isNotEmpty() }
-        }
-
-        else -> null
-    }
-
-    /**
-     * Walk forward, find every balanced `{...}` block, and return the first schema-shaped
-     * JSONObject. This skips parseable-but-wrong prose objects (`{"kind":"x"}`), unwraps common
-     * model envelopes (`{"result": {...schema...}}`), and accepts one-object array wrapping by
-     * treating the inner object as the candidate.
-     */
-    private fun findFirstSchemaObject(raw: String): JSONObject? {
-        var found: JSONObject? = null
-        if (raw.isNotBlank()) {
-            found = findFirstSchemaObjectIn(raw)
-            if (found == null) {
-                found = repairDanglingArrayStringItems(raw)?.let(::findFirstSchemaObjectIn)
-            }
-        }
-        return found
-    }
-
-    private fun findFirstSchemaObjectIn(raw: String): JSONObject? {
-        var cursor = 0
-        var found: JSONObject? = null
-        var keepScanning = true
-        while (keepScanning && found == null) {
-            val open = raw.indexOf('{', cursor).takeIf { it >= 0 }
-            val close = open?.let { scanBalancedClose(raw, it) ?: fallbackObjectClose(raw, it) }
-            if (open == null || close == null) {
-                keepScanning = false
-            } else {
-                val candidate = raw.substring(open, close + 1)
-                found = parseCandidateSchemaObject(candidate)
-                cursor = open + 1
-            }
-        }
-        return found
-    }
-
-    private fun fallbackObjectClose(raw: String, openIdx: Int): Int? = raw.lastIndexOf('}').takeIf { it > openIdx }
-
-    private fun parseCandidateSchemaObject(candidate: String): JSONObject? {
-        candidateVariants(candidate.trim()).forEach { variant ->
-            parseJSONObject(variant)?.let(::selectSchemaObject)?.let { return it }
-        }
-        return null
-    }
-
-    private fun candidateVariants(candidate: String): List<String> {
-        val variants = linkedSetOf(candidate)
-        listOf<(String) -> String?>(
-            ::repairDuplicateCommas,
-            ::repairMissingObjectFieldCommas,
-            ::repairTrailingCommas,
-            ::repairUnquotedPayloadKeys,
-            ::repairCurlyDoubleQuotes,
-            ::repairMalformedQuotedStrings,
-        ).forEach { repair ->
-            variants.toList().forEach { current ->
-                repair(current)?.let(variants::add)
-            }
-        }
-        return variants.toList()
-    }
-
-    private fun parseJSONObject(candidate: String): JSONObject? =
-        runCatching { JSONTokener(candidate).nextValue() as? JSONObject }.getOrNull()
-
-    private fun selectSchemaObject(candidate: JSONObject): JSONObject? {
-        if (candidate.hasAnyPayloadKey()) return candidate
-        var found: JSONObject? = null
-        candidate.keys().asSequence().forEach { key ->
-            (candidate.opt(key) as? JSONObject)?.let { child ->
-                if (found == null) {
-                    found = selectSchemaObject(child)
-                }
-            }
-        }
-        return found
-    }
-
-    private fun JSONObject.hasAnyPayloadKey(): Boolean = PAYLOAD_KEYS.any(::has)
-
-    /**
-     * LiteRT occasionally drops commas between top-level object fields while still emitting the
-     * full schema in order, e.g. `"template_label": "audit"\n"stated_commitment": {...}`.
-     * Repair only the narrow "value directly followed by the next quoted key" shape so genuine
-     * non-JSON garbage still fails closed.
-     */
-    private fun repairMissingObjectFieldCommas(candidate: String): String? {
-        val repaired = MISSING_FIELD_COMMA.replace(candidate) { match ->
-            "${match.groupValues[1]},${match.groupValues[2]}"
-        }
-        return repaired.takeIf { it != candidate }
-    }
-
-    private fun repairDuplicateCommas(candidate: String): String? {
-        val repaired = LEADING_DUPLICATE_COMMA
-            .replace(candidate) { match -> match.groupValues[1] }
-            .let { DUPLICATE_COMMA.replace(it, ",") }
-        return repaired.takeIf { it != candidate }
-    }
-
-    private fun repairTrailingCommas(candidate: String): String? {
-        val repaired = TRAILING_COMMA.replace(candidate, "$1")
-        return repaired.takeIf { it != candidate }
-    }
-
-    private fun repairUnquotedPayloadKeys(candidate: String): String? {
-        val repaired = UNQUOTED_PAYLOAD_KEY.replace(candidate) { match ->
-            "${match.groupValues[1]}\"${match.groupValues[2]}\":"
-        }
-        return repaired.takeIf { it != candidate }
-    }
-
-    private fun repairCurlyDoubleQuotes(candidate: String): String? {
-        val repaired = candidate
-            .replace('“', '"')
-            .replace('”', '"')
-        return repaired.takeIf { it != candidate }
-    }
-
-    // Character-level repair scanner — each arm matches a distinct malformed-quote shape
-    // observed in real-device model output. Helpers carry the mutable traversal state.
-    private fun repairMalformedQuotedStrings(candidate: String): String? {
-        val state = RepairState()
-        val repaired = buildString(candidate.length + 8) {
-            var index = 0
-            while (index < candidate.length) {
-                val c = candidate[index]
-                when {
-                    state.escape -> {
-                        append(c)
-                        state.escape = false
-                    }
-
-                    c == '\\' -> {
-                        append(c)
-                        state.escape = state.inString
-                    }
-
-                    c == '"' -> handleQuoteChar(candidate, index, state)
-
-                    (c == '\n' || c == '\r') && state.inString ->
-                        index = handleNewlineInString(c, candidate, index, state)
-
-                    else -> {
-                        append(c)
-                        state.stringSawWhitespace =
-                            state.stringSawWhitespace || (state.inString && c.isWhitespace())
-                    }
-                }
-                index += 1
-            }
-            if (state.inString) append('"')
-        }
-        return repaired.takeIf { it != candidate }
-    }
-
-    private fun StringBuilder.handleQuoteChar(candidate: String, index: Int, state: RepairState) {
-        if (!state.inString) {
-            append('"')
-            state.inString = true
-            state.stringStartIndex = length
-            state.stringSawWhitespace = false
-            state.insertedLeadingContentQuote = false
-            return
-        }
-        val next = nextNonWhitespaceChar(candidate, index + 1)
-        if (next == null || next in STRING_CLOSE_FOLLOWERS) {
-            append('"')
-            state.inString = false
-            state.stringStartIndex = -1
+        val fields = buildFields(lines.associate { it.first to it.second })
+        return if (fields.values.all { it == null } && flags.isEmpty()) {
+            null
         } else {
-            val canInsertLeadingQuote = !state.insertedLeadingContentQuote &&
-                !state.stringSawWhitespace &&
-                state.stringStartIndex >= 0 &&
-                next.isLetter()
-            if (canInsertLeadingQuote) {
-                insert(state.stringStartIndex, "\\\"")
-                state.insertedLeadingContentQuote = true
-            }
-            append("\\\"")
+            LensExtraction(lens = lens, fields = fields, flags = flags)
         }
     }
 
-    private fun StringBuilder.handleNewlineInString(c: Char, candidate: String, index: Int, state: RepairState): Int {
-        val next = nextNonWhitespaceChar(candidate, index + 1)
-        if (next != null && next in VALUE_CLOSE_FOLLOWERS) {
-            append('"')
-            append(c)
-            state.inString = false
-            return index
-        }
-        return if (c == '\r' && candidate.getOrNull(index + 1) == '\n') {
-            append("\\n")
-            index + 1
-        } else {
-            append("\\n")
-            index
-        }
+    /** `key: value` -> (lowercased key, trimmed value); null for lines without a leading key. */
+    private fun splitLine(line: String): Pair<String, String>? {
+        val separator = line.indexOf(':')
+        if (separator <= 0) return null
+        return line.substring(0, separator).trim().lowercase() to line.substring(separator + 1).trim()
     }
 
-    private class RepairState(
-        var inString: Boolean = false,
-        var escape: Boolean = false,
-        var stringStartIndex: Int = -1,
-        var stringSawWhitespace: Boolean = false,
-        var insertedLeadingContentQuote: Boolean = false,
-    )
-
-    private fun nextNonWhitespaceChar(candidate: String, startIndex: Int): Char? {
-        var index = startIndex
-        while (index < candidate.length) {
-            val c = candidate[index]
-            if (!c.isWhitespace()) return c
-            index += 1
+    /** Last value wins per scalar key; maps to the field shapes convergence expects. */
+    private fun buildFields(byKey: Map<String, String>): Map<String, Any?> {
+        val commitment = byKey["commitment"]?.ifNotNullish()?.let { text ->
+            mapOf("text" to text, "topic_or_person" to byKey["commitment_topic"]?.ifNotNullish())
         }
-        return null
+        return mapOf(
+            "tags" to byKey["tags"]?.split(',')?.mapNotNull(::normalizeToken),
+            "template_label" to byKey["template_label"]?.let(::normalizeWord),
+            "vocabulary" to byKey["vocabulary"]?.let(::normalizeWord),
+            "recurrence_link" to byKey["recurrence_link"]?.ifNotNullish(),
+            "recurrence_kind" to byKey["recurrence_kind"]?.ifNotNullish(),
+            "stated_commitment" to commitment,
+        )
     }
 
-    private fun repairDanglingArrayStringItems(raw: String): String? {
-        val repaired = DANGLING_ARRAY_STRING_ITEM.replace(raw, "")
-        return repaired.takeIf { it != raw }
+    private fun normalizeToken(token: String): String? =
+        token.trim().lowercase().takeIf { it.isNotEmpty() && it !in NULLISH_WORDS }
+
+    private fun normalizeWord(value: String): String? =
+        value.trim().lowercase().takeIf { it.isNotEmpty() && it !in NULLISH_WORDS }
+
+    // `kind | snippet | note` — kind drives the convergence conflict binding; snippet/note are
+    // evidence. Collapsed to the stable "kind:snippet:note" string the resolver already consumes.
+    private fun encodeFlagLine(value: String): String? {
+        val parts = value.split('|').map { it.trim() }
+        val kind = parts.getOrNull(0).orEmpty()
+        val snippet = parts.getOrNull(1).orEmpty()
+        val note = parts.getOrNull(2).orEmpty()
+        return "$kind:$snippet:$note".takeIf { kind.isNotEmpty() || snippet.isNotEmpty() || note.isNotEmpty() }
     }
 
-    private fun scanBalancedClose(raw: String, openIdx: Int): Int? {
-        val state = ScanState()
-        var closeIdx = -1
-        for (i in openIdx until raw.length) {
-            advance(state, raw[i])
-            if (state.closed) {
-                closeIdx = i
-                break
-            }
-        }
-        return closeIdx.takeIf { it >= 0 }
-    }
-
-    private fun advance(state: ScanState, c: Char) {
-        if (state.escape) {
-            state.escape = false
-            return
-        }
-        if (state.inString) {
-            advanceInsideString(state, c)
-            return
-        }
-        when (c) {
-            '"' -> state.inString = true
-
-            '{' -> state.depth += 1
-
-            '}' -> {
-                state.depth -= 1
-                if (state.depth == 0) state.closed = true
-            }
-        }
-    }
-
-    private fun advanceInsideString(state: ScanState, c: Char) {
-        when (c) {
-            '\\' -> state.escape = true
-            '"' -> state.inString = false
-        }
-    }
-
-    private class ScanState(
-        var depth: Int = 0,
-        var inString: Boolean = false,
-        var escape: Boolean = false,
-        var closed: Boolean = false,
-    )
-
-    private fun normalize(value: Any?): Any? = when (value) {
-        null, JSONObject.NULL -> null
-        is JSONObject -> value.keys().asSequence().associateWith { key -> normalize(value.opt(key)) }
-        is JSONArray -> List(value.length()) { idx -> normalize(value.opt(idx)) }
-        is String -> normalizeStringValue(value)
-        else -> value
-    }
-
-    private fun normalizeStringValue(value: String): String = value.trim().replace(LEADING_DOUBLE_QUOTE_RUN, "\"")
-
-    // Group 1 is only the value's final char — the match span is replaced in place, so the
-    // preceding bytes are untouched and a single terminator (string/number/bool/null close,
-    // or `]`/`}`) reconstructs the comma identically without re-tokenizing the whole value.
-    // Over-broad matches re-parse-fail downstream, preserving the fail-closed contract.
-    private val MISSING_FIELD_COMMA = Regex(
-        """(["\]}\w])\s*("(?:\\.|[^"\\])+":)""",
-    )
-
-    private val DANGLING_ARRAY_STRING_ITEM = Regex(
-        """,\s*"\s*(?=])""",
-    )
-
-    private val LEADING_DUPLICATE_COMMA = Regex(
-        """([{\[])\s*,+""",
-    )
-
-    private val DUPLICATE_COMMA = Regex(
-        """,\s*,+""",
-    )
-
-    private val TRAILING_COMMA = Regex(
-        """,\s*([}\]])""",
-    )
-
-    private val UNQUOTED_PAYLOAD_KEY = Regex(
-        """([{\s,])(${PAYLOAD_KEYS.joinToString("|")}):""",
-    )
-
-    private val LEADING_DOUBLE_QUOTE_RUN = Regex(
-        """^""+""",
-    )
-
-    private val STRING_CLOSE_FOLLOWERS = setOf(':', ',', '}', ']')
-
-    private val VALUE_CLOSE_FOLLOWERS = setOf(',', '}', ']')
+    private fun String.ifNotNullish(): String? = takeIf { it.isNotEmpty() && lowercase() !in NULLISH_WORDS }
 }

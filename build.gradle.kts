@@ -112,6 +112,16 @@ kover {
                         "dev.anchildress1.vestige.inference.LiteRtLmEngine*",
                         "dev.anchildress1.vestige.inference.AudioCapture",
                         "dev.anchildress1.vestige.inference.AudioCapture*",
+                        // Coroutine/tx-dispatched wiring kover can't attribute (kotlinx-kover #756 /
+                        // suspend instrumentation); behaviour is measured by :app:testDebugIntegrationTest
+                        // (PatternDetectionOrchestratorTest exercises the orchestrator + its vocab
+                        // cluster updater). Mirrors the sonar.coverage.exclusions list below.
+                        "dev.anchildress1.vestige.patterns.PatternDetectionOrchestrator",
+                        "dev.anchildress1.vestige.patterns.PatternDetectionOrchestrator*",
+                        "dev.anchildress1.vestige.patterns.PatternVocabClusterUpdater",
+                        "dev.anchildress1.vestige.patterns.PatternVocabClusterUpdater*",
+                        "dev.anchildress1.vestige.ui.patterns.PatternsListViewModel",
+                        "dev.anchildress1.vestige.ui.patterns.PatternsListViewModel*",
                     )
                     // Compose UI carries no business logic — `@Composable` functions are
                     // declarative rendering; their "branches" are overwhelmingly the compiler's
@@ -197,6 +207,9 @@ sonar {
                     // intentionally does not cover. Unit-tier coverage on this surface would mock
                     // out PatternDetector + PatternStore — tautological. ADR-014 contract.
                     "**/patterns/PatternDetectionOrchestrator.kt",
+                    // Second-pass cluster stamper run by the orchestrator; same coroutine/tx
+                    // instrumentation gap, exercised by PatternDetectionOrchestratorTest.
+                    "**/patterns/PatternVocabClusterUpdater.kt",
                     // Compose-bound ViewModel; behavior measured by :app:testDebugIntegrationTest
                     // (PatternsListScreenTest). Unit-tier coverage would re-stub the StateFlow plumbing.
                     "**/ui/patterns/PatternsListViewModel.kt",

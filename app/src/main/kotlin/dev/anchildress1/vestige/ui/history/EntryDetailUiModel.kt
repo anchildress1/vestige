@@ -31,7 +31,7 @@ data class EntryDetailUiModel(
     val extraction: ExtractionDisplay = ExtractionDisplay.COMPLETE,
 ) {
     companion object {
-        fun from(entity: EntryEntity, zoneId: ZoneId): EntryDetailUiModel {
+        fun from(entity: EntryEntity, zoneId: ZoneId, repeatTitle: String?): EntryDetailUiModel {
             val hasLensReceiptPayload = entity.lensReceiptsJsonOrEmpty != "[]"
             val status = lensStatus(entity.confidenceJson)
             return EntryDetailUiModel(
@@ -51,7 +51,7 @@ data class EntryDetailUiModel(
                     entity.lensReceiptsJson,
                     hasConflict = status == EntryDetailCopy.THREE_LENS_STATUS_CONFLICT,
                 ).toImmutableList(),
-                fields = buildFieldRows(entity).toImmutableList(),
+                fields = buildFieldRows(entity, repeatTitle).toImmutableList(),
                 observations = parseObservations(entity.entryObservationsJson).toImmutableList(),
                 tags = entity.tags.map { it.name }.sorted().toImmutableList(),
                 extraction = when (entity.extractionStatus) {

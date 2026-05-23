@@ -60,6 +60,7 @@ class BackgroundExtractionSaveFlow(
     private val lifecycleCallbacks: BackgroundExtractionLifecycleCallbacks,
     private val scope: CoroutineScope,
     private val retrieveHistory: suspend (String) -> List<HistoryChunk> = { emptyList() },
+    private val retrievePatternCandidates: suspend (Long) -> List<HistoryChunk> = { emptyList() },
     private val patternOrchestrator: PatternDetectionOrchestrator? = null,
 ) {
 
@@ -245,14 +246,24 @@ class BackgroundExtractionSaveFlow(
         seededHistory: List<HistoryChunk>,
     ): List<HistoryChunk> {
         if (seededHistory.isNotEmpty()) return seededHistory
-        return try {
-            retrieveHistory(entryText)
-        } catch (cancellation: CancellationException) {
-            throw cancellation
-        } catch (@Suppress("TooGenericExceptionCaught") error: Exception) {
-            Log.w(TAG, "Detached retrieval degraded for entryId=$entryId (${error.javaClass.simpleName})")
-            emptyList()
-        }
+        // Pattern candidates first: they carry the deterministic pattern_id the recurrence surface
+        // validates. Semantic chunks follow as context-only background. Either source degrades to
+        // empty independently so one failing never starves the other.
+        return historyOrEmpty(entryId, "candidate") { retrievePatternCandidates(entryId) } +
+            historyOrEmpty(entryId, "semantic") { retrieveHistory(entryText) }
+    }
+
+    private suspend fun historyOrEmpty(
+        entryId: Long,
+        label: String,
+        retrieve: suspend () -> List<HistoryChunk>,
+    ): List<HistoryChunk> = try {
+        retrieve()
+    } catch (cancellation: CancellationException) {
+        throw cancellation
+    } catch (@Suppress("TooGenericExceptionCaught") error: Exception) {
+        Log.w(TAG, "Detached $label retrieval degraded for entryId=$entryId (${error.javaClass.simpleName})")
+        emptyList()
     }
 
     @Suppress("LongParameterList") // Context bundle is clearer than inventing a throwaway carrier type.

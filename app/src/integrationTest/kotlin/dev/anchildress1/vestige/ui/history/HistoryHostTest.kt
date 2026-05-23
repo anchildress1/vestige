@@ -18,6 +18,7 @@ import androidx.compose.ui.test.performClick
 import dev.anchildress1.vestige.model.Persona
 import dev.anchildress1.vestige.model.ResolvedExtraction
 import dev.anchildress1.vestige.storage.EntryStore
+import dev.anchildress1.vestige.storage.PatternStore
 import dev.anchildress1.vestige.storage.closeAfterCleaningThreadResources
 import dev.anchildress1.vestige.testing.cleanupObjectBoxTempRoot
 import dev.anchildress1.vestige.testing.newInMemoryObjectBoxDirectory
@@ -78,6 +79,7 @@ class HistoryHostTest {
         composeRule.activity.setContent {
             HistoryHost(
                 entryStore = entryStore,
+                patternStore = PatternStore(boxStore),
                 persona = Persona.WITNESS,
                 onExit = {},
                 zoneId = ZoneOffset.UTC,
@@ -105,6 +107,7 @@ class HistoryHostTest {
         composeRule.activity.setContent {
             HistoryHost(
                 entryStore = entryStore,
+                patternStore = PatternStore(boxStore),
                 persona = Persona.WITNESS,
                 onExit = { exited = true },
                 zoneId = ZoneOffset.UTC,
@@ -127,6 +130,7 @@ class HistoryHostTest {
         composeRule.activity.setContent {
             HistoryHost(
                 entryStore = entryStore,
+                patternStore = PatternStore(boxStore),
                 persona = Persona.WITNESS,
                 onExit = {},
                 zoneId = ZoneOffset.UTC,
@@ -150,6 +154,7 @@ class HistoryHostTest {
             if (showingHistory.value) {
                 HistoryHost(
                     entryStore = entryStore,
+                    patternStore = PatternStore(boxStore),
                     persona = Persona.WITNESS,
                     onExit = {},
                     zoneId = ZoneOffset.UTC,

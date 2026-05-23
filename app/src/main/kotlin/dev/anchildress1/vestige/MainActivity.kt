@@ -287,6 +287,7 @@ private fun PostOnboardingScreenHost(
 
         PostOnboardingScreen.History -> HistoryHost(
             entryStore = container.entryStore,
+            patternStore = container.patternStore,
             persona = persona,
             onExit = { onNavigate(PostOnboardingScreen.Capture) },
             zoneId = zoneId,

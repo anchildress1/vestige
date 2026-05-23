@@ -12,6 +12,7 @@ import dev.anchildress1.vestige.model.ResolvedField
 import dev.anchildress1.vestige.storage.EntryEntity
 import dev.anchildress1.vestige.storage.EntryLensReceiptJson
 import dev.anchildress1.vestige.storage.EntryStore
+import dev.anchildress1.vestige.storage.PatternStore
 import dev.anchildress1.vestige.storage.closeAfterCleaningThreadResources
 import dev.anchildress1.vestige.testing.cleanupObjectBoxTempRoot
 import dev.anchildress1.vestige.testing.newInMemoryObjectBoxDirectory
@@ -555,6 +556,7 @@ class EntryDetailViewModelTest {
     ): EntryDetailViewModel = EntryDetailViewModel(
         entryId = entryId,
         entryStore = entryStore,
+        patternStore = PatternStore(boxStore),
         zoneId = zone,
         ioDispatcher = dispatcher,
         dataRevision = dataRevision,

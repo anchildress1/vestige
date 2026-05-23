@@ -499,6 +499,37 @@ class BackgroundExtractionSaveFlowTest {
     }
 
     @Test
+    fun `detached path prepends pattern candidates ahead of semantic history`() = runTest {
+        val candidate = HistoryChunk(patternId = "abc123", text = "prior Tuesday crash")
+        val semantic = HistoryChunk(patternId = null, text = "loosely related entry")
+        val flowWithLookup = BackgroundExtractionSaveFlow(
+            entryStore = entryStore,
+            worker = worker,
+            observationGenerator = observationGenerator,
+            lifecycleCallbacks = BackgroundExtractionLifecycleCallbacks(listenerFactory),
+            scope = flowScope,
+            retrieveHistory = { listOf(semantic) },
+            retrievePatternCandidates = { id ->
+                assertEquals(ENTRY_ID, id)
+                listOf(candidate)
+            },
+        )
+        every { entryStore.createPendingEntry(any(), any(), any()) } returns ENTRY_ID
+        coEvery { worker.extract(capture(capturedRequest), any()) } returns BackgroundExtractionResult.Success(
+            totalElapsedMs = 10L,
+            lensResults = emptyList(),
+            modelCallCount = 3,
+            resolved = canonicalSample(),
+            templateLabel = TemplateLabel.AFTERMATH,
+        )
+        coEvery { observationGenerator.generate(any(), any(), any()) } returns emptyList()
+
+        flowWithLookup.saveAndExtract(SAMPLE_TEXT, SAMPLE_TIMESTAMP)
+
+        assertEquals(listOf(candidate, semantic), capturedRequest.captured.retrievedHistory)
+    }
+
+    @Test
     fun `saveAndExtract keeps caller supplied history and skips detached lookup`() = runTest {
         val history = listOf(HistoryChunk(patternId = null, text = "seeded already"))
         val lookupCalls = AtomicInteger(0)

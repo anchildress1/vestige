@@ -3,7 +3,9 @@ package dev.anchildress1.vestige.ui.history
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import dev.anchildress1.vestige.storage.EntryEntity
 import dev.anchildress1.vestige.storage.EntryStore
+import dev.anchildress1.vestige.storage.PatternStore
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
@@ -18,6 +20,7 @@ import java.time.ZoneId
 class EntryDetailViewModel(
     private val entryId: Long,
     private val entryStore: EntryStore,
+    private val patternStore: PatternStore,
     private val zoneId: ZoneId,
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
     dataRevision: StateFlow<Long> = MutableStateFlow(0L),
@@ -38,7 +41,9 @@ class EntryDetailViewModel(
         _state.value = runCatching {
             withContext(ioDispatcher) {
                 entryStore.readEntry(entryId)
-                    ?.let { EntryDetailUiState.Loaded(EntryDetailUiModel.from(it, zoneId)) }
+                    ?.let { entity ->
+                        EntryDetailUiState.Loaded(EntryDetailUiModel.from(entity, zoneId, repeatTitleFor(entity)))
+                    }
                     ?: EntryDetailUiState.NotFound
             }
         }.getOrElse { e ->
@@ -47,6 +52,10 @@ class EntryDetailViewModel(
             EntryDetailUiState.NotFound
         }
     }
+
+    /** The H2 title of the pattern the model validated for this entry, or null when none was confirmed. */
+    private fun repeatTitleFor(entity: EntryEntity): String? =
+        entity.recurrenceLink?.let { patternStore.findByPatternId(it)?.title?.takeIf(String::isNotBlank) }
 
     private companion object {
         private const val TAG = "EntryDetailViewModel"

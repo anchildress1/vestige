@@ -32,6 +32,7 @@ import dev.anchildress1.vestige.model.ModelArtifactStore
 import dev.anchildress1.vestige.model.ModelManifest
 import dev.anchildress1.vestige.model.NetworkGate
 import dev.anchildress1.vestige.model.Persona
+import dev.anchildress1.vestige.patterns.PatternCandidates
 import dev.anchildress1.vestige.patterns.PatternDetectionOrchestrator
 import dev.anchildress1.vestige.save.BackgroundExtractionLifecycleCallbacks
 import dev.anchildress1.vestige.save.BackgroundExtractionSaveFlow
@@ -159,6 +160,7 @@ class AppContainer(
         BackgroundExtractionLifecycleCallbacks,
         CoroutineScope,
         suspend (String) -> List<HistoryChunk>,
+        suspend (Long) -> List<HistoryChunk>,
         PatternDetectionOrchestrator?,
     ) -> BackgroundExtractionSaveFlow =
         {
@@ -168,6 +170,7 @@ class AppContainer(
                 lifecycleCallbacks,
                 extractionScope,
                 retrieveHistory,
+                retrievePatternCandidates,
                 orchestrator,
             ->
             BackgroundExtractionSaveFlow(
@@ -177,6 +180,7 @@ class AppContainer(
                 lifecycleCallbacks = lifecycleCallbacks,
                 scope = extractionScope,
                 retrieveHistory = retrieveHistory,
+                retrievePatternCandidates = retrievePatternCandidates,
                 patternOrchestrator = orchestrator,
             )
         },
@@ -309,6 +313,28 @@ class AppContainer(
         }
     }
 
+    /**
+     * Deterministic candidate-pattern context for a lens read: ACTIVE patterns this entry matches by
+     * signature, each carrying its `pattern_id` so the recurrence surface can validate (or reject) it.
+     * Degrades to empty on any store failure so it never blocks extraction.
+     */
+    suspend fun retrievePatternCandidates(entryId: Long): List<HistoryChunk> = withContext(computeDispatcher) {
+        try {
+            val entry = entryStore.readEntry(entryId) ?: return@withContext emptyList()
+            PatternCandidates.forEntry(
+                target = entry,
+                activePatterns = patternStore.findActive(),
+                zoneId = ZoneId.systemDefault(),
+                maxPriorEntries = PATTERN_CANDIDATE_PRIOR_ENTRIES,
+            )
+        } catch (cancel: CancellationException) {
+            throw cancel
+        } catch (@Suppress("TooGenericExceptionCaught") error: Exception) {
+            Log.w(TAG, "retrievePatternCandidates degraded for entryId=$entryId", error)
+            emptyList()
+        }
+    }
+
     val observationGenerator: ObservationGenerator by lazy {
         ObservationGenerator(engine = backgroundEngine)
     }
@@ -348,6 +374,7 @@ class AppContainer(
             ),
             scope,
             ::retrieveHistory,
+            ::retrievePatternCandidates,
             patternDetectionOrchestrator,
         )
     }
@@ -1045,6 +1072,9 @@ class AppContainer(
         const val VECTOR_BACKFILL_MAX_RETRIES = 12
         const val PCT_MAX = 100
         const val FOREGROUND_HISTORY_TOP_N = 3
+
+        /** Prior supporting entries per candidate pattern fed to the lens recurrence read. */
+        const val PATTERN_CANDIDATE_PRIOR_ENTRIES = 3
 
         fun defaultScope(): CoroutineScope {
             val exceptionHandler = CoroutineExceptionHandler { _, error ->

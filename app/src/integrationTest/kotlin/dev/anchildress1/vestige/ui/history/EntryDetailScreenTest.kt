@@ -28,6 +28,7 @@ import dev.anchildress1.vestige.model.ResolvedField
 import dev.anchildress1.vestige.model.TemplateLabel
 import dev.anchildress1.vestige.storage.EntryEntity
 import dev.anchildress1.vestige.storage.EntryStore
+import dev.anchildress1.vestige.storage.PatternStore
 import dev.anchildress1.vestige.storage.closeAfterCleaningThreadResources
 import dev.anchildress1.vestige.testing.cleanupObjectBoxTempRoot
 import dev.anchildress1.vestige.testing.newInMemoryObjectBoxDirectory
@@ -412,6 +413,7 @@ class EntryDetailScreenTest {
     private fun buildVm(id: Long) = EntryDetailViewModel(
         entryId = id,
         entryStore = entryStore,
+        patternStore = PatternStore(boxStore),
         zoneId = zone,
         ioDispatcher = dispatcher,
     )

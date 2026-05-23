@@ -67,7 +67,7 @@ private fun lensTone(lens: Lens, receipt: EntryLensReceipt?, hasConflict: Boolea
 }
 
 @Suppress("LongMethod", "CyclomaticComplexMethod")
-internal fun buildFieldRows(entity: EntryEntity): List<FieldRow> {
+internal fun buildFieldRows(entity: EntryEntity, repeatTitle: String?): List<FieldRow> {
     val confidence = parseConfidence(entity.confidenceJson)
     val receipts = EntryLensReceiptJson.decodeOrNull(entity.lensReceiptsJson)
     val tagsText = entity.tags.map { it.name }.sorted().take(DISPLAY_LIMIT).joinToString(", ").ifBlank { DASH }
@@ -81,16 +81,11 @@ internal fun buildFieldRows(entity: EntryEntity): List<FieldRow> {
         commitmentValue != DASH -> receiptFieldTone(receipts, KEY_COMMITMENT)
         else -> confidence[KEY_COMMITMENT].toTone()
     }
-    val topLevelRecurrence = entity.recurrenceLink?.takeIf(String::isNotBlank)
-    val recurrenceValue = topLevelRecurrence
-        ?: receipts?.let { firstReceiptPatternId(it) }
-        ?: DASH
-    val recurrenceTone = when {
-        receipts == null -> confidence[KEY_RECURRENCE].toTone()
-        topLevelRecurrence != null -> confidence[KEY_RECURRENCE].toTone()
-        recurrenceValue != DASH -> receiptPatternTone(receipts)
-        else -> LensTone.AMBIGUOUS
-    }
+    // REPEAT shows the H2 title of the pattern the model validated via recurrence_link (resolved by
+    // the caller from the stored pattern_id). Deterministic detection only proposes the candidate;
+    // the model decides viability, so a blank here means "no confirmed recurrence", not "no data".
+    val recurrenceValue = repeatTitle?.takeIf(String::isNotBlank) ?: DASH
+    val recurrenceTone = if (recurrenceValue == DASH) LensTone.AMBIGUOUS else LensTone.CANONICAL
     val resolvedVocab = entity.vocabularyWord?.trim()?.takeIf { it.isNotBlank() && it.lowercase() !in NULLISH_VOCAB }
     val receiptVocab = receipts?.let(::distinctReceiptVocab).orEmpty()
     val vocabValue = resolvedVocab
@@ -186,35 +181,12 @@ private fun commitmentText(json: String?): String? {
 private fun firstReceiptFieldDisplay(receipts: List<EntryLensReceipt>, key: String): String? =
     receipts.asSequence().mapNotNull { displayValue(it.fields[key]) }.firstOrNull()
 
-private fun firstReceiptPatternId(receipts: List<EntryLensReceipt>): String? = receipts.asSequence()
-    .mapNotNull { it.fields[KEY_RECURRENCE] as? String }
-    .map(String::trim)
-    .firstOrNull { it.matches(PATTERN_ID_REGEX) }
-
 private fun receiptFieldTone(receipts: List<EntryLensReceipt>, key: String): LensTone {
     val supported = receipts.count { displayValue(it.fields[key]) != null }
     return when {
         receipts.any { displayValue(it.fields[key]) != null && it.flags.isNotEmpty() } -> LensTone.CONFLICT
         supported >= 2 -> LensTone.CANONICAL
         supported == 1 -> LensTone.CANDIDATE
-        else -> LensTone.AMBIGUOUS
-    }
-}
-
-private fun receiptPatternTone(receipts: List<EntryLensReceipt>): LensTone {
-    val supported = receipts.count {
-        (it.fields[KEY_RECURRENCE] as? String)?.trim()?.matches(PATTERN_ID_REGEX) == true
-    }
-    return when {
-        receipts.any {
-            (it.fields[KEY_RECURRENCE] as? String)?.trim()?.matches(PATTERN_ID_REGEX) == true &&
-                it.flags.isNotEmpty()
-        } -> LensTone.CONFLICT
-
-        supported >= 2 -> LensTone.CANONICAL
-
-        supported == 1 -> LensTone.CANDIDATE
-
         else -> LensTone.AMBIGUOUS
     }
 }
@@ -261,7 +233,6 @@ private const val KEY_VOCABULARY = "vocabulary"
 private val NULLISH_VOCAB = setOf("null", "none", "n/a", "nil")
 private const val KEY_COMMITMENT_TEXT = "text"
 private const val KEY_TOPIC_OR_PERSON = "topic_or_person"
-private val PATTERN_ID_REGEX = Regex("[0-9a-f]{64}")
 private val SUMMARY_KEYS = listOf(
     KEY_TAGS,
     KEY_COMMITMENT,

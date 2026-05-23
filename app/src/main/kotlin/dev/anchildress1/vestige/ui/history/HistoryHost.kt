@@ -13,6 +13,7 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewmodel.compose.viewModel
 import dev.anchildress1.vestige.model.Persona
 import dev.anchildress1.vestige.storage.EntryStore
+import dev.anchildress1.vestige.storage.PatternStore
 import dev.anchildress1.vestige.ui.components.BottomTab
 import kotlinx.coroutines.flow.StateFlow
 import java.time.ZoneId
@@ -21,6 +22,7 @@ import java.time.ZoneId
 @Suppress("LongParameterList") // Route-level host; dataRevision + modifier are structural, not business.
 fun HistoryHost( // NOSONAR kotlin:S107
     entryStore: EntryStore,
+    patternStore: PatternStore,
     persona: Persona,
     onExit: () -> Unit,
     zoneId: ZoneId,
@@ -69,6 +71,7 @@ fun HistoryHost( // NOSONAR kotlin:S107
         else -> HistoryDetailRoute(
             entryId = openEntryId!!,
             entryStore = entryStore,
+            patternStore = patternStore,
             zoneId = zoneId,
             dataRevision = dataRevision,
             highlightOnOpen = highlightOnOpen,
@@ -91,6 +94,7 @@ fun HistoryHost( // NOSONAR kotlin:S107
 private fun HistoryDetailRoute( // NOSONAR kotlin:S107
     entryId: Long,
     entryStore: EntryStore,
+    patternStore: PatternStore,
     zoneId: ZoneId,
     dataRevision: StateFlow<Long>,
     highlightOnOpen: Boolean,
@@ -104,6 +108,7 @@ private fun HistoryDetailRoute( // NOSONAR kotlin:S107
     EntryDetailHost(
         entryId = entryId,
         entryStore = entryStore,
+        patternStore = patternStore,
         zoneId = zoneId,
         dataRevision = dataRevision,
         onBack = onClearDetail,

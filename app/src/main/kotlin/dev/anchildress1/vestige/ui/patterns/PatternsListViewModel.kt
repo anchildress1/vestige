@@ -8,6 +8,7 @@ import dev.anchildress1.vestige.storage.EntryStore
 import dev.anchildress1.vestige.storage.PatternEntity
 import dev.anchildress1.vestige.storage.PatternRepo
 import dev.anchildress1.vestige.storage.PatternStore
+import kotlinx.collections.immutable.toImmutableList
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
@@ -62,7 +63,7 @@ class PatternsListViewModel(
         val visible = patternStore.findVisibleSortedByLastSeen()
         when {
             visible.isNotEmpty() -> PatternsListUiState.Loaded(
-                cards = visible.toCards(totalEntries),
+                cards = visible.toCards(totalEntries).toImmutableList(),
                 entryCount = totalEntries.toInt(),
                 daysSinceFirstCapped = daysSinceFirstEntry(),
             )

@@ -8,6 +8,7 @@ import dev.anchildress1.vestige.storage.EntryStore
 import dev.anchildress1.vestige.storage.PatternEntity
 import dev.anchildress1.vestige.storage.PatternRepo
 import dev.anchildress1.vestige.storage.PatternStore
+import kotlinx.collections.immutable.toImmutableList
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
@@ -174,8 +175,8 @@ class PatternDetailViewModel(
         supportingCount = supportingEntries.size,
         totalEntryCount = totalEntries,
         lastSeenLabel = formatShortDate(lastSeenTimestamp),
-        sources = sources,
-        vocabulary = vocabulary,
+        sources = sources.toImmutableList(),
+        vocabulary = vocabulary.toImmutableList(),
         traceHits = traceHits,
         state = state,
         isTerminal = isTerminalState(state),

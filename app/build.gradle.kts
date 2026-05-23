@@ -157,6 +157,7 @@ dependencies {
 
     implementation(platform(libs.compose.bom))
     implementation(libs.bundles.compose.ui)
+    implementation(libs.kotlinx.collections.immutable)
     debugImplementation(libs.bundles.compose.debug)
 
     testImplementation(testFixtures(project(":core-storage")))

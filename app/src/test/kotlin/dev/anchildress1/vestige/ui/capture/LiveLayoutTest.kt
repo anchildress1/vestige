@@ -12,6 +12,7 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performSemanticsAction
 import dev.anchildress1.vestige.model.Persona
 import dev.anchildress1.vestige.ui.theme.VestigeTheme
+import kotlinx.collections.immutable.toImmutableList
 import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
@@ -106,7 +107,7 @@ class LiveLayoutTest {
                 persona = persona,
                 modelReadiness = readiness,
                 elapsedMs = elapsedMs,
-                recentLevels = List(42) { 0.3f },
+                recentLevels = List(42) { 0.3f }.toImmutableList(),
             ),
             onStopTap = onStopTap,
             onDiscardTap = onDiscardTap,

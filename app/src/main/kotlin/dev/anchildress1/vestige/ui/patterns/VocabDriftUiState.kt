@@ -1,6 +1,7 @@
 package dev.anchildress1.vestige.ui.patterns
 
 import androidx.compose.runtime.Immutable
+import kotlinx.collections.immutable.ImmutableList
 
 /** State for the Vocab Drift screen — see [VocabDriftViewModel] for the load path. */
 sealed interface VocabDriftUiState {
@@ -27,7 +28,7 @@ sealed interface VocabDriftUiState {
         val patternTitle: String,
         val rootToken: String,
         val totalEntries: Int,
-        val clusters: List<VocabClusterUiModel>,
+        val clusters: ImmutableList<VocabClusterUiModel>,
     ) : VocabDriftUiState
 }
 

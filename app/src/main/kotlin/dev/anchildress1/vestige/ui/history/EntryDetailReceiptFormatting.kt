@@ -8,6 +8,7 @@ import dev.anchildress1.vestige.model.EntryLensReceipt
 import dev.anchildress1.vestige.model.Lens
 import dev.anchildress1.vestige.storage.EntryEntity
 import dev.anchildress1.vestige.storage.EntryLensReceiptJson
+import kotlinx.collections.immutable.toImmutableList
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -26,7 +27,7 @@ internal fun parseObservations(json: String): List<ObservationLine> {
                     }
                 }
                 ?: emptyList()
-            text?.let { ObservationLine(text = it, evidence = evidence, fields = fields) }
+            text?.let { ObservationLine(text = it, evidence = evidence, fields = fields.toImmutableList()) }
         }
     }.getOrElse {
         // Surfaced so an empty reading card is debuggable, but never the payload:

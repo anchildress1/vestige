@@ -1,6 +1,7 @@
 package dev.anchildress1.vestige.ui.patterns
 
 import dev.anchildress1.vestige.model.PatternState
+import kotlinx.collections.immutable.ImmutableList
 
 /** Card row payload for the Patterns list. Pure UI — no ObjectBox handles leak past the VM. */
 data class PatternCardUi(
@@ -56,7 +57,7 @@ sealed interface PatternsListUiState {
             require(entryCount >= 0) { "entryCount must be non-negative" }
         }
     }
-    data class Loaded(val cards: List<PatternCardUi>, val entryCount: Int, val daysSinceFirstCapped: Int) :
+    data class Loaded(val cards: ImmutableList<PatternCardUi>, val entryCount: Int, val daysSinceFirstCapped: Int) :
         PatternsListUiState {
         init {
             require(cards.isNotEmpty()) { "Loaded state must have at least one card" }
@@ -90,8 +91,8 @@ sealed interface PatternDetailUiState {
         val supportingCount: Int,
         val totalEntryCount: Long,
         val lastSeenLabel: String,
-        val sources: List<PatternSourceUi>,
-        val vocabulary: List<String>,
+        val sources: ImmutableList<PatternSourceUi>,
+        val vocabulary: ImmutableList<String>,
         val traceHits: Set<Int>,
         val state: PatternState,
         val isTerminal: Boolean,

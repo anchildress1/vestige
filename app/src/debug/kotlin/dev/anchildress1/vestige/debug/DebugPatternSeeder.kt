@@ -89,7 +89,7 @@ object DebugPatternSeeder {
                 "restarted it with completely different reasoning each time. " +
                 "I keep convincing myself the new approach is obviously better. " +
                 "I think I might just be spinning and calling it progress.",
-            Instant.parse("2026-05-04T16:33:00Z"),
+            Instant.parse("2026-05-22T16:33:00Z"),
             28_000L,
         ),
         SeedEntry(
@@ -191,7 +191,7 @@ object DebugPatternSeeder {
             "I was exhausted by 10am and that's new for me. I've been running behind my own capacity for weeks " +
                 "but this is the first time I ran out before lunch. " +
                 "That felt like a line being crossed I did not authorize.",
-            "2026-05-16T13:41:00Z",
+            "2026-05-22T13:41:00Z",
         ),
         Pair(
             "I've been sluggish all day with a brain fog " +

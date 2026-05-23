@@ -14,6 +14,7 @@ import dev.anchildress1.vestige.model.ExtractionStatus
 import dev.anchildress1.vestige.model.Persona
 import dev.anchildress1.vestige.patterns.PatternDetectionOrchestrator
 import dev.anchildress1.vestige.storage.EntryStore
+import dev.anchildress1.vestige.storage.TemporalHistoryRetrieval
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
@@ -414,7 +415,7 @@ class BackgroundExtractionSaveFlow(
         success: BackgroundExtractionResult.Success,
         capturedAt: ZonedDateTime,
     ): List<EntryObservation> = try {
-        observationGenerator.generate(entryText, success.resolved, capturedAt)
+        observationGenerator.generate(entryText, success.resolved, capturedAt, temporalHistoryFor(entryId, capturedAt))
     } catch (cancellation: CancellationException) {
         throw cancellation
     } catch (@Suppress("TooGenericExceptionCaught") error: Exception) {
@@ -423,6 +424,16 @@ class BackgroundExtractionSaveFlow(
         // re-eval (Phase 4). Persist an empty list and move on.
         Log.w(TAG, "ObservationGenerator threw ${error.javaClass.simpleName} for entryId=$entryId", error)
         emptyList()
+    }
+
+    // Prior entries at this entry's weekday + time-of-day, fed to the observation read as
+    // RECURRING CONTEXT so the model can surface a repeat observation. Deterministic + local — no
+    // embeddings — so it works on the very first read, before any pattern is detected.
+    private fun temporalHistoryFor(entryId: Long, capturedAt: ZonedDateTime): List<HistoryChunk> {
+        val target = entryStore.readEntry(entryId) ?: return emptyList()
+        val candidates = entryStore.listCompleted(TEMPORAL_HISTORY_CANDIDATES)
+        return TemporalHistoryRetrieval.matching(target, candidates, capturedAt.zone, TEMPORAL_HISTORY_TOP_N)
+            .map { HistoryChunk(patternId = null, text = it.entryText) }
     }
 
     private suspend fun compensatePersistenceFailure(
@@ -494,6 +505,10 @@ class BackgroundExtractionSaveFlow(
 
     private companion object {
         private const val TAG = "VestigeSaveFlow"
+
+        // Candidate window scanned for same-slot priors, and how many matches to feed the read.
+        private const val TEMPORAL_HISTORY_CANDIDATES = 250
+        private const val TEMPORAL_HISTORY_TOP_N = 5
     }
 }
 

@@ -60,6 +60,44 @@ class ObservationGeneratorTest {
     }
 
     @Test
+    fun `recurring context lists prior same-slot entries, numbered, when present`() = runTest {
+        val resolved = ResolvedExtraction(emptyMap())
+        val capturedPrompt = io.mockk.slot<String>()
+        every { engine.streamText(capture(capturedPrompt), any()) } returns
+            flowOf(themeNoticingPayload("Third week running."))
+
+        newGenerator().generate(
+            SAMPLE_TEXT,
+            resolved,
+            SAMPLE_DAY,
+            temporalHistory = listOf(
+                HistoryChunk(patternId = null, text = "meeting then crashed"),
+                HistoryChunk(patternId = null, text = "drained after standup"),
+            ),
+        )
+
+        val prompt = capturedPrompt.captured
+        assertTrue(prompt.contains("RECURRING CONTEXT"), "prompt should carry the recurring-context section")
+        assertTrue(prompt.contains("1. meeting then crashed"), "prior entries should be listed")
+        assertTrue(prompt.contains("2. drained after standup"), "entries are numbered so the model reads the count")
+    }
+
+    @Test
+    fun `recurring context section is omitted when temporal history is empty`() = runTest {
+        val resolved = ResolvedExtraction(emptyMap())
+        val capturedPrompt = io.mockk.slot<String>()
+        every { engine.streamText(capture(capturedPrompt), any()) } returns
+            flowOf(themeNoticingPayload("Theme noted."))
+
+        newGenerator().generate(SAMPLE_TEXT, resolved, SAMPLE_DAY)
+
+        assertTrue(
+            !capturedPrompt.captured.contains("RECURRING CONTEXT"),
+            "no recurring-context section when there are no prior same-slot entries",
+        )
+    }
+
+    @Test
     fun `retries the model once when the first response contains a forbidden phrase`() = runTest {
         val resolved = ResolvedExtraction(emptyMap())
         every { engine.streamText(any(), any()) } returnsMany listOf(

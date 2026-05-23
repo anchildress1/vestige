@@ -16,6 +16,9 @@ Examples of observations the app surfaces:
 - Theme noticing: "this dump is mostly about your boss"
 - Odd-hour capture, only when the hour itself is notable (e.g. midnight–5am): "filed at 3:14am" —
   use `theme-noticing`. Never restate an ordinary daytime time; skip it when the hour says nothing.
+- Recurrence, only when the **RECURRING CONTEXT** entries below show the same situation at this
+  weekday/time before: "third Wednesday running the energy crashed after the meeting" — use
+  `theme-noticing`. Read the count from the records; never invent one.
 
 ## Forbidden
 

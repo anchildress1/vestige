@@ -170,7 +170,6 @@ sonar {
         property("sonar.projectKey", "anchildress1_vestige")
         property("sonar.organization", "anchildress1")
         property("sonar.host.url", "https://sonarcloud.io")
-        property("sonar.kotlin.coveragePlugin", "jacoco")
         property("sonar.coverage.jacoco.xmlReportPaths", "build/reports/kover/report.xml")
         property(
             "sonar.junit.reportPaths",

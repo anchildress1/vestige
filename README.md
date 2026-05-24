@@ -1,6 +1,6 @@
 <h1 align="center">Vestige</h1>
 
-<p align="center"><em>On-device cognition tracker for ADHD-flavored adults. Anti-sycophant, behavioral, private.</em></p>
+<p align="center"><em>A brain tracker that won't blow smoke up your ass. Gemma 4, Android, fully local.</em></p>
 
 <p align="center">
   Built for the <a href="https://dev.to/devteam/join-the-gemma-4-challenge-3000-prize-pool-for-ten-winners-23in">Gemma 4 Challenge</a> — submission category: Build with Gemma 4.<br/>

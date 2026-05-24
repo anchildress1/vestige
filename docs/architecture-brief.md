@@ -37,7 +37,7 @@ No extra modules in v1 unless they remove a real compile or ownership problem. D
 | `NetworkGate` | process-scoped | sole HTTP/download path; `OPEN` only during model download, `SEALED` otherwise |
 | `EntryStore` | process-scoped | ObjectBox entry/tag writes; export filename stability |
 | `PatternStore` | process-scoped | ObjectBox pattern persistence, lifecycle state machine, and pattern detection algorithm per `adrs/ADR-003-pattern-detection-and-persistence.md` |
-| `RetrievalRepo` | process-scoped | keyword + tag + recency retrieval; vector only if STT-E passes |
+| `RetrievalRepo` | process-scoped | keyword + tag + recency + EmbeddingGemma cosine (STT-E passed — shipped). **Implemented + validated but currently unwired on the live path — see Addendum 2026-05-23.** |
 | `InferenceCoordinator` | process-scoped | Foreground call, background extraction scheduling, prompt composition, resolver. **Single-session, sequential — concurrent multi-context is SDK-impossible on `litertlm-android:0.11.0` (measured on-device 2026-05-17, STT-F `stt-results/stt-f-2026-05-17.md`; `adrs/ADR-008-parallel-lens-execution.md` §Addendum 2026-05-17 reverses §Correction).** `LiteRtLmEngine.callMutex` holds the createConversation→close lifetime exclusively: at most one live session ever (`stateMutex`/`drainGate` close-drain is orthogonal). The three background lenses run sequentially (`LENSES.map { runLens }`). Foreground capture owns the slot: starting a voice foreground call cancels active background extraction; queued background extraction drains FIFO when foreground releases the slot. Two Engines is out (2× weight load). The v1 inference lifecycle is locked by `adrs/ADR-014-foreground-background-split-and-periodic-pattern-analysis.md`; `adrs/ADR-018-inline-foreground-follow-up.md` keeps the follow-up inline with the transcription call. |
 | `SessionState` | per-capture (single-use, terminates with the capture) | active persona for this capture + the live capture state, owned by `CaptureViewModel.CaptureUiState` (Idle / Recording / Inferring / Reviewing) over the `ForegroundStreamEvent` stream, persisted via `saveAndExtract` / `EntryStore`. v1 single-turn lifecycle per `adrs/ADR-005-stt-b-scope-and-v1-single-turn.md` (amends `adrs/ADR-002-multi-lens-extraction-pattern.md` §"Multi-turn behavior"); non-recoverable discard during RECORDING per `adrs/ADR-001-stack-and-build-infra.md` §Q8 (no rehydration, no Undo). The earlier `CaptureSession` / `Transcript` types that realized this were retired post-streaming as an orphaned duplicate — see `adrs/ADR-005…` §Addendum (2026-05-17). |
 
@@ -210,6 +210,14 @@ The consequence is deliberate: entry creation is no longer stalled on query embe
 **Correct behavior:** foreground owns the immediate transcript + follow-up / open-entry handoff; retrieval history feeds detached background analysis after transcription lands.
 
 **Corrected 2026-05-20.** Both voice and typed capture skip retrieval on the critical path. `CaptureViewModel` saves the pending entry as soon as it has authoritative foreground text and opens History detail immediately. `BackgroundExtractionSaveFlow` performs its own retrieval when the caller supplied none, so structured extraction keeps prior-entry context without making the user wait. `LiteRtLmEngine` still serializes Gemma calls on the GPU; foreground cancels active background extraction, then queued extraction reruns FIFO after foreground releases the slot.
+
+**Addendum (2026-05-23) — "retrieval" on the live path is deterministic; the embedding hybrid is unwired.** The "retrieval" `BackgroundExtractionSaveFlow` performs (above) is **deterministic**, not embedding-based — and the embedding hybrid is dead on the live path. Be precise about which is which:
+
+- **Live (deterministic, no embeddings):** the lens read gets `PatternCandidates` (signature match against ACTIVE patterns) via `retrievePatternCandidates`; the observation read gets `TemporalHistoryRetrieval` (same weekday + time-of-day block). Neither touches `EntryEntity.vector`.
+- **Built but unwired:** `RetrievalRepo` (keyword + tag-Jaccard + recency + **EmbeddingGemma cosine**) is fully implemented and STT-E-validated (`stt-results/stt-e-2026-05-19.md`), but its only caller `AppContainer.retrieveHistory` is **never invoked**, and `CaptureViewModel` passes `retrievedHistory = emptyList()`. It is dead code on the live path.
+- **The only runtime consumer of `EntryEntity.vector`** is `EmbeddingClustering` (the `VOCAB_FREQUENCY` pattern → Vocab Drift screen). That is the single surface where embeddings visibly act.
+
+Tracked in `backlog.md` → `embedding-retrieval-surface` (wire it into a demo-gate-clearing surface, or cut it rather than ship dead plumbing).
 
 ---
 

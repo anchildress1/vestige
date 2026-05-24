@@ -33,6 +33,7 @@
 - [Security & Privacy](#security--privacy)
 - [How to Contribute](#how-to-contribute)
 - [What's Next](#whats-next)
+- [Known Limitations](#known-limitations)
 - [License](#license)
 - [Acknowledgements](#acknowledgements)
 - [Author](#author)
@@ -333,6 +334,16 @@ Branches and commits follow [`AGENTS.md`](AGENTS.md) and the repo conventions: a
 ## What's Next
 
 v1 ships 2026-05-24. Deferred features live in [`backlog.md`](docs/backlog.md) — v1.5 / v2 / STT-conditional, with explicit unblock-conditions per entry. No "coming soon" handwaving.
+
+---
+
+## Known Limitations
+
+What v1 actually does, stated straight.
+
+- **Embeddings: clustering ships; ranked retrieval doesn't (yet).** EmbeddingGemma 300M runs on-device and STT-E validated it — hybrid retrieval beat tag-only on 3 of 4 cohort queries on the reference S24 Ultra ([`docs/stt-results/stt-e-2026-05-19.md`](docs/stt-results/stt-e-2026-05-19.md)). But only **one** consumer of those vectors is wired into the running app: `EmbeddingClustering`, which powers the **Vocab Drift** screen (the `VOCAB_FREQUENCY` pattern). That is the visible proof embeddings work — entries that share **no keywords** ("drained" / "running on empty" / "burnt out") cluster by meaning, while a separate positives cluster ("locked-in" / "clear" / "sharp") proves it discriminates rather than lumping everything together. The ranked **hybrid retrieval** (`RetrievalRepo` — keyword + tag + recency + cosine) is implemented and validated but **not wired into any live surface**: its only caller is itself never invoked, capture passes empty history, and the per-entry observation's recurring context uses **deterministic** timestamp/weekday matching, not embeddings. Wiring it — or cutting it rather than shipping dead code — is tracked in [`backlog.md`](docs/backlog.md) → `embedding-retrieval-surface`.
+- **Voice captures cap at 30 s.** `AudioCapture` emits one final chunk at 30 s; the >30 s multi-chunk path is deferred ([`backlog.md`](docs/backlog.md) → `multi-chunk-foreground`). An audio cue at ~28 s warns before the cap fires.
+- **First inference is cold (~15 s).** The engine loads lazily on the first capture — proactive pre-warm was reverted after it regressed into a startup GPU-init crash ([ADR-012](docs/adrs/ADR-012-gpu-inference-performance-gaps.md)). Subsequent calls run ~7–11 s on E4B GPU; a full background 3-lens extraction is ~44 s/entry.
 
 ---
 

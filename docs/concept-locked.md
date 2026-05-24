@@ -6,9 +6,9 @@
 
 **Hook:** "I wrote a brain tracker that won't blow smoke up your ass."
 
-**Tagline:** *Vestige (n.) — a trace, mark, or visible evidence of something no longer present. Your brain keeps leaving traces. This app catches them.*
+**Tagline:** *vestige (n.): a trace of something left behind.*
 
-**Pitch:** Strava for your attention. The coach is a dick. Your data never leaves the phone. ADHD/INTP-coded, anti-sycophant by design.
+**Pitch:** ADHD-friendly Android app that points out the things you don't know you're doing every day. 30-second voice entries in, sourced behavioral patterns out. No grading, no gamification, no feelings prompts. Your data never leaves the phone.
 
 **Internal positioning rule:** Track what happened, not how you graded today. We log cognitive events. We do not do therapy, mental wellness, mood scoring, or anything that implies clinical framing.
 

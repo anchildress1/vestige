@@ -75,10 +75,10 @@ class EntryEntity(
     var lastError: String? = null,
 
     /**
-     * EmbeddingGemma 300M cosine-space vector over the entry's distilled semantic fields
-     * (see [buildEmbeddingText]) — not the raw [entryText]. Null until the backfill worker
-     * populates it. Hybrid retrieval treats a null vector as a zero cosine contribution so
-     * un-embedded rows still rank on keyword/tag/recency.
+     * EmbeddingGemma 300M cosine-space vector over the entry's tone word (see
+     * [buildEmbeddingText]) — the felt quality, not the topic. Null until the backfill worker
+     * populates it, and stays null for a toneless (purely factual) entry so it never joins a
+     * feeling cluster.
      */
     @HnswIndex(dimensions = EMBEDDING_DIMENSIONS, distanceType = VectorDistanceType.COSINE)
     var vector: FloatArray? = null,
@@ -95,11 +95,11 @@ class EntryEntity(
         const val EMBEDDING_DIMENSIONS = 768L
 
         /**
-         * Current correct [vectorSchemaVersion]. Rows below this embedded against the old raw
-         * `entryText` source (Story 3.11) and are re-swept. Bump when the embedding source or
-         * synthesis in [buildEmbeddingText] changes.
+         * Current correct [vectorSchemaVersion]. Bump when the embedding source in
+         * [buildEmbeddingText] changes; rows below this are recognized as stale and re-swept.
+         * v1 = distilled tags/observations/commitment; v2 = tone word (feeling axis).
          */
-        const val CURRENT_VECTOR_SCHEMA_VERSION = 1
+        const val CURRENT_VECTOR_SCHEMA_VERSION = 2
     }
 }
 

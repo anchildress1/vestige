@@ -10,7 +10,7 @@
 
 Lock the demo. Curate the sample data set the recording will use, write the demo storyboard (90-second pitch + 5-minute technical walkthrough), and run dry runs on the reference device until the timing, beats, and STT outcomes are reproducible. By the end of Phase 5, the app is *ready to film* — Phase 6 is recording, editing, and submission package assembly.
 
-**Output of this phase:** a tested, repeatable demo flow on the reference S24 Ultra. Sample data populated. Storyboard committed to `demo-storyboard.md` (new file). Dry runs verify the demo lands in the time budget and the magic moments hit.
+**Output of this phase:** a tested, repeatable demo flow on the reference S24 Ultra. Sample data populated. Storyboard locked in `demo-storyboard.md` (private draft, not committed to the repo). Dry runs verify the demo lands in the time budget and the magic moments hit.
 
 ---
 
@@ -48,7 +48,7 @@ Lock the demo. Curate the sample data set the recording will use, write the demo
 **As** the AI implementor (and Ashley as the demo recorder), **I need** a written `demo-storyboard.md` that locks the 90-second pitch beats and the 5-minute technical walkthrough beats — what shows on screen, what's said, what surface is highlighted, what STT outcomes are demonstrated — **so that** the final recording is a repeatable script rather than improvised tour.
 
 **Done when:**
-- [/] `demo-storyboard.md` exists at `docs/` root.
+- [/] `demo-storyboard.md` exists as a private draft (not committed to the repo).
 - [x] **90-second pitch section** breaks the pitch into beats with timing budgets:
   - 0:00–0:10 — Opening hook (the bite + the persona voice).
   - 0:10–0:30 — Voice in moment (Scoreboard "ON AIR" record button engaging, `sbBars` audio meter, `TickRule` 30s countdown, transcription appearing — per ADR-011 + `poc/Energy Direction.html`).
@@ -119,7 +119,7 @@ If a Phase 5 story starts adding product features or pushing into Phase 6, stop.
 Phase 6 starts when all the following are true:
 
 - [x] Stories 5.1 – 5.4 are Done.
-- [x] `demo-storyboard.md` is committed and reflects actual STT outcomes from Phases 1–3.
+- [x] `demo-storyboard.md` (private draft) reflects actual STT outcomes from Phases 1–3.
 - [x] Sample data narrative in `sample-data-scenarios.md` §"Demo set" is committed.
 - [x] Three dry runs on the reference device completed without show-stoppers.
 - [x] Battery and thermal verified — the device can sustain a 5-minute capture session at demo intensity.

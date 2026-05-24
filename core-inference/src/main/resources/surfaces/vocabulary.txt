@@ -1,15 +1,13 @@
 ## Surface: Vocabulary
 
-Name the entry's overall tone in a single word.
+Name the entry's overall feeling or tone in a single word.
 
 What to capture:
 
 - One word that best captures the felt quality of the entry as a whole. Prefer the user's own word when they name how it felt; otherwise pick the closest single word for the tone the entry carries.
 - This is the felt tone, not the topic or the physical state word — those go to `tags`. When the most obvious word is already a tag, do not return `null`: pick a distinct, unique tone word that names the felt quality without repeating a tag.
 
-Understatement, monotony, and resignation are tones — name them. An entry that shrugs ("same as
-always") carries a tone (resigned, flat, weary); it is not toneless. Reserve `null` for a plain
-factual log with no felt coloring at all.
+- Reserve `null` for a plain factual log with no felt coloring at all.
 
 What goes in the schema:
 

@@ -92,8 +92,9 @@ class VectorBackfillWorkerTest {
     }
 
     @Test
-    fun `embeds the synthesized distillation, never the raw entryText`() = runTest {
+    fun `embeds the tone word, never the raw entryText or content fields`() = runTest {
         insertEntry(
+            vocabularyWord = "Drained",
             tagNames = listOf("standup", "flattened"),
             observations = listOf("meeting ran long", "lead was absent"),
             commitmentTopic = "alice",
@@ -109,10 +110,8 @@ class VectorBackfillWorkerTest {
 
         assertEquals(1, stats.processed)
         assertEquals(0, stats.failed)
-        assertEquals(
-            listOf("standup flattened. meeting ran long. lead was absent. alice"),
-            callTexts,
-        )
+        // Tone word (trimmed, lowercased) — not the tags, observations, commitment, or transcript.
+        assertEquals(listOf("drained"), callTexts)
         val row = boxStore.boxFor<EntryEntity>().all.single()
         assertNotNull(row.vector)
         assertEquals(CURRENT, row.vectorSchemaVersion)
@@ -162,7 +161,7 @@ class VectorBackfillWorkerTest {
             status = ExtractionStatus.PENDING,
             vector = FloatArray(DIMS) { 1f },
             vectorSchemaVersion = 0,
-            tagNames = listOf("recovered"),
+            vocabularyWord = "recovered",
         )
         val cleanupOnlyWorker = VectorBackfillWorker(boxStore) { error("cleanup pass must not embed pending rows") }
 
@@ -216,7 +215,7 @@ class VectorBackfillWorkerTest {
     fun `stale previously-embedded rows are re-embedded against the new source`() = runTest {
         val staleVector = FloatArray(DIMS) { 0.5f }
         val id = insertEntry(
-            tagNames = listOf("rebackfill"),
+            vocabularyWord = "rebackfill",
             vector = staleVector,
             vectorSchemaVersion = 0,
         )
@@ -237,6 +236,7 @@ class VectorBackfillWorkerTest {
     fun `COMPLETED row with nothing distillable but no lens receipts stays stale for post-extraction retry`() =
         runTest {
             val id = insertEntry(
+                vocabularyWord = null,
                 tagNames = emptyList(),
                 observations = emptyList(),
                 commitmentTopic = null,
@@ -261,6 +261,7 @@ class VectorBackfillWorkerTest {
     fun `COMPLETED row with terminal receipts and nothing distillable stamps schema and terminates the sweep`() =
         runTest {
             val id = insertEntry(
+                vocabularyWord = null,
                 tagNames = emptyList(),
                 observations = emptyList(),
                 commitmentTopic = null,
@@ -283,8 +284,8 @@ class VectorBackfillWorkerTest {
 
     @Test
     fun `embedder failure leaves the row stale so the next pass retries it`() = runTest {
-        val good = insertEntry(tagNames = listOf("succeeds"))
-        val bad = insertEntry(tagNames = listOf("throws"))
+        val good = insertEntry(vocabularyWord = "succeeds")
+        val bad = insertEntry(vocabularyWord = "throws")
         val worker = VectorBackfillWorker(boxStore) { text ->
             if (text == "throws") error("simulated embedder failure")
             FloatArray(DIMS) { 1f }
@@ -338,7 +339,7 @@ class VectorBackfillWorkerTest {
         runTest {
             val cleanupId =
                 insertEntry(status = ExtractionStatus.FAILED, vector = FloatArray(DIMS) { 2f }, vectorSchemaVersion = 0)
-            val ids = listOf(cleanupId) + (0 until 5).map { insertEntry(tagNames = listOf("entry-$it")) }
+            val ids = listOf(cleanupId) + (0 until 5).map { insertEntry(vocabularyWord = "entry-$it") }
             val seen = mutableListOf<String>()
             val worker = VectorBackfillWorker(boxStore) { text ->
                 seen.add(text)
@@ -382,8 +383,9 @@ class VectorBackfillWorkerTest {
         // reloads, neither put must resurrect.
         val target = insertEntry(
             status = ExtractionStatus.COMPLETED,
-            // Empty extraction surfaces produce blank distilled text via buildEmbeddingText.
-            // Setting a terminal payload steers into the schema-bump branch.
+            // A null tone word distills to blank text via buildEmbeddingText; the terminal
+            // lens receipt steers into the schema-bump branch.
+            vocabularyWord = null,
             lensReceiptsJson = """[{"lens":"LITERAL","extracted":false}]""",
             tagNames = emptyList(),
         )
@@ -445,8 +447,11 @@ class VectorBackfillWorkerTest {
         )
     }
 
-    @Suppress("LongParameterList") // Test seam mirrors the fields buildEmbeddingText reads.
+    @Suppress("LongParameterList") // Test seam mirrors the entry fields backfill scenarios exercise.
     private fun insertEntry(
+        // buildEmbeddingText now embeds the tone word; default to a non-blank one so a default
+        // COMPLETED row is embeddable. Tests needing blank distillation pass vocabularyWord = null.
+        vocabularyWord: String? = "weary",
         tagNames: List<String> = listOf("default-tag"),
         observations: List<String> = emptyList(),
         commitmentTopic: String? = null,
@@ -478,6 +483,7 @@ class VectorBackfillWorkerTest {
             entryText = entryText,
             timestampEpochMs = System.currentTimeMillis(),
             markdownFilename = "test-${System.nanoTime()}.md",
+            vocabularyWord = vocabularyWord,
             statedCommitmentJson = commitmentJson,
             entryObservationsJson = observationsJson,
             lensReceiptsJson = lensReceiptsJson,

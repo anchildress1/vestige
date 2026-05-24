@@ -676,41 +676,6 @@ class AppContainerTest {
         }
 
     @Test
-    fun `retrieveHistory uses the injected dispatcher and maps entries to context-only chunks`(
-        @TempDir tempRoot: File,
-    ) = runTest {
-        val dataDir = newInMemoryObjectBoxDirectory("retrieve-history-")
-        val boxStore = openInMemoryBoxStore(dataDir)
-        val testDispatcher = StandardTestDispatcher(testScheduler)
-        boxStore.boxFor(EntryEntity::class.java).apply {
-            put(EntryEntity(entryText = "reopened the same ticket again", timestampEpochMs = 2_000L))
-            put(EntryEntity(entryText = "groceries and laundry", timestampEpochMs = 1_000L))
-        }
-        val context = mockk<Context>(relaxed = true) {
-            every { filesDir } returns tempRoot
-            every { cacheDir } returns File(tempRoot, "cache").apply { mkdirs() }
-        }
-        val container = AppContainer(
-            applicationContext = context,
-            boxStoreFactory = { boxStore },
-            recoveredEntryIdsLoader = { emptyList() },
-            foregroundServiceIntentFactory = { Intent("dev.anchildress1.vestige.TEST_START") },
-            foregroundServiceStarter = {},
-            computeDispatcher = testDispatcher,
-            scope = backgroundScope,
-        )
-
-        try {
-            val history = container.retrieveHistory("ticket")
-
-            assertEquals(listOf(HistoryChunk(patternId = null, text = "reopened the same ticket again")), history)
-        } finally {
-            container.close()
-            cleanupObjectBoxTempRoot(tempRoot, dataDir)
-        }
-    }
-
-    @Test
     fun `deleteMainModel removes the artifact and drops readiness to Loading`(@TempDir tempRoot: File) = runTest {
         val modelFile = File(tempRoot, "main-model.litertlm").apply { writeText("xx") } // 2 bytes
         val artifactStore = fakeArtifactStore(artifactFile = modelFile, expectedByteSize = 2L)

@@ -46,7 +46,6 @@ import dev.anchildress1.vestige.storage.PatternDetector
 import dev.anchildress1.vestige.storage.PatternEntity
 import dev.anchildress1.vestige.storage.PatternRepo
 import dev.anchildress1.vestige.storage.PatternStore
-import dev.anchildress1.vestige.storage.RetrievalRepo
 import dev.anchildress1.vestige.storage.TagEntity
 import dev.anchildress1.vestige.storage.VectorBackfillWorker
 import dev.anchildress1.vestige.storage.VestigeBoxStore
@@ -287,27 +286,6 @@ class AppContainer(
             emitAll(foregroundInference.runForegroundCall(audio, persona))
         } finally {
             endForegroundInference()
-        }
-    }
-
-    private val retrievalRepo: RetrievalRepo by lazy {
-        RetrievalRepo(boxStore = boxStore, embedder = { text -> requireEmbedder().embed(text) })
-    }
-
-    /**
-     * Off-thread prior-entry lookup feeding background extraction. Degrades to empty on any failure
-     * (embeddings not backfilled yet, store error) so a bad retrieval never blocks entry creation.
-     * Maps the top entries to context-only [HistoryChunk]s.
-     */
-    suspend fun retrieveHistory(query: String): List<HistoryChunk> = withContext(computeDispatcher) {
-        try {
-            retrievalRepo.query(query, topN = FOREGROUND_HISTORY_TOP_N)
-                .map { HistoryChunk(patternId = null, text = it.entryText) }
-        } catch (cancel: CancellationException) {
-            throw cancel
-        } catch (@Suppress("TooGenericExceptionCaught") error: Exception) {
-            Log.w(TAG, "retrieveHistory degraded", error)
-            emptyList()
         }
     }
 
@@ -1073,7 +1051,6 @@ class AppContainer(
         const val VECTOR_BACKFILL_RETRY_DELAY_MS = 5_000L
         const val VECTOR_BACKFILL_MAX_RETRIES = 12
         const val PCT_MAX = 100
-        const val FOREGROUND_HISTORY_TOP_N = 3
 
         /** Prior supporting entries per candidate pattern fed to the lens recurrence read. */
         const val PATTERN_CANDIDATE_PRIOR_ENTRIES = 3

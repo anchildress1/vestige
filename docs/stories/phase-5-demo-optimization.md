@@ -39,7 +39,7 @@ Lock the demo. Curate the sample data set the recording will use, write the demo
 - [x] Loader is **not shipped in release builds**. Per `AGENTS.md` and the scope rule, demo data is dev-only; the submitted APK has a fresh install state.
 - [x] Sample data narrative is documented in `sample-data-scenarios.md` §"Demo set" (a new section, distinct from the STT validation scenarios).
 
-**Notes / risks:** Don't seed the sample data into the demo APK as fake user history. Judges installing the APK should see `No entries yet.` / `First one takes 30 seconds.` per `ux-copy.md` §"Empty States". The demo recording uses a separate dev build with seeded data; the submission is the clean release build.
+**Notes / risks:** Don't seed the sample data into the demo APK as fake user history. Judges installing the APK should see `Nothing recorded yet.` / `First one takes 30 seconds.` per `ux-copy.md` §"Empty States". The demo recording uses a separate dev build with seeded data; the submission is the clean release build.
 
 ---
 

@@ -239,68 +239,36 @@ Pass condition:
 
 ## Demo Set
 
-Story 5.1 / Story 5.4 — seeded into the reference device for recording. Distinct from the STT corpus above; do not mix IDs. Loaded via the dev-only data loader; not present in the release APK.
+Seeded into the reference device for recording via `DebugPatternSeeder` (`app/src/debug/kotlin/dev/anchildress1/vestige/debug/DebugPatternSeeder.kt`). Debug-only — not present in the release APK. Distinct from the STT corpus above; do not mix.
 
-**Anchor pattern:** post-people-drain Crashed. Six entries across work and personal contexts using different vocabulary for the same crash shape. This is the demo's primary pattern callout moment and the embedding-advantage beat in the technical walkthrough.
+The seeder writes **36 entries**, sorted chronologically before persist. Each lands as `markdownFilename = "debug-seed-$idx.md"` with `ExtractionStatus.PENDING` and a local wall-clock timestamp (device `systemDefault` zone, not UTC). **There is no `DEMO-NN` ID scheme** — entries are identified by their seed index and timestamp.
 
-**Dates:** Apr 21 – May 15 (one month, realistic cadence).
+Extraction fields (`template_label`, `tags`, `vocabulary`, `stated_commitment`, observations) are **model-emitted at extraction time, not seeded.** The seeder supplies only prose, timestamp, and duration.
 
-### DEMO-05
+### Corpus groups
 
-| Field | Value |
-|---|---|
-| ID | DEMO-05 |
-| Timestamp | May 1 (Thu) 11:40 |
-| Text | "After the all-hands I did the hollow routine. Coffee went cold on the desk. Everything I was going to do right after evaporated. Three tabs open. I know what they're for. Still open." |
-| template_label | Crashed |
-| tags | `all-hands`, `meeting`, `work`, `hollow-routine`, `tabs` |
-| vocabulary | `hollow` |
-| stated_commitment | null |
-| entry_observations | 1. Post-meeting crash — work context this time. Vocabulary: "hollow routine" implies this is a recurring shape the user has named themselves. 2. Specific evidence: cold coffee, three tabs, zero execution. |
-| pattern contribution | Crashed cluster #3. First work-context entry in the cluster — broadens the pattern beyond personal social events. |
+| Group | Count | What it demonstrates |
+|---|---|---|
+| `DEMO_ENTRIES` | 12 | Archetype spread + the headline recurrence. 4 Tuesday-afternoon standup/meeting crashes (04-28, 05-05, 05-12, 05-19, ~13:30–14:30); decision-spiral ×2 (05-22 migration rewrite, 05-11 doc rewrite); stalled ×2 (05-01, 05-09 — keyword-free resistance/paralysis prose, recovered from natural language not a planted phrase); goblin-hours ×1 (05-08 02:13); tunnel-exit ×1 (05-15 "got it done"); commitment-anchor ×1 (05-22 13:00 "deal with the backlog" — modal, deadline-free promise; Skeptical flags `commitment-without-anchor` → resolves CONSENSUS_WITH_CONFLICT). |
+| `backlogNarrative` | 2 | 05-18 shipped-then-hit-a-wall; 05-20 audit-cycle double-checking. |
+| `vocabDriftEntries` | 15 | 11 exhaustion entries with drifted vocabulary ("hit a wall" / "drained" / "wiped out" / "running on empty" / "fumes" / "depleted" / "burnt out" / "sluggish/brain fog" / "wired" / "exhausted" / "can't sleep can't focus") + 4 positives ("locked-in" / "clear" / "good" / "sharp"). All share a 14s duration; the prose carries the variation, not the timing. |
+| `artifactRecurrenceEntries` | 4 | Negative control. Thursday-evening 18:30 (04-30, 05-07, 05-14, 05-21) sharing a weekday + time slot but unrelated end-of-day logistics (coffee filters, standing desk, landlord email, ramen). The model should NOT promote it to a cognitive recurrence. |
+| `demoDreadEntries` | 3 | Saturday 10:00 (04-25, 05-02, 05-09) demo-dread priors so a live typed "I hate demos" capture can join the content cluster on stage. |
 
-### DEMO-06
+### Headline demo beat
 
-| Field | Value |
-|---|---|
-| ID | DEMO-06 |
-| Timestamp | May 3 (Sat) 12:00 |
-| Text | "Said I would drop the package off today. Drive past UPS on my route. Spent twenty minutes googling whether the thing is even worth returning. It is. Label is still on the counter." |
-| template_label | Stalled |
-| tags | `return-label`, `package`, `UPS`, `commitment`, `googling` |
-| vocabulary | null |
-| stated_commitment | "drop the return package off today" |
-| entry_observations | 1. Explicit commitment logged: "said I would drop it off today." 2. Avoidance behavior: researched the validity of the task instead of doing it. Commitment connects to DEMO-04. |
-| pattern contribution | Stalled #2. Stated commitment makes this the STT-D B2 analog — stronger signal than DEMO-04. |
+The Tuesday-afternoon meeting-crash recurrence vs. the Thursday-evening negative control. The crashes share a weekday + time-of-day slot; the third forms the time-block pattern and the fourth extracts WITH it as a candidate, so the model validates a genuine recurrence. The Thursday-evening cluster occupies the same shape (same weekday + fixed time) but with no recurring cognitive state — the demo shows the model can tell "I'm tired after work" from "I always log at 5pm."
 
-### DEMO-07
+### Patterns that actually mint on-device
 
-| Field | Value |
-|---|---|
-| ID | DEMO-07 |
-| Timestamp | May 5 (Mon) 21:00 |
-| Text | "Spent an hour and a half comparing couches. Dimensions, reviews, lead time, return policy. Made a spreadsheet. Did not buy a couch. Twelve rows." |
-| template_label | Decision spiral |
-| tags | `couch`, `spreadsheet`, `comparing`, `decision`, `twelve-rows` |
-| vocabulary | null |
-| stated_commitment | null |
-| entry_observations | 1. Decision loop: 90 minutes, spreadsheet, 12 options, no decision. 2. Vocabulary: the user measures their own loop ("twelve rows") without explaining why they can't choose. |
-| pattern contribution | Decision spiral standalone. |
+Verified 2026-05-23 — 5 patterns mint on this corpus:
 
-### Demo Set — expected pattern callout
+- `TEMPORAL_RELATIVE` "Friday Evening Stalling"
+- `TEMPORAL_RELATIVE` "Thursday Evening Routine" — the negative control DID mint, as a benign time-block (not promoted to a cognitive recurrence)
+- `TEMPORAL_RELATIVE` "Saturday Morning Demos" — the dread cluster minted by time, not tone
+- a Tuesday-afternoon time-block — the meeting crashes
+- `TEMPLATE_RECURRENCE` "Stalled"
 
-When DEMO-12 saves, the pattern engine should detect the Crashed cluster and fire a pattern callout appended to DEMO-12's per-entry observation. Example Witness callout:
-
-> "Witness also noticed: sixth entry with a post-people energy drop — Apr 21, Apr 26, May 1, May 6, May 10, May 15. Events vary (dinner, lunch, all-hands, crowd, call). Shape doesn't."
-
-The callout must cite dates or counts. It must not say "you might be feeling drained" or offer any motivation theory.
-
-### Demo Set — embedding-advantage beat
-
-For the technical walkthrough's retrieval comparison, query: `"post-social crash, different words each time"`.
-
-Tag-only baseline is expected to miss DEMO-08 ("signal dropped", "couldn't reboot") and possibly DEMO-10 ("sat in the car", "did nothing useful") because keyword overlap with the crash cluster is low.
-
-Hybrid (tag + embedding) is expected to surface both. This is the observable embedding-advantage moment — show the two result lists side by side and point to the entries that moved.
+**Zero `VOCAB_FREQUENCY` (Vocab Drift) patterns.** The vocab-drift cluster is present in the corpus but does not currently mint a Vocab Drift pattern — the embedding cluster falls below the clustering threshold (tracked in `backlog.md` §`vocab-cluster-threshold`).
 
 > **No template-label fixture.** A draft STT-F template-label smoke test was removed 2026-05-17: template assignment is structurally always `AUDIT` on realistic input (root cause: `backlog.md` §`archetype-template-labeling`). Any fixture that produces a non-AUDIT label only does so by feeding the exact internal trigger vocabulary — a fake test. Story 4.16 shipped the UI yank (2026-05-19); a real fixture is gated on the v1.5 redesign or confirmed prompt-tightening results on `fix/prompt-tightening-smoke-tests`.

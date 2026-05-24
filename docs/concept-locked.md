@@ -103,7 +103,7 @@ The "Reading" debug-style section on entry detail shows each lens's output per s
 
 The product produces useful observable signal from entry one — not validation, not "feels seen" framing, just specific behavioral or vocabulary observations the user can verify. The product visibly sharpens as data accumulates.
 
-**Pattern-enhanced callout (after threshold).** When ≥10 entries exist AND a pattern with ≥3 supporting entries is detected, the per-entry observation is *appended* with a pattern callout. "Witness also noticed: this is the fourth Crashed entry in twelve — all post-meeting." Cooldown of 3 entries on the pattern-callout part only; per-entry observations continue normally during cooldown.
+**Pattern-enhanced callout.** Pattern analysis runs **periodically — every 3 completed entries** ([ADR-014](adrs/ADR-014-foreground-background-split-and-periodic-pattern-analysis.md), supersedes the original "≥10 entries" threshold trigger); when a pattern with ≥3 supporting entries is detected, the per-entry observation is *appended* with a pattern callout. "Witness also noticed: this is the fourth Crashed entry in twelve — all post-meeting." **Per-pattern** callout cooldown of 3 ([ADR-016](adrs/ADR-016-pattern-callout-cooldown-per-pattern.md), supersedes the original global cooldown); per-entry observations continue normally during cooldown.
 
 **Roast me button (P1)** — on-demand deep analysis across history, available in patterns view after the normal pattern list works. User-initiated, no hard threshold: button may be visible from entry one, but generation may return the insufficient-data fallback copy from `ux-copy.md` when there is not enough history to make a sourced roast. Output must always be sourced (counts, dates, quotes); never freeform speculation.
 
@@ -115,9 +115,8 @@ The product produces useful observable signal from entry one — not validation,
 ## Memory architecture
 - ObjectBox = source of truth for entries, tags, patterns, and vectors **(P0)**
 - Markdown files = generated export output (one per entry, readable, debuggable)
-- **Vector index + EmbeddingGemma 300M ship only if STT-E passes.** EmbeddingGemma 300M via LiteRT (~200MB quantized, sub-15ms inference, pre-built `litert-community/embeddinggemma-300m`). Same runtime as the main model.
-- Hybrid retrieval P0 baseline: keyword + Gemma-extracted tags + recency. Vector (semantic similarity) layer added on top **only if STT-E passes**.
-- **If STT-E fails:** v1 ships with keyword + tags + recency only. EmbeddingGemma + vector index drop to v1.5 (see `backlog.md`).
+- **Vector index + EmbeddingGemma 300M ship (STT-E passed 2026-05-12).** EmbeddingGemma 300M via LiteRT (pre-built `litert-community/embeddinggemma-300m`), loaded through `localagents-rag` (ADR-010). Vectors are computed per entry and STT-E-validated. **Caveat:** the vector *surfaces* — ranked hybrid retrieval and the Vocab Drift clustering — are **not yet live** in the build (see README §"Known Limitations"; `backlog.md` → `embedding-retrieval-surface` / `vocab-cluster-threshold`).
+- Hybrid retrieval P0 baseline: keyword + Gemma-extracted tags + recency. The vector (semantic similarity) layer is implemented on top but not yet wired into a live surface.
 - **Why both layers (when shipped):** tags are a modeling layer that drifts with vocabulary; embeddings are a measurement layer that stays stable. Vector layer protects pattern detection from user vocabulary drift over months.
 
 ## Stack

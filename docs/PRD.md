@@ -62,18 +62,18 @@ Edge cases:
 - Witness / Hardass / Editor personas fully working as prompt-and-copy variants. They change tone only, not extraction logic. This keeps onboarding honest and gives the demo its visible bite without adding a second analytical system.
 - Multi-lens extraction pipeline (3 lenses × 5 surfaces) producing the minimal v1 schema with convergence-based confidence. Templates are agent-emitted labels (Aftermath, Tunnel exit, Stalled, Decision spiral, Goblin hours, Audit), not user-picked.
 - Tag extraction per entry, visible to user, stored as queryable structured data
-- **Per-entry observations:** every saved entry surfaces 1–2 behavioral or vocabulary observations from that entry alone, even before any cross-entry pattern exists. The product produces useful observable signal from entry one. Pattern-enhanced callouts remain gated at ≥10 entries + ≥3 supporting entries.
+- **Per-entry observations:** every saved entry surfaces 1–2 behavioral or vocabulary observations from that entry alone, even before any cross-entry pattern exists. The product produces useful observable signal from entry one. Pattern analysis runs periodically (every 3 completed entries, ADR-014); a callout surfaces when a pattern has ≥3 supporting entries.
 
 **Memory:**
 - ObjectBox source-of-truth for entries, tags, patterns, and vectors
 - Generated markdown export for readable backups
 - Hybrid retrieval (keyword + tags + recency) over candidate set
-- **Vector layer (EmbeddingGemma 300M + ObjectBox vector index) ships only if STT-E passes.** If STT-E fails, v1 ships keyword + tags + recency only; embeddings move to v1.5.
+- **Vector layer (EmbeddingGemma 300M + ObjectBox vector index) ships — STT-E passed 2026-05-12.** Vectors are computed and STT-E-validated; the vector *surfaces* (ranked retrieval, Vocab Drift) are not yet live (see README §"Known Limitations").
 - One basic history list of past entries
 - Entry detail screen: transcript, tags, template label, the per-entry observation. Reading/Re-eval debug output is P1.
 
 **Patterns:**
-- Pattern detection runs after every N entries (default 10, hardcoded for v1)
+- Pattern analysis runs periodically — every 3 completed entries (ADR-014), hardcoded for v1
 - At least one cross-entry pattern surfaces in the demo session
 - Patterns persist as their own list; basic patterns view
 - **Pattern actions in v1:** Skip / Drop / Restart. Agency over surfaced patterns is part of the user story; promoted from P1 to P0.
@@ -138,13 +138,13 @@ Edge cases:
 - Given the user finishes a session, when the entry is saved, then the entry shows ≥1 model-extracted tag and tags are stored as queryable structured data.
 
 **Pattern surfacing:**
-- Given the user has ≥10 entries (or seeded sample data), when a session ends, then at least one cross-entry pattern surfaces, is named in the user's own words, and contains no interpretive overlay ("you might be feeling…" is forbidden).
+- Given enough entries (or seeded sample data) and the periodic pattern pass (every 3 completed entries, ADR-014), at least one cross-entry pattern surfaces, is named in the user's own words, and contains no interpretive overlay ("you might be feeling…" is forbidden).
 
 **Privacy claim:**
 - Given the user is using the app normally, when network traffic is monitored on the device, then no outbound network calls occur. Model download is the sole network event and only happens at first launch (or explicit re-download from settings).
 
-**Embedding contingent ship:**
-- Given STT-E (Phase 3 stop-and-test), when tag-only vs tag+embedding retrieval are compared on prepared vocabulary-drift entries, then embeddings ship only if the difference is visually compelling in the demo. If not, EmbeddingGemma and the ObjectBox vector index both drop to v1.5.
+**Embedding ship (resolved):**
+- **STT-E passed 2026-05-12** — hybrid (tag + keyword + recency + EmbeddingGemma cosine) beat tag-only on 3 of 4 cohort queries on the reference S24 Ultra. EmbeddingGemma 300M + the ObjectBox vector index ship in v1. The vector *surfaces* (ranked retrieval, Vocab Drift clustering) are implemented but not yet live in the build — see README §"Known Limitations" / `backlog.md` (`embedding-retrieval-surface`, `vocab-cluster-threshold`).
 
 ## Success Metrics
 
@@ -218,8 +218,8 @@ Sample data for STT-C, STT-D, STT-E lives in `sample-data-scenarios.md`.
 
 ### Phase 3 — Memory and patterns
 1. Hybrid retrieval implementation (keyword + tags + recency)
-2. Embedding layer + ObjectBox vector index integration. **🛑 STT-E — EmbeddingGemma vs tag-only comparison.** Run prepared vocabulary-drift sample data through both retrieval paths; embeddings ship only if visibly better. If not, drop EmbeddingGemma and the vector index to v1.5.
-3. Pattern detection runs at end of session
+2. Embedding layer + ObjectBox vector index integration. **🛑 STT-E — PASSED 2026-05-12** (hybrid beat tag-only 3/4); EmbeddingGemma + vector index ship in v1. (Surfaces not yet live — see README §"Known Limitations".)
+3. Pattern analysis runs periodically — every 3 completed entries (ADR-014), not at end of session
 4. Patterns persist in their own list
 5. Pattern detection list + minimal pattern detail with source evidence; pattern actions (Skip / Drop / Restart) reachable per P0
 6. Per-entry observation generation wired into the capture loop (P0)

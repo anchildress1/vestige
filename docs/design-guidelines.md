@@ -112,6 +112,8 @@ Do not:
 
 The canonical visual system now lives in ADR-011 plus the `../poc/*-final.png` screenshots. The old Mist token tables below are historical context unless an ADR-011 addendum explicitly reuses a rule.
 
+> **Spec ahead of build (2026-05-23):** BigStat/Delta not yet implemented (`ScoreboardPrimitives.kt` ships EyebrowE/StatusDot/Pill/StatRibbon/TickRule/AppTop only); Pattern Detail + Vocab Drift still Material (`TopAppBar`/`OutlinedButton`), not full Scoreboard chrome; AppTop right slot is a hamburger, not the spec'd persona-pill+Settings-gear.
+
 ### Palette tokens (from `poc/design-review.md` §2.1)
 
 | Token | Value | Use |
@@ -524,7 +526,7 @@ Use the `error` token (`#B3261E` per `poc/design-review.md` §2.1) on the destru
 - Single primary action. ≥168px hero size (per the POC `MistHero` 168px spec).
 - Idle: stone with subtle internal gradient, no outer halo amplitude.
 - Active recording: outer halo scales with audio level (`level` prop), `vapor` (#2563EB) tint on the halo and ring, `AudioMeter` renders below, stop affordance center.
-- Post-stop / review: halo collapses to outline state with a thin `vapor` rim, `Reading the entry.` placeholder copy from `ux-copy.md` shows in the transcript area.
+- Post-stop / review: halo collapses to outline state with a thin `vapor` rim, `Reading the entry.` placeholder copy from `ux-copy.md` shows in the transcript area. **Superseded:** no in-Capture review surface ships — capture is Idle/Recording/Submitting, post-stop navigates to History detail (ADR-018 / ADR-014 Addendum). `Reading the entry.` is only the foreground-service notification text.
 - Approaching chunk boundary (25s of 30s): thin progress arc on the ring, soft visual cue, no copy.
 
 Compose translation notes for `MistHero` live in `design-review.md` §8 (radial gradients, conic ring, infinite-transition halo).

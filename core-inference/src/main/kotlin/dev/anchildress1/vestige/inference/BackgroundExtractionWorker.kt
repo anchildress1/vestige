@@ -237,32 +237,18 @@ class BackgroundExtractionWorker(
         }
     }
 
-    // Model-emitted template label wins only when load-bearing (CONSENSUS / CONSENSUS_WITH_CONFLICT).
-    // CANDIDATE means a single lens emitted it — not enough convergence to override the deterministic
-    // labeler. Unknown serials (fromSerial returns null) also fall back to the labeler. The lone
-    // exception: `audit` is the schema's explicit catch-all ("pick audit when no archetype
-    // dominates"), so a model `audit` is the lenses conceding they found no archetype. A specific
-    // deterministic signal (tag tree / goblin-hours) is strictly more informative than that
-    // concession, so the catch-all defers to it — this is what keeps `audit` from swallowing entries
-    // the labeler can place. A specific model pick still overrides the labeler outright.
+    // The model owns the template: its converged pick (CONSENSUS / CONSENSUS_WITH_CONFLICT) stands.
+    // The deterministic labeler is a fallback only — used when the lenses didn't converge on a serial
+    // (CANDIDATE / disagreement) or emitted an unknown one. The model isn't handed the structured
+    // capture time, so it reaches goblin-hours only when the entry text names a late hour; the
+    // labeler's timestamp rule covers the case where it doesn't.
     private fun resolveTemplateLabel(resolved: ResolvedExtraction, capturedAt: ZonedDateTime): TemplateLabel {
         val labelerPick = templateLabeler.label(resolved, capturedAt)
         val modelPick = modelTemplateLabel(resolved)
-        return when {
-            modelPick == null -> labelerPick
-
-            modelPick == TemplateLabel.AUDIT && labelerPick != TemplateLabel.AUDIT -> {
-                Log.d(TAG, "template_label model=audit labeler=$labelerPick (catch-all defers to labeler)")
-                labelerPick
-            }
-
-            modelPick != labelerPick -> {
-                Log.d(TAG, "template_label model=$modelPick labeler=$labelerPick (model wins)")
-                modelPick
-            }
-
-            else -> modelPick
+        if (modelPick != null && modelPick != labelerPick) {
+            Log.d(TAG, "template_label model=$modelPick labeler=$labelerPick (model wins)")
         }
+        return modelPick ?: labelerPick
     }
 
     private fun modelTemplateLabel(resolved: ResolvedExtraction): TemplateLabel? {

@@ -7,7 +7,8 @@ word "null".
 Lines:
 
 - `template_label: <serial>` — required, always present. Exactly one of: aftermath, tunnel-exit,
-  stalled, decision-spiral, goblin-hours, audit. Pick `audit` when no archetype dominates.
+  stalled, decision-spiral, goblin-hours, audit. Commit to the one archetype that best fits what the
+  entry describes; use `audit` only when the entry genuinely matches none of the others.
 - `tags: <comma-separated tokens>` — lowercase kebab-case, each at most two words / one hyphen
   (e.g. `standup`, `battery-died`). About one tag per 20 words; the user's own words, key points only.
 - `vocabulary: <one lowercase word>` — the entry's overall tone, the user's own word for how it

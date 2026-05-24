@@ -61,24 +61,12 @@ object PromptComposer {
             "compose lens=$lens systemChars=${systemInstruction.length} " +
                 "entryChars=${userText.length} tokens~=$tokenEstimate history=${capped.size}",
         )
-        logComposedBody(lens, systemInstruction, userText)
         return ComposedPrompt(
             lens = lens,
             systemInstruction = systemInstruction,
             userText = userText,
             tokenEstimate = tokenEstimate,
         )
-    }
-
-    // Verbose-only so release builds stay quiet; opt in with
-    // `adb shell setprop log.tag.VestigePromptComposer VERBOSE`. Chunked at <4 kB to dodge
-    // logcat's per-line ceiling.
-    private fun logComposedBody(lens: Lens, systemInstruction: String, userText: String) {
-        if (!Log.isLoggable(TAG, Log.VERBOSE)) return
-        val chunks = "$systemInstruction\n\n## ENTRY\n$userText".chunked(LOG_CHUNK_SIZE)
-        chunks.forEachIndexed { index, chunk ->
-            Log.v(TAG, "compose lens=$lens body[${index + 1}/${chunks.size}]=$chunk")
-        }
     }
 
     private fun loadLens(lens: Lens): String = loadResource(lensResourcePath(lens)).trimEnd()
@@ -129,5 +117,4 @@ object PromptComposer {
     private const val MAX_HISTORY_CHARS_PER_CHUNK = 600
     private const val CHARS_PER_TOKEN = 4
     private const val ELLIPSIS = "…"
-    private const val LOG_CHUNK_SIZE = 3500
 }

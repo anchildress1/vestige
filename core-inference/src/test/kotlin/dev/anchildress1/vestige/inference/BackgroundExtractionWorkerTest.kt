@@ -448,6 +448,54 @@ class BackgroundExtractionWorkerTest {
     }
 
     @Test
+    fun `converged audit defers to a specific labeler archetype`() = runTest {
+        val engine = mockk<LiteRtLmEngine>()
+        every { engine.streamText(any(), any()) } returns flowOf("raw-ok")
+        // The lenses converged on the `audit` catch-all, but a "crashed" tag gives the labeler a
+        // specific archetype. The catch-all yields to it instead of swallowing the entry.
+        val auditWithSignal = ResolvedExtraction(
+            fields = mapOf(
+                "tags" to ResolvedField(listOf("crashed"), ConfidenceVerdict.CONSENSUS),
+                "template_label" to ResolvedField("audit", ConfidenceVerdict.CONSENSUS),
+            ),
+        )
+
+        val result = BackgroundExtractionWorker(
+            engine = engine,
+            resolver = RecordingResolver(auditWithSignal),
+            parser = { lens, _ -> extraction(lens) },
+            composer = fakeComposer(),
+        ).extract(request = request)
+
+        val success = assertInstanceOf(BackgroundExtractionResult.Success::class.java, result)
+        assertEquals(TemplateLabel.AFTERMATH, success.templateLabel)
+    }
+
+    @Test
+    fun `converged audit stands when the labeler also finds no archetype`() = runTest {
+        val engine = mockk<LiteRtLmEngine>()
+        every { engine.streamText(any(), any()) } returns flowOf("raw-ok")
+        // No archetype tag and not goblin-hours -> the labeler also lands on audit, so the model's
+        // converged audit is honored rather than overridden.
+        val auditNoSignal = ResolvedExtraction(
+            fields = mapOf(
+                "tags" to ResolvedField(listOf("standup"), ConfidenceVerdict.CONSENSUS),
+                "template_label" to ResolvedField("audit", ConfidenceVerdict.CONSENSUS),
+            ),
+        )
+
+        val result = BackgroundExtractionWorker(
+            engine = engine,
+            resolver = RecordingResolver(auditNoSignal),
+            parser = { lens, _ -> extraction(lens) },
+            composer = fakeComposer(),
+        ).extract(request = request)
+
+        val success = assertInstanceOf(BackgroundExtractionResult.Success::class.java, result)
+        assertEquals(TemplateLabel.AUDIT, success.templateLabel)
+    }
+
+    @Test
     fun `worker labels using the capture timestamp's zone, not the JVM default`() = runTest {
         val engine = mockk<LiteRtLmEngine>()
         every { engine.streamText(any(), any()) } returns flowOf("raw-ok")

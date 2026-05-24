@@ -10,9 +10,11 @@ import java.time.ZonedDateTime
  * Deterministic labeler — now the validator and fallback for the model-emitted `template_label`.
  * The lenses pick one of six [TemplateLabel] serials per the output schema;
  * [BackgroundExtractionWorker] uses the model's converged pick when present and falls back to this
- * labeler when the lenses didn't agree on a serial, logging any divergence between the two. Reads
- * the resolved schema fields plus the entry's local capture time and assigns one of six
- * [TemplateLabel]s per `concept-locked.md` §"Templates" (AGENTS.md: templates are model-emitted).
+ * labeler when the lenses didn't agree on a serial. The one override: a converged `audit` is the
+ * schema's catch-all (the lenses found no archetype), so it defers to this labeler whenever the
+ * tag tree / goblin-hours rules place the entry on a specific archetype. Reads the resolved schema
+ * fields plus the entry's local capture time and assigns one of six [TemplateLabel]s per
+ * `concept-locked.md` §"Templates" (AGENTS.md: templates are model-emitted).
  *
  * Only CONSENSUS / CONSENSUS_WITH_CONFLICT fields drive label selection: CANDIDATE values are
  * single-lens witnesses ("lower confidence, not used by pattern engine until promoted" per

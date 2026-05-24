@@ -233,28 +233,42 @@ class BackgroundExtractionWorker(
 
     // Model-emitted template label wins only when load-bearing (CONSENSUS / CONSENSUS_WITH_CONFLICT).
     // CANDIDATE means a single lens emitted it — not enough convergence to override the deterministic
-    // labeler. Unknown serials (fromSerial returns null) also fall back to the labeler.
+    // labeler. Unknown serials (fromSerial returns null) also fall back to the labeler. The lone
+    // exception: `audit` is the schema's explicit catch-all ("pick audit when no archetype
+    // dominates"), so a model `audit` is the lenses conceding they found no archetype. A specific
+    // deterministic signal (tag tree / goblin-hours) is strictly more informative than that
+    // concession, so the catch-all defers to it — this is what keeps `audit` from swallowing entries
+    // the labeler can place. A specific model pick still overrides the labeler outright.
     private fun resolveTemplateLabel(resolved: ResolvedExtraction, capturedAt: ZonedDateTime): TemplateLabel {
         val labelerPick = templateLabeler.label(resolved, capturedAt)
-        val field = resolved.fields[TEMPLATE_LABEL_KEY]
-        val modelPick = if (field != null &&
-            (field.verdict == ConfidenceVerdict.CONSENSUS || field.verdict == ConfidenceVerdict.CONSENSUS_WITH_CONFLICT)
-        ) {
-            val serial = field.value as? String
-            if (serial != null) {
-                val parsed = TemplateLabel.fromSerial(serial)
-                if (parsed == null) Log.w(TAG, "template_label unknown serial=$serial; labeler wins")
-                parsed
-            } else {
-                null
+        val modelPick = modelTemplateLabel(resolved)
+        return when {
+            modelPick == null -> labelerPick
+
+            modelPick == TemplateLabel.AUDIT && labelerPick != TemplateLabel.AUDIT -> {
+                Log.d(TAG, "template_label model=audit labeler=$labelerPick (catch-all defers to labeler)")
+                labelerPick
             }
-        } else {
-            null
+
+            modelPick != labelerPick -> {
+                Log.d(TAG, "template_label model=$modelPick labeler=$labelerPick (model wins)")
+                modelPick
+            }
+
+            else -> modelPick
         }
-        if (modelPick != null && modelPick != labelerPick) {
-            Log.d(TAG, "template_label model=$modelPick labeler=$labelerPick (model wins)")
-        }
-        return modelPick ?: labelerPick
+    }
+
+    private fun modelTemplateLabel(resolved: ResolvedExtraction): TemplateLabel? {
+        val field = resolved.fields[TEMPLATE_LABEL_KEY] ?: return null
+        val loadBearing = field.verdict == ConfidenceVerdict.CONSENSUS ||
+            field.verdict == ConfidenceVerdict.CONSENSUS_WITH_CONFLICT
+        return (field.value as? String)
+            ?.takeIf { loadBearing }
+            ?.let { serial ->
+                TemplateLabel.fromSerial(serial)
+                    .also { if (it == null) Log.w(TAG, "template_label unknown serial=$serial; labeler wins") }
+            }
     }
 
     private fun tryResolve(parsed: List<LensExtraction>, currentLastError: String?): Resolution = try {

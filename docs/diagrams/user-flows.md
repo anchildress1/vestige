@@ -8,22 +8,24 @@ End-to-end paths through the shipped v1 surfaces. Source: ADR-004 Addendum (onbo
 
 ## 1. Onboarding — 3-screen hub
 
-Not a queue — a hub. Only the **Local** row gates entry; Mic and Notify are optional capability
-switches that never block.
+Not a queue — a hub. The wiring hub has **4** rows (Persona · Local · Mic · Notify); typed entry is
+not a wiring row. Only the **Local** row gates entry; Mic and Notify are optional capability
+switches that never block. Primary buttons: Screen 1 "Select", Screen 2 "Let's Go" (enabled only
+when Local is green).
 
 ```mermaid
 flowchart TD
     accTitle: Onboarding three-screen hub flow
-    accDescr: Screen one picks a persona. Screen two is a wiring hub with Persona, Local, Mic, Notify, and Type rows; only the Local row gates entry. If the model is not present the user goes to Screen three to download it, then auto-returns to the hub. Open Vestige is enabled only when the Local row is green.
+    accDescr: Screen one picks a persona and its button is Select. Screen two is a wiring hub with four rows, Persona, Local, Mic, and Notify; only the Local row gates entry. If the model is not present the user goes to Screen three to download it, then auto-returns to the hub. The Let's Go button is enabled only when the Local row is green.
 
-    S1["Screen 1 — Pick a persona<br/>Witness (default) · Hardass · Editor"] --> S2
-    S2["Screen 2 — Wiring hub<br/>rows: Persona · Local · Mic · Notify · Type"]
-    S2 --> LOCAL{"Local row green?<br/>(model verified)"}
+    S1["Screen 1 — Pick a persona ('Select')<br/>Witness (default) · Hardass · Editor"] --> S2
+    S2["Screen 2 — Wiring hub<br/>4 rows: Persona · Local · Mic · Notify"]
+    S2 --> LOCAL{"Local row green?<br/>(model artifact Complete)"}
     LOCAL -- no, Wi-Fi up --> S3["Screen 3 — Model download<br/>bytes/total/ETA · Pause"]
     LOCAL -- no, no Wi-Fi --> WIFI["open Wi-Fi settings<br/>(no dead-end screen)"]
     WIFI --> S2
     S3 --> S2
-    LOCAL -- yes --> OPEN(["Open Vestige (enabled)"])
+    LOCAL -- yes --> OPEN(["'Let's Go' (enabled)"])
 ```
 
 ---
@@ -33,11 +35,11 @@ flowchart TD
 ```mermaid
 flowchart TD
     accTitle: Voice capture flow
-    accDescr: Tap record to enter RECORDING. Discard during recording ends silently with no entry. Stop and file it triggers the foreground Gemma call returning transcription and one follow-up, persists an ObjectBox row, then runs the background three-lens extraction, convergence, observations, and pattern detection.
+    accDescr: Tap record to enter RECORDING. Discard during recording ends silently with no entry. Stop and file it triggers the foreground Gemma call returning transcription and one inline follow-up, persists an ObjectBox row, then runs the detached background three-lens extraction, convergence, observations, and periodic pattern detection.
 
     IDLE(["IDLE"]) -- "tap Record" --> REC["RECORDING"]
-    REC -- "DISCARD · NO SAVE<br/>(single tap, no confirm, silent)" --> IDLE
-    REC -- "STOP · FILE IT" --> FG["Foreground Gemma call<br/>→ transcription + follow-up"]
+    REC -- "DISCARD · DON'T SAVE<br/>(single tap, no confirm, silent)" --> IDLE
+    REC -- "STOP · FILE IT" --> FG["Foreground Gemma call<br/>→ transcription + inline follow-up"]
     FG --> PERSIST["EntryStore: ObjectBox row<br/>(audio discarded now)"]
     PERSIST --> SHOW["show transcript<br/>(transcription dimmed)"]
     PERSIST --> BG["background: 3 sequential lenses → resolver →<br/>entry_observations → pattern detection if threshold"]
@@ -46,39 +48,45 @@ flowchart TD
 
 ---
 
-## 3. Typed capture (ADR-013 — model required)
+## 3. Typed capture (ADR-013 + ADR-018 — model-gated, no foreground call)
 
-Typed runs the **same** foreground call as voice. No model-free fallback: if `ModelReadiness`
-is not `Ready`, `submitTyped` is a silent no-op (parity with a disabled REC button).
+Typed **persists the text directly** and does **not** make a foreground model call (ADR-018
+superseded the ADR-013 typed-model-call). The model is still **required as a gate** for parity with
+voice: if `ModelReadiness` is not `Ready` (or text is under 3 chars), `submitTyped` is a silent
+no-op (parity with a disabled REC button). Background extraction is the same as voice.
 
 ```mermaid
 flowchart TD
-    accTitle: Typed capture flow requires foreground model
-    accDescr: The user taps Type and enters text. If the model readiness is Ready, Log entry persists the typed transcript and runs the background pipeline. If the model is not Ready, submit is a silent no-op matching the disabled record button.
+    accTitle: Typed capture flow is model-gated but skips the foreground call
+    accDescr: The user taps Type and enters text. If the model readiness is Ready and the text is at least 3 characters, the typed text is persisted directly with no foreground call and a null follow-up, then the same detached background pipeline runs. If the model is not Ready, submit is a silent no-op matching the disabled record button.
 
-    T(["tap Type → 'What just happened.'"]) --> RDY{"ModelReadiness == Ready?"}
+    T(["tap Type → 'What happened.'"]) --> RDY{"ModelReadiness == Ready?<br/>(and text length ≥ 3)"}
     RDY -- no --> NOOP["silent no-op<br/>(parity with disabled REC)"]
-    RDY -- yes --> LOG["Log entry<br/>(typed text · follow_up = null)"]
-    LOG --> BG["same background pipeline as voice"]
+    RDY -- yes --> LOG["persist entry<br/>(typed text · follow_up = null · no foreground call)"]
+    LOG --> BG["same detached background pipeline as voice"]
 ```
 
 ---
 
 ## 4. Patterns — list → detail → actions
 
-Sections render only when non-empty, fixed order. User actions are **Skip / Drop / Restart**,
-each with a ~4 s Undo snackbar. `CLOSED · DONE` is model-detected only (v1.5) — no user Close.
+Sections render only when non-empty, fixed order. Section headers are **ACTIVE**, **SKIPPED · ON
+HOLD**, **CLOSED · DONE**, **DROPPED** (`strings.xml`; mapped in `PatternFormatting`). User actions
+are **Skip / Drop / Restart**, each with a `SnackbarDuration.Short` (~4 s) Undo snackbar.
+`CLOSED · DONE` is model-detected only (v1.5) — no user Close. The kind/`template` eyebrow
+(`PatternKind.serial`) is a **list-card** element, not a model `template_label`, and is not rendered
+on the detail summary.
 
 ```mermaid
 flowchart TD
     accTitle: Patterns list, detail, and lifecycle actions
-    accDescr: The patterns list shows non-empty sections in fixed order ACTIVE, SKIPPED, CLOSED, DROPPED. A card opens detail with sourced evidence. From overflow or the detail action row the user can Skip (returns in 7 days), Drop (record kept), or Restart a non-active pattern, each with an Undo snackbar. Close is model-detected only.
+    accDescr: The patterns list shows non-empty sections in fixed order ACTIVE, SKIPPED on hold, CLOSED done, DROPPED. A card opens detail with title, observation, count meta, a 30-day intensity TraceBar, and sourced evidence. From the card overflow or the detail action row the user can Skip (returns in 7 days), Drop (record kept), or Restart a non-active pattern, each with an Undo snackbar. Close is model-detected only.
 
-    LIST["Patterns list<br/>ACTIVE — STILL HITTING · SKIPPED · ON HOLD · CLOSED · DONE · DROPPED"]
-    LIST -- "tap card" --> DET["Pattern detail<br/>name · template label · sourced evidence · 30-day TraceBar"]
+    LIST["Patterns list (sections, fixed order)<br/>ACTIVE · SKIPPED · ON HOLD · CLOSED · DONE · DROPPED<br/>(card eyebrow = PatternKind.serial)"]
+    LIST -- "tap card" --> DET["Pattern detail<br/>title · observation · count meta · 30-day TraceBar · sourced evidence"]
     DET --> ACT{"action"}
     LIST -- "overflow" --> ACT
-    ACT -- "Skip" --> SK["→ SKIPPED · 7-day wake-up · Undo"]
+    ACT -- "Skip" --> SK["→ SNOOZED (label 'Skip') · 7-day wake-up · Undo"]
     ACT -- "Drop" --> DR["→ DROPPED · record kept · Undo"]
     ACT -- "Restart (non-active)" --> RS["→ ACTIVE · 'Pattern is back.' · Undo"]
     ACT -. "Close (model-detected, v1.5 — not a user action)" .-> CL["→ CLOSED · DONE"]
@@ -106,9 +114,9 @@ flowchart TD
     DATA --> WIPE["Delete all data<br/>type DELETE → wipe ObjectBox + legacy markdown + prefs → first-run"]
 
     MOD --> MS["Local Model Status screen"]
-    MS --> RDL["Re-download<br/>~3.7 GB · replaces file · entries untouched"]
+    MS --> RDL["Re-download<br/>~3.7 GB · wipes + replaces file · entries untouched"]
     MS --> DEL["Delete model<br/>app inert until re-download · entries stay"]
-    RDL -- "failure" --> LOAD["→ Loading (no model on disk)"]
+    RDL -- "failure" --> LOAD["→ Paused (resumable .part)<br/>or Loading (nothing usable)"]
 ```
 
 ---
@@ -119,14 +127,14 @@ How the shipped surfaces connect after first-run. Three bottom-nav tabs
 (Capture / Patterns / History) are mutually reachable on every primary screen. The
 hamburger menu opens Settings from any primary screen and **toggles closed** back to the
 screen it was opened from. Active recording is **modal**: the menu and bottom nav are
-removed, so the only exits are STOP or DISCARD. Opening a detail and then tab-navigating
-away **clears** the detail state first, so re-entering the host lands on the list, not a
-stale detail.
+removed, so the only exits are STOP or DISCARD. Opening an **entry** detail (History) and then
+tab-navigating away **clears** the detail state first, so re-entering the host lands on the list,
+not a stale detail. A **pattern** detail has no bottom nav — it exits via Back only.
 
 ```mermaid
 flowchart TD
     accTitle: Post-onboarding screen navigation map
-    accDescr: Capture, Patterns, and History are mutually reachable via the bottom navigation on every primary screen. Tapping Record enters a modal Recording state with no menu or bottom nav; Discard returns to idle Capture and Stop persists the entry and opens its detail in the History stack. The hamburger menu opens Settings from any primary screen and toggles closed back to the origin screen. Settings Model row and the Capture AppTop status pill both open the Model Status screen, which has the bottom nav with no active tab. History and Patterns open an entry or pattern detail; navigating to another tab from a detail clears the detail state so the host returns to its list.
+    accDescr: Capture, Patterns, and History are mutually reachable via the bottom navigation on every primary screen. Tapping Record enters a modal Recording state with no menu or bottom nav; Discard returns to idle Capture and Stop persists the entry and opens its detail in the History stack. The hamburger menu opens Settings from any primary screen and toggles closed back to the origin screen. Settings Model row and the Capture AppTop status pill both open the Model Status screen, which has the bottom nav with no active tab. History opens an entry detail that keeps the bottom nav, and tab-navigating away from it clears the detail state so the host returns to its list. A Pattern detail is back-only — it has no bottom nav and clears its state on Back.
 
     subgraph TABS["Bottom nav — mutually reachable"]
         CAP["Capture (Idle)"]
@@ -140,10 +148,10 @@ flowchart TD
     SUB -- "entry persists" --> ED["Entry detail<br/>(History stack · extracting → resolved)"]
 
     HIS -- "tap row" --> ED
-    PAT -- "tap card" --> PD["Pattern detail"]
+    PAT -- "tap card" --> PD["Pattern detail<br/>(back-only · no bottom nav)"]
     PD -- "tap source entry" --> ED
     ED -- "back / tab-nav<br/>(clears detail state)" --> HIS
-    PD -- "back / tab-nav<br/>(clears detail state)" --> PAT
+    PD -- "back (no tab-nav)<br/>(clears detail state)" --> PAT
 
     CAP -- "AppTop status pill" --> MS["Model Status<br/>(bottom nav · no active tab)"]
     CAP -- "menu" --> SET["Settings"]

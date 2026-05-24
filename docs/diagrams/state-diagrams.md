@@ -9,55 +9,60 @@ The finite-state machines in the system, as written. Source: `CaptureViewModel.C
 
 ## 1. Capture (`CaptureViewModel.CaptureUiState`)
 
-The live single-capture FSM, owned by `CaptureViewModel` over the `ForegroundStreamEvent`
-stream (it superseded the retired `CaptureSession`; ADR-005 §Addendum 2026-05-17). v1
-voice capture stores one USER transcript turn plus one MODEL follow-up; typed capture stores
-text only and no MODEL follow-up. Discard during `Recording` is a synchronous return to `Idle` —
-no Gemma call, no entry, no rehydration (ADR-001 §Q8). Errors
-surface as a `CaptureError` on `Idle`, not a terminal state. `Idle` is the only resting state;
-`Reviewing` self-transitions when the terminal stream event clears the streaming gate, after
-which Done (acknowledge) is allowed.
+Three phases, owned by `CaptureViewModel` (`CaptureUiState.kt`). There is **no** in-Capture
+review/inferring surface: once call-1 transcription returns and the entry persists, the host is
+told to open it in History detail (which renders its own `extracting → resolved` states off
+`extractionStatus`), and Capture resets to `Idle` only after the route confirms it consumed the
+open event (ADR-018; ADR-014 Addendum 2026-05-18). `Submitting` is the transient spinner between
+STOP / typed-submit and the entry persisting. Discard during `Recording` is a synchronous return
+to `Idle` — no Gemma call, no entry. Both record-start and typed-submit are gated on
+`ModelReadiness == Ready` (ADR-013). Errors surface as a `CaptureError` on `Idle`, not a terminal
+state. `Idle` is the only resting state.
 
 ```mermaid
 stateDiagram-v2
     accTitle: Capture UI state machine (CaptureViewModel.CaptureUiState)
-    accDescr: Idle transitions to Recording on tap Record when the model is Ready. From Recording, discard or no captured audio returns to Idle with no entry; captured audio moves to Inferring. Inferring moves to Reviewing on the first stream event (streaming gate open), or back to Idle with a CaptureError if inference fails. Reviewing self-transitions when the terminal event clears the streaming gate, enabling Done, which acknowledges and returns to Idle. Idle is the only resting state; there are no terminal states.
+    accDescr: Idle has three exits. tap Record (model Ready) goes to Recording; submitTyped (model Ready, text at least 3 chars) goes to Submitting. From Recording, discard or no captured audio returns to Idle with no entry; captured audio moves to Submitting. Submitting persists the entry then fires an openEntry event so the host opens History detail, and the VM resets to Idle once that event is handled; an inference error returns to Idle carrying a CaptureError. Idle is the only resting state; there are no terminal states.
 
     [*] --> Idle
     Idle --> Recording: tap Record (model Ready)
-    Recording --> Idle: discard / no audio
-    Recording --> Inferring: audio captured
-    Inferring --> Reviewing: first stream event (streaming)
-    Inferring --> Idle: inference error (CaptureError)
-    Reviewing --> Reviewing: terminal event clears streaming gate
-    Reviewing --> Idle: Done (acknowledge; only after terminal)
+    Idle --> Submitting: submitTyped (model Ready, len ≥ 3)
+    Recording --> Idle: discard / no audio captured
+    Recording --> Submitting: audio captured
+    Submitting --> Idle: entry persists → openEntry event → onOpenEntryHandled
+    Submitting --> Idle: inference error (CaptureError)
 ```
 
 ---
 
 ## 2. Pattern lifecycle
 
-`PatternState` = `ACTIVE` / `SKIPPED` / `CLOSED` / `DROPPED` (`below_threshold` is an internal
-re-eval drop, not user-visible; no pattern object exists until ≥10 entries and ≥3 supporting).
-**User** actions: Skip / Drop / Restart. **System**: snooze wake-up, re-eval, model-detected
-close (v1.5). Undo restores the exact pre-action snapshot (including original `skippedUntil`).
+`PatternState` (enum constants) = `ACTIVE` / `SNOOZED` / `DROPPED` / `CLOSED` / `BELOW_THRESHOLD`
+(serials `active` / `snoozed` / `dismissed` / `resolved` / `below_threshold` — kept at pre-rename
+values so no ObjectBox migration is needed). `SNOOZED` carries the user **Skip** semantic; the
+user-facing label is "Skip" while the persisted state stays `SNOOZED` and the field is
+`snoozedUntil` (`PatternState.kt`, `PatternEntity.kt`). `BELOW_THRESHOLD` is an internal re-eval
+drop, never user-visible; no pattern object exists until a kind crosses its threshold (≥3
+supporting, ≥4 for vocab). **User** actions: Skip / Drop / Restart. **System**: snooze wake-up,
+re-eval, model-detected close (v1.5). Undo restores the exact pre-action snapshot (including the
+original `snoozedUntil`).
 
 ```mermaid
 stateDiagram-v2
     accTitle: Pattern lifecycle state machine
-    accDescr: A pattern becomes ACTIVE when 3 supporting entries cross threshold. The user can Skip it to SKIPPED with a 7-day wake-up, or Drop it to DROPPED keeping the record. SKIPPED auto-returns to ACTIVE on the cold-start wake-up check. The user can Restart SKIPPED, DROPPED, or CLOSED back to ACTIVE. The model can detect staleness and move ACTIVE to CLOSED (v1.5, no user action). Re-eval can drop ACTIVE to internal below_threshold and back.
+    accDescr: A pattern becomes ACTIVE when supporting entries cross threshold. The user can Skip it to SNOOZED (UI label "Skip") with a 7-day wake-up, or Drop it to DROPPED keeping the record. SNOOZED auto-returns to ACTIVE on the cold-start wake-up check. The user can Restart SNOOZED, DROPPED, or CLOSED back to ACTIVE. The model can detect staleness and move ACTIVE to CLOSED (v1.5, no user action). Re-eval can drop ACTIVE to internal BELOW_THRESHOLD and back.
 
-    [*] --> ACTIVE: ≥3 supporting cross threshold
-    ACTIVE --> SKIPPED: user Skip (skippedUntil = now + 7d)
+    [*] --> ACTIVE: supporting count crosses threshold
+    ACTIVE --> SNOOZED: user Skip — label "Skip" (snoozedUntil = now + 7d)
     ACTIVE --> DROPPED: user Drop (record kept)
     ACTIVE --> CLOSED: model detects stale (v1.5 · system-only)
-    ACTIVE --> below_threshold: re-eval drop (<3 · internal)
-    below_threshold --> ACTIVE: re-eval recovers
-    SKIPPED --> ACTIVE: wake-up check on load (cleared)
-    SKIPPED --> ACTIVE: user Restart
+    ACTIVE --> BELOW_THRESHOLD: re-eval drop (under threshold · internal)
+    BELOW_THRESHOLD --> ACTIVE: re-eval recovers
+    SNOOZED --> ACTIVE: wake-up sweep on load (snoozedUntil elapsed)
+    SNOOZED --> ACTIVE: user Restart
     DROPPED --> ACTIVE: user Restart
     CLOSED --> ACTIVE: user Restart
-    SKIPPED --> ACTIVE: Undo(skip)
+    SNOOZED --> ACTIVE: Undo(skip)
     DROPPED --> ACTIVE: Undo(drop)
 ```
 
@@ -65,24 +70,28 @@ stateDiagram-v2
 
 ## 3. ModelReadiness
 
-Exactly **four** runtime states. `Stalled` / `Failed` / `Updating` are display labels on the
-status screen, **not** runtime states. A failed re-download falls back to `Loading`. Readiness
-is artifact-presence based: a full-size artifact on disk is `Ready`; the engine loads lazily
-on the first inference (ADR-012 §Addendum: proactive pre-warm reverted after it regressed into
-a startup GPU-init crash).
+Exactly **four** runtime states (`ModelReadiness` in `CaptureUiState.kt`: `Loading` / `Downloading(percent)`
+/ `Ready` / `Paused`). `Stalled` / `Failed` / `Updating` are display labels on the status screen,
+**not** runtime states. Readiness is artifact-presence based: a full-size artifact that passes the
+SHA-256 check is `Ready`; the engine loads lazily on the first inference (ADR-012 §Addendum:
+proactive pre-warm reverted after it regressed into a startup GPU-init crash). A re-download first
+wipes the artifact and ticks `Downloading(0)`; if it fails it lands on `Paused` when a resumable
+`.part` survives, or `Loading` when nothing usable remains (corrupt result discarded / `Absent`)
+(`AppContainer.probeModelReadiness`).
 
 ```mermaid
 stateDiagram-v2
     accTitle: ModelReadiness runtime state machine
-    accDescr: Four runtime states. Loading transitions to Downloading when a download starts. Downloading goes to Ready when the artifact is verified complete, or Paused if Wi-Fi drops mid-download. Paused resumes to Downloading. Ready returns to Loading if the artifact is deleted or a re-download fails.
+    accDescr: Four runtime states. Loading transitions to Downloading when a download starts. Downloading goes to Ready when the artifact is verified complete, or Paused if Wi-Fi drops mid-download. Paused resumes to Downloading. A user Re-download moves Ready to Downloading; a failed re-download resolves to Paused (resumable part file) or Loading (nothing usable). Deleting the model returns Ready to Loading.
 
     [*] --> Loading
     Loading --> Downloading: download starts
-    Downloading --> Ready: verified complete
+    Downloading --> Ready: verified complete (size + SHA-256)
     Downloading --> Paused: Wi-Fi dropped mid-download
-    Paused --> Downloading: Wi-Fi restored / resume
-    Ready --> Downloading: user Re-download
-    Ready --> Loading: model deleted / re-download failed
+    Downloading --> Loading: result discarded (corrupt / absent)
+    Paused --> Downloading: Wi-Fi restored / resume (.part)
+    Ready --> Downloading: user Re-download (wipes file, ticks 0%)
+    Ready --> Loading: model deleted
 ```
 
 ---

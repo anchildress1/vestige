@@ -91,14 +91,14 @@ flowchart TB
     User -- type --> FG
 
     subgraph onDevice["on-device only — no network at runtime"]
-      Audio["AudioRecord<br/>30s chunk normalization"]
-      FG["ForegroundInference<br/>fast transcription + persona follow-up"]
-      BG["BackgroundExtractionWorker<br/>3 lens passes × 5 surfaces"]
+      Audio["AudioCapture<br/>mono 16 kHz float32 · 30 s cap"]
+      FG["ForegroundInference<br/>fast transcription + inline persona follow-up"]
+      BG["BackgroundExtractionWorker<br/>3 sequential lens passes × 5 surfaces"]
       Gemma[("Gemma 4 E4B<br/>via LiteRT-LM")]
-      Resolver["Convergence Resolver<br/>consensus · candidate · ambiguous"]
-      ObjectBox[("ObjectBox<br/>entries · tags · patterns · vectors")]
+      Resolver["Convergence Resolver<br/>consensus · candidate · ambiguous · w/ conflict"]
+      ObjectBox[("ObjectBox (source of truth)<br/>entries · tags · patterns · vectors")]
       Export[("Export renderer<br/>markdown + JSON snapshot")]
-      Patterns["Pattern Detection<br/>5 primitives · 90-day window"]
+      Patterns["Pattern Detection<br/>6 primitives · 90-day window · every 3 entries"]
 
       Audio --> FG
       FG -- "prompt + audio" --> Gemma
@@ -131,7 +131,7 @@ Module boundaries: `:app` (UI), `:core-inference` (LiteRT-LM + lens composition)
 │   ├── README.md              # reading order + file inventory
 │   ├── PRD.md                 # P0/P1/P2 requirements + phase schedule
 │   ├── concept-locked.md      # full product spec
-│   ├── adrs/                  # ADR-001..017 (stack, lenses, patterns, lifecycle, runtime, design, …)
+│   ├── adrs/                  # ADR-001..018, no 009 (stack, lenses, patterns, lifecycle, runtime, design, …)
 │   ├── architecture-brief.md
 │   ├── design-guidelines.md
 │   ├── ux-copy.md             # locked microcopy authority

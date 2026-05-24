@@ -215,7 +215,7 @@ The consequence is deliberate: entry creation is no longer stalled on query embe
 
 - **Live (deterministic, no embeddings):** the lens read gets `PatternCandidates` (signature match against ACTIVE patterns) via `retrievePatternCandidates`; the observation read gets `TemporalHistoryRetrieval` (same weekday + time-of-day block). Neither touches `EntryEntity.vector`.
 - **Built but unwired:** `RetrievalRepo` (keyword + tag-Jaccard + recency + **EmbeddingGemma cosine**) is fully implemented and STT-E-validated (`stt-results/stt-e-2026-05-19.md`), but its only caller `AppContainer.retrieveHistory` is **never invoked**, and `CaptureViewModel` passes `retrievedHistory = emptyList()`. It is dead code on the live path.
-- **The only runtime consumer of `EntryEntity.vector`** is `EmbeddingClustering` (the `VOCAB_FREQUENCY` pattern → Vocab Drift screen). That is the single surface where embeddings visibly act.
+- **The only runtime consumer of `EntryEntity.vector`** is `EmbeddingClustering` (the `VOCAB_FREQUENCY` pattern → Vocab Drift screen). That is the single surface where embeddings *would* visibly act — but on the demo corpus it does **not** mint a cluster (cosine cut calibrated for an identical-word fixture; drifted prose fragments below the `VOCAB_THRESHOLD = 4` floor). Verified on-device 2026-05-23: 5 patterns formed, all deterministic, zero vocab. So embeddings currently surface nothing visible. Tracked in `backlog.md` → `vocab-cluster-threshold`.
 
 Tracked in `backlog.md` → `embedding-retrieval-surface` (wire it into a demo-gate-clearing surface, or cut it rather than ship dead plumbing).
 

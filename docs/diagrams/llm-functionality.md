@@ -143,31 +143,34 @@ flowchart LR
 
 ---
 
-## 5. Embeddings: clustering (live) vs. retrieval (built, unwired)
+## 5. Embeddings: computed, but no live surface yet
 
 EmbeddingGemma 300M is shipped and **not STT-E-gated** (STT-E is an on-device measurement harness,
 `SttEEmbeddingComparisonTest`, not a runtime switch). It loads through `GemmaEmbeddingModel` /
 `localagents-rag` (a self-contained `.so`, separate from the Gemma engine; ADR-010).
 `VectorBackfillWorker` embeds a post-convergence **synthesis string** — tags + observations +
 commitment topic (`EmbeddingText.buildEmbeddingText`) — into `EntryEntity.vector` (768-dim HNSW
-cosine), **not** the raw transcription.
+cosine), **not** the raw transcription. **The vectors are computed and STT-E-proven in isolation,
+but neither surface that would *show* embeddings is live:**
 
-The vectors have **one live consumer**: `EmbeddingClustering` (used by the `VOCAB_FREQUENCY`
-pattern → the **Vocab Drift** screen), which groups entries by cosine — that is the on-device
-surface where embeddings visibly do something keyword/tag matching can't. The ranked **hybrid
-retrieval** `RetrievalRepo.query` (keyword + tag-Jaccard + recency + **EmbeddingGemma cosine**,
-`embeddingWeight` default `1.0`) is **implemented and STT-E-validated but not wired into any live
-surface**: its only caller, `AppContainer.retrieveHistory`, has no callers; capture passes
-`retrievedHistory = emptyList()`; and the observation read's recurring context comes from
-**deterministic** `TemporalHistoryRetrieval` (timestamp/weekday), not embeddings.
+- **Clustering (`EmbeddingClustering` → `VOCAB_FREQUENCY` → Vocab Drift screen)** is the *intended*
+  consumer, but it **does not mint on the demo corpus** — the cosine cut (`DEFAULT_MAX_COSINE_DISTANCE
+  = 0.30`) was calibrated on an identical-word fixture, so genuinely-drifted prose fragments below the
+  `VOCAB_THRESHOLD = 4` floor (verified on-device 2026-05-23: 5 patterns, all deterministic, zero
+  vocab — `backlog.md` → `vocab-cluster-threshold`).
+- **Ranked hybrid retrieval** `RetrievalRepo.query` (keyword + tag-Jaccard + recency + **EmbeddingGemma
+  cosine**, `embeddingWeight` default `1.0`) is **implemented and STT-E-validated but not wired into any
+  live surface**: its only caller, `AppContainer.retrieveHistory`, has no callers; capture passes
+  `retrievedHistory = emptyList()`; the observation read's recurring context uses **deterministic**
+  `TemporalHistoryRetrieval` (timestamp/weekday), not embeddings (`backlog.md` → `embedding-retrieval-surface`).
 
 ```mermaid
 flowchart TD
-    accTitle: Embedding clustering (live) vs hybrid retrieval (unwired)
-    accDescr: VectorBackfillWorker embeds a synthesis string of tags, observations, and commitment topic into each entry's 768-dimension vector after the entry finalizes. The vectors have one live consumer, EmbeddingClustering, which powers the VOCAB_FREQUENCY pattern and the Vocab Drift screen. RetrievalRepo implements a ranked hybrid score of keyword, tag Jaccard, recency, and EmbeddingGemma cosine and is STT-E validated, but it is not wired into any live surface — its only caller retrieveHistory is itself never called, capture passes empty history, and the observation recurring context uses deterministic timestamp-based TemporalHistoryRetrieval instead.
+    accTitle: Embeddings computed but no live surface
+    accDescr: VectorBackfillWorker embeds a synthesis string of tags, observations, and commitment topic into each entry's 768-dimension vector after the entry finalizes. The vectors are computed but neither embedding surface is live. EmbeddingClustering is the intended consumer for the VOCAB_FREQUENCY pattern and Vocab Drift screen, but it does not mint on the demo corpus because the cosine cut was calibrated on an identical-word fixture. RetrievalRepo implements a ranked hybrid score and is STT-E validated, but it is not wired into any live surface — its only caller retrieveHistory is never called, capture passes empty history, and the observation recurring context uses deterministic timestamp-based TemporalHistoryRetrieval instead.
 
     BF["VectorBackfillWorker (async, after finalize)<br/>embeds synthesis string: tags · observations · commitment topic"] --> VEC[("EntryEntity.vector<br/>768-dim HNSW cosine")]
-    VEC --> CL["EmbeddingClustering (LIVE)<br/>→ VOCAB_FREQUENCY pattern → Vocab Drift screen"]
+    VEC -. "intended consumer — but does NOT mint on demo corpus<br/>(0.30 cosine cut tuned for identical-word fixture)" .-> CL["EmbeddingClustering → VOCAB_FREQUENCY → Vocab Drift"]
     VEC -. "not consumed live" .-> RR["RetrievalRepo.query (built + STT-E-validated)<br/>keyword + tag + recency + cosine"]
     RR -. "only caller" .-> RH["AppContainer.retrieveHistory()<br/>(no callers — capture passes emptyList)"]
     OBS["observation recurring context"] --> TH["TemporalHistoryRetrieval<br/>(deterministic timestamp/weekday — NOT embeddings)"]

@@ -69,7 +69,7 @@ Produce one cohesive Android mobile design direction for the following screens:
 
 Plus:
 - One app icon direction (with 2 alternates)
-- Core component styling (`MistHero`, transcript turn, pattern card with `TraceBar`, persona toggle, `AppShellTop` status pill — see `poc/design-review.md` §3 for primitives)
+- Core component styling (`MistHero`, transcript turn, pattern card with `TraceBar`, persona toggle, `AppShellTop` status pill — see ADR-011 + the `poc/*-final.png` screenshots for current primitives)
 - Embedded microcopy examples per screen
 
 ---
@@ -114,7 +114,7 @@ The canonical visual system now lives in ADR-011 plus the `../poc/*-final.png` s
 
 > **Spec ahead of build (2026-05-23):** BigStat/Delta not yet implemented (`ScoreboardPrimitives.kt` ships EyebrowE/StatusDot/Pill/StatRibbon/TickRule/AppTop only); Pattern Detail + Vocab Drift still Material (`TopAppBar`/`OutlinedButton`), not full Scoreboard chrome; AppTop right slot is a hamburger, not the spec'd persona-pill+Settings-gear.
 
-### Palette tokens (from `poc/design-review.md` §2.1)
+### Palette tokens (historical Mist — current palette is ADR-011)
 
 | Token | Value | Use |
 |---|---|---|
@@ -142,24 +142,24 @@ Dark only — no light theme in v1.
 - Both accents *may* appear in the same component **when they carry different roles on different elements.** Example: a pattern card with a `glow` left-rule (identity) and a `vapor` focus ring when keyboard-focused (interaction state). Example: a Roast sheet with a `glow` header and a `vapor` active-recording indicator inside.
 - **Forbidden:** a single element rendered in both colors. No `glow → vapor` gradients, no half-and-half buttons, no two-tone icons. One element, one accent at a time.
 - **Forbidden:** the same semantic role rendered in different colors on the same screen. Two "active patterns" on one screen are both `glow`; don't alternate for variety.
-- No gradients between accents. No **unspecified** glows or halos beyond what the design-review primitives define — `MistHero` (§"Component Conventions / MistHero") explicitly carries an outer halo that scales with audio level + a `vapor` rim on stop, and the atmospheric layer in `design-review.md` §2.4 defines the ambient noise/fog drift. Anything else is a forbidden ad-hoc glow.
+- No gradients between accents. No **unspecified** glows or halos beyond what the (historical Mist) primitives defined — `MistHero` (§"Component Conventions / MistHero") explicitly carries an outer halo that scales with audio level + a `vapor` rim on stop, and the atmospheric layer defined the ambient noise/fog drift. Anything else is a forbidden ad-hoc glow. (Current visual rules: ADR-011.)
 
 ### Where each accent lives
 
 **`glow` — primary accent. Patterns, identity, depth.**
 - Active pattern indicator (`glow` left-rule on cards with active patterns)
-- `Roast me` action button + Roast bottom-sheet header (per `Sheet` primitive in `design-review.md` §3.1)
+- `Roast me` action button + Roast bottom-sheet header (`Sheet` primitive; current spec ADR-011 + `poc/roast-final.png`)
 - Currently-active persona pill in the persona selector
 - Pattern detail screen accent
 
 **`vapor` — active accent. Recording, focus, "this is on."**
-- Active recording state on `MistHero` (per `design-review.md` §3.3)
+- Active recording state on `MistHero` (current spec ADR-011 + `poc/capture-recording-final.png`)
 - Live audio waveform tint via `AudioMeter` during recording
 - Selected/focused control (subtle ring on focus, not on default selection)
 - Links and ghost button outlines
 
 **`pulse` — ready-status dot only.**
-- `LOCAL · READY` dot on `AppShellTop` per `design-review.md` §3.2 (`modelState=ready`).
+- `LOCAL · READY` dot on `AppShellTop` (current spec ADR-011 + `poc/system-final.png`) (`modelState=ready`).
 - No other use. The dot glows on idle-ready; it does not appear elsewhere.
 
 Everything else stays in the cool blue-gray atmosphere of `void` / `bg` / `s1` / `s2` / `s3`.
@@ -172,13 +172,13 @@ Everything else stays in the cool blue-gray atmosphere of `void` / `bg` / `s1` /
 
 ## Typography
 
-Three families per `poc/design-review.md` §2.2:
+Three families (historical Mist type stack — current stack is ADR-011):
 
 - **`Inter`** — UI body, sans
 - **`Newsreader`** (italic, opsz axis) — display moments only: app name, hero titles ("What lingered from yesterday?", "What keeps returning.", "This deletes everything.")
 - **`JetBrains Mono`** — forensic-instrument labels, eyebrows, persona names (`WITNESS`, `LOCAL · READY`, `25 DAYS`, `DESTRUCTIVE`)
 
-Type primitives (`HDisplay`, `H1`, `P`, `PersonaLabel`, `Eyebrow`) and Compose translation notes live in `design-review.md` §2.2 and §8. Don't redefine them here.
+Type primitives (`HDisplay`, `H1`, `P`, `PersonaLabel`, `Eyebrow`) and Compose translation notes are governed by ADR-011. Don't redefine them here.
 
 Avoid: display fonts other than Newsreader for hero moments, script, rounded "friendly" sans, serif wellness typography (Newsreader's editorial italic is the chosen serif — anything else reads as wellness).
 
@@ -190,18 +190,18 @@ Must read cleanly at 3am on a 6.8-inch phone.
 
 Use Android **Material 3** structure and accessibility conventions, with **expressiveness suppressed.** We use the system, we choose restraint within it.
 
-**Components feel:** native, restrained, precise, quiet, slightly worn. **Atmospheric is the single visual system** per `design-review.md` §7.3 — no flat counterpoint.
+**Components feel:** native, restrained, precise, quiet, slightly worn. **Atmospheric is the single visual system** (historical Mist) — no flat counterpoint. Current visual system: ADR-011.
 
-**Radii:** Use the `RadiusTokens` scale from `design-review.md` §2.3 (`rPill`, `rXL`, `rL`, `rM`, `rS`, `rXS`). No raw `dp` for corner shapes that map to the scale.
+**Radii:** Use the `RadiusTokens` scale (historical Mist: `rPill`, `rXL`, `rL`, `rM`, `rS`, `rXS`; current scale ADR-011). No raw `dp` for corner shapes that map to the scale.
 
-**Texture:** Two ambient layers per `design-review.md` §2.4 carry across nearly every surface — noise grain (`feTurbulence` 180×180 tile, `mix-blend-mode: overlay`, opacity ~0.05–0.18) and fog drift (two animated radial gradients, `vesDrift1`/`vesDrift2`, 22s/28s alternate).
+**Texture:** Two ambient layers (historical Mist) carry across nearly every surface — noise grain (`feTurbulence` 180×180 tile, `mix-blend-mode: overlay`, opacity ~0.05–0.18) and fog drift (two animated radial gradients, `vesDrift1`/`vesDrift2`, 22s/28s alternate).
 
 **Motion:**
 - minimal and functional only
 - atmospheric drift on loading states is handled by the fog-drift layer above (think fog moving past a window)
 - predictive back gesture (Android 15+ default) — restrained and native, no fighting the system
 - no bounces, springs, celebrations, reward animations, confetti, sparkle transitions
-- keyframe set defined in `design-review.md` §2.5: `vesPulse`, `vesIn`, `vesFade`, `vesSlide`, `vesShimmer`, `vesBreath`, `vesSpin`, `vesDrift1`, `vesDrift2`. Compose translation notes in §8.
+- keyframe set (historical Mist): `vesPulse`, `vesIn`, `vesFade`, `vesSlide`, `vesShimmer`, `vesBreath`, `vesSpin`, `vesDrift1`, `vesDrift2`. Current motion rules: ADR-011.
 
 ---
 
@@ -270,15 +270,15 @@ Forbidden across all personas: "thank you for sharing," "how does that make you 
    - Left: Local Model Status indicator (`LOCAL · READY`-style chip per `ux-copy.md`). The chip is **clickable**; tap opens the persistent Local Model Status screen. Contributes to the 10-second judge test — a visible "this is on-device" signal lives on the primary surface.
    - Right: Persona dropdown pill (`WITNESS ▾`-style per `ux-copy.md`). Tap opens the per-capture persona selector (P1 — see PRD; the prior "per-session override" framing was retired with the STT-B fallback).
 2. **Hero title (above MistHero)**
-   - One short editorial line in `Newsreader` italic per `poc/design-review.md` §2.2 (e.g., the `What lingered from yesterday?` strings visible in `poc/screenshots/capture.png`). Hero copy belongs in `ux-copy.md` §Capture Screen — pull from there, do not invent.
+   - One short editorial line in `Newsreader` italic (historical Mist; current type stack ADR-011), e.g. the `What lingered from yesterday?` strings visible in `poc/capture-final.png`. Hero copy belongs in `ux-copy.md` §Capture Screen — pull from there, do not invent.
    - This is the *editorial* register: a short, observational, present-tense line. It is **not** a journal prompt or a wellness question. The `Newsreader` italic + restrained content distinguishes it from `How are you feeling today?`-class prompts (which remain forbidden — see below).
 3. **MistHero capture stone (dominant, center for hero presence)**
-   - The `MistHero` primitive per `poc/design-review.md` §3.3. 168px hero, five-layer moonstone composition. Behavior per the "MistHero" entry in §"Component Conventions" below.
+   - The `MistHero` primitive (historical Mist; current spec ADR-011 + `poc/capture-final.png`). 168px hero, five-layer moonstone composition. Behavior per the "MistHero" entry in §"Component Conventions" below.
 4. **Tagline strip (below MistHero)**
-   - Two short mono lines per `poc/screenshots/capture.png`: a directive (`HOLD THE STONE · SPEAK`-style) and a privacy-tagline (`30s chunks · audio discarded after extraction`-style). `JetBrains Mono`, eyebrow scale. Strings live in `ux-copy.md`.
+   - Two short mono lines per `poc/capture-final.png`: a directive (`HOLD THE STONE · SPEAK`-style) and a privacy-tagline (`30s chunks · audio discarded after extraction`-style). `JetBrains Mono`, eyebrow scale. Strings live in `ux-copy.md`.
 5. **Type-instead affordance**
    - Small button below the tagline. Expands inline to a text input (placeholder + send copy from `ux-copy.md`). Never buried.
-6. **Patterns peek card** *(below the type affordance, per `poc/screenshots/capture.png` and `ux-copy.md` §"Patterns peek")*
+6. **Patterns peek card** *(below the type affordance, per `poc/capture-final.png` and `ux-copy.md` §"Patterns peek")*
    - Compact card with `{N} ACTIVE TRACES`-style title, one-line teaser of pattern names, subtle `TraceBar` mini-strips. No `glow` left-rule here — that's reserved for the full Patterns list. Empty-state copy comes from `ux-copy.md`.
 7. **Footer metadata strip**
    - Small dim text — last entry timestamp + duration + `PATTERNS` link. Strings per `ux-copy.md` §"Footer metadata."
@@ -393,7 +393,7 @@ Cards present pattern observations on dark surfaces. Restrained, atmospheric, so
 - Semantic label — uppercase mono eyebrow, **above** the name, colored by the section tone (lime active / ember skipped / teal closed-dropped). Current v1 binding is stored `pattern.kind` because `template_label` is untrusted; a future trusted `templateLabel` may return to this slot.
 - Short title (the pattern name, e.g., `Tuesday Meetings`)
 - Observation (one short sentence)
-- **TraceBar — 30-day recurrence glyph** per `poc/tokens.jsx` §TraceBar. 30 thin columns; days the pattern landed render full-height in the glow purple (`#A855F7`); empty days render at 34% height in the muted hair tone. Newest day on the right. The bar is the visual answer to "how often does this come back."
+- **TraceBar — 30-day recurrence glyph** (historical Mist; current spec ADR-011 + `poc/pattern-detail-final.png`). 30 thin columns; days the pattern landed render full-height in the glow purple (`#A855F7`); empty days render at 34% height in the muted hair tone. Newest day on the right. The bar is the visual answer to "how often does this come back."
 - Source count (e.g., `4 of 12 entries`)
 - Last seen (date)
 - Actions (`Skip`, `Drop`) per `spec-pattern-action-buttons.md` §P0.1 / P0.2
@@ -401,7 +401,7 @@ Cards present pattern observations on dark surfaces. Restrained, atmospheric, so
 **Active-state rule** (`#A855F7`) — Phase 3 ships as a 3dp left-rule on every card for legibility. Phase 4 swaps it for the POC's glow-soft border + radial-glow corner treatment on active cards only.
 
 **Example card:**
-> Aftermath
+> Crashed
 > **Tuesday Meetings**
 > Fourth entry mentions Tuesday meetings. State before: cruising. State after: crashed.
 > ▮▯▯▮▯▯▮▯▯▮▯▯▯▮▯▯▮▯▯▮▯▯▮▯▯▮▯▯▮▯  ← 30-day TraceBar
@@ -515,21 +515,21 @@ Serious, sparse, unmistakable. No drama theater.
 >
 > [ Cancel ] [ **Wipe everything. No backup.** ]
 
-Use the `error` token (`#B3261E` per `poc/design-review.md` §2.1) on the destructive button. The confirm field requires typing `DELETE` — no checkbox, no slider, no "Are you sure?" yes/no.
+Use the `error` token (`#B3261E`, historical Mist; current palette ADR-011) on the destructive button. The confirm field requires typing `DELETE` — no checkbox, no slider, no "Are you sure?" yes/no.
 
 ---
 
 ## Component Conventions
 
 ### MistHero (capture screen primary)
-- The central capture surface is the `MistHero` moonstone primitive per `poc/design-review.md` §3.3, not a flat record button. Five-layer composition: outer halo, conic moonstone ring, frosted-glass body, inner noise, center mark.
+- The central capture surface is the `MistHero` moonstone primitive (historical Mist; current spec ADR-011 + `poc/capture-final.png`), not a flat record button. Five-layer composition: outer halo, conic moonstone ring, frosted-glass body, inner noise, center mark.
 - Single primary action. ≥168px hero size (per the POC `MistHero` 168px spec).
 - Idle: stone with subtle internal gradient, no outer halo amplitude.
 - Active recording: outer halo scales with audio level (`level` prop), `vapor` (#2563EB) tint on the halo and ring, `AudioMeter` renders below, stop affordance center.
 - Post-stop / review: halo collapses to outline state with a thin `vapor` rim, `Reading the entry.` placeholder copy from `ux-copy.md` shows in the transcript area. **Superseded:** no in-Capture review surface ships — capture is Idle/Recording/Submitting, post-stop navigates to History detail (ADR-018 / ADR-014 Addendum). `Reading the entry.` is only the foreground-service notification text.
 - Approaching chunk boundary (25s of 30s): thin progress arc on the ring, soft visual cue, no copy.
 
-Compose translation notes for `MistHero` live in `design-review.md` §8 (radial gradients, conic ring, infinite-transition halo).
+Compose translation notes for `MistHero` are governed by ADR-011 (radial gradients, conic ring, infinite-transition halo).
 
 ### Entry transcript
 - One entry contains exactly one `YOU` turn: the transcription. No model follow-up turn, no scroll across exchanges, no session thread.

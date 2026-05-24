@@ -11,7 +11,7 @@ ADR-014 (foreground/background split), ADR-017 (ObjectBox as the entry source of
 Acyclic, fan-in to `:app`. Core modules never depend on `:app`, and **`:core-inference` and
 `:core-storage` do not depend on each other** — each takes only `api(project(":core-model"))`
 (`*/build.gradle.kts`). All inference↔storage orchestration (save flow, pattern detection,
-retrieval wiring) lives in `:app` (`AppContainer`).
+embedding backfill) lives in `:app` (`AppContainer`).
 
 ```mermaid
 flowchart TD
@@ -20,7 +20,7 @@ flowchart TD
 
     App[":app<br/>Compose UI · navigation · AppContainer · permissions · save/pattern orchestration"]
     Inf[":core-inference<br/>LiteRT-LM engine wrapper · mono-16kHz audio capture · prompt composition · convergence resolver"]
-    Sto[":core-storage<br/>ObjectBox source of truth · export markdown renderer · hybrid retrieval (keyword · tag · recency · vector)"]
+    Sto[":core-storage<br/>ObjectBox source of truth · export markdown renderer · deterministic temporal history · embedding/vector store feeding Vocab Drift clustering"]
     Mod[":core-model<br/>domain types · manifests · status enums · pure JVM, no Android deps"]
 
     App --> Inf
@@ -42,7 +42,7 @@ capture-scoped `CaptureUiState` is owned by `CaptureViewModel`, created per capt
 ```mermaid
 flowchart TB
     accTitle: AppContainer composition root
-    accDescr: Application onCreate constructs AppContainer once. It holds the NetworkGate and EntryStore eagerly, and lazily builds three ModelArtifactStores (main model plus embedding model plus tokenizer), one backgroundEngine LiteRtLmEngine per process, a lazy Embedder, the foreground and background inference collaborators (ForegroundInference, BackgroundExtractionWorker with DefaultConvergenceResolver, ObservationGenerator), the foreground-priority BackgroundExtractionQueue and BackgroundExtractionSaveFlow, RetrievalRepo, the pattern stack (PatternStore, PatternDetector, PatternDetectionOrchestrator, CalloutCooldownStore), the BackgroundExtractionLifecycleStateMachine and status bus, and readiness/progress StateFlows. CaptureViewModel owns the capture-scoped CaptureUiState and is created outside the container.
+    accDescr: Application onCreate constructs AppContainer once. It holds the NetworkGate and EntryStore eagerly, and lazily builds three ModelArtifactStores (main model plus embedding model plus tokenizer), one backgroundEngine LiteRtLmEngine per process, a lazy GemmaTextEmbedder, the foreground and background inference collaborators (ForegroundInference, BackgroundExtractionWorker with DefaultConvergenceResolver, ObservationGenerator), the foreground-priority BackgroundExtractionQueue and BackgroundExtractionSaveFlow, the VectorBackfillWorker that embeds each entry by its tone word, the pattern stack (PatternStore, PatternDetector, PatternDetectionOrchestrator, CalloutCooldownStore), the BackgroundExtractionLifecycleStateMachine and status bus, and readiness/progress StateFlows. CaptureViewModel owns the capture-scoped CaptureUiState and is created outside the container.
 
     OnCreate(["Application.onCreate()"]) --> AC["AppContainer<br/>(constructed once)"]
 
@@ -62,7 +62,7 @@ flowchart TB
 
     subgraph store["storage & patterns"]
       ES["entryStore: EntryStore<br/>ObjectBox entry source of truth"]
-      RR["retrievalRepo: RetrievalRepo<br/>keyword + tag + recency + vector"]
+      VBW["vectorBackfillWorker: VectorBackfillWorker<br/>embeds each entry by its tone word → vector store"]
       PS["patternStore / patternDetector / patternDetectionOrchestrator<br/>persistence · lifecycle · detection"]
       CC["calloutCooldownStore: CalloutCooldownStore<br/>per-pattern cooldown"]
     end

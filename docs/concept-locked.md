@@ -6,9 +6,9 @@
 
 **Hook:** "I wrote a brain tracker that won't blow smoke up your ass."
 
-**Tagline:** *Vestige (n.) — a trace, mark, or visible evidence of something no longer present. Your brain keeps leaving traces. This app catches them.*
+**Tagline:** *vestige (n.): a trace of something left behind.*
 
-**Pitch:** Strava for your attention. The coach is a dick. Your data never leaves the phone. ADHD/INTP-coded, anti-sycophant by design.
+**Pitch:** ADHD-friendly Android app that points out the things you don't know you're doing every day. 30-second voice entries in, sourced behavioral patterns out. No grading, no gamification, no feelings prompts. Your data never leaves the phone.
 
 **Internal positioning rule:** Track what happened, not how you graded today. We log cognitive events. We do not do therapy, mental wellness, mood scoring, or anything that implies clinical framing.
 
@@ -115,9 +115,9 @@ The product produces useful observable signal from entry one — not validation,
 ## Memory architecture
 - ObjectBox = source of truth for entries, tags, patterns, and vectors **(P0)**
 - Markdown files = generated export output (one per entry, readable, debuggable)
-- **Vector index + EmbeddingGemma 300M ship (STT-E passed 2026-05-12).** EmbeddingGemma 300M via LiteRT (pre-built `litert-community/embeddinggemma-300m`), loaded through `localagents-rag` (ADR-010). Vectors are computed per entry and STT-E-validated. **Caveat:** the vector *surfaces* — ranked hybrid retrieval and the Vocab Drift clustering — are **not yet live** in the build (see README §"Known Limitations"; `backlog.md` → `embedding-retrieval-surface` / `vocab-cluster-threshold`).
-- Hybrid retrieval P0 baseline: keyword + Gemma-extracted tags + recency. The vector (semantic similarity) layer is implemented on top but not yet wired into a live surface.
-- **Why both layers (when shipped):** tags are a modeling layer that drifts with vocabulary; embeddings are a measurement layer that stays stable. Vector layer protects pattern detection from user vocabulary drift over months.
+- **Vector index + EmbeddingGemma 300M ship (STT-E passed 2026-05-12).** EmbeddingGemma 300M via LiteRT (pre-built `litert-community/embeddinggemma-300m`), loaded through `localagents-rag` (ADR-010). Vectors are computed per entry. The single live consumer is the **Vocab Drift** surface: each entry is embedded by its model-emitted tone word (`vocabularyWord`) → `EmbeddingClustering` → `VOCAB_FREQUENCY`. On the demo corpus this mints `Drained Vocab Frequency` (live ACTIVE, verified on-device 2026-05-24).
+- Ranked content retrieval (keyword + tag + recency + cosine, the old `RetrievalRepo`) is **cut** — the vector axis moved to the tone word, which made a content query against it incoherent. Hybrid retrieval P0 baseline (keyword + Gemma-extracted tags + recency) is deterministic and never touched the vector. Reviving content retrieval would need its own second content vector.
+- **Why the tone-word axis:** the vector is the *feeling* axis, not the topic axis. Vocab Drift clusters synonymous tones ("drained" / "wiped" / "running on empty") across unrelated topics, so a feeling vector groups them where a content vector never would (see ROOT `README.md` §"Known Limitations").
 
 ## Stack
 - **LLM:** Gemma 4 E4B (effective-parameter small model built for edge/mobile use; not the 26B MoE variant)

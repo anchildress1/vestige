@@ -67,7 +67,6 @@ The full loop is implemented and runs on-device: voice / typed capture → Gemma
 | Storage | ObjectBox is the internal source of truth. Export renders readable markdown from rows on demand. |
 | Pattern lifecycle | Skip (returns in 7 days) / Drop (noise, archived) / Restart, with Undo. Closure is model-detected only — v1.5. |
 | Export | System-picker (SAF) zip of per-entry markdown. No storage permission; failures surface, never silent. |
-| Hybrid retrieval | Keyword + tags + recency + EmbeddingGemma 300M cosine over an ObjectBox HNSW index. STT-E-validated and the vectors ship, but the ranked retrieval is **not wired into a live surface yet** — see [Known Limitations](#known-limitations). |
 | Local-only | Zero outbound network calls during normal operation; model download is the only network event. Verified with `tcpdump`. |
 
 ---
@@ -305,7 +304,7 @@ adb uninstall dev.anchildress1.vestige
 
 ## Configuration
 
-v1 has effectively zero configuration. The model artifact downloads on first launch over Wi-Fi (~3.7 GB) into `Context.filesDir/models/`. A cheap presence + size probe resolves the artifact state without hashing the multi-GB file on the UI thread; a full-size artifact is then SHA-256-verified off-thread before readiness flips to `Ready`, so a checksum-corrupt full-size file falls back to `Loading` rather than a false `Ready` (`AppContainer.probeModelReadiness`). The engine itself loads lazily on the first inference, not proactively, because proactive pre-warm regressed into a startup GPU-init crash ([ADR-012](docs/adrs/ADR-012-gpu-inference-performance-gaps.md)). Persona default is set during onboarding and changeable from settings. Pattern analysis runs periodically — every 3 completed entries ([ADR-014](docs/adrs/ADR-014-foreground-background-split-and-periodic-pattern-analysis.md)) — with a per-pattern callout cooldown of 3 ([ADR-016](docs/adrs/ADR-016-pattern-callout-cooldown-per-pattern.md)), hardcoded for v1. No env vars, no `.env` file, no remote-config layer — adding any of those is a P0 violation per [ADR-001 §Q7](docs/adrs/ADR-001-stack-and-build-infra.md).
+v1 has effectively zero configuration. The model artifact downloads on first launch over Wi-Fi (3.66 GB) into `Context.filesDir/models/`. A cheap presence + size probe resolves the artifact state without hashing the multi-GB file on the UI thread; a full-size artifact is then SHA-256-verified off-thread before readiness flips to `Ready`, so a checksum-corrupt full-size file falls back to `Loading` rather than a false `Ready` (`AppContainer.probeModelReadiness`). The engine itself loads lazily on the first inference, not proactively, because proactive pre-warm regressed into a startup GPU-init crash ([ADR-012](docs/adrs/ADR-012-gpu-inference-performance-gaps.md)). Persona default is set during onboarding and changeable from settings. Pattern analysis runs periodically — every 3 completed entries ([ADR-014](docs/adrs/ADR-014-foreground-background-split-and-periodic-pattern-analysis.md)) — with a per-pattern callout cooldown of 3 ([ADR-016](docs/adrs/ADR-016-pattern-callout-cooldown-per-pattern.md)), hardcoded for v1. No env vars, no `.env` file, no remote-config layer — adding any of those is a P0 violation per [ADR-001 §Q7](docs/adrs/ADR-001-stack-and-build-infra.md).
 
 ---
 
@@ -325,7 +324,7 @@ Contributors: do not introduce dependencies that pull in Firebase, Crashlytics, 
 
 ## How to Contribute
 
-PRs are not accepted during the challenge window (until 2026-05-24). Issues are welcome — use the GitHub issue tracker. Post-submission, see [`AGENTS.md`](AGENTS.md) and [`backlog.md`](docs/backlog.md) for the contribution surface.
+PRs are not accepted through the submission deadline (2026-05-24). Issues are welcome — use the GitHub issue tracker. Post-submission, see [`AGENTS.md`](AGENTS.md) and [`backlog.md`](docs/backlog.md) for the contribution surface.
 
 Branches and commits follow [`AGENTS.md`](AGENTS.md) and the repo conventions: atomic, GPG-signed, a `Generated-by:` footer on AI-authored commits (e.g. `Generated-by: claude-opus-4-7`), Conventional Commits, never on `main`.
 

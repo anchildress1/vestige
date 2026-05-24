@@ -34,6 +34,8 @@ jobs:
     if: needs.release.outputs.release_created == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    env:
+      APK_ASSET: vestige-${{ needs.release.outputs.tag_name }}.apk
     environment:
       name: production
       url: ${{ github.server_url }}/${{ github.repository }}/releases/tag/${{ needs.release.outputs.tag_name }}
@@ -92,13 +94,15 @@ jobs:
         run: make assemble
 
       - name: Prepare release assets
-        env:
-          RELEASE_TAG: ${{ needs.release.outputs.tag_name }}
         run: |
           set -euo pipefail
 
           mkdir -p release-assets
-          cp app/build/outputs/apk/release/app-release.apk "release-assets/vestige-${RELEASE_TAG}.apk"
+          cp app/build/outputs/apk/release/app-release.apk "release-assets/${APK_ASSET}"
+          (
+            cd release-assets
+            sha256sum "${APK_ASSET}" > "${APK_ASSET}.sha256"
+          )
 
       - name: Clean up release signing material
         if: always()
@@ -108,4 +112,8 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           RELEASE_TAG: ${{ needs.release.outputs.tag_name }}
-        run: gh release upload "$RELEASE_TAG" "release-assets/vestige-${RELEASE_TAG}.apk"
+        run: |
+          gh release upload "$RELEASE_TAG" \
+            "release-assets/${APK_ASSET}" \
+            "release-assets/${APK_ASSET}.sha256" \
+            --clobber

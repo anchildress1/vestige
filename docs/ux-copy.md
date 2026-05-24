@@ -480,7 +480,7 @@ If model-detected Closed (read-only state — no action row shown):
 
 ## Vocab Drift 🧩
 
-Surfaces from Pattern Detail → "View vocab drift →" when a VOCAB_FREQUENCY pattern has 6+ supporting entries clustered by EmbeddingGemma. Proves the embedding payoff: same underlying state, distinct vocabulary framings that tag matching never connects.
+Surfaces from Pattern Detail → "View vocab drift →" when a VOCAB_FREQUENCY pattern forms — an EmbeddingGemma cluster of 4+ related entries (`VOCAB_THRESHOLD`), which only runs once 6+ entries are vectored (`MIN_SUPPORTING_ENTRIES`). Proves the embedding payoff: same underlying state, distinct vocabulary framings that tag matching never connects.
 
 ### Affordance (PatternDetail)
 > View vocab drift →

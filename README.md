@@ -180,7 +180,7 @@ SonarCloud analysis runs through the Gradle `sonar` task in CI rather than a sta
 make setup      # bootstrap gradle wrapper, install lefthook hooks
 make doctor     # verify local toolchain and environment variables
 make build      # assemble debug APK
-make test       # unit tests + Kover XML coverage + 80% verification
+make test       # unit tests for changed modules (75% coverage gate runs in `make verify`)
 make lint       # ktlint + detekt + Android lint
 make verify     # lint + test + build + staged secret scan
 make ci         # full local check (lint + test + build)

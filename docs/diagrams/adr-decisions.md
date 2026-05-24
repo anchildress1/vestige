@@ -127,9 +127,9 @@ not a raw token count. Lifecycle (the 13/13b Skip/Drop/Restart revision, `CLOSED
 ```mermaid
 flowchart TD
     accTitle: ADR-003 detection algorithm (current — periodic trigger, per-pattern cooldown)
-    accDescr: Every third completed entry, load the 90-day window plus 30 extra days for goblin, enumerate signatures across the six kinds, count via each per-kind predicate (vocab_frequency uses embedding clusters over entry vectors), apply the per-kind threshold, compute the content-addressable id, upsert into ObjectBox, emit a Patterns-list row for any pattern flipped to active, then append a callout if that pattern's own per-pattern cooldown allows.
+    accDescr: Every third completed entry, load the 90-day window (the goblin-hours bucket uses a narrower 30-day window), enumerate signatures across the six kinds, count via each per-kind predicate (vocab_frequency uses embedding clusters over entry vectors), apply the per-kind threshold, compute the content-addressable id, upsert into ObjectBox, emit a Patterns-list row for any pattern flipped to active, then append a callout if that pattern's own per-pattern cooldown allows.
 
-    T(["every 3rd completed entry (ADR-014)"]) --> L["load 90d (+30d goblin)"]
+    T(["every 3rd completed entry (ADR-014)"]) --> L["load 90d (goblin: narrower 30d)"]
     L --> E["enumerate signatures (6 kinds)"]
     E --> C["count via per-kind predicate<br/>(vocab_frequency = embedding cluster over vectors)"]
     C --> TH["apply per-kind threshold (≥3 · ≥4 vocab)"]

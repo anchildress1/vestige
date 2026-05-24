@@ -162,7 +162,8 @@ stateDiagram-v2
     KEEP_ALIVE --> DEMOTING: 30s keep-alive expires
     DEMOTING --> NORMAL: stopForeground() + stopSelf()
     DEMOTING --> PROMOTING: work arrived during demote (ADR-007)
-    PROMOTING --> NORMAL: startForeground failed → 5s bounded retry (ADR-007)
+    PROMOTING --> NORMAL: startForeground failed (ADR-007)
+    NORMAL --> PROMOTING: 5s bounded retry elapsed, work still in flight (ADR-007)
     FOREGROUND --> PROMOTING: OS service kill → onServiceKilled (ADR-007)
     KEEP_ALIVE --> PROMOTING: OS service kill → onServiceKilled (ADR-007)
     DEMOTING --> PROMOTING: OS service kill → onServiceKilled (ADR-007)

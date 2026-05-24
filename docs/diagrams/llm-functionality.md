@@ -119,7 +119,7 @@ flowchart TD
     SKQ -- yes --> AMB["ambiguous<br/>(saved null + note)"]
     ONE -- no --> AMB
 
-    note["Lens error path: 2 surviving ⇒ both must agree;<br/>only 1 survives (2+ fail) ⇒ every field ambiguous.<br/>Tags use ≥2-of-3 majority (plural-stemmed) with a Literal-strongest candidate fallback;<br/>vocabulary lets Inferential win outright (corroboration lifts to consensus)."]
+    note["Lens error path: 2 surviving ⇒ both must agree;<br/>only 1 survives (2+ fail) ⇒ every field ambiguous.<br/>Tags use ≥2-of-3 majority (plural-stemmed) with a Literal-strongest candidate fallback;<br/>vocabulary lets Inferential win outright (corroboration lifts to consensus).<br/>Blank / empty / false values never corroborate — no-op fields don't form consensus."]
 ```
 
 ---

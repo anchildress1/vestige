@@ -60,6 +60,46 @@ class ObservationGeneratorTest {
     }
 
     @Test
+    fun `recurring context lists prior same-slot entries, numbered, when present`() = runTest {
+        val resolved = ResolvedExtraction(emptyMap())
+        val capturedPrompt = io.mockk.slot<String>()
+        every { engine.streamText(capture(capturedPrompt), any()) } returns
+            flowOf(themeNoticingPayload("Third week running."))
+
+        newGenerator().generate(
+            SAMPLE_TEXT,
+            resolved,
+            SAMPLE_DAY,
+            temporalHistory = listOf(
+                HistoryChunk(patternId = null, text = "meeting then crashed"),
+                HistoryChunk(patternId = null, text = "drained after standup"),
+            ),
+        )
+
+        val prompt = capturedPrompt.captured
+        assertTrue(prompt.contains("RECURRING CONTEXT"), "prompt should carry the recurring-context section")
+        // Retrieval hands chunks back most-recent-first; the render reverses to oldest-first, so the
+        // most-recent ("meeting then crashed") is numbered last, closest to the current entry.
+        assertTrue(prompt.contains("1. drained after standup"), "oldest prior entry is listed first")
+        assertTrue(prompt.contains("2. meeting then crashed"), "entries are numbered so the model reads the count")
+    }
+
+    @Test
+    fun `recurring context section is omitted when temporal history is empty`() = runTest {
+        val resolved = ResolvedExtraction(emptyMap())
+        val capturedPrompt = io.mockk.slot<String>()
+        every { engine.streamText(capture(capturedPrompt), any()) } returns
+            flowOf(themeNoticingPayload("Theme noted."))
+
+        newGenerator().generate(SAMPLE_TEXT, resolved, SAMPLE_DAY)
+
+        assertTrue(
+            !capturedPrompt.captured.contains("RECURRING CONTEXT"),
+            "no recurring-context section when there are no prior same-slot entries",
+        )
+    }
+
+    @Test
     fun `retries the model once when the first response contains a forbidden phrase`() = runTest {
         val resolved = ResolvedExtraction(emptyMap())
         every { engine.streamText(any(), any()) } returnsMany listOf(
@@ -118,10 +158,10 @@ class ObservationGeneratorTest {
     fun `prompt renders all resolved field value shapes`() = runTest {
         val resolved = ResolvedExtraction(
             mapOf(
-                "tags" to ResolvedField(listOf("focus", "long-stretch"), ConfidenceVerdict.CANONICAL),
-                "template_label" to ResolvedField("locked-in", ConfidenceVerdict.CANONICAL_WITH_CONFLICT),
-                "recurrence_link" to ResolvedField(null, ConfidenceVerdict.AMBIGUOUS),
-                "some_flag" to ResolvedField(true, ConfidenceVerdict.CANONICAL),
+                "tags" to ResolvedField(listOf("focus", "long-stretch"), ConfidenceVerdict.CONSENSUS),
+                "template_label" to ResolvedField("locked-in", ConfidenceVerdict.CONSENSUS_WITH_CONFLICT),
+                "recurrence_kind" to ResolvedField(null, ConfidenceVerdict.AMBIGUOUS),
+                "some_flag" to ResolvedField(true, ConfidenceVerdict.CONSENSUS),
                 "nested" to ResolvedField(mapOf("a" to 1, "b" to listOf(2, 3)), ConfidenceVerdict.CANDIDATE),
             ),
         )
@@ -135,7 +175,7 @@ class ObservationGeneratorTest {
         // String / List / Map / Boolean / null branches in renderValue all exercised.
         assertTrue(prompt.contains("[\"focus\""), "prompt should render tags list")
         assertTrue(prompt.contains("\"locked-in\""), "prompt should render scalar string")
-        assertTrue(prompt.contains("recurrence_link"), "prompt should render null")
+        assertTrue(prompt.contains("recurrence_kind"), "prompt should render null")
         assertTrue(prompt.contains("some_flag"), "prompt should render boolean")
         assertTrue(prompt.contains("a=1"), "prompt should render nested map")
     }

@@ -39,7 +39,7 @@ class EntryMarkdownRendererTest {
             recurrenceLink = "pattern-1",
             vocabularyWord = "hollow",
             statedCommitmentJson = """{"text":"send invoice"}""",
-            confidenceJson = """{"tags":"CANONICAL"}""",
+            confidenceJson = """{"tags":"CONSENSUS"}""",
             entryObservationsJson = """[{"text":"invoice repeated"}]""",
             lensReceiptsJson = """[{"lens":"LITERAL","extracted":true}]""",
         )
@@ -54,7 +54,7 @@ class EntryMarkdownRendererTest {
         assertTrue(markdown.contains("vocabulary: hollow"))
         assertTrue(markdown.contains("""stated_commitment: {"text":"send invoice"}"""))
         assertTrue(markdown.contains("tags: []"))
-        assertTrue(markdown.contains("""confidence: {"tags":"CANONICAL"}"""))
+        assertTrue(markdown.contains("""confidence: {"tags":"CONSENSUS"}"""))
         assertTrue(markdown.contains("""entry_observations: [{"text":"invoice repeated"}]"""))
         assertTrue(markdown.contains("""lens_receipts: [{"lens":"LITERAL","extracted":true}]"""))
         assertTrue(markdown.endsWith("\ninvoice again\n"))

@@ -12,13 +12,19 @@ import dev.anchildress1.vestige.model.EntryLensReceipt
 import dev.anchildress1.vestige.model.EntryObservation
 import dev.anchildress1.vestige.model.ExtractionStatus
 import dev.anchildress1.vestige.model.Persona
+import dev.anchildress1.vestige.model.ResolvedExtraction
+import dev.anchildress1.vestige.model.ResolvedField
 import dev.anchildress1.vestige.patterns.PatternDetectionOrchestrator
 import dev.anchildress1.vestige.storage.EntryStore
+import dev.anchildress1.vestige.storage.TemporalHistoryRetrieval
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.time.ZonedDateTime
 
 data class BackgroundExtractionLifecycleCallbacks(
@@ -58,8 +64,9 @@ class BackgroundExtractionSaveFlow(
     private val observationGenerator: ObservationGenerator,
     private val lifecycleCallbacks: BackgroundExtractionLifecycleCallbacks,
     private val scope: CoroutineScope,
-    private val retrieveHistory: suspend (String) -> List<HistoryChunk> = { emptyList() },
+    private val retrievePatternCandidates: suspend (Long) -> List<HistoryChunk> = { emptyList() },
     private val patternOrchestrator: PatternDetectionOrchestrator? = null,
+    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) {
 
     /**
@@ -194,7 +201,7 @@ class BackgroundExtractionSaveFlow(
     ) {
         try {
             val requestWithHistory = request.copy(
-                retrievedHistory = resolveRetrievedHistory(entryId, entryText, request.retrievedHistory),
+                retrievedHistory = resolveRetrievedHistory(entryId, request.retrievedHistory),
             )
             when (val result = worker.extract(requestWithHistory, terminalRelay.workerListener)) {
                 is BackgroundExtractionResult.Success -> handleSuccess(
@@ -203,6 +210,7 @@ class BackgroundExtractionSaveFlow(
                     capturedAt = capturedAt,
                     entryAttemptCount = requestWithHistory.entryAttemptCount,
                     result = result,
+                    candidatePatternId = requestWithHistory.retrievedHistory.firstNotNullOfOrNull { it.patternId },
                     terminalRelay = terminalRelay,
                     persona = persona,
                 )
@@ -238,20 +246,26 @@ class BackgroundExtractionSaveFlow(
         }
     }
 
-    private suspend fun resolveRetrievedHistory(
-        entryId: Long,
-        entryText: String,
-        seededHistory: List<HistoryChunk>,
-    ): List<HistoryChunk> {
+    private suspend fun resolveRetrievedHistory(entryId: Long, seededHistory: List<HistoryChunk>): List<HistoryChunk> {
         if (seededHistory.isNotEmpty()) return seededHistory
-        return try {
-            retrieveHistory(entryText)
-        } catch (cancellation: CancellationException) {
-            throw cancellation
-        } catch (@Suppress("TooGenericExceptionCaught") error: Exception) {
-            Log.w(TAG, "Detached retrieval degraded for entryId=$entryId (${error.javaClass.simpleName})")
-            emptyList()
-        }
+        // Only the deterministic, strictly-prior, same-slot candidate feeds the read. Semantic
+        // similarity is NOT time-bounded — it surfaces look-alikes from any date, which made the
+        // model report recurrence on the very first entry. Recurrence must judge real priors only.
+        return historyOrEmpty(entryId, "candidate") { retrievePatternCandidates(entryId) }
+            .take(MAX_CANDIDATE_HISTORY)
+    }
+
+    private suspend fun historyOrEmpty(
+        entryId: Long,
+        label: String,
+        retrieve: suspend () -> List<HistoryChunk>,
+    ): List<HistoryChunk> = try {
+        retrieve()
+    } catch (cancellation: CancellationException) {
+        throw cancellation
+    } catch (@Suppress("TooGenericExceptionCaught") error: Exception) {
+        Log.w(TAG, "Detached $label retrieval degraded for entryId=$entryId (${error.javaClass.simpleName})")
+        emptyList()
     }
 
     @Suppress("LongParameterList") // Context bundle is clearer than inventing a throwaway carrier type.
@@ -261,10 +275,15 @@ class BackgroundExtractionSaveFlow(
         capturedAt: ZonedDateTime,
         entryAttemptCount: Int,
         result: BackgroundExtractionResult.Success,
+        candidatePatternId: String?,
         terminalRelay: DeferredTerminalRelay,
         persona: Persona,
     ) {
         val observations = runObservations(entryId, entryText, result, capturedAt)
+        // Recurrence decision trace (no user content): kind is the model's verdict, candidate is the
+        // matched pattern_id the app will link when kind is non-null.
+        val recurrenceKind = result.resolved.fields[KEY_RECURRENCE_KIND]?.value
+        Log.i(TAG, "recurrence entry=$entryId kind=$recurrenceKind candidate=$candidatePatternId")
         persistTerminalState(
             entryId = entryId,
             entryAttemptCount = entryAttemptCount,
@@ -274,7 +293,7 @@ class BackgroundExtractionSaveFlow(
         ) {
             entryStore.completeEntry(
                 entryId,
-                result.resolved,
+                linkRecurrence(result.resolved, candidatePatternId),
                 result.templateLabel,
                 observations,
                 result.lensResults.toReceipts(),
@@ -282,6 +301,24 @@ class BackgroundExtractionSaveFlow(
         }
         schedulePatternOrchestration(entryId, persona)
         runEntryFinalization(entryId)
+    }
+
+    // The model judges recurrence (recurrence_kind); the app owns the id. When the read confirms a
+    // recurrence and a candidate pattern was fed, stamp that pattern_id as recurrence_link so REPEAT
+    // resolves to its title. The link inherits recurrence_kind's verdict so the field's confidence
+    // (and REPEAT's tone) stays honest about single-lens vs multi-lens agreement.
+    private fun linkRecurrence(resolved: ResolvedExtraction, candidatePatternId: String?): ResolvedExtraction {
+        val kind = resolved.fields[KEY_RECURRENCE_KIND]
+        if (kind?.value == null || candidatePatternId == null) return resolved
+        val link = ResolvedField(
+            value = candidatePatternId,
+            verdict = kind.verdict,
+            flags = kind.flags,
+            sourceLens = kind.sourceLens,
+        )
+        return resolved.copy(
+            fields = resolved.fields + (KEY_RECURRENCE_LINK to link),
+        )
     }
 
     private fun schedulePatternOrchestration(entryId: Long, persona: Persona) {
@@ -414,7 +451,7 @@ class BackgroundExtractionSaveFlow(
         success: BackgroundExtractionResult.Success,
         capturedAt: ZonedDateTime,
     ): List<EntryObservation> = try {
-        observationGenerator.generate(entryText, success.resolved, capturedAt)
+        observationGenerator.generate(entryText, success.resolved, capturedAt, temporalHistoryFor(entryId, capturedAt))
     } catch (cancellation: CancellationException) {
         throw cancellation
     } catch (@Suppress("TooGenericExceptionCaught") error: Exception) {
@@ -424,6 +461,19 @@ class BackgroundExtractionSaveFlow(
         Log.w(TAG, "ObservationGenerator threw ${error.javaClass.simpleName} for entryId=$entryId", error)
         emptyList()
     }
+
+    // Prior entries at this entry's weekday + time-of-day, fed to the observation read as
+    // RECURRING CONTEXT so the model can surface a repeat observation. Deterministic + local — no
+    // embeddings — so it works on the very first read, before any pattern is detected.
+    // ObjectBox reads run on IO, not the save-flow's Default (CPU) context, so the DB hit doesn't
+    // park a compute thread before the in-memory slot matching.
+    private suspend fun temporalHistoryFor(entryId: Long, capturedAt: ZonedDateTime): List<HistoryChunk> =
+        withContext(ioDispatcher) {
+            val target = entryStore.readEntry(entryId) ?: return@withContext emptyList()
+            val candidates = entryStore.listCompleted(TEMPORAL_HISTORY_CANDIDATES)
+            TemporalHistoryRetrieval.matching(target, candidates, capturedAt.zone, TEMPORAL_HISTORY_TOP_N)
+                .map { HistoryChunk(patternId = null, text = it.entryText) }
+        }
 
     private suspend fun compensatePersistenceFailure(
         entryId: Long,
@@ -494,6 +544,17 @@ class BackgroundExtractionSaveFlow(
 
     private companion object {
         private const val TAG = "VestigeSaveFlow"
+
+        // Candidate window scanned for same-slot priors, and how many matches to feed the read.
+        private const val TEMPORAL_HISTORY_CANDIDATES = 250
+        private const val TEMPORAL_HISTORY_TOP_N = 5
+
+        // Exactly one recurrence candidate (the most-recently-seen matched pattern) is judged and
+        // linked — REPEAT shows a single pattern, so there is nothing to gain from feeding more.
+        private const val MAX_CANDIDATE_HISTORY = 1
+
+        private const val KEY_RECURRENCE_KIND = "recurrence_kind"
+        private const val KEY_RECURRENCE_LINK = "recurrence_link"
     }
 }
 

@@ -13,7 +13,7 @@ class SkepticalFlagKindsTest {
         assertEquals(
             mapOf(
                 "commitment-without-anchor" to "stated_commitment",
-                "unsupported-recurrence" to "recurrence_link",
+                "unsupported-recurrence" to "recurrence_kind",
                 "vocabulary-contradiction" to "tags",
             ),
             SkepticalFlagKinds.SCHEMA_BINDING,

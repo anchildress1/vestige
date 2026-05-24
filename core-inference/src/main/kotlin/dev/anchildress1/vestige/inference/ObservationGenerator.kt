@@ -39,17 +39,19 @@ class ObservationGenerator(
         entryText: String,
         resolved: ResolvedExtraction,
         capturedAt: ZonedDateTime,
+        temporalHistory: List<HistoryChunk> = emptyList(),
     ): List<EntryObservation> = withContext(ioDispatcher) {
         require(entryText.isNotBlank()) { "ObservationGenerator.generate requires a non-blank entryText" }
-        runModel(entryText, resolved, capturedAt)
+        runModel(entryText, resolved, capturedAt, temporalHistory)
     }
 
     private suspend fun runModel(
         entryText: String,
         resolved: ResolvedExtraction,
         capturedAt: ZonedDateTime,
+        temporalHistory: List<HistoryChunk>,
     ): List<EntryObservation> {
-        val systemInstruction = composeSystemInstruction(resolved, capturedAt)
+        val systemInstruction = composeSystemInstruction(resolved, capturedAt, temporalHistory)
         val userText = entryText.trimEnd()
         repeat(MAX_MODEL_ATTEMPTS) { attempt ->
             val raw = attemptModelCall(systemInstruction, userText, attempt + 1) ?: return@repeat
@@ -78,16 +80,30 @@ class ObservationGenerator(
         null
     }
 
-    private fun composeSystemInstruction(resolved: ResolvedExtraction, capturedAt: ZonedDateTime): String =
-        buildString {
-            append(systemPromptLoader())
-            append("\n\n")
-            append(outputSchemaLoader())
-            append("\n\n## CAPTURE TIME\n")
-            append(capturedAt.format(CAPTURE_TIME_FORMAT))
-            append("\n\n## RESOLVED FIELDS\n")
-            append(renderResolved(resolved))
+    private fun composeSystemInstruction(
+        resolved: ResolvedExtraction,
+        capturedAt: ZonedDateTime,
+        temporalHistory: List<HistoryChunk>,
+    ): String = buildString {
+        append(systemPromptLoader())
+        append("\n\n")
+        append(outputSchemaLoader())
+        append("\n\n## CAPTURE TIME\n")
+        append(capturedAt.format(CAPTURE_TIME_FORMAT))
+        if (temporalHistory.isNotEmpty()) {
+            append("\n\n## RECURRING CONTEXT\n")
+            append(renderTemporalHistory(temporalHistory))
         }
+        append("\n\n## RESOLVED FIELDS\n")
+        append(renderResolved(resolved))
+    }
+
+    // Prior entries at this entry's weekday + time-of-day. Retrieval hands them back most-recent
+    // first; reverse to oldest-first so the numbered list reads chronologically toward the current
+    // entry. The count (plus the current entry) is the recurrence signal the model reads — it is not
+    // told a number.
+    private fun renderTemporalHistory(history: List<HistoryChunk>): String =
+        history.asReversed().mapIndexed { index, chunk -> "${index + 1}. ${chunk.text}" }.joinToString("\n")
 
     private fun renderResolved(resolved: ResolvedExtraction): String {
         if (resolved.fields.isEmpty()) return "(no resolved fields)"

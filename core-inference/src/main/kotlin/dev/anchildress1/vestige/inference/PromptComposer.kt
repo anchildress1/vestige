@@ -14,7 +14,7 @@ data class HistoryChunk(val patternId: String?, val text: String)
 data class ComposedPrompt(val lens: Lens, val systemInstruction: String, val userText: String, val tokenEstimate: Int)
 
 /**
- * Builds one background lens prompt by stacking the lens framing on top of the four surface
+ * Builds one background lens prompt by stacking the lens framing on top of the five surface
  * instructions, the output schema, the retrieved-history block, and the entry text. Lens and
  * surface text load independently from `resources/lenses/` and `resources/surfaces/` so a tweak
  * to one module cannot diff another. Persona modules never appear here — extraction is voice-free.
@@ -33,6 +33,7 @@ object PromptComposer {
         "state",
         "vocabulary",
         "commitment",
+        "recurrence",
     )
 
     fun compose(lens: Lens, entryText: String, retrievedHistory: List<HistoryChunk> = emptyList()): ComposedPrompt {
@@ -103,6 +104,8 @@ object PromptComposer {
         return text.substring(0, budget).trimEnd() + ELLIPSIS
     }
 
+    // Prior entries as plain content — no pattern ids. Recurrence is judged on whether the current
+    // entry repeats the behavior/state these describe; the app owns which pattern that maps to.
     private fun renderHistory(chunks: List<HistoryChunk>): String {
         if (chunks.isEmpty()) {
             return "## RETRIEVED HISTORY\n(no prior entries)"
@@ -110,10 +113,7 @@ object PromptComposer {
         return buildString {
             append("## RETRIEVED HISTORY")
             chunks.forEach { chunk ->
-                append('\n')
-                val metadata = chunk.patternId?.let { "pattern_id=$it" } ?: "context-only"
-                append("- $metadata\n")
-                append("  ")
+                append("\n- ")
                 append(chunk.text.replace("\n", "\n  "))
             }
         }

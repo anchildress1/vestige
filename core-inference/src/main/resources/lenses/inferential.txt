@@ -21,7 +21,7 @@ Inference limits:
 
 Output discipline:
 
-- Produce a complete schema object covering all surfaces for this entry.
+- Produce a complete read covering all surfaces for this entry.
 - Populate more fields than a strict surface-words reading would. Inferential output is expected to be richer.
 - Do not pad: genuinely sparse entries stay sparse even with a charitable read.
-- Always emit `flags` as `[]` (empty array).
+- Never emit a `flag:` line — only the Skeptical lens flags.

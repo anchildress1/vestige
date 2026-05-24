@@ -6,7 +6,7 @@ object SkepticalFlagKinds {
     /** Schema-binding kind → field it annotates. Entry-level kinds (`time-inconsistency`, `other`) are absent here. */
     val SCHEMA_BINDING: Map<String, String> = mapOf(
         "commitment-without-anchor" to "stated_commitment",
-        "unsupported-recurrence" to "recurrence_link",
+        "unsupported-recurrence" to "recurrence_kind",
         "vocabulary-contradiction" to "tags",
     )
 

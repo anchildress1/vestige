@@ -56,10 +56,10 @@ Each entry runs through a **3-lens × 5-surface** extraction pipeline. Three len
 **Mix-and-match prompt architecture:** surface modules and lens modules stored separately. Each vector pass = one lens + all five surface instructions composed into a single prompt. 3 model calls per entry (one per lens), each returning the full schema.
 
 **Convergence rules:**
-- ≥2 of 3 lenses agree on a field → **canonical**, saved as authoritative
+- ≥2 of 3 lenses agree on a field → **consensus**, saved as authoritative
 - Only Inferential populates a field → **candidate**, lower confidence, not used by pattern engine until promoted
 - Lenses disagree → **ambiguous**, saved null with a note
-- Skeptical flags conflict even when others agree → **canonical with conflict marker**
+- Skeptical flags conflict even when others agree → **consensus with conflict marker**
 
 **Two-tier processing:**
 - *Foreground:* fast pass returns transcription + one persona follow-up per `adrs/ADR-018-inline-foreground-follow-up.md`. Prior-entry recall stays out of foreground; pattern callouts are how Vestige references older entries.
@@ -79,7 +79,7 @@ Eleven content fields total. Extracted fields are convergence-driven; `entry_obs
 - `recurrence_link` — nullable; pattern_id if entry matches a known pattern
 - `stated_commitment` — nullable; tag-only tracking (text + entry_id + topic/person). Pattern engine surfaces "logged commitments about [topic] in N entries, last on [date]." No formal resolution logic in v1.
 - `entry_observations` — 1–2 persisted observations from this entry alone, each with evidence text or a field reference. Generated after convergence; never freeform speculation.
-- `confidence` — per-field convergence result (canonical / candidate / ambiguous / canonical_with_conflict)
+- `confidence` — per-field convergence result (consensus / candidate / ambiguous / consensus_with_conflict)
 
 These eleven are the **content schema** — what the agent extracts/generates and the user sees. The ObjectBox `Entry` entity also carries operational metadata (`extraction_status`, `attempt_count`, `last_error`) for the retry-based background-extraction recovery path. Operational fields are owned by `adrs/ADR-001-stack-and-build-infra.md` §Q3, not by this spec — they are storage concerns, not product concerns.
 

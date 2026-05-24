@@ -90,7 +90,7 @@ The end-to-end dataflow. `EntryStore` writes ObjectBox only; export renders mark
 ```mermaid
 flowchart TB
     accTitle: End-to-end capture and extraction dataflow
-    accDescr: User records or types. Voice goes through AudioRecord then audio normalization to mono 16kHz float32 max 30s, then a foreground Gemma call returns transcription and one follow-up. EntryStore persists ObjectBox rows only. A background pass runs three sequential lens calls, the convergence resolver writes canonical, candidate, or ambiguous fields plus entry observations, then pattern detection runs when the threshold is met.
+    accDescr: User records or types. Voice goes through AudioRecord then audio normalization to mono 16kHz float32 max 30s, then a foreground Gemma call returns transcription and one follow-up. EntryStore persists ObjectBox rows only. A background pass runs three sequential lens calls, the convergence resolver writes consensus, candidate, or ambiguous fields plus entry observations, then pattern detection runs when the threshold is met.
 
     U(["User"]) -- voice --> AR["AudioRecord capture"]
     U -- type --> FG
@@ -98,7 +98,7 @@ flowchart TB
     NORM --> FG["Foreground Gemma call<br/>→ transcription + follow-up"]
     FG --> ES["EntryStore.persist<br/>ObjectBox row only"]
     ES --> BG["Background pass<br/>3 sequential lens calls (Literal→Inferential→Skeptical)"]
-    BG --> CR["Convergence Resolver<br/>canonical · candidate · ambiguous · canonical_with_conflict"]
+    BG --> CR["Convergence Resolver<br/>consensus · candidate · ambiguous · consensus_with_conflict"]
     CR --> OBS["entry_observations<br/>generated from transcript + resolved fields"]
     OBS --> PD{"≥10 entries AND<br/>pattern ≥3 supporting?"}
     PD -- yes --> PAT["Pattern detection<br/>persist sourced patterns + callout (cooldown 3)"]

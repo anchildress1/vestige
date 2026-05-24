@@ -14,7 +14,7 @@ import java.time.ZonedDateTime
  * the resolved schema fields plus the entry's local capture time and assigns one of six
  * [TemplateLabel]s per `concept-locked.md` §"Templates" (AGENTS.md: templates are model-emitted).
  *
- * Only CANONICAL / CANONICAL_WITH_CONFLICT fields drive label selection: CANDIDATE values are
+ * Only CONSENSUS / CONSENSUS_WITH_CONFLICT fields drive label selection: CANDIDATE values are
  * single-lens witnesses ("lower confidence, not used by pattern engine until promoted" per
  * `concept-locked.md` §"Convergence rules") and the template label feeds pattern grouping.
  *
@@ -49,7 +49,7 @@ class TemplateLabeler {
     }
 
     private fun ResolvedField.isLoadBearing(): Boolean =
-        verdict == ConfidenceVerdict.CANONICAL || verdict == ConfidenceVerdict.CANONICAL_WITH_CONFLICT
+        verdict == ConfidenceVerdict.CONSENSUS || verdict == ConfidenceVerdict.CONSENSUS_WITH_CONFLICT
 
     private companion object {
         const val TAGS_KEY = "tags"

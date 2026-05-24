@@ -4,6 +4,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import dev.anchildress1.vestige.storage.EntryStore
+import dev.anchildress1.vestige.storage.PatternStore
 import dev.anchildress1.vestige.ui.components.BottomTab
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -22,6 +23,7 @@ import java.time.ZoneId
 fun EntryDetailHost( // NOSONAR kotlin:S107
     entryId: Long,
     entryStore: EntryStore,
+    patternStore: PatternStore,
     zoneId: ZoneId,
     dataRevision: StateFlow<Long> = MutableStateFlow(0L),
     onBack: () -> Unit,
@@ -31,10 +33,11 @@ fun EntryDetailHost( // NOSONAR kotlin:S107
     highlightOnOpen: Boolean = false,
     modifier: Modifier = Modifier,
 ) {
-    val viewModel = remember(entryId, entryStore, zoneId) {
+    val viewModel = remember(entryId, entryStore, patternStore, zoneId) {
         EntryDetailViewModel(
             entryId = entryId,
             entryStore = entryStore,
+            patternStore = patternStore,
             zoneId = zoneId,
             dataRevision = dataRevision,
         )

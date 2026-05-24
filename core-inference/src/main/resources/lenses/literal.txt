@@ -15,5 +15,5 @@ Output discipline:
 - This lens is the extraction floor. Every field you populate anchors downstream convergence.
 - Null is correct for a field only when the entry contains zero evidence for it. A named activity or object is always evidence for `tags`.
 - `tags` must have at least one entry when the user names any activity, object, or state word.
-- Always emit `flags` as `[]` (empty array).
+- Never emit a `flag:` line — only the Skeptical lens flags.
 - Quotes used as evidence must be exact substrings of the entry text.

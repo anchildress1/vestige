@@ -52,7 +52,7 @@ Use manual constructor injection. No Hilt in v1.
 5. Foreground Gemma call returns transcription + follow-up.
 6. `EntryStore` persists the transcript before background extraction starts: transcription as `entry_text`, foreground `follow_up`, and the selected `persona` for row provenance.
 7. Background extraction runs three sequential lens calls.
-8. Convergence resolver writes canonical/candidate/ambiguous fields plus `entry_observations`.
+8. Convergence resolver writes consensus/candidate/ambiguous fields plus `entry_observations`.
 9. Pattern detection runs after the configured threshold and persists sourced patterns.
 
 Audio bytes are never product data. If temp audio files are required for LiteRT-LM, delete them immediately after the call. User-initiated cancel during RECORDING (the `DISCARD · NO SAVE` affordance) destroys the in-flight buffer synchronously with the tap — `AudioRecord` is stopped + released, no Gemma 4 call fires, no `Entry` row lands, no markdown is written, the session terminates `DISCARDED`. Contract: `adrs/ADR-001-stack-and-build-infra.md` §Q8.

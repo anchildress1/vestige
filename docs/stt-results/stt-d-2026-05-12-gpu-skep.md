@@ -20,7 +20,7 @@
 ## Verdict
 
 **Ship.** 11/15 (73%) divergent. **4 Skeptical flags fired with quoted user evidence** — the
-adversarial lens is doing real work for the first time on the corpus. `canonical_with_conflict`
+adversarial lens is doing real work for the first time on the corpus. `consensus_with_conflict`
 verdict is reachable on 2 entries (A4, B2). Demo Chapter 3 has 4 flagged entries to choose
 from.
 
@@ -30,7 +30,7 @@ from.
 |---|---|---|---|
 | Meaningful divergence | 9/15 (60%) | **11/15 (73%)** | **+13 pp** |
 | Skeptical flags fired | **0** | **4** | **+4** |
-| `canonical_with_conflict`-eligible entries | 0 | **2** (A4, B2) | +2 |
+| `consensus_with_conflict`-eligible entries | 0 | **2** (A4, B2) | +2 |
 | Multi-axis divergence entries | 2 | 4 (A1, A3, A6, C1) | +2 |
 | Mean per-entry latency | 48s | **33s** | **−31%** |
 | Full 3-lens entries | 15/15 | 14/15 (B3 partial) | −1 |
@@ -51,14 +51,14 @@ SKEPTICAL is also under-budget. Total per-call prefill is smaller than the greed
 All 4 fire on patterns the prompt names explicitly with examples. The model is matching the
 in-context examples, not generalizing past them — known limitation, documented below.
 
-## A4 + B2 — the `canonical_with_conflict` entries
+## A4 + B2 — the `consensus_with_conflict` entries
 
 Both entries have `disagree_fields=[]` AND a Skeptical flag fired. The other two lenses agreed
 on the underlying field values; SKEPTICAL annotated the agreement with a contradiction marker.
 
 This is the exact verdict ADR-002 §"Convergence Resolver Contract" promised:
 
-> The convergence resolver writes `canonical_with_conflict` when Literal and Inferential agree
+> The convergence resolver writes `consensus_with_conflict` when Literal and Inferential agree
 > on the underlying value and Skeptical flags it.
 
 **In the GPU greedy baseline (60%/0 flags), this verdict was unreachable on any entry.** It's
@@ -71,11 +71,11 @@ now reachable on A4 and B2.
 | A1 | 3/3 | 30.9 | ✅ | `tags` + `state-behavior-mismatch` flag |
 | A2 | 3/3 | 24.0 | ❌ | — (lenses converged on `[meeting, late-night]`) |
 | A3 | 3/3 | 34.4 | ✅ | `tags` + `energy_descriptor` + INF-only `energy_descriptor` |
-| **A4** | 3/3 | 32.3 | ✅ | **`vocabulary-contradiction` flag only — `canonical_with_conflict` eligible** |
+| **A4** | 3/3 | 32.3 | ✅ | **`vocabulary-contradiction` flag only — `consensus_with_conflict` eligible** |
 | A5 | 3/3 | 29.8 | ❌ | — (no field disagreement, no flag fired) |
 | A6 | 3/3 | 28.8 | ✅ | `tags` + `state_shift` |
 | B1 | 3/3 | 33.2 | ✅ | `tags` |
-| **B2** | 3/3 | 46.1 | ✅ | **`commitment-without-anchor` flag only — `canonical_with_conflict` eligible** |
+| **B2** | 3/3 | 46.1 | ✅ | **`commitment-without-anchor` flag only — `consensus_with_conflict` eligible** |
 | B3 | 2/3 | 41.5 | ❌ | — (one lens parse-failed; resolver fell through) |
 | C1 | 3/3 | 38.5 | ✅ | `tags` + `unsupported-recurrence` flag |
 | C2 | 3/3 | 35.9 | ✅ | `tags` |

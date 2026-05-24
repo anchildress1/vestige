@@ -362,7 +362,7 @@ Checked bullets above are the historical record that the Mist tokens shipped to 
 - [x] / ~~**Re-eval cost confirmation per `adrs/ADR-002-multi-lens-extraction-pattern.md` §Q3:** on the *second* re-read tap within 60 seconds, show the soft-confirm copy `Costs ~30s of inference. Continue?` from `ux-copy.md` §"Re-eval / Reading" before triggering another pipeline pass. First tap of the session goes through without the prompt.~~
 - [x] / ~~During re-read, a placeholder per `ux-copy.md` §"Loading States — Roast generation" or similar shows. The user can leave the screen and the work continues in the background.~~
 - [x] / ~~When the re-read completes, the per-lens outputs are shown side-by-side with the original convergence-resolved fields. Differences are highlighted.~~
-- [x] / ~~User affordances: `Apply this read` (replaces the saved canonical fields with the new ones) or `Keep original` (discards the new read).~~
+- [x] / ~~User affordances: `Apply this read` (replaces the saved consensus fields with the new ones) or `Keep original` (discards the new read).~~
 - [x] / ~~If the re-read converges to the same shape, copy: `Confirmed. Same shape.`~~
 - [x] / ~~Vocabulary chips appear in the Reading section if STT-E passed and Story 3.4 shipped.~~
 
@@ -487,7 +487,7 @@ Checked bullets above are the historical record that the Mist tokens shipped to 
 
 **As** the AI implementor, **I need** every UI surface that renders the agent-emitted template label to stop rendering it, **so that** the demo never shows the structurally-guaranteed `AUDIT` label that makes the product look broken in the 90 s pitch and 5 min walkthrough.
 
-**Why now, not in Phase 2:** The root cause is architectural (CANONICAL requires ≥2-lens agreement; archetype triggers are Inferential-only → CANDIDATE → discarded → always `AUDIT`). The redesign is a new ADR superseding the ADR-002 resolver coupling — v1.5 scope. Ripping `TemplateLabeler` + the `template_label` field mid-Phase-2 is a cross-cutting change touching storage, the extraction worker, and ~20 test files for zero demo value. The label is **inert, not removed**: it stays computed and persisted; only the UI stops showing it. This story is the UI yank only.
+**Why now, not in Phase 2:** The root cause is architectural (CONSENSUS requires ≥2-lens agreement; archetype triggers are Inferential-only → CANDIDATE → discarded → always `AUDIT`). The redesign is a new ADR superseding the ADR-002 resolver coupling — v1.5 scope. Ripping `TemplateLabeler` + the `template_label` field mid-Phase-2 is a cross-cutting change touching storage, the extraction worker, and ~20 test files for zero demo value. The label is **inert, not removed**: it stays computed and persisted; only the UI stops showing it. This story is the UI yank only.
 
 **Done when:**
 - [x] History rows (Story 4.6): the template-label `Pill` is removed. The row leads with the date; snippet + timestamp only. `HistoryRow` / `HistorySummary` stop reading `templateLabel`.

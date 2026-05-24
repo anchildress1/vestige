@@ -76,7 +76,7 @@ sequenceDiagram
     BG->>LM: lens 3 — Skeptical
     LM-->>BG: full schema
     BG->>CR: 3 results
-    CR-->>BG: canonical / candidate / ambiguous fields
+    CR-->>BG: consensus / candidate / ambiguous fields
     BG->>BG: generate entry_observations
     BG->>PD: if ≥10 entries & pattern ≥3 supporting
     PD-->>ES: persist sourced patterns (status = COMPLETED)
@@ -91,12 +91,12 @@ Not a 4th model call. Per-field agreement predicate decides the verdict.
 ```mermaid
 flowchart TD
     accTitle: Convergence resolver per-field decision
-    accDescr: For each field, if two or more of three lenses agree the verdict is canonical, unless Skeptical flags a conflict in which case it is canonical_with_conflict. If only Inferential populated it, the verdict is candidate. If all three disagree, the verdict is ambiguous and the field is saved null with a debug note.
+    accDescr: For each field, if two or more of three lenses agree the verdict is consensus, unless Skeptical flags a conflict in which case it is consensus_with_conflict. If only Inferential populated it, the verdict is candidate. If all three disagree, the verdict is ambiguous and the field is saved null with a debug note.
 
     F(["per field across 3 lens results"]) --> A{"≥2 lenses agree?"}
     A -- yes --> SK{"Skeptical flags<br/>a contradiction?"}
-    SK -- no --> CAN["canonical<br/>(saved authoritative)"]
-    SK -- yes --> CWC["canonical_with_conflict<br/>(canonical + conflict marker)"]
+    SK -- no --> CAN["consensus<br/>(saved authoritative)"]
+    SK -- yes --> CWC["consensus_with_conflict<br/>(consensus + conflict marker)"]
     A -- no --> ONE{"only Inferential<br/>populated it?"}
     ONE -- yes --> CND["candidate<br/>(low confidence; not used by pattern engine)"]
     ONE -- no --> AMB["ambiguous<br/>(saved null + note)"]

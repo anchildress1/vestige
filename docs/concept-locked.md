@@ -25,14 +25,14 @@
 
 ## Templates (agent-emitted labels, not user-facing modes)
 
-Templates are no longer user-picked. Capture screen has no template grid. The user just records or types. The agent labels each entry post-extraction based on which surfaces dominate — with one exception: **Goblin Hours is set deterministically from the capture timestamp**, not by the agent (see below).
+Templates are no longer user-picked. Capture screen has no template grid. The user just records or types. The agent labels each entry post-extraction based on which surfaces dominate. Goblin Hours additionally has a **deterministic floor**: a midnight–5am capture is labelled Goblin Hours whenever the agent didn't commit to a more specific archetype (see below).
 
 Six labels:
 - **Crashed** — energy crash (State surface: crash / depletion state words → `tags`)
 - **Deep Space** — hyperfocus debrief (Behavioral surface: focus subject + extended duration + things-ignored mentions)
 - **Busy Stalling** — task paralysis (Behavioral surface: stuck task + resistance markers)
 - **Nonstop Spiral** — rumination loop (State surface: decision-looping + iteration markers)
-- **Goblin Hours** — late-night capture. **Deterministic, not a model pick:** assigned when the entry's local capture time falls in the midnight–5am window, decided from the timestamp (the model is never handed the clock, and an entry's text can name a different hour than when it was actually captured). The other five labels are the model's read of the entry; this one is the clock's.
+- **Goblin Hours** — late-night capture. The agent can read it directly, but it also has a **deterministic floor**: when the agent commits to nothing more specific than `audit`, a midnight–5am local capture is labelled Goblin Hours from the timestamp alone (the model is never handed the clock, and an entry's text can name a different hour than when it was actually captured). A specific archetype read is never overridden.
 - **Brain Dump** — catch-all when no archetype dominates
 
 Echoes is not a template — recurrence is pattern-engine output across entries.
@@ -73,7 +73,7 @@ Eleven content fields total. Extracted fields are convergence-driven; `entry_obs
 - `follow_up` — foreground persona follow-up for voice captures; `null` for typed entries
 - `persona` — recorded selected persona for row provenance
 - `timestamp` — auto
-- `template_label` — the five archetypes (Crashed / Deep Space / Busy Stalling / Nonstop Spiral / Brain Dump) are agent-emitted + convergence-voted; **Goblin Hours is assigned deterministically from the capture timestamp** (midnight–5am), taking over from a non-committal Brain Dump when the clock qualifies
+- `template_label` — agent-emitted + convergence-voted across all six archetypes; **Goblin Hours additionally has a deterministic floor** — a midnight–5am capture takes over from a non-committal Brain Dump when the clock qualifies (the agent can still read Goblin Hours directly)
 - `tags` — free-form, model-extracted (people, topics, activities, places)
 - `vocabulary` — nullable; one lowercase word for the entry's overall felt tone (Inferential lens wins)
 - `recurrence_link` — nullable; pattern_id if entry matches a known pattern

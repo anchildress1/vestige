@@ -237,29 +237,37 @@ class BackgroundExtractionWorker(
         }
     }
 
-    // The model owns the template: its converged pick (CONSENSUS / CONSENSUS_WITH_CONFLICT) stands.
-    // The deterministic labeler is a fallback only — used when the lenses didn't converge on a serial
-    // (CANDIDATE / disagreement) or emitted an unknown one. The model isn't handed the structured
-    // capture time, so it reaches goblin-hours only when the entry text names a late hour; the
-    // labeler's timestamp rule covers the case where it doesn't.
+    // The model's pick is authoritative — whatever it converged on stands. The single deterministic
+    // override: when it picked nothing specific (`audit`, or didn't converge) AND the entry was
+    // captured inside the goblin window, the clock wins and the label becomes GOBLIN_HOURS. Every
+    // other case — any specific archetype, a model `goblin-hours` pick, or `audit` outside the window
+    // — is "go with what the model said" (defaulting to AUDIT only when there was no pick at all).
     private fun resolveTemplateLabel(resolved: ResolvedExtraction, capturedAt: ZonedDateTime): TemplateLabel {
-        val labelerPick = templateLabeler.label(resolved, capturedAt)
         val modelPick = modelTemplateLabel(resolved)
-        if (modelPick != null && modelPick != labelerPick) {
-            Log.d(TAG, "template_label model=$modelPick labeler=$labelerPick (model wins)")
+        val pickedNothingSpecific = modelPick == null || modelPick == TemplateLabel.AUDIT
+        return when {
+            pickedNothingSpecific && templateLabeler.isGoblinHours(capturedAt) -> TemplateLabel.GOBLIN_HOURS
+            else -> modelPick ?: TemplateLabel.AUDIT
         }
-        return modelPick ?: labelerPick
     }
 
     private fun modelTemplateLabel(resolved: ResolvedExtraction): TemplateLabel? {
         val field = resolved.fields[TEMPLATE_LABEL_KEY] ?: return null
         val loadBearing = field.verdict == ConfidenceVerdict.CONSENSUS ||
             field.verdict == ConfidenceVerdict.CONSENSUS_WITH_CONFLICT
+        // Lenses didn't converge on a label (CANDIDATE / AMBIGUOUS) — keep the "no model pick" signal
+        // visible so it's distinguishable from a clean `audit` pick downstream.
+        if (!loadBearing) {
+            Log.d(TAG, "template_label not load-bearing (verdict=${field.verdict}); deterministic layer decides")
+        }
         return (field.value as? String)
             ?.takeIf { loadBearing }
             ?.let { serial ->
-                TemplateLabel.fromSerial(serial)
-                    .also { if (it == null) Log.w(TAG, "template_label unknown serial=$serial; labeler wins") }
+                val parsed = TemplateLabel.fromSerial(serial)
+                if (parsed == null) {
+                    Log.w(TAG, "template_label unknown serial=$serial; deterministic layer decides")
+                }
+                parsed
             }
     }
 

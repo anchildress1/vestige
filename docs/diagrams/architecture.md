@@ -102,22 +102,19 @@ stateDiagram-v2
 ## 4. Capture → inference → resolver → storage → patterns
 
 The end-to-end dataflow. ObjectBox is the source of truth (ADR-017); export renders markdown from
-those rows on demand. Voice foreground is the only user-facing model call (ADR-014), while typed
-entries skip foreground inference. Current `saveAndExtract` initializes the shared engine before
-creating the pending row, so the first save after lazy startup can still wait on engine init.
-Background extraction is detached and is preempted (cancelled + FIFO-requeued) the instant a new
-voice foreground capture needs the single engine session (ADR-014 Addendum 2026-05-20).
+those rows on demand. The foreground call is the **only** user-blocking step (ADR-014); background
+extraction is detached and is preempted (cancelled + FIFO-requeued) the instant a new foreground
+capture needs the single engine session (ADR-014 Addendum 2026-05-20).
 
 ```mermaid
 flowchart TB
     accTitle: End-to-end capture and extraction dataflow
-    accDescr: User records or types. Voice is captured by AudioCapture as a mono 16kHz float32 chunk capped at 30 seconds, then a single foreground Gemma call returns transcription and an inline follow-up. Typed entries skip the foreground call, but the save path may initialize the shared engine before EntryStore persists an ObjectBox row marked PENDING. A detached background pass runs three sequential lens calls, the convergence resolver writes consensus, candidate, ambiguous, or consensus_with_conflict fields, entry observations are generated, then on every third completed entry a pattern detection pass runs over the 90-day window. Foreground voice capture preempts in-flight background work.
+    accDescr: User records or types. Voice is captured by AudioCapture as a mono 16kHz float32 chunk capped at 30 seconds, then a single foreground Gemma call returns transcription and an inline follow-up. Typed entries skip the foreground call. EntryStore persists an ObjectBox row marked PENDING. A detached background pass runs three sequential lens calls, the convergence resolver writes consensus, candidate, ambiguous, or consensus_with_conflict fields, entry observations are generated, then on every third completed entry a pattern detection pass runs over the 90-day window. Foreground capture preempts in-flight background work.
 
     U(["User"]) -- voice --> AR["AudioCapture<br/>mono 16 kHz float32 · ≤30 s chunk"]
-    U -- type --> INIT["saveAndExtract<br/>may pay lazy engine init before row commit"]
-    AR --> FG["Foreground Gemma call (only user-facing model call)<br/>→ transcription + inline follow-up"]
-    FG --> INIT
-    INIT --> ES["EntryStore.persist<br/>ObjectBox row · status = PENDING"]
+    U -- type --> ES
+    AR --> FG["Foreground Gemma call (only user-blocking step)<br/>→ transcription + inline follow-up"]
+    FG --> ES["EntryStore.persist<br/>ObjectBox row · status = PENDING"]
     ES --> BG["Detached background pass (preemptible)<br/>3 sequential lens calls (Literal→Inferential→Skeptical)"]
     BG --> CR["Convergence Resolver (deterministic Kotlin)<br/>consensus · candidate · ambiguous · consensus_with_conflict"]
     CR --> OBS["entry_observations<br/>model read of transcript + resolved fields"]

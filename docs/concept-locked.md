@@ -25,14 +25,14 @@
 
 ## Templates (agent-emitted labels, not user-facing modes)
 
-Templates are no longer user-picked. Capture screen has no template grid. The user just records or types. The agent labels each entry post-extraction based on which surfaces dominate.
+Templates are no longer user-picked. Capture screen has no template grid. The user just records or types. The agent labels each entry post-extraction based on which surfaces dominate — with one exception: **Goblin Hours is set deterministically from the capture timestamp**, not by the agent (see below).
 
 Six labels:
 - **Crashed** — energy crash (State surface: crash / depletion state words → `tags`)
 - **Deep Space** — hyperfocus debrief (Behavioral surface: focus subject + extended duration + things-ignored mentions)
 - **Busy Stalling** — task paralysis (Behavioral surface: stuck task + resistance markers)
 - **Nonstop Spiral** — rumination loop (State surface: decision-looping + iteration markers)
-- **Goblin Hours** — 3am spiral (Time-of-day context between midnight–5am + State surface late-night markers; **shorter follow-up cadence applied automatically by context-aware prompting**, not template selection)
+- **Goblin Hours** — late-night capture. **Deterministic, not a model pick:** assigned when the entry's local capture time falls in the midnight–5am window, decided from the timestamp (the model is never handed the clock, and an entry's text can name a different hour than when it was actually captured). The other five labels are the model's read of the entry; this one is the clock's.
 - **Brain Dump** — catch-all when no archetype dominates
 
 Echoes is not a template — recurrence is pattern-engine output across entries.
@@ -73,7 +73,7 @@ Eleven content fields total. Extracted fields are convergence-driven; `entry_obs
 - `follow_up` — foreground persona follow-up for voice captures; `null` for typed entries
 - `persona` — recorded selected persona for row provenance
 - `timestamp` — auto
-- `template_label` — agent-emitted (Crashed / Deep Space / Busy Stalling / Nonstop Spiral / Goblin Hours / Brain Dump)
+- `template_label` — the five archetypes (Crashed / Deep Space / Busy Stalling / Nonstop Spiral / Brain Dump) are agent-emitted + convergence-voted; **Goblin Hours is assigned deterministically from the capture timestamp** (midnight–5am), taking over from a non-committal Brain Dump when the clock qualifies
 - `tags` — free-form, model-extracted (people, topics, activities, places)
 - `vocabulary` — nullable; one lowercase word for the entry's overall felt tone (Inferential lens wins)
 - `recurrence_link` — nullable; pattern_id if entry matches a known pattern

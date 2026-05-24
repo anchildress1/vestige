@@ -27,9 +27,13 @@ import java.time.Instant
 import java.time.ZoneId
 import java.util.concurrent.atomic.AtomicInteger
 
+@Suppress("LargeClass") // Cohesive worker-contract suite; splitting would scatter the shared fixture.
 class BackgroundExtractionWorkerTest {
 
-    private val capturedAt = Instant.parse("2026-05-09T08:00:00Z").atZone(ZoneId.of("America/Chicago"))
+    // 17:00Z = 12:00 Chicago (CDT) — outside the goblin window, so a non-committal/absent model pick
+    // resolves to AUDIT by default. Goblin-window cases use explicit timestamps in their own tests.
+    private val capturedAt = Instant.parse("2026-05-09T17:00:00Z").atZone(ZoneId.of("America/Chicago"))
+    private val goblinCapturedAt = Instant.parse("2026-05-09T08:00:00Z").atZone(ZoneId.of("America/Chicago"))
     private val request = BackgroundExtractionRequest(entryText = "user words", capturedAt = capturedAt)
     private val resolved = ResolvedExtraction(
         fields = mapOf(
@@ -109,7 +113,7 @@ class BackgroundExtractionWorkerTest {
         val success = assertInstanceOf(BackgroundExtractionResult.Success::class.java, result)
         assertAll(
             { assertSame(resolved, success.resolved) },
-            { assertEquals(TemplateLabel.AFTERMATH, success.templateLabel) },
+            { assertEquals(TemplateLabel.AUDIT, success.templateLabel) },
             { assertEquals(3, success.lensResults.size) },
             { assertEquals(3, success.modelCallCount) },
             {
@@ -387,14 +391,13 @@ class BackgroundExtractionWorkerTest {
     }
 
     @Test
-    fun `model-emitted template_label wins over the deterministic labeler`() = runTest {
+    fun `specific semantic model pick wins, even inside the goblin window`() = runTest {
         val engine = mockk<LiteRtLmEngine>()
         every { engine.streamText(any(), any(), any()) } returns flowOf("raw-ok")
-        // A "crashed" tag would make the labeler pick AFTERMATH; the model's converged
-        // template_label overrides it.
+        // The model converged on a specific semantic archetype. It stands as the model's read — the
+        // deterministic goblin/audit layer is not consulted, even though this capture is at 03:00.
         val modelLabeled = ResolvedExtraction(
             fields = mapOf(
-                "tags" to ResolvedField(listOf("crashed"), ConfidenceVerdict.CONSENSUS),
                 "template_label" to ResolvedField("decision-spiral", ConfidenceVerdict.CONSENSUS),
             ),
         )
@@ -404,48 +407,149 @@ class BackgroundExtractionWorkerTest {
             resolver = RecordingResolver(modelLabeled),
             parser = { lens, _ -> extraction(lens) },
             composer = fakeComposer(),
-        ).extract(request = request)
+        ).extract(request = BackgroundExtractionRequest(entryText = "user words", capturedAt = goblinCapturedAt))
 
         val success = assertInstanceOf(BackgroundExtractionResult.Success::class.java, result)
         assertEquals(TemplateLabel.DECISION_SPIRAL, success.templateLabel)
     }
 
     @Test
-    fun `template_label falls back to the labeler when the model pick is absent`() = runTest {
+    fun `model goblin-hours pick stands on its own, even outside the goblin window`() = runTest {
         val engine = mockk<LiteRtLmEngine>()
         every { engine.streamText(any(), any(), any()) } returns flowOf("raw-ok")
-        // No template_label resolved -> labeler computes it ("crashed" tag -> AFTERMATH).
+        // The model itself converged on goblin-hours. That is "what the model said" — it stands; the
+        // capture-time override only ever promotes `audit`, it never demotes a model goblin pick.
+        val modelGoblin = ResolvedExtraction(
+            fields = mapOf("template_label" to ResolvedField("goblin-hours", ConfidenceVerdict.CONSENSUS)),
+        )
+
+        // request's capturedAt is 12:00 — outside the goblin window.
         val result = BackgroundExtractionWorker(
+            engine = engine,
+            resolver = RecordingResolver(modelGoblin),
+            parser = { lens, _ -> extraction(lens) },
+            composer = fakeComposer(),
+        ).extract(request = request)
+
+        val success = assertInstanceOf(BackgroundExtractionResult.Success::class.java, result)
+        assertEquals(TemplateLabel.GOBLIN_HOURS, success.templateLabel)
+    }
+
+    @Test
+    fun `converged audit inside the goblin window resolves to GOBLIN_HOURS deterministically`() = runTest {
+        val engine = mockk<LiteRtLmEngine>()
+        every { engine.streamText(any(), any(), any()) } returns flowOf("raw-ok")
+        // Model picked the non-committal `audit`; the capture is at 03:00, so determinism wins goblin.
+        val modelAudit = ResolvedExtraction(
+            fields = mapOf("template_label" to ResolvedField("audit", ConfidenceVerdict.CONSENSUS)),
+        )
+
+        val result = BackgroundExtractionWorker(
+            engine = engine,
+            resolver = RecordingResolver(modelAudit),
+            parser = { lens, _ -> extraction(lens) },
+            composer = fakeComposer(),
+        ).extract(request = BackgroundExtractionRequest(entryText = "user words", capturedAt = goblinCapturedAt))
+
+        val success = assertInstanceOf(BackgroundExtractionResult.Success::class.java, result)
+        assertEquals(TemplateLabel.GOBLIN_HOURS, success.templateLabel)
+    }
+
+    @Test
+    fun `converged audit outside the goblin window stays AUDIT`() = runTest {
+        val engine = mockk<LiteRtLmEngine>()
+        every { engine.streamText(any(), any(), any()) } returns flowOf("raw-ok")
+        val modelAudit = ResolvedExtraction(
+            fields = mapOf("template_label" to ResolvedField("audit", ConfidenceVerdict.CONSENSUS)),
+        )
+
+        // request's capturedAt is 12:00 — outside goblin, so the deterministic layer lands AUDIT.
+        val result = BackgroundExtractionWorker(
+            engine = engine,
+            resolver = RecordingResolver(modelAudit),
+            parser = { lens, _ -> extraction(lens) },
+            composer = fakeComposer(),
+        ).extract(request = request)
+
+        val success = assertInstanceOf(BackgroundExtractionResult.Success::class.java, result)
+        assertEquals(TemplateLabel.AUDIT, success.templateLabel)
+    }
+
+    @Test
+    fun `absent or unknown model pick falls to the deterministic layer`() = runTest {
+        val engine = mockk<LiteRtLmEngine>()
+        every { engine.streamText(any(), any(), any()) } returns flowOf("raw-ok")
+        // No template_label, and an unrecognized serial — both are "no model pick", so the
+        // deterministic layer decides. Outside the goblin window that is AUDIT.
+        val unknown = ResolvedExtraction(
+            fields = mapOf("template_label" to ResolvedField("not-a-real-archetype", ConfidenceVerdict.CONSENSUS)),
+        )
+
+        val absentResult = BackgroundExtractionWorker(
             engine = engine,
             resolver = RecordingResolver(resolved),
             parser = { lens, _ -> extraction(lens) },
             composer = fakeComposer(),
         ).extract(request = request)
 
-        val success = assertInstanceOf(BackgroundExtractionResult.Success::class.java, result)
-        assertEquals(TemplateLabel.AFTERMATH, success.templateLabel)
+        val unknownResult = BackgroundExtractionWorker(
+            engine = engine,
+            resolver = RecordingResolver(unknown),
+            parser = { lens, _ -> extraction(lens) },
+            composer = fakeComposer(),
+        ).extract(request = request)
+
+        assertEquals(
+            TemplateLabel.AUDIT,
+            assertInstanceOf(BackgroundExtractionResult.Success::class.java, absentResult).templateLabel,
+        )
+        assertEquals(
+            TemplateLabel.AUDIT,
+            assertInstanceOf(BackgroundExtractionResult.Success::class.java, unknownResult).templateLabel,
+        )
     }
 
     @Test
-    fun `unknown template_label serial falls back to the labeler`() = runTest {
+    fun `a CANDIDATE template pick is not load-bearing and is dropped`() = runTest {
         val engine = mockk<LiteRtLmEngine>()
         every { engine.streamText(any(), any(), any()) } returns flowOf("raw-ok")
-        val badLabel = ResolvedExtraction(
-            fields = mapOf(
-                "tags" to ResolvedField(listOf("crashed"), ConfidenceVerdict.CONSENSUS),
-                "template_label" to ResolvedField("not-a-real-archetype", ConfidenceVerdict.CONSENSUS),
-            ),
+        // A single-lens CANDIDATE serial is not the model's converged pick, so it's dropped to
+        // "no pick"; outside the goblin window the deterministic layer lands AUDIT.
+        val candidate = ResolvedExtraction(
+            fields = mapOf("template_label" to ResolvedField("decision-spiral", ConfidenceVerdict.CANDIDATE)),
         )
 
         val result = BackgroundExtractionWorker(
             engine = engine,
-            resolver = RecordingResolver(badLabel),
+            resolver = RecordingResolver(candidate),
             parser = { lens, _ -> extraction(lens) },
             composer = fakeComposer(),
         ).extract(request = request)
 
         val success = assertInstanceOf(BackgroundExtractionResult.Success::class.java, result)
-        assertEquals(TemplateLabel.AFTERMATH, success.templateLabel)
+        assertEquals(TemplateLabel.AUDIT, success.templateLabel)
+    }
+
+    @Test
+    fun `a CONSENSUS_WITH_CONFLICT semantic pick is load-bearing and stands`() = runTest {
+        val engine = mockk<LiteRtLmEngine>()
+        every { engine.streamText(any(), any(), any()) } returns flowOf("raw-ok")
+        // Converged-but-flagged still counts as the model's pick — it stands.
+        val conflicted = ResolvedExtraction(
+            fields = mapOf(
+                "template_label" to ResolvedField("decision-spiral", ConfidenceVerdict.CONSENSUS_WITH_CONFLICT),
+            ),
+        )
+
+        val result = BackgroundExtractionWorker(
+            engine = engine,
+            resolver = RecordingResolver(conflicted),
+            parser = { lens, _ -> extraction(lens) },
+            composer = fakeComposer(),
+        ).extract(request = request)
+
+        val success = assertInstanceOf(BackgroundExtractionResult.Success::class.java, result)
+        assertEquals(TemplateLabel.DECISION_SPIRAL, success.templateLabel)
     }
 
     @Test
@@ -466,44 +570,21 @@ class BackgroundExtractionWorkerTest {
     }
 
     @Test
-    fun `converged model template stands without deferring to the labeler`() = runTest {
-        val engine = mockk<LiteRtLmEngine>()
-        every { engine.streamText(any(), any(), any()) } returns flowOf("raw-ok")
-        // A "crashed" tag would make the labeler pick AFTERMATH, but the model converged on `audit`.
-        // The model owns the template: its converged pick stands rather than being overridden.
-        val modelAudit = ResolvedExtraction(
-            fields = mapOf(
-                "tags" to ResolvedField(listOf("crashed"), ConfidenceVerdict.CONSENSUS),
-                "template_label" to ResolvedField("audit", ConfidenceVerdict.CONSENSUS),
-            ),
-        )
-
-        val result = BackgroundExtractionWorker(
-            engine = engine,
-            resolver = RecordingResolver(modelAudit),
-            parser = { lens, _ -> extraction(lens) },
-            composer = fakeComposer(),
-        ).extract(request = request)
-
-        val success = assertInstanceOf(BackgroundExtractionResult.Success::class.java, result)
-        assertEquals(TemplateLabel.AUDIT, success.templateLabel)
-    }
-
-    @Test
     fun `worker labels using the capture timestamp's zone, not the JVM default`() = runTest {
         val engine = mockk<LiteRtLmEngine>()
         every { engine.streamText(any(), any(), any()) } returns flowOf("raw-ok")
-        val lateNightResolved = ResolvedExtraction(
-            fields = mapOf("tags" to ResolvedField(listOf("late-night"), ConfidenceVerdict.CONSENSUS)),
+        // No model template_label -> the deterministic layer decides purely on the local capture hour.
+        val noModelPick = ResolvedExtraction(
+            fields = mapOf("tags" to ResolvedField(listOf("spinning"), ConfidenceVerdict.CONSENSUS)),
         )
         val parser: (Lens, String) -> LensExtraction? = { lens, _ -> extraction(lens) }
-        // 08:00 UTC = 03:00 Chicago (inside goblin) but 08:00 UTC zone (outside goblin). Asserting
-        // both reads of the same instant proves the labeler reads the captured zone, not ambient.
+        // 08:00 UTC = 03:00 Chicago (hour 3, inside goblin) but 08:00 in UTC (hour 8, outside).
+        // Same instant, two zones: proves the labeler reads the captured zone, not ambient.
         val instant = Instant.parse("2026-05-09T08:00:00Z")
 
         val chicagoResult = BackgroundExtractionWorker(
             engine = engine,
-            resolver = RecordingResolver(lateNightResolved),
+            resolver = RecordingResolver(noModelPick),
             parser = parser,
             composer = fakeComposer(),
         ).extract(
@@ -515,7 +596,7 @@ class BackgroundExtractionWorkerTest {
 
         val utcResult = BackgroundExtractionWorker(
             engine = engine,
-            resolver = RecordingResolver(lateNightResolved),
+            resolver = RecordingResolver(noModelPick),
             parser = parser,
             composer = fakeComposer(),
         ).extract(

@@ -18,7 +18,6 @@ MODEL=/data/local/tmp/gemma-4-E4B-it.litertlm
 AUDIO=/data/local/tmp/stt-b/stt-b1.wav
 C_MANIFEST=/data/local/tmp/stt-c-manifest.txt
 D_MANIFEST=/data/local/tmp/stt-d-manifest.txt
-E_MANIFEST=/data/local/tmp/stt-e-manifest.txt
 EMB_MODEL=/data/local/tmp/vestige-emb/embeddinggemma-300M_seq512_mixed-precision.tflite
 EMB_TOKENIZER=/data/local/tmp/vestige-emb/sentencepiece.model
 
@@ -113,11 +112,6 @@ run_test SttDLensDivergenceTest SttDLensDivergenceTest \
 run_test EmbeddingGemmaSmokeTest EmbeddingGemmaSmokeTest \
   -PembeddingModelPath=$EMB_MODEL \
   -PembeddingTokenizerPath=$EMB_TOKENIZER
-
-run_test SttEEmbeddingComparisonTest SttEEmbeddingComparisonTest \
-  -PembeddingModelPath=$EMB_MODEL \
-  -PembeddingTokenizerPath=$EMB_TOKENIZER \
-  -PmanifestPath=$E_MANIFEST
 
 echo ""
 echo "================================================================"

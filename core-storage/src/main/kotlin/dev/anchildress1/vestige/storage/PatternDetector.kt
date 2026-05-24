@@ -144,7 +144,19 @@ class PatternDetector(
     // pattern's lifecycle (skip / drop / cooldown) survives across re-detection runs.
     private fun detectVocab(entries: List<EntryEntity>): List<DetectedPattern> {
         val candidates = entries.filter { !it.vocabularyWord.isNullOrBlank() }
-        return EmbeddingClustering.cluster(candidates)
+        val clusters = EmbeddingClustering.cluster(candidates)
+        // Calibration diagnostics: counts + distances only, never entry text. Read these on-device
+        // (EXTRACT=1 re-seed) to set DEFAULT_MAX_COSINE_DISTANCE / VOCAB_THRESHOLD from real numbers.
+        val nnDistances = EmbeddingClustering.nearestNeighborDistances(candidates)
+        android.util.Log.d(
+            "VestigePatternDetector",
+            "vocab cluster: candidates=${candidates.size} " +
+                "clusterSizes=${clusters.map { it.members.size }} " +
+                "threshold=$VOCAB_THRESHOLD " +
+                "maxCosine=${EmbeddingClustering.DEFAULT_MAX_COSINE_DISTANCE} " +
+                "nnDistances=$nnDistances",
+        )
+        return clusters
             .filter { it.members.size >= VOCAB_THRESHOLD }
             .map { cluster ->
                 val sig = PatternSignature.forVocabToken(dominantVocabularyWord(cluster.members))

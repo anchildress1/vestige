@@ -185,6 +185,48 @@ class EmbeddingClusteringTest {
         assertEquals(2, split.size)
     }
 
+    @Test
+    fun `nearestNeighborDistances is empty below two usable vectors`() {
+        assertTrue(EmbeddingClustering.nearestNeighborDistances(emptyList()).isEmpty())
+        val one = listOf(entry(1L, randomVector(1)))
+        assertTrue(EmbeddingClustering.nearestNeighborDistances(one).isEmpty())
+    }
+
+    @Test
+    fun `nearestNeighborDistances yields one sorted distance per usable member`() {
+        val members = (1L..6L).map { entry(it, randomVector(it.toInt())) }
+
+        val distances = EmbeddingClustering.nearestNeighborDistances(members)
+
+        assertEquals(6, distances.size)
+        assertEquals(distances, distances.sorted())
+    }
+
+    @Test
+    fun `nearestNeighborDistances drops null and pathological vectors`() {
+        val members = listOf(
+            entry(1L, randomVector(1)),
+            entry(2L, randomVector(2)),
+            entry(3L, null),
+            entry(4L, FloatArray(EMBED_DIM)),
+            entry(5L, FloatArray(EMBED_DIM).apply { this[0] = Float.NaN }),
+        )
+
+        // Only ids 1 and 2 are usable → two distances.
+        assertEquals(2, EmbeddingClustering.nearestNeighborDistances(members).size)
+    }
+
+    @Test
+    fun `nearestNeighborDistances reports near-zero for identical vectors`() {
+        val v = randomVector(7)
+        val members = (1L..4L).map { entry(it, v.copyOf()) }
+
+        val distances = EmbeddingClustering.nearestNeighborDistances(members)
+
+        assertEquals(4, distances.size)
+        assertTrue("identical vectors → ~0 nearest distance", distances.all { it < 1e-4 })
+    }
+
     private fun entry(id: Long, vector: FloatArray?): EntryEntity =
         EntryEntity(entryText = "entry $id", timestampEpochMs = id * 1000L).also {
             it.id = id

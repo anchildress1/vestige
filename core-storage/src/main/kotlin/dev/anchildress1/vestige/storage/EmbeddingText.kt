@@ -1,29 +1,18 @@
 package dev.anchildress1.vestige.storage
 
-import dev.anchildress1.vestige.model.ObservationEvidence
-
 /**
- * Builds the semantic embedding target for one entry from its distilled extraction output —
- * tags, generator-authored observation texts, and the stated-commitment topic — instead of the
- * raw verbatim transcription body. A 30s stream-of-consciousness voice entry's centroid is
- * noise; the extracted fields are the model's own distillation of what the entry is *about*.
+ * Builds the embedding target for one entry: its model-emitted tone word
+ * ([EntryEntity.vocabularyWord]) — the felt quality of the entry, not what it is about.
  *
- * Shape: `"{tags}. {observations}. {commitment topic}"`. Any empty component and its
- * separator are omitted. See architecture-brief.md §"Embedding Strategy" and Story 3.11.
+ * Vocab-drift clustering ([EmbeddingClustering]) groups entries that share a *feeling* and
+ * surfaces the distinct words used for it as the drift. That only works if the feeling is what
+ * the vector encodes. Tags / observations / commitment describe the entry's *topic*, which
+ * clusters by subject and never groups synonymous tones ("drained", "wiped", "running on empty")
+ * across different topics — the exact reason no `VOCAB_FREQUENCY` cluster ever minted.
  *
- * @param entity the persisted row; reads its `tags` relation, `entryObservationsJson`, and
- *   `statedCommitmentJson`.
- * @return the synthesized string, or `""` when the entry distilled nothing embeddable.
+ * @param entity the persisted row; reads [EntryEntity.vocabularyWord].
+ * @return the trimmed, lowercased tone word, or `""` for an entry with no tone (a purely factual
+ *   log). Never the literal string `"null"`: a null/blank tone yields an empty target, so the
+ *   backfill worker skips embedding and the entry stays out of every feeling cluster.
  */
-fun buildEmbeddingText(entity: EntryEntity): String {
-    val tags = entity.tags
-        .mapNotNull { it.name.trim().takeIf(String::isNotEmpty) }
-        .joinToString(" ")
-    val observations = decodeObservations(entity.entryObservationsJson)
-        .filterNot { it.evidence == ObservationEvidence.PATTERN_CALLOUT }
-        .joinToString(". ") { it.text.trim() }
-    val commitmentTopic = readCommitmentTopic(entity.statedCommitmentJson).orEmpty()
-    return listOf(tags, observations, commitmentTopic)
-        .filter { it.isNotBlank() }
-        .joinToString(". ")
-}
+fun buildEmbeddingText(entity: EntryEntity): String = entity.vocabularyWord?.trim()?.lowercase().orEmpty()

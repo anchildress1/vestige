@@ -55,6 +55,28 @@ object EmbeddingClustering {
         return assembleClusters(vectored, labels)
     }
 
+    /**
+     * Sorted-ascending nearest-neighbor cosine distance for each usable-vector member — the
+     * calibration signal for [DEFAULT_MAX_COSINE_DISTANCE]. "If I set the cut to X, these pairs
+     * merge." Empty when fewer than two usable vectors. Pure: callers log it where logging is safe.
+     */
+    fun nearestNeighborDistances(members: List<EntryEntity>): List<Double> {
+        val normalized = members
+            .asSequence()
+            .filter { it.vector?.isUsableVector() == true }
+            .sortedBy { it.id }
+            .map { l2Normalize(it.vector!!) }
+            .toList()
+        if (normalized.size < 2) return emptyList()
+        return normalized.indices
+            .map { i ->
+                normalized.indices
+                    .filter { it != i }
+                    .minOf { j -> cosineDistance(normalized[i], normalized[j]) }
+            }
+            .sorted()
+    }
+
     private fun closestPair(normalized: List<FloatArray>, labels: IntArray): Triple<Int, Int, Double>? {
         var bestI = -1
         var bestJ = -1

@@ -179,6 +179,12 @@ This is the model's own distillation of what happened. The vector then represent
 
 **Story 3.11 carries the embedding source fix and re-backfill sweep.**
 
+**Addendum (2026-05-24) — embedding axis repointed to the tone word (feeling), not the topic.** The distilled-content target above optimized for *retrieval* ("what the entry is about"). But the only live consumer of `EntryEntity.vector` is `EmbeddingClustering` (the `VOCAB_FREQUENCY` / Vocab Drift surface), and that feature clusters by *feeling* — it needs synonymous tones ("drained", "wiped", "running on empty") to group across different topics. A content vector clusters by subject and never groups them, which is why no vocab cluster ever minted (the root cause behind `backlog.md` → `vocab-cluster-threshold`).
+
+- **New target:** `buildEmbeddingText` now embeds `EntryEntity.vocabularyWord` (trimmed, lowercased). A null/blank tone yields `""` — a toneless (purely factual) entry is excluded from every feeling cluster, not assigned a fabricated one. `vectorSchemaVersion` bumped `1 → 2` so the backfill worker re-embeds existing rows.
+- **Consequence for retrieval:** the vector is now the *feeling* axis. `RetrievalRepo` (still dead on the live path) would now compare a content query against tone-word entry vectors — incoherent. This reinforces `embedding-retrieval-surface`: wire it to a real surface with its *own* content vector, or delete it. Don't revive it against this vector.
+- **Thresholds pending recalibration.** `DEFAULT_MAX_COSINE_DISTANCE` / `VOCAB_THRESHOLD` / `MIN_SUPPORTING_ENTRIES` were calibrated on the identical-word "tired × 23" fixture and are wrong for tone-word distances. `detectVocab` now logs candidate count + cluster sizes + nearest-neighbor distances. **Open on-device step:** `EXTRACT=1` re-seed, read the real distances, set the cut from measurement, confirm a cluster mints. Until then vocab still won't surface — the axis is fixed, the calibration is not.
+
 ---
 
 ## Concurrent Inference Architecture (Addendum 2026-05-16)

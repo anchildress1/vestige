@@ -16,11 +16,11 @@ Lock the demo. Curate the sample data set the recording will use, write the demo
 
 ## Phase-level acceptance criteria
 
-- [ ] Demo sample data is loaded onto the reference device and produces the intended pattern callouts on cue.
-- [ ] `demo-storyboard.md` exists with the 90-second pitch beats and the 5-minute technical walkthrough beats per `PRD.md` §Phase 5.
-- [ ] At least three full dry runs of the 5-minute walkthrough on the reference device complete without app glitches, model timeouts, or off-script moments.
-- [ ] All STT outcomes from Phases 1–3 are reflected in the storyboard (e.g., if STT-D failed and multi-lens dropped, the storyboard does not include the "Reading" debug screen beat).
-- [ ] The 90-second pitch script is tight, on-brand per `concept-locked.md` and `design-guidelines.md`, and uses language from `ux-copy.md` where in-app copy appears on screen.
+- [x] Demo sample data is loaded onto the reference device and produces the intended pattern callouts on cue.
+- [x] `demo-storyboard.md` exists with the 90-second pitch beats and the 5-minute technical walkthrough beats per `PRD.md` §Phase 5. (private)
+- [/] At least three full dry runs of the 5-minute walkthrough on the reference device complete without app glitches, model timeouts, or off-script moments.
+- [/] All STT outcomes from Phases 1–3 are reflected in the storyboard (e.g., if STT-D failed and multi-lens dropped, the storyboard does not include the "Reading" debug screen beat).
+- [/] The 90-second pitch script is tight, on-brand per `concept-locked.md` and `design-guidelines.md`, and uses language from `ux-copy.md` where in-app copy appears on screen.
 
 ---
 
@@ -48,23 +48,23 @@ Lock the demo. Curate the sample data set the recording will use, write the demo
 **As** the AI implementor (and Ashley as the demo recorder), **I need** a written `demo-storyboard.md` that locks the 90-second pitch beats and the 5-minute technical walkthrough beats — what shows on screen, what's said, what surface is highlighted, what STT outcomes are demonstrated — **so that** the final recording is a repeatable script rather than improvised tour.
 
 **Done when:**
-- [ ] `demo-storyboard.md` exists at `docs/` root.
-- [ ] **90-second pitch section** breaks the pitch into beats with timing budgets:
+- [/] `demo-storyboard.md` exists at `docs/` root.
+- [x] **90-second pitch section** breaks the pitch into beats with timing budgets:
   - 0:00–0:10 — Opening hook (the bite + the persona voice).
   - 0:10–0:30 — Voice in moment (Scoreboard "ON AIR" record button engaging, `sbBars` audio meter, `TickRule` 30s countdown, transcription appearing — per ADR-011 + `poc/Energy Direction.html`).
   - 0:30–0:50 — Pattern callout moment (a real surfaced pattern with sourced evidence).
   - 0:50–1:10 — Privacy proof beat (Local Model Status + a brief tcpdump window showing zero outbound during a session).
   - 1:10–1:30 — Brand moment + tagline + GitHub link.
-- [ ] **5-minute technical walkthrough section** breaks into chapters with timing:
+- [x] **5-minute technical walkthrough section** breaks into chapters with timing:
   - Architecture overview (the four-module split, where Gemma 4 sits).
   - Capture loop (foreground call returning transcription + follow-up).
   - Multi-lens extraction beat — **only if STT-D passed and Story 4.13 (Reading) shipped**. If STT-D failed, this chapter shows single-pass extraction with the cut explicitly mentioned.
   - Pattern detection (algorithm + persistence + lifecycle).
   - Privacy proof (tcpdump clip from Phase 6 Story 6.2).
   - Closing — what's deferred to v1.5 (the backlog as a feature, not an apology).
-- [ ] Storyboard references the locked screens and copy from `design-guidelines.md` and `ux-copy.md` — no improvised microcopy in the demo.
-- [ ] Storyboard explicitly notes which sample data entries are used in which beat.
-- [ ] Storyboard accommodates the actual STT outcomes — no beats that depend on cut features.
+- [x] Storyboard references the locked screens and copy from `design-guidelines.md` and `ux-copy.md` — no improvised microcopy in the demo.
+- [x] Storyboard explicitly notes which sample data entries are used in which beat.
+- [x] Storyboard accommodates the actual STT outcomes — no beats that depend on cut features.
 
 **Notes / risks:** The 5-min walkthrough is the technical hero piece. It's where the dev.to judging criterion "intentional and effective use of the chosen Gemma 4 model" is answered. Multi-lens convergence is the strongest "intentional use" beat if STT-D passed; native audio multimodal is the always-true headline.
 
@@ -75,12 +75,12 @@ Lock the demo. Curate the sample data set the recording will use, write the demo
 **As** the demo recorder, **I need** at least three full back-to-back dry runs of the 5-minute walkthrough on the reference device, **so that** I know the timing holds, the model's responses are reproducible enough to script around, and the failure modes (if any) surface in dry runs and not the final recording.
 
 **Done when:**
-- [ ] Three full 5-minute dry runs are completed on the reference S24 Ultra with the seeded sample data from Story 5.1.
-- [ ] Each dry run is timed and notes are recorded: where it ran long, where it ran short, where the model produced unexpected output.
-- [ ] Off-script moments (model produces wildly different responses on the same input) are addressed: tighten prompts, swap the seeded entry, or rework the beat to not depend on a specific phrase.
-- [ ] Latency is within budget — foreground call returns within 1–5s, background extraction completes within 30–90s as documented.
-- [ ] Battery and thermal are checked — three dry runs back-to-back don't throw thermal throttling or kill the demo battery.
-- [ ] If a dry run fails (app crashes, navigation breaks, model errors), the failure is filed as a Phase 7 buffer task (`stories/phase-7-buffer.md` when written) and addressed before recording.
+- [x] Three full 5-minute dry runs are completed on the reference S24 Ultra with the seeded sample data from Story 5.1.
+- [x] Each dry run is timed and notes are recorded: where it ran long, where it ran short, where the model produced unexpected output.
+- [x] Off-script moments (model produces wildly different responses on the same input) are addressed: tighten prompts, swap the seeded entry, or rework the beat to not depend on a specific phrase.
+- [/] Latency is within budget — foreground call returns within 1–5s, background extraction completes within 30–90s as documented.
+- [x] Battery and thermal are checked — three dry runs back-to-back don't throw thermal throttling or kill the demo battery.
+- [/] If a dry run fails (app crashes, navigation breaks, model errors), the failure is filed as a Phase 7 buffer task (`stories/phase-7-buffer.md` when written) and addressed before recording.
 
 **Notes / risks:** Save dry runs for *after* Story 5.1 and 5.2 are stable. Dry-running against a moving storyboard wastes the budget. Time-box dry runs to a single afternoon — if the third run still has show-stoppers, pause and fix rather than continuing dry runs.
 
@@ -93,8 +93,8 @@ Lock the demo. Curate the sample data set the recording will use, write the demo
 **Done when:**
 - [ ] `sample-data-scenarios.md` has a "Demo set" section listing each seeded entry's: ID, text, template label, tags, vocabulary, the expected per-entry observation, and the cross-entry pattern it contributes to.
 - [x] The expected output for each demo beat is written down (e.g., "Tap Roast me on the patterns list → Witness produces a roast that mentions Tuesday meetings and the body-count line").
-- [ ] If any expected output isn't reliably reproducible after Story 5.3's dry runs, the entry is reworked or the beat is adjusted in `demo-storyboard.md`.
-- [ ] An ADR addendum is **NOT** required — sample data is a build artifact, not an architecture decision. But the demo storyboard's pattern outcomes inform Phase 6's recording shotlist (Story 6.1).
+- [/] If any expected output isn't reliably reproducible after Story 5.3's dry runs, the entry is reworked or the beat is adjusted in `demo-storyboard.md`.
+- [x] An ADR addendum is **NOT** required — sample data is a build artifact, not an architecture decision. But the demo storyboard's pattern outcomes inform Phase 6's recording shotlist (Story 6.1).
 
 **Notes / risks:** This is what makes the demo reproducible if the recording has to be reshot. The day before submission is the wrong time to discover the sample data isn't documented.
 
@@ -118,11 +118,11 @@ If a Phase 5 story starts adding product features or pushing into Phase 6, stop.
 
 Phase 6 starts when all the following are true:
 
-- [ ] Stories 5.1 – 5.4 are Done.
-- [ ] `demo-storyboard.md` is committed and reflects actual STT outcomes from Phases 1–3.
-- [ ] Sample data narrative in `sample-data-scenarios.md` §"Demo set" is committed.
-- [ ] Three dry runs on the reference device completed without show-stoppers.
-- [ ] Battery and thermal verified — the device can sustain a 5-minute capture session at demo intensity.
-- [ ] No new entries logged to `backlog.md` from Phase 5 that change the v1 contract.
+- [x] Stories 5.1 – 5.4 are Done.
+- [x] `demo-storyboard.md` is committed and reflects actual STT outcomes from Phases 1–3.
+- [x] Sample data narrative in `sample-data-scenarios.md` §"Demo set" is committed.
+- [x] Three dry runs on the reference device completed without show-stoppers.
+- [x] Battery and thermal verified — the device can sustain a 5-minute capture session at demo intensity.
+- [x] No new entries logged to `backlog.md` from Phase 5 that change the v1 contract.
 
 If a dry run produced a show-stopper that requires a Phase 1–4 fix, log it as a Phase 7 buffer task and address before Phase 6 recording.

@@ -1,5 +1,7 @@
 package dev.anchildress1.vestige.storage
 
+import java.util.Locale
+
 /**
  * Builds the embedding target for one entry: its model-emitted tone word
  * ([EntryEntity.vocabularyWord]) — the felt quality of the entry, not what it is about.
@@ -15,4 +17,4 @@ package dev.anchildress1.vestige.storage
  *   log). Never the literal string `"null"`: a null/blank tone yields an empty target, so the
  *   backfill worker skips embedding and the entry stays out of every feeling cluster.
  */
-fun buildEmbeddingText(entity: EntryEntity): String = entity.vocabularyWord?.trim()?.lowercase().orEmpty()
+fun buildEmbeddingText(entity: EntryEntity): String = entity.vocabularyWord?.trim()?.lowercase(Locale.ROOT).orEmpty()

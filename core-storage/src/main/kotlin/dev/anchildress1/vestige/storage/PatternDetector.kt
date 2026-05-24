@@ -145,17 +145,19 @@ class PatternDetector(
     private fun detectVocab(entries: List<EntryEntity>): List<DetectedPattern> {
         val candidates = entries.filter { !it.vocabularyWord.isNullOrBlank() }
         val clusters = EmbeddingClustering.cluster(candidates)
-        // Calibration diagnostics: counts + distances only, never entry text. Read these on-device
-        // (EXTRACT=1 re-seed) to set DEFAULT_MAX_COSINE_DISTANCE / VOCAB_THRESHOLD from real numbers.
-        val nnDistances = EmbeddingClustering.nearestNeighborDistances(candidates)
-        android.util.Log.d(
-            "VestigePatternDetector",
-            "vocab cluster: candidates=${candidates.size} " +
-                "clusterSizes=${clusters.map { it.members.size }} " +
-                "threshold=$VOCAB_THRESHOLD " +
-                "maxCosine=${EmbeddingClustering.DEFAULT_MAX_COSINE_DISTANCE} " +
-                "nnDistances=$nnDistances",
-        )
+        // Calibration diagnostics: counts + distances only, never entry text. Gated behind DEBUG —
+        // nearestNeighborDistances is O(n²), so don't pay it on every detection pass in normal runs.
+        // Enable for an on-device calibration read: `adb shell setprop log.tag.VestigePatternDetector DEBUG`.
+        if (android.util.Log.isLoggable("VestigePatternDetector", android.util.Log.DEBUG)) {
+            android.util.Log.d(
+                "VestigePatternDetector",
+                "vocab cluster: candidates=${candidates.size} " +
+                    "clusterSizes=${clusters.map { it.members.size }} " +
+                    "threshold=$VOCAB_THRESHOLD " +
+                    "maxCosine=${EmbeddingClustering.DEFAULT_MAX_COSINE_DISTANCE} " +
+                    "nnDistances=${EmbeddingClustering.nearestNeighborDistances(candidates)}",
+            )
+        }
         return clusters
             .filter { it.members.size >= VOCAB_THRESHOLD }
             .map { cluster ->

@@ -62,7 +62,9 @@ internal object LensResponseParser {
             "vocabulary" to byKey["vocabulary"]?.let(::normalizeWord),
             // recurrence_link is no longer model-emitted — the app sets it deterministically from the
             // matched candidate pattern when the model confirms recurrence_kind. See ADR-002.
-            "recurrence_kind" to byKey["recurrence_kind"]?.ifNotNullish(),
+            // Normalized (trim + lowercase + nullish drop) like the other scalars so the model's
+            // casing drift (`Exact` vs `exact`) can't read as lens disagreement under plain equality.
+            "recurrence_kind" to byKey["recurrence_kind"]?.let(::normalizeWord),
             "stated_commitment" to commitment,
         )
     }

@@ -14,7 +14,8 @@ What goes in the schema:
 - `recurrence_kind: exact` — the same behavior/state recurs in the same context.
 - `recurrence_kind: partial` — the same behavior recurs in a different context.
 - Omit `recurrence_kind` entirely when nothing recurs, when only the clock time coincides, or when
-  there is no retrieved-history block (normal for early entries).
+  the RETRIEVED HISTORY block shows "(no prior entries)" — there is nothing to recur against yet
+  (normal for early entries).
 - Do NOT emit a pattern id of any kind. The app owns the mapping from "this recurs" to which pattern;
   you judge recurrence, nothing more. The Skeptical lens additionally raises an
   `unsupported-recurrence` flag for history it judges a coincidence rather than a real recurrence.

@@ -131,4 +131,12 @@ class LensResponseParserTest {
         // Hyphens inside values (kebab-case tags) are preserved.
         assertEquals(listOf("standup", "battery-died"), extraction.fields["tags"])
     }
+
+    @Test
+    fun `recurrence_kind is lowercased so casing variants converge`() {
+        // Convergence compares scalars by plain equality — `Exact` and `exact` must not read as
+        // lens disagreement.
+        val extraction = LensResponseParser.parse(Lens.LITERAL, "recurrence_kind: Exact")
+        assertEquals("exact", extraction!!.fields["recurrence_kind"])
+    }
 }

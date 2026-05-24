@@ -13,6 +13,7 @@ import org.junit.jupiter.api.Test
  * and were carried forward from the Phase 1 scaffold (Story 1.12). The remaining tests cover the
  * edge cases ADR-002 §"Edge case — lens errors mid-call" calls out explicitly.
  */
+@Suppress("LargeClass") // One resolver contract suite; splitting would hide cross-field rule interactions.
 class ConvergenceResolverTest {
 
     private val resolver = DefaultConvergenceResolver()
@@ -120,15 +121,38 @@ class ConvergenceResolverTest {
 
     @Test
     fun `all three lenses null on a nullable field resolves to ambiguous with null value`() {
-        val literal = LensExtraction(Lens.LITERAL, fields = mapOf("recurrence_link" to null))
-        val inferential = LensExtraction(Lens.INFERENTIAL, fields = mapOf("recurrence_link" to null))
-        val skeptical = LensExtraction(Lens.SKEPTICAL, fields = mapOf("recurrence_link" to null))
+        val literal = LensExtraction(Lens.LITERAL, fields = mapOf("recurrence_kind" to null))
+        val inferential = LensExtraction(Lens.INFERENTIAL, fields = mapOf("recurrence_kind" to null))
+        val skeptical = LensExtraction(Lens.SKEPTICAL, fields = mapOf("recurrence_kind" to null))
 
         val resolved = resolver.resolve(listOf(literal, inferential, skeptical))
 
         assertEquals(
             ResolvedField(value = null, verdict = ConfidenceVerdict.AMBIGUOUS),
-            resolved.fields["recurrence_link"],
+            resolved.fields["recurrence_kind"],
+        )
+    }
+
+    @Test
+    fun `Skeptical unsupported recurrence flag marks recurrence kind consensus with conflict`() {
+        val flag = "unsupported-recurrence:again:no corroborating history"
+        val literal = LensExtraction(Lens.LITERAL, fields = mapOf("recurrence_kind" to "exact"))
+        val inferential = LensExtraction(Lens.INFERENTIAL, fields = mapOf("recurrence_kind" to "exact"))
+        val skeptical = LensExtraction(
+            Lens.SKEPTICAL,
+            fields = mapOf("recurrence_kind" to null),
+            flags = listOf(flag),
+        )
+
+        val resolved = resolver.resolve(listOf(literal, inferential, skeptical))
+
+        assertEquals(
+            ResolvedField(
+                value = "exact",
+                verdict = ConfidenceVerdict.CONSENSUS_WITH_CONFLICT,
+                flags = listOf(flag),
+            ),
+            resolved.fields["recurrence_kind"],
         )
     }
 
@@ -420,19 +444,19 @@ class ConvergenceResolverTest {
     @Test
     fun `field union covers keys present on only one lens`() {
         val literal = LensExtraction(Lens.LITERAL, fields = mapOf("template_label" to "aftermath"))
-        val inferential = LensExtraction(Lens.INFERENTIAL, fields = mapOf("recurrence_link" to "p_aftermath_001"))
+        val inferential = LensExtraction(Lens.INFERENTIAL, fields = mapOf("recurrence_kind" to "partial"))
         val skeptical = LensExtraction(Lens.SKEPTICAL, fields = mapOf("template_label" to "aftermath"))
 
         val resolved = resolver.resolve(listOf(literal, inferential, skeptical))
 
-        assertEquals(setOf("template_label", "recurrence_link"), resolved.fields.keys)
+        assertEquals(setOf("template_label", "recurrence_kind"), resolved.fields.keys)
         assertEquals(
             ResolvedField("aftermath", ConfidenceVerdict.CONSENSUS),
             resolved.fields["template_label"],
         )
         assertEquals(
-            ResolvedField("p_aftermath_001", ConfidenceVerdict.CANDIDATE, sourceLens = Lens.INFERENTIAL),
-            resolved.fields["recurrence_link"],
+            ResolvedField("partial", ConfidenceVerdict.CANDIDATE, sourceLens = Lens.INFERENTIAL),
+            resolved.fields["recurrence_kind"],
         )
     }
 

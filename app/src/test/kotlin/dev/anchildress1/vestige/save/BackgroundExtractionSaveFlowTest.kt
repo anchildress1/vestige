@@ -505,6 +505,61 @@ class BackgroundExtractionSaveFlowTest {
     }
 
     @Test
+    fun `detached path stamps recurrence link with recurrence kind verdict and flags`() = runTest {
+        val candidateId = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        val flag = "unsupported-recurrence:again:no corroborating history"
+        val candidate = HistoryChunk(patternId = candidateId, text = "prior Tuesday crash")
+        val resolved = ResolvedExtraction(
+            mapOf(
+                "recurrence_kind" to ResolvedField(
+                    value = "exact",
+                    verdict = ConfidenceVerdict.CONSENSUS_WITH_CONFLICT,
+                    flags = listOf(flag),
+                ),
+            ),
+        )
+        val persistedResolved = slot<ResolvedExtraction>()
+        val flowWithLookup = BackgroundExtractionSaveFlow(
+            entryStore = entryStore,
+            worker = worker,
+            observationGenerator = observationGenerator,
+            lifecycleCallbacks = BackgroundExtractionLifecycleCallbacks(listenerFactory),
+            scope = flowScope,
+            ioDispatcher = Dispatchers.Unconfined,
+            retrievePatternCandidates = { listOf(candidate) },
+        )
+        every { entryStore.createPendingEntry(any(), any(), any()) } returns ENTRY_ID
+        coEvery { worker.extract(any(), any()) } returns BackgroundExtractionResult.Success(
+            totalElapsedMs = 10L,
+            lensResults = emptyList(),
+            modelCallCount = 3,
+            resolved = resolved,
+            templateLabel = TemplateLabel.AFTERMATH,
+        )
+        coEvery { observationGenerator.generate(SAMPLE_TEXT, resolved, SAMPLE_TIMESTAMP) } returns emptyList()
+
+        flowWithLookup.saveAndExtract(SAMPLE_TEXT, SAMPLE_TIMESTAMP)
+
+        coVerify {
+            entryStore.completeEntry(
+                ENTRY_ID,
+                capture(persistedResolved),
+                TemplateLabel.AFTERMATH,
+                emptyList(),
+                emptyList(),
+            )
+        }
+        assertEquals(
+            ResolvedField(
+                value = candidateId,
+                verdict = ConfidenceVerdict.CONSENSUS_WITH_CONFLICT,
+                flags = listOf(flag),
+            ),
+            persistedResolved.captured.fields["recurrence_link"],
+        )
+    }
+
+    @Test
     fun `saveAndExtract keeps caller supplied history and skips detached lookup`() = runTest {
         val history = listOf(HistoryChunk(patternId = null, text = "seeded already"))
         val lookupCalls = AtomicInteger(0)

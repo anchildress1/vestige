@@ -310,8 +310,14 @@ class BackgroundExtractionSaveFlow(
     private fun linkRecurrence(resolved: ResolvedExtraction, candidatePatternId: String?): ResolvedExtraction {
         val kind = resolved.fields[KEY_RECURRENCE_KIND]
         if (kind?.value == null || candidatePatternId == null) return resolved
+        val link = ResolvedField(
+            value = candidatePatternId,
+            verdict = kind.verdict,
+            flags = kind.flags,
+            sourceLens = kind.sourceLens,
+        )
         return resolved.copy(
-            fields = resolved.fields + (KEY_RECURRENCE_LINK to ResolvedField(candidatePatternId, kind.verdict)),
+            fields = resolved.fields + (KEY_RECURRENCE_LINK to link),
         )
     }
 

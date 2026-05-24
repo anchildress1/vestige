@@ -808,7 +808,8 @@ New contract:
   stamps `recurrence_link` = the fed candidate's `pattern_id`, inheriting `recurrence_kind`'s verdict
   so REPEAT's tone is honest. REPEAT then resolves that id to the pattern's title (the Patterns-page H2).
 
-The convergence resolver is unchanged — `recurrence_kind` resolves like any field; `recurrence_link`
-is no longer a model field. The Skeptical `unsupported-recurrence` flag still marks a coincidence.
+The convergence resolver is unchanged — `recurrence_kind` resolves like any field and carries the
+Skeptical `unsupported-recurrence` flag; `recurrence_link` is no longer a model field. The app-stamped
+link inherits the resulting verdict and flags.
 
 ---

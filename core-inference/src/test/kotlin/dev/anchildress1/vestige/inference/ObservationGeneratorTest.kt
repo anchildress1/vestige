@@ -160,7 +160,7 @@ class ObservationGeneratorTest {
             mapOf(
                 "tags" to ResolvedField(listOf("focus", "long-stretch"), ConfidenceVerdict.CONSENSUS),
                 "template_label" to ResolvedField("locked-in", ConfidenceVerdict.CONSENSUS_WITH_CONFLICT),
-                "recurrence_link" to ResolvedField(null, ConfidenceVerdict.AMBIGUOUS),
+                "recurrence_kind" to ResolvedField(null, ConfidenceVerdict.AMBIGUOUS),
                 "some_flag" to ResolvedField(true, ConfidenceVerdict.CONSENSUS),
                 "nested" to ResolvedField(mapOf("a" to 1, "b" to listOf(2, 3)), ConfidenceVerdict.CANDIDATE),
             ),
@@ -175,7 +175,7 @@ class ObservationGeneratorTest {
         // String / List / Map / Boolean / null branches in renderValue all exercised.
         assertTrue(prompt.contains("[\"focus\""), "prompt should render tags list")
         assertTrue(prompt.contains("\"locked-in\""), "prompt should render scalar string")
-        assertTrue(prompt.contains("recurrence_link"), "prompt should render null")
+        assertTrue(prompt.contains("recurrence_kind"), "prompt should render null")
         assertTrue(prompt.contains("some_flag"), "prompt should render boolean")
         assertTrue(prompt.contains("a=1"), "prompt should render nested map")
     }

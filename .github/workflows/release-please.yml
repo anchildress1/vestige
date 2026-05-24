@@ -97,8 +97,14 @@ jobs:
         run: |
           set -euo pipefail
 
+          apk_asset="vestige-${RELEASE_TAG}.apk"
+
           mkdir -p release-assets
-          cp app/build/outputs/apk/release/app-release.apk "release-assets/vestige-${RELEASE_TAG}.apk"
+          cp app/build/outputs/apk/release/app-release.apk "release-assets/${apk_asset}"
+          (
+            cd release-assets
+            sha256sum "${apk_asset}" > "${apk_asset}.sha256"
+          )
 
       - name: Clean up release signing material
         if: always()
@@ -108,4 +114,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           RELEASE_TAG: ${{ needs.release.outputs.tag_name }}
-        run: gh release upload "$RELEASE_TAG" "release-assets/vestige-${RELEASE_TAG}.apk"
+        run: |
+          gh release upload "$RELEASE_TAG" \
+            "release-assets/vestige-${RELEASE_TAG}.apk" \
+            "release-assets/vestige-${RELEASE_TAG}.apk.sha256"

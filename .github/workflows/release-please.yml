@@ -12,7 +12,7 @@ jobs:
   release:
     name: Release Please
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 30
     permissions:
       contents: write
       pull-requests: write
@@ -75,9 +75,11 @@ jobs:
             printf 'keyPassword=%s\n' "$VESTIGE_RELEASE_KEY_PASSWORD"
           } > keystore.properties
 
-      - name: Assemble release APKs
+      - name: Assemble release APK
         if: steps.release.outputs.release_created == 'true'
-        run: ./gradlew :app:assembleRelease :app:assembleDebug
+        env:
+          ENV: prod
+        run: make assemble
 
       - name: Prepare release assets
         if: steps.release.outputs.release_created == 'true'
@@ -88,11 +90,14 @@ jobs:
 
           mkdir -p release-assets
           cp app/build/outputs/apk/release/app-release.apk "release-assets/vestige-${RELEASE_TAG}.apk"
-          cp app/build/outputs/apk/debug/app-debug.apk "release-assets/vestige-${RELEASE_TAG}-debug-suite-seeded.apk"
 
-      - name: Upload release APK assets
+      - name: Clean up release signing material
+        if: ${{ always() && steps.release.outputs.release_created == 'true' }}
+        run: rm -f keystore.properties "$RUNNER_TEMP/vestige-release.jks"
+
+      - name: Upload release APK asset
         if: steps.release.outputs.release_created == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
           RELEASE_TAG: ${{ steps.release.outputs.tag_name }}
-        run: gh release upload "$RELEASE_TAG" release-assets/*.apk --clobber
+        run: gh release upload "$RELEASE_TAG" "release-assets/vestige-${RELEASE_TAG}.apk"

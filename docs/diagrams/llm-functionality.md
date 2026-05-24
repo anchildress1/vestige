@@ -143,32 +143,34 @@ flowchart LR
 
 ---
 
-## 5. Embeddings & retrieval (shipped hybrid)
+## 5. Embeddings: clustering (live) vs. retrieval (built, unwired)
 
-Retrieval is a **single live hybrid score** in `RetrievalRepo.query`: keyword overlap + tag-set
-Jaccard + recency boost + **EmbeddingGemma cosine** over the stored `EntryEntity.vector`
-(`embeddingWeight` default `1.0`). The vector layer is **shipped, not gated** — STT-E is an
-on-device measurement harness (`SttEEmbeddingComparisonTest`), not a runtime switch; there is no
-code path that disables vector scoring on an STT-E verdict. EmbeddingGemma 300M loads through
-`GemmaEmbeddingModel` / `localagents-rag` (a self-contained `.so`, separate from the Gemma engine;
-ADR-010). The embedded target is a post-convergence **synthesis string** — tags + observations +
-commitment topic (`EmbeddingText.buildEmbeddingText`), 768-dim HNSW cosine index — **not** the raw
-transcription. Vectors are filled by `VectorBackfillWorker` after each entry finalizes; a row with
-a `null` vector contributes **0 cosine** and still ranks on keyword/tag/recency until backfilled.
+EmbeddingGemma 300M is shipped and **not STT-E-gated** (STT-E is an on-device measurement harness,
+`SttEEmbeddingComparisonTest`, not a runtime switch). It loads through `GemmaEmbeddingModel` /
+`localagents-rag` (a self-contained `.so`, separate from the Gemma engine; ADR-010).
+`VectorBackfillWorker` embeds a post-convergence **synthesis string** — tags + observations +
+commitment topic (`EmbeddingText.buildEmbeddingText`) — into `EntryEntity.vector` (768-dim HNSW
+cosine), **not** the raw transcription.
+
+The vectors have **one live consumer**: `EmbeddingClustering` (used by the `VOCAB_FREQUENCY`
+pattern → the **Vocab Drift** screen), which groups entries by cosine — that is the on-device
+surface where embeddings visibly do something keyword/tag matching can't. The ranked **hybrid
+retrieval** `RetrievalRepo.query` (keyword + tag-Jaccard + recency + **EmbeddingGemma cosine**,
+`embeddingWeight` default `1.0`) is **implemented and STT-E-validated but not wired into any live
+surface**: its only caller, `AppContainer.retrieveHistory`, has no callers; capture passes
+`retrievedHistory = emptyList()`; and the observation read's recurring context comes from
+**deterministic** `TemporalHistoryRetrieval` (timestamp/weekday), not embeddings.
 
 ```mermaid
 flowchart TD
-    accTitle: Shipped hybrid retrieval
-    accDescr: A query or pattern match is scored by summing keyword overlap, tag-set Jaccard, a recency boost, and EmbeddingGemma cosine over the stored entry vector. A match needs non-zero keyword, tag, or cosine; recency alone never surfaces an entry. The vector is built asynchronously by VectorBackfillWorker over a post-convergence synthesis string of tags, observations, and commitment topic; a null vector contributes zero cosine so un-backfilled rows still rank on the other signals. The vector layer is shipped and always on, not gated by STT-E.
+    accTitle: Embedding clustering (live) vs hybrid retrieval (unwired)
+    accDescr: VectorBackfillWorker embeds a synthesis string of tags, observations, and commitment topic into each entry's 768-dimension vector after the entry finalizes. The vectors have one live consumer, EmbeddingClustering, which powers the VOCAB_FREQUENCY pattern and the Vocab Drift screen. RetrievalRepo implements a ranked hybrid score of keyword, tag Jaccard, recency, and EmbeddingGemma cosine and is STT-E validated, but it is not wired into any live surface — its only caller retrieveHistory is itself never called, capture passes empty history, and the observation recurring context uses deterministic timestamp-based TemporalHistoryRetrieval instead.
 
-    Q(["query / pattern match"]) --> SCORE["RetrievalRepo.query — summed score"]
-    KW["keyword overlap"] --> SCORE
-    TAG["tag-set Jaccard"] --> SCORE
-    REC["recency boost (weighted)"] --> SCORE
-    VEC["EmbeddingGemma cosine over EntryEntity.vector<br/>(0 when vector is null)"] --> SCORE
-    SCORE --> Out(["ranked results — needs non-zero keyword / tag / cosine"])
-
-    BF["VectorBackfillWorker (async, after finalize)<br/>embeds synthesis string: tags · observations · commitment topic"] -. fills .-> VEC
+    BF["VectorBackfillWorker (async, after finalize)<br/>embeds synthesis string: tags · observations · commitment topic"] --> VEC[("EntryEntity.vector<br/>768-dim HNSW cosine")]
+    VEC --> CL["EmbeddingClustering (LIVE)<br/>→ VOCAB_FREQUENCY pattern → Vocab Drift screen"]
+    VEC -. "not consumed live" .-> RR["RetrievalRepo.query (built + STT-E-validated)<br/>keyword + tag + recency + cosine"]
+    RR -. "only caller" .-> RH["AppContainer.retrieveHistory()<br/>(no callers — capture passes emptyList)"]
+    OBS["observation recurring context"] --> TH["TemporalHistoryRetrieval<br/>(deterministic timestamp/weekday — NOT embeddings)"]
 ```
 
 ---

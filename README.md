@@ -197,17 +197,29 @@ make install    # assemble + adb install debug APK without wiping app data
 make reinstall  # reinstall APK, push models, seed debug fixtures, tail logcat
 ```
 
-**Demo data**
+### Demo data on hardware (dev builds only)
 
-`make reinstall` runs the dev path by default: clean debug install, push the local model artifacts from `~/Downloads`, seed deterministic fixture entries + pattern cards, launch, then tail logcat.
+> **Just want to try Vestige?** Install the **release APK** from the GitHub release and onboard normally — you get a clean first-run (`Nothing on file.`) and capture your own entries. The seeded demo corpus below is a **dev-only reproduction aid** and never ships in the release APK.
+
+The demo seed is a deterministic ~36-entry corpus loaded by `DebugPatternSeeder` through an ADB-triggered `DebugSeedReceiver` that exists **only in debug builds** (`app/src/debug/…`, registered in the debug manifest overlay). It writes rows straight to ObjectBox and marks onboarding complete, so the seeded build opens past first-run with history already populated.
 
 ```bash
-make reinstall ENV=dev EXTRACT=1
+make reinstall ENV=dev            # clean debug install + push models + seed + launch + tail logcat
+make reinstall ENV=dev EXTRACT=1  # same, plus run background extraction so cards carry real lens receipts
+make seed-entries                 # re-seed an already-installed debug build (no reinstall)
+make seed-entries EXTRACT=1       # re-seed + run extraction
 ```
 
-- `EXTRACT=1` runs the LiteRT-LM background extraction over the seeded corpus so cards land with real lens receipts (matches saved-entry shape).
-- Seed timestamps span `2026-05-01` → `2026-05-20` (UTC); pattern / history logic evaluates them at those dates.
-- Idempotent — re-running the command wipes and reloads the debug entries.
+- **Idempotent** — each seed wipes the entry / tag / pattern / cooldown tables and reloads, so re-running never duplicates.
+- **`EXTRACT=1` is slow on purpose.** Extraction is sequential 3-lens (~44 s/entry on E4B GPU), so seeding the full corpus runs for several minutes in the background — watch `DebugSeedReceiver` / `Vestige` in logcat for `seed complete`.
+- Seed timestamps are **local wall-clock** spanning `2026-04-25` → `2026-05-22` (entry prose names clock times like "2am", so the loader seeds in the device zone, not UTC).
+
+**What you'll see on-screen after seeding:**
+
+- **History** — the full timeline populated, newest first.
+- **Patterns** — a **Tuesday-afternoon meeting-crash** recurrence (template `Crashed`) forms once the third supporting entry lands, with a sourced callout. A **Thursday-evening** cluster is a deliberate *negative control* — same time slot, unrelated end-of-day logistics — that the model should **refuse** to promote to a pattern.
+- **Vocab Drift** (requires `EXTRACT=1`, since it needs the embedding backfill) — the embedding layer groups entries that share **no keywords** ("drained", "wiped out", "running on empty", "depleted", "burnt out", "brain fog") into one exhaustion cluster, with a separate positives cluster ("locked-in", "clear", "good", "sharp"). This is the on-device proof the Gemma embeddings do something keyword/tag matching can't.
+- Type **"I hate demos"** as a live entry and it joins the seeded **demo-dread** cluster.
 
 Required local artifact filenames match [`core-model/src/main/resources/model/manifest.properties`](core-model/src/main/resources/model/manifest.properties):
 

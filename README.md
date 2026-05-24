@@ -210,8 +210,9 @@ make seed-entries                 # re-seed an already-installed debug build (no
 make seed-entries EXTRACT=1       # re-seed + run extraction
 ```
 
+- **What `EXTRACT=1` actually does — and why it's slow.** Seeding writes each entry as text **straight to ObjectBox** and **bypasses the foreground model call entirely** — there is no audio, no transcription, and **no model foreground response**. `EXTRACT=1` then runs the **live background extraction once per seeded entry** (the same sequential 3-lens convergence a real capture runs). Expect a **full GPU load of ~30 s per entry** while it churns. Across the **~36-entry** corpus that's **≈18 minutes** at 30 s/entry — in practice **budget ~25–30 minutes**: the measured full 3-lens pass is ~44 s/entry (STT-F), and entries that mint a pattern add an observation + title pass on top. Watch `DebugSeedReceiver` / `Vestige` in logcat for `seed complete`. **If you don't want to sit through that, install the clean release APK instead** (no seed, no extraction).
+- **Without `EXTRACT=1`** entries seed instantly but stay `PENDING` — no lens receipts, no patterns, no vocab clusters. Fine for a History/layout check, useless for the extraction and pattern beats.
 - **Idempotent** — each seed wipes the entry / tag / pattern / cooldown tables and reloads, so re-running never duplicates.
-- **`EXTRACT=1` is slow on purpose.** Extraction is sequential 3-lens (~44 s/entry on E4B GPU), so seeding the full corpus runs for several minutes in the background — watch `DebugSeedReceiver` / `Vestige` in logcat for `seed complete`.
 - Seed timestamps are **local wall-clock** spanning `2026-04-25` → `2026-05-22` (entry prose names clock times like "2am", so the loader seeds in the device zone, not UTC).
 
 **What you'll see on-screen after seeding:**

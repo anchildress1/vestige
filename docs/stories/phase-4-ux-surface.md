@@ -500,6 +500,8 @@ Checked bullets above are the historical record that the Mist tokens shipped to 
 
 **Notes / risks:** This is a v1 UI safety story, not a permanent ban on labels. Do not redesign the label, do not accept Inferential CANDIDATE in `TemplateLabeler` "while we're here" — that is the v1.5 ADR work and is explicitly out of scope (AGENTS.md: no quick fixes, no scope creep). If the label becomes trustworthy later, the Pattern List POC eyebrow slot is the place it can return.
 
+**Superseded 2026-05-24:** the label became trustworthy — `template_label` is now model-emitted + convergence-voted (not a promoted single-lens CANDIDATE, so the §"out of scope" path was never taken), and it is surfaced again in Entry Detail per `ux-copy.md` (2026-05-22). The UI-yank this story performed is historical; the resolution shipped via the model-emitted contract + ADR-002 §Addendum (2026-05-24). See `backlog.md` §`archetype-template-labeling` (RESOLVED).
+
 ---
 
 ## What is explicitly NOT in Phase 4

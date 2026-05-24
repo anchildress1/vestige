@@ -813,3 +813,36 @@ Skeptical `unsupported-recurrence` flag; `recurrence_link` is no longer a model 
 link inherits the resulting verdict and flags.
 
 ---
+
+### Addendum (2026-05-24) — model commits to `template_label`; Goblin Hours is a deterministic floor; Inferential lens samples
+
+Three changes from on-device prompt tuning (STT-H 2026-05-24). Prior decision sections above are
+unchanged per ADR discipline; this addendum is additive.
+
+- **The model commits to the archetype.** `lenses/output-schema.txt` was reworded off "pick `audit`
+  when no archetype dominates" to "commit to the one archetype that best fits". The §"Convergence
+  Resolver Contract" exact-string-match across the closed enum is unchanged; the model now lands a
+  specific archetype instead of defaulting to `audit`. On-device this moved AUDIT 8/12 → 4/12 with
+  six distinct archetypes, all model-emitted. No per-archetype descriptions were added to the prompt
+  (that bloat has regressed picking before).
+
+- **Goblin Hours is a deterministic floor, not a tag map.** `TemplateLabeler` is reduced from the
+  tag→archetype post-extraction labeler to a single `isGoblinHours(capturedAt)` clock predicate — the
+  `AFTERMATH_TAGS` / `DECISION_SPIRAL_TAGS` / `STALLED_TAGS` / `TUNNEL_EXIT_TAGS` sets are deleted; the
+  model owns semantic archetypes. `BackgroundExtractionWorker.resolveTemplateLabel`: the model's
+  converged pick stands; the **only** override is that a non-committal `audit` (or no convergence)
+  becomes `GOBLIN_HOURS` when the local capture hour is midnight–5am. A model `goblin-hours` pick
+  stands on its own; a specific archetype is never overridden. Goblin is read from the timestamp,
+  never from the model spotting an hour in the entry text (the text can name a different hour than
+  the actual capture). This supersedes the §"Convergence Resolver Contract" implication that all six
+  enum values resolve purely by convergence — Goblin Hours additionally has the timestamp floor.
+
+- **The Inferential lens samples for tone variety.** `LiteRtLmEngine.VOCAB_DIVERSITY_SAMPLER`
+  (topK=40 / topP=0.95 / temperature=0.9, seeded) is applied to the Inferential lens only;
+  Literal + Skeptical stay greedy so tag/label convergence keeps its determinism. This activates the
+  GPU sampling path ADR-012 anticipated ("the library should be present … when sampling parameters
+  change"); verified working on-device. `weary` dropped 10/12 → 6/12 with 7 distinct tone words.
+  Measured tradeoff: sampling the lens that co-votes on tags/label adds some convergence noise — full
+  deltas in `docs/stt-results/stt-h-2026-05-24.md`.
+
+Resolves the `backlog.md` `archetype-template-labeling` and `labeler-prompt-tightening` items.

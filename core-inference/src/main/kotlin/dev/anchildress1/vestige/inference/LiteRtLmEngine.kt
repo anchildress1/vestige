@@ -124,11 +124,14 @@ class LiteRtLmEngine(
      * Without the pinned sampler the SDK defaults pick a stochastic path that produces different
      * output across runs on the same prompt.
      */
-    private fun conversationConfig(systemInstruction: String): ConversationConfig = ConversationConfig(
+    private fun conversationConfig(
+        systemInstruction: String,
+        sampler: SamplerConfig = samplerConfig,
+    ): ConversationConfig = ConversationConfig(
         Contents.of(systemInstruction),
         emptyList(),
         emptyList(),
-        samplerConfig,
+        sampler,
     )
 
     suspend fun generateText(systemInstruction: String, prompt: String): String = withContext(ioDispatcher) {
@@ -165,14 +168,20 @@ class LiteRtLmEngine(
             .onFailure { Log.w(TAG, "warmUp failed (${it.javaClass.simpleName}); first inference pays cold start") }
     }
 
-    /** Streaming counterpart to [generateText]. Closes the conversation on flow completion. */
-    fun streamText(systemInstruction: String, prompt: String): Flow<String> = flow {
+    /**
+     * Streaming counterpart to [generateText]. Closes the conversation on flow completion. Pass a
+     * [sampler] to override the engine's pinned greedy decode for this call only — used to give the
+     * tone-word lens lexical variety without destabilizing the deterministic lenses. `null` keeps
+     * the engine default ([samplerConfig]).
+     */
+    fun streamText(systemInstruction: String, prompt: String, sampler: SamplerConfig? = null): Flow<String> = flow {
         callMutex.withLock {
             val active = acquireEngine(
                 "LiteRtLmEngine.streamText called before initialize() (or after close()).",
             )
             try {
-                val conversation = active.createConversation(conversationConfig(systemInstruction))
+                val config = conversationConfig(systemInstruction, sampler ?: samplerConfig)
+                val conversation = active.createConversation(config)
                 val started = System.nanoTime()
                 var charsEmitted = 0
                 try {
@@ -360,6 +369,21 @@ class LiteRtLmEngine(
             topK = 1,
             topP = 1.0,
             temperature = 0.0,
+            seed = 42,
+        )
+
+        /**
+         * Sampled decode for the tone-word lens (see [streamText]'s `sampler` override). Greedy
+         * decode collapses the `vocabulary` surface to the single highest-probability word on
+         * every entry; widening to `topK`/`topP` with a non-zero temperature restores lexical
+         * variety so the Vocab Drift beat has genuinely different surface words to cluster. The
+         * fixed `seed` keeps it reproducible per prompt — variety comes across entries, not across
+         * re-runs of the same entry, so the STT methodology still holds.
+         */
+        val VOCAB_DIVERSITY_SAMPLER: SamplerConfig = SamplerConfig(
+            topK = 40,
+            topP = 0.95,
+            temperature = 0.9,
             seed = 42,
         )
     }

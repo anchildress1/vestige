@@ -20,7 +20,7 @@
   <img src="https://repository-images.githubusercontent.com/1233196257/6d5cb58c-808a-4c73-8627-ee3d5dc7ad7c" alt="Vestige social banner" />
 </p>
 
-## Table of Contents 🗺️
+## Table of Contents
 
 - [About](#about)
 - [Status](#status)
@@ -40,7 +40,7 @@
 
 ---
 
-## About 🧭
+## About
 
 Vestige observes behavioral traces and surfaces patterns without therapy framing, mood scoring, or wellness vocabulary. It runs Gemma 4 E4B locally via LiteRT-LM — your voice never leaves the device, the audio bytes are discarded after inference, and entries can be exported as readable markdown at any time.
 
@@ -48,13 +48,13 @@ The positioning is deliberate: cognition tracker, not journal app. Patterns are 
 
 ---
 
-## Status 🚦
+## Status
 
-The full loop is implemented and runs on-device: voice / typed capture → Gemma 4 E4B → 3-lens extraction → convergence resolver → ObjectBox, with deterministic pattern detection. EmbeddingGemma ships and STT-E validated the retrieval idea, but **neither embedding surface is live yet** — the ranked hybrid retrieval is unwired and the Vocab Drift cluster does not mint on the demo corpus (see [Known Limitations](#known-limitations)). Entry Detail surfaces the model's actual work: the three-lens read, the picked archetype, the tone word, and a collapsible raw per-lens model-output view. Capture, history, pattern list + detail, settings, model-status, and onboarding model-download are all built against the canonical spec under [`./docs/`](docs). Pattern lifecycle is Skip / Drop / Restart — closure is model-detected only (v1.5, see [`backlog.md`](docs/backlog.md) §`pattern-auto-close`). The active phase is on-device prompt tuning against a seeded demo corpus; risk through phases 1–3 was managed via five stop-and-test points (STT-A–E). Screen-flow diagrams: [`docs/diagrams/user-flows.md`](docs/diagrams/user-flows.md).
+The full loop is implemented and runs on-device: voice / typed capture → Gemma 4 E4B → 3-lens extraction → convergence resolver → ObjectBox, with deterministic pattern detection. EmbeddingGemma ships and STT-E validated the retrieval idea; the ranked hybrid retrieval surface is unwired, and Vocab Drift is wired but not reachable from the demo corpus because no `VOCAB_FREQUENCY` cluster mints yet (see [Known Limitations](#known-limitations)). Entry Detail surfaces the model's actual work: the three-lens read, the picked archetype, the tone word, and a collapsible raw per-lens model-output view. Capture, history, pattern list + detail, settings, model-status, and onboarding model-download are all built against the canonical spec under [`./docs/`](docs). Pattern lifecycle is Skip / Drop / Restart — closure is model-detected only (v1.5, see [`backlog.md`](docs/backlog.md) §`pattern-auto-close`). The active phase is on-device prompt tuning against a seeded demo corpus; risk through phases 1–3 was managed via five stop-and-test points (STT-A–E), and on-device tuning since (STT-F–H) lifted the model off its `audit` default into differentiated archetypes. Screen-flow diagrams: [`docs/diagrams/user-flows.md`](docs/diagrams/user-flows.md).
 
 ---
 
-## Features ✨
+## Features
 
 | Feature | What it does |
 |---|---|
@@ -72,7 +72,7 @@ The full loop is implemented and runs on-device: voice / typed capture → Gemma
 
 ---
 
-## Tech Stack 🧱
+## Tech Stack
 
 - Kotlin `2.3.21` + Jetpack Compose (BOM `2026.05.00`), AGP `9.2.1`
 - Gradle KTS + version catalog ([`gradle/libs.versions.toml`](gradle/libs.versions.toml))
@@ -82,7 +82,7 @@ The full loop is implemented and runs on-device: voice / typed capture → Gemma
 
 ---
 
-## Architecture 🏗️
+## Architecture
 
 Four-module split with manual constructor injection through a single `AppContainer` ([ADR-001 §Q1–Q2](docs/adrs/ADR-001-stack-and-build-infra.md)). Foreground call returns transcription + persona-flavored follow-up fast; the 3-lens convergence pass runs in the background and writes consensus / candidate / ambiguous fields when it lands.
 
@@ -120,7 +120,7 @@ Module boundaries: `:app` (UI), `:core-inference` (LiteRT-LM + lens composition)
 
 ---
 
-## Project Structure 🗂️
+## Project Structure
 
 ```
 .
@@ -155,7 +155,7 @@ Four-module split per [ADR-001](docs/adrs/ADR-001-stack-and-build-infra.md): `:a
 
 ---
 
-## Getting Started 🚀
+## Getting Started
 
 ### Prerequisites
 
@@ -303,13 +303,13 @@ adb uninstall dev.anchildress1.vestige
 
 ---
 
-## Configuration ⚙️
+## Configuration
 
 v1 has effectively zero configuration. The model artifact downloads on first launch over Wi-Fi (~3.7 GB) into `Context.filesDir/models/`. A cheap presence + size probe resolves the artifact state without hashing the multi-GB file on the UI thread; a full-size artifact is then SHA-256-verified off-thread before readiness flips to `Ready`, so a checksum-corrupt full-size file falls back to `Loading` rather than a false `Ready` (`AppContainer.probeModelReadiness`). The engine itself loads lazily on the first inference, not proactively, because proactive pre-warm regressed into a startup GPU-init crash ([ADR-012](docs/adrs/ADR-012-gpu-inference-performance-gaps.md)). Persona default is set during onboarding and changeable from settings. Pattern analysis runs periodically — every 3 completed entries ([ADR-014](docs/adrs/ADR-014-foreground-background-split-and-periodic-pattern-analysis.md)) — with a per-pattern callout cooldown of 3 ([ADR-016](docs/adrs/ADR-016-pattern-callout-cooldown-per-pattern.md)), hardcoded for v1. No env vars, no `.env` file, no remote-config layer — adding any of those is a P0 violation per [ADR-001 §Q7](docs/adrs/ADR-001-stack-and-build-infra.md).
 
 ---
 
-## Security & Privacy 🔒
+## Security & Privacy
 
 Privacy is the differentiator, not a side feature.
 
@@ -323,7 +323,7 @@ Contributors: do not introduce dependencies that pull in Firebase, Crashlytics, 
 
 ---
 
-## How to Contribute 🤝
+## How to Contribute
 
 PRs are not accepted during the challenge window (until 2026-05-24). Issues are welcome — use the GitHub issue tracker. Post-submission, see [`AGENTS.md`](AGENTS.md) and [`backlog.md`](docs/backlog.md) for the contribution surface.
 
@@ -331,33 +331,33 @@ Branches and commits follow [`AGENTS.md`](AGENTS.md) and the repo conventions: a
 
 ---
 
-## What's Next 🔭
+## What's Next
 
 v1 ships 2026-05-24. Deferred features live in [`backlog.md`](docs/backlog.md) — v1.5 / v2 / STT-conditional, with explicit unblock-conditions per entry. No "coming soon" handwaving.
 
 ---
 
-## Known Limitations 🚧
+## Known Limitations
 
 What v1 actually does, stated straight.
 
-- **Embeddings compute, but have no visible surface in the demo yet.** EmbeddingGemma 300M runs on-device and STT-E validated the retrieval idea — hybrid retrieval beat tag-only on 3 of 4 cohort queries on the reference S24 Ultra ([`docs/stt-results/stt-e-2026-05-19.md`](docs/stt-results/stt-e-2026-05-19.md)). But neither of the two surfaces that would *show* it is live:
+- **Embeddings compute, but demo-visible coverage is incomplete.** EmbeddingGemma 300M runs on-device and STT-E validated the retrieval idea — hybrid retrieval beat tag-only on 3 of 4 cohort queries on the reference S24 Ultra ([`docs/stt-results/stt-e-2026-05-19.md`](docs/stt-results/stt-e-2026-05-19.md)). The two places that would prove it in the demo are blocked differently:
   - **Ranked hybrid retrieval** (`RetrievalRepo` — keyword + tag + recency + cosine) is implemented and validated but **not wired into any live surface**: its only caller is never invoked, capture passes empty history, and the per-entry observation's recurring context uses **deterministic** timestamp/weekday matching, not embeddings. Tracked: [`backlog.md`](docs/backlog.md) → `embedding-retrieval-surface`.
-  - **Vocab Drift clustering** (`VOCAB_FREQUENCY` / `EmbeddingClustering`) is implemented but **does not mint on the demo corpus** — the cosine cut was calibrated on an identical-word fixture, and genuinely-drifted prose (embedded as a tags+observations synthesis string) fragments below the cluster threshold. Verified on-device 2026-05-23: 5 patterns formed, all deterministic (temporal + template), **zero vocab**. Tracked: [`backlog.md`](docs/backlog.md) → `vocab-cluster-threshold`.
+  - **Vocab Drift clustering** (`VOCAB_FREQUENCY` / `EmbeddingClustering`) is wired from Pattern Detail when clusters exist, but **does not mint on the demo corpus** — the cosine cut was calibrated on an identical-word fixture, and genuinely-drifted prose (embedded as a tags+observations synthesis string) fragments below the cluster threshold. Verified on-device 2026-05-23: 5 patterns formed, all deterministic (temporal + template), **zero vocab**. Tracked: [`backlog.md`](docs/backlog.md) → `vocab-cluster-threshold`.
 
-  Net: the vectors are computed and STT-E-proven in isolation, but the running app currently surfaces nothing the user can see as "embeddings." Honest fix for both is to instrument, measure on-device, and calibrate — not guess.
+  Net: the vectors are computed and STT-E-proven in isolation, but the seeded demo currently surfaces nothing the user can see as "embeddings." Honest fix for both is to instrument, measure on-device, and calibrate — not guess.
 - **Voice captures cap at 30 s.** `AudioCapture` emits one final chunk at 30 s; the >30 s multi-chunk path is deferred ([`backlog.md`](docs/backlog.md) → `multi-chunk-foreground`). An audio cue at ~28 s warns before the cap fires.
 - **First inference is cold (~15 s).** The engine loads lazily on the first capture — proactive pre-warm was reverted after it regressed into a startup GPU-init crash ([ADR-012](docs/adrs/ADR-012-gpu-inference-performance-gaps.md)). Subsequent calls run ~7–11 s on E4B GPU; a full background 3-lens extraction is ~44 s/entry.
 
 ---
 
-## License 📜
+## License
 
 [Polyform Shield 1.0.0](LICENSE) + Supplemental Terms. Source-available, not open-source: read it, run it, modify it for personal or internal use. Don't sell it, don't ship a paid product on top of it, don't use it to compete with Vestige itself. The full grant and exceptions are in [LICENSE](LICENSE) — that is the legally-binding version; this paragraph is just the plain-English flavor.
 
 ---
 
-## Acknowledgements 🙏
+## Acknowledgements
 
 - Google's **Gemma team** for the E4B model and the native audio modality that made this entire concept tractable on a phone.
 - The **LiteRT-LM team** ([`google-ai-edge/LiteRT-LM`](https://github.com/google-ai-edge/LiteRT-LM)) for the Android SDK that lets Kotlin code run a multimodal LLM without writing JNI by hand.
@@ -369,6 +369,6 @@ What v1 actually does, stated straight.
 
 ---
 
-## Author ✍️
+## Author
 
 [Ashley Childress](https://github.com/anchildress1) ([@anchildress1](https://github.com/anchildress1)). Vestige is an Android side-build aimed at the Gemma 4 Challenge "Build with Gemma 4" prize. The brand voice and product opinions are entirely intentional.

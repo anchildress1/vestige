@@ -1,6 +1,7 @@
 package dev.anchildress1.vestige.inference
 
 import android.util.Log
+import com.google.ai.edge.litertlm.SamplerConfig
 import dev.anchildress1.vestige.model.ConfidenceVerdict
 import dev.anchildress1.vestige.model.ExtractionStatus
 import dev.anchildress1.vestige.model.Lens
@@ -58,6 +59,10 @@ class BackgroundExtractionWorker(
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
     val maxAttemptsPerLens: Int = DEFAULT_MAX_ATTEMPTS_PER_LENS,
     private val lenses: List<Lens> = DEFAULT_LENSES,
+    // Per-lens decode policy. The Inferential lens owns the tone word, which greedy decode
+    // collapses to one word across entries; it samples for lexical variety while the other lenses
+    // stay greedy so tag / label / recurrence convergence keeps its determinism. `null` = engine default.
+    private val samplerForLens: (Lens) -> SamplerConfig? = DEFAULT_SAMPLER_FOR_LENS,
 ) {
     private val templateLabeler = TemplateLabeler()
 
@@ -151,7 +156,8 @@ class BackgroundExtractionWorker(
 
     private suspend fun attemptOnce(lens: Lens, composed: ComposedPrompt, attempt: Int): AttemptOutcome = try {
         val raw = buildString {
-            engine.streamText(composed.systemInstruction, composed.userText).collect { append(it) }
+            engine.streamText(composed.systemInstruction, composed.userText, samplerForLens(lens))
+                .collect { append(it) }
         }
         AttemptOutcome(raw = raw, error = null)
     } catch (cancellation: CancellationException) {
@@ -231,30 +237,38 @@ class BackgroundExtractionWorker(
         }
     }
 
-    // Model-emitted template label wins only when load-bearing (CONSENSUS / CONSENSUS_WITH_CONFLICT).
-    // CANDIDATE means a single lens emitted it — not enough convergence to override the deterministic
-    // labeler. Unknown serials (fromSerial returns null) also fall back to the labeler.
+    // The model's pick is authoritative — whatever it converged on stands. The single deterministic
+    // override: when it picked nothing specific (`audit`, or didn't converge) AND the entry was
+    // captured inside the goblin window, the clock wins and the label becomes GOBLIN_HOURS. Every
+    // other case — any specific archetype, a model `goblin-hours` pick, or `audit` outside the window
+    // — is "go with what the model said" (defaulting to AUDIT only when there was no pick at all).
     private fun resolveTemplateLabel(resolved: ResolvedExtraction, capturedAt: ZonedDateTime): TemplateLabel {
-        val labelerPick = templateLabeler.label(resolved, capturedAt)
-        val field = resolved.fields[TEMPLATE_LABEL_KEY]
-        val modelPick = if (field != null &&
-            (field.verdict == ConfidenceVerdict.CONSENSUS || field.verdict == ConfidenceVerdict.CONSENSUS_WITH_CONFLICT)
-        ) {
-            val serial = field.value as? String
-            if (serial != null) {
+        val modelPick = modelTemplateLabel(resolved)
+        val pickedNothingSpecific = modelPick == null || modelPick == TemplateLabel.AUDIT
+        return when {
+            pickedNothingSpecific && templateLabeler.isGoblinHours(capturedAt) -> TemplateLabel.GOBLIN_HOURS
+            else -> modelPick ?: TemplateLabel.AUDIT
+        }
+    }
+
+    private fun modelTemplateLabel(resolved: ResolvedExtraction): TemplateLabel? {
+        val field = resolved.fields[TEMPLATE_LABEL_KEY] ?: return null
+        val loadBearing = field.verdict == ConfidenceVerdict.CONSENSUS ||
+            field.verdict == ConfidenceVerdict.CONSENSUS_WITH_CONFLICT
+        // Lenses didn't converge on a label (CANDIDATE / AMBIGUOUS) — keep the "no model pick" signal
+        // visible so it's distinguishable from a clean `audit` pick downstream.
+        if (!loadBearing) {
+            Log.d(TAG, "template_label not load-bearing (verdict=${field.verdict}); deterministic layer decides")
+        }
+        return (field.value as? String)
+            ?.takeIf { loadBearing }
+            ?.let { serial ->
                 val parsed = TemplateLabel.fromSerial(serial)
-                if (parsed == null) Log.w(TAG, "template_label unknown serial=$serial; labeler wins")
+                if (parsed == null) {
+                    Log.w(TAG, "template_label unknown serial=$serial; deterministic layer decides")
+                }
                 parsed
-            } else {
-                null
             }
-        } else {
-            null
-        }
-        if (modelPick != null && modelPick != labelerPick) {
-            Log.d(TAG, "template_label model=$modelPick labeler=$labelerPick (model wins)")
-        }
-        return modelPick ?: labelerPick
     }
 
     private fun tryResolve(parsed: List<LensExtraction>, currentLastError: String?): Resolution = try {
@@ -298,6 +312,12 @@ class BackgroundExtractionWorker(
         const val DEFAULT_MAX_ATTEMPTS_PER_LENS = 2
 
         val DEFAULT_LENSES: List<Lens> = listOf(Lens.LITERAL, Lens.INFERENTIAL, Lens.SKEPTICAL)
+
+        // Only the Inferential lens samples; Literal + Skeptical stay greedy so their corroboration
+        // anchors tag / label convergence. See [LiteRtLmEngine.VOCAB_DIVERSITY_SAMPLER].
+        val DEFAULT_SAMPLER_FOR_LENS: (Lens) -> SamplerConfig? = { lens ->
+            if (lens == Lens.INFERENTIAL) LiteRtLmEngine.VOCAB_DIVERSITY_SAMPLER else null
+        }
         private val NO_OP_LISTENER = ExtractionStatusListener { _, _, _ -> }
         private const val TAG = "VestigeBackgroundExtraction"
         private const val NANOS_PER_MILLI = 1_000_000L

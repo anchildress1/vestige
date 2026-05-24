@@ -17,7 +17,7 @@ Authority order if anything here disagrees with prose: the ADRs and `concept-loc
 | [llm-functionality.md](llm-functionality.md) | Gemma 4 E4B + LiteRT-LM, 3-lens × 5-surface, two-tier processing, convergence, personas, embeddings |
 | [user-flows.md](user-flows.md) | Onboarding, voice + typed capture, history, patterns, settings, model lifecycle |
 | [state-diagrams.md](state-diagrams.md) | capture UI state, pattern lifecycle, ModelReadiness, download phases, extraction status, foreground service |
-| [adr-decisions.md](adr-decisions.md) | ADR-001…018 (no ADR-009 — deleted) — decision + diagram per live ADR, plus the supersession graph. ADR-008's concurrent-lens decision is **reversed**; ADR-015 is **Proposed** (not on `main`) |
+| [adr-decisions.md](adr-decisions.md) | ADR-001…018 (no ADR-009 — deleted) — decision + diagram per live ADR, plus the supersession graph. ADR-008's concurrent-lens decision is **reversed**; ADR-015 is **Proposed** (present in `adrs/`, not live behavior) |
 
 ---
 

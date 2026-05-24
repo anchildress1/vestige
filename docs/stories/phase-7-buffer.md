@@ -16,10 +16,10 @@ Absorb whatever the previous phases didn't finish, fix bugs surfaced during Phas
 
 ## Phase-level acceptance criteria
 
-- [ ] All show-stopping bugs from Phase 5 dry runs and Phase 6 QA are addressed.
-- [ ] At least one final dry run of the demo on the reference device after any bug fixes.
-- [ ] Any P1 stories from earlier phases that fit in remaining time are shipped (or explicitly punted to v1.5 with a logged backlog entry).
-- [ ] No new P0 work introduced. Phase 7 is for closing, not for opening.
+- [x] All show-stopping bugs from Phase 5 dry runs and Phase 6 QA are addressed.
+- [/] At least one final dry run of the demo on the reference device after any bug fixes.
+- [x] Any P1 stories from earlier phases that fit in remaining time are shipped (or explicitly punted to v1.5 with a logged backlog entry).
+- [x] No new P0 work introduced. Phase 7 is for closing, not for opening.
 - [ ] Submission filed on dev.to before deadline (Story 6.8).
 
 ---
@@ -31,10 +31,10 @@ Absorb whatever the previous phases didn't finish, fix bugs surfaced during Phas
 **As** the AI implementor, **I need** every Phase 5 dry-run regression and Phase 6 QA failure addressed before final recording or final QA pass, **so that** the submitted APK doesn't ship a known-broken state.
 
 **Done when:**
-- [ ] Every issue logged during Phase 5 dry runs (Story 5.3) is either fixed, accepted as a known limitation and documented in `README.md` §"Known limitations", or moved to v1.5 backlog with a rationale.
-- [ ] Every issue logged during Phase 6 QA (Story 6.8) is either fixed before final submission or rolled back (revert the change that introduced the regression).
-- [ ] Each fix is verified on the reference device with the affected scenario re-run.
-- [ ] No bug fix introduces a new show-stopper (no panic-fix that breaks something else).
+- [x] Every issue logged during Phase 5 dry runs (Story 5.3) is either fixed, accepted as a known limitation and documented in `README.md` §"Known limitations", or moved to v1.5 backlog with a rationale.
+- [x] Every issue logged during Phase 6 QA (Story 6.8) is either fixed before final submission or rolled back (revert the change that introduced the regression).
+- [x] Each fix is verified on the reference device with the affected scenario re-run.
+- [x] No bug fix introduces a new show-stopper (no panic-fix that breaks something else).
 
 **Notes / risks:** Resist the urge to refactor while fixing. Phase 7 is for *minimal* fixes. If a fix requires a refactor, the refactor is v1.5 work; ship the minimal patch and log the cleanup as `tech-debt` in `backlog.md`.
 
@@ -45,10 +45,10 @@ Absorb whatever the previous phases didn't finish, fix bugs surfaced during Phas
 **As** the AI implementor, **I need** any P1 feature from Phases 1–4 that didn't ship in its phase to either land here (if it fits in remaining time and visibly improves the demo) or be explicitly punted to v1.5, **so that** P1 scope decisions are deliberate rather than defaulted.
 
 **Done when:**
-- [ ] Each P1 story not-yet-Done from earlier phases (Stories 4.12 / 4.13 / 4.14, plus any that slipped) is reviewed against time remaining.
-- [ ] For each P1 story, the decision is made: **ship now** (sufficient time + visibly improves demo), **defer to v1.5** (logged in `backlog.md` with rationale).
-- [ ] Decisions are recorded — `backlog.md` gets entries for any deferred P1.
-- [ ] Shipped P1 stories are tested in the final dry run before recording (or if recording is already done, on the reference device + secondary device).
+- [x] Each P1 story not-yet-Done from earlier phases (Stories 4.12 / 4.13 / 4.14, plus any that slipped) is reviewed against time remaining.
+- [x] For each P1 story, the decision is made: **ship now** (sufficient time + visibly improves demo), **defer to v1.5** (logged in `backlog.md` with rationale).
+- [x] Decisions are recorded — `backlog.md` gets entries for any deferred P1.
+- [x] Shipped P1 stories are tested in the final dry run before recording (or if recording is already done, on the reference device + secondary device).
 
 **Notes / risks:** Don't ship a P1 that's not been tested. A half-finished Reading screen is worse than no Reading screen. Cut > ship-broken every time.
 
@@ -59,8 +59,8 @@ Absorb whatever the previous phases didn't finish, fix bugs surfaced during Phas
 **As** the demo recorder, **I need** the demo video and dev.to post reviewed once more after any Phase 7 fixes or P1 ships, **so that** the final state of the v1 build is what the submission shows — not the state two days ago when recording happened.
 
 **Done when:**
-- [ ] If any Phase 7 fix changed user-facing behavior shown in the demo, the affected demo segment is re-recorded and re-edited (or the post copy is updated to acknowledge the difference).
-- [ ] If any P1 story shipped in Phase 7, the post and video are updated to reflect it (or the cuts are reversed if they no longer apply).
+- [x] If any Phase 7 fix changed user-facing behavior shown in the demo, the affected demo segment is re-recorded and re-edited (or the post copy is updated to acknowledge the difference).
+- [/] If any P1 story shipped in Phase 7, the post and video are updated to reflect it (or the cuts are reversed if they no longer apply).
 - [ ] Final pass through the dev.to post draft for: typos, broken links, missed STT outcomes, accidental forbidden copy from `ux-copy.md` §"Things to NEVER Write".
 - [ ] Final pass through the GitHub README for the same.
 

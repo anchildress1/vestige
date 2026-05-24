@@ -117,8 +117,8 @@ Pattern List displays four sections, each only rendered when non-empty:
 
 | Section header | Condition | Who sets it |
 |---|---|---|
-| `ACTIVE — STILL HITTING` | state = ACTIVE, skippedUntil = null or expired | — |
-| `SKIPPED · ON HOLD` | state = SKIPPED, skippedUntil > now | User (Skip) |
+| `ACTIVE` | state = ACTIVE, snoozedUntil = null or expired | — |
+| `SKIPPED · ON HOLD` | state = SNOOZED, snoozedUntil > now | User (Skip) |
 | `CLOSED · DONE` | state = CLOSED | AI auto-detected (v1.5) — empty in v1 |
 | `DROPPED` | state = DROPPED | User (Drop) |
 
@@ -206,7 +206,7 @@ CLOSED · DONE (model-detected, v1.5):
 - Pattern closed by model (v1.5): *(no snackbar — silent, visible on next list load)*
 
 **Section headers (JetBrains Mono, EyebrowE primitive):**
-- `ACTIVE — STILL HITTING`
+- `ACTIVE`
 - `SKIPPED · ON HOLD`
 - `CLOSED · DONE`
 - `DROPPED`

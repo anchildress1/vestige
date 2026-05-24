@@ -210,6 +210,8 @@ After tap-stop, while transcribing (1-5 sec target per ADR-002 §"Latency budget
 Spinner icon.
 > Reading the entry.
 
+_Placement note: there is no in-Capture review screen. `Reading the entry.` is the foreground-service notification text (`LocalProcessingNotification`) shown during the brief `Submitting` spinner; the entry then opens in History detail (ADR-018 / ADR-014). The capture FSM is Idle / Recording / Submitting only._
+
 
 ### Capture Screen — Discard
 
@@ -417,10 +419,10 @@ Note: CLOSED · DONE is model-detected only — the model auto-closes a pattern 
 
 Empty states:
 
-- **Fewer than 10 entries (Day 1):**
+- **Fewer than 3 entries (Day 1):**
   - Eyebrow: `VESTIGES · 0 ENTRIES · 30 DAYS`
   - Header: `Nothing to read yet.`
-  - Body: `Patterns surface after 10 entries. Keep recording.`
+  - Body: `Patterns surface after 3 entries. Keep recording.`
 - **Enough entries, no pattern detected:**
   - Header: `No repeating pattern detected.`
   - Body: `The model looked. Nothing came back twice.`
@@ -478,7 +480,7 @@ If model-detected Closed (read-only state — no action row shown):
 
 ## Vocab Drift 🧩
 
-Surfaces from Pattern Detail → "View vocab drift →" when a VOCAB_FREQUENCY pattern has 6+ supporting entries clustered by EmbeddingGemma. Proves the embedding payoff: same underlying state, distinct vocabulary framings that tag matching never connects.
+Surfaces from Pattern Detail → "View vocab drift →" when a VOCAB_FREQUENCY pattern forms — an EmbeddingGemma cluster of 4+ related entries (`VOCAB_THRESHOLD`), which only runs once 6+ entries are vectored (`MIN_SUPPORTING_ENTRIES`). Proves the embedding payoff: same underlying state, distinct vocabulary framings that tag matching never connects.
 
 ### Affordance (PatternDetail)
 > View vocab drift →
@@ -688,9 +690,9 @@ Section: **About**
 
 ### Locked v1 behavior (not configurable)
 
-- **Default input:** voice. Typed entry is an always-available alternate input but, like voice, requires the local model to be Ready (ADR-013 — it runs the same foreground call and reviews identically). Voice is the entry-point per product positioning. No setting toggle.
+- **Default input:** voice. Typed entry is an always-available alternate input but, like voice, requires the local model to be Ready (ADR-013). Typed text is authoritative, so it persists directly with no foreground model call — background extraction still runs (ADR-018). Voice is the entry-point per product positioning. No setting toggle.
 - **Transcription visibility:** always shown in the transcript per P0 acceptance criteria. No setting toggle.
-- **Pattern detection threshold:** every 10 entries, hardcoded for v1.
+- **Pattern analysis cadence:** every 3 completed entries, hardcoded for v1 ([ADR-014](adrs/ADR-014-foreground-background-split-and-periodic-pattern-analysis.md)). Per-pattern callout cooldown of 3 ([ADR-016](adrs/ADR-016-pattern-callout-cooldown-per-pattern.md)).
 - **Pattern callout cooldown:** 3 entries after a callout, hardcoded for v1.
 
 These are deferred to v1.5 along with the rest of the configurable-settings work.

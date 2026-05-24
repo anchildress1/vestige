@@ -16,15 +16,15 @@ Stand up the memory layer (hybrid retrieval over saved entries) and the pattern 
 
 ## Phase-level acceptance criteria
 
-- [ ] `RetrievalRepo` returns relevant entries given a query using keyword + tag-membership + recency.
-- [ ] **STT-E resolved** — EmbeddingGemma either ships in v1 (if it visibly outperforms tag-only on prepared sample data) or defers to v1.5. The decision is recorded in ADR-001 §"Locked Stack" Storage row and `backlog.md`.
-- [ ] If STT-E passed: vector field is added to the `Entry` ObjectBox schema, vectors are computed for all existing entries, and `RetrievalRepo` returns hybrid (keyword + tags + recency + vector) results.
+- [x] `RetrievalRepo` returns relevant entries given a query using keyword + tag-membership + recency.
+- [x] **STT-E resolved** — EmbeddingGemma either ships in v1 (if it visibly outperforms tag-only on prepared sample data) or defers to v1.5. The decision is recorded in ADR-001 §"Locked Stack" Storage row and `backlog.md`.
+- [x] If STT-E passed: vector field is added to the `Entry` ObjectBox schema, vectors are computed for all existing entries, and `RetrievalRepo` returns hybrid (keyword + tags + recency + vector) results.
 - [ ] If STT-E failed: no vector field, no vector index, no EmbeddingGemma artifact. Schema and APK ship without them.
 - [x] Pattern detection runs at end of session and surfaces cross-entry patterns when threshold conditions are met (≥10 entries, ≥3 supporting entries per pattern, cooldown of 3 entries since last pattern of the same shape).
-- [ ] Patterns persist in ObjectBox per ADR-003 with lifecycle states: `active`, `dismissed`, `snoozed`, `resolved`, `below_threshold`.
-- [ ] Pattern actions (dismiss / snooze / mark-resolved) work and survive app restart.
-- [ ] Pattern detail shows the pattern claim, count, recurrence timing, source snippets (date + short text), and the active persona's voice on the surfaced pattern.
-- [ ] All Phase 3 stories pass smoke tests against `sample-data-scenarios.md` data.
+- [x] Patterns persist in ObjectBox per ADR-003 with lifecycle states: `active`, `dismissed`, `snoozed`, `resolved`, `below_threshold`.
+- [ ] Pattern actions (dismiss / snooze / mark-resolved) work and survive app restart. _(MISS: `dismiss`→Drop(DROPPED) and `snooze`→Skip(SNOOZED) ship and survive restart; **`mark-resolved` is not a user action** — `CLOSED`/`resolved` is model-detected only (v1.5). Reword to Skip/Drop/Restart before ticking.)_
+- [x] Pattern detail shows the pattern claim, count, recurrence timing, source snippets (date + short text), and the active persona's voice on the surfaced pattern.
+- [x] All Phase 3 stories pass smoke tests against `sample-data-scenarios.md` data.
 
 ---
 

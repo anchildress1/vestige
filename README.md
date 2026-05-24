@@ -20,7 +20,7 @@
   <img src="https://repository-images.githubusercontent.com/1233196257/6d5cb58c-808a-4c73-8627-ee3d5dc7ad7c" alt="Vestige social banner" />
 </p>
 
-## Table of Contents
+## Table of Contents 🗺️
 
 - [About](#about)
 - [Status](#status)
@@ -33,13 +33,14 @@
 - [Security & Privacy](#security--privacy)
 - [How to Contribute](#how-to-contribute)
 - [What's Next](#whats-next)
+- [Known Limitations](#known-limitations)
 - [License](#license)
 - [Acknowledgements](#acknowledgements)
 - [Author](#author)
 
 ---
 
-## About
+## About 🧭
 
 Vestige observes behavioral traces and surfaces patterns without therapy framing, mood scoring, or wellness vocabulary. It runs Gemma 4 E4B locally via LiteRT-LM — your voice never leaves the device, the audio bytes are discarded after inference, and entries can be exported as readable markdown at any time.
 
@@ -47,31 +48,31 @@ The positioning is deliberate: cognition tracker, not journal app. Patterns are 
 
 ---
 
-## Status
+## Status 🚦
 
-The full loop is implemented and runs on-device: voice / typed capture → Gemma 4 E4B → single-pass 3-lens extraction → convergence resolver → ObjectBox, with deterministic pattern detection and EmbeddingGemma hybrid retrieval (STT-E passed — see [`backlog.md`](docs/backlog.md) §`embeddings-fallback`). Entry Detail surfaces the model's actual work: the three-lens read, the picked archetype, the tone word, and a collapsible raw per-lens model-output view. Capture, history, pattern list + detail, settings, model-status, and onboarding model-download are all built against the canonical spec under [`./docs/`](docs). Pattern lifecycle is Skip / Drop / Restart — closure is model-detected only (v1.5, see [`backlog.md`](docs/backlog.md) §`pattern-auto-close`). The active phase is on-device prompt tuning against a seeded demo corpus; risk through phases 1–3 was managed via five stop-and-test points (STT-A–E). Screen-flow diagrams: [`docs/diagrams/user-flows.md`](docs/diagrams/user-flows.md).
+The full loop is implemented and runs on-device: voice / typed capture → Gemma 4 E4B → 3-lens extraction → convergence resolver → ObjectBox, with deterministic pattern detection. EmbeddingGemma ships and STT-E validated the retrieval idea, but **neither embedding surface is live yet** — the ranked hybrid retrieval is unwired and the Vocab Drift cluster does not mint on the demo corpus (see [Known Limitations](#known-limitations)). Entry Detail surfaces the model's actual work: the three-lens read, the picked archetype, the tone word, and a collapsible raw per-lens model-output view. Capture, history, pattern list + detail, settings, model-status, and onboarding model-download are all built against the canonical spec under [`./docs/`](docs). Pattern lifecycle is Skip / Drop / Restart — closure is model-detected only (v1.5, see [`backlog.md`](docs/backlog.md) §`pattern-auto-close`). The active phase is on-device prompt tuning against a seeded demo corpus; risk through phases 1–3 was managed via five stop-and-test points (STT-A–E). Screen-flow diagrams: [`docs/diagrams/user-flows.md`](docs/diagrams/user-flows.md).
 
 ---
 
-## Features
+## Features ✨
 
 | Feature | What it does |
 |---|---|
-| Voice capture | `AudioRecord` → Gemma 4 E4B native audio modality. No third-party STT. Audio bytes discarded after inference. |
-| Multi-lens extraction | Each entry runs 3 lens passes (Literal / Inferential / Skeptical), each covering all 5 surfaces in one call; a convergence resolver votes every field consensus / candidate / ambiguous — tags, archetype, stated commitment, recurrence, and tone word. See [ADR-002](docs/adrs/ADR-002-multi-lens-extraction-pattern.md). |
+| Voice capture | `AudioCapture` → Gemma 4 E4B native audio modality. No third-party STT. Audio bytes discarded after inference. |
+| Multi-lens extraction | Each entry runs 3 lens passes (Literal / Inferential / Skeptical), each covering all 5 surfaces in one call; a convergence resolver votes every field consensus / candidate / ambiguous / consensus-with-conflict — tags, archetype, stated commitment, recurrence, and tone word. See [ADR-002](docs/adrs/ADR-002-multi-lens-extraction-pattern.md). |
 | Model transparency | Entry Detail exposes the model's actual work — the picked archetype, the per-lens read, the resolved field grid, and a collapsible raw per-lens model-output block. Nothing is hidden behind a score. |
-| Tone & vocab drift | The Inferential lens names a one-word tone per entry; recurring related tone words surface as an embedding cluster (EmbeddingGemma) so drift is visible over time. |
+| Tone & vocab drift | The Inferential lens names a one-word tone per entry; recurring related tone words are *intended* to surface as an EmbeddingGemma cluster (Vocab Drift) so drift is visible over time. Implemented, but **not minting on the demo corpus yet** — see [Known Limitations](#known-limitations). |
 | Three personas | Witness / Hardass / Editor — tone-only variants. They do not fork extraction logic. |
-| Pattern detection | Five primitives counted over the last 90 days; sourced (counts, dates, snippets), no feelings or motivation interpretation. See [ADR-003](docs/adrs/ADR-003-pattern-detection-and-persistence.md). |
+| Pattern detection | Six primitives counted over the last 90 days; sourced (counts, dates, snippets), no feelings or motivation interpretation. See [ADR-003](docs/adrs/ADR-003-pattern-detection-and-persistence.md). |
 | Storage | ObjectBox is the internal source of truth. Export renders readable markdown from rows on demand. |
 | Pattern lifecycle | Skip (returns in 7 days) / Drop (noise, archived) / Restart, with Undo. Closure is model-detected only — v1.5. |
 | Export | System-picker (SAF) zip of per-entry markdown. No storage permission; failures surface, never silent. |
-| Hybrid retrieval | Keyword + tags + recency + EmbeddingGemma 300M cosine over an ObjectBox HNSW index. STT-E passed; ships in v1. |
+| Hybrid retrieval | Keyword + tags + recency + EmbeddingGemma 300M cosine over an ObjectBox HNSW index. STT-E-validated and the vectors ship, but the ranked retrieval is **not wired into a live surface yet** — see [Known Limitations](#known-limitations). |
 | Local-only | Zero outbound network calls during normal operation; model download is the only network event. Verified with `tcpdump`. |
 
 ---
 
-## Tech Stack
+## Tech Stack 🧱
 
 - Kotlin `2.3.21` + Jetpack Compose (BOM `2026.05.00`), AGP `9.2.1`
 - Gradle KTS + version catalog ([`gradle/libs.versions.toml`](gradle/libs.versions.toml))
@@ -81,24 +82,24 @@ The full loop is implemented and runs on-device: voice / typed capture → Gemma
 
 ---
 
-## Architecture
+## Architecture 🏗️
 
 Four-module split with manual constructor injection through a single `AppContainer` ([ADR-001 §Q1–Q2](docs/adrs/ADR-001-stack-and-build-infra.md)). Foreground call returns transcription + persona-flavored follow-up fast; the 3-lens convergence pass runs in the background and writes consensus / candidate / ambiguous fields when it lands.
 
 ```mermaid
 flowchart TB
     User([User]) -- voice --> Audio
-    User -- type --> FG
+    User -- "type · persists directly, skips FG (ADR-018)" --> BG
 
     subgraph onDevice["on-device only — no network at runtime"]
-      Audio["AudioRecord<br/>30s chunk normalization"]
-      FG["ForegroundInference<br/>fast transcription + persona follow-up"]
-      BG["BackgroundExtractionWorker<br/>3 lens passes × 5 surfaces"]
+      Audio["AudioCapture<br/>mono 16 kHz float32 · 30 s cap"]
+      FG["ForegroundInference<br/>fast transcription + inline persona follow-up"]
+      BG["BackgroundExtractionWorker<br/>3 sequential lens passes × 5 surfaces"]
       Gemma[("Gemma 4 E4B<br/>via LiteRT-LM")]
-      Resolver["Convergence Resolver<br/>consensus · candidate · ambiguous"]
-      ObjectBox[("ObjectBox<br/>entries · tags · patterns · vectors")]
+      Resolver["Convergence Resolver<br/>consensus · candidate · ambiguous · w/ conflict"]
+      ObjectBox[("ObjectBox (source of truth)<br/>entries · tags · patterns · vectors")]
       Export[("Export renderer<br/>markdown + JSON snapshot")]
-      Patterns["Pattern Detection<br/>5 primitives · 90-day window"]
+      Patterns["Pattern Detection<br/>6 primitives · 90-day window · every 3 entries"]
 
       Audio --> FG
       FG -- "prompt + audio" --> Gemma
@@ -119,7 +120,7 @@ Module boundaries: `:app` (UI), `:core-inference` (LiteRT-LM + lens composition)
 
 ---
 
-## Project Structure
+## Project Structure 🗂️
 
 ```
 .
@@ -131,7 +132,7 @@ Module boundaries: `:app` (UI), `:core-inference` (LiteRT-LM + lens composition)
 │   ├── README.md              # reading order + file inventory
 │   ├── PRD.md                 # P0/P1/P2 requirements + phase schedule
 │   ├── concept-locked.md      # full product spec
-│   ├── adrs/                  # ADR-001..017 (stack, lenses, patterns, lifecycle, runtime, design, …)
+│   ├── adrs/                  # ADR-001..018, no 009 (stack, lenses, patterns, lifecycle, runtime, design, …)
 │   ├── architecture-brief.md
 │   ├── design-guidelines.md
 │   ├── ux-copy.md             # locked microcopy authority
@@ -154,7 +155,7 @@ Four-module split per [ADR-001](docs/adrs/ADR-001-stack-and-build-infra.md): `:a
 
 ---
 
-## Getting Started
+## Getting Started 🚀
 
 ### Prerequisites
 
@@ -179,7 +180,7 @@ SonarCloud analysis runs through the Gradle `sonar` task in CI rather than a sta
 make setup      # bootstrap gradle wrapper, install lefthook hooks
 make doctor     # verify local toolchain and environment variables
 make build      # assemble debug APK
-make test       # unit tests + Kover XML coverage + 80% verification
+make test       # unit tests for changed modules (75% coverage gate runs in `make verify`)
 make lint       # ktlint + detekt + Android lint
 make verify     # lint + test + build + staged secret scan
 make ci         # full local check (lint + test + build)
@@ -197,17 +198,30 @@ make install    # assemble + adb install debug APK without wiping app data
 make reinstall  # reinstall APK, push models, seed debug fixtures, tail logcat
 ```
 
-**Demo data**
+### Demo data on hardware (dev builds only)
 
-`make reinstall` runs the dev path by default: clean debug install, push the local model artifacts from `~/Downloads`, seed deterministic fixture entries + pattern cards, launch, then tail logcat.
+> **Just want to try Vestige?** Install the **release APK** from the GitHub release and onboard normally — you get a clean first-run (`Nothing on file.`) and capture your own entries. The seeded demo corpus below is a **dev-only reproduction aid** and never ships in the release APK.
+
+The demo seed is a deterministic ~36-entry corpus loaded by `DebugPatternSeeder` through an ADB-triggered `DebugSeedReceiver` that exists **only in debug builds** (`app/src/debug/…`, registered in the debug manifest overlay). It writes rows straight to ObjectBox and marks onboarding complete, so the seeded build opens past first-run with history already populated.
 
 ```bash
-make reinstall ENV=dev EXTRACT=1
+make reinstall ENV=dev            # clean debug install + push models + seed + launch + tail logcat
+make reinstall ENV=dev EXTRACT=1  # same, plus run background extraction so cards carry real lens receipts
+make seed-entries                 # re-seed an already-installed debug build (no reinstall)
+make seed-entries EXTRACT=1       # re-seed + run extraction
 ```
 
-- `EXTRACT=1` runs the LiteRT-LM background extraction over the seeded corpus so cards land with real lens receipts (matches saved-entry shape).
-- Seed timestamps span `2026-05-01` → `2026-05-20` (UTC); pattern / history logic evaluates them at those dates.
-- Idempotent — re-running the command wipes and reloads the debug entries.
+- **What `EXTRACT=1` actually does — and why it's slow.** Seeding writes each entry as text **straight to ObjectBox** and **bypasses the foreground model call entirely** — there is no audio, no transcription, and **no model foreground response**. `EXTRACT=1` then runs the **live background extraction once per seeded entry** (the same sequential 3-lens convergence a real capture runs). Expect a **full GPU load of ~30 s per entry** while it churns. Across the **~36-entry** corpus that's **≈18 minutes** at 30 s/entry — in practice **budget ~25–30 minutes**: the measured full 3-lens pass is ~44 s/entry (STT-F), and entries that mint a pattern add an observation + title pass on top. Watch `DebugSeedReceiver` / `Vestige` in logcat for `seed complete`. **If you don't want to sit through that, install the clean release APK instead** (no seed, no extraction).
+- **Without `EXTRACT=1`** entries seed instantly but stay `PENDING` — no lens receipts, no patterns, no vocab clusters. Fine for a History/layout check, useless for the extraction and pattern beats.
+- **Idempotent** — each seed wipes the entry / tag / pattern / cooldown tables and reloads, so re-running never duplicates.
+- Seed timestamps are **local wall-clock** spanning `2026-04-25` → `2026-05-22` (entry prose names clock times like "2am", so the loader seeds in the device zone, not UTC).
+
+**What you'll see on-screen after seeding:**
+
+- **History** — the full timeline populated, newest first.
+- **Patterns** — a **Tuesday-afternoon meeting-crash** recurrence (template `Crashed`) forms once the third supporting entry lands, with a sourced callout. A **Thursday-evening** cluster is a deliberate *negative control* — same time slot, unrelated end-of-day logistics. Temporal detection is deterministic, so it **does** mint a `TEMPORAL_RELATIVE` "Thursday evening" pattern from the shared weekday + time block alone (≥ 3 distinct dates); the point of the control is that it surfaces as a **benign time-block observation**, not a cognitive recurrence — the demo shows the model can tell "I always log at 5pm" from "I crash every Tuesday."
+- **Vocab Drift** (requires `EXTRACT=1`) — *intended* to group entries that share **no keywords** ("drained", "wiped out", "running on empty", "depleted", "burnt out", "brain fog") into one exhaustion cluster, with a separate positives cluster ("locked-in", "clear", "good", "sharp") — the embedding proof. **Heads-up: on the current seed this does not reliably mint** a `VOCAB_FREQUENCY` pattern (clustering threshold), so the screen may be absent — see [Known Limitations](#known-limitations).
+- Type **"I hate demos"** as a live entry and it joins the seeded **demo-dread** cluster.
 
 Required local artifact filenames match [`core-model/src/main/resources/model/manifest.properties`](core-model/src/main/resources/model/manifest.properties):
 
@@ -289,13 +303,13 @@ adb uninstall dev.anchildress1.vestige
 
 ---
 
-## Configuration
+## Configuration ⚙️
 
-v1 has effectively zero configuration. The model artifact downloads on first launch over Wi-Fi (~3.7 GB) into `Context.filesDir/models/`. A presence + size probe resolves the artifact state, then readiness holds at `Loading` until `engine.initialize()` actually completes — a full-size file on disk is *not* `Ready` on its own, so REC/typed stay gated while a cold first inference would still stall ([ADR-013 §Addendum](docs/adrs/ADR-013-typed-entry-requires-foreground-model.md)). Full SHA-256 integrity is deferred to the engine load path so onboarding never hashes the multi-GB artifact on the UI thread (Story 4.3). Persona default is set during onboarding and changeable from settings. Pattern detection threshold (10 entries) and callout cooldown (3 entries) are hardcoded for v1 per [`docs/ux-copy.md` §"Locked v1 behavior"](docs/ux-copy.md). No env vars, no `.env` file, no remote-config layer — adding any of those is a P0 violation per [ADR-001 §Q7](docs/adrs/ADR-001-stack-and-build-infra.md).
+v1 has effectively zero configuration. The model artifact downloads on first launch over Wi-Fi (~3.7 GB) into `Context.filesDir/models/`. A cheap presence + size probe resolves the artifact state without hashing the multi-GB file on the UI thread; a full-size artifact is then SHA-256-verified off-thread before readiness flips to `Ready`, so a checksum-corrupt full-size file falls back to `Loading` rather than a false `Ready` (`AppContainer.probeModelReadiness`). The engine itself loads lazily on the first inference, not proactively, because proactive pre-warm regressed into a startup GPU-init crash ([ADR-012](docs/adrs/ADR-012-gpu-inference-performance-gaps.md)). Persona default is set during onboarding and changeable from settings. Pattern analysis runs periodically — every 3 completed entries ([ADR-014](docs/adrs/ADR-014-foreground-background-split-and-periodic-pattern-analysis.md)) — with a per-pattern callout cooldown of 3 ([ADR-016](docs/adrs/ADR-016-pattern-callout-cooldown-per-pattern.md)), hardcoded for v1. No env vars, no `.env` file, no remote-config layer — adding any of those is a P0 violation per [ADR-001 §Q7](docs/adrs/ADR-001-stack-and-build-infra.md).
 
 ---
 
-## Security & Privacy
+## Security & Privacy 🔒
 
 Privacy is the differentiator, not a side feature.
 
@@ -309,7 +323,7 @@ Contributors: do not introduce dependencies that pull in Firebase, Crashlytics, 
 
 ---
 
-## How to Contribute
+## How to Contribute 🤝
 
 PRs are not accepted during the challenge window (until 2026-05-24). Issues are welcome — use the GitHub issue tracker. Post-submission, see [`AGENTS.md`](AGENTS.md) and [`backlog.md`](docs/backlog.md) for the contribution surface.
 
@@ -317,28 +331,44 @@ Branches and commits follow [`AGENTS.md`](AGENTS.md) and the repo conventions: a
 
 ---
 
-## What's Next
+## What's Next 🔭
 
 v1 ships 2026-05-24. Deferred features live in [`backlog.md`](docs/backlog.md) — v1.5 / v2 / STT-conditional, with explicit unblock-conditions per entry. No "coming soon" handwaving.
 
 ---
 
-## License
+## Known Limitations 🚧
+
+What v1 actually does, stated straight.
+
+- **Embeddings compute, but have no visible surface in the demo yet.** EmbeddingGemma 300M runs on-device and STT-E validated the retrieval idea — hybrid retrieval beat tag-only on 3 of 4 cohort queries on the reference S24 Ultra ([`docs/stt-results/stt-e-2026-05-19.md`](docs/stt-results/stt-e-2026-05-19.md)). But neither of the two surfaces that would *show* it is live:
+  - **Ranked hybrid retrieval** (`RetrievalRepo` — keyword + tag + recency + cosine) is implemented and validated but **not wired into any live surface**: its only caller is never invoked, capture passes empty history, and the per-entry observation's recurring context uses **deterministic** timestamp/weekday matching, not embeddings. Tracked: [`backlog.md`](docs/backlog.md) → `embedding-retrieval-surface`.
+  - **Vocab Drift clustering** (`VOCAB_FREQUENCY` / `EmbeddingClustering`) is implemented but **does not mint on the demo corpus** — the cosine cut was calibrated on an identical-word fixture, and genuinely-drifted prose (embedded as a tags+observations synthesis string) fragments below the cluster threshold. Verified on-device 2026-05-23: 5 patterns formed, all deterministic (temporal + template), **zero vocab**. Tracked: [`backlog.md`](docs/backlog.md) → `vocab-cluster-threshold`.
+
+  Net: the vectors are computed and STT-E-proven in isolation, but the running app currently surfaces nothing the user can see as "embeddings." Honest fix for both is to instrument, measure on-device, and calibrate — not guess.
+- **Voice captures cap at 30 s.** `AudioCapture` emits one final chunk at 30 s; the >30 s multi-chunk path is deferred ([`backlog.md`](docs/backlog.md) → `multi-chunk-foreground`). An audio cue at ~28 s warns before the cap fires.
+- **First inference is cold (~15 s).** The engine loads lazily on the first capture — proactive pre-warm was reverted after it regressed into a startup GPU-init crash ([ADR-012](docs/adrs/ADR-012-gpu-inference-performance-gaps.md)). Subsequent calls run ~7–11 s on E4B GPU; a full background 3-lens extraction is ~44 s/entry.
+
+---
+
+## License 📜
 
 [Polyform Shield 1.0.0](LICENSE) + Supplemental Terms. Source-available, not open-source: read it, run it, modify it for personal or internal use. Don't sell it, don't ship a paid product on top of it, don't use it to compete with Vestige itself. The full grant and exceptions are in [LICENSE](LICENSE) — that is the legally-binding version; this paragraph is just the plain-English flavor.
 
 ---
 
-## Acknowledgements
+## Acknowledgements 🙏
 
 - Google's **Gemma team** for the E4B model and the native audio modality that made this entire concept tractable on a phone.
 - The **LiteRT-LM team** ([`google-ai-edge/LiteRT-LM`](https://github.com/google-ai-edge/LiteRT-LM)) for the Android SDK that lets Kotlin code run a multimodal LLM without writing JNI by hand.
 - **ObjectBox** for an embedded DB that does not require an SQL ceremony.
 - **Hugging Face / `litert-community`** for hosting the pre-converted [`gemma-4-E4B-it-litert-lm`](https://huggingface.co/litert-community/gemma-4-E4B-it-litert-lm) artifact.
 - The **Polyform Project** for licenses that admit not every project is MIT-shaped.
+- **[DEV](https://dev.to) (dev.to)** for hosting the Gemma 4 Challenge — the venue this whole build was aimed at, and a community that rewards shipping over hand-waving.
+- **[Major League Hacking (MLH)](https://mlh.io)** for backing the challenge and the broader hackathon community that makes deadlines like this one fun instead of just terrifying.
 
 ---
 
-## Author
+## Author ✍️
 
 [Ashley Childress](https://github.com/anchildress1) ([@anchildress1](https://github.com/anchildress1)). Vestige is an Android side-build aimed at the Gemma 4 Challenge "Build with Gemma 4" prize. The brand voice and product opinions are entirely intentional.

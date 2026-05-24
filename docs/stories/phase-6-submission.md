@@ -17,11 +17,11 @@ Produce the four deliverables the submission requires: the **APK** (signed relea
 ## Phase-level acceptance criteria
 
 - [ ] Final signed release APK installs cleanly on the reference S24 Ultra and at least one secondary 2024+ flagship Android.
-- [ ] tcpdump privacy-proof clip recorded showing zero outbound traffic during a normal capture session after model download completes.
+- [/] tcpdump privacy-proof clip recorded showing zero outbound traffic during a normal capture session after model download completes.
 - [ ] 5-minute demo video edited with chapter markers, including the tcpdump clip as a chapter.
-- [ ] Dev.to post drafted following `blog-template.md`, with the canonical tagline, hook, and explicit acknowledgment of any STT outcomes that shaped the v1 build.
+- [x] Dev.to post drafted following `blog-template.md`, with the canonical tagline, hook, and explicit acknowledgment of any STT outcomes that shaped the v1 build.
 - [ ] GitHub release published with the APK as a release asset and the polished `README.md` at the repo root.
-- [ ] App icon and cover image designed and integrated.
+- [x] App icon and cover image designed and integrated.
 - [ ] Final QA on reference device + secondary device passes.
 - [ ] Submission filed on dev.to with required tags, before deadline.
 
@@ -34,12 +34,12 @@ Produce the four deliverables the submission requires: the **APK** (signed relea
 **As** the demo recorder, **I need** raw screen recordings of the 90-second pitch and the 5-minute technical walkthrough on the reference S24 Ultra following the `demo-storyboard.md` script, **so that** Story 6.3 has clean source material to edit.
 
 **Done when:**
-- [ ] At least 2 full takes of the 90-second pitch recorded on the reference device using the device's built-in screen recorder (Galaxy S24 Ultra has it natively per earlier discussion).
-- [ ] At least 2 full takes of the 5-minute walkthrough recorded.
-- [ ] Audio is captured cleanly — narration is recorded separately on a quality microphone, not via the phone speaker (phone audio is for in-app demonstration of voice-in, not narration capture).
-- [ ] Screen recordings show the polished UX from Phase 4 — no half-finished states.
-- [ ] Sample data is loaded from Phase 5's loader before each take.
-- [ ] At least one take per video has the timing and beats matching `demo-storyboard.md`.
+- [x] At least 2 full takes of the 90-second pitch recorded on the reference device using the device's built-in screen recorder (Galaxy S24 Ultra has it natively per earlier discussion).
+- [x] At least 2 full takes of the 5-minute walkthrough recorded.
+- [x] Audio is captured cleanly — narration is recorded separately on a quality microphone, not via the phone speaker (phone audio is for in-app demonstration of voice-in, not narration capture).
+- [x] Screen recordings show the polished UX from Phase 4 — no half-finished states.
+- [x] Sample data is loaded from Phase 5's loader before each take.
+- [x] At least one take per video has the timing and beats matching `demo-storyboard.md`.
 
 **Notes / risks:** Phone-side screen recorder may include ambient phone audio. Do narration on a separate mic and overlay during edit. Don't record narration through the phone — it sounds like a phone call.
 
@@ -50,12 +50,12 @@ Produce the four deliverables the submission requires: the **APK** (signed relea
 **As** the demo recorder, **I need** a chapter-of-the-video clip showing a normal capture session running on the reference device while `tcpdump` (or equivalent) on a connected machine shows zero outbound packets after model download completes, **so that** the privacy claim ("zero outbound network calls during normal operation") is demonstrated visually rather than just asserted.
 
 **Done when:**
-- [ ] The reference device is connected (USB debugging or via a controlled Wi-Fi network) so packet capture can observe its outbound traffic.
-- [ ] `tcpdump` (or Wireshark, or equivalent) is running and recording outbound traffic from the device's IP.
-- [ ] A capture session is performed on the device (record → transcription → background extraction → save).
-- [ ] Packet capture shows zero outbound traffic from the app's process after the model download completed in onboarding.
-- [ ] The clip shows both the device screen and the packet capture window simultaneously (split screen or picture-in-picture in the final edit).
-- [ ] Clip duration: 30–60 seconds. Long enough to demonstrate, short enough to keep the chapter tight.
+- [/] The reference device is connected (USB debugging or via a controlled Wi-Fi network) so packet capture can observe its outbound traffic.
+- [/] `tcpdump` (or Wireshark, or equivalent) is running and recording outbound traffic from the device's IP.
+- [/] A capture session is performed on the device (record → transcription → background extraction → save).
+- [/] Packet capture shows zero outbound traffic from the app's process after the model download completed in onboarding.
+- [/] The clip shows both the device screen and the packet capture window simultaneously (split screen or picture-in-picture in the final edit).
+- [/] Clip duration: 30–60 seconds. Long enough to demonstrate, short enough to keep the chapter tight.
 
 **Notes / risks:** Per `AGENTS.md` guardrail and `PRD.md` §"Privacy claim", the only network event expected is the one-time model download. If anything else shows up in tcpdump, debug before recording — don't show a clip with unexpected packets and try to explain them away.
 
@@ -86,17 +86,17 @@ Produce the four deliverables the submission requires: the **APK** (signed relea
 
 **Done when:**
 - [ ] Post follows the structure in `blog-template.md`.
-- [ ] Hook from `concept-locked.md` opens the post: *"I built a brain tracker that doesn't blow smoke up your ass."*
-- [ ] Tagline from `concept-locked.md` lands in the lede or near it: *"Vestige (n.) — a trace, mark, or visible evidence of something no longer present. Your brain keeps leaving traces. This app catches them."*
-- [ ] **Model-choice section** answers the judging criterion: which Gemma 4 variant (E4B), why it was chosen (native audio multimodal as the headline), and what STT outcomes shaped the architecture. If STT-D failed and multi-lens dropped, this is acknowledged honestly — *"We bet on multi-lens convergence; the architecture didn't earn its keep on the size of data we tested. Single-pass extraction shipped, with the multi-lens design moving to v1.5"* — judges respect honest engineering more than fabricated claims.
-- [ ] **Privacy section** explains the on-device claim, references the tcpdump clip, and uses the headline "Your voice never leaves the device."
-- [ ] **Brand section** uses the in-app "dump" / capture vocabulary only when intentionally quoting microcopy. Public-facing copy uses "voice entry," "capture," "cognitive event" per the README's brand-legibility rule.
-- [ ] **What's deferred** section briefly mentions v1.5 / v2 backlog highlights (handle, TTS, video input, audio retention, Reading screen if cut, Roast bottom sheet if cut, agentic tool-calling, etc.) — framed as roadmap, not apology.
-- [ ] Required dev.to tags: `devchallenge`, `gemmachallenge`, `gemma`.
-- [ ] Submission category: `Build with Gemma 4` only (one of five $500 + DEV++ + badge slots).
+- [x] Hook from `concept-locked.md` opens the post: *"I built a brain tracker that doesn't blow smoke up your ass."*
+- [x] Tagline from `concept-locked.md` lands in the lede or near it: *"Vestige (n.) — a trace, mark, or visible evidence of something no longer present. Your brain keeps leaving traces. This app catches them."*
+- [x] **Model-choice section** answers the judging criterion: which Gemma 4 variant (E4B), why it was chosen (native audio multimodal as the headline), and what STT outcomes shaped the architecture. If STT-D failed and multi-lens dropped, this is acknowledged honestly — *"We bet on multi-lens convergence; the architecture didn't earn its keep on the size of data we tested. Single-pass extraction shipped, with the multi-lens design moving to v1.5"* — judges respect honest engineering more than fabricated claims.
+- [/] **Privacy section** explains the on-device claim, references the tcpdump clip, and uses the headline "Your voice never leaves the device."
+- [x] **Brand section** uses the in-app "dump" / capture vocabulary only when intentionally quoting microcopy. Public-facing copy uses "voice entry," "capture," "cognitive event" per the README's brand-legibility rule.
+- [x] **What's deferred** section briefly mentions v1.5 / v2 backlog highlights (handle, TTS, video input, audio retention, Reading screen if cut, Roast bottom sheet if cut, agentic tool-calling, etc.) — framed as roadmap, not apology.
+- [x] Required dev.to tags: `devchallenge`, `gemmachallenge`, `gemma`.
+- [x] Submission category: `Build with Gemma 4` only (one of five $500 + DEV++ + badge slots).
 - [ ] APK download link points to the GitHub release from Story 6.6.
 - [ ] Demo video embedded or linked from Story 6.3.
-- [ ] At least one architecture diagram or screenshot per `design-guidelines.md` (if Mermaid renders on dev.to natively, use it; otherwise PNG).
+- [/] At least one architecture diagram or screenshot per `design-guidelines.md` (if Mermaid renders on dev.to natively, use it; otherwise PNG).
 
 **Notes / risks:** The "intentional and effective use of the chosen model" criterion is answered by what the model actually did, not what we wished it did. If multi-lens dropped, the post is more honest if it says so — and it's still a winning entry because the audio multimodal use is intentional and the privacy story is real.
 
@@ -107,13 +107,13 @@ Produce the four deliverables the submission requires: the **APK** (signed relea
 **As** the AI implementor, **I need** the repo's `README.md` (the GitHub-facing one, not `docs/README.md`) polished into a public-facing pitch with installation, screenshots, the architecture summary, the model-choice rationale, and the known limitations, **so that** anyone who lands on the GitHub repo from the dev.to post or the demo video gets a coherent picture in 60 seconds.
 
 **Done when:**
-- [ ] Repo root `README.md` exists (separate from `docs/README.md` which is the CLI handoff doc — the public README points at `docs/` for engineers but is itself audience-facing).
-- [ ] Title + tagline + hook (matching `concept-locked.md`).
+- [x] Repo root `README.md` exists (separate from `docs/README.md` which is the CLI handoff doc — the public README points at `docs/` for engineers but is itself audience-facing).
+- [x] Title + tagline + hook (matching `concept-locked.md`).
 - [ ] Demo video embedded or linked.
 - [ ] **Quickstart**: how to install the APK on Android. Min spec callout (Android 14+, 8 GB RAM, 6 GB free storage).
 - [ ] **Architecture summary**: the four-module split, the multi-lens pipeline (or single-pass if STT-D failed), the embedding layer (or absence if STT-E failed). One Mermaid diagram showing data flow.
 - [ ] **Model-choice rationale**: matching the dev.to post's section.
-- [ ] **Privacy claim**: "Your voice never leaves the device" + the tcpdump-clip reference.
+- [/] **Privacy claim**: "Your voice never leaves the device" + the tcpdump-clip reference.
 - [ ] **Known limitations**: what didn't ship and why. Honest.
 - [ ] **Acknowledgments**: Anthropic Claude for the spec/design pairing (per the dev.to challenge being a hackathon), Google for Gemma 4 and LiteRT-LM, ObjectBox, etc.
 - [ ] **License**: link to repo `LICENSE` (Polyform Shield 1.0.0 + Supplemental Terms — source-available, non-commercial). Note that Gemma 4 redistribution obligations are separate and apply to the model artifact, not Vestige's host-app license choice.
@@ -146,11 +146,11 @@ Produce the four deliverables the submission requires: the **APK** (signed relea
 **As** the AI implementor, **I need** the app icon (rendered per `design-guidelines.md` §"App icon" — a single partial footprint dissolving into mist at its edges) and a cover image for dev.to / video thumbnail, **so that** the visual identity is consistent across all touchpoints.
 
 **Done when:**
-- [ ] App icon is designed per `design-guidelines.md` §"App icon": single partial footprint, fading at edges, outline-only or with a subtle gradient from cool white to nothing.
-- [ ] Icon is rendered in the standard Android adaptive-icon sizes (foreground + background layers).
+- [x] App icon is designed per `design-guidelines.md` §"App icon": single partial footprint, fading at edges, outline-only or with a subtle gradient from cool white to nothing.
+- [x] Icon is rendered in the standard Android adaptive-icon sizes (foreground + background layers).
 - [ ] Icon ships in the final APK from Story 6.6.
-- [ ] Cover image (1200×630 for dev.to, video thumbnail aspect for the demo video) uses the locked palette: deep blue-black background, the partial footprint motif, the title `Vestige`, and the tagline (or the hook if the tagline is too long for the layout).
-- [ ] No `glow` or `vapor` in the icon itself unless they earn the moment per `design-guidelines.md` §"Where each accent lives" (icon is generally a low-saturation moment; the accent lives in-app where the user is acting).
+- [x] Cover image (1200×630 for dev.to, video thumbnail aspect for the demo video) uses the locked palette: deep blue-black background, the partial footprint motif, the title `Vestige`, and the tagline (or the hook if the tagline is too long for the layout).
+- [x] No `glow` or `vapor` in the icon itself unless they earn the moment per `design-guidelines.md` §"Where each accent lives" (icon is generally a low-saturation moment; the accent lives in-app where the user is acting).
 - [ ] Cover image embedded in the dev.to post (Story 6.4) and used as the video thumbnail (Story 6.3).
 
 **Notes / risks:** The icon is one of the four things every install begins with. A generic icon undercuts every other piece of brand work. The forensic-procedural / wellness-app traps from `design-guidelines.md` §"Iconography — wrong register" still apply: no fingerprints, no magnifiers, no brains, no leaves, no clipboards.

@@ -1,33 +1,46 @@
 # LLM Functionality
 
 Gemma 4 E4B running on-device via LiteRT-LM. Source: ADR-002 (3-lens × 5-surface, two-tier,
-convergence), ADR-005 (single-turn), ADR-008 (concurrent multi-context; v1 sequential pending measurement), ADR-010 (embedder runtime),
-`concept-locked.md` (personas, audio, observation layering).
+convergence), ADR-005 (single-turn), ADR-008 (**concurrent multi-context REVERSED 2026-05-17** —
+`litertlm-android:0.11.0` is single-session, so sequential 3-lens is the runtime ceiling, not a
+scope choice), ADR-014 (foreground/background split + periodic pattern analysis), ADR-018 (inline
+foreground follow-up), ADR-010 (embedder runtime), `concept-locked.md` (personas, audio,
+observation layering).
 
-One model artifact (`gemma-4-E4B-it-litert-lm`, 3.66 GB), one `ModelHandle` per process.
-Foreground and background inference are **sequential through a single engine behind a `Mutex`** —
-recording blocks if a background lens call is running.
+One model artifact (`gemma-4-E4B-it-litert-lm`, 3.66 GB), one `backgroundEngine` (`LiteRtLmEngine`)
+per process holding **one live session at a time** (`callMutex`; a second concurrent
+`createConversation` throws `FAILED_PRECONDITION` — STT-F). Foreground capture does **not** wait
+behind background extraction: it **preempts** by cancelling the in-flight background lens, leaving
+the row non-terminal, and requeuing the work FIFO after the foreground call releases the session
+(ADR-014 Addendum 2026-05-20).
 
 ---
 
 ## 1. 3 lenses × 5 surfaces
 
 5 surfaces = **what** is extracted. 3 lenses = **how** it's framed. Each lens call composes one
-lens module with all five surface modules into a single prompt and returns the full schema.
-**3 model calls per entry** in the background pass.
+lens module with all five surface modules into a single prompt and returns the full schema
+(`PromptComposer.kt`, `resources/surfaces/*.txt`, `resources/lenses/output-schema.txt`). **3 model
+calls per entry** in the background pass. Field names below are the **emitted schema** keys, not the
+internal resolved-field keys: `recurrence_kind` is the surface output (the app derives the
+`recurrence_link` / `pattern_id` afterward), and the model emits `commitment` + `commitment_topic`
+(persisted as `stated_commitment`). `template_label` is a required cross-cutting field every lens
+emits — the archetype (one of `aftermath` / `tunnel-exit` / `stalled` / `decision-spiral` /
+`goblin-hours` / `audit`).
 
 ```mermaid
 flowchart LR
     accTitle: Three lenses by five surfaces extraction matrix
-    accDescr: Each of three lenses (Literal, Inferential, Skeptical) is one model call that composes all five surfaces (Behavioral, State, Vocabulary, Commitment, Recurrence) and returns the full schema. Three model calls per entry.
+    accDescr: Each of three lenses (Literal, Inferential, Skeptical) is one model call that composes all five surfaces (Behavioral, State, Vocabulary, Commitment, Recurrence) plus the required template_label archetype, and returns the full plain-text schema. Three model calls per entry. Behavioral and State both write tags; Vocabulary writes the one-word tone; Commitment writes commitment and commitment_topic; Recurrence writes recurrence_kind exact or partial and never a pattern id.
 
-    subgraph surfaces["5 surfaces — WHAT (orthogonal modules)"]
+    subgraph surfaces["5 surfaces — WHAT (orthogonal modules) + required archetype"]
       direction TB
       B["Behavioral → tags"]
       S["State → tags (state words)"]
       V["Vocabulary → vocabulary (one tone word)"]
-      C["Commitment → stated_commitment"]
-      R["Recurrence → recurrence_link"]
+      C["Commitment → commitment + commitment_topic"]
+      R["Recurrence → recurrence_kind (exact | partial)<br/>(never a pattern id — app derives recurrence_link)"]
+      T["(all lenses) → template_label (archetype, required)"]
     end
 
     L1["Lens 1: Literal<br/>only what's explicit"] --> P1["call 1<br/>lens + all 5 surfaces"]
@@ -46,13 +59,15 @@ flowchart LR
 
 ## 2. Two-tier processing (sequence)
 
-Foreground is fast (transcription + one follow-up). Background does the
-3-lens convergence over 30–90 s. Audio bytes are discarded immediately after the foreground call.
+Foreground is fast (transcription + one inline follow-up). Background runs the 3-lens convergence
+sequentially — measured on the reference S24 Ultra (GPU, E4B): ≈14.7 s per lens, ≈44 s for the full
+3-lens pass, inside the documented 25–55 s band (ADR-008 §Addendum 2026-05-17, STT-F). Audio bytes
+are discarded immediately after the foreground call.
 
 ```mermaid
 sequenceDiagram
     accTitle: Two-tier foreground and background inference sequence
-    accDescr: User stops recording. The foreground Gemma call returns transcription and one follow-up. EntryStore persists an ObjectBox row and marks extraction PENDING. The background pass runs three sequential lens calls, the resolver writes fields, entry observations are generated, then pattern detection runs if the threshold is met.
+    accDescr: User stops recording. The foreground Gemma call returns transcription and one inline follow-up. EntryStore persists an ObjectBox row and marks extraction PENDING. The detached background pass runs three sequential lens calls, the resolver writes fields, entry observations are generated, the entry is marked COMPLETED, then on every third completed entry a periodic pattern detection pass runs over the 90-day window.
 
     actor U as User
     participant Cap as CaptureViewModel
@@ -75,11 +90,12 @@ sequenceDiagram
     LM-->>BG: full schema
     BG->>LM: lens 3 — Skeptical
     LM-->>BG: full schema
-    BG->>CR: 3 results
-    CR-->>BG: consensus / candidate / ambiguous fields
+    BG->>CR: surviving lens results
+    CR-->>BG: consensus / candidate / ambiguous / consensus_with_conflict fields
     BG->>BG: generate entry_observations
-    BG->>PD: if ≥10 entries & pattern ≥3 supporting
-    PD-->>ES: persist sourced patterns (status = COMPLETED)
+    BG->>ES: write fields + observations, mark extraction COMPLETED
+    BG->>PD: every 3rd completed entry → periodic detection pass (90 d)
+    PD-->>ES: persist sourced patterns + per-pattern callout (cooldown window 3)
 ```
 
 ---
@@ -91,17 +107,19 @@ Not a 4th model call. Per-field agreement predicate decides the verdict.
 ```mermaid
 flowchart TD
     accTitle: Convergence resolver per-field decision
-    accDescr: For each field, if two or more of three lenses agree the verdict is consensus, unless Skeptical flags a conflict in which case it is consensus_with_conflict. If only Inferential populated it, the verdict is candidate. If all three disagree, the verdict is ambiguous and the field is saved null with a debug note.
+    accDescr: For each field, if two or more of three lenses agree the verdict is consensus, unless a Skeptical flag binds to that field in which case it is consensus_with_conflict. If exactly one lens populated the field the verdict is candidate (any single lens, not specifically Inferential), except a lone Skeptical carrying a matching flag resolves to ambiguous. If lenses disagree the verdict is ambiguous and the field is saved null with a lens-disagreement note.
 
-    F(["per field across 3 lens results"]) --> A{"≥2 lenses agree?"}
-    A -- yes --> SK{"Skeptical flags<br/>a contradiction?"}
-    SK -- no --> CAN["consensus<br/>(saved authoritative)"]
+    F(["per field across surviving lens results"]) --> A{"≥2 lenses agree?"}
+    A -- yes --> SK{"Skeptical flag<br/>binds to this field?"}
+    SK -- no --> CON["consensus<br/>(saved authoritative)"]
     SK -- yes --> CWC["consensus_with_conflict<br/>(consensus + conflict marker)"]
-    A -- no --> ONE{"only Inferential<br/>populated it?"}
-    ONE -- yes --> CND["candidate<br/>(low confidence; not used by pattern engine)"]
-    ONE -- no --> AMB["ambiguous<br/>(saved null + note)"]
+    A -- no --> ONE{"exactly one lens<br/>populated it?"}
+    ONE -- yes --> SKQ{"lone lens is Skeptical<br/>+ matching flag?"}
+    SKQ -- no --> CND["candidate<br/>(any single lens; low confidence; not used by pattern engine)"]
+    SKQ -- yes --> AMB["ambiguous<br/>(saved null + note)"]
+    ONE -- no --> AMB
 
-    note["Lens error path: run with surviving 2 (both must agree);<br/>2+ lenses fail ⇒ all fields ambiguous + re-eval suggestion"]
+    note["Lens error path: 2 surviving ⇒ both must agree;<br/>only 1 survives (2+ fail) ⇒ every field ambiguous.<br/>Tags use ≥2-of-3 majority (plural-stemmed) with a Literal-strongest candidate fallback;<br/>vocabulary lets Inferential win outright (corroboration lifts to consensus).<br/>Blank / empty / false values never corroborate — no-op fields don't form consensus."]
 ```
 
 ---
@@ -125,23 +143,61 @@ flowchart LR
 
 ---
 
-## 5. Embeddings & retrieval (STT-E-gated)
+## 5. Embeddings: computed, but no live surface yet
 
-P0 retrieval is keyword + Gemma-extracted tags + recency. The semantic vector layer
-(EmbeddingGemma 300M via LiteRT, loaded through `GemmaEmbeddingModel` / `localagents-rag` — a
-separate native `.so` from `ModelHandle`) ships **only if STT-E passes**; otherwise it drops to
-v1.5. The embedding target is a post-convergence **synthesis string** (tags + observations +
-commitment), not the raw transcription.
+EmbeddingGemma 300M is shipped and **not STT-E-gated** (STT-E is an on-device measurement harness,
+`SttEEmbeddingComparisonTest`, not a runtime switch). It loads through `GemmaEmbeddingModel` /
+`localagents-rag` (a self-contained `.so`, separate from the Gemma engine; ADR-010).
+`VectorBackfillWorker` embeds a post-convergence **synthesis string** — tags + observations +
+commitment topic (`EmbeddingText.buildEmbeddingText`) — into `EntryEntity.vector` (768-dim HNSW
+cosine), **not** the raw transcription. **The vectors are computed and STT-E-proven in isolation,
+but neither surface that would *show* embeddings is live:**
+
+- **Clustering (`EmbeddingClustering` → `VOCAB_FREQUENCY` → Vocab Drift screen)** is the *intended*
+  consumer, but it **does not mint on the demo corpus** — the cosine cut (`DEFAULT_MAX_COSINE_DISTANCE
+  = 0.30`) was calibrated on an identical-word fixture, so genuinely-drifted prose fragments below the
+  `VOCAB_THRESHOLD = 4` floor (verified on-device 2026-05-23: 5 patterns, all deterministic, zero
+  vocab — `backlog.md` → `vocab-cluster-threshold`).
+- **Ranked hybrid retrieval** `RetrievalRepo.query` (keyword + tag-Jaccard + recency + **EmbeddingGemma
+  cosine**, `embeddingWeight` default `1.0`) is **implemented and STT-E-validated but not wired into any
+  live surface**: its only caller, `AppContainer.retrieveHistory`, has no callers; capture passes
+  `retrievedHistory = emptyList()`; the observation read's recurring context uses **deterministic**
+  `TemporalHistoryRetrieval` (timestamp/weekday), not embeddings (`backlog.md` → `embedding-retrieval-surface`).
 
 ```mermaid
 flowchart TD
-    accTitle: Hybrid retrieval with optional vector layer
-    accDescr: Baseline retrieval is keyword plus tags plus recency. If STT-E passes, a vector similarity layer using EmbeddingGemma over a post-convergence synthesis string is added to protect pattern detection from vocabulary drift. If STT-E fails, the vector layer defers to v1.5.
+    accTitle: Embeddings computed but no live surface
+    accDescr: VectorBackfillWorker embeds a synthesis string of tags, observations, and commitment topic into each entry's 768-dimension vector after the entry finalizes. The vectors are computed but neither embedding surface is live. EmbeddingClustering is the intended consumer for the VOCAB_FREQUENCY pattern and Vocab Drift screen, but it does not mint on the demo corpus because the cosine cut was calibrated on an identical-word fixture. RetrievalRepo implements a ranked hybrid score and is STT-E validated, but it is not wired into any live surface — its only caller retrieveHistory is never called, capture passes empty history, and the observation recurring context uses deterministic timestamp-based TemporalHistoryRetrieval instead.
 
-    Q(["query / pattern match"]) --> Base["Baseline: keyword + tags + recency"]
-    Base --> Gate{"STT-E passed?"}
-    Gate -- yes --> Vec["+ vector similarity<br/>EmbeddingGemma over synthesis string<br/>(tags · observations · commitment)"]
-    Gate -- no --> V15["vector layer → v1.5"]
-    Vec --> Out(["ranked results"])
-    Base --> Out
+    BF["VectorBackfillWorker (async, after finalize)<br/>embeds synthesis string: tags · observations · commitment topic"] --> VEC[("EntryEntity.vector<br/>768-dim HNSW cosine")]
+    VEC -. "intended consumer — but does NOT mint on demo corpus<br/>(0.30 cosine cut tuned for identical-word fixture)" .-> CL["EmbeddingClustering → VOCAB_FREQUENCY → Vocab Drift"]
+    VEC -. "not consumed live" .-> RR["RetrievalRepo.query (built + STT-E-validated)<br/>keyword + tag + recency + cosine"]
+    RR -. "only caller" .-> RH["AppContainer.retrieveHistory()<br/>(no callers — capture passes emptyList)"]
+    OBS["observation recurring context"] --> TH["TemporalHistoryRetrieval<br/>(deterministic timestamp/weekday — NOT embeddings)"]
+```
+
+---
+
+## 6. Foreground-priority inference queue (single session)
+
+Both the foreground call and the background lens passes share **one** engine that holds **one live
+session** (`callMutex`). To keep capture from waiting behind extraction (ADR-008 reversal + ADR-014
+Addendum 2026-05-20), `BackgroundExtractionQueue` lets foreground **preempt**: `beginForeground`
+cancels the in-flight extraction (leaving its row non-terminal) and pushes it back to the **front**
+of the queue; while `foregroundDepth > 0` the drain is paused; `endForeground` restarts the drain so
+the requeued work reruns FIFO. Cancelled extraction is discard-and-rerun at the unit-of-work
+boundary — not KV-cache suspend/resume.
+
+```mermaid
+stateDiagram-v2
+    accTitle: Foreground-priority background extraction queue
+    accDescr: The queue idles when empty. Enqueuing work starts draining, which runs background extractions one at a time against the single engine session. When a foreground capture begins, the active extraction is cancelled and requeued at the front and draining pauses until the foreground call ends, after which draining resumes and reruns the requeued work in FIFO order. Cancel-all clears the queue.
+
+    [*] --> Idle
+    Idle --> Draining: enqueue(work)
+    Draining --> Draining: run next extraction (single session)
+    Draining --> Idle: queue empty
+    Draining --> ForegroundHeld: beginForeground (cancel + requeue active at front, pause drain)
+    Idle --> ForegroundHeld: beginForeground
+    ForegroundHeld --> Draining: endForeground (resume drain, rerun FIFO)
 ```

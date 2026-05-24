@@ -175,6 +175,7 @@ sonar {
             "sonar.junit.reportPaths",
             listOf(
                 "app/build/test-results/testDebugUnitTest",
+                "app/build/test-results/testDebugIntegrationTest",
                 "core-inference/build/test-results/testDebugUnitTest",
                 "core-model/build/test-results/test",
                 "core-storage/build/test-results/testDebugUnitTest",

@@ -4,7 +4,7 @@
 **Status:** Draft — 2026-05-13
 **Phase:** 4 (UX Surface)
 **Author:** Ashley (sole owner). AI implementors read this as authoritative.
-**References:** `ux-copy.md` §Pattern List, §Pattern Detail, §System Messages, §Locked UX Decisions; `backlog.md` §`pattern-auto-close`; `poc/screens-patterns.jsx`; `adrs/ADR-011-design-language-scoreboard-pivot.md`
+**References:** `ux-copy.md` §Pattern List, §Pattern Detail, §System Messages, §Locked UX Decisions; `backlog.md` §`pattern-auto-close`; `poc/patterns-final.png`, `poc/pattern-detail-final.png`; `adrs/ADR-011-design-language-scoreboard-pivot.md`
 
 ---
 
@@ -72,12 +72,12 @@ Users can Skip a pattern from two surfaces:
 - Pattern card overflow menu (three-dot or equivalent)
 - Pattern Detail bottom action row
 
-Behavior: transitions pattern state from `ACTIVE` → `SKIPPED`, records skip timestamp, schedules wake-up at `skip_ts + 7 days`.
+Behavior: transitions pattern state from `ACTIVE` → `SNOOZED`, records skip timestamp, schedules wake-up at `skip_ts + 7 days`.
 
 Acceptance criteria:
 - Given an ACTIVE pattern card, when user opens overflow and taps Skip, the card disappears from ACTIVE and appears in SKIPPED · ON HOLD.
 - Given a pattern in Pattern Detail with action row visible, when user taps Skip, the screen pops back to Pattern List and the card appears under SKIPPED · ON HOLD.
-- Skip timestamp is written to the pattern's ObjectBox record (`PatternEntity.skippedUntil: Long?`).
+- Skip timestamp is written to the pattern's ObjectBox record (`PatternEntity.snoozedUntil: Long?`).
 - Snackbar fires: `Skipped.` with Undo (standard Material undo timing, ~4s).
 - Tapping Undo reverses the state to ACTIVE. No skip timestamp persists.
 
@@ -102,14 +102,14 @@ Users can Restart a non-active pattern from two surfaces:
 - Pattern card overflow menu
 - Pattern Detail bottom action row (single-button row)
 
-Behavior: transitions pattern state from `SKIPPED` / `DROPPED` / `CLOSED` → `ACTIVE`.
+Behavior: transitions pattern state from `SNOOZED` / `DROPPED` / `CLOSED` → `ACTIVE`.
 
 Acceptance criteria:
 - Given a skipped pattern card, when user taps Restart, the card disappears from `SKIPPED · ON HOLD` and appears in `ACTIVE`.
 - Given a dropped pattern card, when user taps Restart, the card disappears from `DROPPED` and appears in `ACTIVE`.
 - Given a done pattern card, when user taps Restart, the card disappears from `CLOSED · DONE` and appears in `ACTIVE`.
 - Snackbar fires: `Pattern is back.` with Undo (~4s window).
-- Tapping Undo restores the exact prior state snapshot. If the prior state was `SKIPPED`, the original `skippedUntil` timestamp is restored rather than reset.
+- Tapping Undo restores the exact prior state snapshot. If the prior state was `SNOOZED`, the original `snoozedUntil` timestamp is restored rather than reset.
 
 **P0.4 — Section structure**
 
@@ -131,7 +131,7 @@ Acceptance criteria:
 
 **P0.5 — Skip wake-up**
 
-When `skippedUntil` elapses, the pattern transitions from `SKIPPED` → `ACTIVE` automatically.
+When `snoozedUntil` elapses, the pattern transitions from `SNOOZED` → `ACTIVE` automatically.
 
 Acceptance criteria:
 - A cold start after the skip window has elapsed returns the pattern to ACTIVE.
@@ -219,30 +219,30 @@ CLOSED · DONE (model-detected, v1.5):
 
 ```kotlin
 // Four states — CLOSED is AI-only (v1.5, unreachable in v1)
-enum class PatternState { ACTIVE, SKIPPED, CLOSED, DROPPED }
+enum class PatternState { ACTIVE, SNOOZED, CLOSED, DROPPED }
 
 // Existing or add
 var state: PatternState = PatternState.ACTIVE
 
 // New field for skip wake-up
-var skippedUntil: Long? = null  // epoch ms; null when not skipped
+var snoozedUntil: Long? = null  // epoch ms; null when not snoozed
 ```
 
 State transition rules:
 
-| From | Action | Who | To | skippedUntil |
+| From | Action | Who | To | snoozedUntil |
 |---|---|---|---|---|
-| ACTIVE | Skip | User | SKIPPED | now + 7 days |
+| ACTIVE | Skip | User | SNOOZED | now + 7 days |
 | ACTIVE | Drop | User | DROPPED | null |
-| SKIPPED | Undo (skip) | User | ACTIVE | null |
+| SNOOZED | Undo (skip) | User | ACTIVE | null |
 | DROPPED | Undo (drop) | User | ACTIVE | null |
-| SKIPPED | Restart | User | ACTIVE | null |
+| SNOOZED | Restart | User | ACTIVE | null |
 | DROPPED | Restart | User | ACTIVE | null |
 | CLOSED | Restart | User | ACTIVE | null |
-| ACTIVE | Undo (restart from SKIPPED) | User | SKIPPED | restore original value |
+| ACTIVE | Undo (restart from SNOOZED) | User | SNOOZED | restore original value |
 | ACTIVE | Undo (restart from DROPPED) | User | DROPPED | null |
 | ACTIVE | Undo (restart from CLOSED) | User | CLOSED | null |
-| SKIPPED | Wake-up check on load | System | ACTIVE | null (cleared) |
+| SNOOZED | Wake-up check on load | System | ACTIVE | null (cleared) |
 | ACTIVE | Model detects stale (v1.5) | AI | CLOSED | null |
 
 **ObjectBox note:** Do not delete `PatternEntity` on Drop. Hard-deletes lose the audit trail and break the v1.5 re-detection comparison.

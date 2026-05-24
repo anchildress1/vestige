@@ -143,37 +143,34 @@ flowchart LR
 
 ---
 
-## 5. Embeddings: computed, but no live surface yet
+## 5. Embeddings: the live Vocab Drift surface
 
 EmbeddingGemma 300M is shipped and **not STT-E-gated** (STT-E is an on-device measurement harness,
 `SttEEmbeddingComparisonTest`, not a runtime switch). It loads through `GemmaEmbeddingModel` /
 `localagents-rag` (a self-contained `.so`, separate from the Gemma engine; ADR-010).
-`VectorBackfillWorker` embeds a post-convergence **synthesis string** — tags + observations +
-commitment topic (`EmbeddingText.buildEmbeddingText`) — into `EntryEntity.vector` (768-dim HNSW
-cosine), **not** the raw transcription. **The vectors are computed and STT-E-proven in isolation,
-but neither surface that would *show* embeddings is live:**
+`VectorBackfillWorker` embeds each entry by its model-emitted **tone word** (`vocabularyWord`) into
+`EntryEntity.vector` (768-dim HNSW cosine), **not** the raw transcription. The embedding axis is the
+felt quality of the entry, not its content — which is why a content query can't score against it.
 
-- **Clustering (`EmbeddingClustering` → `VOCAB_FREQUENCY` → Vocab Drift screen)** is the *intended*
-  consumer, but it **does not mint on the demo corpus** — the cosine cut (`DEFAULT_MAX_COSINE_DISTANCE
-  = 0.30`) was calibrated on an identical-word fixture, so genuinely-drifted prose fragments below the
-  `VOCAB_THRESHOLD = 4` floor (verified on-device 2026-05-23: 5 patterns, all deterministic, zero
-  vocab — `backlog.md` → `vocab-cluster-threshold`).
-- **Ranked hybrid retrieval** `RetrievalRepo.query` (keyword + tag-Jaccard + recency + **EmbeddingGemma
-  cosine**, `embeddingWeight` default `1.0`) is **implemented and STT-E-validated but not wired into any
-  live surface**: its only caller, `AppContainer.retrieveHistory`, has no callers; capture passes
-  `retrievedHistory = emptyList()`; the observation read's recurring context uses **deterministic**
-  `TemporalHistoryRetrieval` (timestamp/weekday), not embeddings (`backlog.md` → `embedding-retrieval-surface`).
+- **Clustering (`EmbeddingClustering` → `VOCAB_FREQUENCY` → Vocab Drift screen)** is the live
+  consumer and **mints on the demo corpus**: with the cosine cut `DEFAULT_MAX_COSINE_DISTANCE = 0.30`,
+  the `VOCAB_THRESHOLD = 4` floor, and `MIN_SUPPORTING_ENTRIES = 6`, related tone words cluster into
+  the `Drained Vocab Frequency` pattern (verified on-device 2026-05-24). Vectors carry
+  `CURRENT_VECTOR_SCHEMA_VERSION = 2`.
+- **Deterministic recurring context** uses `TemporalHistoryRetrieval` (timestamp/weekday) via
+  `AppContainer.retrievePatternCandidates(entryId): List<HistoryChunk>` — the only deterministic
+  history helper that exists. The earlier ranked content-retrieval path (`RetrievalRepo` — keyword +
+  tag + recency + cosine) was **cut** when the embedding axis moved to the tone word: a content query
+  can't score against a feeling vector. No `.kt` references to it remain.
 
 ```mermaid
 flowchart TD
-    accTitle: Embeddings computed but no live surface
-    accDescr: VectorBackfillWorker embeds a synthesis string of tags, observations, and commitment topic into each entry's 768-dimension vector after the entry finalizes. The vectors are computed but neither embedding surface is live. EmbeddingClustering is the intended consumer for the VOCAB_FREQUENCY pattern and Vocab Drift screen, but it does not mint on the demo corpus because the cosine cut was calibrated on an identical-word fixture. RetrievalRepo implements a ranked hybrid score and is STT-E validated, but it is not wired into any live surface — its only caller retrieveHistory is never called, capture passes empty history, and the observation recurring context uses deterministic timestamp-based TemporalHistoryRetrieval instead.
+    accTitle: Embeddings power the live Vocab Drift surface
+    accDescr: VectorBackfillWorker embeds each entry by its model-emitted tone word into a 768-dimension vector after the entry finalizes. EmbeddingClustering is the live consumer for the VOCAB_FREQUENCY pattern and the Vocab Drift screen, and it mints on the demo corpus as the Drained Vocab Frequency pattern verified on-device, using a 0.30 cosine cut, a vocab threshold of 4, and a minimum of 6 supporting entries. Separately, the observation recurring context uses deterministic timestamp and weekday based TemporalHistoryRetrieval via AppContainer.retrievePatternCandidates, the only deterministic history helper that exists.
 
-    BF["VectorBackfillWorker (async, after finalize)<br/>embeds synthesis string: tags · observations · commitment topic"] --> VEC[("EntryEntity.vector<br/>768-dim HNSW cosine")]
-    VEC -. "intended consumer — but does NOT mint on demo corpus<br/>(0.30 cosine cut tuned for identical-word fixture)" .-> CL["EmbeddingClustering → VOCAB_FREQUENCY → Vocab Drift"]
-    VEC -. "not consumed live" .-> RR["RetrievalRepo.query (built + STT-E-validated)<br/>keyword + tag + recency + cosine"]
-    RR -. "only caller" .-> RH["AppContainer.retrieveHistory()<br/>(no callers — capture passes emptyList)"]
-    OBS["observation recurring context"] --> TH["TemporalHistoryRetrieval<br/>(deterministic timestamp/weekday — NOT embeddings)"]
+    BF["VectorBackfillWorker (async, after finalize)<br/>embeds each entry by its tone word (vocabularyWord)"] --> VEC[("EntryEntity.vector<br/>768-dim HNSW cosine · schema v2")]
+    VEC -- "live consumer — MINTS on demo corpus<br/>(cosine cut 0.30 · threshold 4 · min 6 entries)" --> CL["EmbeddingClustering → VOCAB_FREQUENCY → Vocab Drift<br/>(Drained Vocab Frequency, on-device 2026-05-24)"]
+    OBS["observation recurring context"] --> TH["TemporalHistoryRetrieval<br/>(deterministic timestamp/weekday — NOT embeddings)<br/>via AppContainer.retrievePatternCandidates(entryId)"]
 ```
 
 ---

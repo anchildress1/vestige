@@ -21,7 +21,7 @@ ADHD adults and similar neurotypes are poorly served by shipped AI journaling an
 5. **Always-on listening / hotword.** Battery, permission friction, and scope creep that doesn't return value at hackathon scale.
 6. **Cloud sync, multi-device, multi-user.** The privacy story is the differentiator; cloud anything compromises it.
 7. **Gamification, streaks, scores, "good day" grading.** Incompatible with the anti-quantified-self brand.
-8. **EmbeddingGemma** was *contingent* on STT-E — **resolved: STT-E passed 2026-05-12**, so the vector layer ships (vectors computed + validated). The ranked-retrieval *surface* is what dropped to v1.5; it isn't wired into a live screen yet (see README §"Known Limitations"). Vectors being computed-but-unsurfaced is reconciled in §User Stories → Memory.
+8. **EmbeddingGemma** was *contingent* on STT-E — **resolved: STT-E passed 2026-05-12**, so the vector layer ships. Vectors feed the **Vocab Drift** surface (live — mints `Drained Vocab Frequency` on-device 2026-05-24). Ranked content retrieval was **cut**, not deferred (see ROOT `README.md` §"Known Limitations"). Reconciled in §User Stories → Memory.
 
 ## User Stories
 
@@ -60,7 +60,7 @@ Edge cases:
 - Audio bytes discarded after each call; transcription persists as `entry_text` (same posture as a typed note)
 - **Single-turn-per-capture** (STT-B v1 scope choice per `adrs/ADR-005-stt-b-scope-and-v1-single-turn.md`, which amends `adrs/ADR-002-multi-lens-extraction-pattern.md` §"Multi-turn behavior"): each recording produces one self-contained transcription + follow-up exchange. Subsequent recordings start a fresh capture. The history surface is a list of independent entries — not a scrolling conversation thread.
 - Witness / Hardass / Editor personas fully working as prompt-and-copy variants. They change tone only, not extraction logic. This keeps onboarding honest and gives the demo its visible bite without adding a second analytical system.
-- Multi-lens extraction pipeline (3 lenses × 5 surfaces) producing the minimal v1 schema with convergence-based confidence. Templates are agent-emitted labels (Aftermath, Tunnel exit, Stalled, Decision spiral, Goblin hours, Audit), not user-picked.
+- Multi-lens extraction pipeline (3 lenses × 5 surfaces) producing the minimal v1 schema with convergence-based confidence. Templates are agent-emitted labels (display names: Crashed, Deep Space, Busy Stalling, Nonstop Spiral, Goblin Hours, Brain Dump), not user-picked.
 - Tag extraction per entry, visible to user, stored as queryable structured data
 - **Per-entry observations:** every saved entry surfaces 1–2 behavioral or vocabulary observations from that entry alone, even before any cross-entry pattern exists. The product produces useful observable signal from entry one. Pattern analysis runs periodically (every 3 completed entries, ADR-014); a callout surfaces when a pattern has ≥3 supporting entries.
 
@@ -68,7 +68,7 @@ Edge cases:
 - ObjectBox source-of-truth for entries, tags, patterns, and vectors
 - Generated markdown export for readable backups
 - Hybrid retrieval (keyword + tags + recency) over candidate set
-- **Vector layer (EmbeddingGemma 300M + ObjectBox vector index) ships — STT-E passed 2026-05-12.** Vectors are computed and STT-E-validated; the vector *surfaces* (ranked retrieval, Vocab Drift) are not yet live (see README §"Known Limitations").
+- **Vector layer (EmbeddingGemma 300M + ObjectBox vector index) ships — STT-E passed 2026-05-12.** Vectors feed Vocab Drift (live — mints on the demo corpus); ranked retrieval was cut (see ROOT `README.md` §"Known Limitations").
 - One basic history list of past entries
 - Entry detail screen: transcript, tags, template label, the per-entry observation. Reading/Re-eval debug output is P1.
 
@@ -94,7 +94,7 @@ Edge cases:
 - Required tags on dev.to: `devchallenge`, `gemmachallenge`, `gemma`
 - Demo APK distributed via GitHub releases (sideload-ready)
 - 5-minute demo video: 90s pitch + technical walkthrough with chapter markers, including a privacy proof clip showing zero outbound traffic during a normal capture session
-- Dev.to post following `blog-template.md` scaffolding
+- Dev.to post (scaffolding doc unwritten — no `blog-template.md` in the repo)
 - README with setup, architecture summary, model-choice rationale, known limitations
 
 ### Nice-to-Have (P1) — fast follow-up
@@ -144,7 +144,7 @@ Edge cases:
 - Given the user is using the app normally, when network traffic is monitored on the device, then no outbound network calls occur. Model download is the sole network event and only happens at first launch (or explicit re-download from settings).
 
 **Embedding ship (resolved):**
-- **STT-E passed 2026-05-12** — hybrid (tag + keyword + recency + EmbeddingGemma cosine) beat tag-only on 3 of 4 cohort queries on the reference S24 Ultra. EmbeddingGemma 300M + the ObjectBox vector index ship in v1. The vector *surfaces* (ranked retrieval, Vocab Drift clustering) are implemented but not yet live in the build — see README §"Known Limitations" / `backlog.md` (`embedding-retrieval-surface`, `vocab-cluster-threshold`).
+- **STT-E passed 2026-05-12** — hybrid (tag + keyword + recency + EmbeddingGemma cosine) beat tag-only on 3 of 4 cohort queries on the reference S24 Ultra. EmbeddingGemma 300M + the ObjectBox vector index ship in v1. The vector now drives **Vocab Drift clustering**, which mints live (`Drained Vocab Frequency`, on-device 2026-05-24); ranked retrieval was **cut** — see ROOT `README.md` §"Known Limitations" / `backlog.md` (`embedding-retrieval-surface` resolved: cut, `vocab-cluster-threshold` resolved: axis fix).
 
 ## Success Metrics
 
@@ -218,7 +218,7 @@ Sample data for STT-C, STT-D, STT-E lives in `sample-data-scenarios.md`.
 
 ### Phase 3 — Memory and patterns
 1. Hybrid retrieval implementation (keyword + tags + recency)
-2. Embedding layer + ObjectBox vector index integration. **🛑 STT-E — PASSED 2026-05-12** (hybrid beat tag-only 3/4); EmbeddingGemma + vector index ship in v1. (Surfaces not yet live — see README §"Known Limitations".)
+2. Embedding layer + ObjectBox vector index integration. **🛑 STT-E — PASSED 2026-05-12** (hybrid beat tag-only 3/4); EmbeddingGemma + vector index ship in v1. (Vector drives Vocab Drift, which mints live; ranked retrieval cut — see ROOT `README.md` §"Known Limitations".)
 3. Pattern analysis runs periodically — every 3 completed entries (ADR-014), not at end of session
 4. Patterns persist in their own list
 5. Pattern detection list + minimal pattern detail with source evidence; pattern actions (Skip / Drop / Restart) reachable per P0
@@ -226,10 +226,10 @@ Sample data for STT-C, STT-D, STT-E lives in `sample-data-scenarios.md`.
 
 ### Phase 4 — UX surface
 
-> Design language pivots to Scoreboard direction on 2026-05-13 per [ADR-011](adrs/ADR-011-design-language-scoreboard-pivot.md). Mist tokens (shipped via Story 4.1 / PR #25) are superseded by Story 4.1.5; visual language references throughout Phase 4 are `poc/Energy Direction.html` + `poc/energy-tokens.jsx`, not the deleted `poc/design-review.md`.
+> Design language pivots to Scoreboard direction on 2026-05-13 per [ADR-011](adrs/ADR-011-design-language-scoreboard-pivot.md). Mist tokens (shipped via Story 4.1 / PR #25) are superseded by Story 4.1.5; visual language throughout Phase 4 resolves through [ADR-011](adrs/ADR-011-design-language-scoreboard-pivot.md) + the `poc/*-final.png` set, not the deleted `poc/design-review.md`.
 
 1. Onboarding flow with model download UX
-2. Capture UI polish (Scoreboard "ON AIR" record state with live timer + `sbBars` audio meter + `TickRule` 30s chunk countdown per `adrs/ADR-011-design-language-scoreboard-pivot.md` + `poc/Energy Direction.html`, single-turn entry transcript)
+2. Capture UI polish (Scoreboard "ON AIR" record state with live timer + `sbBars` audio meter + `TickRule` 30s chunk countdown per `adrs/ADR-011-design-language-scoreboard-pivot.md` + `poc/capture-recording-final.png`, single-turn entry transcript)
 3. History list + entry detail (transcript, tags, template label, per-entry observation)
 4. Polished Pattern List + Pattern Detail UI, action affordances, empty states
 5. Persistent Local Model Status indicator/screen (P0 — visible from app shell or settings)
@@ -250,7 +250,7 @@ Sample data for STT-C, STT-D, STT-E lives in `sample-data-scenarios.md`.
 1. Demo recording (raw takes)
 2. **Privacy proof clip:** record a normal capture session with `tcpdump` running on the reference device, showing zero outbound traffic after the model download completes. Edited into a chapter of the demo video.
 3. Video editing with chapter markers
-4. Dev.to post body following `blog-template.md`. Required tags: `devchallenge`, `gemmachallenge`, `gemma`. Submission category: Build with Gemma 4 only.
+4. Dev.to post body (scaffolding doc unwritten — no `blog-template.md` in the repo). Required tags: `devchallenge`, `gemmachallenge`, `gemma`. Submission category: Build with Gemma 4 only.
 5. README final pass
 6. Final signed release APK + GitHub release (signing pipeline already validated in Phase 1 per ADR-001 Q5)
 7. App icon + cover image

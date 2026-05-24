@@ -111,7 +111,7 @@ Produce the four deliverables the submission requires: the **APK** (signed relea
 - [ ] **Quickstart**: how to install the APK on Android. Min spec callout (Android 14+, 8 GB RAM, 6 GB free storage).
 - [ ] **Architecture summary**: the four-module split, the multi-lens pipeline (or single-pass if STT-D failed), the embedding layer (or absence if STT-E failed). One Mermaid diagram showing data flow.
 - [ ] **Model-choice rationale**: matching the dev.to post's section.
-- [/] **Privacy claim**: "Your voice never leaves the device" + the tcpdump-clip reference.
+- [/] **Privacy claim**: "Your voice never leaves the device" + the offline-capture clip.
 - [ ] **Known limitations**: what didn't ship and why. Honest.
 - [ ] **Acknowledgments**: Anthropic Claude for the spec/design pairing (per the dev.to challenge being a hackathon), Google for Gemma 4 and LiteRT-LM, ObjectBox, etc.
 - [ ] **License**: link to repo `LICENSE` (Polyform Shield 1.0.0 + Supplemental Terms — source-available, non-commercial). Note that Gemma 4 redistribution obligations are separate and apply to the model artifact, not Vestige's host-app license choice.

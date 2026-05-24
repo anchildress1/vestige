@@ -418,11 +418,11 @@ Phase 2 has no capture screen to attach a placeholder to — Story 4.5 builds th
 **As** the AI implementor, **I need** retrieval history to enrich background extraction **without** blocking entry creation, **so that** the user sees the transcript-backed entry immediately while detached work still gets prior-entry context.
 
 **Done when:**
-- [x] Voice and typed capture both save/open first; retrieval runs only on detached extraction. _(`CaptureViewModel` no longer calls `retrieveHistory` before or after `saveAndExtract(...)` / `openEntry(...)`; `BackgroundExtractionSaveFlow` performs retrieval itself when the caller seeded none.)_
+- [x] Voice and typed capture both save/open first; retrieval runs only on detached extraction. _(`CaptureViewModel` no longer calls `retrievePatternCandidates` before or after `saveAndExtract(...)` / `openEntry(...)`; `BackgroundExtractionSaveFlow` performs retrieval itself when the caller seeded none.)_
 - [x] The retrieved history is threaded into `BackgroundExtractionWorker`, not into the initial foreground save/open path. _(`ForegroundInference.runForegroundCall(audio, persona)` remains history-free. `BackgroundExtractionSaveFlow.resolveRetrievedHistory(...)` loads history before `worker.extract(...)`.)_
-- [x] `AppContainer.retrieveHistory(query)` is the shared seam for detached extraction. _(`AppContainer` passes `::retrieveHistory` into `BackgroundExtractionSaveFlow`.)_
-- [x] History retrieval runs on the background dispatcher; it does not block the UI thread. _(`AppContainer.retrieveHistory` wraps the query in `withContext(Dispatchers.Default)`.)_
-- [x] If `RetrievalRepo` returns empty (no prior entries, or embeddings not yet backfilled), entry creation still proceeds normally and the detached work degrades to no history block. _(Two layers: `AppContainer.retrieveHistory` try/catches (rethrowing `CancellationException`) → `emptyList()`; `CaptureViewModel.retrieveHistorySafely` and `BackgroundExtractionSaveFlow.resolveRetrievedHistory(...)` both preserve that degraded path. Logs the exception class only — never the query text, per AGENTS.md §7.)_
+- [x] `AppContainer.retrievePatternCandidates(entryId)` is the shared seam for detached extraction. _(`AppContainer` passes `::retrievePatternCandidates` into `BackgroundExtractionSaveFlow`.)_
+- [x] History retrieval runs on the background dispatcher; it does not block the UI thread. _(`AppContainer.retrievePatternCandidates` wraps the read in `withContext(computeDispatcher)`.)_
+- [x] If detached retrieval returns empty (no prior entries, or history not yet populated), entry creation still proceeds normally and the detached work degrades to no history block. _(Two layers: `AppContainer.retrievePatternCandidates` try/catches (rethrowing `CancellationException`) → `emptyList()`; `CaptureViewModel.retrieveHistorySafely` and `BackgroundExtractionSaveFlow.resolveRetrievedHistory(...)` both preserve that degraded path. Logs the exception class only — never the query text, per AGENTS.md §7.)_
 - [x] Unit tests prove retrieval is no longer on the critical path and still reaches detached work. _(`BackgroundExtractionSaveFlowTest` covers detached retrieval, caller-seeded history, and degraded lookup.)_
 
 **Notes / risks:** Corrected 2026-05-20 for latency. Retrieval is no longer allowed to sit between foreground text and entry-open on either capture path. Gemma execution is still serialized by `LiteRtLmEngine`, so detached extraction waits for foreground decode to release the GPU; this change removes query-embedding / vector-search latency from the critical path, not model latency itself.
@@ -458,7 +458,7 @@ Phase 2 has no capture screen to attach a placeholder to — Story 4.5 builds th
 - No history list, history filter, or entry detail UI (Phase 4).
 - No patterns engine, pattern detection, patterns view, pattern detail, or Roast (Phase 3).
 - No Reading / re-eval debug screen (Phase 4 P1, contingent on STT-D passing).
-- No EmbeddingGemma, no vector retrieval, no `RetrievalRepo` integration (Phase 3, contingent on STT-E).
+- No EmbeddingGemma, no vector retrieval (Phase 3, contingent on STT-E). Ranked content-retrieval (`RetrievalRepo`) was never built — cut entirely; embeddings ship for Vocab Drift's tone-word axis only.
 - No agentic tool-calling (cut entirely).
 - No persona-flavored microcopy on errors or empty states (Phase 4).
 - No onboarding, no settings, no model status surface (Phase 4).

@@ -37,7 +37,7 @@ We are **not** using MediaPipe LLM Inference as a wrapper. Earlier drafts of thi
 - **Verdict:** **Research-only / post-v1 exploration.** Do not implement in v1 unless a later ADR explicitly supersedes the LiteRT-LM-only locked stack. Recorded here for historical context, not as a buildable path.
 
 ## Around the model
-- **Embeddings:** EmbeddingGemma 300M via LiteRT (~200 MB quantized, sub-15 ms inference). Pre-built `litert-community/embeddinggemma-300m`. Same runtime as the main model. Contingent on STT-E (visible advantage over tag-only retrieval on prepared sample data).
+- **Embeddings:** EmbeddingGemma 300M via LiteRT (210 MB quantized, sub-15 ms inference). Pre-built `litert-community/embeddinggemma-300m`. Same runtime as the main model. **STT-E passed 2026-05-12 — shipped** (it cleared the contingency: hybrid beat tag-only on prepared sample data).
 - **Storage:** ObjectBox (native Android, native vector engine — less wiring than SQLite + sqlite-vec for MVP)
 - **Speech-to-text:** Gemma 4 native audio modality. Model-level audio prep target from Google's Gemma docs: mono 16 kHz float32 samples normalized to `[-1, 1]`, max 30 seconds per clip. Android implementation path is the **STT-A stop-and-test** in Phase 1 because LiteRT-LM documents `Content.AudioBytes` / `Content.AudioFile` without spelling out byte packing. **No `SpeechRecognizer`, no third-party STT.** `concept-locked.md` §Stack owns the product rule; `adrs/ADR-001-stack-and-build-infra.md` §Q4 owns the Android encoding contract.
 - **Source-of-truth journal text:** Markdown files on local storage; ObjectBox indexes them

@@ -1,14 +1,18 @@
 # Phase 3 — Memory and Patterns
 
-**Status:** Not started
-**Dates:** TBD — kicks off after Phase 2 exits with STT-B, STT-C, and STT-D resolved
+**Status:** Complete
+**Dates:** Kicked off after Phase 2 exit; stories ticked on-device through 2026-05-19
 **References:** `PRD.md` §Phase 3, `concept-locked.md` §"Memory architecture", `concept-locked.md` §"Analysis (two-layer)", `concept-locked.md` §"Pattern persistence", `AGENTS.md`, `architecture-brief.md`, `adrs/ADR-001-stack-and-build-infra.md` §Q6, `adrs/ADR-003-pattern-detection-and-persistence.md` (entire), `sample-data-scenarios.md`
 
 ---
 
 ## Goal
 
-Stand up the memory layer (hybrid retrieval over saved entries) and the pattern detection layer that turns saved entries into surfaced patterns the user can act on. Resolve STT-E early — the result determines whether `EmbeddingGemma 300M` ships in v1 or defers to v1.5. By the end of Phase 3, the app produces real cross-entry pattern callouts on a populated database, and patterns persist with full lifecycle (active → dismissed / snoozed / resolved).
+Stand up the memory layer and the pattern detection layer that turns saved entries into surfaced patterns the user can act on. Resolve STT-E early — the result determines whether `EmbeddingGemma 300M` ships in v1 or defers to v1.5.
+
+> **Shipped reality (supersedes the original ranked-retrieval framing below).** The `RetrievalRepo` hybrid-ranking design (keyword + tag + recency + cosine over saved entries) was **cut entirely** — zero `.kt` refs remain. Cross-entry detached extraction reads prior context through `TemporalHistoryRetrieval` (deterministic timestamp / weekday) via the `AppContainer.retrievePatternCandidates(entryId)` seam. Embeddings survived for **one job only**: Vocab Drift on the tone-word axis — each entry is embedded by its model-emitted tone word (`vocabularyWord`), clustered by `EmbeddingClustering`, and surfaced as the `VOCAB_FREQUENCY` pattern. Stories below that describe `RetrievalRepo` / ranked content-retrieval are kept for the supersede trail; read them against this note.
+
+By the end of Phase 3, the app produces real cross-entry pattern callouts on a populated database, and patterns persist with full lifecycle (active → dismissed / snoozed / resolved).
 
 **Output of this phase:** a working pattern engine on the reference device. Sessions ending with ≥10 saved entries surface at least one cross-entry pattern with sourced evidence. Patterns persist across app restarts. Pattern actions affect their state. UI for the pattern list and pattern detail is functional but unpolished — Phase 4 owns the polish.
 
@@ -30,7 +34,9 @@ Stand up the memory layer (hybrid retrieval over saved entries) and the pattern 
 
 ## Stories
 
-### Story 3.1 — RetrievalRepo: keyword + tag + recency baseline
+### Story 3.1 — RetrievalRepo: keyword + tag + recency baseline — **SUPERSEDED — `RetrievalRepo` cut**
+
+**Superseded.** The ranked content-retrieval baseline (keyword + tag-overlap + recency) was cut — zero `.kt` refs remain. Detached extraction reads prior context through deterministic `TemporalHistoryRetrieval` via `AppContainer.retrievePatternCandidates(entryId)`; semantic similarity survives only on Vocab Drift's tone-word axis (`vocabularyWord` → `EmbeddingClustering` → `VOCAB_FREQUENCY`). Original story preserved below for the supersede trail.
 
 **As** the AI implementor, **I need** a `RetrievalRepo` in `:core-storage` that returns the top-N relevant entries for a query string using keyword match, tag-set overlap, and recency-weighting (no vectors yet), **so that** pattern detection (Story 3.5) and re-eval workflows have a stable retrieval path that exists regardless of how STT-E (Story 3.3) resolves.
 
@@ -84,7 +90,9 @@ Query-side tag extraction goes beyond exact-substring match: a free-form query b
 
 ---
 
-### Story 3.4 — Vector index integration (contingent on STT-E passing)
+### Story 3.4 — Vector index integration (contingent on STT-E passing) — **SUPERSEDED — embeddings repointed to the tone-word axis**
+
+**Superseded.** STT-E passed and embeddings shipped, but **not** as a ranking signal over saved entries — `RetrievalRepo` was cut. The vector field and embedding pipeline survive to power Vocab Drift only: an entry is embedded by its model-emitted tone word (`vocabularyWord`), clustered by `EmbeddingClustering`, and surfaced as the `VOCAB_FREQUENCY` pattern. Original hybrid-ranking story preserved below for the supersede trail.
 
 **Skipped if STT-E (Story 3.3) failed.** If STT-E passed, this story is required.
 
@@ -104,11 +112,11 @@ Query-side tag extraction goes beyond exact-substring match: a free-form query b
 
 ### Story 3.5 — Pattern detection algorithm
 
-**As** the AI implementor, **I need** a `PatternDetector` that scans saved entries via `RetrievalRepo` and surfaces cross-entry patterns when threshold conditions are met, **so that** the app produces real pattern callouts (not just per-entry observations) once enough data accumulates.
+**As** the AI implementor, **I need** a `PatternDetector` that scans saved entries directly and surfaces cross-entry patterns when threshold conditions are met, **so that** the app produces real pattern callouts (not just per-entry observations) once enough data accumulates. _(Original framing routed this through `RetrievalRepo`; that layer was cut. Detection counts over `EntryEntity` directly; the `vocab_frequency` primitive reads tone-word embedding clusters via `EmbeddingClustering`.)_
 
 **Done when:**
 - [x] `:core-inference` (or `:core-storage` per ADR-003 Action Item #3) exposes a `PatternDetector.detect(entries: List<Entry>): List<DetectedPattern>` that runs after every 10th entry per `adrs/ADR-003-pattern-detection-and-persistence.md` §"Detection algorithm". (Lives in `:core-storage` — deterministic counting over `EntryEntity`. The 10-entry cadence is enforced by the orchestrator in Story 3.7.)
-- [x] Detection enumerates the **five primitives** from ADR-003 §"Pattern primitives (v1)": `template_recurrence`, `tag_pair_co_occurrence`, `time_of_day_cluster`, `commitment_recurrence`, `vocab_frequency`. No clustering, no learned model — this is counting over a 90-day window (30-day for `time_of_day_cluster`).
+- [x] Detection enumerates the **six primitives** (`PatternKind`): `template_recurrence`, `tag_pair_co_occurrence`, `time_of_day_cluster`, `commitment_recurrence`, `vocab_frequency`, `temporal_relative`. No learned model — counting over a 90-day window (30-day for `time_of_day_cluster`); `vocab_frequency` clusters tone-word embeddings via `EmbeddingClustering`.
 - [x] Each primitive applies its threshold (mostly ≥3 supporting entries) and emits a `pattern_id` computed as the SHA-256 of the normalized signature per ADR-003 §"`pattern_id` generation".
 - [x] Pattern claims include the fields from ADR-003 §"ObjectBox `Pattern` entity" — title (≤24 chars, model-generated on insert), `kind`, `signatureJson`, `templateLabel` (denormalized, nullable), `firstSeenTimestamp`, `lastSeenTimestamp`, `supportingEntryIds`, `latestCalloutText`. (`title` + `latestCalloutText` populated on upsert in Story 3.7.)
 - [x] Pattern title generation uses the persona-injected observation prompt from `adrs/ADR-002-multi-lens-extraction-pattern.md` §3, capped at one short model call per newly-active pattern. Title is cached on insert and never regenerated in v1.
@@ -143,12 +151,12 @@ Query-side tag extraction goes beyond exact-substring match: a free-form query b
 - [x] After Story 2.12's save flow completes, the session's worker schedules `PatternDetector.detect(...)` (Story 3.5) on a background coroutine — but only after every 10th entry per ADR-003 §"Detection algorithm". (`PatternDetectionOrchestrator.onEntryCommitted` runs inline on the save coroutine — detection cost is bounded, see ADR-003 §"Detection cost".)
 - [x] If new patterns cross threshold, they are upserted via Story 3.6's `Pattern` entity. New `pattern_id`s land in `state=active`; existing `pattern_id`s in `active` get `supportingEntryIds`/`lastSeenTimestamp` updated; `snoozed` rows whose `snoozedUntil` has passed flip back to `active` only if still meeting threshold; `dismissed` and `resolved` rows update `supportingEntryIds` silently and do not re-surface.
 - [x] If no new patterns cross threshold, no state changes; existing patterns retain their state.
-- [x] **Callout cooldown** is global, not per-pattern, and applies to the appended pattern-callout line on per-entry observations only — never to detection. After a callout fires on entry `E`, suppress callouts on the next 3 entries even when active patterns match. Per-entry observations continue normally during cooldown. (Per ADR-003 §"Cooldown (callout-side only, global)".)
+- [x] **Callout cooldown** applies to the appended pattern-callout line on per-entry observations only — never to detection. After a callout fires, suppress repeat callouts for the same pattern over the next 3 entries even when it still matches. Per-entry observations continue normally during cooldown. _(Cooldown is **per-pattern** per [ADR-016](../adrs/ADR-016-pattern-callout-cooldown-per-pattern.md) (2026-05-19), which supersedes ADR-003's global model. Code: `CalloutCooldownStore`, one row per `patternId`, `DEFAULT_WINDOW = 3`. The original "global, not per-pattern" framing below is the superseded ADR-003 design.)_
 - [x] On a callout-eligible entry with multiple matching active patterns, pick the one with the highest `supportingEntryCount`; ties broken by `lastSeenTimestamp` (most recent first).
 - [x] Detection completes within an additional 5–15 seconds after Story 2.12's save — well inside the background extraction budget. **Manual check required:** on-device profiling against a 10+ entry corpus to confirm wall-clock budget. Unit tests verify correctness only.
 - [x] If detection fails (storage error, title-generation failure), the failure is logged and the session save is unaffected — pattern detection is a best-effort layer, not a blocking one.
 
-**Notes / risks:** Don't conflate detection cooldown (none — detection runs every 10 entries unconditionally) with callout cooldown (global, 3-entry, callout-only). Per-pattern cooldown is explicitly rejected by ADR-003 §"Cooldown" because it lets two patterns fire callouts on the same entry, which is exactly the noise to suppress.
+**Notes / risks:** Don't conflate detection cooldown (none — detection runs every 10 entries unconditionally) with callout cooldown (3-entry, callout-only). ADR-003 originally made the callout cooldown global to prevent two patterns firing on the same entry; [ADR-016](../adrs/ADR-016-pattern-callout-cooldown-per-pattern.md) (2026-05-19) reversed this to **per-pattern** (`CalloutCooldownStore`, one row per `patternId`, `DEFAULT_WINDOW = 3`), with same-entry multi-callout suppressed by the highest-`supportingEntryCount` pick above rather than by a global window.
 
 ---
 
@@ -175,7 +183,7 @@ Query-side tag extraction goes beyond exact-substring match: a free-form query b
 **Done when:**
 - [x] Pattern list is reachable from the app shell (rough navigation; polish is Phase 4). (Rough toggle from `MainActivity` opens `PatternsHost`; `BackHandler` unwinds entry→detail→list→shell so the system back gesture doesn't kill the activity. Phase 4 swaps in a real nav graph.)
 - [x] Each pattern card shows: name, agent-emitted template label, one-line observation, "{N} of {M} entries · Last seen {date}", and a `glow` left-rule per `design-guidelines.md` §"Pattern card". (Purple `#A855F7` left-rule on the card; observation = `latestCalloutText`; denominator = `EntryStore.countCompleted()`. POC-aligned 30-day TraceBar glyph rendered on every card via `TraceBar.kt` + `traceBarHits()`.)
-- [x] Cards are sorted by `last_seen` descending. (`PatternStore.findVisibleSortedByLastSeen()` sorts in the store; VM groups by `PatternSection` (Active / Snoozed · still drifting / Resolved · faded / Dismissed) per `poc/screens-patterns.jsx`. Sort order is preserved within each section.)
+- [x] Cards are sorted by `last_seen` descending. (`PatternStore.findVisibleSortedByLastSeen()` sorts in the store; VM groups by `PatternSection` (Active / Snoozed · still drifting / Resolved · faded / Dismissed) per `poc/patterns-final.png`. Sort order is preserved within each section.)
 - [x] Empty state displays per `ux-copy.md` §"Pattern List / Empty states" (`Insufficient data.` / `Nothing repeating yet.`). (`PatternsListUiState.Empty` distinguishes the two via `EmptyReason`. The all-dismissed / filter-empty empty-state copy lands with Phase 4's filter chips — Phase 3 instead renders the Dismissed section so the cards stay reachable.)
 - [x] Pattern actions from Story 3.8 are reachable from each card via overflow menu (`Dismiss` / `Snooze 7 days` / `Mark resolved`). (`OverflowMenu` composable dispatches into `PatternsListViewModel`, which funnels through `PatternRepo` so ADR-003's validator stays single-source.)
 - [x] Snackbar confirmations per `ux-copy.md` §"System Messages" appear after each action with an `Undo` affordance. (`PatternsListEvent.ActionTaken` carries an optional `PatternUndo`; mark-resolved emits `null` per the sticky-terminal carve-out.)
@@ -191,7 +199,7 @@ Query-side tag extraction goes beyond exact-substring match: a free-form query b
 **Done when:**
 - [x] Tapping a pattern card opens the pattern detail screen. (`PatternsHost` flips `openPatternId`; `PatternDetailViewModel` is keyed off it.)
 - [x] Detail header shows: pattern name, agent-emitted template label. (`LoadedBody` in `PatternDetailScreen`.)
-- [x] Summary section shows the one-line observation and the count + recurrence timing per `design-guidelines.md` §"Pattern Detail". (v1 surfaces `{N} of {M} entries · Last seen {date}` plus a hero-sized 30-day TraceBar under an `INTENSITY · 30 DAYS` eyebrow per `poc/screens-patterns.jsx`. Phase 4 sharpens the recurrence sentence wording.)
+- [x] Summary section shows the one-line observation and the count + recurrence timing per `design-guidelines.md` §"Pattern Detail". (v1 surfaces `{N} of {M} entries · Last seen {date}` plus a hero-sized 30-day TraceBar under an `INTENSITY · 30 DAYS` eyebrow per `poc/pattern-detail-final.png`. Phase 4 sharpens the recurrence sentence wording.)
 - [x] Source section shows a dated list of source entries with short snippets per `ux-copy.md` §"Pattern Detail / Source list" — sources are sorted newest-first; `snippetOf` caps at 60 chars and collapses newlines so the list stays scannable.
 - [x] Tapping a source entry opens the originating entry's detail screen (if Phase 4's history detail screen exists yet — otherwise a placeholder is acceptable). (`onOpenEntry` callback wires to the `SourceRow`; the receiving screen lands with Phase 4's history surface.)
 - [x] Action affordances from Story 3.8 (`Dismiss` / `Snooze 7 days` / `Mark resolved`) appear at the bottom of the detail screen. (`ActionRow` — hidden when the pattern is in a terminal state; the terminal label surfaces instead.)

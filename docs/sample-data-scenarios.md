@@ -261,7 +261,7 @@ The Tuesday-afternoon meeting-crash recurrence vs. the Thursday-evening negative
 
 ### Patterns that actually mint on-device
 
-Verified 2026-05-23 — 5 patterns mint on this corpus:
+Verified 2026-05-23 — 5 deterministic patterns mint on this corpus:
 
 - `TEMPORAL_RELATIVE` "Friday Evening Stalling"
 - `TEMPORAL_RELATIVE` "Thursday Evening Routine" — the negative control DID mint, as a benign time-block (not promoted to a cognitive recurrence)
@@ -269,6 +269,6 @@ Verified 2026-05-23 — 5 patterns mint on this corpus:
 - a Tuesday-afternoon time-block — the meeting crashes
 - `TEMPLATE_RECURRENCE` "Stalled"
 
-**Zero `VOCAB_FREQUENCY` (Vocab Drift) patterns.** The vocab-drift cluster is present in the corpus but does not currently mint a Vocab Drift pattern — the embedding cluster falls below the clustering threshold (tracked in `backlog.md` §`vocab-cluster-threshold`).
+**Vocab Drift mints (updated 2026-05-24).** The earlier "zero `VOCAB_FREQUENCY`" result is stale: embedding the model-emitted tone word (`vocabularyWord`) instead of distilled content moved the vector to the feeling axis. On the demo corpus this mints `Drained Vocab Frequency` as a live ACTIVE pattern — verified on-device 2026-05-24 at the unchanged `maxCosine=0.30` (`backlog.md` §`vocab-cluster-threshold`, resolved: axis fix).
 
-> **No template-label fixture.** A draft STT-F template-label smoke test was removed 2026-05-17: template assignment is structurally always `AUDIT` on realistic input (root cause: `backlog.md` §`archetype-template-labeling`). Any fixture that produces a non-AUDIT label only does so by feeding the exact internal trigger vocabulary — a fake test. Story 4.16 shipped the UI yank (2026-05-19); a real fixture is gated on the v1.5 redesign or confirmed prompt-tightening results on `fix/prompt-tightening-smoke-tests`.
+> **Template label is model-emitted + convergence-voted (updated 2026-05-24).** The earlier "always `AUDIT` on realistic input" claim is superseded: `template_label` is emitted by the model and convergence-voted across lenses. STT-H produced 6 distinct archetypes on realistic input, so a real (non-rigged) fixture is no longer structurally blocked. Story 4.16 shipped the UI yank (2026-05-19).

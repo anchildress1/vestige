@@ -12,7 +12,7 @@ Implementation map for the v1 build, sequenced for Phase 1 entry. Product behavi
 | **STT-D** | Phase 2 multi-lens | 3-lens convergence differs sometimes | Drop multi-lens to single-pass |
 | **STT-E** | Phase 3 retrieval | EmbeddingGemma vs tag-only | Drop EmbeddingGemma to v1.5 |
 
-This brief assumes those gates exist and the architecture is built to absorb their failure modes. (Outcome: **STT-E passed 2026-05-12** — the `EntryEntity.vector` HNSW field shipped in v1. The vector *surfaces* are not yet live; see README §"Known Limitations".)
+This brief assumes those gates exist and the architecture is built to absorb their failure modes. (Outcome: **STT-E passed 2026-05-12** — the `EntryEntity.vector` HNSW field shipped in v1. The vector serves Vocab Drift, which **mints live** (`Drained Vocab Frequency`, on-device 2026-05-24); ranked content retrieval was **cut** — see the §"Embedding Strategy" addendum and ROOT `README.md` §"Known Limitations".)
 
 ## Module Split
 
@@ -217,10 +217,10 @@ The consequence is deliberate: entry creation is no longer stalled on query embe
 
 **Corrected 2026-05-20.** Both voice and typed capture skip retrieval on the critical path. `CaptureViewModel` saves the pending entry as soon as it has authoritative foreground text and opens History detail immediately. `BackgroundExtractionSaveFlow` performs its own retrieval when the caller supplied none, so structured extraction keeps prior-entry context without making the user wait. `LiteRtLmEngine` still serializes Gemma calls on the GPU; foreground cancels active background extraction, then queued extraction reruns FIFO after foreground releases the slot.
 
-**Addendum (2026-05-23) — "retrieval" on the live path is deterministic; the embedding hybrid is unwired.** The "retrieval" `BackgroundExtractionSaveFlow` performs (above) is **deterministic**, not embedding-based — and the embedding hybrid is dead on the live path. Be precise about which is which:
+**Addendum (2026-05-23) — "retrieval" on the live path is deterministic; the embedding hybrid is unwired.** (Superseded 2026-05-24 — `RetrievalRepo` was deleted, not merely unwired; read the §"Embedding Strategy" addendum and §"Retrieval History Gap" 2026-05-24 line below for the current state. Preserved as the 2026-05-23 record.) As of 2026-05-23, the "retrieval" `BackgroundExtractionSaveFlow` performs (above) was **deterministic**, not embedding-based — and the embedding hybrid was dead on the live path. Be precise about which is which:
 
 - **Live (deterministic, no embeddings):** the lens read gets `PatternCandidates` (signature match against ACTIVE patterns) via `retrievePatternCandidates`; the observation read gets `TemporalHistoryRetrieval` (same weekday + time-of-day block). Neither touches `EntryEntity.vector`.
-- **Built but unwired:** `RetrievalRepo` (keyword + tag-Jaccard + recency + **EmbeddingGemma cosine**) is fully implemented and STT-E-validated (`stt-results/stt-e-2026-05-19.md`), but its only caller `AppContainer.retrieveHistory` is **never invoked**, and `CaptureViewModel` passes `retrievedHistory = emptyList()`. It is dead code on the live path.
+- **Built but unwired (as of 2026-05-23, since cut):** `RetrievalRepo` (keyword + tag-Jaccard + recency + **EmbeddingGemma cosine**) was implemented and STT-E-validated (`stt-results/stt-e-2026-05-19.md`), but its only caller `AppContainer.retrieveHistory` was **never invoked**, and `CaptureViewModel` passed `retrievedHistory = emptyList()`. It was dead code on the live path — and was deleted 2026-05-24 (see below).
 - **The only runtime consumer of `EntryEntity.vector`** is `EmbeddingClustering` (the `VOCAB_FREQUENCY` pattern → Vocab Drift screen). That is the single surface where embeddings *would* visibly act — but on the demo corpus it does **not** mint a cluster (cosine cut calibrated for an identical-word fixture; drifted prose fragments below the `VOCAB_THRESHOLD = 4` floor). Verified on-device 2026-05-23: 5 patterns formed, all deterministic, zero vocab. So embeddings currently surface nothing visible. Tracked in `backlog.md` → `vocab-cluster-threshold`.
 
 Tracked in `backlog.md` → `embedding-retrieval-surface`. **Resolved 2026-05-24 — CUT** (the tone-word axis change made content retrieval incoherent; see §"Embedding Strategy" addendum).

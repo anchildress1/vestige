@@ -39,7 +39,7 @@ Lock the demo. Curate the sample data set the recording will use, write the demo
 - [x] Loader is **not shipped in release builds**. Per `AGENTS.md` and the scope rule, demo data is dev-only; the submitted APK has a fresh install state.
 - [x] Sample data narrative is documented in `sample-data-scenarios.md` §"Demo set" (a new section, distinct from the STT validation scenarios).
 
-**Notes / risks:** Don't seed the sample data into the demo APK as fake user history. Judges installing the APK should see `Nothing on file.` per `ux-copy.md` §"Empty States". The demo recording uses a separate dev build with seeded data; the submission is the clean release build.
+**Notes / risks:** Don't seed the sample data into the demo APK as fake user history. Judges installing the APK should see `No entries yet.` / `First one takes 30 seconds.` per `ux-copy.md` §"Empty States". The demo recording uses a separate dev build with seeded data; the submission is the clean release build.
 
 ---
 
@@ -51,7 +51,7 @@ Lock the demo. Curate the sample data set the recording will use, write the demo
 - [/] `demo-storyboard.md` exists as a private draft (not committed to the repo).
 - [x] **90-second pitch section** breaks the pitch into beats with timing budgets:
   - 0:00–0:10 — Opening hook (the bite + the persona voice).
-  - 0:10–0:30 — Voice in moment (Scoreboard "ON AIR" record button engaging, `sbBars` audio meter, `TickRule` 30s countdown, transcription appearing — per ADR-011 + `poc/Energy Direction.html`).
+  - 0:10–0:30 — Voice in moment (Scoreboard "ON AIR" record button engaging, `sbBars` audio meter, `TickRule` 30s countdown, transcription appearing — per ADR-011 + `poc/capture-recording-final.png`).
   - 0:30–0:50 — Pattern callout moment (a real surfaced pattern with sourced evidence).
   - 0:50–1:10 — Privacy proof beat (Local Model Status + a brief tcpdump window showing zero outbound during a session).
   - 1:10–1:30 — Brand moment + tagline + GitHub link.

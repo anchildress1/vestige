@@ -690,7 +690,7 @@ Section: **About**
 
 ### Locked v1 behavior (not configurable)
 
-- **Default input:** voice. Typed entry is an always-available alternate input but, like voice, requires the local model to be Ready (ADR-013 — it runs the same foreground call and reviews identically). Voice is the entry-point per product positioning. No setting toggle.
+- **Default input:** voice. Typed entry is an always-available alternate input but, like voice, requires the local model to be Ready (ADR-013). Typed text is authoritative, so it persists directly with no foreground model call — background extraction still runs (ADR-018). Voice is the entry-point per product positioning. No setting toggle.
 - **Transcription visibility:** always shown in the transcript per P0 acceptance criteria. No setting toggle.
 - **Pattern analysis cadence:** every 3 completed entries, hardcoded for v1 ([ADR-014](adrs/ADR-014-foreground-background-split-and-periodic-pattern-analysis.md)). Per-pattern callout cooldown of 3 ([ADR-016](adrs/ADR-016-pattern-callout-cooldown-per-pattern.md)).
 - **Pattern callout cooldown:** 3 entries after a callout, hardcoded for v1.

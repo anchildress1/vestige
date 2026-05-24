@@ -17,7 +17,7 @@ Lock the demo. Curate the sample data set the recording will use, write the demo
 ## Phase-level acceptance criteria
 
 - [x] Demo sample data is loaded onto the reference device and produces the intended pattern callouts on cue.
-- [x] `demo-storyboard.md` exists with the 90-second pitch beats and the 5-minute technical walkthrough beats per `PRD.md` §Phase 5. (private)
+- [/] `demo-storyboard.md` exists with the 90-second pitch beats and the 5-minute technical walkthrough beats per `PRD.md` §Phase 5. (private draft — not yet committed to `docs/` root; matches Story 5.2 partial status)
 - [/] At least three full dry runs of the 5-minute walkthrough on the reference device complete without app glitches, model timeouts, or off-script moments.
 - [/] All STT outcomes from Phases 1–3 are reflected in the storyboard (e.g., if STT-D failed and multi-lens dropped, the storyboard does not include the "Reading" debug screen beat).
 - [/] The 90-second pitch script is tight, on-brand per `concept-locked.md` and `design-guidelines.md`, and uses language from `ux-copy.md` where in-app copy appears on screen.

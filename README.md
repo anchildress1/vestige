@@ -58,12 +58,12 @@ The full loop is implemented and runs on-device: voice / typed capture → Gemma
 
 | Feature | What it does |
 |---|---|
-| Voice capture | `AudioRecord` → Gemma 4 E4B native audio modality. No third-party STT. Audio bytes discarded after inference. |
-| Multi-lens extraction | Each entry runs 3 lens passes (Literal / Inferential / Skeptical), each covering all 5 surfaces in one call; a convergence resolver votes every field consensus / candidate / ambiguous — tags, archetype, stated commitment, recurrence, and tone word. See [ADR-002](docs/adrs/ADR-002-multi-lens-extraction-pattern.md). |
+| Voice capture | `AudioCapture` → Gemma 4 E4B native audio modality. No third-party STT. Audio bytes discarded after inference. |
+| Multi-lens extraction | Each entry runs 3 lens passes (Literal / Inferential / Skeptical), each covering all 5 surfaces in one call; a convergence resolver votes every field consensus / candidate / ambiguous / consensus-with-conflict — tags, archetype, stated commitment, recurrence, and tone word. See [ADR-002](docs/adrs/ADR-002-multi-lens-extraction-pattern.md). |
 | Model transparency | Entry Detail exposes the model's actual work — the picked archetype, the per-lens read, the resolved field grid, and a collapsible raw per-lens model-output block. Nothing is hidden behind a score. |
 | Tone & vocab drift | The Inferential lens names a one-word tone per entry; recurring related tone words are *intended* to surface as an EmbeddingGemma cluster (Vocab Drift) so drift is visible over time. Implemented, but **not minting on the demo corpus yet** — see [Known Limitations](#known-limitations). |
 | Three personas | Witness / Hardass / Editor — tone-only variants. They do not fork extraction logic. |
-| Pattern detection | Five primitives counted over the last 90 days; sourced (counts, dates, snippets), no feelings or motivation interpretation. See [ADR-003](docs/adrs/ADR-003-pattern-detection-and-persistence.md). |
+| Pattern detection | Six primitives counted over the last 90 days; sourced (counts, dates, snippets), no feelings or motivation interpretation. See [ADR-003](docs/adrs/ADR-003-pattern-detection-and-persistence.md). |
 | Storage | ObjectBox is the internal source of truth. Export renders readable markdown from rows on demand. |
 | Pattern lifecycle | Skip (returns in 7 days) / Drop (noise, archived) / Restart, with Undo. Closure is model-detected only — v1.5. |
 | Export | System-picker (SAF) zip of per-entry markdown. No storage permission; failures surface, never silent. |
@@ -89,7 +89,7 @@ Four-module split with manual constructor injection through a single `AppContain
 ```mermaid
 flowchart TB
     User([User]) -- voice --> Audio
-    User -- type --> FG
+    User -- "type · persists directly, skips FG (ADR-018)" --> BG
 
     subgraph onDevice["on-device only — no network at runtime"]
       Audio["AudioCapture<br/>mono 16 kHz float32 · 30 s cap"]
@@ -219,7 +219,7 @@ make seed-entries EXTRACT=1       # re-seed + run extraction
 **What you'll see on-screen after seeding:**
 
 - **History** — the full timeline populated, newest first.
-- **Patterns** — a **Tuesday-afternoon meeting-crash** recurrence (template `Crashed`) forms once the third supporting entry lands, with a sourced callout. A **Thursday-evening** cluster is a deliberate *negative control* — same time slot, unrelated end-of-day logistics — that the model should **refuse** to promote to a pattern.
+- **Patterns** — a **Tuesday-afternoon meeting-crash** recurrence (template `Crashed`) forms once the third supporting entry lands, with a sourced callout. A **Thursday-evening** cluster is a deliberate *negative control* — same time slot, unrelated end-of-day logistics. Temporal detection is deterministic, so it **does** mint a `TEMPORAL_RELATIVE` "Thursday evening" pattern from the shared weekday + time block alone (≥ 3 distinct dates); the point of the control is that it surfaces as a **benign time-block observation**, not a cognitive recurrence — the demo shows the model can tell "I always log at 5pm" from "I crash every Tuesday."
 - **Vocab Drift** (requires `EXTRACT=1`) — *intended* to group entries that share **no keywords** ("drained", "wiped out", "running on empty", "depleted", "burnt out", "brain fog") into one exhaustion cluster, with a separate positives cluster ("locked-in", "clear", "good", "sharp") — the embedding proof. **Heads-up: on the current seed this does not reliably mint** a `VOCAB_FREQUENCY` pattern (clustering threshold), so the screen may be absent — see [Known Limitations](#known-limitations).
 - Type **"I hate demos"** as a live entry and it joins the seeded **demo-dread** cluster.
 
@@ -305,7 +305,7 @@ adb uninstall dev.anchildress1.vestige
 
 ## Configuration ⚙️
 
-v1 has effectively zero configuration. The model artifact downloads on first launch over Wi-Fi (~3.7 GB) into `Context.filesDir/models/`. A presence + size probe resolves the artifact state, then readiness holds at `Loading` until `engine.initialize()` actually completes — a full-size file on disk is *not* `Ready` on its own, so REC/typed stay gated while a cold first inference would still stall ([ADR-013 §Addendum](docs/adrs/ADR-013-typed-entry-requires-foreground-model.md)). Full SHA-256 integrity is deferred to the engine load path so onboarding never hashes the multi-GB artifact on the UI thread (Story 4.3). Persona default is set during onboarding and changeable from settings. Pattern analysis runs periodically — every 3 completed entries ([ADR-014](docs/adrs/ADR-014-foreground-background-split-and-periodic-pattern-analysis.md)) — with a per-pattern callout cooldown of 3 ([ADR-016](docs/adrs/ADR-016-pattern-callout-cooldown-per-pattern.md)), hardcoded for v1. No env vars, no `.env` file, no remote-config layer — adding any of those is a P0 violation per [ADR-001 §Q7](docs/adrs/ADR-001-stack-and-build-infra.md).
+v1 has effectively zero configuration. The model artifact downloads on first launch over Wi-Fi (~3.7 GB) into `Context.filesDir/models/`. A cheap presence + size probe resolves the artifact state without hashing the multi-GB file on the UI thread; a full-size artifact is then SHA-256-verified off-thread before readiness flips to `Ready`, so a checksum-corrupt full-size file falls back to `Loading` rather than a false `Ready` (`AppContainer.probeModelReadiness`). The engine itself loads lazily on the first inference, not proactively, because proactive pre-warm regressed into a startup GPU-init crash ([ADR-012](docs/adrs/ADR-012-gpu-inference-performance-gaps.md)). Persona default is set during onboarding and changeable from settings. Pattern analysis runs periodically — every 3 completed entries ([ADR-014](docs/adrs/ADR-014-foreground-background-split-and-periodic-pattern-analysis.md)) — with a per-pattern callout cooldown of 3 ([ADR-016](docs/adrs/ADR-016-pattern-callout-cooldown-per-pattern.md)), hardcoded for v1. No env vars, no `.env` file, no remote-config layer — adding any of those is a P0 violation per [ADR-001 §Q7](docs/adrs/ADR-001-stack-and-build-infra.md).
 
 ---
 

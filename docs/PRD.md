@@ -21,7 +21,7 @@ ADHD adults and similar neurotypes are poorly served by shipped AI journaling an
 5. **Always-on listening / hotword.** Battery, permission friction, and scope creep that doesn't return value at hackathon scale.
 6. **Cloud sync, multi-device, multi-user.** The privacy story is the differentiator; cloud anything compromises it.
 7. **Gamification, streaks, scores, "good day" grading.** Incompatible with the anti-quantified-self brand.
-8. **EmbeddingGemma** ships *contingent* on STT-E. Drops to v1.5 if it doesn't visibly outperform tag-only retrieval on prepared sample data.
+8. **EmbeddingGemma** was *contingent* on STT-E — **resolved: STT-E passed 2026-05-12**, so the vector layer ships (vectors computed + validated). The ranked-retrieval *surface* is what dropped to v1.5; it isn't wired into a live screen yet (see README §"Known Limitations"). Vectors being computed-but-unsurfaced is reconciled in §User Stories → Memory.
 
 ## User Stories
 

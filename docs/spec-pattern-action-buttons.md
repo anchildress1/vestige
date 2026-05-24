@@ -118,7 +118,7 @@ Pattern List displays four sections, each only rendered when non-empty:
 | Section header | Condition | Who sets it |
 |---|---|---|
 | `ACTIVE` | state = ACTIVE, snoozedUntil = null or expired | — |
-| `SKIPPED · ON HOLD` | state = SKIPPED, skippedUntil > now | User (Skip) |
+| `SKIPPED · ON HOLD` | state = SNOOZED, snoozedUntil > now | User (Skip) |
 | `CLOSED · DONE` | state = CLOSED | AI auto-detected (v1.5) — empty in v1 |
 | `DROPPED` | state = DROPPED | User (Drop) |
 

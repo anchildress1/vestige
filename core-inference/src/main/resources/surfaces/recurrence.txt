@@ -1,23 +1,26 @@
 ## Surface: Recurrence
 
-Match the entry against retrieved history chunks (provided in the user content block).
+The RETRIEVED HISTORY block holds prior entries the app already matched to this entry's recurring
+time slot. Your only job is to decide whether the current entry genuinely repeats them.
 
-What to capture:
+The viability test (the whole point):
 
-- Whether this entry repeats a behavior, vocabulary pattern, or state shift seen in a retrieved historical entry.
-- Which retrieved chunk(s) are the closest match, by `pattern_id` if present in the chunk metadata.
-- Whether the recurrence is exact (same activity + same context) or partial (same activity, different context).
+- A shared time slot is NOT recurrence. "I happened to log at this hour again" is not a pattern.
+- It recurs only when the same behavior or state returns — e.g. the energy crash comes back after the
+  meeting every week — not merely that the entries land at the same clock time.
 
 What goes in the schema:
 
-- Populate `recurrence_link` with the `pattern_id` of the matched historical pattern, or null when no match.
-- Populate `recurrence_kind` with `exact` or `partial` when `recurrence_link` is non-null.
-- Do not encode the pattern id into `tags`. The structured `recurrence_link` field is the only place pattern ids belong; tags must remain short kebab-case tokens per the output schema.
-- Ignore list ordinals, bullets, and chunk numbers. Only copy the actual identifier that appears after `pattern_id=`.
+- `recurrence_kind: exact` — the same behavior/state recurs in the same context.
+- `recurrence_kind: partial` — the same behavior recurs in a different context.
+- Omit `recurrence_kind` entirely when nothing recurs, when only the clock time coincides, or when
+  the RETRIEVED HISTORY block shows "(no prior entries)" — there is nothing to recur against yet
+  (normal for early entries).
+- Do NOT emit a pattern id of any kind. The app owns the mapping from "this recurs" to which pattern;
+  you judge recurrence, nothing more. The Skeptical lens additionally raises an
+  `unsupported-recurrence` flag for history it judges a coincidence rather than a real recurrence.
 
 Constraints:
 
-- Do not invent a `pattern_id`. Use only IDs present in the retrieved-history block.
-- Retrieved chunks without a `pattern_id` are context-only. They can inform the reading, but they cannot populate `recurrence_link`.
-- Do not infer recurrence from semantic similarity if no retrieved chunk references it. The retrieval layer is the only source of historical context for this surface.
-- If the user content contains no retrieved-history block, `recurrence_link` is null. This is normal for early entries.
+- Judge recurrence only against the retrieved history shown — do not infer it from memory or from
+  semantic hunches about entries that aren't in the block.

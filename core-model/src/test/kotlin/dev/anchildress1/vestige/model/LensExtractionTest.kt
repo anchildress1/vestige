@@ -60,7 +60,7 @@ class LensExtractionTest {
 
     @Test
     fun `ResolvedField flags default to empty list`() {
-        val field = ResolvedField(value = "aftermath", verdict = ConfidenceVerdict.CANONICAL)
+        val field = ResolvedField(value = "aftermath", verdict = ConfidenceVerdict.CONSENSUS)
         assertTrue(field.flags.isEmpty())
     }
 
@@ -73,22 +73,22 @@ class LensExtractionTest {
 
     @Test
     fun `ResolvedField equality holds when value verdict and flags match`() {
-        val a = ResolvedField("flattened", ConfidenceVerdict.CANONICAL, flags = listOf("x"))
-        val b = ResolvedField("flattened", ConfidenceVerdict.CANONICAL, flags = listOf("x"))
+        val a = ResolvedField("flattened", ConfidenceVerdict.CONSENSUS, flags = listOf("x"))
+        val b = ResolvedField("flattened", ConfidenceVerdict.CONSENSUS, flags = listOf("x"))
         assertEquals(a, b)
     }
 
     @Test
     fun `ResolvedField equality discriminates on verdict`() {
-        val a = ResolvedField("flattened", ConfidenceVerdict.CANONICAL)
+        val a = ResolvedField("flattened", ConfidenceVerdict.CONSENSUS)
         val b = ResolvedField("flattened", ConfidenceVerdict.CANDIDATE)
         assertNotEquals(a, b)
     }
 
     @Test
     fun `ResolvedField equality discriminates on flags`() {
-        val a = ResolvedField("flattened", ConfidenceVerdict.CANONICAL_WITH_CONFLICT, flags = listOf("flag-a"))
-        val b = ResolvedField("flattened", ConfidenceVerdict.CANONICAL_WITH_CONFLICT, flags = listOf("flag-b"))
+        val a = ResolvedField("flattened", ConfidenceVerdict.CONSENSUS_WITH_CONFLICT, flags = listOf("flag-a"))
+        val b = ResolvedField("flattened", ConfidenceVerdict.CONSENSUS_WITH_CONFLICT, flags = listOf("flag-b"))
         assertNotEquals(a, b)
     }
 
@@ -103,7 +103,7 @@ class LensExtractionTest {
 
     @Test
     fun `ResolvedExtraction equality holds on identical fields maps`() {
-        val field = ResolvedField("aftermath", ConfidenceVerdict.CANONICAL)
+        val field = ResolvedField("aftermath", ConfidenceVerdict.CONSENSUS)
         val a = ResolvedExtraction(fields = mapOf("template_label" to field))
         val b = ResolvedExtraction(fields = mapOf("template_label" to field))
         assertEquals(a, b)
@@ -117,7 +117,7 @@ class LensExtractionTest {
 
     @Test
     fun `ResolvedExtraction equality discriminates on field name`() {
-        val field = ResolvedField("aftermath", ConfidenceVerdict.CANONICAL)
+        val field = ResolvedField("aftermath", ConfidenceVerdict.CONSENSUS)
         val a = ResolvedExtraction(fields = mapOf("template_label" to field))
         val b = ResolvedExtraction(fields = mapOf("recurrence_link" to field))
         assertNotEquals(a, b)

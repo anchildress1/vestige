@@ -52,7 +52,7 @@ import java.util.Locale
 private fun LensTone.color(): Color {
     val colors = VestigeTheme.colors
     return when (this) {
-        LensTone.CANONICAL -> colors.lime
+        LensTone.CONSENSUS -> colors.lime
         LensTone.CONFLICT -> colors.coral
         LensTone.AMBIGUOUS -> colors.ember
         LensTone.CANDIDATE -> colors.teal
@@ -203,7 +203,7 @@ private fun ThreeLensRead(status: String, lenses: List<LensRead>) {
         modifier = Modifier.fillMaxWidth().testTag("entry_three_lens"),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        // The eyebrow label is weighted so it yields/clips first; the CANONICAL_WITH_CONFLICT
+        // The eyebrow label is weighted so it yields/clips first; the CONSENSUS_WITH_CONFLICT
         // status is unweighted, so the Row measures it at full intrinsic width — it is never
         // cut off, on any device width.
         Row(

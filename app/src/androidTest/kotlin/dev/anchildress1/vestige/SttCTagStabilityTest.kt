@@ -115,7 +115,7 @@ class SttCTagStabilityTest {
                     timeoutMs = PER_ENTRY_TIMEOUT_MS,
                 ),
             )
-            val tags = extractCanonicalTags(result)
+            val tags = extractConsensusTags(result)
             val parsed = parsedLensCount(result)
             android.util.Log.i(
                 TAG,
@@ -135,7 +135,7 @@ class SttCTagStabilityTest {
         )
     }
 
-    private fun extractCanonicalTags(result: BackgroundExtractionResult): Set<String> = when (result) {
+    private fun extractConsensusTags(result: BackgroundExtractionResult): Set<String> = when (result) {
         is BackgroundExtractionResult.Success -> tagsFromResolved(result.resolved)
         is BackgroundExtractionResult.Failed -> emptySet()
         is BackgroundExtractionResult.TimedOut -> emptySet()

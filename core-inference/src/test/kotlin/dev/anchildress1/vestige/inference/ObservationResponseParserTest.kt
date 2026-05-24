@@ -37,6 +37,30 @@ class ObservationResponseParserTest {
     }
 
     @Test
+    fun `keeps field references verbatim — no pre-known field whitelist`() {
+        val raw = """
+            {
+              "observations": [
+                {
+                  "text": "Third Tuesday running the energy crashed after the meeting.",
+                  "evidence": "theme-noticing",
+                  "fields": ["weekday", "tags"]
+                }
+              ]
+            }
+        """.trimIndent()
+
+        val observations = ObservationResponseParser.parse(raw)
+
+        assertNotNull(observations)
+        assertEquals(1, observations!!.size)
+        // "weekday" is not a resolved-schema field, but observations are model reads — we keep
+        // what the model surfaces rather than gating on a hardcoded set.
+        assertEquals(listOf("weekday", "tags"), observations[0].fields)
+        assertEquals(ObservationEvidence.THEME_NOTICING, observations[0].evidence)
+    }
+
+    @Test
     fun `truncates to two when the model overshoots`() {
         val raw = """
             {
@@ -130,10 +154,13 @@ class ObservationResponseParserTest {
     }
 
     @Test
-    fun `drops an observation whose fields are invalid for its evidence`() {
-        // commitment-flag must carry exactly ["stated_commitment"]; an empty list is invalid.
+    fun `keeps a commitment-flag observation regardless of its fields list`() {
+        // No field-vs-evidence whitelist — the model owns field provenance; we keep the read.
         val raw = """{"observations": [{"text": "obs", "evidence": "commitment-flag", "fields": []}]}"""
-        assertNull(ObservationResponseParser.parse(raw))
+        val observations = ObservationResponseParser.parse(raw)
+        assertNotNull(observations)
+        assertEquals(1, observations!!.size)
+        assertEquals(ObservationEvidence.COMMITMENT_FLAG, observations[0].evidence)
     }
 
     @Test
@@ -309,14 +336,17 @@ class ObservationResponseParserTest {
     }
 
     @Test
-    fun `commitment flag rejects mismatched field attribution`() {
+    fun `parser drops only nullish junk from the fields array`() {
         val raw = """
             {"observations":[
-              {"text":"You said you'd do it.","evidence":"commitment-flag","fields":["tags"]}
+              {"text":"obs","evidence":"theme-noticing","fields":["null","none","tags"]}
             ]}
         """.trimIndent()
 
-        assertNull(ObservationResponseParser.parse(raw))
+        val observations = ObservationResponseParser.parse(raw)
+
+        assertNotNull(observations)
+        assertEquals(listOf("tags"), observations!!.first().fields)
     }
 
     @Test

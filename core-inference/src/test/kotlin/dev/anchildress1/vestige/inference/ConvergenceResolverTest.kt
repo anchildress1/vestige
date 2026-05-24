@@ -9,16 +9,17 @@ import org.junit.jupiter.api.Test
 
 /**
  * Convergence resolver contract per ADR-002 §"Convergence Resolver Contract". The first four cases
- * exercise the named resolution rules (canonical / candidate / ambiguous / canonical-with-conflict)
+ * exercise the named resolution rules (consensus / candidate / ambiguous / consensus-with-conflict)
  * and were carried forward from the Phase 1 scaffold (Story 1.12). The remaining tests cover the
  * edge cases ADR-002 §"Edge case — lens errors mid-call" calls out explicitly.
  */
+@Suppress("LargeClass") // One resolver contract suite; splitting would hide cross-field rule interactions.
 class ConvergenceResolverTest {
 
     private val resolver = DefaultConvergenceResolver()
 
     @Test
-    fun `all three lenses identical resolves to canonical for every field`() {
+    fun `all three lenses identical resolves to consensus for every field`() {
         val literal = LensExtraction(
             lens = Lens.LITERAL,
             fields = mapOf(
@@ -32,11 +33,11 @@ class ConvergenceResolverTest {
         val resolved = resolver.resolve(listOf(literal, inferential, skeptical))
 
         assertEquals(
-            ResolvedField("aftermath", ConfidenceVerdict.CANONICAL),
+            ResolvedField("aftermath", ConfidenceVerdict.CONSENSUS),
             resolved.fields["template_label"],
         )
         assertEquals(
-            ResolvedField(listOf("standup", "launch-doc"), ConfidenceVerdict.CANONICAL),
+            ResolvedField(listOf("standup", "launch-doc"), ConfidenceVerdict.CONSENSUS),
             resolved.fields["tags"],
         )
     }
@@ -81,7 +82,7 @@ class ConvergenceResolverTest {
     }
 
     @Test
-    fun `Skeptical flags conflict even when others agree resolves to canonical with conflict marker`() {
+    fun `Skeptical flags conflict even when others agree resolves to consensus with conflict marker`() {
         val commitment = mapOf("text" to "send the doc tonight", "topic_or_person" to "Nora")
         val literal = LensExtraction(Lens.LITERAL, fields = mapOf("stated_commitment" to commitment))
         val inferential = LensExtraction(Lens.INFERENTIAL, fields = mapOf("stated_commitment" to commitment))
@@ -97,7 +98,7 @@ class ConvergenceResolverTest {
         assertEquals(
             ResolvedField(
                 value = commitment,
-                verdict = ConfidenceVerdict.CANONICAL_WITH_CONFLICT,
+                verdict = ConfidenceVerdict.CONSENSUS_WITH_CONFLICT,
                 flags = listOf("commitment-without-anchor:send the doc:no deadline named"),
             ),
             resolved.fields["stated_commitment"],
@@ -105,7 +106,7 @@ class ConvergenceResolverTest {
     }
 
     @Test
-    fun `two of three lenses agree resolves to canonical on the majority value`() {
+    fun `two of three lenses agree resolves to consensus on the majority value`() {
         val literal = LensExtraction(Lens.LITERAL, fields = mapOf("template_label" to "aftermath"))
         val inferential = LensExtraction(Lens.INFERENTIAL, fields = mapOf("template_label" to "aftermath"))
         val skeptical = LensExtraction(Lens.SKEPTICAL, fields = mapOf("template_label" to "audit"))
@@ -113,22 +114,45 @@ class ConvergenceResolverTest {
         val resolved = resolver.resolve(listOf(literal, inferential, skeptical))
 
         assertEquals(
-            ResolvedField(value = "aftermath", verdict = ConfidenceVerdict.CANONICAL),
+            ResolvedField(value = "aftermath", verdict = ConfidenceVerdict.CONSENSUS),
             resolved.fields["template_label"],
         )
     }
 
     @Test
     fun `all three lenses null on a nullable field resolves to ambiguous with null value`() {
-        val literal = LensExtraction(Lens.LITERAL, fields = mapOf("recurrence_link" to null))
-        val inferential = LensExtraction(Lens.INFERENTIAL, fields = mapOf("recurrence_link" to null))
-        val skeptical = LensExtraction(Lens.SKEPTICAL, fields = mapOf("recurrence_link" to null))
+        val literal = LensExtraction(Lens.LITERAL, fields = mapOf("recurrence_kind" to null))
+        val inferential = LensExtraction(Lens.INFERENTIAL, fields = mapOf("recurrence_kind" to null))
+        val skeptical = LensExtraction(Lens.SKEPTICAL, fields = mapOf("recurrence_kind" to null))
 
         val resolved = resolver.resolve(listOf(literal, inferential, skeptical))
 
         assertEquals(
             ResolvedField(value = null, verdict = ConfidenceVerdict.AMBIGUOUS),
-            resolved.fields["recurrence_link"],
+            resolved.fields["recurrence_kind"],
+        )
+    }
+
+    @Test
+    fun `Skeptical unsupported recurrence flag marks recurrence kind consensus with conflict`() {
+        val flag = "unsupported-recurrence:again:no corroborating history"
+        val literal = LensExtraction(Lens.LITERAL, fields = mapOf("recurrence_kind" to "exact"))
+        val inferential = LensExtraction(Lens.INFERENTIAL, fields = mapOf("recurrence_kind" to "exact"))
+        val skeptical = LensExtraction(
+            Lens.SKEPTICAL,
+            fields = mapOf("recurrence_kind" to null),
+            flags = listOf(flag),
+        )
+
+        val resolved = resolver.resolve(listOf(literal, inferential, skeptical))
+
+        assertEquals(
+            ResolvedField(
+                value = "exact",
+                verdict = ConfidenceVerdict.CONSENSUS_WITH_CONFLICT,
+                flags = listOf(flag),
+            ),
+            resolved.fields["recurrence_kind"],
         )
     }
 
@@ -149,7 +173,7 @@ class ConvergenceResolverTest {
         assertEquals(
             ResolvedField(
                 value = commitment,
-                verdict = ConfidenceVerdict.CANONICAL_WITH_CONFLICT,
+                verdict = ConfidenceVerdict.CONSENSUS_WITH_CONFLICT,
                 flags = listOf(flag),
             ),
             resolved.fields["stated_commitment"],
@@ -157,7 +181,7 @@ class ConvergenceResolverTest {
     }
 
     @Test
-    fun `Skeptical vocabulary-contradiction flag marks agreed tags canonical with conflict`() {
+    fun `Skeptical vocabulary-contradiction flag marks agreed tags consensus with conflict`() {
         val tags = listOf("fine", "exhausted")
         val literal = LensExtraction(Lens.LITERAL, fields = mapOf("tags" to tags))
         val inferential = LensExtraction(Lens.INFERENTIAL, fields = mapOf("tags" to tags))
@@ -173,7 +197,7 @@ class ConvergenceResolverTest {
         assertEquals(
             ResolvedField(
                 value = tags,
-                verdict = ConfidenceVerdict.CANONICAL_WITH_CONFLICT,
+                verdict = ConfidenceVerdict.CONSENSUS_WITH_CONFLICT,
                 flags = listOf(flag),
             ),
             resolved.fields["tags"],
@@ -249,20 +273,20 @@ class ConvergenceResolverTest {
         val resolved = resolver.resolve(listOf(literal, inferential, skeptical))
 
         assertEquals(
-            ResolvedField(value = listOf("re-organizing-photo-library"), verdict = ConfidenceVerdict.CANONICAL),
+            ResolvedField(value = listOf("re-organizing-photo-library"), verdict = ConfidenceVerdict.CONSENSUS),
             resolved.fields["tags"],
         )
     }
 
     @Test
-    fun `two surviving lenses agree resolves to canonical`() {
+    fun `two surviving lenses agree resolves to consensus`() {
         val literal = LensExtraction(Lens.LITERAL, fields = mapOf("template_label" to "aftermath"))
         val skeptical = LensExtraction(Lens.SKEPTICAL, fields = mapOf("template_label" to "aftermath"))
 
         val resolved = resolver.resolve(listOf(literal, skeptical))
 
         assertEquals(
-            ResolvedField("aftermath", ConfidenceVerdict.CANONICAL),
+            ResolvedField("aftermath", ConfidenceVerdict.CONSENSUS),
             resolved.fields["template_label"],
         )
     }
@@ -296,7 +320,7 @@ class ConvergenceResolverTest {
         assertEquals(
             ResolvedField(
                 value = listOf("standup", "launch-doc", "roadmap"),
-                verdict = ConfidenceVerdict.CANONICAL,
+                verdict = ConfidenceVerdict.CONSENSUS,
             ),
             resolved.fields["tags"],
         )
@@ -373,7 +397,7 @@ class ConvergenceResolverTest {
     }
 
     @Test
-    fun `Skeptical flags whose kind does not bind to a field do not flip canonical verdicts`() {
+    fun `Skeptical flags whose kind does not bind to a field do not flip consensus verdicts`() {
         val literal = LensExtraction(Lens.LITERAL, fields = mapOf("template_label" to "aftermath"))
         val inferential = LensExtraction(Lens.INFERENTIAL, fields = mapOf("template_label" to "aftermath"))
         val skeptical = LensExtraction(
@@ -387,7 +411,7 @@ class ConvergenceResolverTest {
         val resolved = resolver.resolve(listOf(literal, inferential, skeptical))
 
         assertEquals(
-            ResolvedField(value = "aftermath", verdict = ConfidenceVerdict.CANONICAL),
+            ResolvedField(value = "aftermath", verdict = ConfidenceVerdict.CONSENSUS),
             resolved.fields["template_label"],
         )
     }
@@ -420,19 +444,19 @@ class ConvergenceResolverTest {
     @Test
     fun `field union covers keys present on only one lens`() {
         val literal = LensExtraction(Lens.LITERAL, fields = mapOf("template_label" to "aftermath"))
-        val inferential = LensExtraction(Lens.INFERENTIAL, fields = mapOf("recurrence_link" to "p_aftermath_001"))
+        val inferential = LensExtraction(Lens.INFERENTIAL, fields = mapOf("recurrence_kind" to "partial"))
         val skeptical = LensExtraction(Lens.SKEPTICAL, fields = mapOf("template_label" to "aftermath"))
 
         val resolved = resolver.resolve(listOf(literal, inferential, skeptical))
 
-        assertEquals(setOf("template_label", "recurrence_link"), resolved.fields.keys)
+        assertEquals(setOf("template_label", "recurrence_kind"), resolved.fields.keys)
         assertEquals(
-            ResolvedField("aftermath", ConfidenceVerdict.CANONICAL),
+            ResolvedField("aftermath", ConfidenceVerdict.CONSENSUS),
             resolved.fields["template_label"],
         )
         assertEquals(
-            ResolvedField("p_aftermath_001", ConfidenceVerdict.CANDIDATE, sourceLens = Lens.INFERENTIAL),
-            resolved.fields["recurrence_link"],
+            ResolvedField("partial", ConfidenceVerdict.CANDIDATE, sourceLens = Lens.INFERENTIAL),
+            resolved.fields["recurrence_kind"],
         )
     }
 
@@ -448,7 +472,7 @@ class ConvergenceResolverTest {
         // value preserves the first-seen surface form (Literal) rather than the (naive) stem so a
         // legitimate plural surface stays a real word.
         assertEquals(
-            ResolvedField(value = listOf("meetings", "docs"), verdict = ConfidenceVerdict.CANONICAL),
+            ResolvedField(value = listOf("meetings", "docs"), verdict = ConfidenceVerdict.CONSENSUS),
             resolved.fields["tags"],
         )
     }
@@ -465,7 +489,7 @@ class ConvergenceResolverTest {
         val resolved = resolver.resolve(listOf(literal, inferential, skeptical))
 
         assertEquals(
-            ResolvedField(value = listOf("news", "series"), verdict = ConfidenceVerdict.CANONICAL),
+            ResolvedField(value = listOf("news", "series"), verdict = ConfidenceVerdict.CONSENSUS),
             resolved.fields["tags"],
         )
     }
@@ -502,7 +526,7 @@ class ConvergenceResolverTest {
                     "text" to "review the launch doc tonight",
                     "topic_or_person" to "Nora",
                 ),
-                verdict = ConfidenceVerdict.CANONICAL,
+                verdict = ConfidenceVerdict.CONSENSUS,
             ),
             resolved.fields["stated_commitment"],
         )
@@ -541,7 +565,7 @@ class ConvergenceResolverTest {
                     "topic_or_person" to "Nora",
                     "entry_id" to "entry-123",
                 ),
-                verdict = ConfidenceVerdict.CANONICAL,
+                verdict = ConfidenceVerdict.CONSENSUS,
             ),
             resolved.fields["stated_commitment"],
         )
@@ -615,7 +639,7 @@ class ConvergenceResolverTest {
                     "text" to "do the thing later",
                     "topic_or_person" to null,
                 ),
-                verdict = ConfidenceVerdict.CANONICAL,
+                verdict = ConfidenceVerdict.CONSENSUS,
             ),
             resolved.fields["stated_commitment"],
         )
@@ -651,7 +675,7 @@ class ConvergenceResolverTest {
                     "text" to "drop the package off today",
                     "topic_or_person" to "package",
                 ),
-                verdict = ConfidenceVerdict.CANONICAL,
+                verdict = ConfidenceVerdict.CONSENSUS,
             ),
             resolved.fields["stated_commitment"],
         )
@@ -672,7 +696,7 @@ class ConvergenceResolverTest {
     }
 
     @Test
-    fun `vocabulary is canonical when another lens corroborates Inferential`() {
+    fun `vocabulary is consensus when another lens corroborates Inferential`() {
         val literal = LensExtraction(Lens.LITERAL, fields = mapOf("vocabulary" to "resigned"))
         val inferential = LensExtraction(Lens.INFERENTIAL, fields = mapOf("vocabulary" to "resigned"))
         val skeptical = LensExtraction(Lens.SKEPTICAL, fields = mapOf("vocabulary" to "numb"))
@@ -680,7 +704,7 @@ class ConvergenceResolverTest {
         val resolved = resolver.resolve(listOf(literal, inferential, skeptical))
 
         assertEquals(
-            ResolvedField(value = "resigned", verdict = ConfidenceVerdict.CANONICAL, sourceLens = Lens.INFERENTIAL),
+            ResolvedField(value = "resigned", verdict = ConfidenceVerdict.CONSENSUS, sourceLens = Lens.INFERENTIAL),
             resolved.fields["vocabulary"],
         )
     }

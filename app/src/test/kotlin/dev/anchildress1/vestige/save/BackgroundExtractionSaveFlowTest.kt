@@ -70,11 +70,12 @@ class BackgroundExtractionSaveFlowTest {
         observationGenerator = observationGenerator,
         lifecycleCallbacks = BackgroundExtractionLifecycleCallbacks(listenerFactory),
         scope = flowScope,
+        ioDispatcher = Dispatchers.Unconfined,
     )
 
     @Test
     fun `saveAndExtract emits PENDING to the listener before invoking the worker`() = runTest {
-        val resolved = canonicalSample()
+        val resolved = consensusSample()
         every { entryStore.createPendingEntry(any(), any(), any()) } returns ENTRY_ID
         val listenerSnapshotAtWorkerCall = mutableListOf<ExtractionStatus>()
         coEvery { worker.extract(any(), any()) } coAnswers {
@@ -107,6 +108,7 @@ class BackgroundExtractionSaveFlowTest {
             observationGenerator = observationGenerator,
             lifecycleCallbacks = BackgroundExtractionLifecycleCallbacks(listenerFactory),
             scope = flowScope,
+            ioDispatcher = Dispatchers.Unconfined,
             patternOrchestrator = orchestrator,
         )
         val storedEntry = dev.anchildress1.vestige.storage.EntryEntity(
@@ -118,7 +120,7 @@ class BackgroundExtractionSaveFlowTest {
             evidence = dev.anchildress1.vestige.model.ObservationEvidence.PATTERN_CALLOUT,
             fields = emptyList(),
         )
-        val resolved = canonicalSample()
+        val resolved = consensusSample()
         every { entryStore.createPendingEntry(any(), any(), any()) } returns ENTRY_ID
         every { entryStore.readEntry(ENTRY_ID) } returns storedEntry
         coEvery { worker.extract(any(), any()) } returns BackgroundExtractionResult.Success(
@@ -173,7 +175,7 @@ class BackgroundExtractionSaveFlowTest {
         )
         val storedEntry = completedEntry()
         val callout = patternCallout()
-        val resolved = canonicalSample()
+        val resolved = consensusSample()
         stubSuccessfulPatternExtraction(storedEntry, resolved)
         coEvery {
             orchestrator.onEntryCommitted(storedEntry, dev.anchildress1.vestige.model.Persona.WITNESS)
@@ -220,6 +222,7 @@ class BackgroundExtractionSaveFlowTest {
             observationGenerator = observationGenerator,
             lifecycleCallbacks = BackgroundExtractionLifecycleCallbacks(listenerFactory),
             scope = flowScope,
+            ioDispatcher = Dispatchers.Unconfined,
             patternOrchestrator = orchestrator,
         )
         val storedEntry = dev.anchildress1.vestige.storage.EntryEntity(
@@ -231,7 +234,7 @@ class BackgroundExtractionSaveFlowTest {
             evidence = dev.anchildress1.vestige.model.ObservationEvidence.PATTERN_CALLOUT,
             fields = emptyList(),
         )
-        val resolved = canonicalSample()
+        val resolved = consensusSample()
         every { entryStore.createPendingEntry(any(), any(), any()) } returns ENTRY_ID
         every { entryStore.readEntry(ENTRY_ID) } returns storedEntry
         coEvery { worker.extract(any(), any()) } returns BackgroundExtractionResult.Success(
@@ -266,9 +269,10 @@ class BackgroundExtractionSaveFlowTest {
             observationGenerator = observationGenerator,
             lifecycleCallbacks = BackgroundExtractionLifecycleCallbacks(listenerFactory),
             scope = flowScope,
+            ioDispatcher = Dispatchers.Unconfined,
             patternOrchestrator = orchestrator,
         )
-        val resolved = canonicalSample()
+        val resolved = consensusSample()
         every { entryStore.createPendingEntry(any(), any(), any()) } returns ENTRY_ID
         every { entryStore.readEntry(ENTRY_ID) } returns dev.anchildress1.vestige.storage.EntryEntity(id = ENTRY_ID)
         coEvery { worker.extract(any(), any()) } returns BackgroundExtractionResult.Success(
@@ -290,7 +294,7 @@ class BackgroundExtractionSaveFlowTest {
     @Test
     fun `success routes to completeEntry with resolver output, template label, and observations`() = runTest {
         every { entryStore.createPendingEntry(any(), any(), any()) } returns ENTRY_ID
-        val resolved = canonicalSample()
+        val resolved = consensusSample()
         val observations = listOf(SAMPLE_OBSERVATION)
         coEvery {
             worker.extract(capture(capturedRequest), capture(capturedListener))
@@ -322,7 +326,7 @@ class BackgroundExtractionSaveFlowTest {
     @Test
     fun `success routes parsed lens receipts to completeEntry with raw model output`() = runTest {
         every { entryStore.createPendingEntry(any(), any(), any()) } returns ENTRY_ID
-        val resolved = canonicalSample()
+        val resolved = consensusSample()
         val literalRaw = """{"tags":["standup"],"template_label":"aftermath"}"""
         val lensResults = listOf(
             LensResult(
@@ -378,7 +382,7 @@ class BackgroundExtractionSaveFlowTest {
     @Test
     fun `observation generator throwing does not block the save and persists empty list`() = runTest {
         every { entryStore.createPendingEntry(any(), any(), any()) } returns ENTRY_ID
-        val resolved = canonicalSample()
+        val resolved = consensusSample()
         coEvery { worker.extract(any(), any()) } returns BackgroundExtractionResult.Success(
             totalElapsedMs = 25_000L,
             lensResults = emptyList(),
@@ -470,17 +474,18 @@ class BackgroundExtractionSaveFlowTest {
     }
 
     @Test
-    fun `saveAndExtract retrieves history inside the detached path when caller provides none`() = runTest {
-        val history = listOf(HistoryChunk(patternId = null, text = "same loop last Thursday"))
+    fun `detached path feeds the matched pattern candidate as the read history`() = runTest {
+        val candidate = HistoryChunk(patternId = "abc123", text = "prior Tuesday crash")
         val flowWithLookup = BackgroundExtractionSaveFlow(
             entryStore = entryStore,
             worker = worker,
             observationGenerator = observationGenerator,
             lifecycleCallbacks = BackgroundExtractionLifecycleCallbacks(listenerFactory),
             scope = flowScope,
-            retrieveHistory = { query ->
-                assertEquals(SAMPLE_TEXT, query)
-                history
+            ioDispatcher = Dispatchers.Unconfined,
+            retrievePatternCandidates = { id ->
+                assertEquals(ENTRY_ID, id)
+                listOf(candidate)
             },
         )
         every { entryStore.createPendingEntry(any(), any(), any()) } returns ENTRY_ID
@@ -488,14 +493,70 @@ class BackgroundExtractionSaveFlowTest {
             totalElapsedMs = 10L,
             lensResults = emptyList(),
             modelCallCount = 3,
-            resolved = canonicalSample(),
+            resolved = consensusSample(),
             templateLabel = TemplateLabel.AFTERMATH,
         )
         coEvery { observationGenerator.generate(any(), any(), any()) } returns emptyList()
 
         flowWithLookup.saveAndExtract(SAMPLE_TEXT, SAMPLE_TIMESTAMP)
 
-        assertEquals(history, capturedRequest.captured.retrievedHistory)
+        // Recurrence reads only the deterministic candidate — no untemporal semantic history.
+        assertEquals(listOf(candidate), capturedRequest.captured.retrievedHistory)
+    }
+
+    @Test
+    fun `detached path stamps recurrence link with recurrence kind verdict and flags`() = runTest {
+        val candidateId = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        val flag = "unsupported-recurrence:again:no corroborating history"
+        val candidate = HistoryChunk(patternId = candidateId, text = "prior Tuesday crash")
+        val resolved = ResolvedExtraction(
+            mapOf(
+                "recurrence_kind" to ResolvedField(
+                    value = "exact",
+                    verdict = ConfidenceVerdict.CONSENSUS_WITH_CONFLICT,
+                    flags = listOf(flag),
+                ),
+            ),
+        )
+        val persistedResolved = slot<ResolvedExtraction>()
+        val flowWithLookup = BackgroundExtractionSaveFlow(
+            entryStore = entryStore,
+            worker = worker,
+            observationGenerator = observationGenerator,
+            lifecycleCallbacks = BackgroundExtractionLifecycleCallbacks(listenerFactory),
+            scope = flowScope,
+            ioDispatcher = Dispatchers.Unconfined,
+            retrievePatternCandidates = { listOf(candidate) },
+        )
+        every { entryStore.createPendingEntry(any(), any(), any()) } returns ENTRY_ID
+        coEvery { worker.extract(any(), any()) } returns BackgroundExtractionResult.Success(
+            totalElapsedMs = 10L,
+            lensResults = emptyList(),
+            modelCallCount = 3,
+            resolved = resolved,
+            templateLabel = TemplateLabel.AFTERMATH,
+        )
+        coEvery { observationGenerator.generate(SAMPLE_TEXT, resolved, SAMPLE_TIMESTAMP) } returns emptyList()
+
+        flowWithLookup.saveAndExtract(SAMPLE_TEXT, SAMPLE_TIMESTAMP)
+
+        coVerify {
+            entryStore.completeEntry(
+                ENTRY_ID,
+                capture(persistedResolved),
+                TemplateLabel.AFTERMATH,
+                emptyList(),
+                emptyList(),
+            )
+        }
+        assertEquals(
+            ResolvedField(
+                value = candidateId,
+                verdict = ConfidenceVerdict.CONSENSUS_WITH_CONFLICT,
+                flags = listOf(flag),
+            ),
+            persistedResolved.captured.fields["recurrence_link"],
+        )
     }
 
     @Test
@@ -508,7 +569,8 @@ class BackgroundExtractionSaveFlowTest {
             observationGenerator = observationGenerator,
             lifecycleCallbacks = BackgroundExtractionLifecycleCallbacks(listenerFactory),
             scope = flowScope,
-            retrieveHistory = {
+            ioDispatcher = Dispatchers.Unconfined,
+            retrievePatternCandidates = {
                 lookupCalls.incrementAndGet()
                 emptyList()
             },
@@ -518,7 +580,7 @@ class BackgroundExtractionSaveFlowTest {
             totalElapsedMs = 10L,
             lensResults = emptyList(),
             modelCallCount = 3,
-            resolved = canonicalSample(),
+            resolved = consensusSample(),
             templateLabel = TemplateLabel.AFTERMATH,
         )
         coEvery { observationGenerator.generate(any(), any(), any()) } returns emptyList()
@@ -537,14 +599,15 @@ class BackgroundExtractionSaveFlowTest {
             observationGenerator = observationGenerator,
             lifecycleCallbacks = BackgroundExtractionLifecycleCallbacks(listenerFactory),
             scope = flowScope,
-            retrieveHistory = { error("vector store unavailable") },
+            ioDispatcher = Dispatchers.Unconfined,
+            retrievePatternCandidates = { error("pattern store unavailable") },
         )
         every { entryStore.createPendingEntry(any(), any(), any()) } returns ENTRY_ID
         coEvery { worker.extract(capture(capturedRequest), any()) } returns BackgroundExtractionResult.Success(
             totalElapsedMs = 10L,
             lensResults = emptyList(),
             modelCallCount = 3,
-            resolved = canonicalSample(),
+            resolved = consensusSample(),
             templateLabel = TemplateLabel.AFTERMATH,
         )
         coEvery { observationGenerator.generate(any(), any(), any()) } returns emptyList()
@@ -564,6 +627,7 @@ class BackgroundExtractionSaveFlowTest {
                 observationGenerator,
                 lifecycleCallbacks = BackgroundExtractionLifecycleCallbacks(listenerFactory = { downstream }),
                 scope = flowScope,
+                ioDispatcher = Dispatchers.Unconfined,
             )
         every { entryStore.createPendingEntry(any(), any(), any()) } returns ENTRY_ID
         coEvery {
@@ -575,7 +639,7 @@ class BackgroundExtractionSaveFlowTest {
                 totalElapsedMs = 25_000L,
                 lensResults = emptyList(),
                 modelCallCount = 3,
-                resolved = canonicalSample(),
+                resolved = consensusSample(),
                 templateLabel = TemplateLabel.AFTERMATH,
             )
         }
@@ -585,8 +649,8 @@ class BackgroundExtractionSaveFlowTest {
 
         coVerifyOrder {
             downstream.onUpdate(ExtractionStatus.RUNNING, 0, null)
-            observationGenerator.generate(SAMPLE_TEXT, canonicalSample(), SAMPLE_TIMESTAMP)
-            entryStore.completeEntry(ENTRY_ID, canonicalSample(), TemplateLabel.AFTERMATH, emptyList(), emptyList())
+            observationGenerator.generate(SAMPLE_TEXT, consensusSample(), SAMPLE_TIMESTAMP)
+            entryStore.completeEntry(ENTRY_ID, consensusSample(), TemplateLabel.AFTERMATH, emptyList(), emptyList())
             downstream.onUpdate(ExtractionStatus.COMPLETED, 0, null)
         }
         verify(exactly = 0) { entryStore.failEntry(any(), any(), any()) }
@@ -602,8 +666,9 @@ class BackgroundExtractionSaveFlowTest {
                 observationGenerator,
                 lifecycleCallbacks = BackgroundExtractionLifecycleCallbacks(listenerFactory = { downstream }),
                 scope = flowScope,
+                ioDispatcher = Dispatchers.Unconfined,
             )
-        val resolved = canonicalSample()
+        val resolved = consensusSample()
         every { entryStore.createPendingEntry(any(), any(), any()) } returns ENTRY_ID
         coEvery {
             worker.extract(any(), capture(capturedListener))
@@ -650,6 +715,7 @@ class BackgroundExtractionSaveFlowTest {
                 observationGenerator,
                 lifecycleCallbacks = BackgroundExtractionLifecycleCallbacks(listenerFactory = { downstream }),
                 scope = flowScope,
+                ioDispatcher = Dispatchers.Unconfined,
             )
         val failEntryReturned = CompletableDeferred<Unit>()
         every { entryStore.createPendingEntry(any(), any(), any()) } returns ENTRY_ID
@@ -698,6 +764,7 @@ class BackgroundExtractionSaveFlowTest {
                 observationGenerator,
                 lifecycleCallbacks = BackgroundExtractionLifecycleCallbacks(listenerFactory = { downstream }),
                 scope = flowScope,
+                ioDispatcher = Dispatchers.Unconfined,
             )
         val failEntryReturned = CompletableDeferred<Unit>()
         every { entryStore.createPendingEntry(any(), any(), any()) } returns ENTRY_ID
@@ -746,6 +813,7 @@ class BackgroundExtractionSaveFlowTest {
                 observationGenerator,
                 lifecycleCallbacks = BackgroundExtractionLifecycleCallbacks(listenerFactory = { downstream }),
                 scope = flowScope,
+                ioDispatcher = Dispatchers.Unconfined,
             )
         every { entryStore.createPendingEntry(any(), any(), any()) } returns ENTRY_ID
         coEvery { worker.extract(any(), any()) } returns BackgroundExtractionResult.Failed(
@@ -788,6 +856,7 @@ class BackgroundExtractionSaveFlowTest {
                 observationGenerator,
                 lifecycleCallbacks = BackgroundExtractionLifecycleCallbacks(listenerFactory = { downstream }),
                 scope = flowScope,
+                ioDispatcher = Dispatchers.Unconfined,
             )
         every { entryStore.createPendingEntry(any(), any(), any()) } returns ENTRY_ID
         coEvery { worker.extract(any(), any()) } returns BackgroundExtractionResult.TimedOut(
@@ -827,8 +896,9 @@ class BackgroundExtractionSaveFlowTest {
                 observationGenerator,
                 lifecycleCallbacks = BackgroundExtractionLifecycleCallbacks(listenerFactory = { downstream }),
                 scope = flowScope,
+                ioDispatcher = Dispatchers.Unconfined,
             )
-        val resolved = canonicalSample()
+        val resolved = consensusSample()
         every { entryStore.createPendingEntry(any(), any(), any()) } returns ENTRY_ID
         coEvery { worker.extract(any(), any()) } returns BackgroundExtractionResult.Success(
             totalElapsedMs = 25_000L,
@@ -870,7 +940,7 @@ class BackgroundExtractionSaveFlowTest {
                 totalElapsedMs = 25_000L,
                 lensResults = emptyList(),
                 modelCallCount = 3,
-                resolved = canonicalSample(),
+                resolved = consensusSample(),
                 templateLabel = TemplateLabel.AFTERMATH,
             )
         }
@@ -887,7 +957,7 @@ class BackgroundExtractionSaveFlowTest {
 
     @Test
     fun `saveAndExtract threads durationMs through to createPendingEntry`() = runTest {
-        val resolved = canonicalSample()
+        val resolved = consensusSample()
         every { entryStore.createPendingEntry(any(), any(), any()) } returns ENTRY_ID
         coEvery { worker.extract(any(), any()) } returns BackgroundExtractionResult.Success(
             totalElapsedMs = 1L,
@@ -905,9 +975,9 @@ class BackgroundExtractionSaveFlowTest {
         }
     }
 
-    private fun canonicalSample() = ResolvedExtraction(
+    private fun consensusSample() = ResolvedExtraction(
         mapOf(
-            "tags" to ResolvedField(listOf("standup", "flattened", "crashed"), ConfidenceVerdict.CANONICAL),
+            "tags" to ResolvedField(listOf("standup", "flattened", "crashed"), ConfidenceVerdict.CONSENSUS),
         ),
     )
 
@@ -923,6 +993,7 @@ class BackgroundExtractionSaveFlowTest {
                 onEntryFinalized = { finalizedCount++ },
             ),
             scope = flowScope,
+            ioDispatcher = Dispatchers.Unconfined,
         )
         every { entryStore.createPendingEntry(any(), any(), any()) } returns ENTRY_ID
         coEvery { worker.extract(any(), any()) } returns BackgroundExtractionResult.Failed(
@@ -949,6 +1020,7 @@ class BackgroundExtractionSaveFlowTest {
                 onEntryFinalized = { finalizedCount++ },
             ),
             scope = flowScope,
+            ioDispatcher = Dispatchers.Unconfined,
         )
         every { entryStore.createPendingEntry(any(), any(), any()) } returns ENTRY_ID
         coEvery { worker.extract(any(), any()) } returns BackgroundExtractionResult.TimedOut(
@@ -975,8 +1047,9 @@ class BackgroundExtractionSaveFlowTest {
                 onEntryFinalized = { finalizedCount++ },
             ),
             scope = flowScope,
+            ioDispatcher = Dispatchers.Unconfined,
         )
-        val resolved = canonicalSample()
+        val resolved = consensusSample()
         every { entryStore.createPendingEntry(any(), any(), any()) } returns ENTRY_ID
         coEvery { worker.extract(any(), any()) } returns BackgroundExtractionResult.Success(
             totalElapsedMs = 25_000L,
@@ -997,7 +1070,7 @@ class BackgroundExtractionSaveFlowTest {
 
     @Test
     fun `onEntryFinalized failure is swallowed after the entry is already persisted`() = runTest {
-        val resolved = canonicalSample()
+        val resolved = consensusSample()
         val flowWithCallback = BackgroundExtractionSaveFlow(
             entryStore = entryStore,
             worker = worker,
@@ -1007,6 +1080,7 @@ class BackgroundExtractionSaveFlowTest {
                 onEntryFinalized = { throw IllegalStateException("scheduler boom") },
             ),
             scope = flowScope,
+            ioDispatcher = Dispatchers.Unconfined,
         )
         every { entryStore.createPendingEntry(any(), any(), any()) } returns ENTRY_ID
         coEvery { worker.extract(any(), any()) } returns BackgroundExtractionResult.Success(
@@ -1029,7 +1103,7 @@ class BackgroundExtractionSaveFlowTest {
 
     @Test
     fun `recoverEntry runs the detached pipeline against the existing entry id without creating a new row`() = runTest {
-        val resolved = canonicalSample()
+        val resolved = consensusSample()
         coEvery { worker.extract(any(), any()) } returns BackgroundExtractionResult.Success(
             totalElapsedMs = 12L,
             lensResults = emptyList(),
@@ -1057,6 +1131,7 @@ class BackgroundExtractionSaveFlowTest {
         observationGenerator = observationGenerator,
         lifecycleCallbacks = lifecycleCallbacks,
         scope = flowScope,
+        ioDispatcher = Dispatchers.Unconfined,
         patternOrchestrator = orchestrator,
     )
 

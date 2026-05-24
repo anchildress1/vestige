@@ -12,6 +12,7 @@ import dev.anchildress1.vestige.model.ResolvedField
 import dev.anchildress1.vestige.storage.EntryEntity
 import dev.anchildress1.vestige.storage.EntryLensReceiptJson
 import dev.anchildress1.vestige.storage.EntryStore
+import dev.anchildress1.vestige.storage.PatternStore
 import dev.anchildress1.vestige.storage.closeAfterCleaningThreadResources
 import dev.anchildress1.vestige.testing.cleanupObjectBoxTempRoot
 import dev.anchildress1.vestige.testing.newInMemoryObjectBoxDirectory
@@ -342,8 +343,8 @@ class EntryDetailViewModelTest {
     @Test
     fun `each confidence verdict maps to its three-lens status string`() = runTest {
         val cases = mapOf(
-            ConfidenceVerdict.CANONICAL_WITH_CONFLICT to EntryDetailCopy.THREE_LENS_STATUS_CONFLICT,
-            ConfidenceVerdict.CANONICAL to EntryDetailCopy.THREE_LENS_STATUS_CANONICAL,
+            ConfidenceVerdict.CONSENSUS_WITH_CONFLICT to EntryDetailCopy.THREE_LENS_STATUS_CONFLICT,
+            ConfidenceVerdict.CONSENSUS to EntryDetailCopy.THREE_LENS_STATUS_CONSENSUS,
             ConfidenceVerdict.CANDIDATE to EntryDetailCopy.THREE_LENS_STATUS_CANDIDATE,
             ConfidenceVerdict.AMBIGUOUS to EntryDetailCopy.THREE_LENS_STATUS_AMBIGUOUS,
         )
@@ -373,7 +374,7 @@ class EntryDetailViewModelTest {
                 mapOf(
                     "tags" to ResolvedField(
                         listOf("meeting", "battery-died"),
-                        ConfidenceVerdict.CANONICAL_WITH_CONFLICT,
+                        ConfidenceVerdict.CONSENSUS_WITH_CONFLICT,
                     ),
                 ),
             ),
@@ -398,7 +399,7 @@ class EntryDetailViewModelTest {
             val loaded = awaitItem() as EntryDetailUiState.Loaded
             assertEquals(3, loaded.model.lenses.size)
             assertEquals("battery died", loaded.model.lenses.first { it.label == "LITERAL" }.value)
-            // tags resolved CANONICAL_WITH_CONFLICT, so the card status is CONFLICT and the
+            // tags resolved CONSENSUS_WITH_CONFLICT, so the card status is CONFLICT and the
             // flagged Skeptical lens reads red — lens colour tracks the real conflict, not a tag diff.
             assertEquals(LensTone.CONFLICT, loaded.model.lenses.first { it.label == "SKEPTICAL" }.tone)
             assertEquals(EntryDetailCopy.THREE_LENS_STATUS_CONFLICT, loaded.model.lensStatus)
@@ -464,7 +465,7 @@ class EntryDetailViewModelTest {
                 val loaded = awaitItem() as EntryDetailUiState.Loaded
                 val promises = loaded.model.fields.first { it.label == "PROMISES" }
                 assertEquals("drop the package off today", promises.value)
-                assertEquals(LensTone.CANONICAL, promises.tone)
+                assertEquals(LensTone.CONSENSUS, promises.tone)
             }
         }
 
@@ -505,7 +506,7 @@ class EntryDetailViewModelTest {
         val id = createCompleted("same loop again")
         val box = boxStore.boxFor(EntryEntity::class.java)
         box.get(id).also {
-            it.confidenceJson = """{"recurrence_link":"CANONICAL"}"""
+            it.confidenceJson = """{"recurrence_link":"CONSENSUS"}"""
             it.recurrenceLink = null
             it.lensReceiptsJson = EntryLensReceiptJson.encode(
                 listOf(
@@ -555,6 +556,7 @@ class EntryDetailViewModelTest {
     ): EntryDetailViewModel = EntryDetailViewModel(
         entryId = entryId,
         entryStore = entryStore,
+        patternStore = PatternStore(boxStore),
         zoneId = zone,
         ioDispatcher = dispatcher,
         dataRevision = dataRevision,
@@ -575,7 +577,7 @@ class EntryDetailViewModelTest {
         mapOf(
             "tags" to dev.anchildress1.vestige.model.ResolvedField(
                 tags.toList(),
-                dev.anchildress1.vestige.model.ConfidenceVerdict.CANONICAL,
+                dev.anchildress1.vestige.model.ConfidenceVerdict.CONSENSUS,
             ),
         ),
     )

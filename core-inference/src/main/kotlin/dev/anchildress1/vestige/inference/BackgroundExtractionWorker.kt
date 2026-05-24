@@ -231,14 +231,14 @@ class BackgroundExtractionWorker(
         }
     }
 
-    // Model-emitted template label wins only when load-bearing (CANONICAL / CANONICAL_WITH_CONFLICT).
+    // Model-emitted template label wins only when load-bearing (CONSENSUS / CONSENSUS_WITH_CONFLICT).
     // CANDIDATE means a single lens emitted it — not enough convergence to override the deterministic
     // labeler. Unknown serials (fromSerial returns null) also fall back to the labeler.
     private fun resolveTemplateLabel(resolved: ResolvedExtraction, capturedAt: ZonedDateTime): TemplateLabel {
         val labelerPick = templateLabeler.label(resolved, capturedAt)
         val field = resolved.fields[TEMPLATE_LABEL_KEY]
         val modelPick = if (field != null &&
-            (field.verdict == ConfidenceVerdict.CANONICAL || field.verdict == ConfidenceVerdict.CANONICAL_WITH_CONFLICT)
+            (field.verdict == ConfidenceVerdict.CONSENSUS || field.verdict == ConfidenceVerdict.CONSENSUS_WITH_CONFLICT)
         ) {
             val serial = field.value as? String
             if (serial != null) {

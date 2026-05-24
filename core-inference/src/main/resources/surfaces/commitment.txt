@@ -19,7 +19,6 @@ What does NOT count:
 
 What goes in the schema:
 
-- `stated_commitment`: one object `{text, topic_or_person}` for the strongest qualifying commitment. `text` is the user's words, near-verbatim.
-- Null when no qualifying commitment is present.
-- `topic_or_person`: null if the user did not name one.
-- Do not add `entry_id`; storage injects the current entry id after convergence.
+- `commitment:` line — the strongest qualifying commitment, near-verbatim in the user's words.
+- Omit the `commitment:` line when no qualifying commitment is present.
+- `commitment_topic:` line — the named object or person; omit if the user did not name one.

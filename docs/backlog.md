@@ -65,7 +65,7 @@ stt-N : conditional on stop-and-test outcome (see PRD §"Build philosophy: build
 | `recording-screen-density` | v1.5 | design | **Deferred 2026-05-17 (Story 4.15 triage).** Recording-screen layout (`Screenshot_20260516_220422_Vestige.png`) has ~50% dead vertical space between the chunk progress bar and the `LEVEL · LIVE` audio meter. Active surface during the 30 s record window — functional, just sparse. Reorder is cheap but not demo-blocking | Post-submission polish window |
 | `settings-back-affordance` | v1.5 | design | **Deferred 2026-05-17 (Story 4.15 triage).** Settings ships without an explicit `← BACK` link — only predictive-back gesture exits the surface. Discoverability concern for non-Android-power users; not a 90 s pitch or 5 min walkthrough blocker (judge uses predictive-back or system gesture) | First-run usability data shows users stranded on Settings, or Settings is added to the demo walkthrough script |
 | `mtp-latency-ab` | v1.5 | inference | **Deferred 2026-05-17 — non-gating measurement.** Story 2.15's MTP fore/background latency A/B decides nothing (MTP ships enabled regardless of the ratio per the story's own rule), is not demo-visible, and correctness is already pinned by `LiteRtLmEngineTest`. Measuring needs two invasive builds (no runtime MTP toggle). Pure verification debt — fails the demo-impact test | A v1.5 perf-tuning pass that actually acts on the number, or a `macrobenchmark` module if decode latency becomes a real regression surface |
-| `archetype-template-labeling` | v1.5 | extraction | **Structurally broken on realistic input (traced 2026-05-17).** `TemplateLabeler` only consumes CANONICAL fields; CANONICAL requires ≥2-of-3 lens agreement; the archetype triggers (`energy_descriptor=="crashed"`, `state_shift`, tags `tunnel-exit`/`decision-spiral`/`stuck`/`late-night`) are all inferences only the Inferential lens emits, which resolves to CANDIDATE and is discarded. Every realistic entry falls through to `AUDIT`; the feature only produces a real label when the user speaks the exact internal vocabulary (Literal then also emits it → 2-lens agreement). Code retained but inert; Story 4.16 removed untrusted labels from UI. The Pattern List eyebrow slot currently uses `pattern.kind` and can accept a trusted label again after this redesign. See detail block | A redesigned multi-lens contract: label demoted from canonical pattern-grouping key to a display-only single-lens hint (Inferential-sourced CANDIDATE accepted), superseding the ADR-002 resolver-contract coupling. New ADR required |
+| `archetype-template-labeling` | v1.5 | extraction | **Structurally broken on realistic input (traced 2026-05-17).** `TemplateLabeler` only consumes CONSENSUS fields; CONSENSUS requires ≥2-of-3 lens agreement; the archetype triggers (`energy_descriptor=="crashed"`, `state_shift`, tags `tunnel-exit`/`decision-spiral`/`stuck`/`late-night`) are all inferences only the Inferential lens emits, which resolves to CANDIDATE and is discarded. Every realistic entry falls through to `AUDIT`; the feature only produces a real label when the user speaks the exact internal vocabulary (Literal then also emits it → 2-lens agreement). Code retained but inert; Story 4.16 removed untrusted labels from UI. The Pattern List eyebrow slot currently uses `pattern.kind` and can accept a trusted label again after this redesign. See detail block | A redesigned multi-lens contract: label demoted from canonical pattern-grouping key to a display-only single-lens hint (Inferential-sourced CANDIDATE accepted), superseding the ADR-002 resolver-contract coupling. New ADR required |
 | `labeler-prompt-tightening` | v1.5 | extraction | **Added 2026-05-20.** `TemplateLabeler.DECISION_SPIRAL_TAGS` and `AFTERMATH_TAGS` were widened beyond the AGENTS.md "narrow on purpose. STT-C tag stability will expand or trim this list with measured evidence" rule so demo labels would land pre-STT-C. The real fix is prompt tightening so the lens output emits the existing narrow vocabulary instead of compensating in the post-processor. `PatternDetector` also silently filters `TemplateLabel.AUDIT` from template-recurrence + tag-pair detection because AUDIT is the fallback bucket, not a pattern shape — that filter is correct, but it masks the prompt quality. | STT-C tag-stability measurement, or a Phase-6 prompt revision pass with `DemoExamplesSmokeTest` proving the narrow vocabulary survives extraction |
 
 ## Detail blocks
@@ -76,9 +76,9 @@ Only items where the index row drops information needed to disambiguate.
 
 ```
 root-cause (2026-05-17, traced through ConvergenceResolver.kt + TemplateLabeler.kt):
-  - TemplateLabeler.isLoadBearing() accepts only CANONICAL / CANONICAL_WITH_CONFLICT;
+  - TemplateLabeler.isLoadBearing() accepts only CONSENSUS / CONSENSUS_WITH_CONFLICT;
     CANDIDATE and AMBIGUOUS fields are discarded before label selection.
-  - DefaultConvergenceResolver mints CANONICAL only on >=2-of-3 lens agreement
+  - DefaultConvergenceResolver mints CONSENSUS only on >=2-of-3 lens agreement
     (one lens alone -> CANDIDATE; no majority -> AMBIGUOUS).
   - The three lenses cannot corroborate an archetype signal from natural language:
       Literal     — strict, "null is a real answer"; emits the trigger token only
@@ -90,7 +90,7 @@ root-cause (2026-05-17, traced through ConvergenceResolver.kt + TemplateLabeler.
   - Net: every archetype trigger is single-lens (Inferential) -> CANDIDATE ->
     discarded -> entry falls through to AUDIT. A non-AUDIT label only appears
     when the user speaks the exact internal vocabulary, at which point Literal
-    ALSO emits it and 2-lens agreement mints CANONICAL. That is the
+    ALSO emits it and 2-lens agreement mints CONSENSUS. That is the
     keyword-stuffed fixture, not a real test.
 why-not-an-easy-fix:
   Accepting Inferential-sourced CANDIDATE in TemplateLabeler is ~3 lines but

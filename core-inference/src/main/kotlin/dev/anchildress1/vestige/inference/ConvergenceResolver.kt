@@ -8,9 +8,9 @@ import dev.anchildress1.vestige.model.ResolvedField
 
 /**
  * Reduces 0–3 surviving [LensExtraction]s to one [ResolvedExtraction] per the convergence rules:
- * ≥2 lenses agree → CANONICAL; only one lens populates → CANDIDATE; lenses disagree →
+ * ≥2 lenses agree → CONSENSUS; only one lens populates → CANDIDATE; lenses disagree →
  * AMBIGUOUS (null value, noted); Skeptical flags conflict even on agreement →
- * CANONICAL_WITH_CONFLICT.
+ * CONSENSUS_WITH_CONFLICT.
  */
 fun interface ConvergenceResolver {
     fun resolve(extractions: List<LensExtraction>): ResolvedExtraction
@@ -130,7 +130,7 @@ class DefaultConvergenceResolver : ConvergenceResolver {
 
     /**
      * Tone is an inferential read, not a vote: the Inferential lens wins the [VOCABULARY_KEY] word
-     * outright. Literal/Skeptical can only corroborate (raising the verdict to CANONICAL when they
+     * outright. Literal/Skeptical can only corroborate (raising the verdict to CONSENSUS when they
      * agree) — they never override Inferential's word. Falls back to whichever lens did name a tone
      * when Inferential abstained, and only AMBIGUOUS when no lens named one at all.
      */
@@ -144,9 +144,9 @@ class DefaultConvergenceResolver : ConvergenceResolver {
             ?: words.firstOrNull()
             ?: return ambiguousField(matchingFlags)
         // No Skeptical flag kind binds to vocabulary (SkepticalFlagKinds.SCHEMA_BINDING), so there
-        // is no CANONICAL_WITH_CONFLICT path here — corroboration is the only lift on the verdict.
+        // is no CONSENSUS_WITH_CONFLICT path here — corroboration is the only lift on the verdict.
         val agreement = words.count { it.second == chosen.second }
-        val verdict = if (agreement >= MAJORITY_THRESHOLD) ConfidenceVerdict.CANONICAL else ConfidenceVerdict.CANDIDATE
+        val verdict = if (agreement >= MAJORITY_THRESHOLD) ConfidenceVerdict.CONSENSUS else ConfidenceVerdict.CANDIDATE
         return ResolvedField(value = chosen.second, verdict = verdict, flags = matchingFlags, sourceLens = chosen.first)
     }
 
@@ -159,7 +159,7 @@ class DefaultConvergenceResolver : ConvergenceResolver {
         return if (majority != null) {
             val majorityValue = majority.value.first()
             val verdict =
-                if (matchingFlags.isEmpty()) ConfidenceVerdict.CANONICAL else ConfidenceVerdict.CANONICAL_WITH_CONFLICT
+                if (matchingFlags.isEmpty()) ConfidenceVerdict.CONSENSUS else ConfidenceVerdict.CONSENSUS_WITH_CONFLICT
             ResolvedField(value = majorityValue, verdict = verdict, flags = matchingFlags)
         } else {
             ResolvedField(
@@ -188,9 +188,9 @@ class DefaultConvergenceResolver : ConvergenceResolver {
             agreedEntryId = entryIds.singleOrNull(),
         )
         val verdict = if (matchingFlags.isEmpty()) {
-            ConfidenceVerdict.CANONICAL
+            ConfidenceVerdict.CONSENSUS
         } else {
-            ConfidenceVerdict.CANONICAL_WITH_CONFLICT
+            ConfidenceVerdict.CONSENSUS_WITH_CONFLICT
         }
         return ResolvedField(value = patched, verdict = verdict, flags = matchingFlags)
     }
@@ -250,7 +250,7 @@ class DefaultConvergenceResolver : ConvergenceResolver {
         }
         return if (orderedConsensus.isNotEmpty()) {
             val verdict =
-                if (matchingFlags.isEmpty()) ConfidenceVerdict.CANONICAL else ConfidenceVerdict.CANONICAL_WITH_CONFLICT
+                if (matchingFlags.isEmpty()) ConfidenceVerdict.CONSENSUS else ConfidenceVerdict.CONSENSUS_WITH_CONFLICT
             ResolvedField(value = orderedConsensus, verdict = verdict, flags = matchingFlags)
         } else {
             // No tag reaches majority — surface Literal's strongest tag as a candidate so the P0

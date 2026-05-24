@@ -1,10 +1,10 @@
 <h1 align="center">Vestige</h1>
 
-<p align="center"><em>On-device cognition tracker for ADHD-flavored adults. Anti-sycophant, behavioral, private.</em></p>
+<p align="center"><em>A brain tracker that won't blow smoke up your ass. Gemma 4, Android, fully local.</em></p>
 
 <p align="center">
   Built for the <a href="https://dev.to/devteam/join-the-gemma-4-challenge-3000-prize-pool-for-ten-winners-23in">Gemma 4 Challenge</a> — submission category: Build with Gemma 4.<br/>
-  Canonical product spec lives under <a href="docs"><code>docs/</code></a>; see <a href="AGENTS.md"><code>AGENTS.md</code></a> for AI agent rules.
+  Canonical product spec lives under <a href="./docs/"><code>docs/</code></a>; see <a href="AGENTS.md"><code>AGENTS.md</code></a> for AI agent rules.
 </p>
 
 <p align="center">
@@ -49,7 +49,7 @@ The positioning is deliberate: cognition tracker, not journal app. Patterns are 
 
 ## Status
 
-The full loop is implemented and runs on-device: voice / typed capture → Gemma 4 E4B → single-pass 3-lens extraction → convergence resolver → ObjectBox, with deterministic pattern detection and EmbeddingGemma hybrid retrieval (STT-E passed — see [`backlog.md`](docs/backlog.md) §`embeddings-fallback`). Entry Detail surfaces the model's actual work: the three-lens read, the picked archetype, the tone word, and a collapsible raw per-lens model-output view. Capture, history, pattern list + detail, settings, model-status, and onboarding model-download are all built against the canonical spec under [`docs/`](docs). Pattern lifecycle is Skip / Drop / Restart — closure is model-detected only (v1.5, see [`backlog.md`](docs/backlog.md) §`pattern-auto-close`). The active phase is on-device prompt tuning against a seeded demo corpus; risk through phases 1–3 was managed via five stop-and-test points (STT-A–E). Screen-flow diagrams: [`docs/diagrams/user-flows.md`](docs/diagrams/user-flows.md).
+The full loop is implemented and runs on-device: voice / typed capture → Gemma 4 E4B → single-pass 3-lens extraction → convergence resolver → ObjectBox, with deterministic pattern detection and EmbeddingGemma hybrid retrieval (STT-E passed — see [`backlog.md`](docs/backlog.md) §`embeddings-fallback`). Entry Detail surfaces the model's actual work: the three-lens read, the picked archetype, the tone word, and a collapsible raw per-lens model-output view. Capture, history, pattern list + detail, settings, model-status, and onboarding model-download are all built against the canonical spec under [`./docs/`](docs). Pattern lifecycle is Skip / Drop / Restart — closure is model-detected only (v1.5, see [`backlog.md`](docs/backlog.md) §`pattern-auto-close`). The active phase is on-device prompt tuning against a seeded demo corpus; risk through phases 1–3 was managed via five stop-and-test points (STT-A–E). Screen-flow diagrams: [`docs/diagrams/user-flows.md`](docs/diagrams/user-flows.md).
 
 ---
 
@@ -58,7 +58,7 @@ The full loop is implemented and runs on-device: voice / typed capture → Gemma
 | Feature | What it does |
 |---|---|
 | Voice capture | `AudioRecord` → Gemma 4 E4B native audio modality. No third-party STT. Audio bytes discarded after inference. |
-| Multi-lens extraction | Each entry runs 3 lens passes (Literal / Inferential / Skeptical), each covering all 5 surfaces in one call; a convergence resolver votes every field canonical / candidate / ambiguous — tags, archetype, stated commitment, recurrence, and tone word. See [ADR-002](docs/adrs/ADR-002-multi-lens-extraction-pattern.md). |
+| Multi-lens extraction | Each entry runs 3 lens passes (Literal / Inferential / Skeptical), each covering all 5 surfaces in one call; a convergence resolver votes every field consensus / candidate / ambiguous — tags, archetype, stated commitment, recurrence, and tone word. See [ADR-002](docs/adrs/ADR-002-multi-lens-extraction-pattern.md). |
 | Model transparency | Entry Detail exposes the model's actual work — the picked archetype, the per-lens read, the resolved field grid, and a collapsible raw per-lens model-output block. Nothing is hidden behind a score. |
 | Tone & vocab drift | The Inferential lens names a one-word tone per entry; recurring related tone words surface as an embedding cluster (EmbeddingGemma) so drift is visible over time. |
 | Three personas | Witness / Hardass / Editor — tone-only variants. They do not fork extraction logic. |
@@ -83,7 +83,7 @@ The full loop is implemented and runs on-device: voice / typed capture → Gemma
 
 ## Architecture
 
-Four-module split with manual constructor injection through a single `AppContainer` ([ADR-001 §Q1–Q2](docs/adrs/ADR-001-stack-and-build-infra.md)). Foreground call returns transcription + persona-flavored follow-up fast; the 3-lens convergence pass runs in the background and writes canonical / candidate / ambiguous fields when it lands.
+Four-module split with manual constructor injection through a single `AppContainer` ([ADR-001 §Q1–Q2](docs/adrs/ADR-001-stack-and-build-infra.md)). Foreground call returns transcription + persona-flavored follow-up fast; the 3-lens convergence pass runs in the background and writes consensus / candidate / ambiguous fields when it lands.
 
 ```mermaid
 flowchart TB
@@ -95,7 +95,7 @@ flowchart TB
       FG["ForegroundInference<br/>fast transcription + persona follow-up"]
       BG["BackgroundExtractionWorker<br/>3 lens passes × 5 surfaces"]
       Gemma[("Gemma 4 E4B<br/>via LiteRT-LM")]
-      Resolver["Convergence Resolver<br/>canonical · candidate · ambiguous"]
+      Resolver["Convergence Resolver<br/>consensus · candidate · ambiguous"]
       ObjectBox[("ObjectBox<br/>entries · tags · patterns · vectors")]
       Export[("Export renderer<br/>markdown + JSON snapshot")]
       Patterns["Pattern Detection<br/>5 primitives · 90-day window"]

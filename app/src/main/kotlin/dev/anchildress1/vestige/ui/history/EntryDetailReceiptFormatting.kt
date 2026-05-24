@@ -56,9 +56,9 @@ internal fun buildLensReads(json: String?, hasConflict: Boolean = false): List<L
 
 /**
  * Skeptical reads red only when its flag produced a real conflict in convergence — a
- * CANONICAL_WITH_CONFLICT verdict, surfaced as [hasConflict] — not when its raw tag list merely
+ * CONSENSUS_WITH_CONFLICT verdict, surfaced as [hasConflict] — not when its raw tag list merely
  * differs while the lenses still agree on the resolved value. This keeps the lens colour
- * consistent with the card's CANONICAL / CONFLICT status. Literal / Inferential carry no flags.
+ * consistent with the card's CONSENSUS / CONFLICT status. Literal / Inferential carry no flags.
  */
 private fun lensTone(lens: Lens, receipt: EntryLensReceipt?, hasConflict: Boolean): LensTone {
     if (receipt == null) return LensTone.AMBIGUOUS
@@ -67,10 +67,14 @@ private fun lensTone(lens: Lens, receipt: EntryLensReceipt?, hasConflict: Boolea
 }
 
 @Suppress("LongMethod", "CyclomaticComplexMethod")
-internal fun buildFieldRows(entity: EntryEntity): List<FieldRow> {
+internal fun buildFieldRows(entity: EntryEntity, repeatTitle: String?): List<FieldRow> {
     val confidence = parseConfidence(entity.confidenceJson)
     val receipts = EntryLensReceiptJson.decodeOrNull(entity.lensReceiptsJson)
-    val tagsText = entity.tags.map { it.name }.sorted().take(DISPLAY_LIMIT).joinToString(", ").ifBlank { DASH }
+    // Promoted (CONSENSUS) tags persist on the entity; a CANDIDATE-only read isn't promoted, so fall
+    // back to the lens receipts to show the candidate tags rather than a verdict tone with no value.
+    val tagsText = entity.tags.map { it.name }.sorted().take(DISPLAY_LIMIT).joinToString(", ")
+        .ifBlank { receipts?.let { firstReceiptFieldDisplay(it, KEY_TAGS) } ?: DASH }
+    val behaviorTone = if (tagsText == DASH) LensTone.AMBIGUOUS else confidence[KEY_TAGS].toTone()
     val topLevelCommitment = commitmentText(entity.statedCommitmentJson)
     val commitmentValue = topLevelCommitment
         ?: receipts?.let { firstReceiptFieldDisplay(it, KEY_COMMITMENT) }
@@ -81,15 +85,16 @@ internal fun buildFieldRows(entity: EntryEntity): List<FieldRow> {
         commitmentValue != DASH -> receiptFieldTone(receipts, KEY_COMMITMENT)
         else -> confidence[KEY_COMMITMENT].toTone()
     }
-    val topLevelRecurrence = entity.recurrenceLink?.takeIf(String::isNotBlank)
-    val recurrenceValue = topLevelRecurrence
-        ?: receipts?.let { firstReceiptPatternId(it) }
-        ?: DASH
-    val recurrenceTone = when {
-        receipts == null -> confidence[KEY_RECURRENCE].toTone()
-        topLevelRecurrence != null -> confidence[KEY_RECURRENCE].toTone()
-        recurrenceValue != DASH -> receiptPatternTone(receipts)
-        else -> LensTone.AMBIGUOUS
+    // REPEAT shows the H2 title of the pattern the model validated via recurrence_link (resolved by
+    // the caller from the stored pattern_id). Deterministic detection only proposes the candidate;
+    // the model decides viability, so a blank here means "no confirmed recurrence", not "no data".
+    val recurrenceValue = repeatTitle?.takeIf(String::isNotBlank) ?: DASH
+    // Tone follows the recurrence_link verdict, not the mere presence of a title: a single-lens
+    // CANDIDATE link must not render as fully-corroborated CONSENSUS.
+    val recurrenceTone = if (recurrenceValue == DASH) {
+        LensTone.AMBIGUOUS
+    } else {
+        confidence[KEY_RECURRENCE].toTone(fallback = LensTone.CANDIDATE)
     }
     val resolvedVocab = entity.vocabularyWord?.trim()?.takeIf { it.isNotBlank() && it.lowercase() !in NULLISH_VOCAB }
     val receiptVocab = receipts?.let(::distinctReceiptVocab).orEmpty()
@@ -110,7 +115,7 @@ internal fun buildFieldRows(entity: EntryEntity): List<FieldRow> {
         FieldRow(
             label = "BEHAVIOR",
             value = tagsText,
-            tone = confidence[KEY_TAGS].toTone(),
+            tone = behaviorTone,
         ),
         FieldRow(
             label = "VOCAB",
@@ -133,10 +138,10 @@ internal fun buildFieldRows(entity: EntryEntity): List<FieldRow> {
 internal fun lensStatus(confidenceJson: String): String {
     val verdicts = parseConfidence(confidenceJson).values
     return when {
-        verdicts.any { it == ConfidenceVerdict.CANONICAL_WITH_CONFLICT } ->
+        verdicts.any { it == ConfidenceVerdict.CONSENSUS_WITH_CONFLICT } ->
             EntryDetailCopy.THREE_LENS_STATUS_CONFLICT
 
-        verdicts.any { it == ConfidenceVerdict.CANONICAL } -> EntryDetailCopy.THREE_LENS_STATUS_CANONICAL
+        verdicts.any { it == ConfidenceVerdict.CONSENSUS } -> EntryDetailCopy.THREE_LENS_STATUS_CONSENSUS
 
         verdicts.any { it == ConfidenceVerdict.CANDIDATE } -> EntryDetailCopy.THREE_LENS_STATUS_CANDIDATE
 
@@ -167,7 +172,7 @@ private fun EntryLensReceipt.summaryText(): String = when {
 
 private fun EntryLensReceipt.baseTone(): LensTone = when {
     !extracted -> LensTone.AMBIGUOUS
-    fields.values.any { displayValue(it) != null } -> LensTone.CANONICAL
+    fields.values.any { displayValue(it) != null } -> LensTone.CONSENSUS
     else -> LensTone.AMBIGUOUS
 }
 
@@ -186,35 +191,12 @@ private fun commitmentText(json: String?): String? {
 private fun firstReceiptFieldDisplay(receipts: List<EntryLensReceipt>, key: String): String? =
     receipts.asSequence().mapNotNull { displayValue(it.fields[key]) }.firstOrNull()
 
-private fun firstReceiptPatternId(receipts: List<EntryLensReceipt>): String? = receipts.asSequence()
-    .mapNotNull { it.fields[KEY_RECURRENCE] as? String }
-    .map(String::trim)
-    .firstOrNull { it.matches(PATTERN_ID_REGEX) }
-
 private fun receiptFieldTone(receipts: List<EntryLensReceipt>, key: String): LensTone {
     val supported = receipts.count { displayValue(it.fields[key]) != null }
     return when {
         receipts.any { displayValue(it.fields[key]) != null && it.flags.isNotEmpty() } -> LensTone.CONFLICT
-        supported >= 2 -> LensTone.CANONICAL
+        supported >= 2 -> LensTone.CONSENSUS
         supported == 1 -> LensTone.CANDIDATE
-        else -> LensTone.AMBIGUOUS
-    }
-}
-
-private fun receiptPatternTone(receipts: List<EntryLensReceipt>): LensTone {
-    val supported = receipts.count {
-        (it.fields[KEY_RECURRENCE] as? String)?.trim()?.matches(PATTERN_ID_REGEX) == true
-    }
-    return when {
-        receipts.any {
-            (it.fields[KEY_RECURRENCE] as? String)?.trim()?.matches(PATTERN_ID_REGEX) == true &&
-                it.flags.isNotEmpty()
-        } -> LensTone.CONFLICT
-
-        supported >= 2 -> LensTone.CANONICAL
-
-        supported == 1 -> LensTone.CANDIDATE
-
         else -> LensTone.AMBIGUOUS
     }
 }
@@ -245,8 +227,8 @@ private fun displayValue(value: Any?): String? = when (value) {
 }
 
 private fun ConfidenceVerdict?.toTone(fallback: LensTone = LensTone.AMBIGUOUS): LensTone = when (this) {
-    ConfidenceVerdict.CANONICAL -> LensTone.CANONICAL
-    ConfidenceVerdict.CANONICAL_WITH_CONFLICT -> LensTone.CONFLICT
+    ConfidenceVerdict.CONSENSUS -> LensTone.CONSENSUS
+    ConfidenceVerdict.CONSENSUS_WITH_CONFLICT -> LensTone.CONFLICT
     ConfidenceVerdict.CANDIDATE -> LensTone.CANDIDATE
     ConfidenceVerdict.AMBIGUOUS -> LensTone.AMBIGUOUS
     null -> fallback
@@ -261,7 +243,6 @@ private const val KEY_VOCABULARY = "vocabulary"
 private val NULLISH_VOCAB = setOf("null", "none", "n/a", "nil")
 private const val KEY_COMMITMENT_TEXT = "text"
 private const val KEY_TOPIC_OR_PERSON = "topic_or_person"
-private val PATTERN_ID_REGEX = Regex("[0-9a-f]{64}")
 private val SUMMARY_KEYS = listOf(
     KEY_TAGS,
     KEY_COMMITMENT,

@@ -13,7 +13,7 @@ Each `observations[]` object has exactly these keys:
 - `evidence`: one of `"commitment-flag"`, `"volunteered-context"`, `"theme-noticing"`. The kind
   of signal the observation surfaces.
 - `fields`: array of structured-field names from the resolved extraction (`tags`,
-  `recurrence_link`, `stated_commitment`). Empty array `[]` if the observation cites only
+  `recurrence_kind`, `stated_commitment`). Empty array `[]` if the observation cites only
   `entry_text` without a structured-field source.
 
 Hard rules:

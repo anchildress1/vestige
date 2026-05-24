@@ -66,6 +66,7 @@ fun PatternsHost( // NOSONAR kotlin:S107
         openEntryId != null -> PatternEntryDetailRoute(
             entryId = openEntryId!!,
             entryStore = entryStore,
+            patternStore = patternStore,
             zoneId = zoneId,
             highlightOnOpen = highlightEntryOnOpen,
             onClose = {
@@ -131,6 +132,7 @@ fun PatternsHost( // NOSONAR kotlin:S107
 private fun PatternEntryDetailRoute( // NOSONAR kotlin:S107
     entryId: Long,
     entryStore: EntryStore,
+    patternStore: PatternStore,
     zoneId: ZoneId,
     highlightOnOpen: Boolean,
     onClose: () -> Unit,
@@ -143,6 +145,7 @@ private fun PatternEntryDetailRoute( // NOSONAR kotlin:S107
     EntryDetailHost(
         entryId = entryId,
         entryStore = entryStore,
+        patternStore = patternStore,
         zoneId = zoneId,
         onBack = onClose,
         onNewEntry = onNewEntry,

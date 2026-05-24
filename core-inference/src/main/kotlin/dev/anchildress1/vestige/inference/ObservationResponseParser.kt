@@ -47,11 +47,10 @@ internal object ObservationResponseParser {
 
     private const val TAG = "VestigeObservationParse"
     private const val MAX_OBSERVATIONS = 2
-    private val KNOWN_FIELDS = setOf(
-        "tags",
-        "recurrence_link",
-        "stated_commitment",
-    )
+
+    // The only field entries we discard are literal nullish junk — everything else the model
+    // surfaces is kept verbatim. No pre-known field whitelist: observations are model reads.
+    private val NULLISH_FIELD_TOKENS = setOf("null", "none", "n/a", "nil")
 
     fun parse(raw: String): List<EntryObservation>? {
         val root = findFirstParseableObject(raw) ?: return reject("no-json-object")
@@ -101,22 +100,16 @@ internal object ObservationResponseParser {
             ?: return skip("unknown-evidence:len=${evidenceSerial.length}")
         if (evidence == ObservationEvidence.PATTERN_CALLOUT) return skip("pattern-callout-from-model")
 
+        // Keep the model's field provenance verbatim — it should surface unique/relevant
+        // references, not match a pre-known whitelist. Drop only blanks and literal nullish junk.
         val fields = (obj.opt("fields") as? JSONArray)?.let { arr ->
-            (0 until arr.length()).mapNotNull { idx -> (arr.opt(idx) as? String)?.trim()?.takeIf { it.isNotEmpty() } }
+            (0 until arr.length()).mapNotNull { idx ->
+                (arr.opt(idx) as? String)?.trim()
+                    ?.takeIf { it.isNotEmpty() && it.lowercase() !in NULLISH_FIELD_TOKENS }
+            }
         } ?: emptyList()
-        if (!fieldsAreValid(evidence, fields)) return skip("invalid-fields:${evidence.serial}")
 
         return EntryObservation(text = text, evidence = evidence, fields = fields)
-    }
-
-    private fun fieldsAreValid(evidence: ObservationEvidence, fields: List<String>): Boolean = when (evidence) {
-        ObservationEvidence.COMMITMENT_FLAG -> fields == listOf("stated_commitment")
-
-        ObservationEvidence.VOLUNTEERED_CONTEXT,
-        ObservationEvidence.THEME_NOTICING,
-        -> fields.all { it in KNOWN_FIELDS }
-
-        ObservationEvidence.PATTERN_CALLOUT -> false
     }
 
     private fun findFirstParseableObject(raw: String): JSONObject? {

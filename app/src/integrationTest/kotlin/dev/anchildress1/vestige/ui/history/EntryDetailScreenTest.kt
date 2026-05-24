@@ -28,6 +28,7 @@ import dev.anchildress1.vestige.model.ResolvedField
 import dev.anchildress1.vestige.model.TemplateLabel
 import dev.anchildress1.vestige.storage.EntryEntity
 import dev.anchildress1.vestige.storage.EntryStore
+import dev.anchildress1.vestige.storage.PatternStore
 import dev.anchildress1.vestige.storage.closeAfterCleaningThreadResources
 import dev.anchildress1.vestige.testing.cleanupObjectBoxTempRoot
 import dev.anchildress1.vestige.testing.newInMemoryObjectBoxDirectory
@@ -125,7 +126,7 @@ class EntryDetailScreenTest {
                 mapOf(
                     "tags" to ResolvedField(
                         listOf("meeting", "battery-died"),
-                        ConfidenceVerdict.CANONICAL_WITH_CONFLICT,
+                        ConfidenceVerdict.CONSENSUS_WITH_CONFLICT,
                     ),
                 ),
             ),
@@ -183,7 +184,7 @@ class EntryDetailScreenTest {
         val id = entryStore.createPendingEntry("drained to the bone by mid-morning", FIXTURE_INSTANT)
         entryStore.completeEntry(
             id,
-            ResolvedExtraction(mapOf("vocabulary" to ResolvedField("drained", ConfidenceVerdict.CANONICAL))),
+            ResolvedExtraction(mapOf("vocabulary" to ResolvedField("drained", ConfidenceVerdict.CONSENSUS))),
             null,
             lensReceipts = listOf(
                 EntryLensReceipt(lens = Lens.LITERAL, extracted = true, fields = mapOf("vocabulary" to "drained")),
@@ -218,7 +219,7 @@ class EntryDetailScreenTest {
         entryStore.completeEntry(
             id,
             ResolvedExtraction(
-                mapOf("tags" to ResolvedField(listOf("battery-died"), ConfidenceVerdict.CANONICAL)),
+                mapOf("tags" to ResolvedField(listOf("battery-died"), ConfidenceVerdict.CONSENSUS)),
             ),
             null,
             lensReceipts = listOf(
@@ -412,6 +413,7 @@ class EntryDetailScreenTest {
     private fun buildVm(id: Long) = EntryDetailViewModel(
         entryId = id,
         entryStore = entryStore,
+        patternStore = PatternStore(boxStore),
         zoneId = zone,
         ioDispatcher = dispatcher,
     )
@@ -431,7 +433,7 @@ class EntryDetailScreenTest {
         mapOf(
             "tags" to dev.anchildress1.vestige.model.ResolvedField(
                 tags.toList(),
-                dev.anchildress1.vestige.model.ConfidenceVerdict.CANONICAL,
+                dev.anchildress1.vestige.model.ConfidenceVerdict.CONSENSUS,
             ),
         ),
     )

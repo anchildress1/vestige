@@ -45,7 +45,7 @@ The user waits only for step 1. Steps 2, 3, 4 are background; steps 3 and 4 are 
 | User taps `I'm done.` | Foreground | `{transcription, follow_up}` call | Yes | Surface error in capture; entry not persisted unless transcription returns |
 | Foreground returns | Persist + enqueue | `EntryStore.createPendingEntry` → schedule background lens worker | No | Persist before scheduling; markdown is source of truth |
 | Background lens N completes (×3) | Background analytics | Per-lens parse + `LensResult` accumulation | No | Per-lens parse-fail → no-opinion; ADR-002 contract intact |
-| All 3 lenses complete | Background analytics | `ConvergenceResolver` writes canonical / candidate / ambiguous fields | No | ADR-001 §Q3 retry recovery |
+| All 3 lenses complete | Background analytics | `ConvergenceResolver` writes consensus / candidate / ambiguous fields | No | ADR-001 §Q3 retry recovery |
 | `completeEntry` returns | **Background pattern identifier** | Build history slice (see §History Slice Contract); one Gemma call; parse identifier output; upsert patterns | No | On parse-fail / timeout / model unavailable → fall through to deterministic detector on the same slice |
 | Identifier failure | **Background pattern fallback** | Deterministic detector (ADR-003's rule set) over the same slice | No | Detector failure logged; entry persists without pattern updates; next capture re-triggers the pipeline |
 
@@ -88,7 +88,7 @@ The model returns a JSON list of candidate patterns. Each candidate carries:
 - `kind` — one of the existing `PatternKind` values **or** a model-emitted free-form label (the v1.5 question: do we let the model invent new kinds or constrain it to the enum? Default in this ADR: constrain to the enum; the deterministic enum stays the source of truth for `PatternSignature` content-addressability)
 - `signature` — the structured payload the model uses to derive the `Signature.json` content-addressable hash (preserves the `@ConsistentCopyVisibility` contract from `PatternSignature`)
 - `supporting_entry_ids` — references back to the slice IDs
-- `confidence` — `canonical` / `candidate` / `ambiguous` mirroring ADR-002's verdict ladder
+- `confidence` — `consensus` / `candidate` / `ambiguous` mirroring ADR-002's verdict ladder
 - `suggested_title` — model-written title (replaces `PatternTitleGenerator`'s standalone call)
 - `suggested_callout` — model-written callout text (replaces `PatternAnalysisGenerator`'s temporal-only callout pass; now general-purpose)
 
@@ -100,7 +100,7 @@ The output flows through the existing `PatternStore.upsert` path. Lifecycle stat
 - Empty list → no pattern updates (legitimate "nothing identified" — not a failure)
 - Unknown `kind` → that candidate dropped; remaining candidates proceed
 - `supporting_entry_ids` referencing entries outside the slice → that candidate dropped
-- Confidence outside the canonical/candidate/ambiguous ladder → that candidate dropped
+- Confidence outside the consensus/candidate/ambiguous ladder → that candidate dropped
 
 ---
 

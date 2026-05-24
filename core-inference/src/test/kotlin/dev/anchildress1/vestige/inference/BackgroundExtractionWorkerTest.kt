@@ -32,7 +32,7 @@ class BackgroundExtractionWorkerTest {
     private val request = BackgroundExtractionRequest(entryText = "user words", capturedAt = capturedAt)
     private val resolved = ResolvedExtraction(
         fields = mapOf(
-            "tags" to ResolvedField(listOf("crashed"), ConfidenceVerdict.CANONICAL),
+            "tags" to ResolvedField(listOf("crashed"), ConfidenceVerdict.CONSENSUS),
         ),
     )
 
@@ -50,24 +50,13 @@ class BackgroundExtractionWorkerTest {
         )
     }
 
-    private fun compactSuccessJson(): String = """
-        {"tags":["sink"],"stated_commitment":null,"recurrence_link":null,"recurrence_kind":null,"flags":[]}
-    """.trimIndent()
-
-    private fun malformedSkepticalJson(): String = """
-        {
-        "tags": ["sink", "noon", "1pm", "three-hours-later"]
-        "stated_commitment": null
-        "recurrence_link": null
-        "recurrence_kind": null
-        "flags": [
-        {
-        "kind": "commitment-without-anchor",
-        "snippet": "completely fine by 1pm i was gone not tired exactly",
-        "note": "The user describes a state of being fine then immediately negates it with 'not tired exactly'."
-        }
-        ]
-        }
+    private fun proseWrappedSkepticalLines(): String = """
+        Here is my skeptical read of the entry.
+        tags: sink, noon, 1pm, three-hours-later
+        flag: commitment-without-anchor | completely fine by 1pm i was gone not tired exactly | ${
+        "The user describes a state of being fine then immediately negates it with 'not tired exactly'."
+    }
+        done.
     """.trimIndent()
 
     private fun skepticalFlag(): String =
@@ -224,12 +213,12 @@ class BackgroundExtractionWorkerTest {
     }
 
     @Test
-    fun `worker parses malformed skeptical near-json without burning retries`() = runTest {
+    fun `worker parses prose-wrapped skeptical lines without burning retries`() = runTest {
         val engine = mockk<LiteRtLmEngine>()
-        every { engine.streamText("prompt-for-LITERAL", any()) } returns flowOf(compactSuccessJson())
+        every { engine.streamText("prompt-for-LITERAL", any()) } returns flowOf("tags: sink")
         every { engine.streamText("prompt-for-INFERENTIAL", any()) } returns
-            flowOf(compactSuccessJson())
-        every { engine.streamText("prompt-for-SKEPTICAL", any()) } returns flowOf(malformedSkepticalJson())
+            flowOf("tags: sink")
+        every { engine.streamText("prompt-for-SKEPTICAL", any()) } returns flowOf(proseWrappedSkepticalLines())
         val listener = RecordingListener()
 
         val result = BackgroundExtractionWorker(
@@ -404,8 +393,8 @@ class BackgroundExtractionWorkerTest {
         // template_label overrides it.
         val modelLabeled = ResolvedExtraction(
             fields = mapOf(
-                "tags" to ResolvedField(listOf("crashed"), ConfidenceVerdict.CANONICAL),
-                "template_label" to ResolvedField("decision-spiral", ConfidenceVerdict.CANONICAL),
+                "tags" to ResolvedField(listOf("crashed"), ConfidenceVerdict.CONSENSUS),
+                "template_label" to ResolvedField("decision-spiral", ConfidenceVerdict.CONSENSUS),
             ),
         )
 
@@ -442,8 +431,8 @@ class BackgroundExtractionWorkerTest {
         every { engine.streamText(any(), any()) } returns flowOf("raw-ok")
         val badLabel = ResolvedExtraction(
             fields = mapOf(
-                "tags" to ResolvedField(listOf("crashed"), ConfidenceVerdict.CANONICAL),
-                "template_label" to ResolvedField("not-a-real-archetype", ConfidenceVerdict.CANONICAL),
+                "tags" to ResolvedField(listOf("crashed"), ConfidenceVerdict.CONSENSUS),
+                "template_label" to ResolvedField("not-a-real-archetype", ConfidenceVerdict.CONSENSUS),
             ),
         )
 
@@ -463,7 +452,7 @@ class BackgroundExtractionWorkerTest {
         val engine = mockk<LiteRtLmEngine>()
         every { engine.streamText(any(), any()) } returns flowOf("raw-ok")
         val lateNightResolved = ResolvedExtraction(
-            fields = mapOf("tags" to ResolvedField(listOf("late-night"), ConfidenceVerdict.CANONICAL)),
+            fields = mapOf("tags" to ResolvedField(listOf("late-night"), ConfidenceVerdict.CONSENSUS)),
         )
         val parser: (Lens, String) -> LensExtraction? = { lens, _ -> extraction(lens) }
         // 08:00 UTC = 03:00 Chicago (inside goblin) but 08:00 UTC zone (outside goblin). Asserting

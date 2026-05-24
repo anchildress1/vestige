@@ -23,7 +23,7 @@ to the shipped gpu-skep run (`docs/stt-results/stt-d-2026-05-12-gpu-skep.md`).
 ## Verdict
 
 **Pass.** 11/15 (73%) meaningful divergence, 4 Skeptical flags fired with quoted evidence,
-A4 + B2 reachable `canonical_with_conflict`, 14/15 full 3-of-3 parse (B3 partial), 0 timeouts.
+A4 + B2 reachable `consensus_with_conflict`, 14/15 full 3-of-3 parse (B3 partial), 0 timeouts.
 Output verdict identical to the prior gpu-skep archive entry-by-entry.
 
 ## Per-entry summary
@@ -33,11 +33,11 @@ Output verdict identical to the prior gpu-skep archive entry-by-entry.
 | A1 | 3/3 | 30.6 | ✅ | `tags` + `state-behavior-mismatch` flag |
 | A2 | 3/3 | 24.7 | ❌ | — |
 | A3 | 3/3 | 31.6 | ✅ | `tags` + `energy_descriptor` + INF-only `energy_descriptor` |
-| **A4** | 3/3 | 32.1 | ✅ | **`vocabulary-contradiction` flag only — `canonical_with_conflict` eligible** |
+| **A4** | 3/3 | 32.1 | ✅ | **`vocabulary-contradiction` flag only — `consensus_with_conflict` eligible** |
 | A5 | 3/3 | 30.7 | ❌ | — |
 | A6 | 3/3 | 26.0 | ✅ | `tags` + `state_shift` |
 | B1 | 3/3 | 29.7 | ✅ | `tags` |
-| **B2** | 3/3 | 39.7 | ✅ | **`commitment-without-anchor` flag only — `canonical_with_conflict` eligible** |
+| **B2** | 3/3 | 39.7 | ✅ | **`commitment-without-anchor` flag only — `consensus_with_conflict` eligible** |
 | B3 | 2/3 | 35.5 | ❌ | partial parse |
 | C1 | 3/3 | 35.6 | ✅ | `tags` + `unsupported-recurrence` flag |
 | C2 | 3/3 | 33.1 | ✅ | `tags` |
@@ -62,7 +62,7 @@ Mean latency: 32.8 s. Min 24.7 s, max 44.0 s.
 | Factor | Cut | Result |
 |---|---|---|
 | 1. Meaningful divergence ≥ 50% | 50% | 73% ✅ |
-| 2. `canonical_with_conflict` reachable ≥ 2 | 2 | A4 + B2 = 2 ✅ |
+| 2. `consensus_with_conflict` reachable ≥ 2 | 2 | A4 + B2 = 2 ✅ |
 | 3. Parse stability ≥ 90% lens-calls, 0 timeouts | 90% / 0 | 97.8% (44/45), 0 ✅ |
 | 4. Run-to-run consistency | see rerun2 | rerun2 below ✅ |
 

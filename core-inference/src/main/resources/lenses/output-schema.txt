@@ -1,28 +1,29 @@
-## Output schema
+## Output format
 
-Return one JSON object. No prose outside the JSON, no commentary, no markdown fences.
+Return plain text lines, one field per line, as `key: value`. No JSON, no braces, no brackets,
+no markdown, no prose before or after. Omit a line entirely to mean "none" — never write the
+word "null".
 
-Required keys:
+Lines:
 
-- `tags`: array of lowercase kebab-case tokens, each at most two words / one hyphen (e.g. `standup`, `battery-died`).
-- `template_label`: pick exactly one serial naming the entry's archetype:
-  - `aftermath` — a cognitive or energy crash, especially after a named event
-  - `tunnel-exit` — surfacing from deep focus or hyperfocus
-  - `stalled` — stuck, task paralysis, resistance, can't start
-  - `decision-spiral` — looping on the same choice without resolving
-  - `goblin-hours` — awake and spinning between midnight and 5am
-  - `audit` — catch-all when no archetype dominates
-- `stated_commitment`: object `{text, topic_or_person}` or `null`.
-- `vocabulary`: a single lowercase word for the entry's overall tone — the user's own word for how it felt when they name one, else the closest single word. Never a phrase or clause. `null` when the entry carries no discernible tone.
-- `flags`: array of `{kind, snippet, note}` or `[]` — only the Skeptical lens populates this; the other two always return `[]`.
+- `template_label: <serial>` — required, always present. Exactly one of: aftermath, tunnel-exit,
+  stalled, decision-spiral, goblin-hours, audit. Pick `audit` when no archetype dominates.
+- `tags: <comma-separated tokens>` — lowercase kebab-case, each at most two words / one hyphen
+  (e.g. `standup`, `battery-died`). About one tag per 20 words; the user's own words, key points only.
+- `vocabulary: <one lowercase word>` — the entry's overall tone, the user's own word for how it
+  felt when they name one, else the closest single word. One word, never a phrase. Omit if none.
+- `commitment: <near-verbatim text>` — the strongest explicit statement of intent. Omit if none.
+- `commitment_topic: <named object or person>` — omit if the user named none.
+- `recurrence_kind: exact | partial` — emit only when this entry genuinely repeats a behavior or
+  state described in the RETRIEVED HISTORY (`exact` = same activity + same context, `partial` = same
+  behavior, different context). Omit when nothing recurs or only the clock time coincides. Never
+  emit a pattern id — the app owns that. See the Recurrence surface.
+- `flag: <kind> | <snippet> | <note>` — Skeptical lens only; one line per flag, omit if none.
+  `kind` is one of the documented kinds; `snippet` is a verbatim excerpt; `note` is one short
+  sentence. The other two lenses never emit a `flag:` line.
 
-Hard rules:
+Rules:
 
-- Strings use straight quotes. No trailing commas. No comments inside the JSON.
-- Use `null` for missing data, not the string "null", and not omission.
-- Do not invent fields. The keys above are the entire schema for this call.
-- `template_label` is required and never null — pick the closest archetype, or `audit` when none dominates.
-- Each tag is a single word marking a key point. Emit about one tag per 20 words of the entry — pick the key points, not every noun.
-- When the entry contains specific anchors, return at least one substantive field. If the user names any activity, object, place, time anchor, state word, repeated term, or commitment, surface at least one of them.
-- Empty arrays and nulls do not count as substantive output.
-- When the read is sparse, anchor it with explicit `tags` taken from the user's own words rather than leaving the object empty by default.
+- One field per line. No blank values — omit the line instead.
+- When the entry names any activity, object, place, time anchor, state word, repeated term, or
+  commitment, surface at least one as a `tags` token rather than returning nothing substantive.

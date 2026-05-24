@@ -12,7 +12,8 @@ import java.time.ZoneId
 
 object DebugPatternSeeder {
 
-    // The full corpus is seeded — DEMO_ENTRIES + backlog narrative + vocab-drift (incl. positives).
+    // The full corpus is seeded — DEMO_ENTRIES + backlog narrative + vocab-drift (incl. positives) +
+    // the artifact-recurrence negative control + the demo-dread live-line matcher.
     // Exposed so the on-device tuning harness and tests share the exact count.
     val SEED_COUNT: Int get() = corpus().size
 
@@ -48,11 +49,42 @@ object DebugPatternSeeder {
         }
     }
 
-    // [seed] sorts the merged corpus by timestamp before persisting, so the three source lists are
-    // just groupings — the timeline the demo shows is the interleaved chronological order, not the
-    // list order. Timestamps are hand-spread so same-archetype entries rarely land back-to-back.
+    // [seed] sorts the merged corpus by timestamp before persisting, so the cluster lists below are
+    // just groupings — the timeline the demo shows is the interleaved chronological order.
     private fun corpus(): List<SeedEntry> =
-        DEMO_ENTRIES + backlogNarrative() + vocabDriftEntries() + artifactRecurrenceEntries()
+        DEMO_ENTRIES + backlogNarrative() + vocabDriftEntries() + artifactRecurrenceEntries() + demoDreadEntries()
+
+    /**
+     * Demo-dread cluster — three priors sharing a `demo` tag + `dread` tone so a live typed "I hate
+     * demos" capture joins the content cluster on stage. Time-independent (the live entry's timestamp
+     * can't be predicted), so the match is vocab/tag, not temporal. Best-effort: depends on the model
+     * tagging `demo` and reading the tone as dread consistently. Not part of [DEMO_ENTRIES] — appended
+     * on top of the full corpus.
+     */
+    @Suppress("MagicNumber")
+    private fun demoDreadEntries(): List<SeedEntry> = listOf(
+        SeedEntry(
+            "Demo's back on the calendar and my stomach knew before I did. It's the screen-share moment " +
+                "that gets me — that beat where everyone's staring at the spinner and so am I, just waiting " +
+                "to be perceived. I'll dread it for three days and call that preparation.",
+            localTs("2026-04-25T10:00:00"),
+            16_000L,
+        ),
+        SeedEntry(
+            "Another demo Thursday. I practiced it out loud to an empty room four times and I'll still go " +
+                "blank the second a real face is on the call. Demos turn me into a customer-service hold " +
+                "message. The dread is the part nobody warns you about.",
+            localTs("2026-05-02T10:00:00"),
+            16_000L,
+        ),
+        SeedEntry(
+            "Demo tomorrow and I know this material in my sleep, for all the good that does. None of it " +
+                "holds up once people are actually watching. The dread's been sitting on my chest since " +
+                "Monday — honestly the demo itself will feel like a break from dreading it.",
+            localTs("2026-05-09T10:00:00"),
+            16_000L,
+        ),
+    )
 
     /**
      * Archetype spread — aftermath ×5 (clears the ≥3 template-recurrence floor), decision-spiral ×2,
@@ -63,8 +95,8 @@ object DebugPatternSeeder {
      * keyword-free so the run measures whether the lenses + labeler recover the archetype from
      * natural resistance/paralysis language rather than a planted phrase.
      *
-     * Four standup/meeting crashes are timed to consecutive Tuesday afternoons (05-05, 05-12, 05-19,
-     * 05-26) so they share a weekday + time-of-day slot. The weekday-time-block pattern forms once the
+     * Four standup/meeting crashes are timed to consecutive past Tuesday afternoons (04-28, 05-05,
+     * 05-12, 05-19) so they share a weekday + time-of-day slot. The weekday-time-block pattern forms once the
      * third lands; the fourth then extracts WITH that pattern as a candidate, so the model validates a
      * genuine recurrence (`recurrence_link` set → REPEAT shows the pattern title) instead of only
      * surfacing it in the observation read. [artifactRecurrenceEntries] is the negative control — a
@@ -98,7 +130,7 @@ object DebugPatternSeeder {
             "Tuesday again, and again the meeting flattened me. Twenty minutes in I was done " +
                 "and the rest of the afternoon went nowhere. " +
                 "I'm starting to think it's the meeting itself, not me.",
-            localTs("2026-05-26T14:00:00"),
+            localTs("2026-04-28T14:00:00"),
             20_000L,
         ),
         SeedEntry(
@@ -208,7 +240,7 @@ object DebugPatternSeeder {
         ),
         SeedEntry(
             "Done for the day. Might try that new ramen place tonight if it isn't packed.",
-            localTs("2026-05-28T18:30:00"),
+            localTs("2026-04-30T18:30:00"),
             9_000L,
         ),
     )

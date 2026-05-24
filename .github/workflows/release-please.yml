@@ -12,7 +12,10 @@ jobs:
   release:
     name: Release Please
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 10
+    outputs:
+      release_created: ${{ steps.release.outputs.release_created }}
+      tag_name: ${{ steps.release.outputs.tag_name }}
     permissions:
       contents: write
       pull-requests: write
@@ -25,25 +28,33 @@ jobs:
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
 
+  publish:
+    name: Publish release APK
+    needs: release
+    if: needs.release.outputs.release_created == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment:
+      name: production
+      url: ${{ github.server_url }}/${{ github.repository }}/releases/tag/${{ needs.release.outputs.tag_name }}
+    permissions:
+      contents: write
+    steps:
       - name: Checkout release source
-        if: steps.release.outputs.release_created == 'true'
         uses: actions/checkout@v6.0.2
         with:
-          ref: ${{ steps.release.outputs.tag_name }}
+          ref: ${{ needs.release.outputs.tag_name }}
 
       - name: Set up JDK 25
-        if: steps.release.outputs.release_created == 'true'
         uses: actions/setup-java@v5.2.0
         with:
           distribution: temurin
           java-version: '25'
 
       - name: Set up Gradle
-        if: steps.release.outputs.release_created == 'true'
         uses: gradle/actions/setup-gradle@50e97c2cd7a37755bbfafc9c5b7cafaece252f6e # v6.1.0
 
       - name: Configure release signing
-        if: steps.release.outputs.release_created == 'true'
         env:
           VESTIGE_RELEASE_KEYSTORE_BASE64: ${{ secrets.VESTIGE_RELEASE_KEYSTORE_BASE64 }}
           VESTIGE_RELEASE_STORE_PASSWORD: ${{ secrets.VESTIGE_RELEASE_STORE_PASSWORD }}
@@ -76,15 +87,13 @@ jobs:
           } > keystore.properties
 
       - name: Assemble release APK
-        if: steps.release.outputs.release_created == 'true'
         env:
           ENV: prod
         run: make assemble
 
       - name: Prepare release assets
-        if: steps.release.outputs.release_created == 'true'
         env:
-          RELEASE_TAG: ${{ steps.release.outputs.tag_name }}
+          RELEASE_TAG: ${{ needs.release.outputs.tag_name }}
         run: |
           set -euo pipefail
 
@@ -92,12 +101,11 @@ jobs:
           cp app/build/outputs/apk/release/app-release.apk "release-assets/vestige-${RELEASE_TAG}.apk"
 
       - name: Clean up release signing material
-        if: ${{ always() && steps.release.outputs.release_created == 'true' }}
+        if: always()
         run: rm -f keystore.properties "$RUNNER_TEMP/vestige-release.jks"
 
       - name: Upload release APK asset
-        if: steps.release.outputs.release_created == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
-          RELEASE_TAG: ${{ steps.release.outputs.tag_name }}
+          RELEASE_TAG: ${{ needs.release.outputs.tag_name }}
         run: gh release upload "$RELEASE_TAG" "release-assets/vestige-${RELEASE_TAG}.apk"

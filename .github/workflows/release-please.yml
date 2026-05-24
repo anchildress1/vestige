@@ -19,7 +19,80 @@ jobs:
       issues: write
     steps:
       - name: Run Release Please
+        id: release
         uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5.0.0
         with:
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
+
+      - name: Checkout release source
+        if: steps.release.outputs.release_created == 'true'
+        uses: actions/checkout@v6.0.2
+        with:
+          ref: ${{ steps.release.outputs.tag_name }}
+
+      - name: Set up JDK 25
+        if: steps.release.outputs.release_created == 'true'
+        uses: actions/setup-java@v5.2.0
+        with:
+          distribution: temurin
+          java-version: '25'
+
+      - name: Set up Gradle
+        if: steps.release.outputs.release_created == 'true'
+        uses: gradle/actions/setup-gradle@50e97c2cd7a37755bbfafc9c5b7cafaece252f6e # v6.1.0
+
+      - name: Configure release signing
+        if: steps.release.outputs.release_created == 'true'
+        env:
+          VESTIGE_RELEASE_KEYSTORE_BASE64: ${{ secrets.VESTIGE_RELEASE_KEYSTORE_BASE64 }}
+          VESTIGE_RELEASE_STORE_PASSWORD: ${{ secrets.VESTIGE_RELEASE_STORE_PASSWORD }}
+          VESTIGE_RELEASE_KEY_ALIAS: ${{ secrets.VESTIGE_RELEASE_KEY_ALIAS }}
+          VESTIGE_RELEASE_KEY_PASSWORD: ${{ secrets.VESTIGE_RELEASE_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+
+          for name in \
+            VESTIGE_RELEASE_KEYSTORE_BASE64 \
+            VESTIGE_RELEASE_STORE_PASSWORD \
+            VESTIGE_RELEASE_KEY_ALIAS \
+            VESTIGE_RELEASE_KEY_PASSWORD
+          do
+            if [ -z "${!name}" ]; then
+              echo "::error title=Missing release signing secret::$name is required before publishing release APK assets"
+              exit 1
+            fi
+          done
+
+          keystore_path="$RUNNER_TEMP/vestige-release.jks"
+          printf '%s' "$VESTIGE_RELEASE_KEYSTORE_BASE64" | base64 --decode > "$keystore_path"
+          chmod 600 "$keystore_path"
+
+          {
+            printf 'storeFile=%s\n' "$keystore_path"
+            printf 'storePassword=%s\n' "$VESTIGE_RELEASE_STORE_PASSWORD"
+            printf 'keyAlias=%s\n' "$VESTIGE_RELEASE_KEY_ALIAS"
+            printf 'keyPassword=%s\n' "$VESTIGE_RELEASE_KEY_PASSWORD"
+          } > keystore.properties
+
+      - name: Assemble release APKs
+        if: steps.release.outputs.release_created == 'true'
+        run: ./gradlew :app:assembleRelease :app:assembleDebug
+
+      - name: Prepare release assets
+        if: steps.release.outputs.release_created == 'true'
+        env:
+          RELEASE_TAG: ${{ steps.release.outputs.tag_name }}
+        run: |
+          set -euo pipefail
+
+          mkdir -p release-assets
+          cp app/build/outputs/apk/release/app-release.apk "release-assets/vestige-${RELEASE_TAG}.apk"
+          cp app/build/outputs/apk/debug/app-debug.apk "release-assets/vestige-${RELEASE_TAG}-debug-suite-seeded.apk"
+
+      - name: Upload release APK assets
+        if: steps.release.outputs.release_created == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ steps.release.outputs.tag_name }}
+        run: gh release upload "$RELEASE_TAG" release-assets/*.apk --clobber

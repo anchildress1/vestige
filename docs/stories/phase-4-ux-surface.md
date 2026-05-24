@@ -22,7 +22,7 @@ Wrap the app in a coherent, dark, atmospheric UX that meets the 10-second judge 
 - [x] Onboarding 3-screen hub flow per `ux-copy.md` §Onboarding works end-to-end on a fresh install on the reference S24 Ultra. _(Verified on-device.)_
 - [x] Model download UX handles Wi-Fi gating, real progress, retry on stall/failure, and survives app restart mid-download. _(Story 4.3 — ETA + stall watchdog + corrupt re-pull + cheap `probe()`; on-device restart-mid-download still a manual-check.)_
 - [x] Persistent Local Model Status surface exists and is reachable from app shell or settings; status is accurate. _(Story 4.4 — state-aware AppTop pill + Model Status screen + re-download/delete; also linked from Settings (4.9).)_
-- [ ] Capture screen polished per `poc/capture-*-final.png` — `AppTop` shell with `GEMMA 4 · LOCAL ONLY` ↔ `GEMMA 4 · LISTENING LIVE` swap (pill stays lime in both states; coral is REC button + destructive only — see `design-guidelines.md` §"Capture Screen / AppTop status pill"), big REC record button (idle: outline; recording: coral fill + pulsing `StatusDot` + live timer + `TickRule` 30s countdown), `sbBars` audio meter primitive while recording, transcription appearing post-inference on the GPU-only runtime path, entry transcript with muted user transcription and the foreground follow-up. The Mist `MistHero` / `AudioMeter` halo composition is **not** built — superseded by ADR-011.
+- [x] Capture screen polished per `poc/capture-*-final.png` — `AppTop` shell with `GEMMA 4 · LOCAL ONLY` ↔ `GEMMA 4 · LISTENING LIVE` swap (pill stays lime in both states; coral is REC button + destructive only — see `design-guidelines.md` §"Capture Screen / AppTop status pill"), big REC record button (idle: outline; recording: coral fill + pulsing `StatusDot` + live timer + `TickRule` 30s countdown), `sbBars` audio meter primitive while recording, transcription appearing post-inference on the GPU-only runtime path, entry transcript with muted user transcription and the foreground follow-up. The Mist `MistHero` / `AudioMeter` halo composition is **not** built — superseded by ADR-011.
 - [ ] History list, Entry Detail, Pattern List, Pattern Detail, and Vocab Drift are all polished and navigable per the canonical `poc/*-final.png` screenshots. The screenshots own layout; runtime work wires actual stored/model data into those slots.
 - [x] Settings screen P0 scope works: persona default, export all entries (markdown + stored-data snapshot zip), delete all data, model status / re-download / delete. _(Story 4.9 — SAF zip export, typed-DELETE wipe, Model-section delegates to the 4.4 screen.)_
 - [x] Empty states across major screens use the locked microcopy from `ux-copy.md` §"Empty states". _(Story 4.10 — History-empty a11y fixed, pattern-detail no-sources copy reconciled, entry-detail zero-obs verified; peek/filter-empty deferred with the unshipped peek/chips.)_
@@ -241,7 +241,7 @@ Checked bullets above are the historical record that the Mist tokens shipped to 
 **Done when:**
 - [x] / ~~Pattern list header includes the `Roast me` button per `ux-copy.md` §"Pattern List / Action button"~~ _(Deferred to v2 with Story 4.14; no dead button ships in v1.)_
 - [x] / ~~Filter chips: `All · Active · Skipped · Closed · Dropped` per `ux-copy.md` §"Pattern List / Filter chips" + `spec-pattern-action-buttons.md` §P1.1.~~ _(Deferred to v2; v1 remains chronological/state sections without chip filtering.)_
-- [ ] Empty states per `ux-copy.md` §"Pattern List / Empty states" + `spec-pattern-action-buttons.md` §P1.2:
+- [x] Empty states per `ux-copy.md` §"Pattern List / Empty states" + `spec-pattern-action-buttons.md` §P1.2:
   - [x] Fewer than 10 entries (Day 1): eyebrow `VESTIGES · 0 ENTRIES · 30 DAYS`, header `Nothing to read yet.`, body `Patterns surface after 10 entries. Keep recording.` (`NO_ENTRIES` reason fires at `countCompleted() < 10`; structured eyebrow/header/body via `emptyCopyFor`; eyebrow count parameterized — live count, not literal 0 — per the design-guidelines live-count intent. Band a11y: merged `contentDescription` + `liveRegion`, no click action.)
   - [x] Has entries, no pattern detected: header `No repeating pattern detected.`, body `The model looked. Nothing came back twice.` (`NO_PATTERNS` reason, no eyebrow.)
   - [x] / ~~Active tab empty (all snoozed or closed): eyebrow `ACTIVE`, header `Nothing active.`, sub `{N} snoozed · {N} closed`~~ _(Deferred with filter chips to v2.)_
@@ -429,7 +429,7 @@ Checked bullets above are the historical record that the Mist tokens shipped to 
   - `Delete all data` action keeps its coral fill on the destructive confirm (already correct); the surface row uses `Pill` outlined-coral, not bare coral text.
   - `Source code` / `v1.0.0` / `Polyform Shield 1.0.0` stay as plain `P` rows — no `Pill` here.
 
-- [ ] **Model Status screen brought into the system:**
+- [x] **Model Status screen brought into the system:**
   - `AppTop` shell at the top (covered by the first bullet).
   - Title uses `EyebrowE` `MODEL STATUS` + `DisplayBig` `MODEL STATUS.` per the Settings pattern.
   - `Re-download model` action becomes a `Pill` outlined-lime; `Delete model` becomes `Pill` outlined-coral. Current build ships them as two differently-sized bordered rectangles — neither matches a documented primitive.

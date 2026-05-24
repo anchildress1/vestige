@@ -31,13 +31,13 @@ Lock the demo. Curate the sample data set the recording will use, write the demo
 **As** the demo recorder, **I need** a curated sample data set on the reference device that produces the demo's pattern callouts and persona moments reliably, **so that** dry runs and the final recording show the magic moments instead of random output.
 
 **Done when:**
-- [ ] Sample entries are seeded into the reference device's ObjectBox via a dev-only data loader (not via the onboarding flow — the user is presumed to have already onboarded).
-- [ ] The seeded entries collectively trigger at least one polished cross-entry pattern (e.g., the canonical "Tuesday meetings → Aftermath, 4 of 12 entries" example from `design-guidelines.md` §"Pattern card / Example").
-- [ ] If STT-E passed and embeddings shipped, the seeded data includes vocabulary-drift entries so the embedding advantage is observable in the technical walkthrough.
-- [ ] Sample entries respect the brand: behavioral vocabulary, not feelings vocabulary; the model's responses on these entries land Witness/Hardass/Editor tones cleanly.
-- [ ] Loader is idempotent — running it twice produces the same final state, not duplicate entries.
-- [ ] Loader is **not shipped in release builds**. Per `AGENTS.md` and the scope rule, demo data is dev-only; the submitted APK has a fresh install state.
-- [ ] Sample data narrative is documented in `sample-data-scenarios.md` §"Demo set" (a new section, distinct from the STT validation scenarios).
+- [x] Sample entries are seeded into the reference device's ObjectBox via a dev-only data loader (not via the onboarding flow — the user is presumed to have already onboarded).
+- [x] The seeded entries collectively trigger at least one polished cross-entry pattern (e.g., the canonical "Tuesday meetings → Aftermath, 4 of 12 entries" example from `design-guidelines.md` §"Pattern card / Example").
+- [x] If STT-E passed and embeddings shipped, the seeded data includes vocabulary-drift entries so the embedding advantage is observable in the technical walkthrough.
+- [x] Sample entries respect the brand: behavioral vocabulary, not feelings vocabulary; the model's responses on these entries land Witness/Hardass/Editor tones cleanly.
+- [x] Loader is idempotent — running it twice produces the same final state, not duplicate entries.
+- [x] Loader is **not shipped in release builds**. Per `AGENTS.md` and the scope rule, demo data is dev-only; the submitted APK has a fresh install state.
+- [x] Sample data narrative is documented in `sample-data-scenarios.md` §"Demo set" (a new section, distinct from the STT validation scenarios).
 
 **Notes / risks:** Don't seed the sample data into the demo APK as fake user history. Judges installing the APK should see `Nothing on file.` per `ux-copy.md` §"Empty States". The demo recording uses a separate dev build with seeded data; the submission is the clean release build.
 
@@ -92,7 +92,7 @@ Lock the demo. Curate the sample data set the recording will use, write the demo
 
 **Done when:**
 - [ ] `sample-data-scenarios.md` has a "Demo set" section listing each seeded entry's: ID, text, template label, tags, vocabulary, the expected per-entry observation, and the cross-entry pattern it contributes to.
-- [ ] The expected output for each demo beat is written down (e.g., "Tap Roast me on the patterns list → Witness produces a roast that mentions Tuesday meetings and the body-count line").
+- [x] The expected output for each demo beat is written down (e.g., "Tap Roast me on the patterns list → Witness produces a roast that mentions Tuesday meetings and the body-count line").
 - [ ] If any expected output isn't reliably reproducible after Story 5.3's dry runs, the entry is reworked or the beat is adjusted in `demo-storyboard.md`.
 - [ ] An ADR addendum is **NOT** required — sample data is a build artifact, not an architecture decision. But the demo storyboard's pattern outcomes inform Phase 6's recording shotlist (Story 6.1).
 

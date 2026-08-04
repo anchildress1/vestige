@@ -9,7 +9,7 @@ plugins {
 
 android {
     namespace = "dev.anchildress1.vestige.storage"
-    compileSdk = 36
+    compileSdk = 37
 
     defaultConfig {
         minSdk = 31

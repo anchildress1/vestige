@@ -7,7 +7,7 @@ plugins {
 
 android {
     namespace = "dev.anchildress1.vestige.inference"
-    compileSdk = 36
+    compileSdk = 37
 
     defaultConfig {
         minSdk = 31
@@ -28,6 +28,9 @@ android {
     }
 
     testOptions {
+        // Pinned below compileSdk: Robolectric 4.16.1 tops out at SDK 36 (SDK 37 support ships
+        // in 4.17-beta-1). Test manifests otherwise default targetSdkVersion to compileSdk.
+        targetSdk = 36
         unitTests {
             isIncludeAndroidResources = true
             isReturnDefaultValues = true

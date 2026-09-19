@@ -36,7 +36,7 @@ val appVersionCode = appVersionName.split(".").let { (major, minor, patch) ->
 
 android {
     namespace = "dev.anchildress1.vestige"
-    compileSdk = 36
+    compileSdk = 37
 
     defaultConfig {
         applicationId = "dev.anchildress1.vestige"

@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.0.1](https://github.com/anchildress1/vestige/compare/v1.0.0...v1.0.1) (2026-09-19)
+
+
+### Bug Fixes
+
+* **ci:** unblock dependabot dependency bump (AGP 9.3.1, androidx.core 1.19.0, protobuf-javalite 4.35.1) ([#78](https://github.com/anchildress1/vestige/issues/78)) ([e909ebc](https://github.com/anchildress1/vestige/commit/e909ebc65c1a3d48040ce0971e3ad79e9e1df0ca))
+
 ## 1.0.0 (2026-05-24)
 
 
